@@ -1,0 +1,5 @@
+export const SOCIAL_PRIMARY_TEST_ID = 'social-primary-test-id'
+export const SOCIAL_SECONDARY_TEST_ID = 'social-secondary-test-id'
+export const WEB3_PRIMARY_TEST_ID = 'web3-primary-test-id'
+export const WEB3_SECONDARY_TEST_ID = 'web3-secondary-test-id'
+export const SHOW_MORE_BUTTON_TEST_ID = 'show-more-button-test-id'

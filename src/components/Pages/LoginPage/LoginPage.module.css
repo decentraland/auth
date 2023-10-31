@@ -1,0 +1,48 @@
+.main {
+  display: flex;
+  flex-direction: row;
+  height: 100%;
+}
+
+.left {
+  width: 50%;
+  background-color: black;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.connection {
+  max-width: 500px;
+}
+
+.right {
+  display: flex;
+  flex-direction: row;
+  align-items: end;
+  justify-content: center;
+  width: 50%;
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-image: linear-gradient(to bottom, transparent, black), url('../../../assets/images/join.webp');
+}
+
+.footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 96px;
+  font-size: 18px;
+  width: 100%;
+  align-items: center;
+}
+
+.footer > p {
+  color: white;
+}
+
+.footer a {
+  color: white;
+  text-decoration: underline;
+}

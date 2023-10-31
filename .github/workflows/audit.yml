@@ -1,0 +1,13 @@
+name: Audit
+
+on: [push, pull_request]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@main
+      - name: Install
+        run: npm install --legacy-peer-deps
+      - name: Audit signatures
+        run: npm audit signatures
