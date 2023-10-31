@@ -13,6 +13,10 @@
     "pre-commit:fix:code": "eslint -c .eslintrc.js --fix",
     "prepare": "husky install"
   },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
   "dependencies": {
     "@dcl/ui-env": "^1.4.0",
     "classnames": "^2.3.2",
