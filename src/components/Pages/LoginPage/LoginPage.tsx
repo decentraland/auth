@@ -1,21 +1,58 @@
 // import { isElectron } from '../../../integration/desktop'
-import { useCallback } from 'react'
-import { Connection } from '../../Connection'
+import { useState, useCallback } from 'react'
+import { connection } from 'decentraland-connect'
+import { Connection, ConnectionOptionType } from '../../Connection'
+import { ConnectionModal, ConnectionModalState } from '../../ConnectionModal'
+import { WalletInformationModal } from '../../WalletInformationModal'
+import { getSignature, toConnectionOptionToProviderType } from './utils'
 import styles from './LoginPage.module.css'
 
 export const LoginPage = () => {
-  const handleOnConnect = useCallback(provider => {
-    alert('Connect to ' + provider)
-  }, [])
+  const [connectionModalState, setConnectionModalState] = useState(ConnectionModalState.CONNECTING_WALLET)
+  const [showLearnMore, setShowLearnMore] = useState(false)
+  const [showConnectionModal, setShowConnectionModal] = useState(false)
+  const handleLearnMore = useCallback(() => {
+    setShowLearnMore(!showLearnMore)
+  }, [setShowLearnMore, showLearnMore])
 
-  const handleOnLearMore = useCallback(() => {
-    alert('On learn more')
-  }, [])
+  const handleOnConnect = useCallback(
+    async (connectionType: ConnectionOptionType) => {
+      setShowConnectionModal(true)
+      setConnectionModalState(ConnectionModalState.CONNECTING_WALLET)
+      try {
+        const providerType = toConnectionOptionToProviderType(connectionType)
+        const connectionData = await connection.connect(providerType as any)
+        if (!connectionData.account || !connectionData.provider) {
+          throw new Error('Could not get provider')
+        }
+        setConnectionModalState(ConnectionModalState.WAITING_FOR_SIGNATURE)
+        await getSignature(connectionData.account?.toLowerCase(), connectionData.provider)
+        // Do something after logging in
+        setShowConnectionModal(false)
+      } catch (error) {
+        setConnectionModalState(ConnectionModalState.ERROR)
+      }
+    },
+    [setConnectionModalState, setShowConnectionModal]
+  )
+
+  const handleOnCloseConnectionModal = useCallback(() => {
+    setShowConnectionModal(false)
+    setConnectionModalState(ConnectionModalState.CONNECTING_WALLET)
+  }, [setShowConnectionModal])
 
   return (
     <main className={styles.main}>
+      <WalletInformationModal open={showLearnMore} onClose={handleLearnMore} />
+      <ConnectionModal
+        open={showConnectionModal}
+        state={connectionModalState}
+        onClose={handleOnCloseConnectionModal}
+        onTryAgain={() => console.log('On try again')}
+      />
+
       <div className={styles.left}>
-        <Connection className={styles.connection} onConnect={handleOnConnect} onLearnMore={handleOnLearMore} />
+        <Connection className={styles.connection} onLearnMore={handleLearnMore} onConnect={handleOnConnect} />
       </div>
       <div className={styles.right}>
         {/* {!isElectron() ? ( */}

@@ -1,6 +1,4 @@
-import React from 'react'
 import { act, fireEvent, render } from '@testing-library/react'
-import { ConnectionOptionType, ConnectionProps } from './Connection.types'
 import { Connection } from './Connection'
 import {
   SHOW_MORE_BUTTON_TEST_ID,
@@ -9,6 +7,7 @@ import {
   WEB3_PRIMARY_TEST_ID,
   WEB3_SECONDARY_TEST_ID
 } from './constants'
+import { ConnectionOptionType, ConnectionProps } from './Connection.types'
 
 function renderConnection(props: Partial<ConnectionProps>) {
   return render(
@@ -22,6 +21,7 @@ function renderConnection(props: Partial<ConnectionProps>) {
         socialMessage: element => <>Access secured by {element}</>,
         web3Message: learnMore => <>Curious about wallets? {learnMore('Learn More')}</>
       }}
+      onLearnMore={jest.fn()}
       onConnect={jest.fn()}
       {...props}
     />

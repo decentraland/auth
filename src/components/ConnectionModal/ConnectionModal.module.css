@@ -1,0 +1,32 @@
+.main {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 96px;
+  padding-bottom: 96px;
+}
+
+.errorImage {
+  height: 64px;
+  width: 64px;
+  margin-bottom: 24px;
+}
+
+.message {
+  font-size: 24px;
+  padding-left: 50px;
+  padding-right: 50px;
+  text-align: center;
+}
+
+.loader {
+  padding-top: 96px;
+  padding-bottom: 26px;
+}

@@ -3,7 +3,6 @@ import classNames from 'classnames'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import logoSrc from '../../assets/images/logo.svg'
 import { ConnectionIcon } from './ConnectionIcon'
-import { ConnectionOptionType, ConnectionProps } from './Connection.types'
 import {
   SHOW_MORE_BUTTON_TEST_ID,
   SOCIAL_PRIMARY_TEST_ID,
@@ -11,8 +10,8 @@ import {
   WEB3_PRIMARY_TEST_ID,
   WEB3_SECONDARY_TEST_ID
 } from './constants'
+import { ConnectionOptionType, ConnectionProps } from './Connection.types'
 import styles from './Connection.module.css'
-import { WalletInformationModal } from './WalletInformationModal'
 
 const Primary = ({
   message,
@@ -94,26 +93,22 @@ export const Connection = (props: ConnectionProps): JSX.Element => {
   const {
     i18n = defaultProps.i18n,
     onConnect,
+    onLearnMore,
     socialOptions = defaultProps.socialOptions,
     web3Options = defaultProps.web3Options,
     className
   } = props
 
   const [showMore, setShowMore] = useState(false)
-  const [showLearnMore, setShowLearnMore] = useState(false)
   const handleShowMore = useCallback(() => {
     setShowMore(true)
   }, [])
-  const handleLearnMore = useCallback(() => {
-    setShowLearnMore(!showLearnMore)
-  }, [setShowLearnMore, showLearnMore])
 
   const hasSocialSecondaryOptions = socialOptions && socialOptions.secondary && socialOptions.secondary.length > 0
   const hasWeb3SecondaryOptions = web3Options && web3Options.secondary && web3Options.secondary.length > 0
 
   return (
     <div className={classNames(className, styles.connection)}>
-      <WalletInformationModal open={showLearnMore} onClose={handleLearnMore} />
       <img className={styles.dclLogo} src={logoSrc} alt="Decentraland logo" />
       <div>
         <h1 className={styles.title}>{i18n.title}</h1>
@@ -134,7 +129,7 @@ export const Connection = (props: ConnectionProps): JSX.Element => {
             testId={WEB3_PRIMARY_TEST_ID}
             option={web3Options?.primary}
             message={i18n.web3Message(element => (
-              <span className={styles.primaryLearnMore} role="button" onClick={handleLearnMore}>
+              <span className={styles.primaryLearnMore} role="button" onClick={onLearnMore}>
                 {element}
               </span>
             ))}
