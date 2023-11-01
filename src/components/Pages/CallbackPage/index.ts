@@ -1,1 +1,1 @@
-export * from "./CallbackPage";
+export * from './CallbackPage'
