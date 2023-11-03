@@ -2,12 +2,15 @@ import { ethers } from 'ethers'
 import { AuthIdentity, Authenticator } from '@dcl/crypto'
 import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
 import { getIdentity, storeIdentity } from '@dcl/single-sign-on-client'
-import { Provider } from 'decentraland-connect'
+import { connection, ConnectionResponse, Provider } from 'decentraland-connect'
+import { config } from '../../../modules/config'
 import { ConnectionOptionType } from '../../Connection'
 
 const ONE_MONTH_IN_MINUTES = 60 * 24 * 30
 
-export function toConnectionOptionToProviderType(connectionType: ConnectionOptionType) {
+const MAGIC_KEY = config.get('MAGIC_KEY')
+
+export function fromConnectionOptionToProviderType(connectionType: ConnectionOptionType) {
   switch (connectionType) {
     case ConnectionOptionType.DISCORD:
     case ConnectionOptionType.X:
@@ -17,6 +20,7 @@ export function toConnectionOptionToProviderType(connectionType: ConnectionOptio
     case ConnectionOptionType.WALLET_CONNECT:
     case ConnectionOptionType.METAMASK_MOBILE:
       return ProviderType.WALLET_CONNECT_V2
+    case ConnectionOptionType.COINBASE:
     case ConnectionOptionType.WALLET_LINK:
       return ProviderType.WALLET_LINK
     case ConnectionOptionType.FORTMATIC:
@@ -24,7 +28,6 @@ export function toConnectionOptionToProviderType(connectionType: ConnectionOptio
     case ConnectionOptionType.METAMASK:
     case ConnectionOptionType.DAPPER:
     case ConnectionOptionType.SAMSUNG:
-    case ConnectionOptionType.COINBASE:
       return ProviderType.INJECTED
     default:
       throw new Error('Invalid provider')
@@ -32,7 +35,6 @@ export function toConnectionOptionToProviderType(connectionType: ConnectionOptio
 }
 
 async function generateIdentity(address: string, provider: Provider): Promise<AuthIdentity> {
-  // const eth: ethers.BrowserProvider = await getEth()
   const browserProvider = new ethers.BrowserProvider(provider)
   const account = ethers.Wallet.createRandom()
 
@@ -45,6 +47,33 @@ async function generateIdentity(address: string, provider: Provider): Promise<Au
   const signer = await browserProvider.getSigner()
 
   return Authenticator.initializeAuthChain(address, payload, ONE_MONTH_IN_MINUTES, message => signer.signMessage(message))
+}
+
+export async function connectToProvider(connectionOption: ConnectionOptionType): Promise<ConnectionResponse> {
+  const providerType = fromConnectionOptionToProviderType(connectionOption)
+  if (ProviderType.MAGIC === providerType) {
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    const { Magic } = await import('magic-sdk')
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    const { OAuthExtension } = await import('@magic-ext/oauth')
+    const magic = new Magic(MAGIC_KEY, {
+      extensions: [new OAuthExtension()]
+    })
+
+    const url = new URL(window.location.href)
+    url.pathname = '/callback'
+
+    await magic.oauth.loginWithRedirect({
+      provider: connectionOption,
+      redirectURI: url.href
+    })
+  }
+  const connectionData = await connection.connect(providerType as any)
+  if (!connectionData.account || !connectionData.provider) {
+    throw new Error('Could not get provider')
+  }
+
+  return connectionData
 }
 
 export async function getSignature(address: string, provider: Provider): Promise<AuthIdentity> {

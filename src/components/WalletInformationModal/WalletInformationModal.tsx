@@ -1,4 +1,3 @@
-import React from 'react'
 import classNames from 'classnames'
 import ModalContent from 'semantic-ui-react/dist/commonjs/modules/Modal/ModalContent'
 import { Modal } from 'decentraland-ui/dist/components/Modal/Modal'

@@ -22,6 +22,7 @@
     "@dcl/schemas": "^9.8.0",
     "@dcl/single-sign-on-client": "^0.1.0",
     "@dcl/ui-env": "^1.4.0",
+    "@magic-ext/oauth": "^15.1.1",
     "ajv": "^8.12.0",
     "classnames": "^2.3.2",
     "decentraland-connect": "^5.1.0",

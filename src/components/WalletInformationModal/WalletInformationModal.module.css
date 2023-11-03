@@ -31,9 +31,9 @@
 }
 
 .assets {
-  background-image: url('../../../assets/images/handshine.svg');
+  background-image: url('../../assets/images/handshine.svg');
 }
 
 .login {
-  background-image: url('../../../assets/images/signin.svg');
+  background-image: url('../../assets/images/signin.svg');
 }
