@@ -1,0 +1,39 @@
+.main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  text-align: center;
+}
+
+.title {
+  margin-bottom: 40px;
+}
+
+.info {
+  font-size: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.info + .info {
+  margin-top: 40px;
+}
+
+.infoImage {
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  height: 64px;
+  width: 64px;
+}
+
+.assets {
+  background-image: url('../../assets/images/handshine.svg');
+}
+
+.login {
+  background-image: url('../../assets/images/signin.svg');
+}

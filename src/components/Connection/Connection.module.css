@@ -1,0 +1,100 @@
+/* Main styles */
+
+.connection {
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+}
+
+.dclLogo {
+  height: 40px;
+  width: 40px;
+  margin-bottom: 24px;
+}
+
+.title {
+  margin-bottom: 0px;
+  font-size: 30px;
+}
+
+.subtitle {
+  font-size: 30px;
+  margin-top: 0px;
+  margin-bottom: 56px;
+  font-weight: 400;
+}
+
+/* Primary button styles */
+
+.primaryButton:global(.ui.button.primary) {
+  background-color: #ffffff;
+  color: black;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+}
+
+.primaryImage {
+  margin-right: 7.5px;
+}
+
+.primaryMessage {
+  font-size: 16px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 19px;
+}
+
+.primaryMagic {
+  background-image: url(../../assets/images/magic.svg);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  width: 66px;
+  height: 24px;
+  margin-left: 6px;
+  margin-right: 6px;
+}
+
+.primaryLearnMore {
+  text-decoration: underline;
+  cursor: pointer;
+  margin-left: 6px;
+  margin-right: 6px;
+}
+
+/* Primary option buttons styles */
+
+.primary + .primary {
+  margin-top: 20px;
+}
+
+/* Show more styles */
+
+.showMore {
+  margin-top: 48px;
+}
+
+.showMoreButton:global(.ui.button.secondary) {
+  color: #ffffff;
+}
+
+.showMoreSecondaryOptions {
+  display: grid;
+  grid-auto-columns: 1fr;
+  grid-template-columns: repeat(3, 1fr);
+  column-gap: 15px;
+  row-gap: 15px;
+}
+
+.showMoreSecondaryOptions + .showMoreSecondaryOptions {
+  margin-top: 24px;
+}
+
+/* Not showing? */
+
+.secondaryOptionButton:global(.ui.button.primary) {
+  min-width: 104px;
+}
