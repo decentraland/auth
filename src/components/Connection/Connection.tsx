@@ -78,26 +78,11 @@ const defaultProps = {
     moreOptions: 'Show More Options',
     socialMessage: (element: React.ReactNode) => <>Access secured by {element}</>,
     web3Message: (learnMore: (value: React.ReactNode) => React.ReactNode) => <>Curious about wallets? {learnMore('Learn More')}</>
-  },
-  socialOptions: {
-    primary: ConnectionOptionType.GOOGLE,
-    secondary: [ConnectionOptionType.DISCORD, ConnectionOptionType.APPLE, ConnectionOptionType.X]
-  },
-  web3Options: {
-    primary: ConnectionOptionType.METAMASK,
-    secondary: [ConnectionOptionType.FORTMATIC, ConnectionOptionType.COINBASE, ConnectionOptionType.WALLET_CONNECT]
   }
 }
 
 export const Connection = (props: ConnectionProps): JSX.Element => {
-  const {
-    i18n = defaultProps.i18n,
-    onConnect,
-    onLearnMore,
-    socialOptions = defaultProps.socialOptions,
-    web3Options = defaultProps.web3Options,
-    className
-  } = props
+  const { i18n = defaultProps.i18n, onConnect, onLearnMore, socialOptions, web3Options, className } = props
 
   const [showMore, setShowMore] = useState(false)
   const handleShowMore = useCallback(() => {

@@ -57,7 +57,19 @@ export const LoginPage = () => {
       />
 
       <div className={styles.left}>
-        <Connection className={styles.connection} onLearnMore={handleLearnMore} onConnect={handleOnConnect} />
+        <Connection
+          className={styles.connection}
+          onLearnMore={handleLearnMore}
+          onConnect={handleOnConnect}
+          socialOptions={{
+            primary: ConnectionOptionType.GOOGLE,
+            secondary: [ConnectionOptionType.DISCORD, ConnectionOptionType.APPLE, ConnectionOptionType.X]
+          }}
+          web3Options={{
+            primary: ConnectionOptionType.METAMASK,
+            secondary: [ConnectionOptionType.FORTMATIC, ConnectionOptionType.COINBASE, ConnectionOptionType.WALLET_CONNECT]
+          }}
+        />
       </div>
       <div className={styles.right}>
         {/* {!isElectron() ? ( */}
