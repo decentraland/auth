@@ -1,10 +1,11 @@
 import { useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { ProviderType } from '@dcl/schemas'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
+import { getConfiguration, connection } from 'decentraland-connect'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
-import { config } from '../../../modules/config'
 
-const MAGIC_KEY = config.get('MAGIC_KEY')
+const MAGIC_KEY = getConfiguration().magic.apiKey
 
 export const CallbackPage = () => {
   const redirectTo = useAfterLoginRedirection()
@@ -22,6 +23,8 @@ export const CallbackPage = () => {
 
     try {
       await magic?.oauth.getRedirectResult()
+      // Perform the connection once logged in to store the connection data
+      await connection.connect(ProviderType.MAGIC)
       if (redirectTo) {
         window.location.href = redirectTo
       } else {
@@ -38,5 +41,5 @@ export const CallbackPage = () => {
     logInAndRedirect()
   }, [])
 
-  return <Loader size="huge" />
+  return <Loader active size="huge" />
 }
