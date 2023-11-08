@@ -14,6 +14,8 @@ export const CallbackPage = () => {
   const logInAndRedirect = useCallback(async () => {
     // eslint-disable-next-line @typescript-eslint/naming-convention
     const { Magic } = await import('magic-sdk')
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
     // eslint-disable-next-line @typescript-eslint/naming-convention
     const { OAuthExtension } = await import('@magic-ext/oauth')
 
