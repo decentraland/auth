@@ -1,0 +1,22 @@
+name: Test
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@main
+      - name: Use Node.js 18.x
+        uses: actions/setup-node@v1
+        with:
+          node-version: 18.x
+      - name: Install
+        run: npm install --legacy-peer-deps
+      - name: Test
+        run: npm run test:coverage
+        if: ${{ always() }}
+      # - name: report coverage
+      #   uses: coverallsapp/github-action@main
+      #   with:
+      #     github-token: ${{ secrets.GITHUB_TOKEN }}
