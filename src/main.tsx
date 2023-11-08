@@ -9,12 +9,13 @@ import { DefaultPage } from './components/Pages/DefaultPage'
 import { CallbackPage } from './components/Pages/CallbackPage'
 import 'decentraland-ui/dist/themes/alternative/dark-theme.css'
 import './index.css'
+import { LoginPage } from './components/Pages/LoginPage'
 
 ReactDOM.render(
   <React.StrictMode>
     <BrowserRouter>
       <Routes>
-        <Route path="/login" element={<p>Login page</p>} />
+        <Route path="/login" element={<LoginPage />} />
         <Route path="/callback" element={<CallbackPage />} />
         <Route path="/user" element={<UserPage />} />
         <Route path="*" element={<DefaultPage />} />

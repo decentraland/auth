@@ -1,0 +1,49 @@
+.icon {
+  min-width: 32px;
+  min-height: 32px;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+.icon-metamask-mobile,
+.icon-metamask {
+  background-image: url('../../../assets/images/metamask.svg');
+}
+
+.icon-dapper {
+  background-image: url('../../../assets/images/dapper.png');
+}
+
+.icon-fortmatic {
+  background-image: url('../../../assets/images/fortmatic.png');
+}
+
+.icon-wallet-connect {
+  background-image: url('../../../assets/images/wallet-connect.png');
+}
+
+.icon-samsung-blockchain-wallet {
+  background-image: url('../../../assets/images/samsung-blockchain-wallet.svg');
+}
+
+.icon-coinbase,
+.icon-wallet-link {
+  background-image: url('../../../assets/images/coinbase.svg');
+}
+
+.icon-google {
+  background-image: url('../../../assets/images/google.svg');
+}
+
+.icon-discord {
+  background-image: url('../../../assets/images/discord.svg');
+}
+
+.icon-apple {
+  background-image: url('../../../assets/images/apple.svg');
+}
+
+.icon-x {
+  background-image: url('../../../assets/images/x.svg');
+}
