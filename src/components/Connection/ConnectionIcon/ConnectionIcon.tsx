@@ -1,4 +1,3 @@
-import React from 'react'
 import classNames from 'classnames'
 import Popup from 'semantic-ui-react/dist/commonjs/modules/Popup'
 import { ConnectionIconProps } from './ConnectionIcon.types'

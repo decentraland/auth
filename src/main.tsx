@@ -7,9 +7,9 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { UserPage } from './components/Pages/UserPage'
 import { DefaultPage } from './components/Pages/DefaultPage'
 import { CallbackPage } from './components/Pages/CallbackPage'
+import { LoginPage } from './components/Pages/LoginPage'
 import 'decentraland-ui/dist/themes/alternative/dark-theme.css'
 import './index.css'
-import { LoginPage } from './components/Pages/LoginPage'
 
 ReactDOM.render(
   <React.StrictMode>
