@@ -2,13 +2,12 @@ import { ethers } from 'ethers'
 import { AuthIdentity, Authenticator } from '@dcl/crypto'
 import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
 import { getIdentity, storeIdentity } from '@dcl/single-sign-on-client'
-import { connection, ConnectionResponse, Provider } from 'decentraland-connect'
-import { config } from '../../../modules/config'
+import { connection, getConfiguration, ConnectionResponse, Provider } from 'decentraland-connect'
 import { ConnectionOptionType } from '../../Connection'
 
 const ONE_MONTH_IN_MINUTES = 60 * 24 * 30
 
-const MAGIC_KEY = config.get('MAGIC_KEY')
+const MAGIC_KEY = getConfiguration().magic.apiKey
 
 export function fromConnectionOptionToProviderType(connectionType: ConnectionOptionType) {
   switch (connectionType) {
@@ -54,6 +53,8 @@ export async function connectToProvider(connectionOption: ConnectionOptionType):
   if (ProviderType.MAGIC === providerType) {
     // eslint-disable-next-line @typescript-eslint/naming-convention
     const { Magic } = await import('magic-sdk')
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
     // eslint-disable-next-line @typescript-eslint/naming-convention
     const { OAuthExtension } = await import('@magic-ext/oauth')
     const magic = new Magic(MAGIC_KEY, {

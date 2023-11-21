@@ -24,5 +24,5 @@ export const DefaultPage = () => {
     })
   }, [checkIfConnected, navigate])
 
-  return <Loader size="huge" />
+  return <Loader active size="huge" />
 }
