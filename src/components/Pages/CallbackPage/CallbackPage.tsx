@@ -35,12 +35,15 @@ export const CallbackPage = () => {
       await magic?.oauth.getRedirectResult()
       // Perform the connection once logged in to store the connection data
       setIsLoading(false)
-      getUserSignature()
+      await getUserSignature()
+      // Store the signature using the SSO client
+      // TODO
 
       if (redirectTo) {
         window.location.href = redirectTo
       } else {
         // Navigate to user or to any other site
+        // TODO: Navigate to the landing page.
         navigate('/user')
       }
     } catch (error) {

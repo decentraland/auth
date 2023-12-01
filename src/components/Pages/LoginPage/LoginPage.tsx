@@ -25,8 +25,10 @@ export const LoginPage = () => {
       setConnectionModalState(ConnectionModalState.CONNECTING_WALLET)
       try {
         const connectionData = await connectToProvider(connectionType)
+        // This is not reached if Magic is used
         setConnectionModalState(ConnectionModalState.WAITING_FOR_SIGNATURE)
         await getSignature(connectionData.account?.toLowerCase() ?? '', connectionData.provider)
+        // TODO: Store the signature using the SSO client
         // Do something after logging in
         if (redirectTo) {
           window.location.href = redirectTo
