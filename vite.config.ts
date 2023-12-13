@@ -1,26 +1,30 @@
 import react from '@vitejs/plugin-react'
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 
 // https://vitejs.dev/config/
-export default defineConfig(({ command }) => ({
-  plugins: [react()],
-  ...(command === 'build'
-    ? {
-        base: '/auth',
-        optimizeDeps: {
-          esbuildOptions: {
-            // Node.js global to browser globalThis
-            define: {
-              global: 'globalThis'
-            }
-          },
-          build: {
-            commonjsOptions: {
-              transformMixedEsModules: true
+export default defineConfig(({ command, mode }) => {
+  const envVariables = loadEnv(mode, process.cwd())
+
+  return {
+    plugins: [react()],
+    ...(command === 'build'
+      ? {
+          base: envVariables.VITE_BASE_URL,
+          optimizeDeps: {
+            esbuildOptions: {
+              // Node.js global to browser globalThis
+              define: {
+                global: 'globalThis'
+              }
             },
-            sourcemap: true
+            build: {
+              commonjsOptions: {
+                transformMixedEsModules: true
+              },
+              sourcemap: true
+            }
           }
         }
-      }
-    : undefined)
-}))
+      : undefined)
+  }
+})
