@@ -14,10 +14,10 @@ function renderConnection(props: Partial<ConnectionProps>) {
     <Connection
       i18n={{
         title: 'Unlock Your Virtual World.',
-        subtitle: 'Access your Web3 Account.',
+        subtitle: 'Access and start exploring.',
         accessWith: option => `Access with ${option}`,
         connectWith: option => `Connect with ${option}`,
-        moreOptions: 'Show More Options',
+        moreOptions: 'More Options',
         socialMessage: element => <>Access secured by {element}</>,
         web3Message: learnMore => <>Curious about wallets? {learnMore('Learn More')}</>
       }}

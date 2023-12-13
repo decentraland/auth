@@ -6,7 +6,7 @@ export default defineConfig(({ command }) => ({
   plugins: [react()],
   ...(command === 'build'
     ? {
-        base: '/profile',
+        base: '/auth',
         optimizeDeps: {
           esbuildOptions: {
             // Node.js global to browser globalThis
