@@ -1,8 +1,8 @@
-import { connection } from 'decentraland-connect'
-import { ethers } from 'ethers'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
+import { ethers } from 'ethers'
 import { Socket, io } from 'socket.io-client'
+import { connection } from 'decentraland-connect'
 
 export const RequestPage = () => {
   const { requestId } = useParams()
