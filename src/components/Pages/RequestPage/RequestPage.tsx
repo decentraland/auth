@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { ethers } from 'ethers'
 import { Socket, io } from 'socket.io-client'
 import { connection } from 'decentraland-connect'
+import { config } from '../../../modules/config'
 
 export const RequestPage = () => {
   const { requestId } = useParams()
@@ -14,8 +15,9 @@ export const RequestPage = () => {
   const reconnect = useCallback(async () => {
     try {
       await connection.tryPreviousConnection()
-      // const socket = io('https://auth-api.decentraland.today', {})
-      const socket = io('http://localhost:8080', {})
+      
+      const authServerUrl = config.get('AUTH_SERVER_URL')
+      const socket = io(authServerUrl, {})
 
       socket.on('connect', () => {
         console.log('socket connected')
