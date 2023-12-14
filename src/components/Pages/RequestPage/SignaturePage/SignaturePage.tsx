@@ -1,7 +1,7 @@
+import { useState } from 'react'
+import { ethers } from 'ethers'
 import { connection } from 'decentraland-connect'
 import { Props, Step } from './SignaturePage.types'
-import { ethers } from 'ethers'
-import { useState } from 'react'
 
 export const SignaturePage = ({ request, socketRef }: Props) => {
   const [step, setStep] = useState<Step>(Step.WAITING_CLICK_ON_SIGN)
