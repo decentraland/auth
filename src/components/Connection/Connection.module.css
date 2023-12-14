@@ -74,11 +74,16 @@
 /* Show more styles */
 
 .showMore {
-  margin-top: 48px;
+  margin-top: 32px;
 }
 
-.showMoreButton:global(.ui.button.secondary) {
-  color: #ffffff;
+.showMoreButton:global(.ui.button.basic) {
+  color: #ffffff !important;
+  font-weight: bold;
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-bottom: 15px;
 }
 
 .showMoreSecondaryOptions {
@@ -94,6 +99,10 @@
 }
 
 /* Not showing? */
+
+.primaryOption {
+  width: 100%;
+}
 
 .secondaryOptionButton:global(.ui.button.primary) {
   min-width: 104px;

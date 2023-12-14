@@ -1,8 +1,9 @@
 import React, { useCallback, useState } from 'react'
 import classNames from 'classnames'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
+import Icon from 'semantic-ui-react/dist/commonjs/elements/Icon/Icon'
 import logoSrc from '../../assets/images/logo.svg'
-import { ConnectionIcon } from './ConnectionIcon'
+import { ConnectionOption } from './ConnectionOption'
 import {
   SHOW_MORE_BUTTON_TEST_ID,
   SOCIAL_PRIMARY_TEST_ID,
@@ -28,17 +29,9 @@ const Primary = ({
 }) => (
   <div className={styles.primary} data-testid={testId}>
     <div className={styles.primaryMessage}>{message}</div>
-    <Button
-      primary
-      size="small"
-      fluid
-      data-testid={`${testId}-button`}
-      className={classNames(styles.primaryButton, styles.primaryOption)}
-      onClick={() => onConnect(option)}
-    >
-      <ConnectionIcon className={styles.primaryImage} type={option} />
+    <ConnectionOption type={option} onClick={onConnect} className={classNames(styles.primaryButton, styles.primaryOption)} testId={testId}>
       {children}
-    </Button>
+    </ConnectionOption>
   </div>
 )
 
@@ -55,16 +48,14 @@ const Secondary = ({
 }) => (
   <div className={styles.showMoreSecondaryOptions} data-testid={testId}>
     {options.map(option => (
-      <Button
-        primary
+      <ConnectionOption
         key={option}
-        size="small"
-        data-testid={`${testId}-${option}-button`}
         className={classNames(styles.primaryButton, styles.secondaryOptionButton)}
-        onClick={() => onConnect(option)}
-      >
-        <ConnectionIcon className="dui-connection-primary__image" showTooltip tooltipPosition={tooltipDirection} type={option} />
-      </Button>
+        showTooltip
+        tooltipPosition={tooltipDirection}
+        type={option}
+        onClick={onConnect}
+      />
     ))}
   </div>
 )
@@ -86,8 +77,8 @@ export const Connection = (props: ConnectionProps): JSX.Element => {
 
   const [showMore, setShowMore] = useState(false)
   const handleShowMore = useCallback(() => {
-    setShowMore(true)
-  }, [])
+    setShowMore(!showMore)
+  }, [showMore])
 
   const hasSocialSecondaryOptions = socialOptions && socialOptions.secondary && socialOptions.secondary.length > 0
   const hasWeb3SecondaryOptions = web3Options && web3Options.secondary && web3Options.secondary.length > 0
@@ -125,37 +116,34 @@ export const Connection = (props: ConnectionProps): JSX.Element => {
       </div>
 
       <div className={styles.showMore}>
-        {!showMore && (hasWeb3SecondaryOptions || hasSocialSecondaryOptions) ? (
+        {(hasWeb3SecondaryOptions || hasSocialSecondaryOptions) && (
           <Button
             data-testid={SHOW_MORE_BUTTON_TEST_ID}
-            inverted
-            secondary
+            basic
             size="medium"
             fluid
             className={styles.showMoreButton}
             onClick={handleShowMore}
           >
             {i18n.moreOptions}
+            <Icon name={showMore ? 'chevron up' : 'chevron down'} />
           </Button>
-        ) : (
-          <>
-            {hasSocialSecondaryOptions ? (
-              <Secondary
-                testId={SOCIAL_SECONDARY_TEST_ID}
-                options={socialOptions.secondary}
-                onConnect={onConnect}
-                tooltipDirection="top center"
-              />
-            ) : null}
-            {hasWeb3SecondaryOptions ? (
-              <Secondary
-                testId={WEB3_SECONDARY_TEST_ID}
-                options={web3Options.secondary}
-                onConnect={onConnect}
-                tooltipDirection="bottom center"
-              />
-            ) : null}
-          </>
+        )}
+        {showMore && hasSocialSecondaryOptions && (
+          <Secondary
+            testId={SOCIAL_SECONDARY_TEST_ID}
+            options={socialOptions.secondary}
+            onConnect={onConnect}
+            tooltipDirection="top center"
+          />
+        )}
+        {showMore && hasWeb3SecondaryOptions && (
+          <Secondary
+            testId={WEB3_SECONDARY_TEST_ID}
+            options={web3Options.secondary}
+            onConnect={onConnect}
+            tooltipDirection="bottom center"
+          />
         )}
       </div>
     </div>

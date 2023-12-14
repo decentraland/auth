@@ -27,7 +27,6 @@ export const LoginPage = () => {
         const connectionData = await connectToProvider(connectionType)
         setConnectionModalState(ConnectionModalState.WAITING_FOR_SIGNATURE)
         await getSignature(connectionData.account?.toLowerCase() ?? '', connectionData.provider)
-        // Do something after logging in
         if (redirectTo) {
           window.location.href = redirectTo
         } else {
@@ -70,20 +69,6 @@ export const LoginPage = () => {
             secondary: [ConnectionOptionType.FORTMATIC, ConnectionOptionType.COINBASE, ConnectionOptionType.WALLET_CONNECT]
           }}
         />
-      </div>
-      <div className={styles.right}>
-        {/* {!isElectron() ? ( */}
-        <div className={styles.footer}>
-          <p>Want better graphics and faster speed?</p>
-
-          <span>
-            👉&nbsp;&nbsp;
-            <a href="https://decentraland.org/download/" target="_blank" rel="noreferrer">
-              <b>Download desktop client</b>
-            </a>
-          </span>
-        </div>
-        {/* ) : null} */}
       </div>
     </main>
   )

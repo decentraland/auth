@@ -14,4 +14,5 @@ export type WalletInformationModalI18N = {
     title: string
     text: string
   }
+  goBack: string
 }
