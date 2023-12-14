@@ -5,5 +5,8 @@ export type ConnectionIconProps = {
   type: ConnectionOptionType
   className?: string
   showTooltip?: boolean
+  testId?: string
   tooltipPosition?: PopupProps['position']
+  children?: React.ReactNode
+  onClick: (type: ConnectionOptionType) => void
 }

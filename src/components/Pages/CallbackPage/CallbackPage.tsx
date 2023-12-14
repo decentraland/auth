@@ -36,15 +36,12 @@ export const CallbackPage = () => {
       // Perform the connection once logged in to store the connection data
       setIsLoading(false)
       await getUserSignature()
-      // Store the signature using the SSO client
-      // TODO
-
       if (redirectTo) {
         window.location.href = redirectTo
       } else {
         // Navigate to user or to any other site
         // TODO: Navigate to the landing page.
-        navigate('/user')
+        window.location.href = '/'
       }
     } catch (error) {
       console.log(error)

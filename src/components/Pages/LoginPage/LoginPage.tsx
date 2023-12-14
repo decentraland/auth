@@ -73,20 +73,6 @@ export const LoginPage = () => {
           }}
         />
       </div>
-      <div className={styles.right}>
-        {/* {!isElectron() ? ( */}
-        <div className={styles.footer}>
-          <p>Want better graphics and faster speed?</p>
-
-          <span>
-            👉&nbsp;&nbsp;
-            <a href="https://decentraland.org/download/" target="_blank" rel="noreferrer">
-              <b>Download desktop client</b>
-            </a>
-          </span>
-        </div>
-        {/* ) : null} */}
-      </div>
     </main>
   )
 }
