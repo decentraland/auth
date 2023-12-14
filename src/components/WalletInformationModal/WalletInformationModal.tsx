@@ -1,7 +1,7 @@
 import classNames from 'classnames'
 import ModalContent from 'semantic-ui-react/dist/commonjs/modules/Modal/ModalContent'
-import { Modal } from 'decentraland-ui/dist/components/Modal/Modal'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
+import { Modal } from 'decentraland-ui/dist/components/Modal/Modal'
 import { ModalNavigation } from 'decentraland-ui/dist/components/ModalNavigation/ModalNavigation'
 import { WalletInformationModalProps } from './WalletInformationModal.types'
 import styles from './WalletInformationModal.module.css'

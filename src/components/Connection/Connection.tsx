@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from 'react'
 import classNames from 'classnames'
-import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import Icon from 'semantic-ui-react/dist/commonjs/elements/Icon/Icon'
+import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import logoSrc from '../../assets/images/logo.svg'
 import { ConnectionOption } from './ConnectionOption'
 import {

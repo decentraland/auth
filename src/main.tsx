@@ -5,6 +5,7 @@ import React from 'react'
 import ReactDOM from 'react-dom'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { UserPage } from './components/Pages/UserPage'
+import { RequestPage } from './components/Pages/RequestPage'
 import { DefaultPage } from './components/Pages/DefaultPage'
 import { CallbackPage } from './components/Pages/CallbackPage'
 import { LoginPage } from './components/Pages/LoginPage'
@@ -20,6 +21,7 @@ ReactDOM.render(
         <Route path="/login" element={<LoginPage />} />
         <Route path="/callback" element={<CallbackPage />} />
         <Route path="/user" element={<UserPage />} />
+        <Route path="/requests/:requestId" element={<RequestPage />} />
         <Route path="*" element={<DefaultPage />} />
       </Routes>
     </BrowserRouter>
