@@ -55,6 +55,7 @@ const Secondary = ({
         tooltipPosition={tooltipDirection}
         type={option}
         onClick={onConnect}
+        testId={testId}
       />
     ))}
   </div>

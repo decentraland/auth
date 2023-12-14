@@ -64,7 +64,7 @@ describe('when rendering the component', () => {
 
     it('should call the onConnect method prop when clicking the button', () => {
       const { getByTestId } = screen
-      fireEvent.click(getByTestId(`${SOCIAL_PRIMARY_TEST_ID}-button`))
+      fireEvent.click(getByTestId(`${SOCIAL_PRIMARY_TEST_ID}-${ConnectionOptionType.GOOGLE}-button`))
       expect(onConnect).toHaveBeenCalledWith(ConnectionOptionType.GOOGLE)
     })
 
@@ -119,7 +119,7 @@ describe('when rendering the component', () => {
 
     it('should call the onConnect method prop when clicking the button', () => {
       const { getByTestId } = screen
-      fireEvent.click(getByTestId(`${WEB3_PRIMARY_TEST_ID}-button`))
+      fireEvent.click(getByTestId(`${WEB3_PRIMARY_TEST_ID}-${ConnectionOptionType.METAMASK}-button`))
       expect(onConnect).toHaveBeenCalledWith(ConnectionOptionType.METAMASK)
     })
 
