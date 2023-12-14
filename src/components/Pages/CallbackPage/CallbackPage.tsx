@@ -1,15 +1,23 @@
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ProviderType } from '@dcl/schemas'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
 import { getConfiguration, connection } from 'decentraland-connect'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
+import { ConnectionModal, ConnectionModalState } from '../../ConnectionModal'
+import { getSignature } from '../LoginPage/utils'
 
 const MAGIC_KEY = getConfiguration().magic.apiKey
 
 export const CallbackPage = () => {
   const redirectTo = useAfterLoginRedirection()
   const navigate = useNavigate()
+  const [isLoading, setIsLoading] = useState(true)
+
+  const getUserSignature = useCallback(async () => {
+    const connectionData = await connection.connect(ProviderType.MAGIC)
+    await getSignature(connectionData.account?.toLowerCase() ?? '', connectionData.provider)
+  }, [])
 
   const logInAndRedirect = useCallback(async () => {
     // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -26,11 +34,16 @@ export const CallbackPage = () => {
     try {
       await magic?.oauth.getRedirectResult()
       // Perform the connection once logged in to store the connection data
-      await connection.connect(ProviderType.MAGIC)
+      setIsLoading(false)
+      await getUserSignature()
+      // Store the signature using the SSO client
+      // TODO
+
       if (redirectTo) {
         window.location.href = redirectTo
       } else {
         // Navigate to user or to any other site
+        // TODO: Navigate to the landing page.
         navigate('/user')
       }
     } catch (error) {
@@ -43,5 +56,14 @@ export const CallbackPage = () => {
     logInAndRedirect()
   }, [])
 
-  return <Loader active size="huge" />
+  return isLoading ? (
+    <Loader active size="huge" />
+  ) : (
+    <ConnectionModal
+      open={true}
+      state={ConnectionModalState.WAITING_FOR_SIGNATURE}
+      onTryAgain={getUserSignature}
+      onClose={() => undefined}
+    />
+  )
 }
