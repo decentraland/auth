@@ -5,7 +5,7 @@ import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { Connection, ConnectionOptionType } from '../../Connection'
 import { ConnectionModal, ConnectionModalState } from '../../ConnectionModal'
 import { WalletInformationModal } from '../../WalletInformationModal'
-import { getSignature, connectToProvider } from './utils'
+import { getSignature, connectToProvider, isSocialLogin } from './utils'
 import styles from './LoginPage.module.css'
 
 export const LoginPage = () => {
@@ -22,22 +22,24 @@ export const LoginPage = () => {
   const handleOnConnect = useCallback(
     async (connectionType: ConnectionOptionType) => {
       setShowConnectionModal(true)
-      setConnectionModalState(ConnectionModalState.CONNECTING_WALLET)
-      try {
-        const connectionData = await connectToProvider(connectionType)
-        // This is not reached if Magic is used
-        setConnectionModalState(ConnectionModalState.WAITING_FOR_SIGNATURE)
-        await getSignature(connectionData.account?.toLowerCase() ?? '', connectionData.provider)
-        // TODO: Store the signature using the SSO client
-        // Do something after logging in
-        if (redirectTo) {
-          window.location.href = redirectTo
-        } else {
-          navigate('/user')
+      if (isSocialLogin(connectionType)) {
+        setConnectionModalState(ConnectionModalState.LOADING_MAGIC)
+        await connectToProvider(connectionType)
+      } else {
+        try {
+          setConnectionModalState(ConnectionModalState.CONNECTING_WALLET)
+          const connectionData = await connectToProvider(connectionType)
+          setConnectionModalState(ConnectionModalState.WAITING_FOR_SIGNATURE)
+          await getSignature(connectionData.account?.toLowerCase() ?? '', connectionData.provider)
+          if (redirectTo) {
+            window.location.href = redirectTo
+          } else {
+            navigate('/user')
+          }
+          setShowConnectionModal(false)
+        } catch (error) {
+          setConnectionModalState(ConnectionModalState.ERROR)
         }
-        setShowConnectionModal(false)
-      } catch (error) {
-        setConnectionModalState(ConnectionModalState.ERROR)
       }
     },
     [setConnectionModalState, setShowConnectionModal, redirectTo]
