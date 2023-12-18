@@ -1,7 +1,5 @@
 import { useLocation } from 'react-router-dom'
 
-const isDecentralandDomain = /decentraland\.(org|zone|today)$/
-
 export const useAfterLoginRedirection = () => {
   const location = useLocation()
   const search = new URLSearchParams(location.search)
@@ -18,13 +16,11 @@ export const useAfterLoginRedirection = () => {
       redirectToURL = new URL(redirectToSearchParam, window.location.origin)
     } else {
       redirectToURL = new URL(redirectToSearchParam)
-
-      // For complete urls, only allow redirections to decentraland domains.
-      if (!isDecentralandDomain.test(redirectToURL.hostname)) {
-        return undefined
-      }
     }
 
+    if (redirectToURL.hostname !== window.location.hostname) {
+      return undefined
+    }
     return redirectToURL.href
   } catch (error) {
     console.error("Can't parse redirectTo URL")
