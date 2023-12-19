@@ -62,7 +62,7 @@ export async function connectToProvider(connectionOption: ConnectionOptionType):
     })
 
     const url = new URL(window.location.href)
-    url.pathname = '/callback'
+    url.pathname = '/auth/callback'
 
     await magic.oauth.loginWithRedirect({
       provider: connectionOption,
