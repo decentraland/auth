@@ -12,11 +12,9 @@ import { LoginPage } from './components/Pages/LoginPage'
 import 'decentraland-ui/dist/themes/alternative/dark-theme.css'
 import './index.css'
 
-const basename = /^decentraland.(zone|org|today)$/.test(window.location.host) ? '/auth' : '/'
-
 ReactDOM.render(
   <React.StrictMode>
-    <BrowserRouter basename={basename}>
+    <BrowserRouter basename="/auth">
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/callback" element={<CallbackPage />} />
