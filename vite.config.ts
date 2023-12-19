@@ -7,6 +7,9 @@ export default defineConfig(({ command, mode }) => {
 
   return {
     plugins: [react()],
+    server: {
+      open: '/auth',
+    },
     ...(command === 'build'
       ? {
           base: envVariables.VITE_BASE_URL,
