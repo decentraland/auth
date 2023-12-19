@@ -1,4 +1,3 @@
-import { useHref } from 'react-router-dom'
 import { ethers } from 'ethers'
 import { AuthIdentity, Authenticator } from '@dcl/crypto'
 import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
@@ -63,7 +62,7 @@ export async function connectToProvider(connectionOption: ConnectionOptionType):
     })
 
     const url = new URL(window.location.href)
-    url.pathname = useHref({ pathname: '/callback' })
+    url.pathname = '/auth/callback'
 
     await magic.oauth.loginWithRedirect({
       provider: connectionOption,
