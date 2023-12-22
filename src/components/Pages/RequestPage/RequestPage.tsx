@@ -1,19 +1,79 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Socket, io } from 'socket.io-client'
+import { io } from 'socket.io-client'
 import { connection } from 'decentraland-connect'
 import { config } from '../../../modules/config'
-import { SignaturePage } from './SignaturePage/SignaturePage'
+import { ethers } from 'ethers'
 
 export const RequestPage = () => {
-  const { requestId } = useParams()
-  const navigate = useNavigate()
-  const socketRef = useRef<Socket>()
-  // TODO: Show error somewehere.
-  const [error, setError] = useState<string | null>(null)
-  const [request, setRequest] = useState<any | null>(null)
+  const params = useParams()
+  const requestId = params.requestId ?? ''
+  const { request, error: recoverError } = useRecoverRequestFromAuthServer(requestId)
 
-  const initialize = useCallback(async () => {
+  if (recoverError) {
+    return <div style={{ margin: '1rem' }}>Could not recover request...</div>
+  }
+
+  if (!request) {
+    return <div style={{ margin: '1rem' }}>Loading...</div>
+  }
+
+  if (request.method === 'dcl_personal_sign') {
+    return (
+      <div style={{ margin: '1rem' }}>
+        <h1>{request.method}</h1>
+        <pre>{request.params[0]}</pre>
+        <div>
+          Code: <b>{request.code}</b> (This code should be visible on the desktop client as well)
+        </div>
+        <button
+          style={{ marginTop: '1rem' }}
+          onClick={async () => {
+            const provider = await connection.getProvider()
+            const browserProvider = new ethers.BrowserProvider(provider)
+            const signer = await browserProvider.getSigner()
+            const signature = await signer.signMessage(request.params[0])
+            await authServerFetch('outcome', { requestId, sender: await signer.getAddress(), result: signature })
+          }}
+        >
+          Sign Ephemeral Message
+        </button>
+      </div>
+    )
+  } else {
+    return (
+      <div style={{ margin: '1rem' }}>
+        <h1>{request.method}</h1>
+        <pre>{JSON.stringify(request.params)}</pre>
+        <button
+          style={{ marginTop: '1rem' }}
+          onClick={async () => {
+            const provider = await connection.getProvider()
+            const browserProvider = new ethers.BrowserProvider(provider)
+            const signer = await browserProvider.getSigner()
+            const result = await browserProvider.send(request.method, request.params)
+            await authServerFetch('outcome', { requestId, sender: await signer.getAddress(), result })
+          }}
+        >
+          Execute
+        </button>
+      </div>
+    )
+  }
+}
+
+/**
+ * Recovers a request with the provided request id from the auth server.
+ * If the user is not connected, it will be redirected to the login page.
+ * It is expected that once the user is logged in, it is redirected back to this page.
+ */
+const useRecoverRequestFromAuthServer = (requestId: string) => {
+  const navigate = useNavigate()
+
+  const [request, setRequest] = useState<any | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const fetchRequest = useCallback(async () => {
     try {
       // Try to restablish connection with the wallet.
       await connection.tryPreviousConnection()
@@ -25,71 +85,39 @@ export const RequestPage = () => {
     }
 
     try {
-      const authServerUrl = config.get('AUTH_SERVER_URL')
-
-      if (!authServerUrl) {
-        throw new Error('Missing AUTH_SERVER_URL')
-      }
-
-      // Connects the browser to the auth server to enable messaging.
-      const socket = io(authServerUrl, {})
-
-      socket.on('connect', () => {
-        // Store a reference to the socket once it is connected so it can be used elsewhere.
-        socketRef.current = socket
-
-        // Once connected, recover the request data sent by the client from the auth server.
-        socket.emit('message', {
-          type: 'recover',
-          payload: {
-            requestId
-          }
-        })
-      })
-
-      socket.on('message', (message: any) => {
-        // When the request data is retrieved, store it in the state.
-        // Now the UI should be ready to display what the client intends to do.
-        if (message.payload.requestId === requestId) {
-          if (message.payload.error) {
-            console.error(message.payload.error)
-            setError(message.payload.error)
-          } else {
-            setRequest(message)
-          }
-        }
-      })
+      const request = await authServerFetch('recover', { requestId })
+      setRequest(request)
     } catch (e) {
-      console.error(e as Error)
-      setError('Cannot connect to the auth server')
+      console.log(e)
+      setError((e as Error).message)
     }
   }, [])
 
   useEffect(() => {
-    initialize()
-
-    return () => {
-      // Close the socket connection when the component is unmounted.
-      socketRef.current?.close()
-    }
+    fetchRequest()
   }, [])
 
-  if (error) {
-    return (
-      <div style={{ margin: '1rem' }}>
-        Failed to fetch the client request from the auth server: <b>${error}</b>
-      </div>
-    )
+  return {
+    request,
+    error
+  }
+}
+
+const authServerFetch = async (ev: string, msg: any) => {
+  const authServerUrl = config.get('AUTH_SERVER_URL')
+  const socket = io(authServerUrl)
+
+  await new Promise<void>(resolve => {
+    socket.on('connect', resolve)
+  })
+
+  const response = await socket.emitWithAck(ev, msg)
+
+  socket.close()
+
+  if (response.error) {
+    throw new Error(response.error)
   }
 
-  if (!request) {
-    return <div style={{ margin: '1rem' }}>Fetching client request from the auth server...</div>
-  }
-
-  switch (request.payload.type) {
-    case 'signature':
-      return <SignaturePage request={request} socketRef={socketRef} />
-    default:
-      return <div style={{ margin: '1rem' }}>Invalid request type: "{request.payload.type}"</div>
-  }
+  return response
 }
