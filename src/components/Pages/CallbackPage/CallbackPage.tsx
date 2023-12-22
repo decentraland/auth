@@ -37,7 +37,7 @@ export const CallbackPage = () => {
       setIsLoading(false)
       await getUserSignature()
       if (redirectTo) {
-        window.location.href = redirectTo
+        window.location.href = decodeURIComponent(redirectTo)
       } else {
         // Navigate to user or to any other site
         // TODO: Navigate to the landing page.
