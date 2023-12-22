@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom'
 export const useAfterLoginRedirection = () => {
   const location = useLocation()
   const search = new URLSearchParams(location.search)
-  const redirectToSearchParam = search.get('redirectTo')
+  const redirectToSearchParam = decodeURIComponent(search.get('redirectTo') || '')
 
   if (redirectToSearchParam === null) {
     return undefined
