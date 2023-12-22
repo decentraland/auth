@@ -1,7 +1,7 @@
 import { ethers } from 'ethers'
 import { AuthIdentity, Authenticator } from '@dcl/crypto'
 import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
-import { LocalStorageUtils } from '@dcl/single-sign-on-client'
+import { localStorageGetIdentity, localStorageStoreIdentity } from '@dcl/single-sign-on-client'
 import { connection, getConfiguration, ConnectionResponse, Provider } from 'decentraland-connect'
 import { ConnectionOptionType } from '../../Connection'
 
@@ -85,11 +85,11 @@ export function isSocialLogin(connectionType: ConnectionOptionType): boolean {
 export async function getSignature(address: string, provider: Provider): Promise<AuthIdentity> {
   let identity: AuthIdentity
 
-  const ssoIdentity = LocalStorageUtils.getIdentity(address)
+  const ssoIdentity = localStorageGetIdentity(address)
 
   if (!ssoIdentity) {
     identity = await generateIdentity(address, provider)
-    LocalStorageUtils.setIdentity(address, identity)
+    localStorageStoreIdentity(address, identity)
   } else {
     identity = ssoIdentity
   }
