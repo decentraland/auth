@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { ethers } from 'ethers'
 import { io } from 'socket.io-client'
 import { connection } from 'decentraland-connect'
 import { config } from '../../../modules/config'
-import { ethers } from 'ethers'
 
 export const RequestPage = () => {
   const params = useParams()
