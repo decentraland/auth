@@ -4,18 +4,19 @@ export const useAfterLoginRedirection = () => {
   const location = useLocation()
   const search = new URLSearchParams(location.search)
   const redirectToSearchParam = search.get('redirectTo')
+  const redirectTo = redirectToSearchParam ? decodeURIComponent(redirectToSearchParam) : null
 
-  if (redirectToSearchParam === null) {
+  if (redirectTo === null) {
     return undefined
   }
 
   try {
     let redirectToURL: URL
 
-    if (redirectToSearchParam.startsWith('/')) {
-      redirectToURL = new URL(redirectToSearchParam, window.location.origin)
+    if (redirectTo.startsWith('/')) {
+      redirectToURL = new URL(redirectTo, window.location.origin)
     } else {
-      redirectToURL = new URL(redirectToSearchParam)
+      redirectToURL = new URL(redirectTo)
     }
 
     if (redirectToURL.hostname !== window.location.hostname) {

@@ -32,7 +32,7 @@ export const LoginPage = () => {
           setConnectionModalState(ConnectionModalState.WAITING_FOR_SIGNATURE)
           await getSignature(connectionData.account?.toLowerCase() ?? '', connectionData.provider)
           if (redirectTo) {
-            window.location.href = redirectTo
+            window.location.href = decodeURIComponent(redirectTo)
           } else {
             navigate('/user')
           }
