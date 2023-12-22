@@ -1,5 +1,6 @@
 import { ethers } from 'ethers'
 import { AuthIdentity, Authenticator } from '@dcl/crypto'
+import { OAuthProvider } from '@magic-ext/oauth'
 import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
 import { localStorageGetIdentity, localStorageStoreIdentity } from '@dcl/single-sign-on-client'
 import { connection, getConfiguration, ConnectionResponse, Provider } from 'decentraland-connect'
@@ -65,7 +66,7 @@ export async function connectToProvider(connectionOption: ConnectionOptionType):
     url.pathname = '/auth/callback'
 
     await magic.oauth.loginWithRedirect({
-      provider: connectionOption,
+      provider: connectionOption as OAuthProvider,
       redirectURI: url.href
     })
   }
