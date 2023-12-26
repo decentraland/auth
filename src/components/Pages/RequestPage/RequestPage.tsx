@@ -16,11 +16,6 @@ export const RequestPage = () => {
   const [resultSent, setResultSent] = useState<boolean>(false)
   const [denied, setDenied] = useState<boolean>(false)
 
-  const getProvider = async () => {
-    const provider = await connection.getProvider()
-    return new ethers.BrowserProvider(provider)
-  }
-
   const onDenied = useCallback(() => {
     setDenied(true)
   }, [])
@@ -159,6 +154,15 @@ export const RequestPage = () => {
       </main>
     )
   }
+}
+
+/**
+ * Gets an ethers browser provider from the one provided by decentraland-connect.
+ * Useful to enhance the amount of operations that can be done with the provider.
+ */
+const getProvider = async () => {
+  const provider = await connection.getProvider()
+  return new ethers.BrowserProvider(provider)
 }
 
 /**
