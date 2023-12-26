@@ -168,6 +168,7 @@ export const RequestPage = () => {
 const useRecoverRequestFromAuthServer = (requestId: string) => {
   const navigate = useNavigate()
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [request, setRequest] = useState<any | null>(null)
   const [error, setError] = useState<string | null>(null)
 
