@@ -188,7 +188,6 @@ const useRecoverRequestFromAuthServer = (requestId: string) => {
       const request = await authServerFetch('recover', { requestId })
       setRequest(request)
     } catch (e) {
-      console.log(e)
       setError((e as Error).message)
     }
   }, [])
