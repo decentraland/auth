@@ -2,16 +2,19 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ethers } from 'ethers'
 import { io } from 'socket.io-client'
+import { Button } from 'decentraland-ui/dist/components/Button/Button'
+import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
 import { connection } from 'decentraland-connect'
 import { config } from '../../../modules/config'
 import styles from './RequestPage.module.css'
-import { Button } from 'decentraland-ui/dist/components/Button/Button'
-import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
 
 export const RequestPage = () => {
   const params = useParams()
   const requestId = params.requestId ?? ''
   const { request, error: recoverError } = useRecoverRequestFromAuthServer(requestId)
+  const [resultError, setResultError] = useState<string | null>(null)
+  const [resultSent, setResultSent] = useState<boolean>(false)
+  const [denied, setDenied] = useState<boolean>(false)
 
   if (recoverError) {
     return (
@@ -21,6 +24,45 @@ export const RequestPage = () => {
           <div className={styles.errorTitle}>There was an error obtaining your request...</div>
           <div className={styles.errorSubtitle}>Close this window and try again.</div>
           <div className={styles.errorValue}>{recoverError}</div>
+        </div>
+      </main>
+    )
+  }
+
+  if (denied) {
+    return (
+      <main className={styles.main}>
+        <div className={styles.left}>
+          <div className={styles.errorLogo}></div>
+          <div className={styles.errorTitle}>Was this action not taken by you?</div>
+          <div className={styles.errorSubtitle}>
+            If this action was not initiated by you, feel free to dismiss this message and close this window.
+          </div>
+        </div>
+      </main>
+    )
+  }
+
+  if (resultError) {
+    return (
+      <main className={styles.main}>
+        <div className={styles.left}>
+          <div className={styles.errorLogo}></div>
+          <div className={styles.errorTitle}>An error ocurred while interacting with your wallet...</div>
+          <div className={styles.errorSubtitle}>Close this window and try again.</div>
+          <div className={styles.errorValue}>{resultError}</div>
+        </div>
+      </main>
+    )
+  }
+
+  if (resultSent) {
+    return (
+      <main className={styles.main}>
+        <div className={styles.left}>
+          <div className={styles.logo}></div>
+          <div className={styles.title}>Wallet Interaction Complete</div>
+          <div className={styles.description}>You can close this window now.</div>
         </div>
       </main>
     )
@@ -47,7 +89,12 @@ export const RequestPage = () => {
           <div className={styles.description}>Do you see the same verification number on your desktop app?</div>
           <div className={styles.code}>{request.code}</div>
           <div className={styles.buttons}>
-            <Button className={styles.noButton}>
+            <Button
+              className={styles.noButton}
+              onClick={() => {
+                setDenied(true)
+              }}
+            >
               <div className={styles.noLogo}></div> No
             </Button>
             <Button
@@ -57,7 +104,13 @@ export const RequestPage = () => {
                 const browserProvider = new ethers.BrowserProvider(provider)
                 const signer = await browserProvider.getSigner()
                 const signature = await signer.signMessage(request.params[0])
-                await authServerFetch('outcome', { requestId, sender: await signer.getAddress(), result: signature })
+                const result = await authServerFetch('outcome', { requestId, sender: await signer.getAddress(), result: signature })
+
+                if (result.error) {
+                  setResultError(result.error)
+                }
+
+                setResultSent(true)
               }}
             >
               <div className={styles.yesLogo}></div> Yes, they are the same
@@ -74,7 +127,12 @@ export const RequestPage = () => {
           <div className={styles.title}>Remote Wallet Interaction</div>
           <div className={styles.description}>The desktop app is trying to interact with your wallet.</div>
           <div className={styles.buttons}>
-            <Button className={styles.noButton}>
+            <Button
+              className={styles.noButton}
+              onClick={() => {
+                setDenied(true)
+              }}
+            >
               <div className={styles.noLogo}></div>Deny
             </Button>
             <Button
@@ -84,7 +142,13 @@ export const RequestPage = () => {
                 const browserProvider = new ethers.BrowserProvider(provider)
                 const signer = await browserProvider.getSigner()
                 const result = await browserProvider.send(request.method, request.params)
-                await authServerFetch('outcome', { requestId, sender: await signer.getAddress(), result })
+                const fetchResult = await authServerFetch('outcome', { requestId, sender: await signer.getAddress(), result })
+
+                if (fetchResult.error) {
+                  setResultError(fetchResult.error)
+                }
+
+                setResultSent(true)
               }}
             >
               <div className={styles.yesLogo}></div>Allow

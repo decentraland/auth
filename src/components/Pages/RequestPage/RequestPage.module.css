@@ -43,12 +43,14 @@
   font-size: 30px;
   font-weight: 600;
   color: var(--text);
+  line-height: 36.31px;
 }
 
 .errorSubtitle {
   font-size: 24px;
   font-weight: 400;
   color: var(--text);
+  line-height: 29.05px;
 }
 
 .errorValue {
