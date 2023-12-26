@@ -80,7 +80,7 @@ const useRecoverRequestFromAuthServer = (requestId: string) => {
     } catch (e) {
       // If it fails it is because there is no connection and the user needs to login.
       // The user should login and then be redirected back to this page to continue the transaction.
-      navigate(`/login?redirectTo=/requests/${requestId}`)
+      navigate(`/login?redirectTo=/auth/requests/${requestId}`)
       return
     }
 
