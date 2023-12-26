@@ -201,6 +201,7 @@ const useRecoverRequestFromAuthServer = (requestId: string) => {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const authServerFetch = async (ev: string, msg: any) => {
   const authServerUrl = config.get('AUTH_SERVER_URL')
   const socket = io(authServerUrl)
