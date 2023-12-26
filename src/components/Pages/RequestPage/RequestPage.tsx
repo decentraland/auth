@@ -16,6 +16,49 @@ export const RequestPage = () => {
   const [resultSent, setResultSent] = useState<boolean>(false)
   const [denied, setDenied] = useState<boolean>(false)
 
+  const getProvider = async () => {
+    const provider = await connection.getProvider()
+    return new ethers.BrowserProvider(provider)
+  }
+
+  const onDenied = useCallback(() => {
+    setDenied(true)
+  }, [])
+
+  const onDclPersonSignConfirm = useCallback(async () => {
+    const provider = await getProvider()
+    const signer = await provider.getSigner()
+    const signature = await signer.signMessage(request.params[0])
+    const result = await authServerFetch('outcome', {
+      requestId,
+      sender: await signer.getAddress(),
+      result: signature
+    })
+
+    if (result.error) {
+      setResultError(result.error)
+    }
+
+    setResultSent(true)
+  }, [request, requestId])
+
+  const onWalletInteractionConfirm = useCallback(async () => {
+    const provider = await getProvider()
+    const signer = await provider.getSigner()
+    const result = await provider.send(request.method, request.params)
+    const fetchResult = await authServerFetch('outcome', {
+      requestId,
+      sender: await signer.getAddress(),
+      result
+    })
+
+    if (fetchResult.error) {
+      setResultError(fetchResult.error)
+    }
+
+    setResultSent(true)
+  }, [request, requestId])
+
   if (recoverError) {
     return (
       <main className={styles.main}>
@@ -78,8 +121,6 @@ export const RequestPage = () => {
     )
   }
 
-  console.log(request)
-
   if (request.method === 'dcl_personal_sign') {
     return (
       <main className={styles.main}>
@@ -89,30 +130,10 @@ export const RequestPage = () => {
           <div className={styles.description}>Do you see the same verification number on your desktop app?</div>
           <div className={styles.code}>{request.code}</div>
           <div className={styles.buttons}>
-            <Button
-              className={styles.noButton}
-              onClick={() => {
-                setDenied(true)
-              }}
-            >
+            <Button className={styles.noButton} onClick={onDenied}>
               <div className={styles.noLogo}></div> No
             </Button>
-            <Button
-              className={styles.yesButton}
-              onClick={async () => {
-                const provider = await connection.getProvider()
-                const browserProvider = new ethers.BrowserProvider(provider)
-                const signer = await browserProvider.getSigner()
-                const signature = await signer.signMessage(request.params[0])
-                const result = await authServerFetch('outcome', { requestId, sender: await signer.getAddress(), result: signature })
-
-                if (result.error) {
-                  setResultError(result.error)
-                }
-
-                setResultSent(true)
-              }}
-            >
+            <Button className={styles.yesButton} onClick={onDclPersonSignConfirm}>
               <div className={styles.yesLogo}></div> Yes, they are the same
             </Button>
           </div>
@@ -127,30 +148,10 @@ export const RequestPage = () => {
           <div className={styles.title}>Remote Wallet Interaction</div>
           <div className={styles.description}>The desktop app is trying to interact with your wallet.</div>
           <div className={styles.buttons}>
-            <Button
-              className={styles.noButton}
-              onClick={() => {
-                setDenied(true)
-              }}
-            >
+            <Button className={styles.noButton} onClick={onDenied}>
               <div className={styles.noLogo}></div>Deny
             </Button>
-            <Button
-              className={styles.yesButton}
-              onClick={async () => {
-                const provider = await connection.getProvider()
-                const browserProvider = new ethers.BrowserProvider(provider)
-                const signer = await browserProvider.getSigner()
-                const result = await browserProvider.send(request.method, request.params)
-                const fetchResult = await authServerFetch('outcome', { requestId, sender: await signer.getAddress(), result })
-
-                if (fetchResult.error) {
-                  setResultError(fetchResult.error)
-                }
-
-                setResultSent(true)
-              }}
-            >
+            <Button className={styles.yesButton} onClick={onWalletInteractionConfirm}>
               <div className={styles.yesLogo}></div>Allow
             </Button>
           </div>
