@@ -1,0 +1,133 @@
+.main {
+  display: grid;
+  grid-template-columns: 50% 50%;
+  height: 100%;
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: right;
+  background-image: url('/src/assets/images/party.png');
+}
+
+.main::before {
+  content: '';
+  position: fixed;
+  width: 100%;
+  height: 350%;
+  background: radial-gradient(ellipse at 0 50%, transparent 10%, #c640cd 40%, #491975 70%);
+  top: -100%;
+  transform: rotate(180deg);
+  overflow: hidden;
+}
+
+.left {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  justify-content: center;
+  z-index: 1;
+  padding-left: 80px;
+  gap: 32px;
+}
+
+.errorLogo {
+  width: 40px;
+  height: 40px;
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: right;
+  background-image: url('/src/assets/images/wrong.svg');
+}
+
+.errorTitle {
+  font-size: 30px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.errorSubtitle {
+  font-size: 24px;
+  font-weight: 400;
+  color: var(--text);
+}
+
+.errorValue {
+  font-size: 12;
+  color: var(--text);
+}
+
+.logo {
+  width: 40px;
+  height: 40px;
+  background-image: url('/src/assets/images/logo.svg');
+}
+
+.title {
+  font-size: 30px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 36.31px;
+}
+
+.description {
+  font-size: 24px;
+  font-weight: 400;
+  color: var(--text);
+  line-height: 29.05px;
+}
+
+.code {
+  font-size: 100px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 121.02px;
+}
+
+.buttons {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.noLogo {
+  width: 24px;
+  height: 24px;
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: right;
+  background-image: url('/src/assets/images/wrong.svg');
+  margin-right: 10px;
+}
+
+.yesLogo {
+  width: 24px;
+  height: 24px;
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: right;
+  background-image: url('/src/assets/images/correct.svg');
+  margin-right: 10px;
+}
+
+.noButton:global(.ui.button) {
+  background-color: #ffffff;
+  color: black;
+  display: flex;
+  align-items: center;
+}
+
+.yesButton:global(.ui.button) {
+  background-color: #ffffff;
+  color: black;
+  display: flex;
+  align-items: center;
+}
+
+.requestDetails {
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--text);
+  line-height: 19.39px;
+  background-color: black;
+}
