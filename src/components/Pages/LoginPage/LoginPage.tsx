@@ -1,5 +1,5 @@
 // import { isElectron } from '../../../integration/desktop'
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { Connection, ConnectionOptionType } from '../../Connection'
@@ -14,10 +14,20 @@ export const LoginPage = () => {
   const [showConnectionModal, setShowConnectionModal] = useState(false)
   const redirectTo = useAfterLoginRedirection()
   const navigate = useNavigate()
+  const showGuestOption = redirectTo && new URL(redirectTo).pathname === '/play'
 
   const handleLearnMore = useCallback(() => {
     setShowLearnMore(!showLearnMore)
   }, [setShowLearnMore, showLearnMore])
+
+  const guestRedirectToURL = useMemo(() => {
+    if (redirectTo) {
+      const playUrl = new URL(redirectTo)
+      playUrl.searchParams.append('guest', 'true')
+      return playUrl.toString()
+    }
+    return ''
+  }, [redirectTo])
 
   const handleOnConnect = useCallback(
     async (connectionType: ConnectionOptionType) => {
@@ -61,19 +71,25 @@ export const LoginPage = () => {
       />
 
       <div className={styles.left}>
-        <Connection
-          className={styles.connection}
-          onLearnMore={handleLearnMore}
-          onConnect={handleOnConnect}
-          socialOptions={{
-            primary: ConnectionOptionType.GOOGLE,
-            secondary: [ConnectionOptionType.DISCORD, ConnectionOptionType.APPLE, ConnectionOptionType.X]
-          }}
-          web3Options={{
-            primary: ConnectionOptionType.METAMASK,
-            secondary: [ConnectionOptionType.FORTMATIC, ConnectionOptionType.COINBASE, ConnectionOptionType.WALLET_CONNECT]
-          }}
-        />
+        <div className={styles.leftInfo}>
+          <Connection
+            onLearnMore={handleLearnMore}
+            onConnect={handleOnConnect}
+            socialOptions={{
+              primary: ConnectionOptionType.GOOGLE,
+              secondary: [ConnectionOptionType.DISCORD, ConnectionOptionType.APPLE, ConnectionOptionType.X]
+            }}
+            web3Options={{
+              primary: ConnectionOptionType.METAMASK,
+              secondary: [ConnectionOptionType.FORTMATIC, ConnectionOptionType.COINBASE, ConnectionOptionType.WALLET_CONNECT]
+            }}
+          />
+          {showGuestOption && (
+            <div className={styles.guestInfo}>
+              Quick dive? <a href={guestRedirectToURL}>Explore as a guest</a>
+            </div>
+          )}
+        </div>
       </div>
     </main>
   )
