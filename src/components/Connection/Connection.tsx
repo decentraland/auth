@@ -19,17 +19,26 @@ const Primary = ({
   children,
   option,
   testId,
+  loadingOption,
   onConnect
 }: {
   message: React.ReactNode
   children: React.ReactChild
   option: ConnectionOptionType
+  loadingOption?: ConnectionOptionType
   testId?: string
   onConnect: (wallet: ConnectionOptionType) => unknown
 }) => (
   <div className={styles.primary} data-testid={testId}>
     <div className={styles.primaryMessage}>{message}</div>
-    <ConnectionOption type={option} onClick={onConnect} className={classNames(styles.primaryButton, styles.primaryOption)} testId={testId}>
+    <ConnectionOption
+      disabled={!!loadingOption}
+      loading={loadingOption === option}
+      type={option}
+      onClick={onConnect}
+      className={classNames(styles.primaryButton, styles.primaryOption)}
+      testId={testId}
+    >
       {children}
     </ConnectionOption>
   </div>
@@ -39,11 +48,13 @@ const Secondary = ({
   options,
   tooltipDirection,
   testId,
+  loadingOption,
   onConnect
 }: {
   options: ConnectionOptionType[]
   tooltipDirection: 'top center' | 'bottom center'
   testId?: string
+  loadingOption?: ConnectionOptionType
   onConnect: (wallet: ConnectionOptionType) => unknown
 }) => (
   <div className={styles.showMoreSecondaryOptions} data-testid={testId}>
@@ -56,6 +67,8 @@ const Secondary = ({
         type={option}
         onClick={onConnect}
         testId={testId}
+        loading={loadingOption === option}
+        disabled={!!loadingOption}
       />
     ))}
   </div>
@@ -74,7 +87,7 @@ const defaultProps = {
 }
 
 export const Connection = (props: ConnectionProps): JSX.Element => {
-  const { i18n = defaultProps.i18n, onConnect, onLearnMore, socialOptions, web3Options, className } = props
+  const { i18n = defaultProps.i18n, onConnect, onLearnMore, socialOptions, web3Options, className, loadingOption } = props
 
   const [showMore, setShowMore] = useState(false)
   const handleShowMore = useCallback(() => {
@@ -95,6 +108,7 @@ export const Connection = (props: ConnectionProps): JSX.Element => {
             onConnect={onConnect}
             testId={SOCIAL_PRIMARY_TEST_ID}
             option={socialOptions?.primary}
+            loadingOption={loadingOption}
             message={<>{i18n.socialMessage(<div className={styles.primaryMagic} role="img" aria-label="Magic" />)}</>}
           >
             <>{i18n.accessWith(socialOptions?.primary)}</>
@@ -105,6 +119,7 @@ export const Connection = (props: ConnectionProps): JSX.Element => {
             onConnect={onConnect}
             testId={WEB3_PRIMARY_TEST_ID}
             option={web3Options?.primary}
+            loadingOption={loadingOption}
             message={i18n.web3Message(element => (
               <span className={styles.primaryLearnMore} role="button" onClick={onLearnMore}>
                 {element}
@@ -136,6 +151,7 @@ export const Connection = (props: ConnectionProps): JSX.Element => {
             options={socialOptions.secondary}
             onConnect={onConnect}
             tooltipDirection="top center"
+            loadingOption={loadingOption}
           />
         )}
         {showMore && hasWeb3SecondaryOptions && (
@@ -144,6 +160,7 @@ export const Connection = (props: ConnectionProps): JSX.Element => {
             options={web3Options.secondary}
             onConnect={onConnect}
             tooltipDirection="bottom center"
+            loadingOption={loadingOption}
           />
         )}
       </div>

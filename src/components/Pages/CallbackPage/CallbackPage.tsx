@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ProviderType } from '@dcl/schemas'
-import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
 import { getConfiguration, connection } from 'decentraland-connect'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { ConnectionModal, ConnectionModalState } from '../../ConnectionModal'
@@ -53,14 +52,11 @@ export const CallbackPage = () => {
     logInAndRedirect()
   }, [])
 
-  return isLoading ? (
-    <Loader active size="huge" />
-  ) : (
+  return (
     <ConnectionModal
       open={true}
-      state={ConnectionModalState.WAITING_FOR_SIGNATURE}
+      state={isLoading ? ConnectionModalState.VALIDATING_SIGN_IN : ConnectionModalState.WAITING_FOR_SIGNATURE}
       onTryAgain={getUserSignature}
-      onClose={() => undefined}
     />
   )
 }

@@ -13,7 +13,9 @@ export const ConnectionModal = (props: ConnectionModalProps) => {
   const isLoading =
     state === ConnectionModalState.CONNECTING_WALLET ||
     state === ConnectionModalState.WAITING_FOR_SIGNATURE ||
-    ConnectionModalState.LOADING_MAGIC
+    state === ConnectionModalState.LOADING_MAGIC ||
+    state === ConnectionModalState.VALIDATING_SIGN_IN
+
   return (
     <Modal size="tiny" open={open}>
       <ModalNavigation title="" onClose={!isLoading ? onClose : undefined} />

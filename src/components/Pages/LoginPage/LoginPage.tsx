@@ -12,6 +12,7 @@ export const LoginPage = () => {
   const [connectionModalState, setConnectionModalState] = useState(ConnectionModalState.CONNECTING_WALLET)
   const [showLearnMore, setShowLearnMore] = useState(false)
   const [showConnectionModal, setShowConnectionModal] = useState(false)
+  const [currentConnectionType, setCurrentConnectionType] = useState<ConnectionOptionType>()
   const redirectTo = useAfterLoginRedirection()
   const navigate = useNavigate()
 
@@ -21,12 +22,13 @@ export const LoginPage = () => {
 
   const handleOnConnect = useCallback(
     async (connectionType: ConnectionOptionType) => {
-      setShowConnectionModal(true)
+      setCurrentConnectionType(connectionType)
       if (isSocialLogin(connectionType)) {
         setConnectionModalState(ConnectionModalState.LOADING_MAGIC)
         await connectToProvider(connectionType)
       } else {
         try {
+          setShowConnectionModal(true)
           setConnectionModalState(ConnectionModalState.CONNECTING_WALLET)
           const connectionData = await connectToProvider(connectionType)
           setConnectionModalState(ConnectionModalState.WAITING_FOR_SIGNATURE)
@@ -42,13 +44,20 @@ export const LoginPage = () => {
         }
       }
     },
-    [setConnectionModalState, setShowConnectionModal, redirectTo]
+    [setConnectionModalState, setShowConnectionModal, setCurrentConnectionType, redirectTo]
   )
 
   const handleOnCloseConnectionModal = useCallback(() => {
     setShowConnectionModal(false)
+    setCurrentConnectionType(undefined)
     setConnectionModalState(ConnectionModalState.CONNECTING_WALLET)
   }, [setShowConnectionModal])
+
+  const handleTryAgain = useCallback(() => {
+    if (currentConnectionType) {
+      handleOnConnect(currentConnectionType)
+    }
+  }, [currentConnectionType])
 
   return (
     <main className={styles.main}>
@@ -57,14 +66,14 @@ export const LoginPage = () => {
         open={showConnectionModal}
         state={connectionModalState}
         onClose={handleOnCloseConnectionModal}
-        onTryAgain={() => console.log('On try again')}
+        onTryAgain={handleTryAgain}
       />
-
       <div className={styles.left}>
         <Connection
           className={styles.connection}
           onLearnMore={handleLearnMore}
           onConnect={handleOnConnect}
+          loadingOption={currentConnectionType}
           socialOptions={{
             primary: ConnectionOptionType.GOOGLE,
             secondary: [ConnectionOptionType.DISCORD, ConnectionOptionType.APPLE, ConnectionOptionType.X]
