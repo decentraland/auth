@@ -41,7 +41,7 @@ export const LoginPage = () => {
           setConnectionModalState(ConnectionModalState.CONNECTING_WALLET)
           const connectionData = await connectToProvider(connectionType)
 
-          // The requests sign in flow for the desktop app has a different identity. 
+          // The requests sign in flow for the desktop app has a different identity.
           // There is no need to create one here if the user is coming from the requests page.
           if (searchParams.get('fromRequests') !== 'true') {
             setConnectionModalState(ConnectionModalState.WAITING_FOR_SIGNATURE)
