@@ -1,3 +1,5 @@
+import { ProviderType } from '@dcl/schemas'
+
 export enum ConnectionModalState {
   CONNECTING_WALLET = 'CONNECTING_WALLET',
   WAITING_FOR_SIGNATURE = 'WAITING_FOR_SIGNATURE',
@@ -9,6 +11,7 @@ export enum ConnectionModalState {
 export type ConnectionModalProps = {
   open: boolean
   state: ConnectionModalState
+  providerType: ProviderType | null
   onClose?: () => unknown
   onTryAgain: () => unknown
 }

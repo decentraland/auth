@@ -57,6 +57,7 @@ export const CallbackPage = () => {
       open={true}
       state={isLoading ? ConnectionModalState.VALIDATING_SIGN_IN : ConnectionModalState.WAITING_FOR_SIGNATURE}
       onTryAgain={getUserSignature}
+      providerType={ProviderType.MAGIC}
     />
   )
 }

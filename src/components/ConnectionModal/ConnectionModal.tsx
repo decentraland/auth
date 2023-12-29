@@ -9,7 +9,7 @@ import { ConnectionModalProps, ConnectionModalState } from './ConnectionModal.ty
 import styles from './ConnectionModal.module.css'
 
 export const ConnectionModal = (props: ConnectionModalProps) => {
-  const { open, state, onClose, onTryAgain } = props
+  const { open, state, providerType, onClose, onTryAgain } = props
   const isLoading =
     state === ConnectionModalState.CONNECTING_WALLET ||
     state === ConnectionModalState.WAITING_FOR_SIGNATURE ||
@@ -23,7 +23,7 @@ export const ConnectionModal = (props: ConnectionModalProps) => {
         <div className={styles.content}>
           {state === ConnectionModalState.ERROR && <img className={styles.errorImage} src={warningSrc} />}
           {isLoading && <Loader className={styles.loader} size="huge" inline />}
-          <p className={styles.message}>{getConnectionMessage(state)}</p>
+          <p className={styles.message}>{getConnectionMessage(state, providerType)}</p>
           {state === ConnectionModalState.ERROR && (
             <Button primary onClick={onTryAgain}>
               Try again

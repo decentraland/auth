@@ -5,7 +5,7 @@ import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { Connection, ConnectionOptionType } from '../../Connection'
 import { ConnectionModal, ConnectionModalState } from '../../ConnectionModal'
 import { WalletInformationModal } from '../../WalletInformationModal'
-import { getSignature, connectToProvider, isSocialLogin } from './utils'
+import { getSignature, connectToProvider, isSocialLogin, fromConnectionOptionToProviderType } from './utils'
 import styles from './LoginPage.module.css'
 
 export const LoginPage = () => {
@@ -77,6 +77,7 @@ export const LoginPage = () => {
         state={connectionModalState}
         onClose={handleOnCloseConnectionModal}
         onTryAgain={handleTryAgain}
+        providerType={currentConnectionType ? fromConnectionOptionToProviderType(currentConnectionType) : null}
       />
       <div className={styles.left}>
         <div className={styles.leftInfo}>
