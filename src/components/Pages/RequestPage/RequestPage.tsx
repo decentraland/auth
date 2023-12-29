@@ -40,8 +40,9 @@ export const RequestPage = () => {
     return new ethers.BrowserProvider(await connection.getProvider())
   }, [])
 
-  const goToLogin = useCallback(() => {
-    navigate(`/login?redirectTo=/auth/requests/${requestId}`)
+  // Goes to the login page were the user will have to connect a wallet.
+  const toLoginPage = useCallback(() => {
+    navigate(`/login?redirectTo=/auth/requests/${requestId}&fromRequests=true`)
   }, [])
 
   useEffect(() => {
@@ -50,11 +51,12 @@ export const RequestPage = () => {
         // Try to restablish connection with the wallet.
         await connection.tryPreviousConnection()
       } catch (e) {
-        goToLogin()
+        toLoginPage()
         return
       }
 
       try {
+        // Recover the request from the auth server.
         const request = await authServerFetch('recover', { requestId })
         requestRef.current = request
 
@@ -62,15 +64,18 @@ export const RequestPage = () => {
         const signer = await provider.getSigner()
         const signerAddress = await signer.getAddress()
 
+        // If the sender defined in the request is different than the one that is connected, show an error.
         if (request.sender && request.sender !== signerAddress.toLowerCase()) {
           setView(View.DIFFERENT_ACCOUNT)
           return
         }
 
+        // Initialize the timeout to display the timeout view when the request expires.
         timeoutRef.current = setTimeout(() => {
           setView(View.TIMEOUT)
         }, new Date(request.expiration).getTime() - Date.now())
 
+        // Show different views depending on the request method.
         if (request.method === 'dcl_personal_sign') {
           setView(View.VERIFY_SIGN_IN)
         } else {
@@ -88,6 +93,8 @@ export const RequestPage = () => {
   }, [])
 
   useEffect(() => {
+    // The timeout is only necessary on the verify sign in and wallet interaction views.
+    // We can clear it out when the user is shown another view to prevent the timeout from triggering somewhere not intended.
     if (view !== View.VERIFY_SIGN_IN && view !== View.WALLET_INTERACTION) {
       clearTimeout(timeoutRef.current)
     }
@@ -158,7 +165,7 @@ export const RequestPage = () => {
           <div className={styles.errorTitle}>Looks like you are connected with a different account.</div>
           <div className={styles.errorSubtitle}>Please change your wallet account to the one connected to the Desktop App.</div>
           <div className={styles.buttons}>
-            <Button className={styles.yesButton} onClick={goToLogin}>
+            <Button className={styles.yesButton} onClick={toLoginPage}>
               Change account
             </Button>
           </div>
