@@ -40,7 +40,7 @@ export const RequestPage = () => {
     return new ethers.BrowserProvider(await connection.getProvider())
   }, [])
 
-  // Goes to the login page were the user will have to connect a wallet.
+  // Goes to the login page where the user will have to connect a wallet.
   const toLoginPage = useCallback(() => {
     navigate(`/login?redirectTo=/auth/requests/${requestId}&fromRequests=true`)
   }, [])
