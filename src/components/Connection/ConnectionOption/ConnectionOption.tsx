@@ -21,7 +21,9 @@ export const ConnectionOption = (props: ConnectionIconProps): JSX.Element => {
           disabled={disabled}
           loading={loading}
         >
-          <div role="img" aria-label={type} className={classNames(styles.icon, styles[`icon-${type}`], styles.primaryImage)} />
+          {!loading ? (
+            <div role="img" aria-label={type} className={classNames(styles.icon, styles[`icon-${type}`], styles.primaryImage)} />
+          ) : null}
           {children}
         </Button>
       }
