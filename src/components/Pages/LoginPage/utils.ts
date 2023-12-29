@@ -66,7 +66,7 @@ export async function connectToProvider(connectionOption: ConnectionOptionType):
     url.pathname = '/auth/callback'
 
     await magic.oauth.loginWithRedirect({
-      provider: connectionOption as OAuthProvider,
+      provider: connectionOption === ConnectionOptionType.X ? 'twitter' : (connectionOption as OAuthProvider),
       redirectURI: url.href
     })
   }
