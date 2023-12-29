@@ -1,6 +1,6 @@
 // import { isElectron } from '../../../integration/desktop'
 import { useState, useCallback, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { Connection, ConnectionOptionType } from '../../Connection'
 import { ConnectionModal, ConnectionModalState } from '../../ConnectionModal'
@@ -9,6 +9,7 @@ import { getSignature, connectToProvider, isSocialLogin, fromConnectionOptionToP
 import styles from './LoginPage.module.css'
 
 export const LoginPage = () => {
+  const [searchParams] = useSearchParams()
   const [connectionModalState, setConnectionModalState] = useState(ConnectionModalState.CONNECTING_WALLET)
   const [showLearnMore, setShowLearnMore] = useState(false)
   const [showConnectionModal, setShowConnectionModal] = useState(false)
@@ -41,8 +42,14 @@ export const LoginPage = () => {
           setShowConnectionModal(true)
           setConnectionModalState(ConnectionModalState.CONNECTING_WALLET)
           const connectionData = await connectToProvider(connectionType)
-          setConnectionModalState(ConnectionModalState.WAITING_FOR_SIGNATURE)
-          await getSignature(connectionData.account?.toLowerCase() ?? '', connectionData.provider)
+
+          // The requests sign in flow for the desktop app has a different identity.
+          // There is no need to create one here if the user is coming from the requests page.
+          if (searchParams.get('fromRequests') !== 'true') {
+            setConnectionModalState(ConnectionModalState.WAITING_FOR_SIGNATURE)
+            await getSignature(connectionData.account?.toLowerCase() ?? '', connectionData.provider)
+          }
+
           if (redirectTo) {
             window.location.href = decodeURIComponent(redirectTo)
           } else {
@@ -54,7 +61,7 @@ export const LoginPage = () => {
         }
       }
     },
-    [setConnectionModalState, setShowConnectionModal, setCurrentConnectionType, redirectTo]
+    [setConnectionModalState, setShowConnectionModal, setCurrentConnectionType, redirectTo, searchParams]
   )
 
   const handleOnCloseConnectionModal = useCallback(() => {

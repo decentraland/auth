@@ -126,10 +126,8 @@
   align-items: center;
 }
 
-.requestDetails {
+.closeWindow {
   font-size: 16px;
   font-weight: 400;
   color: var(--text);
-  line-height: 19.39px;
-  background-color: black;
 }
