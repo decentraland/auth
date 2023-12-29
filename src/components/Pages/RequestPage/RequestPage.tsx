@@ -10,6 +10,7 @@ import styles from './RequestPage.module.css'
 
 enum View {
   TIMEOUT,
+  DIFFERENT_ACCOUNT,
   // Loading
   LOADING_REQUEST,
   LOADING_ERROR,
@@ -35,21 +36,36 @@ export const RequestPage = () => {
 
   const requestId = params.requestId ?? ''
 
+  const getProvider = useCallback(async () => {
+    return new ethers.BrowserProvider(await connection.getProvider())
+  }, [])
+
+  const goToLogin = useCallback(() => {
+    navigate(`/login?redirectTo=/auth/requests/${requestId}`)
+  }, [])
+
   useEffect(() => {
     ;(async () => {
       try {
         // Try to restablish connection with the wallet.
         await connection.tryPreviousConnection()
       } catch (e) {
-        // If it fails it is because there is no connection and the user needs to login.
-        // The user should login and then be redirected back to this page to continue the transaction.
-        navigate(`/login?redirectTo=/auth/requests/${requestId}`)
+        goToLogin()
         return
       }
 
       try {
         const request = await authServerFetch('recover', { requestId })
         requestRef.current = request
+
+        const provider = await getProvider()
+        const signer = await provider.getSigner()
+        const signerAddress = await signer.getAddress()
+
+        if (request.sender && request.sender !== signerAddress.toLowerCase()) {
+          setView(View.DIFFERENT_ACCOUNT)
+          return
+        }
 
         timeoutRef.current = setTimeout(() => {
           setView(View.TIMEOUT)
@@ -65,11 +81,17 @@ export const RequestPage = () => {
         setView(View.LOADING_ERROR)
       }
     })()
+
+    return () => {
+      clearTimeout(timeoutRef.current)
+    }
   }, [])
 
-  const getProvider = useCallback(async () => {
-    return new ethers.BrowserProvider(await connection.getProvider())
-  }, [])
+  useEffect(() => {
+    if (view !== View.VERIFY_SIGN_IN && view !== View.WALLET_INTERACTION) {
+      clearTimeout(timeoutRef.current)
+    }
+  }, [view])
 
   const onDenyVerifySignIn = useCallback(() => {
     setView(View.VERIFY_SIGN_IN_DENIED)
@@ -84,8 +106,6 @@ export const RequestPage = () => {
       sender: await signer.getAddress(),
       result: signature
     })
-
-    clearTimeout(timeoutRef.current)
 
     if (result.error) {
       errorRef.current = result.error
@@ -109,8 +129,6 @@ export const RequestPage = () => {
       result
     })
 
-    clearTimeout(timeoutRef.current)
-
     if (fetchResult.error) {
       errorRef.current = fetchResult.error
       setView(View.WALLET_INTERACTION_ERROR)
@@ -127,6 +145,23 @@ export const RequestPage = () => {
           <div className={styles.errorTitle}>Looks like you took too long and the request has expired</div>
           <div className={styles.errorSubtitle}>Please return to Decentraland's Desktop App to try again.</div>
           <CloseWindow />
+        </div>
+      </main>
+    )
+  }
+
+  if (view === View.DIFFERENT_ACCOUNT) {
+    return (
+      <main className={styles.main}>
+        <div className={styles.left}>
+          <div className={styles.errorLogo}></div>
+          <div className={styles.errorTitle}>Looks like you are connected with a different account.</div>
+          <div className={styles.errorSubtitle}>Please change your wallet account to the one connected to the Desktop App.</div>
+          <div className={styles.buttons}>
+            <Button className={styles.yesButton} onClick={goToLogin}>
+              Change account
+            </Button>
+          </div>
         </div>
       </main>
     )
