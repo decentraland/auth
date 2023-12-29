@@ -34,6 +34,7 @@ export type ConnectionProps = {
     secondary: ConnectionOptionType[]
   }
   className?: string
+  loadingOption?: ConnectionOptionType
   onConnect: (wallet: ConnectionOptionType) => unknown
   onLearnMore: () => unknown
 }

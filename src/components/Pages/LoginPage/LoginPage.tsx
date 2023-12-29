@@ -5,7 +5,7 @@ import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { Connection, ConnectionOptionType } from '../../Connection'
 import { ConnectionModal, ConnectionModalState } from '../../ConnectionModal'
 import { WalletInformationModal } from '../../WalletInformationModal'
-import { getSignature, connectToProvider, isSocialLogin } from './utils'
+import { getSignature, connectToProvider, isSocialLogin, fromConnectionOptionToProviderType } from './utils'
 import styles from './LoginPage.module.css'
 
 export const LoginPage = () => {
@@ -13,6 +13,7 @@ export const LoginPage = () => {
   const [connectionModalState, setConnectionModalState] = useState(ConnectionModalState.CONNECTING_WALLET)
   const [showLearnMore, setShowLearnMore] = useState(false)
   const [showConnectionModal, setShowConnectionModal] = useState(false)
+  const [currentConnectionType, setCurrentConnectionType] = useState<ConnectionOptionType>()
   const redirectTo = useAfterLoginRedirection()
   const navigate = useNavigate()
   const showGuestOption = redirectTo && new URL(redirectTo).pathname === '/play'
@@ -32,12 +33,13 @@ export const LoginPage = () => {
 
   const handleOnConnect = useCallback(
     async (connectionType: ConnectionOptionType) => {
-      setShowConnectionModal(true)
+      setCurrentConnectionType(connectionType)
       if (isSocialLogin(connectionType)) {
         setConnectionModalState(ConnectionModalState.LOADING_MAGIC)
         await connectToProvider(connectionType)
       } else {
         try {
+          setShowConnectionModal(true)
           setConnectionModalState(ConnectionModalState.CONNECTING_WALLET)
           const connectionData = await connectToProvider(connectionType)
 
@@ -59,13 +61,20 @@ export const LoginPage = () => {
         }
       }
     },
-    [setConnectionModalState, setShowConnectionModal, redirectTo, searchParams]
+    [setConnectionModalState, setShowConnectionModal, setCurrentConnectionType, redirectTo, searchParams]
   )
 
   const handleOnCloseConnectionModal = useCallback(() => {
     setShowConnectionModal(false)
+    setCurrentConnectionType(undefined)
     setConnectionModalState(ConnectionModalState.CONNECTING_WALLET)
   }, [setShowConnectionModal])
+
+  const handleTryAgain = useCallback(() => {
+    if (currentConnectionType) {
+      handleOnConnect(currentConnectionType)
+    }
+  }, [currentConnectionType])
 
   return (
     <main className={styles.main}>
@@ -74,14 +83,15 @@ export const LoginPage = () => {
         open={showConnectionModal}
         state={connectionModalState}
         onClose={handleOnCloseConnectionModal}
-        onTryAgain={() => console.log('On try again')}
+        onTryAgain={handleTryAgain}
+        providerType={currentConnectionType ? fromConnectionOptionToProviderType(currentConnectionType) : null}
       />
-
       <div className={styles.left}>
         <div className={styles.leftInfo}>
           <Connection
             onLearnMore={handleLearnMore}
             onConnect={handleOnConnect}
+            loadingOption={currentConnectionType}
             socialOptions={{
               primary: ConnectionOptionType.GOOGLE,
               secondary: [ConnectionOptionType.DISCORD, ConnectionOptionType.APPLE, ConnectionOptionType.X]
