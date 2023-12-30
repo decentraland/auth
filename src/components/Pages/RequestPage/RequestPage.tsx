@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ethers } from 'ethers'
 import { io } from 'socket.io-client'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
+import { WearablePreview } from 'decentraland-ui/dist/components/WearablePreview/WearablePreview'
 import { connection } from 'decentraland-connect'
 import { config } from '../../../modules/config'
 import styles from './RequestPage.module.css'
@@ -33,6 +34,7 @@ export const RequestPage = () => {
   const requestRef = useRef<any>()
   const errorRef = useRef<string>()
   const timeoutRef = useRef<NodeJS.Timeout>()
+  const connectedAccountRef = useRef<string>()
 
   const requestId = params.requestId ?? ''
 
@@ -63,6 +65,8 @@ export const RequestPage = () => {
         const provider = await getProvider()
         const signer = await provider.getSigner()
         const signerAddress = await signer.getAddress()
+
+        connectedAccountRef.current = signerAddress
 
         // If the sender defined in the request is different than the one that is connected, show an error.
         if (request.sender && request.sender !== signerAddress.toLowerCase()) {
@@ -144,33 +148,56 @@ export const RequestPage = () => {
     }
   }, [getProvider])
 
+  const onChangeAccount = useCallback(async () => {
+    await connection.disconnect()
+    toLoginPage()
+  }, [])
+
+  const Container = useCallback((props: { children: ReactNode }) => {
+    return (
+      <div>
+        <div className={styles.background} />
+        <div className={styles.main}>
+          <div className={styles.left}>{props.children}</div>
+          <div className={styles.right}>
+            {connectedAccountRef.current ? (
+              <>
+                <WearablePreview
+                  lockBeta={true}
+                  panning={false}
+                  disableBackground={true}
+                  profile={connectedAccountRef.current}
+                  dev={false}
+                />
+                <Button inverted onClick={onChangeAccount}>
+                  Change Account
+                </Button>
+              </>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    )
+  }, [])
+
   if (view === View.TIMEOUT) {
     return (
-      <main className={styles.main}>
-        <div className={styles.left}>
-          <div className={styles.errorLogo}></div>
-          <div className={styles.errorTitle}>Looks like you took too long and the request has expired</div>
-          <div className={styles.errorSubtitle}>Please return to Decentraland's Desktop App to try again.</div>
-          <CloseWindow />
-        </div>
-      </main>
+      <Container>
+        <div className={styles.errorLogo}></div>
+        <div className={styles.title}>Looks like you took too long and the request has expired</div>
+        <div className={styles.description}>Please return to Decentraland's Desktop App to try again.</div>
+        <CloseWindow />
+      </Container>
     )
   }
 
   if (view === View.DIFFERENT_ACCOUNT) {
     return (
-      <main className={styles.main}>
-        <div className={styles.left}>
-          <div className={styles.errorLogo}></div>
-          <div className={styles.errorTitle}>Looks like you are connected with a different account.</div>
-          <div className={styles.errorSubtitle}>Please change your wallet account to the one connected to the Desktop App.</div>
-          <div className={styles.buttons}>
-            <Button className={styles.yesButton} onClick={toLoginPage}>
-              Change account
-            </Button>
-          </div>
-        </div>
-      </main>
+      <Container>
+        <div className={styles.errorLogo}></div>
+        <div className={styles.title}>Looks like you are connected with a different account.</div>
+        <div className={styles.description}>Please change your wallet account to the one connected to the Desktop App.</div>
+      </Container>
     )
   }
 
@@ -178,24 +205,22 @@ export const RequestPage = () => {
 
   if (view === View.LOADING_REQUEST) {
     return (
-      <main className={styles.main}>
+      <Container>
         <div className={styles.left}>
           <Loader active size="huge" />
         </div>
-      </main>
+      </Container>
     )
   }
 
   if (view === View.LOADING_ERROR) {
     return (
-      <main className={styles.main}>
-        <div className={styles.left}>
-          <div className={styles.errorLogo}></div>
-          <div className={styles.errorTitle}>There was an error recovering the request...</div>
-          <div className={styles.errorSubtitle}>The request is not available anymore. Feel free to create a new one and try again.</div>
-          <CloseWindow />
-        </div>
-      </main>
+      <Container>
+        <div className={styles.errorLogo}></div>
+        <div className={styles.title}>There was an error recovering the request...</div>
+        <div className={styles.description}>The request is not available anymore. Feel free to create a new one and try again.</div>
+        <CloseWindow />
+      </Container>
     )
   }
 
@@ -203,50 +228,44 @@ export const RequestPage = () => {
 
   if (view === View.VERIFY_SIGN_IN && requestRef.current) {
     return (
-      <main className={styles.main}>
-        <div className={styles.left}>
-          <div className={styles.logo}></div>
-          <div className={styles.title}>Verify Sign In</div>
-          <div className={styles.description}>Do you see the same verification number on your Desktop App?</div>
-          <div className={styles.code}>{requestRef.current.code}</div>
-          <div className={styles.buttons}>
-            <Button className={styles.noButton} onClick={onDenyVerifySignIn}>
-              <div className={styles.noLogo}></div> No
-            </Button>
-            <Button className={styles.yesButton} onClick={onApproveSignInVerification}>
-              <div className={styles.yesLogo}></div> Yes, they are the same
-            </Button>
-          </div>
+      <Container>
+        <div className={styles.logo}></div>
+        <div className={styles.title}>Verify Sign In</div>
+        <div className={styles.description}>Do you see the same verification number on your Desktop App?</div>
+        <div className={styles.code}>{requestRef.current.code}</div>
+        <div className={styles.buttons}>
+          <Button inverted onClick={onDenyVerifySignIn}>
+            No
+          </Button>
+          <Button primary onClick={onApproveSignInVerification}>
+            Yes, they are the same
+          </Button>
         </div>
-      </main>
+      </Container>
     )
   }
 
   if (view === View.VERIFY_SIGN_IN_DENIED) {
     return (
-      <main className={styles.main}>
-        <div className={styles.left}>
-          <div className={styles.errorLogo}></div>
-          <div className={styles.errorTitle}>Did the number not match, or was this action not taken by you?</div>
-          <div className={styles.errorSubtitle}>
-            If you're trying to sign in, retry the action. If this action was not initiated by you, dismiss this message.
-          </div>
-          <CloseWindow />
+      <Container>
+        <div className={styles.errorLogo}></div>
+        <div className={styles.title}>Did the number not match, or was this action not taken by you?</div>
+        <div className={styles.description}>
+          If you're trying to sign in, retry the action. If this action was not initiated by you, dismiss this message.
         </div>
-      </main>
+        <CloseWindow />
+      </Container>
     )
   }
 
   if (view === View.VERIFY_SIGN_IN_COMPLETE) {
     return (
-      <main className={styles.main}>
-        <div className={styles.left}>
-          <div className={styles.logo}></div>
-          <div className={styles.title}>Your account is ready!</div>
-          <div className={styles.description}>Return to the Desktop App and enjoy Decentraland.</div>
-          <CloseWindow />
-        </div>
-      </main>
+      <Container>
+        <div className={styles.logo}></div>
+        <div className={styles.title}>Your account is ready!</div>
+        <div className={styles.description}>Return to the Desktop App and enjoy Decentraland.</div>
+        <CloseWindow />
+      </Container>
     )
   }
 
@@ -254,47 +273,41 @@ export const RequestPage = () => {
 
   if (view === View.WALLET_INTERACTION && requestRef.current) {
     return (
-      <main className={styles.main}>
-        <div className={styles.left}>
-          <div className={styles.logo}></div>
-          <div className={styles.title}>The Desktop App wants to interact with your wallet.</div>
-          <div className={styles.description}>Review the following data carefully on your wallet before approving it.</div>
-          <div className={styles.buttons}>
-            <Button className={styles.noButton} onClick={onDenyWalletInteraction}>
-              <div className={styles.noLogo}></div>Deny
-            </Button>
-            <Button className={styles.yesButton} onClick={onApproveWalletInteraction}>
-              <div className={styles.yesLogo}></div>Allow
-            </Button>
-          </div>
+      <Container>
+        <div className={styles.logo}></div>
+        <div className={styles.title}>The Desktop App wants to interact with your wallet.</div>
+        <div className={styles.description}>Review the following data carefully on your wallet before approving it.</div>
+        <div className={styles.buttons}>
+          <Button inverted onClick={onDenyWalletInteraction}>
+            Deny
+          </Button>
+          <Button primary onClick={onApproveWalletInteraction}>
+            Allow
+          </Button>
         </div>
-      </main>
+      </Container>
     )
   }
 
   if (view === View.WALLET_INTERACTION_DENIED) {
     return (
-      <main className={styles.main}>
-        <div className={styles.left}>
-          <div className={styles.errorLogo}></div>
-          <div className={styles.errorTitle}>Was this action not initiated by you?</div>
-          <div className={styles.errorSubtitle}>If this action was not initiated by you, dismiss this message.</div>
-          <CloseWindow />
-        </div>
-      </main>
+      <Container>
+        <div className={styles.errorLogo}></div>
+        <div className={styles.title}>Was this action not initiated by you?</div>
+        <div className={styles.description}>If this action was not initiated by you, dismiss this message.</div>
+        <CloseWindow />
+      </Container>
     )
   }
 
   if (view === View.WALLET_INTERACTION_COMPLETE) {
     return (
-      <main className={styles.main}>
-        <div className={styles.left}>
-          <div className={styles.logo}></div>
-          <div className={styles.title}>Wallet interaction complete</div>
-          <div className={styles.description}>The action has been executed successfuly.</div>
-          <CloseWindow />
-        </div>
-      </main>
+      <Container>
+        <div className={styles.logo}></div>
+        <div className={styles.title}>Wallet interaction complete</div>
+        <div className={styles.description}>The action has been executed successfuly.</div>
+        <CloseWindow />
+      </Container>
     )
   }
 
@@ -302,14 +315,12 @@ export const RequestPage = () => {
 
   if (view === View.VERIFY_SIGN_IN_ERROR || view === View.WALLET_INTERACTION_ERROR) {
     return (
-      <main className={styles.main}>
-        <div className={styles.left}>
-          <div className={styles.errorLogo}></div>
-          <div className={styles.errorTitle}>There was an error while trying to submit the request.</div>
-          <div className={styles.errorSubtitle}>Return to the Desktop App to try again, or contant support if the error persists.</div>
-          <CloseWindow />
-        </div>
-      </main>
+      <Container>
+        <div className={styles.errorLogo}></div>
+        <div className={styles.title}>There was an error while trying to submit the request.</div>
+        <div className={styles.description}>Return to the Desktop App to try again, or contant support if the error persists.</div>
+        <CloseWindow />
+      </Container>
     )
   }
 
