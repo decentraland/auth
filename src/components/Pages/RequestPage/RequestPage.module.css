@@ -33,7 +33,7 @@
   justify-content: center;
   align-items: flex-start;
   height: 100%;
-  max-width: 50%;
+  width: 30%;
 }
 
 .right {
@@ -46,10 +46,14 @@
 :global(.WearablePreview) {
   background-color: unset;
   height: 80%;
+  width: 100vh;
+  transform: translateX(-40%);
 }
 
-.right :global(.ui.button) {
-  margin: 0 auto;
+.changeAccount {
+  width: 100vh;
+  transform: translateX(-40%);
+  text-align: center;
 }
 
 .errorLogo {
@@ -92,6 +96,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 24px;
   margin-top: 40px;
 }

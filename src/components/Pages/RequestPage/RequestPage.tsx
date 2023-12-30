@@ -169,9 +169,11 @@ export const RequestPage = () => {
                   profile={connectedAccountRef.current}
                   dev={false}
                 />
-                <Button inverted onClick={onChangeAccount}>
-                  Change Account
-                </Button>
+                <div className={styles.changeAccount}>
+                  <Button inverted onClick={onChangeAccount}>
+                    Change Account
+                  </Button>
+                </div>
               </>
             ) : null}
           </div>
