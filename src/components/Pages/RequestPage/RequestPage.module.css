@@ -1,14 +1,12 @@
-.main {
-  display: grid;
-  grid-template-columns: 50% 50%;
+.background {
+  position: fixed;
   height: 100%;
-  background-repeat: no-repeat;
+  width: 100%;
+  background: url('/src/assets/images/party.png') no-repeat center center fixed;
   background-size: cover;
-  background-position: right;
-  background-image: url('/src/assets/images/party.png');
 }
 
-.main::before {
+.background::before {
   content: '';
   position: fixed;
   width: 100%;
@@ -19,15 +17,43 @@
   overflow: hidden;
 }
 
-.left {
+.main {
+  font-family: system-ui, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  color: var(--text);
+  position: absolute;
+  display: flex;
+  height: 100%;
   width: 100%;
+  justify-content: space-evenly;
+}
+
+.left {
   display: flex;
   flex-direction: column;
-  align-items: start;
   justify-content: center;
-  z-index: 1;
-  padding-left: 80px;
-  gap: 32px;
+  align-items: flex-start;
+  height: 100%;
+  width: 30%;
+}
+
+.right {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 25%;
+}
+
+:global(.WearablePreview) {
+  background-color: unset;
+  height: 80%;
+  width: 100vh;
+  transform: translateX(-40%);
+}
+
+.changeAccount {
+  width: 100vh;
+  transform: translateX(-40%);
+  text-align: center;
 }
 
 .errorLogo {
@@ -39,25 +65,6 @@
   background-image: url('/src/assets/images/wrong.svg');
 }
 
-.errorTitle {
-  font-size: 30px;
-  font-weight: 600;
-  color: var(--text);
-  line-height: 36.31px;
-}
-
-.errorSubtitle {
-  font-size: 24px;
-  font-weight: 400;
-  color: var(--text);
-  line-height: 29.05px;
-}
-
-.errorValue {
-  font-size: 12;
-  color: var(--text);
-}
-
 .logo {
   width: 40px;
   height: 40px;
@@ -65,69 +72,38 @@
 }
 
 .title {
-  font-size: 30px;
+  font-size: 36px;
   font-weight: 600;
-  color: var(--text);
-  line-height: 36.31px;
+  line-height: 44px;
+  margin-top: 32px;
 }
 
 .description {
   font-size: 24px;
   font-weight: 400;
-  color: var(--text);
   line-height: 29.05px;
+  margin-top: 16px;
 }
 
 .code {
   font-size: 100px;
   font-weight: 700;
-  color: var(--text);
   line-height: 121.02px;
+  margin-top: 40px;
 }
 
 .buttons {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 24px;
-}
-
-.noLogo {
-  width: 24px;
-  height: 24px;
-  background-repeat: no-repeat;
-  background-size: cover;
-  background-position: right;
-  background-image: url('/src/assets/images/wrong.svg');
-  margin-right: 10px;
-}
-
-.yesLogo {
-  width: 24px;
-  height: 24px;
-  background-repeat: no-repeat;
-  background-size: cover;
-  background-position: right;
-  background-image: url('/src/assets/images/correct.svg');
-  margin-right: 10px;
-}
-
-.noButton:global(.ui.button) {
-  background-color: #ffffff;
-  color: black;
-  display: flex;
-  align-items: center;
-}
-
-.yesButton:global(.ui.button) {
-  background-color: #ffffff;
-  color: black;
-  display: flex;
-  align-items: center;
+  margin-top: 40px;
+  z-index: 1;
 }
 
 .closeWindow {
   font-size: 16px;
   font-weight: 400;
-  color: var(--text);
+  margin-top: 40px;
 }
