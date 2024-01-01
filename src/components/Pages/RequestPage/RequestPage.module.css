@@ -99,6 +99,7 @@
   flex-wrap: wrap;
   gap: 24px;
   margin-top: 40px;
+  z-index: 1;
 }
 
 .closeWindow {
