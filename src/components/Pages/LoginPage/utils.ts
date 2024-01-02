@@ -1,6 +1,6 @@
+import { OAuthProvider } from '@magic-ext/oauth'
 import { ethers } from 'ethers'
 import { AuthIdentity, Authenticator } from '@dcl/crypto'
-import { OAuthProvider } from '@magic-ext/oauth'
 import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
 import { localStorageGetIdentity, localStorageStoreIdentity } from '@dcl/single-sign-on-client'
 import { connection, getConfiguration, ConnectionResponse, Provider } from 'decentraland-connect'
