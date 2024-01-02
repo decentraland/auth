@@ -18,7 +18,7 @@ export const DefaultPage = () => {
   useEffect(() => {
     checkIfConnected().then(isConnected => {
       if (isConnected) {
-        navigate('/user')
+        window.location.href = '/'
       } else {
         navigate({ pathname: '/login', search: location.search })
       }

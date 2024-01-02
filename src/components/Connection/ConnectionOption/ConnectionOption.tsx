@@ -16,7 +16,7 @@ export const ConnectionOption = (props: ConnectionIconProps): JSX.Element => {
           key={type}
           size="small"
           data-testid={`${testId}-${type}-button`}
-          className={className}
+          className={classNames(className, styles.button)}
           onClick={() => onClick(type)}
           disabled={disabled}
           loading={loading}

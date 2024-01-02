@@ -1,3 +1,7 @@
+.button:global(.ui.small.primary.button) {
+  min-height: 46px;
+}
+
 .icon {
   min-width: 32px;
   min-height: 32px;

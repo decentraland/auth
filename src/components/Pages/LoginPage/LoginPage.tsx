@@ -1,6 +1,5 @@
-// import { isElectron } from '../../../integration/desktop'
 import { useState, useCallback, useMemo } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { Connection, ConnectionOptionType } from '../../Connection'
 import { ConnectionModal, ConnectionModalState } from '../../ConnectionModal'
@@ -15,7 +14,6 @@ export const LoginPage = () => {
   const [showConnectionModal, setShowConnectionModal] = useState(false)
   const [currentConnectionType, setCurrentConnectionType] = useState<ConnectionOptionType>()
   const redirectTo = useAfterLoginRedirection()
-  const navigate = useNavigate()
   const showGuestOption = redirectTo && new URL(redirectTo).pathname === '/play'
 
   const handleLearnMore = useCallback(() => {
@@ -53,7 +51,7 @@ export const LoginPage = () => {
           if (redirectTo) {
             window.location.href = decodeURIComponent(redirectTo)
           } else {
-            navigate('/user')
+            window.location.href = '/'
           }
           setShowConnectionModal(false)
         } catch (error) {
