@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { Connection, ConnectionOptionType } from '../../Connection'
 import { ConnectionModal, ConnectionModalState } from '../../ConnectionModal'
+import { MagicInformationModal } from '../../MagicInformationModal'
 import { WalletInformationModal } from '../../WalletInformationModal'
 import { getSignature, connectToProvider, isSocialLogin, fromConnectionOptionToProviderType } from './utils'
 import styles from './LoginPage.module.css'
@@ -11,14 +12,31 @@ export const LoginPage = () => {
   const [searchParams] = useSearchParams()
   const [connectionModalState, setConnectionModalState] = useState(ConnectionModalState.CONNECTING_WALLET)
   const [showLearnMore, setShowLearnMore] = useState(false)
+  const [showMagicLearnMore, setShowMagicLearnMore] = useState(false)
   const [showConnectionModal, setShowConnectionModal] = useState(false)
   const [currentConnectionType, setCurrentConnectionType] = useState<ConnectionOptionType>()
   const redirectTo = useAfterLoginRedirection()
-  const showGuestOption = redirectTo && new URL(redirectTo).pathname === '/play'
+  const showGuestOption = redirectTo && new URL(redirectTo).pathname.includes('/play')
 
-  const handleLearnMore = useCallback(() => {
-    setShowLearnMore(!showLearnMore)
-  }, [setShowLearnMore, showLearnMore])
+  const handleLearnMore = useCallback(
+    (option?: ConnectionOptionType) => {
+      if (option && isSocialLogin(option)) {
+        setShowMagicLearnMore(true)
+      } else {
+        setShowLearnMore(true)
+      }
+    },
+    [setShowLearnMore, setShowMagicLearnMore, showLearnMore]
+  )
+
+  const handleCloseLearnMore = useCallback(() => {
+    setShowLearnMore(false)
+    setShowMagicLearnMore(false)
+  }, [setShowLearnMore, setShowMagicLearnMore])
+
+  const handleToggleMagicInfo = useCallback(() => {
+    setShowMagicLearnMore(!showMagicLearnMore)
+  }, [setShowMagicLearnMore, showMagicLearnMore])
 
   const guestRedirectToURL = useMemo(() => {
     if (redirectTo) {
@@ -76,7 +94,8 @@ export const LoginPage = () => {
 
   return (
     <main className={styles.main}>
-      <WalletInformationModal open={showLearnMore} onClose={handleLearnMore} />
+      <WalletInformationModal open={showLearnMore} onClose={handleCloseLearnMore} />
+      <MagicInformationModal open={showMagicLearnMore} onClose={handleToggleMagicInfo} />
       <ConnectionModal
         open={showConnectionModal}
         state={connectionModalState}

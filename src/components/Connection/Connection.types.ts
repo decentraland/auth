@@ -36,5 +36,5 @@ export type ConnectionProps = {
   className?: string
   loadingOption?: ConnectionOptionType
   onConnect: (wallet: ConnectionOptionType) => unknown
-  onLearnMore: () => unknown
+  onLearnMore: (type?: ConnectionOptionType) => unknown
 }
