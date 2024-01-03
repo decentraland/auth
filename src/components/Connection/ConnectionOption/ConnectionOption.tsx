@@ -1,6 +1,7 @@
 import classNames from 'classnames'
 import Popup from 'semantic-ui-react/dist/commonjs/modules/Popup'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
+import { capitalize } from '../../../shared/text'
 import { ConnectionIconProps } from './ConnectionOption.types'
 import styles from './ConnectionOption.module.css'
 
@@ -27,7 +28,7 @@ export const ConnectionOption = (props: ConnectionIconProps): JSX.Element => {
           {children}
         </Button>
       }
-      content={type}
+      content={capitalize(type)}
       on="hover"
     />
   )
