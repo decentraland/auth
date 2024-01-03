@@ -109,7 +109,14 @@ export const Connection = (props: ConnectionProps): JSX.Element => {
             testId={SOCIAL_PRIMARY_TEST_ID}
             option={socialOptions?.primary}
             loadingOption={loadingOption}
-            message={<>{i18n.socialMessage(<div className={styles.primaryMagic} role="img" aria-label="Magic" />)}</>}
+            message={
+              <>
+                {i18n.socialMessage(<div className={styles.primaryMagic} role="img" aria-label="Magic" />)}
+                <span className={styles.primaryLearnMore} role="button" onClick={() => onLearnMore(socialOptions?.primary)}>
+                  Learn More
+                </span>
+              </>
+            }
           >
             <>{i18n.accessWith(socialOptions?.primary)}</>
           </Primary>
@@ -121,7 +128,7 @@ export const Connection = (props: ConnectionProps): JSX.Element => {
             option={web3Options?.primary}
             loadingOption={loadingOption}
             message={i18n.web3Message(element => (
-              <span className={styles.primaryLearnMore} role="button" onClick={onLearnMore}>
+              <span className={styles.primaryLearnMore} role="button" onClick={() => onLearnMore(web3Options.primary)}>
                 {element}
               </span>
             ))}
