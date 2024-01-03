@@ -1,0 +1,34 @@
+.main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  text-align: center;
+  gap: 30px;
+}
+
+.title {
+  margin-bottom: 0;
+}
+
+.infoModal :global(.dcl.modal-navigation) {
+  padding: 0
+}
+
+:global(.ui.modal) > :global(.content).infoContent {
+  margin: 60px;
+}
+
+.info {
+  font-size: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.infoModal .goBackButton:global(.ui.button.secondary) {
+  color: white;
+  box-shadow: none !important;
+}

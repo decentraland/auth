@@ -24,7 +24,7 @@ const defaultProps = {
 export const WalletInformationModal = (props: WalletInformationModalProps) => {
   const { i18n = defaultProps.i18n, onClose, open } = props
   return (
-    <Modal size="tiny" open={open} className={styles.infoModal}>
+    <Modal size="tiny" open={open} className={styles.infoModal} onClose={onClose}>
       <ModalNavigation title="" onClose={onClose} />
       <ModalContent className={styles.infoContent}>
         <div className={styles.main}>
