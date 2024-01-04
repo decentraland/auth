@@ -167,7 +167,7 @@ export const RequestPage = () => {
     toLoginPage()
   }, [])
 
-  const Container = useCallback((props: { children: ReactNode; canChangeAccount?: boolean }) => {
+  const Container = useCallback((props: { children: ReactNode; canChangeAccount?: boolean; isLoading?: boolean }) => {
     return (
       <div>
         <div className={styles.background} />
@@ -185,7 +185,7 @@ export const RequestPage = () => {
                 />
                 {props.canChangeAccount ? (
                   <div className={styles.changeAccount}>
-                    <Button inverted onClick={onChangeAccount}>
+                    <Button disabled={isLoading} inverted onClick={onChangeAccount}>
                       Change Account
                     </Button>
                   </div>
@@ -247,7 +247,7 @@ export const RequestPage = () => {
 
   if (view === View.VERIFY_SIGN_IN && requestRef.current) {
     return (
-      <Container canChangeAccount>
+      <Container canChangeAccount isLoading={isLoading}>
         <div className={styles.logo}></div>
         <div className={styles.title}>Verify Sign In</div>
         <div className={styles.description}>Do you see the same verification number on your Desktop App?</div>
@@ -292,7 +292,7 @@ export const RequestPage = () => {
 
   if (view === View.WALLET_INTERACTION && requestRef.current) {
     return (
-      <Container canChangeAccount>
+      <Container canChangeAccount isLoading={isLoading}>
         <div className={styles.logo}></div>
         <div className={styles.title}>The Desktop App wants to interact with your wallet.</div>
         <div className={styles.description}>Review the following data carefully on your wallet before approving it.</div>
