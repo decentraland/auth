@@ -2,10 +2,20 @@
   display: grid;
   grid-template-columns: 50% 50%;
   height: 100%;
+  position: relative
+}
+
+.background {
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  position: absolute;
   background-repeat: no-repeat;
   background-size: cover;
   background-position: right;
-  background-image: url('/src/assets/images/party.png');
+  animation: move-background 10s linear infinite alternate;
+  z-index: -1;
 }
 
 .main::before {
@@ -95,5 +105,14 @@
   .left {
     padding-left: 20px;
     padding-right: 20px;
+  }
+}
+
+@keyframes move-background {
+  from {
+    transform: translateX(0);
+  }
+  to { 
+    transform: translateX(10%);
   }
 }
