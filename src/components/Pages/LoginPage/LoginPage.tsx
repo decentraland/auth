@@ -1,11 +1,7 @@
 import { useState, useCallback, useMemo, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { useAfterLoginRedirection } from '../../../hooks/redirection'
-import { Connection, ConnectionOptionType } from '../../Connection'
-import { ConnectionModal, ConnectionModalState } from '../../ConnectionModal'
-import { MagicInformationModal } from '../../MagicInformationModal'
-import { WalletInformationModal } from '../../WalletInformationModal'
 import Image1 from '../../../assets/images/background/image1.webp'
+import Image10 from '../../../assets/images/background/image10.webp'
 import Image2 from '../../../assets/images/background/image2.webp'
 import Image3 from '../../../assets/images/background/image3.webp'
 import Image4 from '../../../assets/images/background/image4.webp'
@@ -14,7 +10,11 @@ import Image6 from '../../../assets/images/background/image6.webp'
 import Image7 from '../../../assets/images/background/image7.webp'
 import Image8 from '../../../assets/images/background/image8.webp'
 import Image9 from '../../../assets/images/background/image9.webp'
-import Image10 from '../../../assets/images/background/image10.webp'
+import { useAfterLoginRedirection } from '../../../hooks/redirection'
+import { Connection, ConnectionOptionType } from '../../Connection'
+import { ConnectionModal, ConnectionModalState } from '../../ConnectionModal'
+import { MagicInformationModal } from '../../MagicInformationModal'
+import { WalletInformationModal } from '../../WalletInformationModal'
 import { getSignature, connectToProvider, isSocialLogin, fromConnectionOptionToProviderType } from './utils'
 import styles from './LoginPage.module.css'
 
@@ -105,22 +105,19 @@ export const LoginPage = () => {
     }
   }, [currentConnectionType])
 
-  useEffect(
-    () => {
-      const backgroundInterval = setInterval(() => {
-        setCurrentBackgroundIndex(index => {
-          if (index === BACKGROUND_IMAGES.length - 1) {
-            return 0
-          }
-          return index + 1
-        })
-      }, 5000)
-      return () => {
-        clearInterval(backgroundInterval)
-      }
-    },
-    []
-  )
+  useEffect(() => {
+    const backgroundInterval = setInterval(() => {
+      setCurrentBackgroundIndex(index => {
+        if (index === BACKGROUND_IMAGES.length - 1) {
+          return 0
+        }
+        return index + 1
+      })
+    }, 5000)
+    return () => {
+      clearInterval(backgroundInterval)
+    }
+  }, [])
 
   return (
     <main className={styles.main}>
