@@ -7,6 +7,7 @@ import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
 import { WearablePreview } from 'decentraland-ui/dist/components/WearablePreview/WearablePreview'
 import { connection } from 'decentraland-connect'
 import { config } from '../../../modules/config'
+import { isErrorWithMessage } from '../../../shared/errors'
 import styles from './RequestPage.module.css'
 
 enum View {
@@ -31,11 +32,11 @@ export const RequestPage = () => {
   const params = useParams()
   const navigate = useNavigate()
   const [view, setView] = useState(View.LOADING_REQUEST)
+  const [isLoading, setIsLoading] = useState(false)
   const requestRef = useRef<any>()
-  const errorRef = useRef<string>()
+  const [error, setError] = useState<string>()
   const timeoutRef = useRef<NodeJS.Timeout>()
   const connectedAccountRef = useRef<string>()
-
   const requestId = params.requestId ?? ''
 
   const getProvider = useCallback(async () => {
@@ -86,7 +87,7 @@ export const RequestPage = () => {
           setView(View.WALLET_INTERACTION)
         }
       } catch (e) {
-        errorRef.current = (e as Error).message
+        setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
         setView(View.LOADING_ERROR)
       }
     })()
@@ -109,42 +110,55 @@ export const RequestPage = () => {
   }, [])
 
   const onApproveSignInVerification = useCallback(async () => {
-    const provider = await getProvider()
-    const signer = await provider.getSigner()
-    const signature = await signer.signMessage(requestRef.current.params[0])
-    const result = await authServerFetch('outcome', {
-      requestId,
-      sender: await signer.getAddress(),
-      result: signature
-    })
+    setIsLoading(true)
+    try {
+      throw new Error('Falopa')
+      const provider = await getProvider()
+      const signer = await provider.getSigner()
+      const signature = await signer.signMessage(requestRef.current.params[0])
+      const result = await authServerFetch('outcome', {
+        requestId,
+        sender: await signer.getAddress(),
+        result: signature
+      })
 
-    if (result.error) {
-      errorRef.current = result.error
+      if (result.error) {
+        throw new Error(result.error)
+      } else {
+        setView(View.VERIFY_SIGN_IN_COMPLETE)
+      }
+    } catch (e) {
+      setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
       setView(View.VERIFY_SIGN_IN_ERROR)
-    } else {
-      setView(View.VERIFY_SIGN_IN_COMPLETE)
+    } finally {
+      setIsLoading(false)
     }
-  }, [getProvider])
+  }, [getProvider, setIsLoading])
 
   const onDenyWalletInteraction = useCallback(() => {
     setView(View.WALLET_INTERACTION_DENIED)
   }, [])
 
   const onApproveWalletInteraction = useCallback(async () => {
-    const provider = await getProvider()
-    const signer = await provider.getSigner()
-    const result = await provider.send(requestRef.current.method, requestRef.current.params)
-    const fetchResult = await authServerFetch('outcome', {
-      requestId,
-      sender: await signer.getAddress(),
-      result
-    })
+    setIsLoading(true)
+    try {
+      const provider = await getProvider()
+      const signer = await provider.getSigner()
+      const result = await provider.send(requestRef.current.method, requestRef.current.params)
+      const fetchResult = await authServerFetch('outcome', {
+        requestId,
+        sender: await signer.getAddress(),
+        result
+      })
 
-    if (fetchResult.error) {
-      errorRef.current = fetchResult.error
+      if (fetchResult.error) {
+        throw new Error(fetchResult.error)
+      } else {
+        setView(View.WALLET_INTERACTION_COMPLETE)
+      }
+    } catch (e) {
+      setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
       setView(View.WALLET_INTERACTION_ERROR)
-    } else {
-      setView(View.WALLET_INTERACTION_COMPLETE)
     }
   }, [getProvider])
 
@@ -153,7 +167,7 @@ export const RequestPage = () => {
     toLoginPage()
   }, [])
 
-  const Container = useCallback((props: { children: ReactNode }) => {
+  const Container = useCallback((props: { children: ReactNode; canChangeAccount?: boolean; isLoading?: boolean }) => {
     return (
       <div>
         <div className={styles.background} />
@@ -169,11 +183,13 @@ export const RequestPage = () => {
                   profile={connectedAccountRef.current}
                   dev={false}
                 />
-                <div className={styles.changeAccount}>
-                  <Button inverted onClick={onChangeAccount}>
-                    Change Account
-                  </Button>
-                </div>
+                {props.canChangeAccount ? (
+                  <div className={styles.changeAccount}>
+                    <Button disabled={isLoading} inverted onClick={onChangeAccount}>
+                      Change Account
+                    </Button>
+                  </div>
+                ) : null}
               </>
             ) : null}
           </div>
@@ -195,7 +211,7 @@ export const RequestPage = () => {
 
   if (view === View.DIFFERENT_ACCOUNT) {
     return (
-      <Container>
+      <Container canChangeAccount>
         <div className={styles.errorLogo}></div>
         <div className={styles.title}>Looks like you are connected with a different account.</div>
         <div className={styles.description}>Please change your wallet account to the one connected to the Desktop App.</div>
@@ -222,6 +238,7 @@ export const RequestPage = () => {
         <div className={styles.title}>There was an error recovering the request...</div>
         <div className={styles.description}>The request is not available anymore. Feel free to create a new one and try again.</div>
         <CloseWindow />
+        <div className={styles.errorMessage}>{error}</div>
       </Container>
     )
   }
@@ -230,16 +247,16 @@ export const RequestPage = () => {
 
   if (view === View.VERIFY_SIGN_IN && requestRef.current) {
     return (
-      <Container>
+      <Container canChangeAccount isLoading={isLoading}>
         <div className={styles.logo}></div>
         <div className={styles.title}>Verify Sign In</div>
         <div className={styles.description}>Do you see the same verification number on your Desktop App?</div>
         <div className={styles.code}>{requestRef.current.code}</div>
         <div className={styles.buttons}>
-          <Button inverted onClick={onDenyVerifySignIn}>
+          <Button inverted disabled={isLoading} onClick={onDenyVerifySignIn}>
             No
           </Button>
-          <Button primary onClick={onApproveSignInVerification}>
+          <Button primary loading={isLoading} disabled={isLoading} onClick={onApproveSignInVerification}>
             Yes, they are the same
           </Button>
         </div>
@@ -249,7 +266,7 @@ export const RequestPage = () => {
 
   if (view === View.VERIFY_SIGN_IN_DENIED) {
     return (
-      <Container>
+      <Container canChangeAccount>
         <div className={styles.errorLogo}></div>
         <div className={styles.title}>Did the number not match, or was this action not taken by you?</div>
         <div className={styles.description}>
@@ -275,15 +292,15 @@ export const RequestPage = () => {
 
   if (view === View.WALLET_INTERACTION && requestRef.current) {
     return (
-      <Container>
+      <Container canChangeAccount isLoading={isLoading}>
         <div className={styles.logo}></div>
         <div className={styles.title}>The Desktop App wants to interact with your wallet.</div>
         <div className={styles.description}>Review the following data carefully on your wallet before approving it.</div>
         <div className={styles.buttons}>
-          <Button inverted onClick={onDenyWalletInteraction}>
+          <Button inverted disabled={isLoading} onClick={onDenyWalletInteraction}>
             Deny
           </Button>
-          <Button primary onClick={onApproveWalletInteraction}>
+          <Button primary disabled={isLoading} loading={isLoading} onClick={onApproveWalletInteraction}>
             Allow
           </Button>
         </div>
@@ -307,7 +324,7 @@ export const RequestPage = () => {
       <Container>
         <div className={styles.logo}></div>
         <div className={styles.title}>Wallet interaction complete</div>
-        <div className={styles.description}>The action has been executed successfuly.</div>
+        <div className={styles.description}>The action has been executed successfully.</div>
         <CloseWindow />
       </Container>
     )
@@ -320,8 +337,9 @@ export const RequestPage = () => {
       <Container>
         <div className={styles.errorLogo}></div>
         <div className={styles.title}>There was an error while trying to submit the request.</div>
-        <div className={styles.description}>Return to the Desktop App to try again, or contant support if the error persists.</div>
+        <div className={styles.description}>Return to the Desktop App to try again, or contact support if the error persists.</div>
         <CloseWindow />
+        <div className={styles.errorMessage}>{error}</div>
       </Container>
     )
   }
