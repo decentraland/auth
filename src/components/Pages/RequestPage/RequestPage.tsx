@@ -11,6 +11,7 @@ import manDefault from '../../../assets/images/ManDefault.webp'
 import platformImg from '../../../assets/images/Platform.webp'
 import usePageTracking from '../../../hooks/usePageTracking'
 import { getAnalytics } from '../../../modules/analytics/segment'
+import { ClickEvents, TrackingEvents } from '../../../modules/analytics/types'
 import { config } from '../../../modules/config'
 import { isErrorWithMessage } from '../../../shared/errors'
 import { fetchProfile } from './utils'
@@ -116,8 +117,11 @@ export const RequestPage = () => {
   }, [view])
 
   const onDenyVerifySignIn = useCallback(() => {
+    analytics.track(TrackingEvents.CLICK, {
+      action: ClickEvents.DENY_SIGN_IN
+    })
     setView(View.VERIFY_SIGN_IN_DENIED)
-  }, [])
+  }, [analytics])
 
   const handleLoadWearablePreview = useCallback(params => {
     if (connectedAccountRef.current && params.profile === connectedAccountRef.current) {
@@ -126,6 +130,9 @@ export const RequestPage = () => {
   }, [])
 
   const onApproveSignInVerification = useCallback(async () => {
+    analytics.track(TrackingEvents.CLICK, {
+      action: ClickEvents.APPROVE_SING_IN
+    })
     setIsLoading(true)
     const provider = providerRef.current
     try {
@@ -152,11 +159,14 @@ export const RequestPage = () => {
     } finally {
       setIsLoading(false)
     }
-  }, [setIsLoading])
+  }, [setIsLoading, analytics])
 
   const onDenyWalletInteraction = useCallback(() => {
+    analytics.track(TrackingEvents.CLICK, {
+      action: ClickEvents.DENY_WALLET_INTERACTION
+    })
     setView(View.WALLET_INTERACTION_DENIED)
-  }, [])
+  }, [analytics])
 
   const onApproveWalletInteraction = useCallback(async () => {
     setIsLoading(true)
@@ -168,6 +178,10 @@ export const RequestPage = () => {
 
       const signer = await provider.getSigner()
       const result = await provider.send(requestRef.current.method, requestRef.current.params)
+      analytics.track(TrackingEvents.CLICK, {
+        action: ClickEvents.APPROVE_WALLET_INTERACTION,
+        method: requestRef.current.method
+      })
       const fetchResult = await authServerFetch('outcome', {
         requestId,
         sender: await signer.getAddress(),
@@ -184,7 +198,7 @@ export const RequestPage = () => {
       setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
       setView(View.WALLET_INTERACTION_ERROR)
     }
-  }, [])
+  }, [analytics])
 
   const onChangeAccount = useCallback(async evt => {
     evt.preventDefault()
