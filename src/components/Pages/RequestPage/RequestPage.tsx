@@ -112,7 +112,6 @@ export const RequestPage = () => {
   const onApproveSignInVerification = useCallback(async () => {
     setIsLoading(true)
     try {
-      throw new Error('Falopa')
       const provider = await getProvider()
       const signer = await provider.getSigner()
       const signature = await signer.signMessage(requestRef.current.params[0])
