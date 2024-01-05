@@ -1,11 +1,13 @@
 import { ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ethers } from 'ethers'
+import { ethers, BrowserProvider } from 'ethers'
 import { io } from 'socket.io-client'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
 import { WearablePreview } from 'decentraland-ui/dist/components/WearablePreview/WearablePreview'
 import { connection } from 'decentraland-connect'
+import usePageTracking from '../../../hooks/usePageTracking'
+import { getAnalytics } from '../../../modules/analytics/segment'
 import { config } from '../../../modules/config'
 import { isErrorWithMessage } from '../../../shared/errors'
 import styles from './RequestPage.module.css'
@@ -29,8 +31,11 @@ enum View {
 }
 
 export const RequestPage = () => {
+  usePageTracking()
+  const analytics = getAnalytics()
   const params = useParams()
   const navigate = useNavigate()
+  const providerRef = useRef<BrowserProvider>()
   const [view, setView] = useState(View.LOADING_REQUEST)
   const [isLoading, setIsLoading] = useState(false)
   const requestRef = useRef<any>()
@@ -38,10 +43,6 @@ export const RequestPage = () => {
   const timeoutRef = useRef<NodeJS.Timeout>()
   const connectedAccountRef = useRef<string>()
   const requestId = params.requestId ?? ''
-
-  const getProvider = useCallback(async () => {
-    return new ethers.BrowserProvider(await connection.getProvider())
-  }, [])
 
   // Goes to the login page where the user will have to connect a wallet.
   const toLoginPage = useCallback(() => {
@@ -52,21 +53,20 @@ export const RequestPage = () => {
     ;(async () => {
       try {
         // Try to restablish connection with the wallet.
-        await connection.tryPreviousConnection()
+        const connectionData = await connection.tryPreviousConnection()
+        providerRef.current = new ethers.BrowserProvider(connectionData.provider)
       } catch (e) {
         toLoginPage()
         return
       }
 
       try {
+        const signer = await providerRef.current.getSigner()
+        const signerAddress = await signer.getAddress()
+        analytics.identify({ ethAddress: signerAddress })
         // Recover the request from the auth server.
         const request = await authServerFetch('recover', { requestId })
         requestRef.current = request
-
-        const provider = await getProvider()
-        const signer = await provider.getSigner()
-        const signerAddress = await signer.getAddress()
-
         connectedAccountRef.current = signerAddress
 
         // If the sender defined in the request is different than the one that is connected, show an error.
@@ -111,8 +111,12 @@ export const RequestPage = () => {
 
   const onApproveSignInVerification = useCallback(async () => {
     setIsLoading(true)
+    const provider = providerRef.current
     try {
-      const provider = await getProvider()
+      if (!provider) {
+        throw new Error('Provider not created')
+      }
+
       const signer = await provider.getSigner()
       const signature = await signer.signMessage(requestRef.current.params[0])
       const result = await authServerFetch('outcome', {
@@ -132,7 +136,7 @@ export const RequestPage = () => {
     } finally {
       setIsLoading(false)
     }
-  }, [getProvider, setIsLoading])
+  }, [setIsLoading])
 
   const onDenyWalletInteraction = useCallback(() => {
     setView(View.WALLET_INTERACTION_DENIED)
@@ -140,8 +144,12 @@ export const RequestPage = () => {
 
   const onApproveWalletInteraction = useCallback(async () => {
     setIsLoading(true)
+    const provider = providerRef.current
     try {
-      const provider = await getProvider()
+      if (!provider) {
+        throw new Error('Provider not created')
+      }
+
       const signer = await provider.getSigner()
       const result = await provider.send(requestRef.current.method, requestRef.current.params)
       const fetchResult = await authServerFetch('outcome', {
@@ -156,10 +164,11 @@ export const RequestPage = () => {
         setView(View.WALLET_INTERACTION_COMPLETE)
       }
     } catch (e) {
+      console.log('Wallet error', JSON.stringify((e as any).info?.error))
       setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
       setView(View.WALLET_INTERACTION_ERROR)
     }
-  }, [getProvider])
+  }, [])
 
   const onChangeAccount = useCallback(async () => {
     await connection.disconnect()

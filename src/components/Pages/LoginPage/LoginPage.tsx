@@ -11,16 +11,23 @@ import Image7 from '../../../assets/images/background/image7.webp'
 import Image8 from '../../../assets/images/background/image8.webp'
 import Image9 from '../../../assets/images/background/image9.webp'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
+import usePageTracking from '../../../hooks/usePageTracking'
+import { getAnalytics } from '../../../modules/analytics/segment'
+import { ClickEvents, ConnectionType, TrackingEvents } from '../../../modules/analytics/types'
+import { isErrorWithMessage } from '../../../shared/errors'
+import { wait } from '../../../shared/time'
 import { Connection, ConnectionOptionType } from '../../Connection'
 import { ConnectionModal, ConnectionModalState } from '../../ConnectionModal'
 import { MagicInformationModal } from '../../MagicInformationModal'
 import { WalletInformationModal } from '../../WalletInformationModal'
-import { getSignature, connectToProvider, isSocialLogin, fromConnectionOptionToProviderType } from './utils'
+import { getIdentitySignature, connectToProvider, isSocialLogin, fromConnectionOptionToProviderType } from './utils'
 import styles from './LoginPage.module.css'
 
 const BACKGROUND_IMAGES = [Image1, Image2, Image3, Image4, Image5, Image6, Image7, Image8, Image9, Image10]
 
 export const LoginPage = () => {
+  usePageTracking()
+  const analytics = getAnalytics()
   const [searchParams] = useSearchParams()
   const [connectionModalState, setConnectionModalState] = useState(ConnectionModalState.CONNECTING_WALLET)
   const [showLearnMore, setShowLearnMore] = useState(false)
@@ -33,13 +40,18 @@ export const LoginPage = () => {
 
   const handleLearnMore = useCallback(
     (option?: ConnectionOptionType) => {
-      if (option && isSocialLogin(option)) {
+      const isLearningMoreAboutMagic = option && isSocialLogin(option)
+      analytics.track(TrackingEvents.CLICK, {
+        action: ClickEvents.LEARN_MORE,
+        type: isLearningMoreAboutMagic ? 'Learn more about Magic' : 'Learn more about wallets'
+      })
+      if (isLearningMoreAboutMagic) {
         setShowMagicLearnMore(true)
       } else {
         setShowLearnMore(true)
       }
     },
-    [setShowLearnMore, setShowMagicLearnMore, showLearnMore]
+    [setShowLearnMore, setShowMagicLearnMore, showLearnMore, analytics]
   )
 
   const handleCloseLearnMore = useCallback(() => {
@@ -50,6 +62,12 @@ export const LoginPage = () => {
   const handleToggleMagicInfo = useCallback(() => {
     setShowMagicLearnMore(!showMagicLearnMore)
   }, [setShowMagicLearnMore, showMagicLearnMore])
+
+  const handleGuestLogin = useCallback(async () => {
+    // Wait 300 ms for the tracking to be completed
+    await wait(500)
+    analytics.track(TrackingEvents.LOGIN_CLICK, { type: 'guest' })
+  }, [analytics])
 
   const guestRedirectToURL = useMemo(() => {
     if (redirectTo) {
@@ -62,8 +80,13 @@ export const LoginPage = () => {
 
   const handleOnConnect = useCallback(
     async (connectionType: ConnectionOptionType) => {
+      const isLoggingInThroughSocial = isSocialLogin(connectionType)
       setCurrentConnectionType(connectionType)
-      if (isSocialLogin(connectionType)) {
+      analytics.track(TrackingEvents.LOGIN_CLICK, {
+        method: connectionType,
+        type: isLoggingInThroughSocial ? ConnectionType.WEB2 : ConnectionType.WEB3
+      })
+      if (isLoggingInThroughSocial) {
         setConnectionModalState(ConnectionModalState.LOADING_MAGIC)
         await connectToProvider(connectionType)
       } else {
@@ -76,8 +99,14 @@ export const LoginPage = () => {
           // There is no need to create one here if the user is coming from the requests page.
           if (searchParams.get('fromRequests') !== 'true') {
             setConnectionModalState(ConnectionModalState.WAITING_FOR_SIGNATURE)
-            await getSignature(connectionData.account?.toLowerCase() ?? '', connectionData.provider)
+            await getIdentitySignature(connectionData.account?.toLowerCase() ?? '', connectionData.provider)
           }
+
+          // eslint-disable-next-line @typescript-eslint/naming-convention
+          analytics.track(TrackingEvents.LOGIN_SUCCESS, { eth_address: connectionData.account })
+          analytics.identify({ ethAddress: connectionData.account })
+          // Wait 500 ms for the tracking to be completed
+          await wait(500)
 
           if (redirectTo) {
             window.location.href = decodeURIComponent(redirectTo)
@@ -86,11 +115,13 @@ export const LoginPage = () => {
           }
           setShowConnectionModal(false)
         } catch (error) {
+          console.log('Error', JSON.stringify(error))
+          analytics.track(TrackingEvents.LOGIN_ERROR, { error: isErrorWithMessage(error) ? error.message : error })
           setConnectionModalState(ConnectionModalState.ERROR)
         }
       }
     },
-    [setConnectionModalState, setShowConnectionModal, setCurrentConnectionType, redirectTo, searchParams]
+    [setConnectionModalState, setShowConnectionModal, setCurrentConnectionType, redirectTo, searchParams, analytics]
   )
 
   const handleOnCloseConnectionModal = useCallback(() => {
@@ -148,7 +179,10 @@ export const LoginPage = () => {
           />
           {showGuestOption && (
             <div className={styles.guestInfo}>
-              Quick dive? <a href={guestRedirectToURL}>Explore as a guest</a>
+              Quick dive?{' '}
+              <a href={guestRedirectToURL} onClick={handleGuestLogin}>
+                Explore as a guest
+              </a>
             </div>
           )}
         </div>
