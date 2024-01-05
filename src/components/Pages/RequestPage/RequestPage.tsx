@@ -1,14 +1,19 @@
 import { ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ethers } from 'ethers'
+
 import { io } from 'socket.io-client'
+import Icon from 'semantic-ui-react/dist/commonjs/elements/Icon/Icon'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
 import { WearablePreview } from 'decentraland-ui/dist/components/WearablePreview/WearablePreview'
 import { connection } from 'decentraland-connect'
 import { config } from '../../../modules/config'
+import platformImg from '../../../assets/images/Platform.webp'
+import manDefault from '../../../assets/images/ManDefault.webp'
 import { isErrorWithMessage } from '../../../shared/errors'
 import styles from './RequestPage.module.css'
+import { fetchProfile } from './utils'
 
 enum View {
   TIMEOUT,
@@ -33,11 +38,13 @@ export const RequestPage = () => {
   const navigate = useNavigate()
   const [view, setView] = useState(View.LOADING_REQUEST)
   const [isLoading, setIsLoading] = useState(false)
+  const [profile, setProfile] = useState(null)
   const requestRef = useRef<any>()
   const [error, setError] = useState<string>()
   const timeoutRef = useRef<NodeJS.Timeout>()
   const connectedAccountRef = useRef<string>()
   const requestId = params.requestId ?? ''
+  const [isLoadingAvatar, setIsLoadingAvatar] = useState(false)
 
   const getProvider = useCallback(async () => {
     return new ethers.BrowserProvider(await connection.getProvider())
@@ -66,8 +73,11 @@ export const RequestPage = () => {
         const provider = await getProvider()
         const signer = await provider.getSigner()
         const signerAddress = await signer.getAddress()
+        const profile = await fetchProfile(signerAddress)
+        setProfile(profile.length ? profile[0] : null)
 
         connectedAccountRef.current = signerAddress
+        setIsLoadingAvatar(true)
 
         // If the sender defined in the request is different than the one that is connected, show an error.
         if (request.sender && request.sender !== signerAddress.toLowerCase()) {
@@ -107,6 +117,12 @@ export const RequestPage = () => {
 
   const onDenyVerifySignIn = useCallback(() => {
     setView(View.VERIFY_SIGN_IN_DENIED)
+  }, [])
+
+  const handleLoadWearablePreview = useCallback(params => {
+    if (connectedAccountRef.current && params.profile === connectedAccountRef.current) {
+      setIsLoadingAvatar(false)
+    }
   }, [])
 
   const onApproveSignInVerification = useCallback(async () => {
@@ -161,41 +177,62 @@ export const RequestPage = () => {
     }
   }, [getProvider])
 
-  const onChangeAccount = useCallback(async () => {
+  const onChangeAccount = useCallback(async evt => {
+    evt.preventDefault()
     await connection.disconnect()
     toLoginPage()
   }, [])
 
-  const Container = useCallback((props: { children: ReactNode; canChangeAccount?: boolean; isLoading?: boolean }) => {
-    return (
-      <div>
-        <div className={styles.background} />
-        <div className={styles.main}>
-          <div className={styles.left}>{props.children}</div>
-          <div className={styles.right}>
-            {connectedAccountRef.current ? (
-              <>
-                <WearablePreview
-                  lockBeta={true}
-                  panning={false}
-                  disableBackground={true}
-                  profile={connectedAccountRef.current}
-                  dev={false}
-                />
-                {props.canChangeAccount ? (
-                  <div className={styles.changeAccount}>
-                    <Button disabled={isLoading} inverted onClick={onChangeAccount}>
-                      Change Account
-                    </Button>
-                  </div>
-                ) : null}
-              </>
-            ) : null}
+  const Container = useCallback(
+    (props: { children: ReactNode; canChangeAccount?: boolean; isLoading?: boolean }) => {
+      return (
+        <div>
+          <div
+            className={`${styles.background} ${
+              (!connectedAccountRef || profile === null) && view !== View.LOADING_REQUEST ? styles.emptyProfile : ''
+            }`}
+          />
+          <div className={styles.main}>
+            <div className={styles.left}>
+              {props.children}
+              {props.canChangeAccount ? (
+                <div className={styles.changeAccount}>
+                  Use another profile?{' '}
+                  <a href="/auth/login" onClick={onChangeAccount}>
+                    Return to log in
+                  </a>
+                </div>
+              ) : null}
+            </div>
+            <div className={`${styles.right} ${isLoadingAvatar ? styles.loading : ''}`}>
+              {connectedAccountRef.current && profile !== null ? (
+                <>
+                  <img src={manDefault} alt="Avatar" className={styles.wearableDefaultImg} />
+                  <WearablePreview
+                    lockBeta={true}
+                    panning={false}
+                    disableBackground={true}
+                    profile={connectedAccountRef.current}
+                    dev={false}
+                    onUpdate={handleLoadWearablePreview}
+                  />
+                  <img src={platformImg} alt="platform" className={styles.wearablePlatform} />
+                </>
+              ) : null}
+            </div>
+            <a className={styles.discordBtn} href="https://decentraland.org/discord" target="about:blank">
+              <Icon name="discord" />
+              <p className={styles.discordInfo}>
+                <span>Need guidance?</span>
+                <span>MEET THE COMMUNITY</span>
+              </p>
+            </a>
           </div>
         </div>
-      </div>
-    )
-  }, [])
+      )
+    },
+    [isLoadingAvatar, view]
+  )
 
   if (view === View.TIMEOUT) {
     return (
@@ -252,10 +289,12 @@ export const RequestPage = () => {
         <div className={styles.description}>Do you see the same verification number on your Desktop App?</div>
         <div className={styles.code}>{requestRef.current.code}</div>
         <div className={styles.buttons}>
-          <Button inverted disabled={isLoading} onClick={onDenyVerifySignIn}>
-            No
+          <Button inverted disabled={isLoading} onClick={onDenyVerifySignIn} className={styles.noButton}>
+            <Icon name="times circle" />
+            No, it doesn't
           </Button>
-          <Button primary loading={isLoading} disabled={isLoading} onClick={onApproveSignInVerification}>
+          <Button inverted loading={isLoading} disabled={isLoading} onClick={onApproveSignInVerification} className={styles.yesButton}>
+            <Icon name="check circle" />
             Yes, they are the same
           </Button>
         </div>

@@ -23,7 +23,7 @@
   position: fixed;
   width: 100%;
   height: 350%;
-  background: radial-gradient(ellipse at 0 50%, transparent 10%, #ff00f5 40%, #491975 70%);
+  background: radial-gradient(ellipse at 0 50%, transparent 10%, #e02dd3 40%, #491975 70%);
   top: -100%;
   transform: rotate(180deg);
   overflow: hidden;
@@ -42,7 +42,7 @@
 .leftInfo {
   height: 100%;
   width: 100%;
-  max-width: 400px;
+  max-width: 450px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -99,7 +99,7 @@
   }
 
   .main::before {
-    background: radial-gradient(ellipse at 0 50%, #ff00f5 0%, #491975 70%);
+    background: radial-gradient(ellipse at 0 50%, #e02dd3 0%, #491975 70%);
   }
 
   .left {
