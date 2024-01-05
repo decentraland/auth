@@ -8,14 +8,14 @@ import styles from './WalletInformationModal.module.css'
 
 const defaultProps = {
   i18n: {
-    title: 'What is a wallet?',
+    title: 'What is a digital wallet?',
     assets: {
-      title: 'A home for your digital assets',
-      text: 'Wallets are used to send, receive, store, and display digital assets like Ethereum and NFTs.'
+      title: 'A Home For Your Digital Assets',
+      text: 'Wallets are used to send, receive, store, and display digital assets, such as your Decentraland Wearables, NAMEs, LANDs, etc.'
     },
     logIn: {
       title: 'A New Way To Log In',
-      text: 'Instead of creating new accounts and passwords on every website, just connect your wallet.'
+      text: 'Instead of creating new accounts and passwords on every website, in the world of Web3 all you need to do is just connect your digital wallet.'
     },
     goBack: 'Return to log in page'
   }
