@@ -1,3 +1,4 @@
 {
-  "AUTH_SERVER_URL": "https://auth-api.decentraland.today"
+  "AUTH_SERVER_URL": "https://auth-api.decentraland.today",
+  "SEGMENT_API_KEY": "FQqbzV2KeUKe2RPOeFkedKRPkJAFsU9r"
 }
