@@ -1,3 +1,4 @@
 {
-  "AUTH_SERVER_URL": "https://auth-api.decentraland.today"
+  "AUTH_SERVER_URL": "https://auth-api.decentraland.today",
+  "PEER_URL": "https://peer.decentraland.org"
 }
