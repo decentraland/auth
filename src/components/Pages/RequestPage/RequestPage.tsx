@@ -1,6 +1,6 @@
 import { ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ethers } from 'ethers'
+import { ethers, BrowserProvider } from 'ethers'
 import Icon from 'semantic-ui-react/dist/commonjs/elements/Icon/Icon'
 import { io } from 'socket.io-client'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
@@ -9,6 +9,9 @@ import { WearablePreview } from 'decentraland-ui/dist/components/WearablePreview
 import { connection } from 'decentraland-connect'
 import manDefault from '../../../assets/images/ManDefault.webp'
 import platformImg from '../../../assets/images/Platform.webp'
+import usePageTracking from '../../../hooks/usePageTracking'
+import { getAnalytics } from '../../../modules/analytics/segment'
+import { ClickEvents, TrackingEvents } from '../../../modules/analytics/types'
 import { config } from '../../../modules/config'
 import { isErrorWithMessage } from '../../../shared/errors'
 import { fetchProfile } from './utils'
@@ -33,8 +36,11 @@ enum View {
 }
 
 export const RequestPage = () => {
+  usePageTracking()
+  const analytics = getAnalytics()
   const params = useParams()
   const navigate = useNavigate()
+  const providerRef = useRef<BrowserProvider>()
   const [view, setView] = useState(View.LOADING_REQUEST)
   const [isLoading, setIsLoading] = useState(false)
   const [profile, setProfile] = useState(null)
@@ -45,10 +51,6 @@ export const RequestPage = () => {
   const requestId = params.requestId ?? ''
   const [isLoadingAvatar, setIsLoadingAvatar] = useState(false)
 
-  const getProvider = useCallback(async () => {
-    return new ethers.BrowserProvider(await connection.getProvider())
-  }, [])
-
   // Goes to the login page where the user will have to connect a wallet.
   const toLoginPage = useCallback(() => {
     navigate(`/login?redirectTo=/auth/requests/${requestId}&fromRequests=true`)
@@ -58,20 +60,20 @@ export const RequestPage = () => {
     ;(async () => {
       try {
         // Try to restablish connection with the wallet.
-        await connection.tryPreviousConnection()
+        const connectionData = await connection.tryPreviousConnection()
+        providerRef.current = new ethers.BrowserProvider(connectionData.provider)
       } catch (e) {
         toLoginPage()
         return
       }
 
       try {
+        const signer = await providerRef.current.getSigner()
+        const signerAddress = await signer.getAddress()
+        analytics.identify({ ethAddress: signerAddress })
         // Recover the request from the auth server.
         const request = await authServerFetch('recover', { requestId })
         requestRef.current = request
-
-        const provider = await getProvider()
-        const signer = await provider.getSigner()
-        const signerAddress = await signer.getAddress()
         const profile = await fetchProfile(signerAddress)
         setProfile(profile.length ? profile[0] : null)
 
@@ -115,8 +117,11 @@ export const RequestPage = () => {
   }, [view])
 
   const onDenyVerifySignIn = useCallback(() => {
+    analytics.track(TrackingEvents.CLICK, {
+      action: ClickEvents.DENY_SIGN_IN
+    })
     setView(View.VERIFY_SIGN_IN_DENIED)
-  }, [])
+  }, [analytics])
 
   const handleLoadWearablePreview = useCallback(params => {
     if (connectedAccountRef.current && params.profile === connectedAccountRef.current) {
@@ -125,9 +130,16 @@ export const RequestPage = () => {
   }, [])
 
   const onApproveSignInVerification = useCallback(async () => {
+    analytics.track(TrackingEvents.CLICK, {
+      action: ClickEvents.APPROVE_SING_IN
+    })
     setIsLoading(true)
+    const provider = providerRef.current
     try {
-      const provider = await getProvider()
+      if (!provider) {
+        throw new Error('Provider not created')
+      }
+
       const signer = await provider.getSigner()
       const signature = await signer.signMessage(requestRef.current.params[0])
       const result = await authServerFetch('outcome', {
@@ -147,18 +159,29 @@ export const RequestPage = () => {
     } finally {
       setIsLoading(false)
     }
-  }, [getProvider, setIsLoading])
+  }, [setIsLoading, analytics])
 
   const onDenyWalletInteraction = useCallback(() => {
+    analytics.track(TrackingEvents.CLICK, {
+      action: ClickEvents.DENY_WALLET_INTERACTION
+    })
     setView(View.WALLET_INTERACTION_DENIED)
-  }, [])
+  }, [analytics])
 
   const onApproveWalletInteraction = useCallback(async () => {
     setIsLoading(true)
+    const provider = providerRef.current
     try {
-      const provider = await getProvider()
+      if (!provider) {
+        throw new Error('Provider not created')
+      }
+
       const signer = await provider.getSigner()
       const result = await provider.send(requestRef.current.method, requestRef.current.params)
+      analytics.track(TrackingEvents.CLICK, {
+        action: ClickEvents.APPROVE_WALLET_INTERACTION,
+        method: requestRef.current.method
+      })
       const fetchResult = await authServerFetch('outcome', {
         requestId,
         sender: await signer.getAddress(),
@@ -171,10 +194,11 @@ export const RequestPage = () => {
         setView(View.WALLET_INTERACTION_COMPLETE)
       }
     } catch (e) {
+      console.log('Wallet error', JSON.stringify((e as any).info?.error))
       setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
       setView(View.WALLET_INTERACTION_ERROR)
     }
-  }, [getProvider])
+  }, [analytics])
 
   const onChangeAccount = useCallback(async evt => {
     evt.preventDefault()

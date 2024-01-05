@@ -83,7 +83,7 @@ export function isSocialLogin(connectionType: ConnectionOptionType): boolean {
   return SOCIAL_LOGIN_TYPES.includes(connectionType)
 }
 
-export async function getSignature(address: string, provider: Provider): Promise<AuthIdentity> {
+export async function getIdentitySignature(address: string, provider: Provider): Promise<AuthIdentity> {
   let identity: AuthIdentity
 
   const ssoIdentity = localStorageGetIdentity(address)
