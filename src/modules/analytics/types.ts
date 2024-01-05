@@ -6,7 +6,11 @@ export enum TrackingEvents {
 }
 
 export enum ClickEvents {
-  LEARN_MORE = 'Learn More'
+  LEARN_MORE = 'Learn More',
+  DENY_SIGN_IN = 'Deny Sign In',
+  DENY_WALLET_INTERACTION = 'Deny Wallet Interaction',
+  APPROVE_SING_IN = 'Approve Sign In',
+  APPROVE_WALLET_INTERACTION = 'Approve Wallet Interaction'
 }
 
 export enum ConnectionType {
