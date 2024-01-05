@@ -10,7 +10,7 @@ const defaultProps = {
   i18n: {
     title: 'How does Magic work?',
     subtitle:
-      "Magic handles digital wallet creation & management behind the scenes so you don't have to. Just log into Decentraland with your favorite social account and let Magic handle the rest.<br /> <br />If you'd rather take a more hands-on approach to your digital asset storage (e.g. Wearables, NAMEs, etc.), get a digital wallet from a provider such as MetaMask and use it to create your Decentraland account.",
+      "Magic handles digital wallet creation & management behind the scenes so you don't have to. Just log into Decentraland with your favorite social account and let Magic handle the rest.<br /> <br />If you'd rather take a more hands-on approach to your digital asset storage (e.g. Wearables, NAMEs, etc.), you can get a digital wallet from a provider such as <a href='https://metamask.io/'>MetaMask</a> and use it to create your Decentraland account.",
     goBack: 'Return to log in page'
   }
 }

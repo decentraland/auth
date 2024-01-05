@@ -1,4 +1,8 @@
 {
   "AUTH_SERVER_URL": "https://auth-api.decentraland.today",
+<<<<<<< HEAD
   "SEGMENT_API_KEY": "FQqbzV2KeUKe2RPOeFkedKRPkJAFsU9r"
+=======
+  "PEER_URL": "https://peer.decentraland.org"
+>>>>>>> 2aa83dbe90eb4970996c7130b92c145e8115bdc0
 }
