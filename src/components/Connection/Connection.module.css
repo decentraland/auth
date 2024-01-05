@@ -45,6 +45,7 @@
   flex-direction: row;
   align-items: center;
   margin-bottom: 19px;
+  gap: 6px;
 }
 
 .primaryMagic {
@@ -54,15 +55,11 @@
   background-size: contain;
   width: 66px;
   height: 24px;
-  margin-left: 6px;
-  margin-right: 6px;
 }
 
 .primaryLearnMore {
   text-decoration: underline;
   cursor: pointer;
-  margin-left: 6px;
-  margin-right: 6px;
 }
 
 /* Primary option buttons styles */

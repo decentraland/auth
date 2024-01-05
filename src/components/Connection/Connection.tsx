@@ -76,13 +76,13 @@ const Secondary = ({
 
 const defaultProps = {
   i18n: {
-    title: 'Unlock Your Virtual World.',
-    subtitle: 'Access and start exploring.',
+    title: 'Discover a virtual social world',
+    subtitle: 'shaped by its community of creators & explorers.',
     accessWith: (option: React.ReactNode) => `Access with ${option}`,
     connectWith: (option: React.ReactNode) => `Connect with ${option}`,
     moreOptions: 'More Options',
     socialMessage: (element: React.ReactNode) => <>Access secured by {element}</>,
-    web3Message: (learnMore: (value: React.ReactNode) => React.ReactNode) => <>Curious about wallets? {learnMore('Learn More')}</>
+    web3Message: (learnMore: (value: React.ReactNode) => React.ReactNode) => <>Have a digital wallet? {learnMore('Learn More')}</>
   }
 }
 
