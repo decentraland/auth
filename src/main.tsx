@@ -14,9 +14,6 @@ import './modules/analytics/snippet'
 import 'decentraland-ui/dist/themes/alternative/dark-theme.css'
 import './index.css'
 
-getAnalytics().ready(() => {
-  console.log('Analytics loaded')
-})
 getAnalytics().load(config.get('SEGMENT_API_KEY'))
 
 ReactDOM.render(
