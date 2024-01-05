@@ -1,19 +1,18 @@
 import { ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ethers } from 'ethers'
-
-import { io } from 'socket.io-client'
 import Icon from 'semantic-ui-react/dist/commonjs/elements/Icon/Icon'
+import { io } from 'socket.io-client'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
 import { WearablePreview } from 'decentraland-ui/dist/components/WearablePreview/WearablePreview'
 import { connection } from 'decentraland-connect'
-import { config } from '../../../modules/config'
-import platformImg from '../../../assets/images/Platform.webp'
 import manDefault from '../../../assets/images/ManDefault.webp'
+import platformImg from '../../../assets/images/Platform.webp'
+import { config } from '../../../modules/config'
 import { isErrorWithMessage } from '../../../shared/errors'
-import styles from './RequestPage.module.css'
 import { fetchProfile } from './utils'
+import styles from './RequestPage.module.css'
 
 enum View {
   TIMEOUT,
