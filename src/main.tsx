@@ -8,8 +8,13 @@ import { RequestPage } from './components/Pages/RequestPage'
 import { DefaultPage } from './components/Pages/DefaultPage'
 import { CallbackPage } from './components/Pages/CallbackPage'
 import { LoginPage } from './components/Pages/LoginPage'
+import { config } from './modules/config'
+import { getAnalytics } from './modules/analytics/segment'
+import './modules/analytics/snippet'
 import 'decentraland-ui/dist/themes/alternative/dark-theme.css'
 import './index.css'
+
+getAnalytics().load(config.get('SEGMENT_API_KEY'))
 
 ReactDOM.render(
   <React.StrictMode>

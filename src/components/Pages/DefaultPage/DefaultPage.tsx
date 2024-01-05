@@ -2,6 +2,7 @@ import { useCallback, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
 import { connection } from 'decentraland-connect'
+import styles from './DefaultPage.module.css'
 
 export const DefaultPage = () => {
   const navigate = useNavigate()
@@ -25,5 +26,9 @@ export const DefaultPage = () => {
     })
   }, [checkIfConnected, navigate])
 
-  return <Loader active size="huge" />
+  return (
+    <div className={styles.main}>
+      <Loader active size="huge" />
+    </div>
+  )
 }
