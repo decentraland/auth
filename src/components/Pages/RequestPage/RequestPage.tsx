@@ -195,6 +195,14 @@ export const RequestPage = () => {
       }
     } catch (e) {
       console.log('Wallet error', JSON.stringify((e as any).info?.error))
+      const signer = await providerRef.current?.getSigner()
+      if (signer) {
+        await authServerFetch('outcome', {
+          requestId,
+          sender: await signer.getAddress(),
+          result: (e as any).info?.error ?? 'Unknown error'
+        })
+      }
       setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
       setView(View.WALLET_INTERACTION_ERROR)
     }
