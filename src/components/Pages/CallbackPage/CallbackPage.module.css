@@ -1,0 +1,37 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  padding: 70px 60px;
+  gap: 30px;
+}
+
+.container::before {
+  width: 75px;
+  height: 75px;
+  content: '';
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-image: url('/src/assets/images/logo.svg');
+}
+
+.info {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+  font-size: 16px;
+  line-height: 20px;
+}
+
+.info a {
+  color: var(--primary);
+  text-decoration: underline;
+  margin-left: 5px;
+}
+
+.title {
+  margin: 0;
+  font-size: 24px;
+}
