@@ -84,7 +84,7 @@ export const CallbackPage = () => {
           <div className={styles.info}>
             <span>This step only verifies your identity.</span>
             <span>
-              No payments or transactions will ocurr without your explicit approval. <a>Learn More</a>
+              No payments or transactions will ocurr without your explicit approval.
             </span>
           </div>
           <Button primary onClick={handleContinue}>
