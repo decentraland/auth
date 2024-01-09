@@ -207,7 +207,7 @@ export const RequestPage = () => {
         setView(View.WALLET_INTERACTION_COMPLETE)
       }
     } catch (e) {
-      console.log('Wallet error', JSON.stringify(e as any))
+      console.error('Wallet error', JSON.stringify(e as any))
       const signer = await providerRef.current?.getSigner()
       if (signer) {
         if (isRpcError(e)) {
