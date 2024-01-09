@@ -83,9 +83,7 @@ export const CallbackPage = () => {
           <h3 className={styles.title}>Confirm your login</h3>
           <div className={styles.info}>
             <span>This step only verifies your identity.</span>
-            <span>
-              No payments or transactions will ocurr without your explicit approval.
-            </span>
+            <span>No payments or transactions will occur without your explicit approval.</span>
           </div>
           <Button primary onClick={handleContinue}>
             Continue

@@ -13,7 +13,7 @@ import usePageTracking from '../../../hooks/usePageTracking'
 import { getAnalytics } from '../../../modules/analytics/segment'
 import { ClickEvents, TrackingEvents } from '../../../modules/analytics/types'
 import { config } from '../../../modules/config'
-import { isErrorWithMessage } from '../../../shared/errors'
+import { isErrorWithMessage, isRpcError } from '../../../shared/errors'
 import { fetchProfile } from './utils'
 import styles from './RequestPage.module.css'
 
@@ -116,11 +116,24 @@ export const RequestPage = () => {
     }
   }, [view])
 
-  const onDenyVerifySignIn = useCallback(() => {
+  const onDenyVerifySignIn = useCallback(async () => {
+    setIsLoading(true)
     analytics.track(TrackingEvents.CLICK, {
       action: ClickEvents.DENY_SIGN_IN
     })
-    setView(View.VERIFY_SIGN_IN_DENIED)
+    try {
+      const signer = await providerRef.current?.getSigner()
+      if (signer) {
+        await authServerFetch('outcome', {
+          requestId,
+          sender: await signer.getAddress(),
+          error: { code: -32003, message: 'Transaction rejected' }
+        })
+      }
+    } finally {
+      setIsLoading(false)
+      setView(View.VERIFY_SIGN_IN_DENIED)
+    }
   }, [analytics])
 
   const handleLoadWearablePreview = useCallback(params => {
@@ -194,14 +207,22 @@ export const RequestPage = () => {
         setView(View.WALLET_INTERACTION_COMPLETE)
       }
     } catch (e) {
-      console.log('Wallet error', JSON.stringify((e as any).info?.error))
+      console.error('Wallet error', JSON.stringify(e as any))
       const signer = await providerRef.current?.getSigner()
       if (signer) {
-        await authServerFetch('outcome', {
-          requestId,
-          sender: await signer.getAddress(),
-          result: (e as any).info?.error ?? 'Unknown error'
-        })
+        if (isRpcError(e)) {
+          await authServerFetch('outcome', {
+            requestId,
+            sender: await signer.getAddress(),
+            error: e.error
+          })
+        } else {
+          await authServerFetch('outcome', {
+            requestId,
+            sender: await signer.getAddress(),
+            error: { code: 999, message: isErrorWithMessage(e) ? e.message : 'Unknown error' }
+          })
+        }
       }
       setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
       setView(View.WALLET_INTERACTION_ERROR)
