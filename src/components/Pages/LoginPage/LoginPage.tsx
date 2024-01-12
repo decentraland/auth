@@ -64,8 +64,8 @@ export const LoginPage = () => {
   }, [setShowMagicLearnMore, showMagicLearnMore])
 
   const handleGuestLogin = useCallback(async () => {
-    // Wait 300 ms for the tracking to be completed
-    await wait(500)
+    // Wait 800 ms for the tracking to be completed
+    await wait(800)
     analytics.track(TrackingEvents.LOGIN_CLICK, { type: 'guest' })
   }, [analytics])
 
@@ -105,8 +105,8 @@ export const LoginPage = () => {
           // eslint-disable-next-line @typescript-eslint/naming-convention
           analytics.track(TrackingEvents.LOGIN_SUCCESS, { eth_address: connectionData.account })
           analytics.identify({ ethAddress: connectionData.account })
-          // Wait 500 ms for the tracking to be completed
-          await wait(500)
+          // Wait 800 ms for the tracking to be completed
+          await wait(800)
 
           if (redirectTo) {
             window.location.href = decodeURIComponent(redirectTo)
