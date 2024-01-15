@@ -88,6 +88,8 @@ export const LoginPage = () => {
       })
       if (isLoggingInThroughSocial) {
         setConnectionModalState(ConnectionModalState.LOADING_MAGIC)
+        // Wait 800 ms for the tracking to be completed
+        await wait(800)
         await connectToProvider(connectionType)
       } else {
         try {
