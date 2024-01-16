@@ -15,9 +15,6 @@ import 'decentraland-ui/dist/themes/alternative/dark-theme.css'
 import './index.css'
 
 getAnalytics().load(config.get('SEGMENT_API_KEY'))
-getAnalytics().ready(() => {
-  console.log('Analytics ready')
-})
 
 ReactDOM.render(
   <React.StrictMode>
