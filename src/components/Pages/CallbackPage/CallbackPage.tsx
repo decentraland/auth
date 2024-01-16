@@ -54,14 +54,13 @@ export const CallbackPage = () => {
   }, [])
 
   const handleContinue = useCallback(async () => {
-    const analytics = getAnalytics()
     try {
       setConnectionModalState(ConnectionModalState.WAITING_FOR_SIGNATURE)
       const connectionData = await connectAndGenerateSignature()
       const ethAddress = connectionData.account?.toLowerCase() ?? ''
-      analytics.identify({ ethAddress })
+      getAnalytics().identify({ ethAddress })
       // eslint-disable-next-line @typescript-eslint/naming-convention
-      analytics.track(TrackingEvents.LOGIN_SUCCESS, { eth_address: ethAddress })
+      getAnalytics().track(TrackingEvents.LOGIN_SUCCESS, { eth_address: ethAddress })
       // Wait 800 ms for the tracking to be completed
       await wait(800)
       if (redirectTo) {

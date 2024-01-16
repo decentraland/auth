@@ -27,7 +27,6 @@ const BACKGROUND_IMAGES = [Image1, Image2, Image3, Image4, Image5, Image6, Image
 
 export const LoginPage = () => {
   usePageTracking()
-  const analytics = getAnalytics()
   const [searchParams] = useSearchParams()
   const [connectionModalState, setConnectionModalState] = useState(ConnectionModalState.CONNECTING_WALLET)
   const [showLearnMore, setShowLearnMore] = useState(false)
@@ -41,7 +40,7 @@ export const LoginPage = () => {
   const handleLearnMore = useCallback(
     (option?: ConnectionOptionType) => {
       const isLearningMoreAboutMagic = option && isSocialLogin(option)
-      analytics.track(TrackingEvents.CLICK, {
+      getAnalytics().track(TrackingEvents.CLICK, {
         action: ClickEvents.LEARN_MORE,
         type: isLearningMoreAboutMagic ? 'Learn more about Magic' : 'Learn more about wallets'
       })
@@ -51,7 +50,7 @@ export const LoginPage = () => {
         setShowLearnMore(true)
       }
     },
-    [setShowLearnMore, setShowMagicLearnMore, showLearnMore, analytics]
+    [setShowLearnMore, setShowMagicLearnMore, showLearnMore]
   )
 
   const handleCloseLearnMore = useCallback(() => {
@@ -65,9 +64,9 @@ export const LoginPage = () => {
 
   const handleGuestLogin = useCallback(async () => {
     // Wait 800 ms for the tracking to be completed
+    getAnalytics().track(TrackingEvents.LOGIN_CLICK, { type: 'guest' })
     await wait(800)
-    analytics.track(TrackingEvents.LOGIN_CLICK, { type: 'guest' })
-  }, [analytics])
+  }, [])
 
   const guestRedirectToURL = useMemo(() => {
     if (redirectTo) {
@@ -82,7 +81,7 @@ export const LoginPage = () => {
     async (connectionType: ConnectionOptionType) => {
       const isLoggingInThroughSocial = isSocialLogin(connectionType)
       setCurrentConnectionType(connectionType)
-      analytics.track(TrackingEvents.LOGIN_CLICK, {
+      getAnalytics().track(TrackingEvents.LOGIN_CLICK, {
         method: connectionType,
         type: isLoggingInThroughSocial ? ConnectionType.WEB2 : ConnectionType.WEB3
       })
@@ -105,8 +104,8 @@ export const LoginPage = () => {
           }
 
           // eslint-disable-next-line @typescript-eslint/naming-convention
-          analytics.track(TrackingEvents.LOGIN_SUCCESS, { eth_address: connectionData.account })
-          analytics.identify({ ethAddress: connectionData.account })
+          getAnalytics().track(TrackingEvents.LOGIN_SUCCESS, { eth_address: connectionData.account })
+          getAnalytics().identify({ ethAddress: connectionData.account })
           // Wait 800 ms for the tracking to be completed
           await wait(800)
 
@@ -118,12 +117,12 @@ export const LoginPage = () => {
           setShowConnectionModal(false)
         } catch (error) {
           console.log('Error', JSON.stringify(error))
-          analytics.track(TrackingEvents.LOGIN_ERROR, { error: isErrorWithMessage(error) ? error.message : error })
+          getAnalytics().track(TrackingEvents.LOGIN_ERROR, { error: isErrorWithMessage(error) ? error.message : error })
           setConnectionModalState(ConnectionModalState.ERROR)
         }
       }
     },
-    [setConnectionModalState, setShowConnectionModal, setCurrentConnectionType, redirectTo, searchParams, analytics]
+    [setConnectionModalState, setShowConnectionModal, setCurrentConnectionType, redirectTo, searchParams]
   )
 
   const handleOnCloseConnectionModal = useCallback(() => {
