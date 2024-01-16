@@ -37,7 +37,6 @@ enum View {
 
 export const RequestPage = () => {
   usePageTracking()
-  const analytics = getAnalytics()
   const params = useParams()
   const navigate = useNavigate()
   const providerRef = useRef<BrowserProvider>()
@@ -70,7 +69,7 @@ export const RequestPage = () => {
       try {
         const signer = await providerRef.current.getSigner()
         const signerAddress = await signer.getAddress()
-        analytics.identify({ ethAddress: signerAddress })
+        getAnalytics().identify({ ethAddress: signerAddress })
         // Recover the request from the auth server.
         const request = await authServerFetch('recover', { requestId })
         requestRef.current = request
@@ -118,7 +117,7 @@ export const RequestPage = () => {
 
   const onDenyVerifySignIn = useCallback(async () => {
     setIsLoading(true)
-    analytics.track(TrackingEvents.CLICK, {
+    getAnalytics().track(TrackingEvents.CLICK, {
       action: ClickEvents.DENY_SIGN_IN
     })
     try {
@@ -134,7 +133,7 @@ export const RequestPage = () => {
       setIsLoading(false)
       setView(View.VERIFY_SIGN_IN_DENIED)
     }
-  }, [analytics])
+  }, [])
 
   const handleLoadWearablePreview = useCallback(params => {
     if (connectedAccountRef.current && params.profile === connectedAccountRef.current) {
@@ -143,7 +142,7 @@ export const RequestPage = () => {
   }, [])
 
   const onApproveSignInVerification = useCallback(async () => {
-    analytics.track(TrackingEvents.CLICK, {
+    getAnalytics().track(TrackingEvents.CLICK, {
       action: ClickEvents.APPROVE_SING_IN
     })
     setIsLoading(true)
@@ -172,14 +171,14 @@ export const RequestPage = () => {
     } finally {
       setIsLoading(false)
     }
-  }, [setIsLoading, analytics])
+  }, [setIsLoading])
 
   const onDenyWalletInteraction = useCallback(() => {
-    analytics.track(TrackingEvents.CLICK, {
+    getAnalytics().track(TrackingEvents.CLICK, {
       action: ClickEvents.DENY_WALLET_INTERACTION
     })
     setView(View.WALLET_INTERACTION_DENIED)
-  }, [analytics])
+  }, [])
 
   const onApproveWalletInteraction = useCallback(async () => {
     setIsLoading(true)
@@ -191,7 +190,7 @@ export const RequestPage = () => {
 
       const signer = await provider.getSigner()
       const result = await provider.send(requestRef.current.method, requestRef.current.params)
-      analytics.track(TrackingEvents.CLICK, {
+      getAnalytics().track(TrackingEvents.CLICK, {
         action: ClickEvents.APPROVE_WALLET_INTERACTION,
         method: requestRef.current.method
       })
@@ -227,7 +226,7 @@ export const RequestPage = () => {
       setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
       setView(View.WALLET_INTERACTION_ERROR)
     }
-  }, [analytics])
+  }, [])
 
   const onChangeAccount = useCallback(async evt => {
     evt.preventDefault()
