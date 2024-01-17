@@ -22,6 +22,7 @@ import { MagicInformationModal } from '../../MagicInformationModal'
 import { WalletInformationModal } from '../../WalletInformationModal'
 import { getIdentitySignature, connectToProvider, isSocialLogin, fromConnectionOptionToProviderType } from './utils'
 import styles from './LoginPage.module.css'
+import { config } from '../../../modules/config'
 
 const BACKGROUND_IMAGES = [Image1, Image2, Image3, Image4, Image5, Image6, Image7, Image8, Image9, Image10]
 
@@ -109,11 +110,23 @@ export const LoginPage = () => {
           // Wait 800 ms for the tracking to be completed
           await wait(800)
 
-          if (redirectTo) {
+          const peerUrl = config.get('PEER_URL')
+          // Get the profile for the connected account.
+          const fetchProfileResult = await fetch(`${peerUrl}/lambdas/profiles/${connectionData.account}`)
+
+          if (!fetchProfileResult.ok) {
+            // If there is not profile fo the connected account, take the user to the avatar setup page.
+            // Provide the same params to the setup page to respect redirection.
+            window.location.href = `/auth/setup?${searchParams.toString()}`
+          } else if (redirectTo) {
+            // If a redirection url was provided in the query params, redirect the user to that url.
             window.location.href = decodeURIComponent(redirectTo)
           } else {
+            // Redirect the user to the root url if there is no other place to redirect.
+            // TODO: Maybe we should add something to the root page, or simply redirect to the profile app.
             window.location.href = '/'
           }
+
           setShowConnectionModal(false)
         } catch (error) {
           console.log('Error', JSON.stringify(error))
