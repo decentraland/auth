@@ -14,6 +14,7 @@ import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import usePageTracking from '../../../hooks/usePageTracking'
 import { getAnalytics } from '../../../modules/analytics/segment'
 import { ClickEvents, ConnectionType, TrackingEvents } from '../../../modules/analytics/types'
+import { config } from '../../../modules/config'
 import { isErrorWithMessage } from '../../../shared/errors'
 import { wait } from '../../../shared/time'
 import { Connection, ConnectionOptionType } from '../../Connection'
@@ -22,7 +23,6 @@ import { MagicInformationModal } from '../../MagicInformationModal'
 import { WalletInformationModal } from '../../WalletInformationModal'
 import { getIdentitySignature, connectToProvider, isSocialLogin, fromConnectionOptionToProviderType } from './utils'
 import styles from './LoginPage.module.css'
-import { config } from '../../../modules/config'
 
 const BACKGROUND_IMAGES = [Image1, Image2, Image3, Image4, Image5, Image6, Image7, Image8, Image9, Image10]
 
