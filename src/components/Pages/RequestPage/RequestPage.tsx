@@ -43,6 +43,8 @@ export const RequestPage = () => {
   const [view, setView] = useState(View.LOADING_REQUEST)
   const [isLoading, setIsLoading] = useState(false)
   const [profile, setProfile] = useState(null)
+  // TODO: Add a type for the request.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const requestRef = useRef<any>()
   const [error, setError] = useState<string>()
   const timeoutRef = useRef<NodeJS.Timeout>()
@@ -206,7 +208,7 @@ export const RequestPage = () => {
         setView(View.WALLET_INTERACTION_COMPLETE)
       }
     } catch (e) {
-      console.error('Wallet error', JSON.stringify(e as any))
+      console.error('Wallet error', JSON.stringify(e))
       const signer = await providerRef.current?.getSigner()
       if (signer) {
         if (isRpcError(e)) {
