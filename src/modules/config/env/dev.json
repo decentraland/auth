@@ -1,5 +1,7 @@
 {
   "AUTH_SERVER_URL": "https://auth-api.decentraland.zone",
   "SEGMENT_API_KEY": "FQqbzV2KeUKe2RPOeFkedKRPkJAFsU9r",
-  "PEER_URL": "https://peer.decentraland.zone"
+  "PEER_URL": "https://peer.decentraland.zone",
+  "FEATURE_FLAGS_URL": "https://feature-flags.decentraland.org",
+  "FEATURE_FLAGS_INTERVAL": "60000"
 }
