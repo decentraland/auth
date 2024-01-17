@@ -12,6 +12,7 @@ import { wait } from '../../../shared/time'
 import { ConnectionModal, ConnectionModalState } from '../../ConnectionModal'
 import { getIdentitySignature } from '../LoginPage/utils'
 import styles from './CallbackPage.module.css'
+import { config } from '../../../modules/config'
 
 const MAGIC_KEY = getConfiguration().magic.apiKey
 
@@ -63,10 +64,24 @@ export const CallbackPage = () => {
       getAnalytics().track(TrackingEvents.LOGIN_SUCCESS, { eth_address: ethAddress })
       // Wait 800 ms for the tracking to be completed
       await wait(800)
-      if (redirectTo) {
+
+      const peerUrl = config.get('PEER_URL')
+      // Get the profile for the connected account.
+      const fetchProfileResult = await fetch(`${peerUrl}/lambdas/profiles/${connectionData.account}`)
+
+      if (!fetchProfileResult.ok) {
+        // If there is not profile fo the connected account, take the user to the avatar setup page.
+        if (redirectTo) {
+          // Provide the redirection url if present to the setup page to respect redirection.
+          window.location.href = `/auth/setup?redirectTo=${redirectTo}`
+        } else {
+          window.location.href = `/auth/setup`
+        }
+      } else if (redirectTo) {
+        // If redirection url is present, redirect the user to that url.
         window.location.href = decodeURIComponent(redirectTo)
       } else {
-        // Navigate to the landing page.
+        // Navigate to the landing page if there is no other place to redirect.
         window.location.href = '/'
       }
     } catch (error) {
