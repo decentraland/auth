@@ -101,6 +101,6 @@
   width: 100%;
 }
 
-.secondaryOptionButton:global(.ui.button.primary) {
+.secondaryOptionButton span :global(.ui.button.primary) {
   min-width: 104px;
 }

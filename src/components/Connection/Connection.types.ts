@@ -13,6 +13,8 @@ export enum ConnectionOptionType {
   X = 'x'
 }
 
+export type MetamaskEthereumWindow = typeof window.ethereum & { isMetaMask?: boolean }
+
 export type ConnectionI18N = {
   title: React.ReactNode
   subtitle: React.ReactNode

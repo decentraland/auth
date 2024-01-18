@@ -277,7 +277,7 @@ export const RequestPage = () => {
               <Icon name="discord" />
               <p className={styles.discordInfo}>
                 <span>Need guidance?</span>
-                <span>MEET THE COMMUNITY</span>
+                <span>ASK THE COMMUNITY</span>
               </p>
             </a>
           </div>
