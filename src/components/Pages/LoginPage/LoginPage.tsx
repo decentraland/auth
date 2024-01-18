@@ -115,7 +115,7 @@ export const LoginPage = () => {
           const fetchProfileResult = await fetch(`${peerUrl}/lambdas/profiles/${connectionData.account}`)
 
           if (!fetchProfileResult.ok) {
-            // If there is not profile fo the connected account, take the user to the avatar setup page.
+            // If there is not profile for the connected account, take the user to the avatar setup page.
             // Provide the same params to the setup page to respect redirection.
             window.location.href = `/auth/setup?${searchParams.toString()}`
           } else if (redirectTo) {
