@@ -28,6 +28,11 @@ function renderConnection(props: Partial<ConnectionProps>) {
   )
 }
 
+;(window.ethereum as any) = {
+  ...window.ethereum,
+  isMetaMask: true
+}
+
 let screen: ReturnType<typeof renderConnection>
 
 describe('when rendering the component', () => {
@@ -102,6 +107,59 @@ describe('when rendering the component', () => {
     })
   })
 
+  describe('and the user has metamask installed', () => {
+    let oldEthereum: typeof window.ethereum
+
+    beforeEach(() => {
+      oldEthereum = window.ethereum
+      ;(window.ethereum as any) = {
+        ...window.ethereum,
+        isMetaMask: true
+      }
+      web3Options = {
+        primary: ConnectionOptionType.METAMASK,
+        secondary: [ConnectionOptionType.FORTMATIC, ConnectionOptionType.WALLET_CONNECT, ConnectionOptionType.COINBASE]
+      }
+      onConnect = jest.fn()
+      screen = renderConnection({ web3Options, onConnect })
+    })
+
+    afterEach(() => {
+      window.ethereum = oldEthereum
+    })
+
+    it('should call the onConnect method prop when clicking the button', () => {
+      const { getByTestId } = screen
+      fireEvent.click(getByTestId(`${WEB3_PRIMARY_TEST_ID}-${ConnectionOptionType.METAMASK}-button`))
+      expect(onConnect).toHaveBeenCalledWith(ConnectionOptionType.METAMASK)
+    })
+  })
+
+  describe('and the user does not have metamask installed', () => {
+    let oldEthereum: typeof window.ethereum
+
+    beforeEach(() => {
+      oldEthereum = window.ethereum
+      window.ethereum = undefined
+      web3Options = {
+        primary: ConnectionOptionType.METAMASK,
+        secondary: [ConnectionOptionType.FORTMATIC, ConnectionOptionType.WALLET_CONNECT, ConnectionOptionType.COINBASE]
+      }
+      onConnect = jest.fn()
+      screen = renderConnection({ web3Options, onConnect })
+    })
+
+    afterEach(() => {
+      window.ethereum = oldEthereum
+    })
+
+    it('should not call the onConnect method prop when clicking the button', () => {
+      const { getByTestId } = screen
+      fireEvent.click(getByTestId(`${WEB3_PRIMARY_TEST_ID}-${ConnectionOptionType.METAMASK}-button`))
+      expect(onConnect).not.toHaveBeenCalled()
+    })
+  })
+
   describe('and there are web3 options', () => {
     beforeEach(() => {
       onConnect = jest.fn()
@@ -115,12 +173,6 @@ describe('when rendering the component', () => {
     it('should render the primary social option', () => {
       const { getByTestId } = screen
       expect(getByTestId(WEB3_PRIMARY_TEST_ID)).toBeInTheDocument()
-    })
-
-    it('should call the onConnect method prop when clicking the button', () => {
-      const { getByTestId } = screen
-      fireEvent.click(getByTestId(`${WEB3_PRIMARY_TEST_ID}-${ConnectionOptionType.METAMASK}-button`))
-      expect(onConnect).toHaveBeenCalledWith(ConnectionOptionType.METAMASK)
     })
 
     it('should render all the secondary options', () => {
