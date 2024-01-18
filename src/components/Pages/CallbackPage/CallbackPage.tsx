@@ -8,12 +8,12 @@ import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import usePageTracking from '../../../hooks/usePageTracking'
 import { getAnalytics } from '../../../modules/analytics/segment'
 import { TrackingEvents } from '../../../modules/analytics/types'
+import { fetchProfile } from '../../../modules/profile'
 import { wait } from '../../../shared/time'
 import { ConnectionModal, ConnectionModalState } from '../../ConnectionModal'
+import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import { getIdentitySignature } from '../LoginPage/utils'
 import styles from './CallbackPage.module.css'
-import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
-import { fetchProfile } from '../../../modules/profile'
 
 const MAGIC_KEY = getConfiguration().magic.apiKey
 
