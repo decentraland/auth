@@ -11,10 +11,8 @@ import {
   WEB3_PRIMARY_TEST_ID,
   WEB3_SECONDARY_TEST_ID
 } from './constants'
-import { ConnectionOptionType, ConnectionProps } from './Connection.types'
+import { ConnectionOptionType, ConnectionProps, MetamaskEthereumWindow } from './Connection.types'
 import styles from './Connection.module.css'
-
-type MetamaskEthereumWindow = typeof window.ethereum & { isMetaMask?: boolean }
 
 const Primary = ({
   message,
@@ -101,7 +99,6 @@ export const Connection = (props: ConnectionProps): JSX.Element => {
   }, [showMore])
 
   const isMetamaskAvailable = (window.ethereum as MetamaskEthereumWindow)?.isMetaMask
-
   const hasSocialSecondaryOptions = socialOptions && socialOptions.secondary && socialOptions.secondary.length > 0
   const hasWeb3SecondaryOptions = web3Options && web3Options.secondary && web3Options.secondary.length > 0
 
@@ -136,7 +133,7 @@ export const Connection = (props: ConnectionProps): JSX.Element => {
             option={web3Options?.primary}
             loadingOption={loadingOption}
             error={
-              !isMetamaskAvailable
+              !isMetamaskAvailable && web3Options?.primary === ConnectionOptionType.METAMASK
                 ? 'You need to install the MetaMask Browser Extension to proceed. Please install it and try again.'
                 : undefined
             }
