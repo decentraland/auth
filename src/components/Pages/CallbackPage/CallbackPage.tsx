@@ -94,7 +94,7 @@ export const CallbackPage = () => {
       console.log(error)
       navigate('/login')
     }
-  }, [flags])
+  }, [navigate, redirectTo, flags])
 
   if (state === ConnectionModalState.WAITING_FOR_CONFIRMATION) {
     return (
