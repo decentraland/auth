@@ -11,7 +11,7 @@ import {
   WEB3_PRIMARY_TEST_ID,
   WEB3_SECONDARY_TEST_ID
 } from './constants'
-import { ConnectionOptionType, ConnectionProps } from './Connection.types'
+import { ConnectionOptionType, ConnectionProps, MetamaskEthereumWindow } from './Connection.types'
 import styles from './Connection.module.css'
 
 const Primary = ({
@@ -20,21 +20,25 @@ const Primary = ({
   option,
   testId,
   loadingOption,
+  error,
   onConnect
 }: {
   message: React.ReactNode
   children: React.ReactChild
   option: ConnectionOptionType
   loadingOption?: ConnectionOptionType
+  error?: string
   testId?: string
   onConnect: (wallet: ConnectionOptionType) => unknown
 }) => (
   <div className={styles.primary} data-testid={testId}>
     <div className={styles.primaryMessage}>{message}</div>
     <ConnectionOption
-      disabled={!!loadingOption}
+      disabled={!!loadingOption || !!error}
       loading={loadingOption === option}
+      showTooltip={!!error}
       type={option}
+      info={error}
       onClick={onConnect}
       className={classNames(styles.primaryButton, styles.primaryOption)}
       testId={testId}
@@ -94,6 +98,7 @@ export const Connection = (props: ConnectionProps): JSX.Element => {
     setShowMore(!showMore)
   }, [showMore])
 
+  const isMetamaskAvailable = (window.ethereum as MetamaskEthereumWindow)?.isMetaMask
   const hasSocialSecondaryOptions = socialOptions && socialOptions.secondary && socialOptions.secondary.length > 0
   const hasWeb3SecondaryOptions = web3Options && web3Options.secondary && web3Options.secondary.length > 0
 
@@ -127,6 +132,11 @@ export const Connection = (props: ConnectionProps): JSX.Element => {
             testId={WEB3_PRIMARY_TEST_ID}
             option={web3Options?.primary}
             loadingOption={loadingOption}
+            error={
+              !isMetamaskAvailable && web3Options?.primary === ConnectionOptionType.METAMASK
+                ? 'You need to install the MetaMask Browser Extension to proceed. Please install it and try again.'
+                : undefined
+            }
             message={i18n.web3Message(element => (
               <span className={styles.primaryLearnMore} role="button" onClick={() => onLearnMore(web3Options.primary)}>
                 {element}

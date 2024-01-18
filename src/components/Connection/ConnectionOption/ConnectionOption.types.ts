@@ -4,6 +4,7 @@ import { ConnectionOptionType } from '../Connection.types'
 export type ConnectionIconProps = {
   type: ConnectionOptionType
   className?: string
+  info?: string
   showTooltip?: boolean
   testId?: string
   tooltipPosition?: PopupProps['position']
