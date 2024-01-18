@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useContext, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ProviderType } from '@dcl/schemas'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
@@ -8,11 +8,12 @@ import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import usePageTracking from '../../../hooks/usePageTracking'
 import { getAnalytics } from '../../../modules/analytics/segment'
 import { TrackingEvents } from '../../../modules/analytics/types'
-import { config } from '../../../modules/config'
 import { wait } from '../../../shared/time'
 import { ConnectionModal, ConnectionModalState } from '../../ConnectionModal'
 import { getIdentitySignature } from '../LoginPage/utils'
 import styles from './CallbackPage.module.css'
+import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
+import { fetchProfile } from '../../../modules/profile'
 
 const MAGIC_KEY = getConfiguration().magic.apiKey
 
@@ -21,6 +22,7 @@ export const CallbackPage = () => {
   const redirectTo = useAfterLoginRedirection()
   const navigate = useNavigate()
   const [state, setConnectionModalState] = useState(ConnectionModalState.WAITING_FOR_CONFIRMATION)
+  const { flags } = useContext(FeatureFlagsContext)
 
   const connectAndGenerateSignature = useCallback(async () => {
     const connectionData = await connection.connect(ProviderType.MAGIC)
@@ -65,19 +67,23 @@ export const CallbackPage = () => {
       // Wait 800 ms for the tracking to be completed
       await wait(800)
 
-      const peerUrl = config.get('PEER_URL')
-      // Get the profile for the connected account.
-      const fetchProfileResult = await fetch(`${peerUrl}/lambdas/profiles/${connectionData.account}`)
+      // If the flag is enabled, proceed with the simplified avatar setup flow.
+      if (flags[FeatureFlagsKeys.SIMPLIFIED_AVATAR_SETUP]) {
+        // Can only proceed if the connection data has an account. Without the account the profile cannot be fetched.
+        // Continues with the original flow if the account is not present.
+        if (connectionData.account) {
+          const profile = await fetchProfile(connectionData.account)
 
-      if (!fetchProfileResult.ok) {
-        // If there is not profile fo the connected account, take the user to the avatar setup page.
-        if (redirectTo) {
-          // Provide the redirection url if present to the setup page to respect redirection.
-          window.location.href = `/auth/setup?redirectTo=${redirectTo}`
-        } else {
-          window.location.href = '/auth/setup'
+          // If the connected account does not have a profile, redirect the user to the setup page to create a new one.
+          // The setup page should then redirect the user to the url provided as query param if available.
+          if (!profile) {
+            window.location.href = '/auth/setup' + (redirectTo ? `?redirectTo=${redirectTo}` : '')
+            return
+          }
         }
-      } else if (redirectTo) {
+      }
+
+      if (redirectTo) {
         // If redirection url is present, redirect the user to that url.
         window.location.href = decodeURIComponent(redirectTo)
       } else {
