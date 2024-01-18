@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from 'react'
+import { useState, useCallback, useMemo, useEffect, useContext } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import Image1 from '../../../assets/images/background/image1.webp'
 import Image10 from '../../../assets/images/background/image10.webp'
@@ -14,11 +14,12 @@ import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import usePageTracking from '../../../hooks/usePageTracking'
 import { getAnalytics } from '../../../modules/analytics/segment'
 import { ClickEvents, ConnectionType, TrackingEvents } from '../../../modules/analytics/types'
-import { config } from '../../../modules/config'
+import { fetchProfile } from '../../../modules/profile'
 import { isErrorWithMessage } from '../../../shared/errors'
 import { wait } from '../../../shared/time'
 import { Connection, ConnectionOptionType } from '../../Connection'
 import { ConnectionModal, ConnectionModalState } from '../../ConnectionModal'
+import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import { MagicInformationModal } from '../../MagicInformationModal'
 import { WalletInformationModal } from '../../WalletInformationModal'
 import { getIdentitySignature, connectToProvider, isSocialLogin, fromConnectionOptionToProviderType } from './utils'
@@ -37,6 +38,7 @@ export const LoginPage = () => {
   const redirectTo = useAfterLoginRedirection()
   const showGuestOption = redirectTo && new URL(redirectTo).pathname.includes('/play')
   const [currentBackgroundIndex, setCurrentBackgroundIndex] = useState(0)
+  const { flags } = useContext(FeatureFlagsContext)
 
   const handleLearnMore = useCallback(
     (option?: ConnectionOptionType) => {
@@ -110,15 +112,24 @@ export const LoginPage = () => {
           // Wait 800 ms for the tracking to be completed
           await wait(800)
 
-          const peerUrl = config.get('PEER_URL')
-          // Get the profile for the connected account.
-          const fetchProfileResult = await fetch(`${peerUrl}/lambdas/profiles/${connectionData.account}`)
+          // If the flag is enabled, proceed with the simplified avatar setup flow.
+          if (flags[FeatureFlagsKeys.SIMPLIFIED_AVATAR_SETUP]) {
+            // Can only proceed if the connection data has an account. Without the account the profile cannot be fetched.
+            // Continues with the original flow if the account is not present.
+            if (connectionData.account) {
+              const profile = await fetchProfile(connectionData.account)
 
-          if (!fetchProfileResult.ok) {
-            // If there is not profile for the connected account, take the user to the avatar setup page.
-            // Provide the same params to the setup page to respect redirection.
-            window.location.href = `/auth/setup?${searchParams.toString()}`
-          } else if (redirectTo) {
+              // If the connected account does not have a profile, redirect the user to the setup page to create a new one.
+              // The setup page should then redirect the user to the url provided as query param if available.
+              if (!profile) {
+                window.location.href = '/auth/setup' + (redirectTo ? `?redirectTo=${redirectTo}` : '')
+                setShowConnectionModal(false)
+                return
+              }
+            }
+          }
+
+          if (redirectTo) {
             // If a redirection url was provided in the query params, redirect the user to that url.
             window.location.href = decodeURIComponent(redirectTo)
           } else {
@@ -135,7 +146,7 @@ export const LoginPage = () => {
         }
       }
     },
-    [setConnectionModalState, setShowConnectionModal, setCurrentConnectionType, redirectTo, searchParams]
+    [setConnectionModalState, setShowConnectionModal, setCurrentConnectionType, redirectTo, searchParams, flags]
   )
 
   const handleOnCloseConnectionModal = useCallback(() => {
