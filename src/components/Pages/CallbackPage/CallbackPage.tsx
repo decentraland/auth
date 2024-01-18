@@ -8,11 +8,11 @@ import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import usePageTracking from '../../../hooks/usePageTracking'
 import { getAnalytics } from '../../../modules/analytics/segment'
 import { TrackingEvents } from '../../../modules/analytics/types'
+import { config } from '../../../modules/config'
 import { wait } from '../../../shared/time'
 import { ConnectionModal, ConnectionModalState } from '../../ConnectionModal'
 import { getIdentitySignature } from '../LoginPage/utils'
 import styles from './CallbackPage.module.css'
-import { config } from '../../../modules/config'
 
 const MAGIC_KEY = getConfiguration().magic.apiKey
 
@@ -75,7 +75,7 @@ export const CallbackPage = () => {
           // Provide the redirection url if present to the setup page to respect redirection.
           window.location.href = `/auth/setup?redirectTo=${redirectTo}`
         } else {
-          window.location.href = `/auth/setup`
+          window.location.href = '/auth/setup'
         }
       } else if (redirectTo) {
         // If redirection url is present, redirect the user to that url.
