@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { ethers, BrowserProvider } from 'ethers'
 import Icon from 'semantic-ui-react/dist/commonjs/elements/Icon/Icon'
 import { io } from 'socket.io-client'
+import { Profile } from '@dcl/schemas'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
 import { WearablePreview } from 'decentraland-ui/dist/components/WearablePreview/WearablePreview'
@@ -13,8 +14,8 @@ import usePageTracking from '../../../hooks/usePageTracking'
 import { getAnalytics } from '../../../modules/analytics/segment'
 import { ClickEvents, TrackingEvents } from '../../../modules/analytics/types'
 import { config } from '../../../modules/config'
+import { fetchProfile } from '../../../modules/profile'
 import { isErrorWithMessage, isRpcError } from '../../../shared/errors'
-import { fetchProfile } from './utils'
 import styles from './RequestPage.module.css'
 
 enum View {
@@ -42,7 +43,7 @@ export const RequestPage = () => {
   const providerRef = useRef<BrowserProvider>()
   const [view, setView] = useState(View.LOADING_REQUEST)
   const [isLoading, setIsLoading] = useState(false)
-  const [profile, setProfile] = useState(null)
+  const [profile, setProfile] = useState<Profile | null>()
   // TODO: Add a type for the request.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const requestRef = useRef<any>()
@@ -76,7 +77,7 @@ export const RequestPage = () => {
         const request = await authServerFetch('recover', { requestId })
         requestRef.current = request
         const profile = await fetchProfile(signerAddress)
-        setProfile(profile.length ? profile[0] : null)
+        setProfile(profile)
 
         connectedAccountRef.current = signerAddress
         setIsLoadingAvatar(true)
