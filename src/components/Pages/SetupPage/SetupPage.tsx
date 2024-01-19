@@ -1,11 +1,11 @@
 import { useCallback, useContext, useEffect, useState } from 'react'
-import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
-import logoImg from '../../../assets/images/logo.svg'
-import styles from './SetupPage.module.css'
-import { Field } from 'decentraland-ui/dist/components/Field/Field'
-import { Checkbox } from 'decentraland-ui/dist/components/Checkbox/Checkbox'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
+import { Checkbox } from 'decentraland-ui/dist/components/Checkbox/Checkbox'
+import { Field } from 'decentraland-ui/dist/components/Field/Field'
 import { InputOnChangeData } from 'decentraland-ui'
+import logoImg from '../../../assets/images/logo.svg'
+import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
+import styles from './SetupPage.module.css'
 
 export const SetupPage = () => {
   const { initialized, flags } = useContext(FeatureFlagsContext)
