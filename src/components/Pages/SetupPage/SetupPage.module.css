@@ -1,0 +1,86 @@
+.container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+}
+
+.left {
+  flex: 1;
+  padding: 1rem;
+  background-color: black;
+  color: white;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.leftInner {
+  max-width: 500px;
+  display: flex;
+  flex-direction: column;
+}
+
+.logo {
+  width: 50px;
+  height: 50px;
+}
+
+.title {
+  margin-top: 2rem;
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.subtitle {
+  margin-top: 1rem;
+  font-size: 1.8rem;
+}
+
+.name {
+  margin-top: 8rem;
+}
+
+.nameError {
+  color: var(--error);
+  display: inline-block;
+  margin-bottom: 1rem;
+  font-style: italic;
+}
+
+.email {
+}
+
+.emailError {
+  color: var(--error);
+  font-style: italic;
+}
+
+.agree {
+  margin-top: 4rem;
+  display: flex;
+  align-items: center;
+}
+
+.checkbox {
+  margin-right: 10px;
+}
+
+.agree > a {
+  color: white;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+.agreeError {
+  color: var(--error);
+  margin-top: 0.5rem;
+  font-style: italic;
+}
+
+.jumpIn {
+  margin-top: 4rem;
+}
+
+.right {
+  flex: 1;
+}
