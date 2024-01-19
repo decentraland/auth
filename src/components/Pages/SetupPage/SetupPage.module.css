@@ -120,21 +120,8 @@
   margin-top: 24px;
 }
 
-.nameError {
-  color: var(--error);
-  display: inline-block;
-  margin-bottom: 1rem;
-  font-style: italic;
-}
-
 .email {
   margin-top: 24px;
-}
-
-.emailError {
-  position: absolute;
-  color: var(--error);
-  font-style: italic;
 }
 
 .agree {
@@ -157,10 +144,23 @@
   text-decoration: underline;
 }
 
-.agreeError {
+.error {
   color: var(--error);
-  margin-top: 0.5rem;
   font-style: italic;
+  font-weight: 600;
+}
+
+.nameError {
+  display: inline-block;
+  margin-bottom: 1rem;
+}
+
+.emailError {
+  position: absolute;
+}
+
+.agreeError {
+  margin-top: 0.5rem;
   opacity: 70%;
 }
 

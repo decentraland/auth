@@ -8,6 +8,7 @@ import diceImg from '../../../assets/images/dice.svg'
 import logoImg from '../../../assets/images/logo.svg'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import styles from './SetupPage.module.css'
+import classNames from 'classnames'
 
 enum View {
   RANDOMIZE,
@@ -129,7 +130,7 @@ export const SetupPage = () => {
                   label="Name"
                   placeholder="Enter your name"
                   onChange={onNameChange}
-                  message={showErrors ? <span className={styles.nameError}>{nameError}</span> : undefined}
+                  message={showErrors ? <span className={classNames(styles.error, styles.nameError)}>{nameError}</span> : undefined}
                 />
               </div>
               <div className={styles.email}>
@@ -140,7 +141,7 @@ export const SetupPage = () => {
                     <>
                       {showErrors && emailError ? (
                         <>
-                          <span className={styles.emailError}>{emailError}</span>
+                          <span className={classNames(styles.error, styles.emailError)}>{emailError}</span>
                           <br />
                         </>
                       ) : null}
@@ -163,7 +164,7 @@ export const SetupPage = () => {
                   Privacy policy
                 </a>
               </div>
-              {showErrors && agreeError ? <div className={styles.agreeError}>{agreeError}</div> : null}
+              {showErrors && agreeError ? <div className={classNames(styles.error, styles.agreeError)}>{agreeError}</div> : null}
               <div className={styles.jumpIn}>
                 <Button primary fluid type="submit">
                   Jump in decentraland
