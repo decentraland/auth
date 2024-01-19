@@ -170,4 +170,19 @@
 
 .right {
   flex: 1;
+  width: 100%;
+}
+
+.right :global(.WearablePreview) {
+  height: 80%;
+  position: relative;
+  z-index: 1px;
+
+}
+
+.platform {
+  display: block;
+  margin: auto;
+  transform: translateY(-110%);
+  width: 50vh;
 }

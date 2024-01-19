@@ -7,8 +7,10 @@ import { InputOnChangeData } from 'decentraland-ui'
 import backImg from '../../../assets/images/back.svg'
 import diceImg from '../../../assets/images/dice.svg'
 import logoImg from '../../../assets/images/logo.svg'
+import platformImg from '../../../assets/images/Platform.webp'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import styles from './SetupPage.module.css'
+import { WearablePreview } from 'decentraland-ui/dist/components/WearablePreview/WearablePreview'
 
 enum View {
   RANDOMIZE,
@@ -107,7 +109,10 @@ export const SetupPage = () => {
             </div>
           </div>
         </div>
-        <div className={styles.right}></div>
+        <div className={styles.right}>
+          <WearablePreview lockBeta={true} panning={false} disableBackground={true} profile="default" dev={false} />
+          <img className={styles.platform} src={platformImg} alt="platform" />
+        </div>
       </div>
     )
   }
@@ -173,7 +178,10 @@ export const SetupPage = () => {
             </form>
           </div>
         </div>
-        <div className={styles.right}></div>
+        <div className={styles.right}>
+          <WearablePreview lockBeta={true} panning={false} disableBackground={true} profile="default" dev={false} />
+          <img className={styles.platform} src={platformImg} alt="platform" />
+        </div>
       </div>
     )
   }
