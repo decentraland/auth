@@ -3,6 +3,7 @@ import classNames from 'classnames'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import { Checkbox } from 'decentraland-ui/dist/components/Checkbox/Checkbox'
 import { Field } from 'decentraland-ui/dist/components/Field/Field'
+import { WearablePreview } from 'decentraland-ui/dist/components/WearablePreview/WearablePreview'
 import { InputOnChangeData } from 'decentraland-ui'
 import backImg from '../../../assets/images/back.svg'
 import diceImg from '../../../assets/images/dice.svg'
@@ -10,7 +11,6 @@ import logoImg from '../../../assets/images/logo.svg'
 import platformImg from '../../../assets/images/Platform.webp'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import styles from './SetupPage.module.css'
-import { WearablePreview } from 'decentraland-ui/dist/components/WearablePreview/WearablePreview'
 
 enum View {
   RANDOMIZE,
