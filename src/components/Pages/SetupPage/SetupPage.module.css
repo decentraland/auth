@@ -1,17 +1,47 @@
 .container {
+  font-family: system-ui, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   width: 100%;
   height: 100%;
   display: flex;
 }
 
+.background {
+  position: fixed;
+  height: 100vh;
+  width: 100vw;
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: right;
+  background-image: url('/src/assets/images/background.svg');
+  z-index: -1;
+}
+
 .left {
   flex: 1;
   padding: 1rem;
-  background-color: black;
   color: white;
   display: flex;
   justify-content: center;
   align-items: center;
+}
+
+.left :global(.message) {
+  color: white !important;
+  opacity: 70%;
+}
+
+.left :global(.ui.sub.header) > label {
+  color: white !important;
+  opacity: 70%;
+}
+
+.left input {
+  border-bottom: 2px solid rgba(255, 255, 255, 0.7) !important;
+}
+
+.left input::placeholder {
+  color: white !important;
+  opacity: 70%;
 }
 
 .leftInner {
@@ -21,23 +51,73 @@
 }
 
 .logo {
-  width: 50px;
-  height: 50px;
+  width: 64px;
+  height: 64px;
 }
 
 .title {
-  margin-top: 2rem;
-  font-size: 2rem;
-  font-weight: 700;
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 36px;
+  margin-top: 24px;
 }
 
 .subtitle {
-  margin-top: 1rem;
-  font-size: 1.8rem;
+  font-size: 30px;
+  font-weight: 400;
+  line-height: 36px;
+}
+
+.meetYourAvatar {
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 22px;
+  margin-top: 24px;
+}
+
+.meetYourAvatarDescription {
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 17px;
+  margin-top: 24px;
+}
+
+.randomize {
+  margin-top: 16px;
+}
+
+.randomize > :global(.button) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.continue {
+  width: 75%;
+  margin-top: 24px;
+}
+
+.logoSmall {
+  width: 40px;
+  height: 40px;
+}
+
+.back {
+  margin-top: 26px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.back > span {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 18px;
 }
 
 .name {
-  margin-top: 8rem;
+  margin-top: 24px;
 }
 
 .nameError {
@@ -48,21 +128,27 @@
 }
 
 .email {
+  margin-top: 24px;
 }
 
 .emailError {
+  position: absolute;
   color: var(--error);
   font-style: italic;
 }
 
 .agree {
-  margin-top: 4rem;
+  margin-top: 24px;
   display: flex;
   align-items: center;
 }
 
-.checkbox {
+.agree > :global(.checkbox) {
   margin-right: 10px;
+}
+
+.agree :global(.ui.checkbox input[type='checkbox'].hidden ~ label:before) {
+  border: 2px solid rgba(255, 255, 255, 0.7);
 }
 
 .agree > a {
@@ -75,10 +161,11 @@
   color: var(--error);
   margin-top: 0.5rem;
   font-style: italic;
+  opacity: 70%;
 }
 
 .jumpIn {
-  margin-top: 4rem;
+  margin-top: 24px;
 }
 
 .right {
