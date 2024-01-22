@@ -171,6 +171,8 @@
 .right {
   flex: 1;
   width: 100%;
+  position: relative;
+  top: 10%;
 }
 
 .right :global(.WearablePreview) {

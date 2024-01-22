@@ -17,8 +17,13 @@ enum View {
   FORM
 }
 
+function getRandomDefaultProfile() {
+  return 'default' + (Math.floor(Math.random() * (160 - 1 + 1)) + 1)
+}
+
 export const SetupPage = () => {
   const [view, setView] = useState(View.RANDOMIZE)
+  const [profile, setProfile] = useState(getRandomDefaultProfile())
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [agree, setAgree] = useState(false)
@@ -29,6 +34,7 @@ export const SetupPage = () => {
 
   const { initialized, flags } = useContext(FeatureFlagsContext)
 
+  const onRandomize = useCallback(() => setProfile(getRandomDefaultProfile()), [])
   const onContinue = useCallback(() => setView(View.FORM), [])
   const onBack = useCallback(() => setView(View.RANDOMIZE), [])
   const onNameChange = useCallback((_e: any, data: InputOnChangeData) => setName(data.value), [])
@@ -97,7 +103,7 @@ export const SetupPage = () => {
               Don't worry if it's not quite 'you' yet - you'll later have plenty of options to make it your own.
             </div>
             <div className={styles.randomize}>
-              <Button compact inverted>
+              <Button compact inverted onClick={onRandomize}>
                 <img src={diceImg} alt="diceImg" />
                 <span>randomize</span>
               </Button>
@@ -110,7 +116,7 @@ export const SetupPage = () => {
           </div>
         </div>
         <div className={styles.right}>
-          <WearablePreview lockBeta={true} panning={false} disableBackground={true} profile="default" dev={false} />
+          <WearablePreview lockBeta={true} panning={false} disableBackground={true} profile={profile} dev={false} />
           <img className={styles.platform} src={platformImg} alt="platform" />
         </div>
       </div>
@@ -179,7 +185,7 @@ export const SetupPage = () => {
           </div>
         </div>
         <div className={styles.right}>
-          <WearablePreview lockBeta={true} panning={false} disableBackground={true} profile="default" dev={false} />
+          <WearablePreview lockBeta={true} panning={false} disableBackground={true} profile={profile} dev={false} />
           <img className={styles.platform} src={platformImg} alt="platform" />
         </div>
       </div>
