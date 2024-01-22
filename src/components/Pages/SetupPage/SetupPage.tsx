@@ -177,7 +177,7 @@ export const SetupPage = () => {
               </div>
               {showErrors && agreeError ? <div className={classNames(styles.error, styles.agreeError)}>{agreeError}</div> : null}
               <div className={styles.jumpIn}>
-                <Button primary fluid type="submit">
+                <Button primary fluid type="submit" disabled={!agree}>
                   Jump in decentraland
                 </Button>
               </div>
