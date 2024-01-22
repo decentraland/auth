@@ -10,7 +10,14 @@ import diceImg from '../../../assets/images/dice.svg'
 import logoImg from '../../../assets/images/logo.svg'
 import platformImg from '../../../assets/images/Platform.webp'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
+import { createContentClient, DeploymentBuilder } from 'dcl-catalyst-client'
 import styles from './SetupPage.module.css'
+import { config } from '../../../modules/config'
+import { createFetchComponent } from '@well-known-components/fetch-component'
+import { Avatar, EntityType, Profile } from '@dcl/schemas'
+import { connection } from 'decentraland-connect'
+import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
+import { Authenticator } from '@dcl/crypto'
 
 enum View {
   RANDOMIZE,
@@ -41,7 +48,7 @@ export const SetupPage = () => {
   const onEmailChange = useCallback((_e: any, data: InputOnChangeData) => setEmail(data.value), [])
   const onAgreeChange = useCallback(() => setAgree(!agree), [agree])
 
-  const onSubmit = useCallback((e: React.FormEvent<HTMLFormElement>) => {
+  const onSubmit = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
 
     setShowErrors(true)
@@ -50,8 +57,67 @@ export const SetupPage = () => {
       return
     }
 
-    // TODO: Handle submit.
-    console.log('submit')
+    // Try to restore connection so the connection lib can use the provider.
+    await connection.tryPreviousConnection()
+
+    // Get the address of the currently connected account.
+    const provider = await connection.getProvider()
+    const account = ((await provider.request({ method: 'eth_accounts' })) as string[])[0]
+
+    // Create the content client to fetch and deploy profiles.
+    const peerUrl = config.get('PEER_URL', '')
+    const client = createContentClient({ url: peerUrl + '/content', fetcher: createFetchComponent() })
+
+    // Fetch the profile of the currently selected profile and extract the avatar.
+    const defaultAvatar = ((await client.fetchEntitiesByPointers([profile]))[0].metadata as Profile).avatars[0]
+
+    // Default profiles come with legacy ids for wearables, they need to be updated to urns before deploying.
+    const mapLegacyIdToUrn = (urn: string) => urn.replace('dcl://base-avatars/', 'urn:decentraland:off-chain:base-avatars:')
+
+    const deploymentAvatar: Avatar = {
+      userId: account,
+      ethAddress: account,
+      email: '',
+      version: 0,
+      hasClaimedName: false,
+      tutorialStep: 0,
+      name,
+      description: '',
+      hasConnectedWeb3: true,
+      avatar: {
+        bodyShape: mapLegacyIdToUrn(defaultAvatar.avatar.bodyShape),
+        wearables: defaultAvatar.avatar.wearables.map(mapLegacyIdToUrn),
+        emotes: [],
+        eyes: defaultAvatar.avatar.eyes,
+        hair: defaultAvatar.avatar.hair,
+        skin: defaultAvatar.avatar.skin,
+        snapshots: defaultAvatar.avatar.snapshots
+      }
+    }
+
+    const buildEntityParams: Parameters<(typeof DeploymentBuilder)['buildEntity']>[0] = {
+      type: EntityType.PROFILE,
+      pointers: [account],
+      metadata: { avatars: [deploymentAvatar] },
+    }
+
+    const deploymentEntity = await DeploymentBuilder.buildEntity(buildEntityParams)
+    const identity = localStorageGetIdentity(account)
+
+    if (!identity) {
+      throw new Error('Missing identity')
+    }
+
+    const authChain = Authenticator.signPayload(identity, deploymentEntity.entityId)
+
+    // TODO: Fix deployment not working due to missing face256 and body.png.
+    await client.deploy({
+      entityId: deploymentEntity.entityId,
+      files: deploymentEntity.files,
+      authChain
+    })
+
+    // TODO: Redirect to wherever the user was trying to go.
   }, [])
 
   useEffect(() => {
