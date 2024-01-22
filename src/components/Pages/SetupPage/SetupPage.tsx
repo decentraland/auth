@@ -1,23 +1,23 @@
 import { useCallback, useContext, useEffect, useState } from 'react'
+import { createFetchComponent } from '@well-known-components/fetch-component'
 import classNames from 'classnames'
+import { createContentClient, DeploymentBuilder } from 'dcl-catalyst-client'
+import { Authenticator } from '@dcl/crypto'
+import { Avatar, EntityType, Profile } from '@dcl/schemas'
+import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import { Checkbox } from 'decentraland-ui/dist/components/Checkbox/Checkbox'
 import { Field } from 'decentraland-ui/dist/components/Field/Field'
 import { WearablePreview } from 'decentraland-ui/dist/components/WearablePreview/WearablePreview'
+import { connection } from 'decentraland-connect'
 import { InputOnChangeData } from 'decentraland-ui'
 import backImg from '../../../assets/images/back.svg'
 import diceImg from '../../../assets/images/dice.svg'
 import logoImg from '../../../assets/images/logo.svg'
 import platformImg from '../../../assets/images/Platform.webp'
-import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
-import { createContentClient, DeploymentBuilder } from 'dcl-catalyst-client'
-import styles from './SetupPage.module.css'
 import { config } from '../../../modules/config'
-import { createFetchComponent } from '@well-known-components/fetch-component'
-import { Avatar, EntityType, Profile } from '@dcl/schemas'
-import { connection } from 'decentraland-connect'
-import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
-import { Authenticator } from '@dcl/crypto'
+import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
+import styles from './SetupPage.module.css'
 
 enum View {
   RANDOMIZE,
@@ -98,7 +98,7 @@ export const SetupPage = () => {
     const buildEntityParams: Parameters<(typeof DeploymentBuilder)['buildEntity']>[0] = {
       type: EntityType.PROFILE,
       pointers: [account],
-      metadata: { avatars: [deploymentAvatar] },
+      metadata: { avatars: [deploymentAvatar] }
     }
 
     const deploymentEntity = await DeploymentBuilder.buildEntity(buildEntityParams)
