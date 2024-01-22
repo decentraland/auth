@@ -171,31 +171,14 @@
   position: absolute;
   transition: ease-out 3s;
   z-index: 1;
-} 
+}
 
 .loading .wearableDefaultImg {
   opacity: 0.9;
 }
 
-.discordBtn {
+.communityBubble {
   position: absolute;
   bottom: 20px;
   right: 20px;
-  display: flex;
-  color: white;
-  border-radius: 12px;
-  padding: 14px;
-  background: #161518;
-  align-items: flex-end;
-  gap: 5px;
-}
-
-.discordInfo {
-  display: flex;
-  flex-direction: column;
-  color: white;
-}
-
-.discordBtn i {
-  font-size: 28px;
 }

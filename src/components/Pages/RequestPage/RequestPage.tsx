@@ -5,6 +5,7 @@ import Icon from 'semantic-ui-react/dist/commonjs/elements/Icon/Icon'
 import { io } from 'socket.io-client'
 import { Profile } from '@dcl/schemas'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
+import { CommunityBubble } from 'decentraland-ui/dist/components/CommunityBubble'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
 import { WearablePreview } from 'decentraland-ui/dist/components/WearablePreview/WearablePreview'
 import { connection } from 'decentraland-connect'
@@ -274,13 +275,7 @@ export const RequestPage = () => {
                 </>
               ) : null}
             </div>
-            <a className={styles.discordBtn} href="https://decentraland.org/discord" target="about:blank">
-              <Icon name="discord" />
-              <p className={styles.discordInfo}>
-                <span>Need guidance?</span>
-                <span>ASK THE COMMUNITY</span>
-              </p>
-            </a>
+            <CommunityBubble className={styles.communityBubble} />
           </div>
         </div>
       )
