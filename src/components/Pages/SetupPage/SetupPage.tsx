@@ -150,6 +150,7 @@ export const SetupPage = () => {
       } catch (e) {
         setDeploying(false)
 
+        // TODO: Display a proper error on the page to show the user.
         console.error('There was an error deploying the profile', (e as Error).message)
       }
     },
