@@ -149,7 +149,7 @@ export const SetupPage = () => {
         }
       } catch (e) {
         setDeploying(false)
-        
+
         console.error('There was an error deploying the profile', (e as Error).message)
       }
     },
