@@ -3,7 +3,7 @@ import { createFetchComponent } from '@well-known-components/fetch-component'
 import classNames from 'classnames'
 import { createContentClient, DeploymentBuilder } from 'dcl-catalyst-client'
 import { Authenticator } from '@dcl/crypto'
-import { Avatar, EntityType, Profile } from '@dcl/schemas'
+import { EntityType } from '@dcl/schemas'
 import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import { Checkbox } from 'decentraland-ui/dist/components/Checkbox/Checkbox'
@@ -49,89 +49,86 @@ export const SetupPage = () => {
   const onEmailChange = useCallback((_e: any, data: InputOnChangeData) => setEmail(data.value), [])
   const onAgreeChange = useCallback(() => setAgree(!agree), [agree])
 
-  const onSubmit = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
+  const onSubmit = useCallback(
+    async (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault()
 
-    setShowErrors(true)
+      setShowErrors(true)
 
-    if (nameError || emailError || agreeError) {
-      return
-    }
-
-    // Try to restore connection so the connection lib can use the provider.
-    // This view should be visible only after the user has already connected.
-    // This is just a temporary workaround for development.
-    await connection.tryPreviousConnection()
-
-    // Get the address of the currently connected account.
-    const provider = await connection.getProvider()
-    const account = ((await provider.request({ method: 'eth_accounts' })) as string[])[0]
-
-    // Create the content client to fetch and deploy profiles.
-    const peerUrl = config.get('PEER_URL', '')
-    const client = createContentClient({ url: peerUrl + '/content', fetcher: createFetchComponent() })
-
-    // Fetch the profile of the currently selected profile and extract the avatar.
-    const defaultAvatar = ((await client.fetchEntitiesByPointers([profile]))[0].metadata as Profile).avatars[0]
-
-    // Default profiles come with legacy ids for wearables, they need to be updated to urns before deploying.
-    const mapLegacyIdToUrn = (urn: string) => urn.replace('dcl://base-avatars/', 'urn:decentraland:off-chain:base-avatars:')
-
-    const deploymentAvatar: Avatar = {
-      userId: account,
-      ethAddress: account,
-      email: '',
-      version: 0,
-      hasClaimedName: false,
-      tutorialStep: 0,
-      name,
-      description: '',
-      hasConnectedWeb3: true,
-      avatar: {
-        bodyShape: mapLegacyIdToUrn(defaultAvatar.avatar.bodyShape),
-        wearables: defaultAvatar.avatar.wearables.map(mapLegacyIdToUrn),
-        emotes: [],
-        eyes: defaultAvatar.avatar.eyes,
-        hair: defaultAvatar.avatar.hair,
-        skin: defaultAvatar.avatar.skin,
-        snapshots: defaultAvatar.avatar.snapshots
+      if (nameError || emailError || agreeError) {
+        return
       }
-    }
 
-    const buildEntityParams: Parameters<(typeof DeploymentBuilder)['buildEntity']>[0] = {
-      type: EntityType.PROFILE,
-      pointers: [account],
-      metadata: { avatars: [deploymentAvatar] }
-    }
+      // Try to restore connection so the connection lib can use the provider.
+      // This view should be visible only after the user has already connected.
+      // This is just a temporary workaround for development.
+      await connection.tryPreviousConnection()
 
-    const deploymentEntity = await DeploymentBuilder.buildEntity(buildEntityParams)
-    const identity = localStorageGetIdentity(account)
+      // Get the address of the currently connected account.
+      const provider = await connection.getProvider()
+      const account = ((await provider.request({ method: 'eth_accounts' })) as string[])[0]
 
-    if (!identity) {
-      throw new Error('Missing identity')
-    }
+      // Create the content client to fetch and deploy profiles.
+      const peerUrl = config.get('PEER_URL', '')
+      const client = createContentClient({ url: peerUrl + '/content', fetcher: createFetchComponent() })
 
-    const authChain = Authenticator.signPayload(identity, deploymentEntity.entityId)
+      // Fetch the entity of the currently selected default profile.
+      const defaultEntity = (await client.fetchEntitiesByPointers([profile]))[0]
+      console.log(defaultEntity)
 
-    // TODO: Fix deployment not working due to missing face256 and body.png.
-    await client.deploy({
-      entityId: deploymentEntity.entityId,
-      files: deploymentEntity.files,
-      authChain
-    })
+      // Download the content of the default profile and create the files map to be used for deploying the new profile.
+      const bodyName = 'body.png'
+      const faceName = 'face256.png'
 
-    // Subscribe to the newsletter only if the user has provided an email.
-    if (email) {
-      // Given that the subscription is an extra step, we don't want to block the user if it fails.
-      try {
-        await subscribeToNewsletter(email)
-      } catch (e) {
-        console.warn('There was an error subscribing to the newsletter', (e as Error).message)
+      const bodyBuffer = await client.downloadContent(defaultEntity.content.find(x => x.file === bodyName)!.hash)
+      const faceBuffer = await client.downloadContent(defaultEntity.content.find(x => x.file === faceName)!.hash)
+
+      const files = new Map<string, Uint8Array>()
+
+      files.set(bodyName, bodyBuffer)
+      files.set(faceName, faceBuffer)
+
+      // Default profiles come with legacy ids for wearables, they need to be updated to urns before deploying.
+      const mapLegacyIdToUrn = (urn: string) => urn.replace('dcl://base-avatars/', 'urn:decentraland:off-chain:base-avatars:')
+
+      // Override the default avatar with the form data and the currently connected account.
+      const avatar = defaultEntity.metadata.avatars[0]
+
+      avatar.ethAddress = account
+      avatar.name = name
+      avatar.avatar.bodyShape = mapLegacyIdToUrn(defaultEntity.metadata.avatars[0].avatar.bodyShape)
+      avatar.avatar.wearables = defaultEntity.metadata.avatars[0].avatar.wearables.map(mapLegacyIdToUrn)
+      avatar.avatar.version = 1
+
+      const deploymentEntity = await DeploymentBuilder.buildEntity({
+        type: EntityType.PROFILE,
+        pointers: [account],
+        metadata: { avatars: [avatar] },
+        timestamp: Date.now(),
+        files
+      })
+
+      // Deploy the profile for the currently connected account.
+      await client.deploy({
+        entityId: deploymentEntity.entityId,
+        files: deploymentEntity.files,
+        authChain: Authenticator.signPayload(localStorageGetIdentity(account)!, deploymentEntity.entityId)
+      })
+
+      // Subscribe to the newsletter only if the user has provided an email.
+      if (email) {
+        // Given that the subscription is an extra step, we don't want to block the user if it fails.
+        try {
+          await subscribeToNewsletter(email)
+        } catch (e) {
+          console.warn('There was an error subscribing to the newsletter', (e as Error).message)
+        }
       }
-    }
 
-    // TODO: Redirect to wherever the user was trying to go.
-  }, [])
+      // TODO: Redirect to wherever the user was trying to go.
+    },
+    [nameError, emailError, agreeError, name, email, agree, profile]
+  )
 
   useEffect(() => {
     if (!name.length) {
@@ -273,3 +270,5 @@ export const SetupPage = () => {
 
   return null
 }
+
+// offsetY={0.3}  cameraY={0.5} offsetZ={-1.5}
