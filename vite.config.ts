@@ -9,8 +9,11 @@ import { nodePolyfills } from 'vite-plugin-node-polyfills'
 export default defineConfig(({ command, mode }) => {
   const envVariables = loadEnv(mode, process.cwd())
   return {
-    plugins: [react(), nodePolyfills()],
-    // Required because the CatalystClient tries to access it
+    plugins: [
+      react(), 
+      // The catalyst client requires node polyfills to work in the browser.
+      nodePolyfills()
+    ],
     define: {
       // eslint-disable-next-line @typescript-eslint/naming-convention
       'process.env': {
