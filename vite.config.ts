@@ -10,7 +10,7 @@ export default defineConfig(({ command, mode }) => {
   const envVariables = loadEnv(mode, process.cwd())
   return {
     plugins: [
-      react(), 
+      react(),
       // The catalyst client requires node polyfills to work in the browser.
       nodePolyfills()
     ],
