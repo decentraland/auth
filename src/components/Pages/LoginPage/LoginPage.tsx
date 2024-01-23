@@ -99,12 +99,8 @@ export const LoginPage = () => {
           setConnectionModalState(ConnectionModalState.CONNECTING_WALLET)
           const connectionData = await connectToProvider(connectionType)
 
-          // The requests sign in flow for the desktop app has a different identity.
-          // There is no need to create one here if the user is coming from the requests page.
-          if (searchParams.get('fromRequests') !== 'true') {
-            setConnectionModalState(ConnectionModalState.WAITING_FOR_SIGNATURE)
-            await getIdentitySignature(connectionData.account?.toLowerCase() ?? '', connectionData.provider)
-          }
+          setConnectionModalState(ConnectionModalState.WAITING_FOR_SIGNATURE)
+          await getIdentitySignature(connectionData.account?.toLowerCase() ?? '', connectionData.provider)
 
           // eslint-disable-next-line @typescript-eslint/naming-convention
           getAnalytics().track(TrackingEvents.LOGIN_SUCCESS, { eth_address: connectionData.account })
