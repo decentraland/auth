@@ -58,6 +58,8 @@ export const SetupPage = () => {
     }
 
     // Try to restore connection so the connection lib can use the provider.
+    // This view should be visible only after the user has already connected.
+    // This is just a temporary workaround for development.
     await connection.tryPreviousConnection()
 
     // Get the address of the currently connected account.
