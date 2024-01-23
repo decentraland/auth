@@ -15,6 +15,7 @@ import backImg from '../../../assets/images/back.svg'
 import diceImg from '../../../assets/images/dice.svg'
 import logoImg from '../../../assets/images/logo.svg'
 import platformImg from '../../../assets/images/Platform.webp'
+import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { config } from '../../../modules/config'
 import { fetchProfile } from '../../../modules/profile'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
@@ -31,6 +32,7 @@ function getRandomDefaultProfile() {
 }
 
 export const SetupPage = () => {
+  const [initialized, setInitialized] = useState(false)
   const [view, setView] = useState(View.RANDOMIZE)
   const [profile, setProfile] = useState(getRandomDefaultProfile())
   const [name, setName] = useState('')
@@ -40,17 +42,20 @@ export const SetupPage = () => {
   const [emailError, setEmailError] = useState('')
   const [agreeError, setAgreeError] = useState('')
   const [showErrors, setShowErrors] = useState(false)
+  const [deploying, setDeploying] = useState(false)
 
   const accountRef = useRef<string>()
   const identityRef = useRef<AuthIdentity>()
 
-  const { initialized, flags } = useContext(FeatureFlagsContext)
+  const { initialized: initializedFlags, flags } = useContext(FeatureFlagsContext)
+
+  const redirectTo = useAfterLoginRedirection()
 
   const onRandomize = useCallback(() => setProfile(getRandomDefaultProfile()), [])
   const onContinue = useCallback(() => setView(View.FORM), [])
   const onBack = useCallback(() => setView(View.RANDOMIZE), [])
-  const onNameChange = useCallback((_e: any, data: InputOnChangeData) => setName(data.value), [])
-  const onEmailChange = useCallback((_e: any, data: InputOnChangeData) => setEmail(data.value), [])
+  const onNameChange = useCallback((_e: unknown, data: InputOnChangeData) => setName(data.value), [])
+  const onEmailChange = useCallback((_e: unknown, data: InputOnChangeData) => setEmail(data.value), [])
   const onAgreeChange = useCallback(() => setAgree(!agree), [agree])
 
   const onSubmit = useCallback(
@@ -59,70 +64,96 @@ export const SetupPage = () => {
 
       setShowErrors(true)
 
+      // If any of the fields has an error, don't submit.
       if (nameError || emailError || agreeError) {
         return
       }
 
-      // Create the content client to fetch and deploy profiles.
-      const peerUrl = config.get('PEER_URL', '')
-      const client = createContentClient({ url: peerUrl + '/content', fetcher: createFetchComponent() })
-
-      // Fetch the entity of the currently selected default profile.
-      const defaultEntity = (await client.fetchEntitiesByPointers([profile]))[0]
-      console.log(defaultEntity)
-
-      // Download the content of the default profile and create the files map to be used for deploying the new profile.
-      const bodyName = 'body.png'
-      const faceName = 'face256.png'
-
-      const bodyBuffer = await client.downloadContent(defaultEntity.content.find(x => x.file === bodyName)!.hash)
-      const faceBuffer = await client.downloadContent(defaultEntity.content.find(x => x.file === faceName)!.hash)
-
-      const files = new Map<string, Uint8Array>()
-
-      files.set(bodyName, bodyBuffer)
-      files.set(faceName, faceBuffer)
-
-      // Default profiles come with legacy ids for wearables, they need to be updated to urns before deploying.
-      const mapLegacyIdToUrn = (urn: string) => urn.replace('dcl://base-avatars/', 'urn:decentraland:off-chain:base-avatars:')
-
-      // Override the default avatar with the form data and the currently connected account.
-      const avatar = defaultEntity.metadata.avatars[0]
-
-      avatar.ethAddress = accountRef.current!
-      avatar.name = name
-      avatar.avatar.bodyShape = mapLegacyIdToUrn(defaultEntity.metadata.avatars[0].avatar.bodyShape)
-      avatar.avatar.wearables = defaultEntity.metadata.avatars[0].avatar.wearables.map(mapLegacyIdToUrn)
-      avatar.avatar.version = 1
-
-      const deploymentEntity = await DeploymentBuilder.buildEntity({
-        type: EntityType.PROFILE,
-        pointers: [accountRef.current!],
-        metadata: { avatars: [avatar] },
-        timestamp: Date.now(),
-        files
-      })
-
-      // Deploy the profile for the currently connected account.
-      await client.deploy({
-        entityId: deploymentEntity.entityId,
-        files: deploymentEntity.files,
-        authChain: Authenticator.signPayload(identityRef.current!, deploymentEntity.entityId)
-      })
-
-      // Subscribe to the newsletter only if the user has provided an email.
-      if (email) {
-        // Given that the subscription is an extra step, we don't want to block the user if it fails.
-        try {
-          await subscribeToNewsletter(email)
-        } catch (e) {
-          console.warn('There was an error subscribing to the newsletter', (e as Error).message)
-        }
+      // These refs should have values at this point.
+      // If they don't, it means that there was something wrong on the initialization effect.
+      if (!accountRef.current || !identityRef.current) {
+        console.warn('No account or identity found.')
+        return
       }
 
-      // TODO: Redirect to wherever the user was trying to go.
+      try {
+        setDeploying(true)
+
+        // Create the content client to fetch and deploy profiles.
+        const peerUrl = config.get('PEER_URL', '')
+        const client = createContentClient({ url: peerUrl + '/content', fetcher: createFetchComponent() })
+
+        // Fetch the entity of the currently selected default profile.
+        const defaultEntity = (await client.fetchEntitiesByPointers([profile]))[0]
+        console.log(defaultEntity)
+
+        // Download the content of the default profile and create the files map to be used for deploying the new profile.
+        const bodyFile = 'body.png'
+        const faceFile = 'face256.png'
+
+        const contentHashesByFile = defaultEntity.content.reduce(
+          (acc, next) => ({ ...acc, [next.file]: next.hash }),
+          {} as Record<string, string>
+        )
+
+        const bodyBuffer = await client.downloadContent(contentHashesByFile[bodyFile])
+        const faceBuffer = await client.downloadContent(contentHashesByFile[faceFile])
+
+        const files = new Map<string, Uint8Array>()
+
+        files.set(bodyFile, bodyBuffer)
+        files.set(faceFile, faceBuffer)
+
+        // Default profiles come with legacy ids for wearables, they need to be updated to urns before deploying.
+        const mapLegacyIdToUrn = (urn: string) => urn.replace('dcl://base-avatars/', 'urn:decentraland:off-chain:base-avatars:')
+
+        // Override the default avatar with the form data and the currently connected account.
+        const avatar = defaultEntity.metadata.avatars[0]
+
+        avatar.ethAddress = accountRef.current
+        avatar.name = name
+        avatar.avatar.bodyShape = mapLegacyIdToUrn(defaultEntity.metadata.avatars[0].avatar.bodyShape)
+        avatar.avatar.wearables = defaultEntity.metadata.avatars[0].avatar.wearables.map(mapLegacyIdToUrn)
+        avatar.avatar.version = 1
+
+        const deploymentEntity = await DeploymentBuilder.buildEntity({
+          type: EntityType.PROFILE,
+          pointers: [accountRef.current],
+          metadata: { avatars: [avatar] },
+          timestamp: Date.now(),
+          files
+        })
+
+        // Deploy the profile for the currently connected account.
+        await client.deploy({
+          entityId: deploymentEntity.entityId,
+          files: deploymentEntity.files,
+          authChain: Authenticator.signPayload(identityRef.current, deploymentEntity.entityId)
+        })
+
+        // Subscribe to the newsletter only if the user has provided an email.
+        if (email) {
+          // Given that the subscription is an extra step, we don't want to block the user if it fails.
+          try {
+            await subscribeToNewsletter(email)
+          } catch (e) {
+            console.warn('There was an error subscribing to the newsletter', (e as Error).message)
+          }
+        }
+
+        // Redirect to the site defined in the search params.
+        if (redirectTo) {
+          window.location.href = decodeURIComponent(redirectTo)
+        } else {
+          window.location.href = '/'
+        }
+      } catch (e) {
+        setDeploying(false)
+        
+        console.error('There was an error deploying the profile', (e as Error).message)
+      }
     },
-    [nameError, emailError, agreeError, name, email, agree, profile]
+    [nameError, emailError, agreeError, name, email, agree, profile, redirectTo]
   )
 
   // Validation effect.
@@ -204,10 +235,12 @@ export const SetupPage = () => {
       }
 
       identityRef.current = identity
+
+      setInitialized(true)
     })()
   }, [])
 
-  if (!initialized) {
+  if (!initialized || !initializedFlags) {
     return null
   }
 
@@ -306,8 +339,8 @@ export const SetupPage = () => {
               </div>
               {showErrors && agreeError ? <div className={classNames(styles.error, styles.agreeError)}>{agreeError}</div> : null}
               <div className={styles.jumpIn}>
-                <Button primary fluid type="submit" disabled={!agree}>
-                  Jump in decentraland
+                <Button primary fluid type="submit" disabled={!agree || deploying} loading={deploying}>
+                  Continue
                 </Button>
               </div>
             </form>
@@ -323,5 +356,3 @@ export const SetupPage = () => {
 
   return null
 }
-
-// offsetY={0.3}  cameraY={0.5} offsetZ={-1.5}
