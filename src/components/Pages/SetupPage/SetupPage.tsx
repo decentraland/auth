@@ -1,8 +1,8 @@
-import { useCallback, useContext, useEffect, useState } from 'react'
+import { useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { createFetchComponent } from '@well-known-components/fetch-component'
 import classNames from 'classnames'
 import { createContentClient, DeploymentBuilder } from 'dcl-catalyst-client'
-import { Authenticator } from '@dcl/crypto'
+import { AuthIdentity, Authenticator } from '@dcl/crypto'
 import { EntityType } from '@dcl/schemas'
 import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
@@ -19,6 +19,7 @@ import { config } from '../../../modules/config'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import { subscribeToNewsletter } from './utils'
 import styles from './SetupPage.module.css'
+import { fetchProfile } from '../../../modules/profile'
 
 enum View {
   RANDOMIZE,
@@ -40,6 +41,9 @@ export const SetupPage = () => {
   const [agreeError, setAgreeError] = useState('')
   const [showErrors, setShowErrors] = useState(false)
 
+  const accountRef = useRef<string>()
+  const identityRef = useRef<AuthIdentity>()
+
   const { initialized, flags } = useContext(FeatureFlagsContext)
 
   const onRandomize = useCallback(() => setProfile(getRandomDefaultProfile()), [])
@@ -58,15 +62,6 @@ export const SetupPage = () => {
       if (nameError || emailError || agreeError) {
         return
       }
-
-      // Try to restore connection so the connection lib can use the provider.
-      // This view should be visible only after the user has already connected.
-      // This is just a temporary workaround for development.
-      await connection.tryPreviousConnection()
-
-      // Get the address of the currently connected account.
-      const provider = await connection.getProvider()
-      const account = ((await provider.request({ method: 'eth_accounts' })) as string[])[0]
 
       // Create the content client to fetch and deploy profiles.
       const peerUrl = config.get('PEER_URL', '')
@@ -94,7 +89,7 @@ export const SetupPage = () => {
       // Override the default avatar with the form data and the currently connected account.
       const avatar = defaultEntity.metadata.avatars[0]
 
-      avatar.ethAddress = account
+      avatar.ethAddress = accountRef.current!
       avatar.name = name
       avatar.avatar.bodyShape = mapLegacyIdToUrn(defaultEntity.metadata.avatars[0].avatar.bodyShape)
       avatar.avatar.wearables = defaultEntity.metadata.avatars[0].avatar.wearables.map(mapLegacyIdToUrn)
@@ -102,7 +97,7 @@ export const SetupPage = () => {
 
       const deploymentEntity = await DeploymentBuilder.buildEntity({
         type: EntityType.PROFILE,
-        pointers: [account],
+        pointers: [accountRef.current!],
         metadata: { avatars: [avatar] },
         timestamp: Date.now(),
         files
@@ -112,7 +107,7 @@ export const SetupPage = () => {
       await client.deploy({
         entityId: deploymentEntity.entityId,
         files: deploymentEntity.files,
-        authChain: Authenticator.signPayload(localStorageGetIdentity(account)!, deploymentEntity.entityId)
+        authChain: Authenticator.signPayload(identityRef.current!, deploymentEntity.entityId)
       })
 
       // Subscribe to the newsletter only if the user has provided an email.
@@ -130,7 +125,10 @@ export const SetupPage = () => {
     [nameError, emailError, agreeError, name, email, agree, profile]
   )
 
+  // Validation effect.
+  // Will perform some validations on the form data whenever input changes.
   useEffect(() => {
+    // Validate the name.
     if (!name.length) {
       setNameError('Please enter your name.')
     } else if (name.length >= 15) {
@@ -141,18 +139,73 @@ export const SetupPage = () => {
       setNameError('')
     }
 
+    // Validate the email.
     if (email && !email.includes('@')) {
       setEmailError('Please enter a valid email.')
     } else {
       setEmailError('')
     }
 
+    // Validate the agree checkbox.
     if (!agree) {
       setAgreeError('Please accept the terms of use and privacy policy.')
     } else {
       setAgreeError('')
     }
   }, [name, email, agree])
+
+  // Initialization effect.
+  // Will run some checks to see if the user can proceed with the simplified avatar setup flow.
+  useEffect(() => {
+    ;(async () => {
+      const toLogin = () => {
+        window.location.href = '/auth/login'
+      }
+
+      // Check if the wallet is connected.
+      try {
+        await connection.tryPreviousConnection()
+      } catch (e) {
+        console.warn('No previous connection found')
+        toLogin()
+        return
+      }
+
+      const provider = await connection.getProvider()
+      const accounts = (await provider.request({ method: 'eth_accounts' })) as string[]
+
+      // Check that there is at least one account connected.
+      if (!accounts.length) {
+        console.warn('No accounts found')
+        toLogin()
+        return
+      }
+
+      const account = accounts[0]
+
+      accountRef.current = account
+
+      const profile = await fetchProfile(account)
+
+      // Check that the connected account does not have a profile already.
+      if (profile) {
+        console.warn('Profile already exists')
+        toLogin()
+        return
+      }
+
+      const identity = localStorageGetIdentity(account)
+
+      // Check that the connected account has an identity.
+      if (!identity) {
+        console.warn('No identity found for the connected account')
+        toLogin()
+        return
+      }
+
+      identityRef.current = identity
+    })()
+  }, [])
 
   if (!initialized) {
     return null
