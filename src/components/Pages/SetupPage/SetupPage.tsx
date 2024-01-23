@@ -17,6 +17,7 @@ import logoImg from '../../../assets/images/logo.svg'
 import platformImg from '../../../assets/images/Platform.webp'
 import { config } from '../../../modules/config'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
+import { subscribeToNewsletter } from './utils'
 import styles from './SetupPage.module.css'
 
 enum View {
@@ -118,6 +119,16 @@ export const SetupPage = () => {
       files: deploymentEntity.files,
       authChain
     })
+
+    // Subscribe to the newsletter only if the user has provided an email.
+    if (email) {
+      // Given that the subscription is an extra step, we don't want to block the user if it fails.
+      try {
+        await subscribeToNewsletter(email)
+      } catch (e) {
+        console.warn('There was an error subscribing to the newsletter', (e as Error).message)
+      }
+    }
 
     // TODO: Redirect to wherever the user was trying to go.
   }, [])
