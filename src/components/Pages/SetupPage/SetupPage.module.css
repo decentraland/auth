@@ -1,8 +1,9 @@
 .container {
   font-family: system-ui, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   width: 100%;
-  height: 100%;
+  height: 100vh;
   display: flex;
+  overflow: hidden;
 }
 
 .background {
@@ -178,8 +179,6 @@
 .right :global(.WearablePreview) {
   height: 80%;
   position: relative;
-  z-index: 1px;
-
 }
 
 .platform {
