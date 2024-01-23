@@ -16,10 +16,10 @@ import diceImg from '../../../assets/images/dice.svg'
 import logoImg from '../../../assets/images/logo.svg'
 import platformImg from '../../../assets/images/Platform.webp'
 import { config } from '../../../modules/config'
+import { fetchProfile } from '../../../modules/profile'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import { subscribeToNewsletter } from './utils'
 import styles from './SetupPage.module.css'
-import { fetchProfile } from '../../../modules/profile'
 
 enum View {
   RANDOMIZE,
