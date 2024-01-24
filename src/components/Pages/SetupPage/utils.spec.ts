@@ -5,23 +5,23 @@ jest.mock('../../../modules/config')
 
 const mockConfig = config as jest.Mocked<typeof config>
 
-let mockFetch: jest.Mock
-let mockEmail: string
-let mockBuilderServerUrl: string
-
-beforeEach(() => {
-  mockEmail = 'email@domain.com'
-  mockBuilderServerUrl = 'https://builder.com'
-  mockFetch = jest.fn()
-  global.fetch = mockFetch
-})
-
 describe('when subscribing to the newsletter', () => {
+  let mockFetch: jest.Mock
+  let mockEmail: string
+  let mockBuilderServerUrl: string
+
   beforeEach(() => {
-    mockConfig.get.mockReturnValue('')
+    mockEmail = 'email@domain.com'
+    mockBuilderServerUrl = 'https://builder.com'
+    mockFetch = jest.fn()
+    global.fetch = mockFetch
   })
 
   describe('when config does not have a builder server url', () => {
+    beforeEach(() => {
+      mockConfig.get.mockReturnValueOnce('')
+    })
+
     it('should fail with a missing builder server url error', async () => {
       await expect(subscribeToNewsletter(mockEmail)).rejects.toThrow('Missing BUILDER_SERVER_URL.')
     })
@@ -29,12 +29,12 @@ describe('when subscribing to the newsletter', () => {
 
   describe('when config has a builder server url', () => {
     beforeEach(() => {
-      mockConfig.get.mockReturnValue(mockBuilderServerUrl)
+      mockConfig.get.mockReturnValueOnce(mockBuilderServerUrl)
     })
 
     describe('when the request response is not ok', () => {
       beforeEach(() => {
-        mockFetch.mockResolvedValue({ ok: false, status: 500 })
+        mockFetch.mockResolvedValueOnce({ ok: false, status: 500 })
       })
 
       it('should fail with a subscription error containing the status code', async () => {
@@ -44,7 +44,7 @@ describe('when subscribing to the newsletter', () => {
 
     describe('when the request response is ok', () => {
       beforeEach(() => {
-        mockFetch.mockResolvedValue({ ok: true })
+        mockFetch.mockResolvedValueOnce({ ok: true })
       })
 
       it('should not throw any error', async () => {
