@@ -1,9 +1,6 @@
 import { useCallback, useContext, useEffect, useRef, useState } from 'react'
-import { createFetchComponent } from '@well-known-components/fetch-component'
 import classNames from 'classnames'
-import { createContentClient, DeploymentBuilder } from 'dcl-catalyst-client'
-import { AuthIdentity, Authenticator } from '@dcl/crypto'
-import { EntityType } from '@dcl/schemas'
+import { AuthIdentity } from '@dcl/crypto'
 import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import { Checkbox } from 'decentraland-ui/dist/components/Checkbox/Checkbox'
@@ -16,10 +13,9 @@ import diceImg from '../../../assets/images/dice.svg'
 import logoImg from '../../../assets/images/logo.svg'
 import platformImg from '../../../assets/images/Platform.webp'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
-import { config } from '../../../modules/config'
 import { fetchProfile } from '../../../modules/profile'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
-import { subscribeToNewsletter } from './utils'
+import { deployProfileFromDefault, subscribeToNewsletter } from './utils'
 import styles from './SetupPage.module.css'
 
 enum View {
@@ -79,56 +75,12 @@ export const SetupPage = () => {
       try {
         setDeploying(true)
 
-        // Create the content client to fetch and deploy profiles.
-        const peerUrl = config.get('PEER_URL', '')
-        const client = createContentClient({ url: peerUrl + '/content', fetcher: createFetchComponent() })
-
-        // Fetch the entity of the currently selected default profile.
-        const defaultEntity = (await client.fetchEntitiesByPointers([profile]))[0]
-        console.log(defaultEntity)
-
-        // Download the content of the default profile and create the files map to be used for deploying the new profile.
-        const bodyFile = 'body.png'
-        const faceFile = 'face256.png'
-
-        const contentHashesByFile = defaultEntity.content.reduce(
-          (acc, next) => ({ ...acc, [next.file]: next.hash }),
-          {} as Record<string, string>
-        )
-
-        const bodyBuffer = await client.downloadContent(contentHashesByFile[bodyFile])
-        const faceBuffer = await client.downloadContent(contentHashesByFile[faceFile])
-
-        const files = new Map<string, Uint8Array>()
-
-        files.set(bodyFile, bodyBuffer)
-        files.set(faceFile, faceBuffer)
-
-        // Default profiles come with legacy ids for wearables, they need to be updated to urns before deploying.
-        const mapLegacyIdToUrn = (urn: string) => urn.replace('dcl://base-avatars/', 'urn:decentraland:off-chain:base-avatars:')
-
-        // Override the default avatar with the form data and the currently connected account.
-        const avatar = defaultEntity.metadata.avatars[0]
-
-        avatar.ethAddress = accountRef.current
-        avatar.name = name
-        avatar.avatar.bodyShape = mapLegacyIdToUrn(defaultEntity.metadata.avatars[0].avatar.bodyShape)
-        avatar.avatar.wearables = defaultEntity.metadata.avatars[0].avatar.wearables.map(mapLegacyIdToUrn)
-        avatar.avatar.version = 1
-
-        const deploymentEntity = await DeploymentBuilder.buildEntity({
-          type: EntityType.PROFILE,
-          pointers: [accountRef.current],
-          metadata: { avatars: [avatar] },
-          timestamp: Date.now(),
-          files
-        })
-
-        // Deploy the profile for the currently connected account.
-        await client.deploy({
-          entityId: deploymentEntity.entityId,
-          files: deploymentEntity.files,
-          authChain: Authenticator.signPayload(identityRef.current, deploymentEntity.entityId)
+        // Deploy a new profile for the user based on the selected default profile.
+        await deployProfileFromDefault({
+          connectedAccount: accountRef.current,
+          connectedAccountIdentity: identityRef.current,
+          defaultProfile: profile,
+          deploymentProfileName: name
         })
 
         // Subscribe to the newsletter only if the user has provided an email.
