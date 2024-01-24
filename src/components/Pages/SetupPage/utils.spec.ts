@@ -1,6 +1,6 @@
 import { DeploymentBuilder, createContentClient } from 'dcl-catalyst-client'
 import { AuthIdentity, Authenticator } from '@dcl/crypto'
-import { Entity } from '@dcl/schemas'
+import { AuthLink, Entity, EntityType } from '@dcl/schemas'
 import { config } from '../../../modules/config'
 import { deployProfileFromDefault, subscribeToNewsletter } from './utils'
 
@@ -262,8 +262,13 @@ describe('when deploying a new profile', () => {
             })
 
             describe('when the entity can be built', () => {
+              let mockEntityId: string
+              let mockFiles: Map<string, Uint8Array>
+
               beforeEach(() => {
-                mockDeploymentBuilder.buildEntity.mockResolvedValueOnce({ entityId: 'entityId', files: new Map() })
+                mockEntityId = 'entityId'
+                mockFiles = new Map()
+                mockDeploymentBuilder.buildEntity.mockResolvedValueOnce({ entityId: mockEntityId, files: mockFiles })
               })
 
               describe('when signing the payload fails', () => {
@@ -284,8 +289,11 @@ describe('when deploying a new profile', () => {
               })
 
               describe('when signing the payload does not fail', () => {
+                let mockAuthChain: AuthLink[]
+
                 beforeEach(() => {
-                  mockAuthenticator.signPayload.mockReturnValueOnce([])
+                  mockAuthChain = []
+                  mockAuthenticator.signPayload.mockReturnValueOnce(mockAuthChain)
                 })
 
                 describe('when the deployment fails', () => {
@@ -303,16 +311,82 @@ describe('when deploying a new profile', () => {
                 })
 
                 describe('when the deployment does not fail', () => {
+                  let mockFetchEntitiesByPointers: jest.Mock
+                  let mockDeploy: jest.Mock
+
                   beforeEach(() => {
+                    mockFetchEntitiesByPointers = jest.fn().mockResolvedValueOnce([mockEntity])
+                    mockDeploy = jest.fn()
+
                     mockCreateContentClient.mockReturnValueOnce({
-                      fetchEntitiesByPointers: jest.fn().mockResolvedValueOnce([mockEntity]),
+                      fetchEntitiesByPointers: mockFetchEntitiesByPointers,
                       downloadContent: mockDownloadContent,
-                      deploy: jest.fn()
+                      deploy: mockDeploy
                     } as unknown as ReturnType<typeof createContentClient>)
                   })
 
                   it('should resolve', async () => {
                     await expect(deployProfileFromDefault(mockDeployProfileFromDefaultParams)).resolves.not.toThrow()
+                  })
+
+                  it('should call create client with the correct url', async () => {
+                    await expect(deployProfileFromDefault(mockDeployProfileFromDefaultParams)).resolves.not.toThrow()
+
+                    expect(mockCreateContentClient).toHaveBeenCalledWith({
+                      url: mockPeerUrl + '/content',
+                      fetcher: expect.anything()
+                    })
+                  })
+
+                  it('should call fetch entities by pointers with the correct default profile', async () => {
+                    await expect(deployProfileFromDefault(mockDeployProfileFromDefaultParams)).resolves.not.toThrow()
+
+                    expect(mockFetchEntitiesByPointers).toHaveBeenCalledWith([mockDeployProfileFromDefaultParams.defaultProfile])
+                  })
+
+                  it('should call download content with the correct body hash', async () => {
+                    await expect(deployProfileFromDefault(mockDeployProfileFromDefaultParams)).resolves.not.toThrow()
+
+                    expect(mockDownloadContent).toHaveBeenCalledTimes(2)
+                    expect(mockDownloadContent).toHaveBeenCalledWith('bodyHash')
+                    expect(mockDownloadContent).toHaveBeenCalledWith('faceHash')
+                  })
+
+                  it('should call build entity with the correct parameters', async () => {
+                    await expect(deployProfileFromDefault(mockDeployProfileFromDefaultParams)).resolves.not.toThrow()
+
+                    expect(mockDeploymentBuilder.buildEntity).toHaveBeenCalledWith({
+                      type: EntityType.PROFILE,
+                      files: expect.anything(),
+                      pointers: [mockDeployProfileFromDefaultParams.connectedAccount],
+                      timestamp: expect.any(Number),
+                      metadata: {
+                        avatars: [
+                          {
+                            ethAddress: mockDeployProfileFromDefaultParams.connectedAccount,
+                            name: mockDeployProfileFromDefaultParams.deploymentProfileName,
+                            avatar: {
+                              bodyShape: 'urn:decentraland:off-chain:base-avatars:bodyShape',
+                              version: 1,
+                              wearables: [
+                                'urn:decentraland:off-chain:base-avatars:wearable1',
+                                'urn:decentraland:off-chain:base-avatars:wearable2'
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    })
+                  })
+
+                  it('should call deploy with the correct parameters', async () => {
+                    await expect(deployProfileFromDefault(mockDeployProfileFromDefaultParams)).resolves.not.toThrow()
+
+                    expect(mockDeploy).toHaveBeenCalledWith({
+                      authChain: mockAuthChain,
+                      files: mockFiles,
+                      entityId: mockEntityId
+                    })
                   })
                 })
               })
