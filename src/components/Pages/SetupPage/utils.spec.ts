@@ -1,9 +1,16 @@
+import { AuthIdentity, Authenticator } from '@dcl/crypto'
 import { config } from '../../../modules/config'
-import { subscribeToNewsletter } from './utils'
+import { deployProfileFromDefault, subscribeToNewsletter } from './utils'
+import { DeploymentBuilder, createContentClient } from 'dcl-catalyst-client'
 
 jest.mock('../../../modules/config')
+jest.mock('dcl-catalyst-client')
+jest.mock('@dcl/crypto')
 
 const mockConfig = config as jest.Mocked<typeof config>
+const mockCreateContentClient = createContentClient as jest.MockedFunction<typeof createContentClient>
+const mockDeploymentBuilder = DeploymentBuilder as jest.Mocked<typeof DeploymentBuilder>
+const mockAuthenticator = Authenticator as jest.Mocked<typeof Authenticator>
 
 describe('when subscribing to the newsletter', () => {
   let mockFetch: jest.Mock
@@ -59,6 +66,343 @@ describe('when subscribing to the newsletter', () => {
           body: JSON.stringify({ email: mockEmail, source: 'auth' }),
           // eslint-disable-next-line @typescript-eslint/naming-convention
           headers: { 'content-type': 'application/json' }
+        })
+      })
+    })
+  })
+})
+
+describe('when deploying a new profile', () => {
+  let mockPeerUrl: string
+  let mockDeployProfileFromDefaultParams: Parameters<typeof deployProfileFromDefault>[0]
+
+  beforeEach(() => {
+    mockPeerUrl = 'https://peer.com'
+
+    mockDeployProfileFromDefaultParams = {
+      connectedAccount: 'connectedAccount',
+      connectedAccountIdentity: {} as AuthIdentity,
+      defaultProfile: 'defaultProfile',
+      deploymentProfileName: 'deploymentProfileName'
+    }
+  })
+
+  describe('when the config does not have a peer url', () => {
+    beforeEach(() => {
+      mockConfig.get.mockReturnValueOnce('')
+    })
+
+    it('should fail with a missing peer url error', async () => {
+      await expect(deployProfileFromDefault(mockDeployProfileFromDefaultParams)).rejects.toThrow('Missing PEER_URL.')
+    })
+  })
+
+  describe('when the config has a peer url', () => {
+    beforeEach(() => {
+      mockConfig.get.mockReturnValueOnce(mockPeerUrl)
+    })
+
+    describe('when the entities fail to be fetched', () => {
+      beforeEach(() => {
+        mockCreateContentClient.mockReturnValueOnce({
+          fetchEntitiesByPointers: jest.fn().mockRejectedValueOnce(new Error('Fetch Error'))
+        } as unknown as ReturnType<typeof createContentClient>)
+      })
+
+      it('should fail with a failed to load profile error', async () => {
+        await expect(deployProfileFromDefault(mockDeployProfileFromDefaultParams)).rejects.toThrow('Fetch Error')
+      })
+    })
+
+    describe('when the entities fetched are an empty array', () => {
+      beforeEach(() => {
+        mockCreateContentClient.mockReturnValueOnce({
+          fetchEntitiesByPointers: jest.fn().mockResolvedValueOnce([])
+        } as unknown as ReturnType<typeof createContentClient>)
+      })
+
+      it('should fail with a failed to load profile error', async () => {
+        await expect(deployProfileFromDefault(mockDeployProfileFromDefaultParams)).rejects.toThrow(
+          `Default profile not found: ${mockDeployProfileFromDefaultParams.defaultProfile}`
+        )
+      })
+    })
+
+    describe('when the entities fetched return an array with an entity', () => {
+      describe('when the entity does not have the body file', () => {
+        beforeEach(() => {
+          mockCreateContentClient.mockReturnValueOnce({
+            fetchEntitiesByPointers: jest.fn().mockResolvedValueOnce([
+              {
+                content: [{ file: 'face256.png', hash: 'faceHash' }]
+              }
+            ])
+          } as unknown as ReturnType<typeof createContentClient>)
+        })
+
+        it('should fail with a failed to load profile error', async () => {
+          await expect(deployProfileFromDefault(mockDeployProfileFromDefaultParams)).rejects.toThrow(
+            `Missing files in default entity content: ${mockDeployProfileFromDefaultParams.defaultProfile}`
+          )
+        })
+      })
+
+      describe('when the entity does not have the face file', () => {
+        beforeEach(() => {
+          mockCreateContentClient.mockReturnValueOnce({
+            fetchEntitiesByPointers: jest.fn().mockResolvedValueOnce([
+              {
+                content: [{ file: 'body.png', hash: 'bodyHash' }]
+              }
+            ])
+          } as unknown as ReturnType<typeof createContentClient>)
+        })
+
+        it('should fail with a failed to load profile error', async () => {
+          await expect(deployProfileFromDefault(mockDeployProfileFromDefaultParams)).rejects.toThrow(
+            `Missing files in default entity content: ${mockDeployProfileFromDefaultParams.defaultProfile}`
+          )
+        })
+      })
+
+      describe('when the entity has both files', () => {
+        let content: any[]
+
+        beforeEach(() => {
+          content = [
+            { file: 'body.png', hash: 'bodyHash' },
+            { file: 'face256.png', hash: 'faceHash' }
+          ]
+        })
+
+        describe('when the body cannot be downloaded', () => {
+          beforeEach(() => {
+            const mockDownloadContent = jest.fn()
+
+            mockDownloadContent.mockRejectedValueOnce(new Error('Body Download Error'))
+
+            mockCreateContentClient.mockReturnValueOnce({
+              fetchEntitiesByPointers: jest.fn().mockResolvedValueOnce([{ content }]),
+              downloadContent: mockDownloadContent
+            } as unknown as ReturnType<typeof createContentClient>)
+          })
+
+          it('should fail with a failed to download body error', async () => {
+            await expect(deployProfileFromDefault(mockDeployProfileFromDefaultParams)).rejects.toThrow('Body Download Error')
+          })
+        })
+
+        describe('when the face cannot be downloaded', () => {
+          beforeEach(() => {
+            const mockDownloadContent = jest.fn()
+
+            mockDownloadContent.mockResolvedValueOnce(new Uint8Array())
+            mockDownloadContent.mockRejectedValueOnce(new Error('Face Download Error'))
+
+            mockCreateContentClient.mockReturnValueOnce({
+              fetchEntitiesByPointers: jest.fn().mockResolvedValueOnce([{ content }]),
+              downloadContent: mockDownloadContent
+            } as unknown as ReturnType<typeof createContentClient>)
+          })
+
+          it('should fail with a failed to download face error', async () => {
+            await expect(deployProfileFromDefault(mockDeployProfileFromDefaultParams)).rejects.toThrow('Face Download Error')
+          })
+        })
+
+        describe('when both files can be downloaded', () => {
+          describe('when the entity does not have an avatar', () => {
+            beforeEach(() => {
+              const mockDownloadContent = jest.fn()
+
+              mockDownloadContent.mockResolvedValueOnce(new Uint8Array())
+              mockDownloadContent.mockResolvedValueOnce(new Uint8Array())
+
+              mockCreateContentClient.mockReturnValueOnce({
+                fetchEntitiesByPointers: jest.fn().mockResolvedValueOnce([{ content }]),
+                downloadContent: mockDownloadContent
+              } as unknown as ReturnType<typeof createContentClient>)
+            })
+
+            it('should fail with a missing avatar error', async () => {
+              await expect(deployProfileFromDefault(mockDeployProfileFromDefaultParams)).rejects.toThrow(
+                `Missing avatar in default entity metadata: ${mockDeployProfileFromDefaultParams.defaultProfile}`
+              )
+            })
+          })
+
+          describe('when the entity has an avatar', () => {
+            describe('when the entity cannot be built', () => {
+              beforeEach(() => {
+                const mockDownloadContent = jest.fn()
+
+                mockDownloadContent.mockResolvedValueOnce(new Uint8Array())
+                mockDownloadContent.mockResolvedValueOnce(new Uint8Array())
+
+                mockCreateContentClient.mockReturnValueOnce({
+                  fetchEntitiesByPointers: jest.fn().mockResolvedValueOnce([
+                    {
+                      content,
+                      metadata: {
+                        avatars: [
+                          {
+                            ethAddress: 'ethAddress',
+                            name: 'name',
+                            avatar: {
+                              bodyShape: 'dcl://base-avatars/bodyShape',
+                              version: 0,
+                              wearables: ['dcl://base-avatars/wearable1', 'dcl://base-avatars/wearable2']
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]),
+                  downloadContent: mockDownloadContent
+                } as unknown as ReturnType<typeof createContentClient>)
+
+                mockDeploymentBuilder.buildEntity.mockRejectedValueOnce(new Error('Failed to build entity'))
+              })
+
+              it('should fail with a failed to build error', async () => {
+                await expect(deployProfileFromDefault(mockDeployProfileFromDefaultParams)).rejects.toThrow(`Failed to build entity`)
+              })
+            })
+
+            describe('when the entity can be built', () => {
+              describe('when signing the payload fails', () => {
+                beforeEach(() => {
+                  const mockDownloadContent = jest.fn()
+
+                  mockDownloadContent.mockResolvedValueOnce(new Uint8Array())
+                  mockDownloadContent.mockResolvedValueOnce(new Uint8Array())
+
+                  mockCreateContentClient.mockReturnValueOnce({
+                    fetchEntitiesByPointers: jest.fn().mockResolvedValueOnce([
+                      {
+                        content,
+                        metadata: {
+                          avatars: [
+                            {
+                              ethAddress: 'ethAddress',
+                              name: 'name',
+                              avatar: {
+                                bodyShape: 'dcl://base-avatars/bodyShape',
+                                version: 0,
+                                wearables: ['dcl://base-avatars/wearable1', 'dcl://base-avatars/wearable2']
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    ]),
+                    downloadContent: mockDownloadContent
+                  } as unknown as ReturnType<typeof createContentClient>)
+
+                  mockDeploymentBuilder.buildEntity.mockResolvedValueOnce({
+                    entityId: 'entityId',
+                    files: new Map()
+                  })
+
+                  mockAuthenticator.signPayload.mockImplementationOnce(() => {
+                    throw new Error('Failed to sign payload')
+                  })
+                })
+
+                it('should fail with a failed to deploy error', async () => {
+                  await expect(deployProfileFromDefault(mockDeployProfileFromDefaultParams)).rejects.toThrow(`Failed to sign payload`)
+                })
+              })
+
+              describe('when signing the payload does not fail', () => {
+                describe('when the deployment fails', () => {
+                  beforeEach(() => {
+                    const mockDownloadContent = jest.fn()
+
+                    mockDownloadContent.mockResolvedValueOnce(new Uint8Array())
+                    mockDownloadContent.mockResolvedValueOnce(new Uint8Array())
+
+                    mockCreateContentClient.mockReturnValueOnce({
+                      fetchEntitiesByPointers: jest.fn().mockResolvedValueOnce([
+                        {
+                          content,
+                          metadata: {
+                            avatars: [
+                              {
+                                ethAddress: 'ethAddress',
+                                name: 'name',
+                                avatar: {
+                                  bodyShape: 'dcl://base-avatars/bodyShape',
+                                  version: 0,
+                                  wearables: ['dcl://base-avatars/wearable1', 'dcl://base-avatars/wearable2']
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      ]),
+                      downloadContent: mockDownloadContent,
+                      deploy: jest.fn().mockRejectedValueOnce(new Error('Failed to deploy'))
+                    } as unknown as ReturnType<typeof createContentClient>)
+
+                    mockDeploymentBuilder.buildEntity.mockResolvedValueOnce({
+                      entityId: 'entityId',
+                      files: new Map()
+                    })
+
+                    mockAuthenticator.signPayload.mockReturnValueOnce([])
+                  })
+
+                  it('should fail with a failed to deploy error', async () => {
+                    await expect(deployProfileFromDefault(mockDeployProfileFromDefaultParams)).rejects.toThrow(`Failed to deploy`)
+                  })
+                })
+
+                describe('when the deployment does not fail', () => {
+                  beforeEach(() => {
+                    const mockDownloadContent = jest.fn()
+
+                    mockDownloadContent.mockResolvedValueOnce(new Uint8Array())
+                    mockDownloadContent.mockResolvedValueOnce(new Uint8Array())
+
+                    mockCreateContentClient.mockReturnValueOnce({
+                      fetchEntitiesByPointers: jest.fn().mockResolvedValueOnce([
+                        {
+                          content,
+                          metadata: {
+                            avatars: [
+                              {
+                                ethAddress: 'ethAddress',
+                                name: 'name',
+                                avatar: {
+                                  bodyShape: 'dcl://base-avatars/bodyShape',
+                                  version: 0,
+                                  wearables: ['dcl://base-avatars/wearable1', 'dcl://base-avatars/wearable2']
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      ]),
+                      downloadContent: mockDownloadContent,
+                      deploy: jest.fn()
+                    } as unknown as ReturnType<typeof createContentClient>)
+
+                    mockDeploymentBuilder.buildEntity.mockResolvedValueOnce({
+                      entityId: 'entityId',
+                      files: new Map()
+                    })
+
+                    mockAuthenticator.signPayload.mockReturnValueOnce([])
+                  })
+
+                  it('should fail with a failed to deploy error', async () => {
+                    await expect(deployProfileFromDefault(mockDeployProfileFromDefaultParams)).resolves.not.toThrow()
+                  })
+                })
+              })
+            })
+          })
         })
       })
     })

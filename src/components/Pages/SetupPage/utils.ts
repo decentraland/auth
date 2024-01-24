@@ -36,10 +36,21 @@ export async function deployProfileFromDefault({
 }) {
   // Create the content client to fetch and deploy profiles.
   const peerUrl = config.get('PEER_URL', '')
+
+  if (!peerUrl) {
+    throw new Error('Missing PEER_URL.')
+  }
+
   const client = createContentClient({ url: peerUrl + '/content', fetcher: createFetchComponent() })
 
   // Fetch the entity of the currently selected default profile.
-  const defaultEntity = (await client.fetchEntitiesByPointers([defaultProfile]))[0]
+  const defaultEntities = await client.fetchEntitiesByPointers([defaultProfile])
+
+  if (!defaultEntities.length) {
+    throw new Error(`Default profile not found: ${defaultProfile}`)
+  }
+
+  const defaultEntity = defaultEntities[0]
 
   // Download the content of the default profile and create the files map to be used for deploying the new profile.
   const bodyFile = 'body.png'
@@ -49,6 +60,10 @@ export async function deployProfileFromDefault({
     (acc, next) => ({ ...acc, [next.file]: next.hash }),
     {} as Record<string, string>
   )
+
+  if (!contentHashesByFile[bodyFile] || !contentHashesByFile[faceFile]) {
+    throw new Error(`Missing files in default entity content: ${defaultProfile}`)
+  }
 
   const bodyBuffer = await client.downloadContent(contentHashesByFile[bodyFile])
   const faceBuffer = await client.downloadContent(contentHashesByFile[faceFile])
@@ -62,7 +77,11 @@ export async function deployProfileFromDefault({
   const mapLegacyIdToUrn = (urn: string) => urn.replace('dcl://base-avatars/', 'urn:decentraland:off-chain:base-avatars:')
 
   // Override the default avatar with the provided name and connected account address.
-  const avatar = defaultEntity.metadata.avatars[0]
+  const avatar = defaultEntity.metadata?.avatars?.[0]
+
+  if (!avatar) {
+    throw new Error(`Missing avatar in default entity metadata: ${defaultProfile}`)
+  }
 
   avatar.ethAddress = connectedAccount
   avatar.name = deploymentProfileName
