@@ -1,7 +1,7 @@
+import { DeploymentBuilder, createContentClient } from 'dcl-catalyst-client'
 import { AuthIdentity, Authenticator } from '@dcl/crypto'
 import { config } from '../../../modules/config'
 import { deployProfileFromDefault, subscribeToNewsletter } from './utils'
-import { DeploymentBuilder, createContentClient } from 'dcl-catalyst-client'
 
 jest.mock('../../../modules/config')
 jest.mock('dcl-catalyst-client')
@@ -265,7 +265,7 @@ describe('when deploying a new profile', () => {
               })
 
               it('should fail with a failed to build error', async () => {
-                await expect(deployProfileFromDefault(mockDeployProfileFromDefaultParams)).rejects.toThrow(`Failed to build entity`)
+                await expect(deployProfileFromDefault(mockDeployProfileFromDefaultParams)).rejects.toThrow('Failed to build entity')
               })
             })
 
@@ -310,7 +310,7 @@ describe('when deploying a new profile', () => {
                 })
 
                 it('should fail with a failed to deploy error', async () => {
-                  await expect(deployProfileFromDefault(mockDeployProfileFromDefaultParams)).rejects.toThrow(`Failed to sign payload`)
+                  await expect(deployProfileFromDefault(mockDeployProfileFromDefaultParams)).rejects.toThrow('Failed to sign payload')
                 })
               })
 
@@ -354,7 +354,7 @@ describe('when deploying a new profile', () => {
                   })
 
                   it('should fail with a failed to deploy error', async () => {
-                    await expect(deployProfileFromDefault(mockDeployProfileFromDefaultParams)).rejects.toThrow(`Failed to deploy`)
+                    await expect(deployProfileFromDefault(mockDeployProfileFromDefaultParams)).rejects.toThrow('Failed to deploy')
                   })
                 })
 
