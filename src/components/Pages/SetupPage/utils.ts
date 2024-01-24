@@ -1,8 +1,8 @@
-import { DeploymentBuilder, createContentClient } from 'dcl-catalyst-client'
-import { config } from '../../../modules/config'
 import { createFetchComponent } from '@well-known-components/fetch-component'
-import { EntityType } from '@dcl/schemas'
+import { DeploymentBuilder, createContentClient } from 'dcl-catalyst-client'
 import { AuthIdentity, Authenticator } from '@dcl/crypto'
+import { EntityType } from '@dcl/schemas'
+import { config } from '../../../modules/config'
 
 export async function subscribeToNewsletter(email: string) {
   const url = config.get('BUILDER_SERVER_URL', '') + '/v1/newsletter'
