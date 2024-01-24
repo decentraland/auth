@@ -262,14 +262,16 @@ describe('when deploying a new profile', () => {
             })
 
             describe('when the entity can be built', () => {
+              beforeEach(() => {
+                mockDeploymentBuilder.buildEntity.mockResolvedValueOnce({ entityId: 'entityId', files: new Map() })
+              })
+
               describe('when signing the payload fails', () => {
                 beforeEach(() => {
                   mockCreateContentClient.mockReturnValueOnce({
                     fetchEntitiesByPointers: jest.fn().mockResolvedValueOnce([mockEntity]),
                     downloadContent: mockDownloadContent
                   } as unknown as ReturnType<typeof createContentClient>)
-
-                  mockDeploymentBuilder.buildEntity.mockResolvedValueOnce({ entityId: 'entityId', files: new Map() })
 
                   mockAuthenticator.signPayload.mockImplementationOnce(() => {
                     throw new Error('Failed to sign payload')
@@ -282,6 +284,10 @@ describe('when deploying a new profile', () => {
               })
 
               describe('when signing the payload does not fail', () => {
+                beforeEach(() => {
+                  mockAuthenticator.signPayload.mockReturnValueOnce([])
+                })
+
                 describe('when the deployment fails', () => {
                   beforeEach(() => {
                     mockCreateContentClient.mockReturnValueOnce({
@@ -289,13 +295,6 @@ describe('when deploying a new profile', () => {
                       downloadContent: mockDownloadContent,
                       deploy: jest.fn().mockRejectedValueOnce(new Error('Failed to deploy'))
                     } as unknown as ReturnType<typeof createContentClient>)
-
-                    mockDeploymentBuilder.buildEntity.mockResolvedValueOnce({
-                      entityId: 'entityId',
-                      files: new Map()
-                    })
-
-                    mockAuthenticator.signPayload.mockReturnValueOnce([])
                   })
 
                   it('should fail with a failed to deploy error', async () => {
@@ -310,13 +309,6 @@ describe('when deploying a new profile', () => {
                       downloadContent: mockDownloadContent,
                       deploy: jest.fn()
                     } as unknown as ReturnType<typeof createContentClient>)
-
-                    mockDeploymentBuilder.buildEntity.mockResolvedValueOnce({
-                      entityId: 'entityId',
-                      files: new Map()
-                    })
-
-                    mockAuthenticator.signPayload.mockReturnValueOnce([])
                   })
 
                   it('should resolve', async () => {
