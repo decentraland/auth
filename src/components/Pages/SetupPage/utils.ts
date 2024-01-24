@@ -5,9 +5,13 @@ import { EntityType } from '@dcl/schemas'
 import { config } from '../../../modules/config'
 
 export async function subscribeToNewsletter(email: string) {
-  const url = config.get('BUILDER_SERVER_URL', '') + '/v1/newsletter'
+  const url = config.get('BUILDER_SERVER_URL')
 
-  const response = await fetch(url, {
+  if (!url) {
+    throw new Error('Missing BUILDER_SERVER_URL.')
+  }
+
+  const response = await fetch(url + '/v1/newsletter', {
     method: 'post',
     body: JSON.stringify({ email, source: 'auth' }),
     // eslint-disable-next-line @typescript-eslint/naming-convention
