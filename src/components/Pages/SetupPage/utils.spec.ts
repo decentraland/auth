@@ -1,8 +1,8 @@
 import { DeploymentBuilder, createContentClient } from 'dcl-catalyst-client'
 import { AuthIdentity, Authenticator } from '@dcl/crypto'
+import { Entity } from '@dcl/schemas'
 import { config } from '../../../modules/config'
 import { deployProfileFromDefault, subscribeToNewsletter } from './utils'
-import { Entity } from '@dcl/schemas'
 
 jest.mock('../../../modules/config')
 jest.mock('dcl-catalyst-client')
