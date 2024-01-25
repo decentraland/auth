@@ -79,7 +79,7 @@ export async function deployProfileFromDefault({
   avatar.name = deploymentProfileName
   avatar.ethAddress = connectedAccount
   avatar.userId = connectedAccount
-  avatar.version = 0
+  avatar.version = 1
   avatar.tutorialStep = 0
   avatar.hasClaimedName = false
   avatar.hasConnectedWeb3 = true
