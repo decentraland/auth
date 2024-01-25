@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useRef, useState } from 'react'
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import classNames from 'classnames'
 import { AuthIdentity } from '@dcl/crypto'
 import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
@@ -34,9 +34,6 @@ export const SetupPage = () => {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [agree, setAgree] = useState(false)
-  const [nameError, setNameError] = useState('')
-  const [emailError, setEmailError] = useState('')
-  const [agreeError, setAgreeError] = useState('')
   const [showErrors, setShowErrors] = useState(false)
   const [deploying, setDeploying] = useState(false)
 
@@ -46,6 +43,40 @@ export const SetupPage = () => {
   const { initialized: initializedFlags, flags } = useContext(FeatureFlagsContext)
 
   const redirectTo = useAfterLoginRedirection()
+
+  // Validate the name.
+  const nameError = useMemo(() => {
+    if (!name.length) {
+      return 'Please enter your name.'
+    }
+    if (name.length >= 15) {
+      return 'Name can have a maximum of 15 characters.'
+    }
+
+    if (!/^[a-zA-Z0-9]+$/.test(name)) {
+      return 'Name can only contain letters and numbers.'
+    }
+
+    return ''
+  }, [name])
+
+  // Validate the email.
+  const emailError = useMemo(() => {
+    if (email && !email.includes('@')) {
+      return 'Please enter a valid email.'
+    }
+
+    return ''
+  }, [email])
+
+  // Validate the agree checkbox.
+  const agreeError = useMemo(() => {
+    if (!agree) {
+      return 'Please accept the terms of use and privacy policy.'
+    }
+
+    return ''
+  }, [agree])
 
   const onRandomize = useCallback(() => setProfile(getRandomDefaultProfile()), [])
   const onContinue = useCallback(() => setView(View.FORM), [])
@@ -108,35 +139,6 @@ export const SetupPage = () => {
     },
     [nameError, emailError, agreeError, name, email, agree, profile, redirectTo]
   )
-
-  // Validation effect.
-  // Will perform some validations on the form data whenever input changes.
-  useEffect(() => {
-    // Validate the name.
-    if (!name.length) {
-      setNameError('Please enter your name.')
-    } else if (name.length >= 15) {
-      setNameError('Name can have a maximum of 15 characters.')
-    } else if (!/^[a-zA-Z0-9]+$/.test(name)) {
-      setNameError('Name can only contain letters and numbers.')
-    } else {
-      setNameError('')
-    }
-
-    // Validate the email.
-    if (email && !email.includes('@')) {
-      setEmailError('Please enter a valid email.')
-    } else {
-      setEmailError('')
-    }
-
-    // Validate the agree checkbox.
-    if (!agree) {
-      setAgreeError('Please accept the terms of use and privacy policy.')
-    } else {
-      setAgreeError('')
-    }
-  }, [name, email, agree])
 
   // Initialization effect.
   // Will run some checks to see if the user can proceed with the simplified avatar setup flow.
