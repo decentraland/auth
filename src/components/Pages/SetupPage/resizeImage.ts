@@ -1,6 +1,7 @@
 /**
  * Resizes an image to 256x256.
  * This function is on a different file than utils because it uses the browser API which is currently not supported by the tests.
+ * TODO: Move this function back to utils and test it.
  */
 export async function resizeImage(buffer: Buffer): Promise<Buffer> {
   const width = 256
