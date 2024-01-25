@@ -1,17 +1,25 @@
 import { DeploymentBuilder, createContentClient } from 'dcl-catalyst-client'
+import { DeploymentPreparationData } from 'dcl-catalyst-client/dist/client/types'
 import { AuthIdentity, Authenticator } from '@dcl/crypto'
 import { AuthLink, Entity, EntityType } from '@dcl/schemas'
 import { config } from '../../../modules/config'
+import { resizeImage } from './resizeImage'
 import { deployProfileFromDefault, subscribeToNewsletter } from './utils'
 
 jest.mock('../../../modules/config')
 jest.mock('dcl-catalyst-client')
 jest.mock('@dcl/crypto')
+jest.mock('./resizeImage')
 
 const mockConfig = config as jest.Mocked<typeof config>
 const mockCreateContentClient = createContentClient as jest.MockedFunction<typeof createContentClient>
+const mockResizeImage = resizeImage as jest.MockedFunction<typeof resizeImage>
 const mockDeploymentBuilder = DeploymentBuilder as jest.Mocked<typeof DeploymentBuilder>
 const mockAuthenticator = Authenticator as jest.Mocked<typeof Authenticator>
+
+afterEach(() => {
+  jest.clearAllMocks()
+})
 
 describe('when subscribing to the newsletter', () => {
   let mockFetch: jest.Mock
@@ -27,7 +35,7 @@ describe('when subscribing to the newsletter', () => {
 
   describe('when config does not have a builder server url', () => {
     beforeEach(() => {
-      mockConfig.get.mockReturnValueOnce('')
+      mockConfig.get.mockReturnValue('')
     })
 
     it('should fail with a missing builder server url error', async () => {
@@ -37,12 +45,12 @@ describe('when subscribing to the newsletter', () => {
 
   describe('when config has a builder server url', () => {
     beforeEach(() => {
-      mockConfig.get.mockReturnValueOnce(mockBuilderServerUrl)
+      mockConfig.get.mockReturnValue(mockBuilderServerUrl)
     })
 
     describe('when the request response is not ok', () => {
       beforeEach(() => {
-        mockFetch.mockResolvedValueOnce({ ok: false, status: 500 })
+        mockFetch.mockResolvedValue({ ok: false, status: 500 })
       })
 
       it('should fail with a subscription error containing the status code', async () => {
@@ -52,7 +60,7 @@ describe('when subscribing to the newsletter', () => {
 
     describe('when the request response is ok', () => {
       beforeEach(() => {
-        mockFetch.mockResolvedValueOnce({ ok: true })
+        mockFetch.mockResolvedValue({ ok: true })
       })
 
       it('should not throw any error', async () => {
@@ -73,327 +81,197 @@ describe('when subscribing to the newsletter', () => {
   })
 })
 
-describe('when deploying a new profile', () => {
+describe('when deploying a profile', () => {
+  let mockParams: Parameters<typeof deployProfileFromDefault>[0]
+  let mockEntity: Entity
   let mockPeerUrl: string
-  let mockDeployProfileFromDefaultParams: Parameters<typeof deployProfileFromDefault>[0]
+  let mockDownloadedBodyContent: Uint8Array
+  let mockDownloadedFaceContent: Uint8Array
+  let mockResizedFaceContent: Uint8Array
+  let mockBuiltEntity: DeploymentPreparationData
+  let mockAuthChain: AuthLink[]
+  let mockFetchEntitiesByPointers: jest.Mock
+  let mockDownloadContent: jest.Mock
+  let mockDeploy: jest.Mock
 
   beforeEach(() => {
-    mockPeerUrl = 'https://peer.com'
-
-    mockDeployProfileFromDefaultParams = {
-      connectedAccount: 'connectedAccount',
-      connectedAccountIdentity: {} as AuthIdentity,
+    mockParams = {
       defaultProfile: 'defaultProfile',
-      deploymentProfileName: 'deploymentProfileName'
+      connectedAccount: 'connectedAccount',
+      deploymentProfileName: 'deploymentProfileName',
+      connectedAccountIdentity: {} as AuthIdentity
     }
-  })
 
-  describe('when the config does not have a peer url', () => {
-    beforeEach(() => {
-      mockConfig.get.mockReturnValueOnce('')
-    })
-
-    it('should fail with a missing peer url error', async () => {
-      await expect(deployProfileFromDefault(mockDeployProfileFromDefaultParams)).rejects.toThrow('Missing PEER_URL.')
-    })
-  })
-
-  describe('when the config has a peer url', () => {
-    let mockEntity: Entity
-
-    beforeEach(() => {
-      mockConfig.get.mockReturnValueOnce(mockPeerUrl)
-
-      mockEntity = {
-        content: [
-          { file: 'body.png', hash: 'bodyHash' },
-          { file: 'face256.png', hash: 'faceHash' }
-        ],
-        metadata: {
-          avatars: [
-            {
-              ethAddress: 'ethAddress',
-              name: 'name',
-              avatar: {
-                bodyShape: 'dcl://base-avatars/bodyShape',
-                version: 0,
-                wearables: ['dcl://base-avatars/wearable1', 'dcl://base-avatars/wearable2']
+    mockEntity = {
+      version: 'v3',
+      id: 'QmUHmjpHoMizhHdDo2mBuZL6JceTWyAoYXffTgFyNL98x5',
+      type: EntityType.PROFILE,
+      pointers: ['default52'],
+      timestamp: 1581706296003,
+      content: [
+        {
+          file: 'body.png',
+          hash: 'QmNSxCVyDpNfUmTeoDP2M2EVgNSiU32c8kAUuevQHraFUv'
+        },
+        {
+          file: 'face.png',
+          hash: 'QmXVQ9EdCtpPVme3dNxRiygVcgZts6k1nyBiKfdSxj3Ewv'
+        }
+      ],
+      metadata: {
+        avatars: [
+          {
+            name: '',
+            description: '',
+            avatar: {
+              bodyShape: 'dcl://base-avatars/BaseFemale',
+              skin: {
+                color: {
+                  r: 0.9490196108818054,
+                  g: 0.7607843279838562,
+                  b: 0.6470588445663452
+                }
+              },
+              hair: {
+                color: {
+                  r: 0.10980392247438431,
+                  g: 0.10980392247438431,
+                  b: 0.10980392247438431
+                }
+              },
+              eyes: {
+                color: {
+                  r: 0.2235294133424759,
+                  g: 0.48627451062202454,
+                  b: 0.6901960968971252
+                }
+              },
+              wearables: [
+                'dcl://base-avatars/colored_sweater',
+                'dcl://base-avatars/f_brown_trousers',
+                'dcl://base-avatars/crocs',
+                'dcl://base-avatars/two_tails',
+                'dcl://base-avatars/square_earring',
+                'dcl://base-avatars/f_mouth_08'
+              ],
+              version: 0,
+              snapshots: {
+                face: 'QmXVQ9EdCtpPVme3dNxRiygVcgZts6k1nyBiKfdSxj3Ewv',
+                body: 'QmNSxCVyDpNfUmTeoDP2M2EVgNSiU32c8kAUuevQHraFUv'
               }
             }
-          ]
-        }
-      } as Entity
+          }
+        ]
+      }
+    }
+
+    mockPeerUrl = 'https://peer.com'
+
+    mockDownloadedBodyContent = new Uint8Array([1, 2, 3])
+    mockDownloadedFaceContent = new Uint8Array([2, 3, 4])
+    mockDownloadedFace256Content = new Uint8Array([3, 4, 5])
+    mockResizedFaceContent = new Uint8Array([4, 5, 6])
+    mockBuiltEntity = { entityId: 'entityId', files: new Map<string, Uint8Array>() }
+    mockAuthChain = []
+
+    mockConfig.get.mockReturnValueOnce(mockPeerUrl)
+
+    mockFetchEntitiesByPointers = jest.fn().mockResolvedValue([mockEntity])
+    mockDownloadContent = jest.fn()
+    mockDeploy = jest.fn()
+
+    mockDownloadContent.mockResolvedValueOnce(mockDownloadedBodyContent)
+    mockDownloadContent.mockResolvedValueOnce(mockDownloadedFaceContent)
+
+    mockCreateContentClient.mockReturnValueOnce({
+      fetchEntitiesByPointers: mockFetchEntitiesByPointers,
+      downloadContent: mockDownloadContent,
+      deploy: mockDeploy
+    } as unknown as ReturnType<typeof createContentClient>)
+
+    mockResizeImage.mockResolvedValue(mockResizedFaceContent as Buffer)
+
+    mockDeploymentBuilder.buildEntity.mockResolvedValue(mockBuiltEntity)
+
+    mockAuthenticator.signPayload.mockReturnValue(mockAuthChain)
+  })
+
+  it('should resolve', async () => {
+    await expect(deployProfileFromDefault(mockParams)).resolves.not.toThrow()
+
+    expect(mockCreateContentClient).toHaveBeenCalledWith({ url: mockPeerUrl + '/content', fetcher: expect.anything() })
+
+    expect(mockFetchEntitiesByPointers).toHaveBeenCalledWith([mockParams.defaultProfile])
+
+    expect(mockDownloadContent).toHaveBeenCalledWith(mockEntity.content[0].hash)
+    expect(mockDownloadContent).toHaveBeenCalledWith(mockEntity.content[1].hash)
+
+    expect(mockResizeImage).toHaveBeenCalledWith(mockDownloadedFaceContent)
+
+    expect(mockDeploymentBuilder.buildEntity).toHaveBeenCalledWith({
+      type: EntityType.PROFILE,
+      pointers: [mockParams.connectedAccount],
+      timestamp: expect.any(Number),
+      files: new Map([
+        ['body.png', mockDownloadedBodyContent],
+        ['face256.png', mockResizedFaceContent]
+      ]),
+      metadata: {
+        avatars: [
+          {
+            name: mockParams.deploymentProfileName,
+            description: '',
+            ethAddress: mockParams.connectedAccount,
+            userId: mockParams.connectedAccount,
+            version: 1,
+            tutorialStep: 0,
+            hasClaimedName: false,
+            hasConnectedWeb3: true,
+            avatar: {
+              bodyShape: 'urn:decentraland:off-chain:base-avatars:BaseFemale',
+              skin: {
+                color: {
+                  r: 0.9490196108818054,
+                  g: 0.7607843279838562,
+                  b: 0.6470588445663452
+                }
+              },
+              hair: {
+                color: {
+                  r: 0.10980392247438431,
+                  g: 0.10980392247438431,
+                  b: 0.10980392247438431
+                }
+              },
+              eyes: {
+                color: {
+                  r: 0.2235294133424759,
+                  g: 0.48627451062202454,
+                  b: 0.6901960968971252
+                }
+              },
+              wearables: [
+                'urn:decentraland:off-chain:base-avatars:colored_sweater',
+                'urn:decentraland:off-chain:base-avatars:f_brown_trousers',
+                'urn:decentraland:off-chain:base-avatars:crocs',
+                'urn:decentraland:off-chain:base-avatars:two_tails',
+                'urn:decentraland:off-chain:base-avatars:square_earring',
+                'urn:decentraland:off-chain:base-avatars:f_mouth_08'
+              ],
+              version: 0,
+              snapshots: {
+                face256: 'bafkreidypr4y4onfxqmrank3vzwqzwd2g2zocd6qeavihy53nmaf3kbuoi',
+                body: 'bafkreiadsbmmn4waznesyuz3bjgrj33xzqhxrk6mz3ksq7meugrachh3qe'
+              },
+              emotes: []
+            }
+          }
+        ]
+      }
     })
 
-    describe('when the entities fail to be fetched', () => {
-      beforeEach(() => {
-        mockCreateContentClient.mockReturnValueOnce({
-          fetchEntitiesByPointers: jest.fn().mockRejectedValueOnce(new Error('Fetch Error'))
-        } as unknown as ReturnType<typeof createContentClient>)
-      })
+    expect(mockAuthenticator.signPayload).toHaveBeenCalledWith(mockParams.connectedAccountIdentity, mockBuiltEntity.entityId)
 
-      it('should fail with a failed to load profile error', async () => {
-        await expect(deployProfileFromDefault(mockDeployProfileFromDefaultParams)).rejects.toThrow('Fetch Error')
-      })
-    })
-
-    describe('when the entities fetched are an empty array', () => {
-      beforeEach(() => {
-        mockCreateContentClient.mockReturnValueOnce({
-          fetchEntitiesByPointers: jest.fn().mockResolvedValueOnce([])
-        } as unknown as ReturnType<typeof createContentClient>)
-      })
-
-      it('should fail with a failed to load profile error', async () => {
-        await expect(deployProfileFromDefault(mockDeployProfileFromDefaultParams)).rejects.toThrow(
-          `Default profile not found: ${mockDeployProfileFromDefaultParams.defaultProfile}`
-        )
-      })
-    })
-
-    describe('when the entities fetched return an array with an entity', () => {
-      describe('when the entity does not have the body file', () => {
-        beforeEach(() => {
-          mockEntity.content = [{ file: 'face256.png', hash: 'faceHash' }]
-
-          mockCreateContentClient.mockReturnValueOnce({
-            fetchEntitiesByPointers: jest.fn().mockResolvedValueOnce([mockEntity])
-          } as unknown as ReturnType<typeof createContentClient>)
-        })
-
-        it('should fail with a failed to load profile error', async () => {
-          await expect(deployProfileFromDefault(mockDeployProfileFromDefaultParams)).rejects.toThrow(
-            `Missing files in default entity content: ${mockDeployProfileFromDefaultParams.defaultProfile}`
-          )
-        })
-      })
-
-      describe('when the entity does not have the face file', () => {
-        beforeEach(() => {
-          mockEntity.content = [{ file: 'body.png', hash: 'bodyHash' }]
-
-          mockCreateContentClient.mockReturnValueOnce({
-            fetchEntitiesByPointers: jest.fn().mockResolvedValueOnce([mockEntity])
-          } as unknown as ReturnType<typeof createContentClient>)
-        })
-
-        it('should fail with a failed to load profile error', async () => {
-          await expect(deployProfileFromDefault(mockDeployProfileFromDefaultParams)).rejects.toThrow(
-            `Missing files in default entity content: ${mockDeployProfileFromDefaultParams.defaultProfile}`
-          )
-        })
-      })
-
-      describe('when the entity has both files', () => {
-        let mockDownloadContent: jest.Mock
-
-        beforeEach(() => {
-          mockDownloadContent = jest.fn()
-        })
-
-        describe('when the body cannot be downloaded', () => {
-          beforeEach(() => {
-            mockDownloadContent.mockRejectedValueOnce(new Error('Body Download Error'))
-
-            mockCreateContentClient.mockReturnValueOnce({
-              fetchEntitiesByPointers: jest.fn().mockResolvedValueOnce([mockEntity]),
-              downloadContent: mockDownloadContent
-            } as unknown as ReturnType<typeof createContentClient>)
-          })
-
-          it('should fail with a failed to download body error', async () => {
-            await expect(deployProfileFromDefault(mockDeployProfileFromDefaultParams)).rejects.toThrow('Body Download Error')
-          })
-        })
-
-        describe('when the face cannot be downloaded', () => {
-          beforeEach(() => {
-            mockDownloadContent.mockResolvedValueOnce(new Uint8Array())
-            mockDownloadContent.mockRejectedValueOnce(new Error('Face Download Error'))
-
-            mockCreateContentClient.mockReturnValueOnce({
-              fetchEntitiesByPointers: jest.fn().mockResolvedValueOnce([mockEntity]),
-              downloadContent: mockDownloadContent
-            } as unknown as ReturnType<typeof createContentClient>)
-          })
-
-          it('should fail with a failed to download face error', async () => {
-            await expect(deployProfileFromDefault(mockDeployProfileFromDefaultParams)).rejects.toThrow('Face Download Error')
-          })
-        })
-
-        describe('when both files can be downloaded', () => {
-          beforeEach(() => {
-            mockDownloadContent.mockResolvedValueOnce(new Uint8Array())
-            mockDownloadContent.mockResolvedValueOnce(new Uint8Array())
-          })
-
-          describe('when the entity does not have an avatar', () => {
-            beforeEach(() => {
-              delete mockEntity.metadata
-
-              mockCreateContentClient.mockReturnValueOnce({
-                fetchEntitiesByPointers: jest.fn().mockResolvedValueOnce([mockEntity]),
-                downloadContent: mockDownloadContent
-              } as unknown as ReturnType<typeof createContentClient>)
-            })
-
-            it('should fail with a missing avatar error', async () => {
-              await expect(deployProfileFromDefault(mockDeployProfileFromDefaultParams)).rejects.toThrow(
-                `Missing avatar in default entity metadata: ${mockDeployProfileFromDefaultParams.defaultProfile}`
-              )
-            })
-          })
-
-          describe('when the entity has an avatar', () => {
-            describe('when the entity cannot be built', () => {
-              beforeEach(() => {
-                mockCreateContentClient.mockReturnValueOnce({
-                  fetchEntitiesByPointers: jest.fn().mockResolvedValueOnce([mockEntity]),
-                  downloadContent: mockDownloadContent
-                } as unknown as ReturnType<typeof createContentClient>)
-
-                mockDeploymentBuilder.buildEntity.mockRejectedValueOnce(new Error('Failed to build entity'))
-              })
-
-              it('should fail with a failed to build error', async () => {
-                await expect(deployProfileFromDefault(mockDeployProfileFromDefaultParams)).rejects.toThrow('Failed to build entity')
-              })
-            })
-
-            describe('when the entity can be built', () => {
-              let mockEntityId: string
-              let mockFiles: Map<string, Uint8Array>
-
-              beforeEach(() => {
-                mockEntityId = 'entityId'
-                mockFiles = new Map()
-                mockDeploymentBuilder.buildEntity.mockResolvedValueOnce({ entityId: mockEntityId, files: mockFiles })
-              })
-
-              describe('when signing the payload fails', () => {
-                beforeEach(() => {
-                  mockCreateContentClient.mockReturnValueOnce({
-                    fetchEntitiesByPointers: jest.fn().mockResolvedValueOnce([mockEntity]),
-                    downloadContent: mockDownloadContent
-                  } as unknown as ReturnType<typeof createContentClient>)
-
-                  mockAuthenticator.signPayload.mockImplementationOnce(() => {
-                    throw new Error('Failed to sign payload')
-                  })
-                })
-
-                it('should fail with a failed to deploy error', async () => {
-                  await expect(deployProfileFromDefault(mockDeployProfileFromDefaultParams)).rejects.toThrow('Failed to sign payload')
-                })
-              })
-
-              describe('when signing the payload does not fail', () => {
-                let mockAuthChain: AuthLink[]
-
-                beforeEach(() => {
-                  mockAuthChain = []
-                  mockAuthenticator.signPayload.mockReturnValueOnce(mockAuthChain)
-                })
-
-                describe('when the deployment fails', () => {
-                  beforeEach(() => {
-                    mockCreateContentClient.mockReturnValueOnce({
-                      fetchEntitiesByPointers: jest.fn().mockResolvedValueOnce([mockEntity]),
-                      downloadContent: mockDownloadContent,
-                      deploy: jest.fn().mockRejectedValueOnce(new Error('Failed to deploy'))
-                    } as unknown as ReturnType<typeof createContentClient>)
-                  })
-
-                  it('should fail with a failed to deploy error', async () => {
-                    await expect(deployProfileFromDefault(mockDeployProfileFromDefaultParams)).rejects.toThrow('Failed to deploy')
-                  })
-                })
-
-                describe('when the deployment does not fail', () => {
-                  let mockFetchEntitiesByPointers: jest.Mock
-                  let mockDeploy: jest.Mock
-
-                  beforeEach(() => {
-                    mockFetchEntitiesByPointers = jest.fn().mockResolvedValueOnce([mockEntity])
-                    mockDeploy = jest.fn()
-
-                    mockCreateContentClient.mockReturnValueOnce({
-                      fetchEntitiesByPointers: mockFetchEntitiesByPointers,
-                      downloadContent: mockDownloadContent,
-                      deploy: mockDeploy
-                    } as unknown as ReturnType<typeof createContentClient>)
-                  })
-
-                  it('should resolve', async () => {
-                    await expect(deployProfileFromDefault(mockDeployProfileFromDefaultParams)).resolves.not.toThrow()
-                  })
-
-                  it('should call create client with the correct url', async () => {
-                    await expect(deployProfileFromDefault(mockDeployProfileFromDefaultParams)).resolves.not.toThrow()
-
-                    expect(mockCreateContentClient).toHaveBeenCalledWith({
-                      url: mockPeerUrl + '/content',
-                      fetcher: expect.anything()
-                    })
-                  })
-
-                  it('should call fetch entities by pointers with the correct default profile', async () => {
-                    await expect(deployProfileFromDefault(mockDeployProfileFromDefaultParams)).resolves.not.toThrow()
-
-                    expect(mockFetchEntitiesByPointers).toHaveBeenCalledWith([mockDeployProfileFromDefaultParams.defaultProfile])
-                  })
-
-                  it('should call download content with the correct body hash', async () => {
-                    await expect(deployProfileFromDefault(mockDeployProfileFromDefaultParams)).resolves.not.toThrow()
-
-                    expect(mockDownloadContent).toHaveBeenCalledTimes(2)
-                    expect(mockDownloadContent).toHaveBeenCalledWith('bodyHash')
-                    expect(mockDownloadContent).toHaveBeenCalledWith('faceHash')
-                  })
-
-                  it('should call build entity with the correct parameters', async () => {
-                    await expect(deployProfileFromDefault(mockDeployProfileFromDefaultParams)).resolves.not.toThrow()
-
-                    expect(mockDeploymentBuilder.buildEntity).toHaveBeenCalledWith({
-                      type: EntityType.PROFILE,
-                      files: expect.anything(),
-                      pointers: [mockDeployProfileFromDefaultParams.connectedAccount],
-                      timestamp: expect.any(Number),
-                      metadata: {
-                        avatars: [
-                          {
-                            ethAddress: mockDeployProfileFromDefaultParams.connectedAccount,
-                            name: mockDeployProfileFromDefaultParams.deploymentProfileName,
-                            avatar: {
-                              bodyShape: 'urn:decentraland:off-chain:base-avatars:bodyShape',
-                              version: 1,
-                              wearables: [
-                                'urn:decentraland:off-chain:base-avatars:wearable1',
-                                'urn:decentraland:off-chain:base-avatars:wearable2'
-                              ]
-                            }
-                          }
-                        ]
-                      }
-                    })
-                  })
-
-                  it('should call deploy with the correct parameters', async () => {
-                    await expect(deployProfileFromDefault(mockDeployProfileFromDefaultParams)).resolves.not.toThrow()
-
-                    expect(mockDeploy).toHaveBeenCalledWith({
-                      authChain: mockAuthChain,
-                      files: mockFiles,
-                      entityId: mockEntityId
-                    })
-                  })
-                })
-              })
-            })
-          })
-        })
-      })
-    })
+    expect(mockDeploy).toHaveBeenCalledWith({ entityId: mockBuiltEntity.entityId, files: mockBuiltEntity.files, authChain: mockAuthChain })
   })
 })

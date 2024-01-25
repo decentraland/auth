@@ -4,6 +4,7 @@ import { AuthIdentity, Authenticator } from '@dcl/crypto'
 import { hashV1 } from '@dcl/hashing'
 import { EntityType } from '@dcl/schemas'
 import { config } from '../../../modules/config'
+import { resizeImage } from './resizeImage'
 
 export async function subscribeToNewsletter(email: string) {
   const url = config.get('BUILDER_SERVER_URL')
@@ -108,56 +109,5 @@ export async function deployProfileFromDefault({
     entityId: deploymentEntity.entityId,
     files: deploymentEntity.files,
     authChain: Authenticator.signPayload(connectedAccountIdentity, deploymentEntity.entityId)
-  })
-}
-
-/**
- * Resizes an image to 256x256.
- */
-async function resizeImage(buffer: Buffer): Promise<Buffer> {
-  const width = 256
-  const height = 256
-
-  return new Promise((resolve, reject) => {
-    // Convert Buffer to Blob
-    const blob = new Blob([buffer], { type: 'image/png' })
-
-    // Create an Image element
-    const img = new Image()
-
-    img.onload = () => {
-      // Create a Canvas element and set its size
-      const canvas = document.createElement('canvas')
-
-      canvas.width = width
-      canvas.height = height
-
-      // Draw the image onto the canvas
-      const ctx = canvas.getContext('2d')
-
-      if (!ctx) {
-        return reject(new Error('Failed to get canvas context'))
-      }
-
-      ctx.drawImage(img, 0, 0, width, height)
-
-      // Convert the canvas back to a Blob, then to a Buffer
-      canvas.toBlob(blob => {
-        if (!blob) {
-          return reject(new Error('Failed to convert canvas to blob'))
-        }
-
-        const reader = new FileReader()
-
-        reader.onload = () => resolve(Buffer.from(reader.result as ArrayBuffer))
-        reader.onerror = () => reject(new Error('Failed to read blob as buffer'))
-        reader.readAsArrayBuffer(blob)
-      }, 'image/png')
-    }
-
-    img.onerror = () => reject(new Error('Failed to load image'))
-
-    // Create an Object URL from the Blob and set it as the image source
-    img.src = URL.createObjectURL(blob)
   })
 }
