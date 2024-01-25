@@ -56,7 +56,7 @@ export const RequestPage = () => {
 
   // Goes to the login page where the user will have to connect a wallet.
   const toLoginPage = useCallback(() => {
-    navigate(`/login?redirectTo=/auth/requests/${requestId}&fromRequests=true`)
+    navigate(`/login?redirectTo=/auth/requests/${requestId}`)
   }, [])
 
   useEffect(() => {
