@@ -89,10 +89,8 @@ export async function deployProfileFromDefault({
   avatar.avatar.emotes = []
 
   if (isLegacy) {
-    avatar.avatar.snapshots = {
-      [bodyFile.replace('.png', '')]: await hashV1(bodyBuffer),
-      [face256File.replace('.png', '')]: await hashV1(faceBuffer)
-    }
+    const [body, face256] = await Promise.all([hashV1(bodyBuffer), hashV1(faceBuffer)])
+    avatar.avatar.snapshots = { body, face256 }
   }
 
   // Build the entity for the profile to be deployed.
