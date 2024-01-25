@@ -3,6 +3,7 @@ import { DeploymentBuilder, createContentClient } from 'dcl-catalyst-client'
 import { AuthIdentity, Authenticator } from '@dcl/crypto'
 import { EntityType } from '@dcl/schemas'
 import { config } from '../../../modules/config'
+import { hashV1 } from '@dcl/hashing'
 
 export async function subscribeToNewsletter(email: string) {
   const url = config.get('BUILDER_SERVER_URL')
@@ -36,58 +37,62 @@ export async function deployProfileFromDefault({
 }) {
   // Create the content client to fetch and deploy profiles.
   const peerUrl = config.get('PEER_URL', '')
-
-  if (!peerUrl) {
-    throw new Error('Missing PEER_URL.')
-  }
-
   const client = createContentClient({ url: peerUrl + '/content', fetcher: createFetchComponent() })
 
   // Fetch the entity of the currently selected default profile.
   const defaultEntities = await client.fetchEntitiesByPointers([defaultProfile])
-
-  if (!defaultEntities.length) {
-    throw new Error(`Default profile not found: ${defaultProfile}`)
-  }
-
   const defaultEntity = defaultEntities[0]
+
+  // Check if the retrieved entity belongs to a legacy profile.
+  const isLegacy = defaultEntity.id.startsWith('Qm')
 
   // Download the content of the default profile and create the files map to be used for deploying the new profile.
   const bodyFile = 'body.png'
-  const faceFile = 'face256.png'
+  const faceFile = 'face.png'
+  const face256File = 'face256.png'
 
   const contentHashesByFile = defaultEntity.content.reduce(
     (acc, next) => ({ ...acc, [next.file]: next.hash }),
     {} as Record<string, string>
   )
 
-  if (!contentHashesByFile[bodyFile] || !contentHashesByFile[faceFile]) {
-    throw new Error(`Missing files in default entity content: ${defaultProfile}`)
-  }
-
   const bodyBuffer = await client.downloadContent(contentHashesByFile[bodyFile])
-  const faceBuffer = await client.downloadContent(contentHashesByFile[faceFile])
+  const faceBuffer = !isLegacy
+    ? await client.downloadContent(contentHashesByFile[face256File])
+    : // Legacy profiles have a face.png file that needs to be resized to 256x256.
+      await resizeImage(await client.downloadContent(contentHashesByFile[faceFile]))
 
   const files = new Map<string, Uint8Array>()
 
   files.set(bodyFile, bodyBuffer)
-  files.set(faceFile, faceBuffer)
+  // We are going to upload a new profile that needs to have a face256 file.
+  // We can use the face file from the legacy profile for it.
+  files.set(face256File, faceBuffer)
 
-  // Default profiles come with legacy ids for wearables, they need to be updated to urns before deploying.
+  // Both org and zone content server profiles have legacy ids for wearables and body shapes.
+  // We need to map them to urns to be able to deploy the profile.
   const mapLegacyIdToUrn = (urn: string) => urn.replace('dcl://base-avatars/', 'urn:decentraland:off-chain:base-avatars:')
 
   // Override the default avatar with the provided name and connected account address.
   const avatar = defaultEntity.metadata?.avatars?.[0]
 
-  if (!avatar) {
-    throw new Error(`Missing avatar in default entity metadata: ${defaultProfile}`)
-  }
-
-  avatar.ethAddress = connectedAccount
   avatar.name = deploymentProfileName
+  avatar.ethAddress = connectedAccount
+  avatar.userId = connectedAccount
+  avatar.version = 0
+  avatar.tutorialStep = 0
+  avatar.hasClaimedName = false
+  avatar.hasConnectedWeb3 = true
   avatar.avatar.bodyShape = mapLegacyIdToUrn(defaultEntity.metadata.avatars[0].avatar.bodyShape)
   avatar.avatar.wearables = defaultEntity.metadata.avatars[0].avatar.wearables.map(mapLegacyIdToUrn)
-  avatar.avatar.version = 1
+  avatar.avatar.emotes = []
+
+  if (isLegacy) {
+    avatar.avatar.snapshots = {
+      [bodyFile.replace('.png', '')]: await hashV1(bodyBuffer),
+      [face256File.replace('.png', '')]: await hashV1(faceBuffer)
+    }
+  }
 
   // Build the entity for the profile to be deployed.
   const deploymentEntity = await DeploymentBuilder.buildEntity({
@@ -103,5 +108,56 @@ export async function deployProfileFromDefault({
     entityId: deploymentEntity.entityId,
     files: deploymentEntity.files,
     authChain: Authenticator.signPayload(connectedAccountIdentity, deploymentEntity.entityId)
+  })
+}
+
+/**
+ * Resizes an image to 256x256.
+ */
+async function resizeImage(buffer: Buffer): Promise<Buffer> {
+  const width = 256
+  const height = 256
+
+  return new Promise((resolve, reject) => {
+    // Convert Buffer to Blob
+    const blob = new Blob([buffer], { type: 'image/png' })
+
+    // Create an Image element
+    const img = new Image()
+
+    img.onload = () => {
+      // Create a Canvas element and set its size
+      const canvas = document.createElement('canvas')
+
+      canvas.width = width
+      canvas.height = height
+
+      // Draw the image onto the canvas
+      const ctx = canvas.getContext('2d')
+
+      if (!ctx) {
+        return reject(new Error('Failed to get canvas context'))
+      }
+
+      ctx.drawImage(img, 0, 0, width, height)
+
+      // Convert the canvas back to a Blob, then to a Buffer
+      canvas.toBlob(blob => {
+        if (!blob) {
+          return reject(new Error('Failed to convert canvas to blob'))
+        }
+
+        const reader = new FileReader()
+
+        reader.onload = () => resolve(Buffer.from(reader.result as ArrayBuffer))
+        reader.onerror = () => reject(new Error('Failed to read blob as buffer'))
+        reader.readAsArrayBuffer(blob)
+      }, 'image/png')
+    }
+
+    img.onerror = () => reject(new Error('Failed to load image'))
+
+    // Create an Object URL from the Blob and set it as the image source
+    img.src = URL.createObjectURL(blob)
   })
 }
