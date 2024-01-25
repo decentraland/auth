@@ -14,6 +14,8 @@ import diceImg from '../../../assets/images/dice.svg'
 import logoImg from '../../../assets/images/logo.svg'
 import platformImg from '../../../assets/images/Platform.webp'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
+import { getAnalytics } from '../../../modules/analytics/segment'
+import { ClickEvents, TrackingEvents } from '../../../modules/analytics/types'
 import { fetchProfile } from '../../../modules/profile'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import { deployProfileFromDefault, subscribeToNewsletter } from './utils'
@@ -79,13 +81,44 @@ export const SetupPage = () => {
     return ''
   }, [agree])
 
-  const handleRandomize = useCallback(() => setProfile(getRandomDefaultProfile()), [])
-  const handleContinue = useCallback(() => setView(View.FORM), [])
-  const handleBack = useCallback(() => setView(View.RANDOMIZE), [])
+  // Sets a random default profile.
+  const handleRandomize = useCallback(() => {
+    getAnalytics().track(TrackingEvents.CLICK, {
+      action: ClickEvents.RANDOMIZE
+    })
+
+    setProfile(getRandomDefaultProfile())
+  }, [])
+
+  // Confirms the current default profile and goes to the form view.
+  const handleContinue = useCallback(() => {
+    getAnalytics().track(TrackingEvents.AVATAR_EDIT_SUCCESS, {
+      // eslint-disable-next-line @typescript-eslint/naming-convention
+      eth_address: accountRef.current,
+      // eslint-disable-next-line @typescript-eslint/naming-convention
+      is_guest: false,
+      profile
+    })
+
+    setView(View.FORM)
+  }, [profile])
+
+  // Goes back into the randomize view to select a new default profile.
+  const handleBack = useCallback(() => {
+    getAnalytics().track(TrackingEvents.CLICK, {
+      action: ClickEvents.BACK_TO_AVATAR_RANDOMIZATION_VIEW
+    })
+
+    setView(View.RANDOMIZE)
+  }, [])
+
+  // Form input handlers.
   const handleNameChange = useCallback((_e: unknown, data: InputOnChangeData) => setName(data.value), [])
   const handleEmailChange = useCallback((_e: unknown, data: InputOnChangeData) => setEmail(data.value), [])
   const handleAgreeChange = useCallback(() => setAgree(!agree), [agree])
 
+  // Handles the deployment of a new profile based on the selected default profile.
+  // Also subscribes the user to the newsletter if an email is provided.
   const handleSubmit = useCallback(
     async (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault()
@@ -124,6 +157,15 @@ export const SetupPage = () => {
             console.warn('There was an error subscribing to the newsletter', (e as Error).message)
           }
         }
+
+        getAnalytics().track(TrackingEvents.TERMS_OF_SERVICE_SUCCESS, {
+          // eslint-disable-next-line @typescript-eslint/naming-convention
+          eth_address: accountRef.current,
+          // eslint-disable-next-line @typescript-eslint/naming-convention
+          is_guest: false,
+          email: email || undefined,
+          name
+        })
 
         // Redirect to the site defined in the search params.
         if (redirectTo) {
