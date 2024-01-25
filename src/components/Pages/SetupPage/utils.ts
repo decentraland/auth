@@ -1,9 +1,9 @@
 import { createFetchComponent } from '@well-known-components/fetch-component'
 import { DeploymentBuilder, createContentClient } from 'dcl-catalyst-client'
 import { AuthIdentity, Authenticator } from '@dcl/crypto'
+import { hashV1 } from '@dcl/hashing'
 import { EntityType } from '@dcl/schemas'
 import { config } from '../../../modules/config'
-import { hashV1 } from '@dcl/hashing'
 
 export async function subscribeToNewsletter(email: string) {
   const url = config.get('BUILDER_SERVER_URL')
