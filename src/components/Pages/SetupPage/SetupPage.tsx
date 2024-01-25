@@ -123,6 +123,10 @@ export const SetupPage = () => {
     async (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault()
 
+      getAnalytics().track(TrackingEvents.CLICK, {
+        action: ClickEvents.SUBMIT_PROFILE
+      })
+
       setShowErrors(true)
 
       // If any of the fields has an error, don't submit.

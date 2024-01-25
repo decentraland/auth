@@ -14,7 +14,8 @@ export enum ClickEvents {
   APPROVE_SING_IN = 'Approve Sign In',
   APPROVE_WALLET_INTERACTION = 'Approve Wallet Interaction',
   RANDOMIZE = 'Randomize default profile',
-  BACK_TO_AVATAR_RANDOMIZATION_VIEW = 'Back to avatar randomization view'
+  BACK_TO_AVATAR_RANDOMIZATION_VIEW = 'Back to avatar randomization view',
+  SUBMIT_PROFILE = 'Submit profile'
 }
 
 export enum ConnectionType {
