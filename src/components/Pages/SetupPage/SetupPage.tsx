@@ -78,14 +78,14 @@ export const SetupPage = () => {
     return ''
   }, [agree])
 
-  const onRandomize = useCallback(() => setProfile(getRandomDefaultProfile()), [])
-  const onContinue = useCallback(() => setView(View.FORM), [])
-  const onBack = useCallback(() => setView(View.RANDOMIZE), [])
-  const onNameChange = useCallback((_e: unknown, data: InputOnChangeData) => setName(data.value), [])
-  const onEmailChange = useCallback((_e: unknown, data: InputOnChangeData) => setEmail(data.value), [])
-  const onAgreeChange = useCallback(() => setAgree(!agree), [agree])
+  const handleRandomize = useCallback(() => setProfile(getRandomDefaultProfile()), [])
+  const handleContinue = useCallback(() => setView(View.FORM), [])
+  const handleBack = useCallback(() => setView(View.RANDOMIZE), [])
+  const handleNameChange = useCallback((_e: unknown, data: InputOnChangeData) => setName(data.value), [])
+  const handleEmailChange = useCallback((_e: unknown, data: InputOnChangeData) => setEmail(data.value), [])
+  const handleAgreeChange = useCallback(() => setAgree(!agree), [agree])
 
-  const onSubmit = useCallback(
+  const handleSubmit = useCallback(
     async (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault()
 
@@ -220,13 +220,13 @@ export const SetupPage = () => {
               Don't worry if it's not quite 'you' yet - you'll later have plenty of options to make it your own.
             </div>
             <div className={styles.randomize}>
-              <Button compact inverted onClick={onRandomize}>
+              <Button compact inverted onClick={handleRandomize}>
                 <img src={diceImg} alt="diceImg" />
                 <span>randomize</span>
               </Button>
             </div>
             <div className={styles.continue}>
-              <Button primary fluid onClick={onContinue}>
+              <Button primary fluid onClick={handleContinue}>
                 continue
               </Button>
             </div>
@@ -246,17 +246,17 @@ export const SetupPage = () => {
       <div className={styles.left}>
         <div className={styles.leftInner}>
           <img className={styles.logoSmall} src={logoImg} alt="logo" />
-          <div className={styles.back} onClick={onBack}>
+          <div className={styles.back} onClick={handleBack}>
             <img src={backImg} alt="backImg" />
             <span>BACK</span>
           </div>
           <div className={styles.title}>Complete your Profile</div>
-          <form onSubmit={onSubmit}>
+          <form onSubmit={handleSubmit}>
             <div className={styles.name}>
               <Field
                 label="Name"
                 placeholder="Enter your name"
-                onChange={onNameChange}
+                onChange={handleNameChange}
                 message={showErrors ? <span className={classNames(styles.error, styles.nameError)}>{nameError}</span> : undefined}
               />
             </div>
@@ -275,11 +275,11 @@ export const SetupPage = () => {
                     <span>Subscribe to Decentraland's newsletter to receive the latest news about events, updates, contests and more.</span>
                   </>
                 }
-                onChange={onEmailChange}
+                onChange={handleEmailChange}
               />
             </div>
             <div className={styles.agree}>
-              <Checkbox onChange={onAgreeChange} />
+              <Checkbox onChange={handleAgreeChange} />
               &nbsp;I agree with Decentraland's&nbsp;
               <a target="_blank" rel="noopener noreferrer" href="https://decentraland.org/terms/">
                 Terms of use
