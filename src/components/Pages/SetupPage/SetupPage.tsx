@@ -17,6 +17,7 @@ import { fetchProfile } from '../../../modules/profile'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import { deployProfileFromDefault, subscribeToNewsletter } from './utils'
 import styles from './SetupPage.module.css'
+import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
 
 enum View {
   RANDOMIZE,
@@ -203,7 +204,12 @@ export const SetupPage = () => {
   }, [redirectTo])
 
   if (!initialized || !initializedFlags) {
-    return null
+    return (
+      <div className={styles.container}>
+        <div className={styles.background} />
+        <Loader active size="huge" />
+      </div>
+    )
   }
 
   if (!flags[FeatureFlagsKeys.SIMPLIFIED_AVATAR_SETUP]) {
