@@ -144,7 +144,6 @@ export const SetupPage = () => {
   // Initialization effect.
   // Will run some checks to see if the user can proceed with the simplified avatar setup flow.
   useEffect(() => {
-    console.log('effecting')
     ;(async () => {
       const toLogin = () => {
         window.location.href = '/auth/login'
