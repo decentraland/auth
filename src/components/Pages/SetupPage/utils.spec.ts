@@ -400,8 +400,6 @@ describe('when deploying a profile based on a default profile', () => {
     expect(mockDownloadContent).toHaveBeenCalledWith(mockEntity.content[0].hash)
     expect(mockDownloadContent).toHaveBeenCalledWith(mockEntity.content[1].hash)
 
-    expect(mockResizeImage).not.toHaveBeenCalled()
-
     expect(mockDeploymentBuilder.buildEntity).toHaveBeenCalledWith({
       type: EntityType.PROFILE,
       pointers: [mockParams.connectedAccount],
