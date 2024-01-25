@@ -5,6 +5,7 @@ import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import { Checkbox } from 'decentraland-ui/dist/components/Checkbox/Checkbox'
 import { Field } from 'decentraland-ui/dist/components/Field/Field'
+import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
 import { WearablePreview } from 'decentraland-ui/dist/components/WearablePreview/WearablePreview'
 import { connection } from 'decentraland-connect'
 import { InputOnChangeData } from 'decentraland-ui'
@@ -17,7 +18,6 @@ import { fetchProfile } from '../../../modules/profile'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import { deployProfileFromDefault, subscribeToNewsletter } from './utils'
 import styles from './SetupPage.module.css'
-import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
 
 enum View {
   RANDOMIZE,
