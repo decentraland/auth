@@ -169,7 +169,6 @@ describe('when deploying a profile', () => {
 
     mockDownloadedBodyContent = new Uint8Array([1, 2, 3])
     mockDownloadedFaceContent = new Uint8Array([2, 3, 4])
-    mockDownloadedFace256Content = new Uint8Array([3, 4, 5])
     mockResizedFaceContent = new Uint8Array([4, 5, 6])
     mockBuiltEntity = { entityId: 'entityId', files: new Map<string, Uint8Array>() }
     mockAuthChain = []
