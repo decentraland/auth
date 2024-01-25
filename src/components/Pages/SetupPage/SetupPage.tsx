@@ -143,6 +143,7 @@ export const SetupPage = () => {
   // Initialization effect.
   // Will run some checks to see if the user can proceed with the simplified avatar setup flow.
   useEffect(() => {
+    console.log('effecting')
     ;(async () => {
       const toLogin = () => {
         window.location.href = '/auth/login'
@@ -176,7 +177,13 @@ export const SetupPage = () => {
       // Check that the connected account does not have a profile already.
       if (profile) {
         console.warn('Profile already exists')
-        toLogin()
+
+        if (redirectTo) {
+          window.location.href = decodeURIComponent(redirectTo)
+        } else {
+          window.location.href = '/'
+        }
+
         return
       }
 
@@ -193,7 +200,7 @@ export const SetupPage = () => {
 
       setInitialized(true)
     })()
-  }, [])
+  }, [redirectTo])
 
   if (!initialized || !initializedFlags) {
     return null
