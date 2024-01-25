@@ -238,74 +238,68 @@ export const SetupPage = () => {
     )
   }
 
-  if (view === View.FORM) {
-    return (
-      <div className={styles.container}>
-        <div className={styles.background} />
-        <div className={styles.left}>
-          <div className={styles.leftInner}>
-            <img className={styles.logoSmall} src={logoImg} alt="logo" />
-            <div className={styles.back} onClick={onBack}>
-              <img src={backImg} alt="backImg" />
-              <span>BACK</span>
-            </div>
-            <div className={styles.title}>Complete your Profile</div>
-            <form onSubmit={onSubmit}>
-              <div className={styles.name}>
-                <Field
-                  label="Name"
-                  placeholder="Enter your name"
-                  onChange={onNameChange}
-                  message={showErrors ? <span className={classNames(styles.error, styles.nameError)}>{nameError}</span> : undefined}
-                />
-              </div>
-              <div className={styles.email}>
-                <Field
-                  label="Email (optional)"
-                  placeholder="Enter your email"
-                  message={
-                    <>
-                      {showErrors && emailError ? (
-                        <>
-                          <span className={classNames(styles.error, styles.emailError)}>{emailError}</span>
-                          <br />
-                        </>
-                      ) : null}
-                      <span>
-                        Subscribe to Decentraland's newsletter to receive the latest news about events, updates, contests and more.
-                      </span>
-                    </>
-                  }
-                  onChange={onEmailChange}
-                />
-              </div>
-              <div className={styles.agree}>
-                <Checkbox onChange={onAgreeChange} />
-                &nbsp;I agree with Decentraland's&nbsp;
-                <a target="_blank" rel="noopener noreferrer" href="https://decentraland.org/terms/">
-                  Terms of use
-                </a>
-                &nbsp;and&nbsp;
-                <a target="_blank" rel="noopener noreferrer" href="https://decentraland.org/privacy">
-                  Privacy policy
-                </a>
-              </div>
-              {showErrors && agreeError ? <div className={classNames(styles.error, styles.agreeError)}>{agreeError}</div> : null}
-              <div className={styles.jumpIn}>
-                <Button primary fluid type="submit" disabled={!agree || deploying} loading={deploying}>
-                  Continue
-                </Button>
-              </div>
-            </form>
+  return (
+    <div className={styles.container}>
+      <div className={styles.background} />
+      <div className={styles.left}>
+        <div className={styles.leftInner}>
+          <img className={styles.logoSmall} src={logoImg} alt="logo" />
+          <div className={styles.back} onClick={onBack}>
+            <img src={backImg} alt="backImg" />
+            <span>BACK</span>
           </div>
-        </div>
-        <div className={styles.right}>
-          <WearablePreview lockBeta={true} panning={false} disableBackground={true} profile={profile} dev={false} />
-          <img className={styles.platform} src={platformImg} alt="platform" />
+          <div className={styles.title}>Complete your Profile</div>
+          <form onSubmit={onSubmit}>
+            <div className={styles.name}>
+              <Field
+                label="Name"
+                placeholder="Enter your name"
+                onChange={onNameChange}
+                message={showErrors ? <span className={classNames(styles.error, styles.nameError)}>{nameError}</span> : undefined}
+              />
+            </div>
+            <div className={styles.email}>
+              <Field
+                label="Email (optional)"
+                placeholder="Enter your email"
+                message={
+                  <>
+                    {showErrors && emailError ? (
+                      <>
+                        <span className={classNames(styles.error, styles.emailError)}>{emailError}</span>
+                        <br />
+                      </>
+                    ) : null}
+                    <span>Subscribe to Decentraland's newsletter to receive the latest news about events, updates, contests and more.</span>
+                  </>
+                }
+                onChange={onEmailChange}
+              />
+            </div>
+            <div className={styles.agree}>
+              <Checkbox onChange={onAgreeChange} />
+              &nbsp;I agree with Decentraland's&nbsp;
+              <a target="_blank" rel="noopener noreferrer" href="https://decentraland.org/terms/">
+                Terms of use
+              </a>
+              &nbsp;and&nbsp;
+              <a target="_blank" rel="noopener noreferrer" href="https://decentraland.org/privacy">
+                Privacy policy
+              </a>
+            </div>
+            {showErrors && agreeError ? <div className={classNames(styles.error, styles.agreeError)}>{agreeError}</div> : null}
+            <div className={styles.jumpIn}>
+              <Button primary fluid type="submit" disabled={!agree || deploying} loading={deploying}>
+                Continue
+              </Button>
+            </div>
+          </form>
         </div>
       </div>
-    )
-  }
-
-  return null
+      <div className={styles.right}>
+        <WearablePreview lockBeta={true} panning={false} disableBackground={true} profile={profile} dev={false} />
+        <img className={styles.platform} src={platformImg} alt="platform" />
+      </div>
+    </div>
+  )
 }
