@@ -26,21 +26,21 @@
   align-items: center;
 }
 
-.left :global(.message) {
+.container :global(.message) {
   color: white !important;
   opacity: 70%;
 }
 
-.left :global(.ui.sub.header) > label {
+.container :global(.ui.sub.header) > label {
   color: white !important;
   opacity: 70%;
 }
 
-.left input {
+.container input {
   border-bottom: 2px solid rgba(255, 255, 255, 0.7) !important;
 }
 
-.left input::placeholder {
+.container input::placeholder {
   color: white !important;
   opacity: 70%;
 }
@@ -90,6 +90,7 @@
 .randomize > :global(.button) {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
 }
 
@@ -131,7 +132,7 @@
   align-items: center;
 }
 
-.agree > :global(.checkbox) {
+.agree :global(.checkbox) {
   margin-right: 10px;
 }
 
@@ -139,7 +140,7 @@
   border: 2px solid rgba(255, 255, 255, 0.7);
 }
 
-.agree > a {
+.agree a {
   color: white;
   font-weight: 700;
   text-decoration: underline;
@@ -186,9 +187,89 @@
   z-index: 0;
 }
 
-.platform {
+.right .platform {
   display: block;
   margin: auto;
   transform: translateY(-110%);
   width: 50vh;
+}
+
+@media screen and (max-width: 768px) {
+  .mobileContainer {
+    padding: 24px;
+    color: white;
+  }
+
+  .meetYourAvatar {
+    margin-top: 12px;
+  }
+
+  .meetYourAvatarDescription {
+    margin-top: 12px;
+  }
+
+  .mobilePreviewContainer {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .mobilePreviewContainer :global(.WearablePreview) {
+    height: 500px;
+    width: 50%;
+    margin: auto;
+  }
+
+  .mobilePreviewContainer :global(.loader) {
+    top: 30% !important;
+    z-index: 0;
+  }
+
+  .mobilePreviewContainer .platform {
+    position: relative;
+    margin: auto;
+    bottom: 85px;
+    width: 100%;
+  }
+
+  .mobileButtons {
+    display: flex;
+    gap: 16px;
+  }
+
+  .randomize {
+    flex: 1;
+    margin-top: 0px;
+  }
+
+  .randomize > :global(.button) {
+    width: 100%;
+  }
+
+  .continue {
+    flex: 1;
+    margin-top: 0px;
+    width: unset;
+  }
+
+  .continue > :global(.button) {
+    width: 100%;
+    transform: scale(1.05);
+  }
+
+  .mobileCompleteYourProfile {
+    margin-top: 47px;
+  }
+
+  .mobileContainer :global(.dcl.field) {
+    min-width: unset;
+  }
+
+  .email {
+    margin-top: unset;
+  }
+
+  .agree {
+    display: flex;
+  }
 }
