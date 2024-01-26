@@ -26,21 +26,21 @@
   align-items: center;
 }
 
-.left :global(.message) {
+:global(.message) {
   color: white !important;
   opacity: 70%;
 }
 
-.left :global(.ui.sub.header) > label {
+:global(.ui.sub.header) > label {
   color: white !important;
   opacity: 70%;
 }
 
-.left input {
+input {
   border-bottom: 2px solid rgba(255, 255, 255, 0.7) !important;
 }
 
-.left input::placeholder {
+input::placeholder {
   color: white !important;
   opacity: 70%;
 }
@@ -132,7 +132,7 @@
   align-items: center;
 }
 
-.agree > :global(.checkbox) {
+.agree :global(.checkbox) {
   margin-right: 10px;
 }
 
@@ -140,7 +140,7 @@
   border: 2px solid rgba(255, 255, 255, 0.7);
 }
 
-.agree > a {
+.agree a {
   color: white;
   font-weight: 700;
   text-decoration: underline;
@@ -255,5 +255,21 @@
   .continue > :global(.button) {
     width: 100%;
     transform: scale(1.05);
+  }
+
+  .mobileCompleteYourProfile {
+    margin-top: 47px;
+  }
+
+  :global(.dcl.field) {
+    min-width: unset;
+  }
+
+  .email {
+    margin-top: unset;
+  }
+
+  .agree {
+    display: flex;
   }
 }

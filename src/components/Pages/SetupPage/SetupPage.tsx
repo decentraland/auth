@@ -337,6 +337,68 @@ export const SetupPage = () => {
     )
   }
 
+  if (isMobile) {
+    return (
+      <div className={styles.container}>
+        <div className={styles.background} />
+        <div className={styles.mobileContainer}>
+          <div className={styles.back} onClick={handleBack}>
+            <img src={backImg} alt="backImg" />
+            <span>BACK</span>
+          </div>
+          <div className={classNames(styles.title, styles.mobileCompleteYourProfile)}>Complete your Profile</div>
+          <form onSubmit={handleSubmit}>
+            <div className={styles.name}>
+              <Field
+                label="Name"
+                placeholder="Enter your name"
+                onChange={handleNameChange}
+                message={showErrors ? <span className={classNames(styles.error, styles.nameError)}>{nameError}</span> : undefined}
+              />
+            </div>
+            <div className={styles.email}>
+              <Field
+                label="Email (optional)"
+                placeholder="Enter your email"
+                message={
+                  <>
+                    {showErrors && emailError ? (
+                      <>
+                        <span className={classNames(styles.error, styles.emailError)}>{emailError}</span>
+                        <br />
+                      </>
+                    ) : null}
+                    <span>Subscribe to Decentraland's newsletter to receive the latest news about events, updates, contests and more.</span>
+                  </>
+                }
+                onChange={handleEmailChange}
+              />
+            </div>
+            <div className={styles.agree}>
+              <Checkbox onChange={handleAgreeChange} />
+              <div>
+                I agree with Decentraland's&nbsp;
+                <a target="_blank" rel="noopener noreferrer" href="https://decentraland.org/terms/">
+                  Terms of use
+                </a>
+                &nbsp;and&nbsp;
+                <a target="_blank" rel="noopener noreferrer" href="https://decentraland.org/privacy">
+                  Privacy policy
+                </a>
+              </div>
+            </div>
+            {showErrors && agreeError ? <div className={classNames(styles.error, styles.agreeError)}>{agreeError}</div> : null}
+            <div className={styles.jumpIn}>
+              <Button primary fluid type="submit" disabled={!agree || deploying} loading={deploying}>
+                Continue
+              </Button>
+            </div>
+          </form>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className={styles.container}>
       <div className={styles.background} />
