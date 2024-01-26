@@ -20,6 +20,7 @@ import { fetchProfile } from '../../../modules/profile'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import { deployProfileFromDefault, subscribeToNewsletter } from './utils'
 import styles from './SetupPage.module.css'
+import { Mobile, NotMobile } from 'decentraland-ui/dist/components/Media/Media'
 
 enum View {
   RANDOMIZE,
@@ -265,203 +266,210 @@ export const SetupPage = () => {
   }
 
   if (view === View.RANDOMIZE) {
-    if (isMobile) {
-      return (
-        <div className={styles.container}>
-          <div className={styles.background} />
-          <div className={styles.mobileContainer}>
-            <img className={styles.logo} src={logoImg} alt="logo" />
-            <div className={styles.title}>Welcome to Decentraland!</div>
-            <div className={styles.meetYourAvatar}>First, Meet Your Avatar</div>
-            <div className={styles.meetYourAvatarDescription}>
-              Choose an avatar to start your journey.
-              <br />
-              <b>You can customize it later on desktop</b>, where all the magic happens!
+    return (
+      <>
+        <Mobile>
+          <div className={styles.container}>
+            <div className={styles.background} />
+            <div className={styles.mobileContainer}>
+              <img className={styles.logo} src={logoImg} alt="logo" />
+              <div className={styles.title}>Welcome to Decentraland!</div>
+              <div className={styles.meetYourAvatar}>First, Meet Your Avatar</div>
+              <div className={styles.meetYourAvatarDescription}>
+                Choose an avatar to start your journey.
+                <br />
+                <b>You can customize it later on desktop</b>, where all the magic happens!
+              </div>
+              <div className={styles.mobilePreviewContainer}>
+                <WearablePreview lockBeta={true} panning={false} disableBackground={true} profile={profile} dev={false} />
+                <Loader active />
+                <img className={styles.platform} src={platformImg} alt="platform" />
+              </div>
+              <div className={styles.mobileButtons}>
+                <div className={styles.randomize}>
+                  <Button compact inverted onClick={handleRandomize}>
+                    <img src={diceImg} alt="diceImg" />
+                    <span>randomize</span>
+                  </Button>
+                </div>
+                <div className={styles.continue}>
+                  <Button compact primary onClick={handleContinue}>
+                    continue
+                  </Button>
+                </div>
+              </div>
             </div>
-            <div className={styles.mobilePreviewContainer}>
+          </div>
+        </Mobile>
+        <NotMobile>
+          <div className={styles.container}>
+            <div className={styles.background} />
+            <div className={styles.left}>
+              <div className={styles.leftInner}>
+                <img className={styles.logo} src={logoImg} alt="logo" />
+                <div className={styles.title}>Welcome to Decentraland!</div>
+                <div className={styles.subtitle}>Your journey begins here</div>
+                <div className={styles.meetYourAvatar}>First, Meet Your Avatar</div>
+                <div className={styles.meetYourAvatarDescription}>
+                  This is your new digital self!
+                  <br />
+                  Don't worry if it's not quite 'you' yet - you'll later have plenty of options to make it your own.
+                </div>
+                <div className={styles.randomize}>
+                  <Button compact inverted onClick={handleRandomize}>
+                    <img src={diceImg} alt="diceImg" />
+                    <span>randomize</span>
+                  </Button>
+                </div>
+                <div className={styles.continue}>
+                  <Button primary fluid onClick={handleContinue}>
+                    continue
+                  </Button>
+                </div>
+              </div>
+            </div>
+            <div className={styles.right}>
               <WearablePreview lockBeta={true} panning={false} disableBackground={true} profile={profile} dev={false} />
-              <Loader active />
+              <Loader active size="huge" />
               <img className={styles.platform} src={platformImg} alt="platform" />
             </div>
-            <div className={styles.mobileButtons}>
-              <div className={styles.randomize}>
-                <Button compact inverted onClick={handleRandomize}>
-                  <img src={diceImg} alt="diceImg" />
-                  <span>randomize</span>
-                </Button>
-              </div>
-              <div className={styles.continue}>
-                <Button compact primary onClick={handleContinue}>
-                  continue
-                </Button>
-              </div>
-            </div>
           </div>
-        </div>
-      )
-    }
-
-    return (
-      <div className={styles.container}>
-        <div className={styles.background} />
-        <div className={styles.left}>
-          <div className={styles.leftInner}>
-            <img className={styles.logo} src={logoImg} alt="logo" />
-            <div className={styles.title}>Welcome to Decentraland!</div>
-            <div className={styles.subtitle}>Your journey begins here</div>
-            <div className={styles.meetYourAvatar}>First, Meet Your Avatar</div>
-            <div className={styles.meetYourAvatarDescription}>
-              This is your new digital self!
-              <br />
-              Don't worry if it's not quite 'you' yet - you'll later have plenty of options to make it your own.
-            </div>
-            <div className={styles.randomize}>
-              <Button compact inverted onClick={handleRandomize}>
-                <img src={diceImg} alt="diceImg" />
-                <span>randomize</span>
-              </Button>
-            </div>
-            <div className={styles.continue}>
-              <Button primary fluid onClick={handleContinue}>
-                continue
-              </Button>
-            </div>
-          </div>
-        </div>
-        <div className={styles.right}>
-          <WearablePreview lockBeta={true} panning={false} disableBackground={true} profile={profile} dev={false} />
-          <Loader active size="huge" />
-          <img className={styles.platform} src={platformImg} alt="platform" />
-        </div>
-      </div>
+        </NotMobile>
+      </>
     )
   }
 
   if (isMobile) {
     return (
-      <div className={styles.container}>
-        <div className={styles.background} />
-        <div className={styles.mobileContainer}>
-          <div className={styles.back} onClick={handleBack}>
-            <img src={backImg} alt="backImg" />
-            <span>BACK</span>
-          </div>
-          <div className={classNames(styles.title, styles.mobileCompleteYourProfile)}>Complete your Profile</div>
-          <form onSubmit={handleSubmit}>
-            <div className={styles.name}>
-              <Field
-                label="Name"
-                placeholder="Enter your name"
-                onChange={handleNameChange}
-                message={showErrors ? <span className={classNames(styles.error, styles.nameError)}>{nameError}</span> : undefined}
-              />
-            </div>
-            <div className={styles.email}>
-              <Field
-                label="Email (optional)"
-                placeholder="Enter your email"
-                message={
-                  <>
-                    {showErrors && emailError ? (
+      <>
+        <Mobile>
+          <div className={styles.container}>
+            <div className={styles.background} />
+            <div className={styles.mobileContainer}>
+              <div className={styles.back} onClick={handleBack}>
+                <img src={backImg} alt="backImg" />
+                <span>BACK</span>
+              </div>
+              <div className={classNames(styles.title, styles.mobileCompleteYourProfile)}>Complete your Profile</div>
+              <form onSubmit={handleSubmit}>
+                <div className={styles.name}>
+                  <Field
+                    label="Name"
+                    placeholder="Enter your name"
+                    onChange={handleNameChange}
+                    message={showErrors ? <span className={classNames(styles.error, styles.nameError)}>{nameError}</span> : undefined}
+                  />
+                </div>
+                <div className={styles.email}>
+                  <Field
+                    label="Email (optional)"
+                    placeholder="Enter your email"
+                    message={
                       <>
-                        <span className={classNames(styles.error, styles.emailError)}>{emailError}</span>
-                        <br />
+                        {showErrors && emailError ? (
+                          <>
+                            <span className={classNames(styles.error, styles.emailError)}>{emailError}</span>
+                            <br />
+                          </>
+                        ) : null}
+                        <span>
+                          Subscribe to Decentraland's newsletter to receive the latest news about events, updates, contests and more.
+                        </span>
                       </>
-                    ) : null}
-                    <span>Subscribe to Decentraland's newsletter to receive the latest news about events, updates, contests and more.</span>
-                  </>
-                }
-                onChange={handleEmailChange}
-              />
+                    }
+                    onChange={handleEmailChange}
+                  />
+                </div>
+                <div className={styles.agree}>
+                  <Checkbox onChange={handleAgreeChange} />
+                  <div>
+                    I agree with Decentraland's&nbsp;
+                    <a target="_blank" rel="noopener noreferrer" href="https://decentraland.org/terms/">
+                      Terms of use
+                    </a>
+                    &nbsp;and&nbsp;
+                    <a target="_blank" rel="noopener noreferrer" href="https://decentraland.org/privacy">
+                      Privacy policy
+                    </a>
+                  </div>
+                </div>
+                {showErrors && agreeError ? <div className={classNames(styles.error, styles.agreeError)}>{agreeError}</div> : null}
+                <div className={styles.jumpIn}>
+                  <Button primary fluid type="submit" disabled={!agree || deploying} loading={deploying}>
+                    Continue
+                  </Button>
+                </div>
+              </form>
             </div>
-            <div className={styles.agree}>
-              <Checkbox onChange={handleAgreeChange} />
-              <div>
-                I agree with Decentraland's&nbsp;
-                <a target="_blank" rel="noopener noreferrer" href="https://decentraland.org/terms/">
-                  Terms of use
-                </a>
-                &nbsp;and&nbsp;
-                <a target="_blank" rel="noopener noreferrer" href="https://decentraland.org/privacy">
-                  Privacy policy
-                </a>
+          </div>
+        </Mobile>
+        <NotMobile>
+          <div className={styles.container}>
+            <div className={styles.background} />
+            <div className={styles.left}>
+              <div className={styles.leftInner}>
+                <img className={styles.logoSmall} src={logoImg} alt="logo" />
+                <div className={styles.back} onClick={handleBack}>
+                  <img src={backImg} alt="backImg" />
+                  <span>BACK</span>
+                </div>
+                <div className={styles.title}>Complete your Profile</div>
+                <form onSubmit={handleSubmit}>
+                  <div className={styles.name}>
+                    <Field
+                      label="Name"
+                      placeholder="Enter your name"
+                      onChange={handleNameChange}
+                      message={showErrors ? <span className={classNames(styles.error, styles.nameError)}>{nameError}</span> : undefined}
+                    />
+                  </div>
+                  <div className={styles.email}>
+                    <Field
+                      label="Email (optional)"
+                      placeholder="Enter your email"
+                      message={
+                        <>
+                          {showErrors && emailError ? (
+                            <>
+                              <span className={classNames(styles.error, styles.emailError)}>{emailError}</span>
+                              <br />
+                            </>
+                          ) : null}
+                          <span>
+                            Subscribe to Decentraland's newsletter to receive the latest news about events, updates, contests and more.
+                          </span>
+                        </>
+                      }
+                      onChange={handleEmailChange}
+                    />
+                  </div>
+                  <div className={styles.agree}>
+                    <Checkbox onChange={handleAgreeChange} />I agree with Decentraland's&nbsp;
+                    <a target="_blank" rel="noopener noreferrer" href="https://decentraland.org/terms/">
+                      Terms of use
+                    </a>
+                    &nbsp;and&nbsp;
+                    <a target="_blank" rel="noopener noreferrer" href="https://decentraland.org/privacy">
+                      Privacy policy
+                    </a>
+                  </div>
+                  {showErrors && agreeError ? <div className={classNames(styles.error, styles.agreeError)}>{agreeError}</div> : null}
+                  <div className={styles.jumpIn}>
+                    <Button primary fluid type="submit" disabled={!agree || deploying} loading={deploying}>
+                      Continue
+                    </Button>
+                  </div>
+                </form>
               </div>
             </div>
-            {showErrors && agreeError ? <div className={classNames(styles.error, styles.agreeError)}>{agreeError}</div> : null}
-            <div className={styles.jumpIn}>
-              <Button primary fluid type="submit" disabled={!agree || deploying} loading={deploying}>
-                Continue
-              </Button>
+            <div className={styles.right}>
+              <WearablePreview lockBeta={true} panning={false} disableBackground={true} profile={profile} dev={false} />
+              <Loader active size="huge" />
+              <img className={styles.platform} src={platformImg} alt="platform" />
             </div>
-          </form>
-        </div>
-      </div>
+          </div>
+        </NotMobile>
+      </>
     )
   }
-
-  return (
-    <div className={styles.container}>
-      <div className={styles.background} />
-      <div className={styles.left}>
-        <div className={styles.leftInner}>
-          <img className={styles.logoSmall} src={logoImg} alt="logo" />
-          <div className={styles.back} onClick={handleBack}>
-            <img src={backImg} alt="backImg" />
-            <span>BACK</span>
-          </div>
-          <div className={styles.title}>Complete your Profile</div>
-          <form onSubmit={handleSubmit}>
-            <div className={styles.name}>
-              <Field
-                label="Name"
-                placeholder="Enter your name"
-                onChange={handleNameChange}
-                message={showErrors ? <span className={classNames(styles.error, styles.nameError)}>{nameError}</span> : undefined}
-              />
-            </div>
-            <div className={styles.email}>
-              <Field
-                label="Email (optional)"
-                placeholder="Enter your email"
-                message={
-                  <>
-                    {showErrors && emailError ? (
-                      <>
-                        <span className={classNames(styles.error, styles.emailError)}>{emailError}</span>
-                        <br />
-                      </>
-                    ) : null}
-                    <span>Subscribe to Decentraland's newsletter to receive the latest news about events, updates, contests and more.</span>
-                  </>
-                }
-                onChange={handleEmailChange}
-              />
-            </div>
-            <div className={styles.agree}>
-              <Checkbox onChange={handleAgreeChange} />
-              &nbsp;I agree with Decentraland's&nbsp;
-              <a target="_blank" rel="noopener noreferrer" href="https://decentraland.org/terms/">
-                Terms of use
-              </a>
-              &nbsp;and&nbsp;
-              <a target="_blank" rel="noopener noreferrer" href="https://decentraland.org/privacy">
-                Privacy policy
-              </a>
-            </div>
-            {showErrors && agreeError ? <div className={classNames(styles.error, styles.agreeError)}>{agreeError}</div> : null}
-            <div className={styles.jumpIn}>
-              <Button primary fluid type="submit" disabled={!agree || deploying} loading={deploying}>
-                Continue
-              </Button>
-            </div>
-          </form>
-        </div>
-      </div>
-      <div className={styles.right}>
-        <WearablePreview lockBeta={true} panning={false} disableBackground={true} profile={profile} dev={false} />
-        <Loader active size="huge" />
-        <img className={styles.platform} src={platformImg} alt="platform" />
-      </div>
-    </div>
-  )
 }
