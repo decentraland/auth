@@ -26,21 +26,21 @@
   align-items: center;
 }
 
-:global(.message) {
+.container :global(.message) {
   color: white !important;
   opacity: 70%;
 }
 
-:global(.ui.sub.header) > label {
+.container :global(.ui.sub.header) > label {
   color: white !important;
   opacity: 70%;
 }
 
-input {
+.container input {
   border-bottom: 2px solid rgba(255, 255, 255, 0.7) !important;
 }
 
-input::placeholder {
+.container input::placeholder {
   color: white !important;
   opacity: 70%;
 }
@@ -261,7 +261,7 @@ input::placeholder {
     margin-top: 47px;
   }
 
-  :global(.dcl.field) {
+  .mobileContainer :global(.dcl.field) {
     min-width: unset;
   }
 
