@@ -47,6 +47,8 @@ export const SetupPage = () => {
 
   const redirectTo = useAfterLoginRedirection()
 
+  const isMobile = useMemo(() => window.innerWidth <= 768, [])
+
   // Validate the name.
   const nameError = useMemo(() => {
     if (!name.length) {
@@ -263,6 +265,42 @@ export const SetupPage = () => {
   }
 
   if (view === View.RANDOMIZE) {
+    if (isMobile) {
+      return (
+        <div className={styles.container}>
+          <div className={styles.background} />
+          <div className={styles.mobileContainer}>
+            <img className={styles.logo} src={logoImg} alt="logo" />
+            <div className={styles.title}>Welcome to Decentraland!</div>
+            <div className={styles.meetYourAvatar}>First, Meet Your Avatar</div>
+            <div className={styles.meetYourAvatarDescription}>
+              Choose an avatar to start your journey.
+              <br />
+              <b>You can customize it later on desktop</b>, where all the magic happens!
+            </div>
+            <div className={styles.mobilePreviewContainer}>
+              <WearablePreview lockBeta={true} panning={false} disableBackground={true} profile={profile} dev={false} />
+              <Loader active />
+              <img className={styles.platform} src={platformImg} alt="platform" />
+            </div>
+            <div className={styles.mobileButtons}>
+              <div className={styles.randomize}>
+                <Button compact inverted onClick={handleRandomize}>
+                  <img src={diceImg} alt="diceImg" />
+                  <span>randomize</span>
+                </Button>
+              </div>
+              <div className={styles.continue}>
+                <Button compact primary onClick={handleContinue}>
+                  continue
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )
+    }
+
     return (
       <div className={styles.container}>
         <div className={styles.background} />

@@ -90,6 +90,7 @@
 .randomize > :global(.button) {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
 }
 
@@ -186,9 +187,73 @@
   z-index: 0;
 }
 
-.platform {
+.right .platform {
   display: block;
   margin: auto;
   transform: translateY(-110%);
   width: 50vh;
+}
+
+@media screen and (max-width: 768px) {
+  .mobileContainer {
+    padding: 24px;
+    color: white;
+  }
+
+  .meetYourAvatar {
+    margin-top: 12px;
+  }
+
+  .meetYourAvatarDescription {
+    margin-top: 12px;
+  }
+
+  .mobilePreviewContainer {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .mobilePreviewContainer :global(.WearablePreview) {
+    height: 500px;
+    width: 50%;
+    margin: auto;
+  }
+
+  .mobilePreviewContainer :global(.loader) {
+    top: 30% !important;
+    z-index: 0;
+  }
+
+  .mobilePreviewContainer .platform {
+    position: relative;
+    margin: auto;
+    bottom: 85px;
+    width: 100%;
+  }
+
+  .mobileButtons {
+    display: flex;
+    gap: 16px;
+  }
+
+  .randomize {
+    flex: 1;
+    margin-top: 0px;
+  }
+
+  .randomize > :global(.button) {
+    width: 100%;
+  }
+
+  .continue {
+    flex: 1;
+    margin-top: 0px;
+    width: unset;
+  }
+
+  .continue > :global(.button) {
+    width: 100%;
+    transform: scale(1.05);
+  }
 }
