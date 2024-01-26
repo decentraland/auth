@@ -292,6 +292,7 @@ export const SetupPage = () => {
         </div>
         <div className={styles.right}>
           <WearablePreview lockBeta={true} panning={false} disableBackground={true} profile={profile} dev={false} />
+          <Loader active size="huge" />
           <img className={styles.platform} src={platformImg} alt="platform" />
         </div>
       </div>
@@ -358,6 +359,7 @@ export const SetupPage = () => {
       </div>
       <div className={styles.right}>
         <WearablePreview lockBeta={true} panning={false} disableBackground={true} profile={profile} dev={false} />
+        <Loader active size="huge" />
         <img className={styles.platform} src={platformImg} alt="platform" />
       </div>
     </div>
