@@ -82,6 +82,30 @@ export const SetupPage = () => {
     return ''
   }, [agree])
 
+  // Message displayed on the button that completes the avatar creation.
+  // Will display a message according to where the user will be redirected to.
+  const continueMessage = useMemo(() => {
+    if (deploying) {
+      return 'creating account'
+    }
+
+    if (redirectTo) {
+      if (redirectTo.includes('play')) {
+        return 'jump in decentraland'
+      }
+
+      const sites = ['marketplace', 'builder', 'account', 'profile', 'events', 'places', 'governance']
+
+      for (const site of sites) {
+        if (redirectTo.includes(site)) {
+          return `continue to ${site}`
+        }
+      }
+    }
+
+    return 'continue'
+  }, [redirectTo, deploying])
+
   // Sets a random default profile.
   const handleRandomize = useCallback(() => {
     getAnalytics().track(TrackingEvents.CLICK, {
@@ -292,7 +316,7 @@ export const SetupPage = () => {
                 </div>
                 <div className={styles.continue}>
                   <Button compact primary onClick={handleContinue}>
-                    continue
+                    Continue
                   </Button>
                 </div>
               </div>
@@ -321,7 +345,7 @@ export const SetupPage = () => {
                 </div>
                 <div className={styles.continue}>
                   <Button primary fluid onClick={handleContinue}>
-                    continue
+                    Continue
                   </Button>
                 </div>
               </div>
@@ -393,7 +417,7 @@ export const SetupPage = () => {
               {showErrors && agreeError ? <div className={classNames(styles.error, styles.agreeError)}>{agreeError}</div> : null}
               <div className={styles.jumpIn}>
                 <Button primary fluid type="submit" disabled={!agree || deploying} loading={deploying}>
-                  Continue
+                  {continueMessage}
                 </Button>
               </div>
             </form>
@@ -453,7 +477,7 @@ export const SetupPage = () => {
                 {showErrors && agreeError ? <div className={classNames(styles.error, styles.agreeError)}>{agreeError}</div> : null}
                 <div className={styles.jumpIn}>
                   <Button primary fluid type="submit" disabled={!agree || deploying} loading={deploying}>
-                    Continue
+                    {continueMessage}
                   </Button>
                 </div>
               </form>
