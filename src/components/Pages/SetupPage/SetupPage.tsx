@@ -85,10 +85,6 @@ export const SetupPage = () => {
   // Message displayed on the button that completes the avatar creation.
   // Will display a message according to where the user will be redirected to.
   const continueMessage = useMemo(() => {
-    if (deploying) {
-      return 'creating account'
-    }
-
     if (redirectTo) {
       if (redirectTo.includes('play')) {
         return 'jump in decentraland'
@@ -104,7 +100,7 @@ export const SetupPage = () => {
     }
 
     return 'continue'
-  }, [redirectTo, deploying])
+  }, [redirectTo])
 
   // Sets a random default profile.
   const handleRandomize = useCallback(() => {
