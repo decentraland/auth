@@ -90,7 +90,7 @@ export const SetupPage = () => {
         return 'jump in decentraland'
       }
 
-      const sites = ['marketplace', 'builder', 'account', 'profile', 'events', 'places', 'governance']
+      const sites = ['marketplace', 'builder', 'account', 'profile', 'events', 'places', 'governance', 'dao', 'rewards']
 
       for (const site of sites) {
         if (redirectTo.includes(site)) {
