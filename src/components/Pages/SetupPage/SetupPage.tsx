@@ -51,18 +51,18 @@ export const SetupPage = () => {
   // Validate the name.
   const nameError = useMemo(() => {
     if (!name.length) {
-      return 'Please enter your name.'
+      return 'Please enter your username.'
     }
     if (name.length >= 15) {
-      return 'Name can have a maximum of 15 characters.'
+      return 'Sorry, usernames can have a maximum of 15 characters.'
     }
 
     if (name.includes(' ')) {
-      return 'Name cannot contain spaces.'
+      return 'Sorry, spaces are not permitted.'
     }
 
     if (!/^[a-zA-Z0-9]+$/.test(name)) {
-      return 'Name can only contain letters and numbers.'
+      return 'Sorry, special characters (!@#$%) are not permitted.'
     }
 
     return ''
@@ -71,7 +71,7 @@ export const SetupPage = () => {
   // Validate the email.
   const emailError = useMemo(() => {
     if (email && !email.includes('@')) {
-      return 'Please enter a valid email.'
+      return 'Invalid email, please try again.'
     }
 
     return ''
@@ -91,7 +91,7 @@ export const SetupPage = () => {
   const continueMessage = useMemo(() => {
     if (redirectTo) {
       if (redirectTo.includes('play')) {
-        return 'jump in decentraland'
+        return 'jump into decentraland'
       }
 
       const sites = ['marketplace', 'builder', 'account', 'profile', 'events', 'places', 'governance', 'dao', 'rewards']
@@ -375,8 +375,8 @@ export const SetupPage = () => {
             <form onSubmit={handleSubmit}>
               <div className={styles.name}>
                 <Field
-                  label="Name"
-                  placeholder="Enter your name"
+                  label="Username"
+                  placeholder="Enter your Username"
                   onChange={handleNameChange}
                   message={showErrors ? <span className={classNames(styles.error, styles.nameError)}>{nameError}</span> : undefined}
                 />
@@ -412,6 +412,7 @@ export const SetupPage = () => {
                   <a target="_blank" rel="noopener noreferrer" href="https://decentraland.org/privacy">
                     Privacy policy
                   </a>
+                  .
                 </div>
               </div>
               {showErrors && agreeError ? <div className={classNames(styles.error, styles.agreeError)}>{agreeError}</div> : null}
@@ -438,8 +439,8 @@ export const SetupPage = () => {
               <form onSubmit={handleSubmit}>
                 <div className={styles.name}>
                   <Field
-                    label="Name"
-                    placeholder="Enter your name"
+                    label="Username"
+                    placeholder="Enter your username"
                     onChange={handleNameChange}
                     message={showErrors ? <span className={classNames(styles.error, styles.nameError)}>{nameError}</span> : undefined}
                   />
@@ -473,6 +474,7 @@ export const SetupPage = () => {
                   <a target="_blank" rel="noopener noreferrer" href="https://decentraland.org/privacy">
                     Privacy policy
                   </a>
+                  .
                 </div>
                 {showErrors && agreeError ? <div className={classNames(styles.error, styles.agreeError)}>{agreeError}</div> : null}
                 <div className={styles.jumpIn}>
