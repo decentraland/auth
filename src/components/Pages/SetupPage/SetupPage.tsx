@@ -1,6 +1,7 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import classNames from 'classnames'
 import { AuthIdentity } from '@dcl/crypto'
+import { PreviewEmote } from '@dcl/schemas'
 import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import { Checkbox } from 'decentraland-ui/dist/components/Checkbox/Checkbox'
@@ -313,7 +314,15 @@ export const SetupPage = () => {
                 <b>You can customize it later on desktop</b>, where all the magic happens!
               </div>
               <div className={styles.mobilePreviewContainer}>
-                <WearablePreview lockBeta={true} panning={false} disableBackground={true} profile={profile} dev={false} />
+                <WearablePreview
+                  lockBeta={true}
+                  panning={false}
+                  disableBackground={true}
+                  profile={profile}
+                  dev={false}
+                  emote={PreviewEmote.WAVE}
+                  disableAutoRotate
+                />
                 <Loader active />
                 <img className={styles.platform} src={platformImg} alt="platform" />
               </div>
@@ -361,7 +370,15 @@ export const SetupPage = () => {
               </div>
             </div>
             <div className={styles.right}>
-              <WearablePreview lockBeta={true} panning={false} disableBackground={true} profile={profile} dev={false} />
+              <WearablePreview
+                lockBeta={true}
+                panning={false}
+                disableBackground={true}
+                profile={profile}
+                dev={false}
+                emote={PreviewEmote.WAVE}
+                disableAutoRotate
+              />
               <Loader active size="huge" />
               <img className={styles.platform} src={platformImg} alt="platform" />
             </div>
@@ -486,7 +503,15 @@ export const SetupPage = () => {
             </div>
           </div>
           <div className={styles.right}>
-            <WearablePreview lockBeta={true} panning={false} disableBackground={true} profile={profile} dev={false} />
+            <WearablePreview
+              lockBeta={true}
+              panning={false}
+              disableBackground={true}
+              profile={profile}
+              dev={false}
+              emote={PreviewEmote.WAVE}
+              disableAutoRotate
+            />
             <Loader active size="huge" />
             <img className={styles.platform} src={platformImg} alt="platform" />
           </div>
