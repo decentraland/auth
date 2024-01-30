@@ -14,6 +14,7 @@ import backImg from '../../../assets/images/back.svg'
 import diceImg from '../../../assets/images/dice.svg'
 import logoImg from '../../../assets/images/logo.svg'
 import platformImg from '../../../assets/images/Platform.webp'
+import wrongImg from '../../../assets/images/wrong.svg'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { getAnalytics } from '../../../modules/analytics/segment'
 import { ClickEvents, TrackingEvents } from '../../../modules/analytics/types'
@@ -29,6 +30,15 @@ enum View {
 
 function getRandomDefaultProfile() {
   return 'default' + (Math.floor(Math.random() * (160 - 1 + 1)) + 1)
+}
+
+const Error = (props: { message: string; className?: string }) => {
+  return (
+    <div className={classNames(styles.error, props.className)}>
+      <img src={wrongImg} />
+      <div>{props.message}</div>
+    </div>
+  )
 }
 
 export const SetupPage = () => {
@@ -51,14 +61,18 @@ export const SetupPage = () => {
   // Validate the name.
   const nameError = useMemo(() => {
     if (!name.length) {
-      return 'Please enter your name.'
+      return 'Please enter your username.'
     }
     if (name.length >= 15) {
-      return 'Name can have a maximum of 15 characters.'
+      return 'Sorry, usernames can have a maximum of 15 characters.'
+    }
+
+    if (name.includes(' ')) {
+      return 'Sorry, spaces are not permitted.'
     }
 
     if (!/^[a-zA-Z0-9]+$/.test(name)) {
-      return 'Name can only contain letters and numbers.'
+      return 'Sorry, special characters (!@#$%) are not permitted.'
     }
 
     return ''
@@ -67,7 +81,7 @@ export const SetupPage = () => {
   // Validate the email.
   const emailError = useMemo(() => {
     if (email && !email.includes('@')) {
-      return 'Please enter a valid email.'
+      return 'Invalid email, please try again.'
     }
 
     return ''
@@ -87,7 +101,7 @@ export const SetupPage = () => {
   const continueMessage = useMemo(() => {
     if (redirectTo) {
       if (redirectTo.includes('play')) {
-        return 'jump in decentraland'
+        return 'jump into decentraland'
       }
 
       const sites = ['marketplace', 'builder', 'account', 'profile', 'events', 'places', 'governance', 'dao', 'rewards']
@@ -329,9 +343,9 @@ export const SetupPage = () => {
                 <div className={styles.subtitle}>Your journey begins here</div>
                 <div className={styles.meetYourAvatar}>First, Meet Your Avatar</div>
                 <div className={styles.meetYourAvatarDescription}>
-                  This is your new digital self!
+                  Say hi to your new digital self!
                   <br />
-                  Don't worry if it's not quite 'you' yet - you'll later have plenty of options to make it your own.
+                  Don't worry, of course they're not quite 'you' yet—soon you'll be able to customize them to your heart's content.
                 </div>
                 <div className={styles.randomize}>
                   <Button compact inverted onClick={handleRandomize}>
@@ -371,24 +385,19 @@ export const SetupPage = () => {
             <form onSubmit={handleSubmit}>
               <div className={styles.name}>
                 <Field
-                  label="Name"
-                  placeholder="Enter your name"
+                  label="Username"
+                  placeholder="Enter your Username"
                   onChange={handleNameChange}
-                  message={showErrors ? <span className={classNames(styles.error, styles.nameError)}>{nameError}</span> : undefined}
+                  message={showErrors && nameError ? <Error message={nameError} /> : undefined}
                 />
               </div>
-              <div className={styles.email}>
+              <div>
                 <Field
                   label="Email (optional)"
                   placeholder="Enter your email"
                   message={
                     <>
-                      {showErrors && emailError ? (
-                        <>
-                          <span className={classNames(styles.error, styles.emailError)}>{emailError}</span>
-                          <br />
-                        </>
-                      ) : null}
+                      {showErrors && emailError ? <Error className={styles.emailError} message={emailError} /> : null}
                       <span>
                         Subscribe to Decentraland's newsletter to receive the latest news about events, updates, contests and more.
                       </span>
@@ -408,9 +417,10 @@ export const SetupPage = () => {
                   <a target="_blank" rel="noopener noreferrer" href="https://decentraland.org/privacy">
                     Privacy policy
                   </a>
+                  .
                 </div>
               </div>
-              {showErrors && agreeError ? <div className={classNames(styles.error, styles.agreeError)}>{agreeError}</div> : null}
+              {showErrors && agreeError ? <Error className={styles.agreeError} message={agreeError} /> : null}
               <div className={styles.jumpIn}>
                 <Button primary fluid type="submit" disabled={!agree || deploying} loading={deploying}>
                   {continueMessage}
@@ -434,24 +444,19 @@ export const SetupPage = () => {
               <form onSubmit={handleSubmit}>
                 <div className={styles.name}>
                   <Field
-                    label="Name"
-                    placeholder="Enter your name"
+                    label="Username"
+                    placeholder="Enter your username"
                     onChange={handleNameChange}
-                    message={showErrors ? <span className={classNames(styles.error, styles.nameError)}>{nameError}</span> : undefined}
+                    message={showErrors && nameError ? <Error message={nameError} /> : undefined}
                   />
                 </div>
-                <div className={styles.email}>
+                <div>
                   <Field
                     label="Email (optional)"
                     placeholder="Enter your email"
                     message={
                       <>
-                        {showErrors && emailError ? (
-                          <>
-                            <span className={classNames(styles.error, styles.emailError)}>{emailError}</span>
-                            <br />
-                          </>
-                        ) : null}
+                        {showErrors && emailError ? <Error className={styles.emailError} message={emailError} /> : null}
                         <span>
                           Subscribe to Decentraland's newsletter to receive the latest news about events, updates, contests and more.
                         </span>
@@ -469,8 +474,9 @@ export const SetupPage = () => {
                   <a target="_blank" rel="noopener noreferrer" href="https://decentraland.org/privacy">
                     Privacy policy
                   </a>
+                  .
                 </div>
-                {showErrors && agreeError ? <div className={classNames(styles.error, styles.agreeError)}>{agreeError}</div> : null}
+                {showErrors && agreeError ? <Error className={styles.agreeError} message={agreeError} /> : null}
                 <div className={styles.jumpIn}>
                   <Button primary fluid type="submit" disabled={!agree || deploying} loading={deploying}>
                     {continueMessage}
