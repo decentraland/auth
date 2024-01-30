@@ -333,9 +333,9 @@ export const SetupPage = () => {
                 <div className={styles.subtitle}>Your journey begins here</div>
                 <div className={styles.meetYourAvatar}>First, Meet Your Avatar</div>
                 <div className={styles.meetYourAvatarDescription}>
-                  This is your new digital self!
+                  Say hi to your new digital self!
                   <br />
-                  Don't worry if it's not quite 'you' yet - you'll later have plenty of options to make it your own.
+                  Don't worry, of course they're not quite 'you' yet—soon you'll be able to customize them to your heart's content.
                 </div>
                 <div className={styles.randomize}>
                   <Button compact inverted onClick={handleRandomize}>
