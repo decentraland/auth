@@ -57,6 +57,10 @@ export const SetupPage = () => {
       return 'Name can have a maximum of 15 characters.'
     }
 
+    if (name.includes(' ')) {
+      return 'Name cannot contain spaces.'
+    }
+
     if (!/^[a-zA-Z0-9]+$/.test(name)) {
       return 'Name can only contain letters and numbers.'
     }
