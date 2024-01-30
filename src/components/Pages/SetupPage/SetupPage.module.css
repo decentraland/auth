@@ -122,10 +122,6 @@
   margin-top: 24px;
 }
 
-.email {
-  margin-top: 24px;
-}
-
 .agree {
   margin-top: 24px;
   display: flex;
@@ -147,23 +143,24 @@
 }
 
 .error {
-  color: var(--error);
-  font-style: italic;
-  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
-.nameError {
-  display: inline-block;
-  margin-bottom: 1rem;
+.error > img {
+  width: 16px;
+  height: 16px;
 }
 
 .emailError {
-  position: absolute;
+  margin-bottom: 4px;
 }
 
 .agreeError {
-  margin-top: 0.5rem;
   opacity: 70%;
+  margin-top: 8px;
+  font-size: 15px;
 }
 
 .jumpIn {
@@ -263,10 +260,6 @@
 
   .mobileContainer :global(.dcl.field) {
     min-width: unset;
-  }
-
-  .email {
-    margin-top: unset;
   }
 
   .agree {

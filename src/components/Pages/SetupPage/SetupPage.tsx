@@ -14,6 +14,7 @@ import backImg from '../../../assets/images/back.svg'
 import diceImg from '../../../assets/images/dice.svg'
 import logoImg from '../../../assets/images/logo.svg'
 import platformImg from '../../../assets/images/Platform.webp'
+import wrongImg from '../../../assets/images/wrong.svg'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { getAnalytics } from '../../../modules/analytics/segment'
 import { ClickEvents, TrackingEvents } from '../../../modules/analytics/types'
@@ -29,6 +30,15 @@ enum View {
 
 function getRandomDefaultProfile() {
   return 'default' + (Math.floor(Math.random() * (160 - 1 + 1)) + 1)
+}
+
+const Error = (props: { message: string; className?: string }) => {
+  return (
+    <div className={classNames(styles.error, props.className)}>
+      <img src={wrongImg} />
+      <div>{props.message}</div>
+    </div>
+  )
 }
 
 export const SetupPage = () => {
@@ -378,21 +388,16 @@ export const SetupPage = () => {
                   label="Username"
                   placeholder="Enter your Username"
                   onChange={handleNameChange}
-                  message={showErrors ? <span className={classNames(styles.error, styles.nameError)}>{nameError}</span> : undefined}
+                  message={showErrors && nameError ? <Error message={nameError} /> : undefined}
                 />
               </div>
-              <div className={styles.email}>
+              <div>
                 <Field
                   label="Email (optional)"
                   placeholder="Enter your email"
                   message={
                     <>
-                      {showErrors && emailError ? (
-                        <>
-                          <span className={classNames(styles.error, styles.emailError)}>{emailError}</span>
-                          <br />
-                        </>
-                      ) : null}
+                      {showErrors && emailError ? <Error className={styles.emailError} message={emailError} /> : null}
                       <span>
                         Subscribe to Decentraland's newsletter to receive the latest news about events, updates, contests and more.
                       </span>
@@ -415,7 +420,7 @@ export const SetupPage = () => {
                   .
                 </div>
               </div>
-              {showErrors && agreeError ? <div className={classNames(styles.error, styles.agreeError)}>{agreeError}</div> : null}
+              {showErrors && agreeError ? <Error className={styles.agreeError} message={agreeError} /> : null}
               <div className={styles.jumpIn}>
                 <Button primary fluid type="submit" disabled={!agree || deploying} loading={deploying}>
                   {continueMessage}
@@ -442,21 +447,16 @@ export const SetupPage = () => {
                     label="Username"
                     placeholder="Enter your username"
                     onChange={handleNameChange}
-                    message={showErrors ? <span className={classNames(styles.error, styles.nameError)}>{nameError}</span> : undefined}
+                    message={showErrors && nameError ? <Error message={nameError} /> : undefined}
                   />
                 </div>
-                <div className={styles.email}>
+                <div>
                   <Field
                     label="Email (optional)"
                     placeholder="Enter your email"
                     message={
                       <>
-                        {showErrors && emailError ? (
-                          <>
-                            <span className={classNames(styles.error, styles.emailError)}>{emailError}</span>
-                            <br />
-                          </>
-                        ) : null}
+                        {showErrors && emailError ? <Error className={styles.emailError} message={emailError} /> : null}
                         <span>
                           Subscribe to Decentraland's newsletter to receive the latest news about events, updates, contests and more.
                         </span>
@@ -476,7 +476,7 @@ export const SetupPage = () => {
                   </a>
                   .
                 </div>
-                {showErrors && agreeError ? <div className={classNames(styles.error, styles.agreeError)}>{agreeError}</div> : null}
+                {showErrors && agreeError ? <Error className={styles.agreeError} message={agreeError} /> : null}
                 <div className={styles.jumpIn}>
                   <Button primary fluid type="submit" disabled={!agree || deploying} loading={deploying}>
                     {continueMessage}
