@@ -3,7 +3,6 @@
   width: 100%;
   height: 100vh;
   display: flex;
-  overflow: hidden;
 }
 
 .background {
@@ -213,7 +212,6 @@
 
   .mobilePreviewContainer :global(.WearablePreview) {
     height: 500px;
-    margin: auto;
   }
 
   .mobilePreviewContainer :global(.loader) {
