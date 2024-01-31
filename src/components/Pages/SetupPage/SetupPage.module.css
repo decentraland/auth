@@ -192,6 +192,11 @@
 }
 
 @media screen and (max-width: 768px) {
+  .container {
+    overflow: unset;
+    height: unset;
+  }
+
   .mobileContainer {
     padding: 24px;
     color: white;
