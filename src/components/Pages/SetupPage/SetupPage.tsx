@@ -42,6 +42,31 @@ const Error = (props: { message: string; className?: string }) => {
   )
 }
 
+const AvatarPreview = (props: { profile: string; className: string }) => {
+  const [isLoading, setIsLoading] = useState(true)
+
+  const handleOnLoad = useCallback(() => setIsLoading(false), [])
+
+  useEffect(() => setIsLoading(true), [props.profile])
+
+  return (
+    <div className={props.className}>
+      <WearablePreview
+        lockBeta={true}
+        panning={false}
+        disableBackground={true}
+        profile={props.profile}
+        dev={false}
+        emote={PreviewEmote.WAVE}
+        disableAutoRotate
+        onLoad={handleOnLoad}
+      />
+      <Loader active={isLoading} size="huge" />
+      <img className={styles.platform} src={platformImg} alt="platform" />
+    </div>
+  )
+}
+
 export const SetupPage = () => {
   const [initialized, setInitialized] = useState(false)
   const [view, setView] = useState(View.RANDOMIZE)
@@ -313,19 +338,7 @@ export const SetupPage = () => {
                 <br />
                 <b>You can customize it later on desktop</b>, where all the magic happens!
               </div>
-              <div className={styles.mobilePreviewContainer}>
-                <WearablePreview
-                  lockBeta={true}
-                  panning={false}
-                  disableBackground={true}
-                  profile={profile}
-                  dev={false}
-                  emote={PreviewEmote.WAVE}
-                  disableAutoRotate
-                />
-                <Loader active />
-                <img className={styles.platform} src={platformImg} alt="platform" />
-              </div>
+              <AvatarPreview profile={profile} className={styles.mobilePreviewContainer} />
               <div className={styles.mobileButtons}>
                 <div className={styles.randomize}>
                   <Button compact inverted onClick={handleRandomize}>
@@ -369,19 +382,7 @@ export const SetupPage = () => {
                 </div>
               </div>
             </div>
-            <div className={styles.right}>
-              <WearablePreview
-                lockBeta={true}
-                panning={false}
-                disableBackground={true}
-                profile={profile}
-                dev={false}
-                emote={PreviewEmote.WAVE}
-                disableAutoRotate
-              />
-              <Loader active size="huge" />
-              <img className={styles.platform} src={platformImg} alt="platform" />
-            </div>
+            <AvatarPreview profile={profile} className={styles.right} />
           </div>
         </NotMobile>
       </>
@@ -502,19 +503,7 @@ export const SetupPage = () => {
               </form>
             </div>
           </div>
-          <div className={styles.right}>
-            <WearablePreview
-              lockBeta={true}
-              panning={false}
-              disableBackground={true}
-              profile={profile}
-              dev={false}
-              emote={PreviewEmote.WAVE}
-              disableAutoRotate
-            />
-            <Loader active size="huge" />
-            <img className={styles.platform} src={platformImg} alt="platform" />
-          </div>
+          <AvatarPreview profile={profile} className={styles.right} />
         </div>
       </NotMobile>
     </>
