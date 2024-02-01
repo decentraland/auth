@@ -65,6 +65,19 @@ export const RequestPage = () => {
         // Try to restablish connection with the wallet.
         const connectionData = await connection.tryPreviousConnection()
         providerRef.current = new ethers.BrowserProvider(connectionData.provider)
+
+        // Goes to the login page if no account is returned in the data.
+        if (!connectionData.account) {
+          throw new Error('No account connected')
+        }
+
+        const profile = await fetchProfile(connectionData.account)
+
+        // Goes to the setup page if the connected account does not have a profile yet.
+        if (!profile) {
+          navigate(`/setup?redirectTo=/auth/requests/${requestId}`)
+          return
+        }
       } catch (e) {
         toLoginPage()
         return
