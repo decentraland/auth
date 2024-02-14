@@ -99,6 +99,11 @@ export const LoginPage = () => {
           setConnectionModalState(ConnectionModalState.CONNECTING_WALLET)
           const connectionData = await connectToProvider(connectionType)
 
+          // Wait a second after the connection is established so there is no race condition between the readiness
+          // of the connection and the signature being requested.
+          // This is necessary for Wallet Connect.
+          await wait(1000)
+
           setConnectionModalState(ConnectionModalState.WAITING_FOR_SIGNATURE)
           await getIdentitySignature(connectionData.account?.toLowerCase() ?? '', connectionData.provider)
 
