@@ -35,7 +35,7 @@
     "ajv": "^8.12.0",
     "classnames": "^2.3.2",
     "dcl-catalyst-client": "^21.5.5",
-    "decentraland-connect": "^5.2.4",
+    "decentraland-connect": "^6.2.0",
     "decentraland-ui": "^5.2.0",
     "ethers": "^6.8.0",
     "magic-sdk": "^21.2.0",
