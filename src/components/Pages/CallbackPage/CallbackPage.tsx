@@ -102,7 +102,7 @@ export const CallbackPage = () => {
         <div className={styles.container}>
           <h3 className={styles.title}>Confirm your login</h3>
           <div className={styles.info}>
-            <span>This step only verifies your identity.</span>
+            <span>The next step only verifies your identity.</span>
             <span>No payments or transactions will occur without your explicit approval.</span>
           </div>
           <Button primary onClick={handleContinue}>
