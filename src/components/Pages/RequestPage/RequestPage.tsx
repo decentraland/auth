@@ -1,4 +1,4 @@
-import { ReactNode, useCallback, useEffect, useRef, useState } from 'react'
+import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ethers, BrowserProvider } from 'ethers'
 import Icon from 'semantic-ui-react/dist/commonjs/elements/Icon/Icon'
@@ -53,6 +53,7 @@ export const RequestPage = () => {
   const connectedAccountRef = useRef<string>()
   const requestId = params.requestId ?? ''
   const [isLoadingAvatar, setIsLoadingAvatar] = useState(false)
+  const peerUrl = useMemo(() => config.get('PEER_URL'), [])
 
   // Goes to the login page where the user will have to connect a wallet.
   const toLoginPage = useCallback(() => {
@@ -277,6 +278,7 @@ export const RequestPage = () => {
                 <>
                   <img src={manDefault} alt="Avatar" className={styles.wearableDefaultImg} />
                   <WearablePreview
+                    peerUrl={peerUrl}
                     lockBeta={true}
                     panning={false}
                     disableBackground={true}
