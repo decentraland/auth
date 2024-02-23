@@ -19,11 +19,11 @@ import wrongImg from '../../../assets/images/wrong.svg'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { getAnalytics } from '../../../modules/analytics/segment'
 import { ClickEvents, TrackingEvents } from '../../../modules/analytics/types'
+import { config } from '../../../modules/config'
 import { fetchProfile } from '../../../modules/profile'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import { deployProfileFromDefault, subscribeToNewsletter } from './utils'
 import styles from './SetupPage.module.css'
-import { config } from '../../../modules/config'
 
 enum View {
   RANDOMIZE,
