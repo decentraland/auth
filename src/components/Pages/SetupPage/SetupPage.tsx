@@ -23,6 +23,7 @@ import { fetchProfile } from '../../../modules/profile'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import { deployProfileFromDefault, subscribeToNewsletter } from './utils'
 import styles from './SetupPage.module.css'
+import { config } from '../../../modules/config'
 
 enum View {
   RANDOMIZE,
@@ -58,6 +59,8 @@ export const SetupPage = () => {
   const { initialized: initializedFlags, flags } = useContext(FeatureFlagsContext)
 
   const redirectTo = useAfterLoginRedirection()
+
+  const peerUrl = useMemo(() => config.get('PEER_URL'), [])
 
   // Validate the name.
   const nameError = useMemo(() => {
@@ -315,6 +318,7 @@ export const SetupPage = () => {
               </div>
               <div className={styles.mobilePreviewContainer}>
                 <WearablePreview
+                  peerUrl={peerUrl}
                   lockBeta={true}
                   panning={false}
                   disableBackground={true}
@@ -371,6 +375,7 @@ export const SetupPage = () => {
             </div>
             <div className={styles.right}>
               <WearablePreview
+                peerUrl={peerUrl}
                 lockBeta={true}
                 panning={false}
                 disableBackground={true}
@@ -504,6 +509,7 @@ export const SetupPage = () => {
           </div>
           <div className={styles.right}>
             <WearablePreview
+              peerUrl={peerUrl}
               lockBeta={true}
               panning={false}
               disableBackground={true}
