@@ -82,8 +82,8 @@ const defaultProps = {
   i18n: {
     title: 'Discover a virtual social world',
     subtitle: 'shaped by its community of creators & explorers.',
-    accessWith: (option: React.ReactNode) => `Access with ${option}`,
-    connectWith: (option: React.ReactNode) => `Connect with ${option}`,
+    accessWith: (option: React.ReactNode) => `Continue with ${option}`,
+    connectWith: (option: React.ReactNode) => `Continue with ${option}`,
     moreOptions: 'More Options',
     socialMessage: (element: React.ReactNode) => <>Access secured by {element}</>,
     web3Message: (learnMore: (value: React.ReactNode) => React.ReactNode) => <>Have a digital wallet? {learnMore('Learn More')}</>
