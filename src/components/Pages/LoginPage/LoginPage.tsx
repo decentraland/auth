@@ -117,7 +117,7 @@ export const LoginPage = () => {
           await wait(800)
 
           // If the flag is enabled, proceed with the simplified avatar setup flow.
-          if (flags[FeatureFlagsKeys.SIMPLIFIED_AVATAR_SETUP] && targetConfig.skipSetup) {
+          if (flags[FeatureFlagsKeys.SIMPLIFIED_AVATAR_SETUP] && !targetConfig.skipSetup) {
             // Can only proceed if the connection data has an account. Without the account the profile cannot be fetched.
             // Continues with the original flow if the account is not present.
             if (connectionData.account) {
