@@ -5,6 +5,7 @@ import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import { Modal } from 'decentraland-ui/dist/components/Modal/Modal'
 import { getConfiguration, connection } from 'decentraland-connect'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
+import { useTargetConfig } from '../../../hooks/targetConfig'
 import usePageTracking from '../../../hooks/usePageTracking'
 import { getAnalytics } from '../../../modules/analytics/segment'
 import { TrackingEvents } from '../../../modules/analytics/types'
@@ -23,6 +24,7 @@ export const CallbackPage = () => {
   const navigate = useNavigate()
   const [state, setConnectionModalState] = useState(ConnectionModalState.WAITING_FOR_CONFIRMATION)
   const { flags } = useContext(FeatureFlagsContext)
+  const [targetConfig] = useTargetConfig()
 
   const connectAndGenerateSignature = useCallback(async () => {
     const connectionData = await connection.connect(ProviderType.MAGIC)
@@ -68,7 +70,7 @@ export const CallbackPage = () => {
       await wait(800)
 
       // If the flag is enabled, proceed with the simplified avatar setup flow.
-      if (flags[FeatureFlagsKeys.SIMPLIFIED_AVATAR_SETUP]) {
+      if (flags[FeatureFlagsKeys.SIMPLIFIED_AVATAR_SETUP] && !targetConfig.skipSetup) {
         // Can only proceed if the connection data has an account. Without the account the profile cannot be fetched.
         // Continues with the original flow if the account is not present.
         if (connectionData.account) {

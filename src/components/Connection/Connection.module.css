@@ -33,6 +33,7 @@
   flex-direction: row;
   align-items: center;
   justify-content: center;
+  width: 100%;
 }
 
 .primaryImage {
@@ -84,11 +85,10 @@
 }
 
 .showMoreSecondaryOptions {
+  width: 100%;
   display: grid;
-  grid-auto-columns: 1fr;
   grid-template-columns: repeat(3, 1fr);
-  column-gap: 15px;
-  row-gap: 15px;
+  gap: 24px
 }
 
 .showMoreSecondaryOptions + .showMoreSecondaryOptions {
@@ -101,6 +101,15 @@
   width: 100%;
 }
 
-.secondaryOptionButton span :global(.ui.button.primary) {
-  min-width: 104px;
+.secondaryOptionButton:global(.ui.button.primary) {
+  min-width: 46px;
+}
+
+@media (max-width: 320px) {
+  .showMoreSecondaryOptions {
+      grid-template-columns: repeat(1, 1fr);
+    }
+  .secondaryOptionButton span :global(.ui.button.primary) {
+    margin: auto
+  }
 }

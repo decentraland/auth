@@ -23,6 +23,10 @@
   background-image: url('../../../assets/images/fortmatic.png');
 }
 
+.icon-facebook {
+  background-image: url('../../../assets/images/facebook.svg');
+}
+
 .icon-wallet-connect {
   background-image: url('../../../assets/images/wallet-connect.png');
 }

@@ -11,6 +11,7 @@ import { WearablePreview } from 'decentraland-ui/dist/components/WearablePreview
 import { connection } from 'decentraland-connect'
 import manDefault from '../../../assets/images/ManDefault.webp'
 import platformImg from '../../../assets/images/Platform.webp'
+import { useTargetConfig } from '../../../hooks/targetConfig'
 import usePageTracking from '../../../hooks/usePageTracking'
 import { getAnalytics } from '../../../modules/analytics/segment'
 import { ClickEvents, TrackingEvents } from '../../../modules/analytics/types'
@@ -52,11 +53,12 @@ export const RequestPage = () => {
   const timeoutRef = useRef<NodeJS.Timeout>()
   const connectedAccountRef = useRef<string>()
   const requestId = params.requestId ?? ''
+  const [targetConfig, targetConfigId] = useTargetConfig()
   const [isLoadingAvatar, setIsLoadingAvatar] = useState(false)
 
   // Goes to the login page where the user will have to connect a wallet.
   const toLoginPage = useCallback(() => {
-    navigate(`/login?redirectTo=/auth/requests/${requestId}`)
+    navigate(`/login?redirectTo=${encodeURIComponent(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}`)}`)
   }, [])
 
   useEffect(() => {
@@ -73,10 +75,13 @@ export const RequestPage = () => {
 
         const profile = await fetchProfile(connectionData.account)
 
-        // Goes to the setup page if the connected account does not have a profile yet.
-        if (!profile) {
-          navigate(`/setup?redirectTo=/auth/requests/${requestId}`)
-          return
+        // `alternative` has its own set up
+        if (!targetConfig.skipSetup) {
+          // Goes to the setup page if the connected account does not have a profile yet.
+          if (!profile) {
+            navigate(`/setup?redirectTo=/auth/requests/${requestId}`)
+            return
+          }
         }
       } catch (e) {
         toLoginPage()
@@ -109,7 +114,11 @@ export const RequestPage = () => {
 
         // Show different views depending on the request method.
         if (request.method === 'dcl_personal_sign') {
-          setView(View.VERIFY_SIGN_IN)
+          if (targetConfig.skipVerifyCode) {
+            onApproveSignInVerification(true)
+          } else {
+            setView(View.VERIFY_SIGN_IN)
+          }
         } else {
           setView(View.WALLET_INTERACTION)
         }
@@ -158,37 +167,42 @@ export const RequestPage = () => {
     }
   }, [])
 
-  const onApproveSignInVerification = useCallback(async () => {
-    getAnalytics().track(TrackingEvents.CLICK, {
-      action: ClickEvents.APPROVE_SING_IN
-    })
-    setIsLoading(true)
-    const provider = providerRef.current
-    try {
-      if (!provider) {
-        throw new Error('Provider not created')
+  const onApproveSignInVerification = useCallback(
+    async (skipTrack?: boolean) => {
+      if (skipTrack !== true) {
+        getAnalytics().track(TrackingEvents.CLICK, {
+          action: ClickEvents.APPROVE_SING_IN
+        })
       }
+      setIsLoading(true)
+      const provider = providerRef.current
+      try {
+        if (!provider) {
+          throw new Error('Provider not created')
+        }
 
-      const signer = await provider.getSigner()
-      const signature = await signer.signMessage(requestRef.current.params[0])
-      const result = await authServerFetch('outcome', {
-        requestId,
-        sender: await signer.getAddress(),
-        result: signature
-      })
+        const signer = await provider.getSigner()
+        const signature = await signer.signMessage(requestRef.current.params[0])
+        const result = await authServerFetch('outcome', {
+          requestId,
+          sender: await signer.getAddress(),
+          result: signature
+        })
 
-      if (result.error) {
-        throw new Error(result.error)
-      } else {
-        setView(View.VERIFY_SIGN_IN_COMPLETE)
+        if (result.error) {
+          throw new Error(result.error)
+        } else {
+          setView(View.VERIFY_SIGN_IN_COMPLETE)
+        }
+      } catch (e) {
+        setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
+        setView(View.VERIFY_SIGN_IN_ERROR)
+      } finally {
+        setIsLoading(false)
       }
-    } catch (e) {
-      setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
-      setView(View.VERIFY_SIGN_IN_ERROR)
-    } finally {
-      setIsLoading(false)
-    }
-  }, [setIsLoading])
+    },
+    [setIsLoading]
+  )
 
   const onDenyWalletInteraction = useCallback(() => {
     getAnalytics().track(TrackingEvents.CLICK, {
@@ -253,45 +267,71 @@ export const RequestPage = () => {
 
   const Container = useCallback(
     (props: { children: ReactNode; canChangeAccount?: boolean; isLoading?: boolean }) => {
-      return (
-        <div>
-          <div
-            className={`${styles.background} ${
-              (!connectedAccountRef || profile === null) && view !== View.LOADING_REQUEST ? styles.emptyProfile : ''
-            }`}
-          />
-          <div className={styles.main}>
-            <div className={styles.left}>
-              {props.children}
-              {props.canChangeAccount ? (
-                <div className={styles.changeAccount}>
-                  Use another profile?{' '}
-                  <a href="/auth/login" onClick={onChangeAccount}>
-                    Return to log in
-                  </a>
-                </div>
-              ) : null}
+      if (targetConfig.showWearablePreview) {
+        return (
+          <div>
+            <div
+              className={`${styles.background} ${
+                (!connectedAccountRef || profile === null) && view !== View.LOADING_REQUEST ? styles.emptyProfile : ''
+              }`}
+            />
+            <div className={styles.main}>
+              <div className={styles.left}>
+                {props.children}
+                {props.canChangeAccount ? (
+                  <div className={styles.changeAccount}>
+                    Use another profile?{' '}
+                    <a href="/auth/login" onClick={onChangeAccount}>
+                      Return to log in
+                    </a>
+                  </div>
+                ) : null}
+              </div>
+              <div className={`${styles.right} ${isLoadingAvatar ? styles.loading : ''}`}>
+                {connectedAccountRef.current && profile !== null ? (
+                  <>
+                    <img src={manDefault} alt="Avatar" className={styles.wearableDefaultImg} />
+                    <WearablePreview
+                      lockBeta={true}
+                      panning={false}
+                      disableBackground={true}
+                      profile={connectedAccountRef.current}
+                      dev={false}
+                      onUpdate={handleLoadWearablePreview}
+                    />
+                    <img src={platformImg} alt="platform" className={styles.wearablePlatform} />
+                  </>
+                ) : null}
+              </div>
+              <CommunityBubble className={styles.communityBubble} />
             </div>
-            <div className={`${styles.right} ${isLoadingAvatar ? styles.loading : ''}`}>
-              {connectedAccountRef.current && profile !== null ? (
-                <>
-                  <img src={manDefault} alt="Avatar" className={styles.wearableDefaultImg} />
-                  <WearablePreview
-                    lockBeta={true}
-                    panning={false}
-                    disableBackground={true}
-                    profile={connectedAccountRef.current}
-                    dev={false}
-                    onUpdate={handleLoadWearablePreview}
-                  />
-                  <img src={platformImg} alt="platform" className={styles.wearablePlatform} />
-                </>
-              ) : null}
-            </div>
-            <CommunityBubble className={styles.communityBubble} />
           </div>
-        </div>
-      )
+        )
+      } else {
+        return (
+          <div>
+            <div
+              className={`${styles.background} ${
+                (!connectedAccountRef || profile === null) && view !== View.LOADING_REQUEST ? styles.emptyProfile : ''
+              }`}
+            />
+            <div className={styles.main}>
+              <div className={styles.left}>
+                {props.children}
+                {props.canChangeAccount ? (
+                  <div className={styles.changeAccount}>
+                    Use another profile?{' '}
+                    <a href="/auth/login" onClick={onChangeAccount}>
+                      Return to log in
+                    </a>
+                  </div>
+                ) : null}
+              </div>
+              <CommunityBubble className={styles.communityBubble} />
+            </div>
+          </div>
+        )
+      }
     },
     [isLoadingAvatar, view]
   )
@@ -301,7 +341,7 @@ export const RequestPage = () => {
       <Container>
         <div className={styles.errorLogo}></div>
         <div className={styles.title}>Looks like you took too long and the request has expired</div>
-        <div className={styles.description}>Please return to Decentraland's Desktop App to try again.</div>
+        <div className={styles.description}>Please return to Decentraland's {targetConfig.explorerText} to try again.</div>
         <CloseWindow />
       </Container>
     )
@@ -312,7 +352,7 @@ export const RequestPage = () => {
       <Container canChangeAccount>
         <div className={styles.errorLogo}></div>
         <div className={styles.title}>Looks like you are connected with a different account.</div>
-        <div className={styles.description}>Please change your wallet account to the one connected to the Desktop App.</div>
+        <div className={styles.description}>Please change your wallet account to the one connected to the {targetConfig.explorerText}.</div>
       </Container>
     )
   }
@@ -348,14 +388,20 @@ export const RequestPage = () => {
       <Container canChangeAccount isLoading={isLoading}>
         <div className={styles.logo}></div>
         <div className={styles.title}>Verify Sign In</div>
-        <div className={styles.description}>Do you see the same verification number on your Desktop App?</div>
+        <div className={styles.description}>Do you see the same verification number on your {targetConfig.explorerText}?</div>
         <div className={styles.code}>{requestRef.current.code}</div>
         <div className={styles.buttons}>
           <Button inverted disabled={isLoading} onClick={onDenyVerifySignIn} className={styles.noButton}>
             <Icon name="times circle" />
             No, it doesn't
           </Button>
-          <Button inverted loading={isLoading} disabled={isLoading} onClick={onApproveSignInVerification} className={styles.yesButton}>
+          <Button
+            inverted
+            loading={isLoading}
+            disabled={isLoading}
+            onClick={() => onApproveSignInVerification()}
+            className={styles.yesButton}
+          >
             <Icon name="check circle" />
             Yes, they are the same
           </Button>
@@ -382,7 +428,7 @@ export const RequestPage = () => {
       <Container>
         <div className={styles.logo}></div>
         <div className={styles.title}>Your account is ready!</div>
-        <div className={styles.description}>Return to the Desktop App and enjoy Decentraland.</div>
+        <div className={styles.description}>Return to the {targetConfig.explorerText} and enjoy Decentraland.</div>
         <CloseWindow />
       </Container>
     )
@@ -394,7 +440,7 @@ export const RequestPage = () => {
     return (
       <Container canChangeAccount isLoading={isLoading}>
         <div className={styles.logo}></div>
-        <div className={styles.title}>The Desktop App wants to interact with your wallet.</div>
+        <div className={styles.title}>The {targetConfig.explorerText} wants to interact with your wallet.</div>
         <div className={styles.description}>Review the following data carefully on your wallet before approving it.</div>
         <div className={styles.buttons}>
           <Button inverted disabled={isLoading} onClick={onDenyWalletInteraction}>
@@ -437,7 +483,9 @@ export const RequestPage = () => {
       <Container>
         <div className={styles.errorLogo}></div>
         <div className={styles.title}>There was an error while trying to submit the request.</div>
-        <div className={styles.description}>Return to the Desktop App to try again, or contact support if the error persists.</div>
+        <div className={styles.description}>
+          Return to the {targetConfig.explorerText} to try again, or contact support if the error persists.
+        </div>
         <CloseWindow />
         <div className={styles.errorMessage}>{error}</div>
       </Container>

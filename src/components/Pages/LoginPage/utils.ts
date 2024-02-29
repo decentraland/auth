@@ -16,6 +16,7 @@ export function fromConnectionOptionToProviderType(connectionType: ConnectionOpt
     case ConnectionOptionType.X:
     case ConnectionOptionType.GOOGLE:
     case ConnectionOptionType.APPLE:
+    case ConnectionOptionType.FACEBOOK:
       return ProviderType.MAGIC
     case ConnectionOptionType.WALLET_CONNECT:
     case ConnectionOptionType.METAMASK_MOBILE:
@@ -96,4 +97,9 @@ export async function getIdentitySignature(address: string, provider: Provider):
   }
 
   return identity
+}
+
+export function getIsMobile() {
+  const userAgent = navigator.userAgent
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent)
 }

@@ -135,7 +135,9 @@
 .errorMessage {
   padding: 15px;
   border-radius: 10px;
-  width: 500px;
+  width: 80%;
+  margin: auto;
+  max-width: 500px;
   margin-top: 30px;
   background-color: var(--primary);
   line-break: anywhere;
@@ -181,4 +183,29 @@
   position: absolute;
   bottom: 20px;
   right: 20px;
+}
+
+
+@media (max-width:500px){
+  .main{
+    display:flex;
+    flex-direction:column
+  }
+  .errorMessage {
+    padding: 15px;
+    border-radius: 10px;
+    max-width: 80%;
+    margin-top: 30px;
+    background-color: var(--primary);
+    color: white;
+  }
+  .left {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    width: 100%;
+    padding: 20px;
+    margin-left:0px
+  }
 }
