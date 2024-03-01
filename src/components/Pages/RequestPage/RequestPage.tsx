@@ -14,8 +14,8 @@ import { ClickEvents, TrackingEvents } from '../../../modules/analytics/types'
 import { config } from '../../../modules/config'
 import { fetchProfile } from '../../../modules/profile'
 import { isErrorWithMessage, isRpcError } from '../../../shared/errors'
-import styles from './RequestPage.module.css'
 import { CustomWearablePreview } from '../../CustomWearablePreview'
+import styles from './RequestPage.module.css'
 
 enum View {
   TIMEOUT,
