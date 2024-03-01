@@ -16,7 +16,6 @@ export function fromConnectionOptionToProviderType(connectionType: ConnectionOpt
     case ConnectionOptionType.X:
     case ConnectionOptionType.GOOGLE:
     case ConnectionOptionType.APPLE:
-    case ConnectionOptionType.FACEBOOK:
       return ProviderType.MAGIC
     case ConnectionOptionType.WALLET_CONNECT:
     case ConnectionOptionType.METAMASK_MOBILE:

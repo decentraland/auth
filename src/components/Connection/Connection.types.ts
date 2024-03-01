@@ -10,14 +10,12 @@ export enum ConnectionOptionType {
   GOOGLE = 'google',
   APPLE = 'apple',
   DISCORD = 'discord',
-  X = 'x',
-  FACEBOOK = 'facebook'
+  X = 'x'
 }
 
 export const connectionOptionTitles: { [key in ConnectionOptionType]: string } = {
   [ConnectionOptionType.METAMASK]: 'MetaMask',
   [ConnectionOptionType.DAPPER]: 'Dapper',
-  [ConnectionOptionType.FACEBOOK]: 'Facebook',
   [ConnectionOptionType.FORTMATIC]: 'Fortmatic',
   [ConnectionOptionType.COINBASE]: 'Coinbase',
   [ConnectionOptionType.SAMSUNG]: 'Samsung Blockchain Wallet',

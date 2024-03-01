@@ -205,7 +205,7 @@ export const LoginPage = () => {
               isMobile
                 ? {
                     primary: ConnectionOptionType.WALLET_CONNECT,
-                    secondary: [ConnectionOptionType.FORTMATIC, ConnectionOptionType.COINBASE, ConnectionOptionType.FACEBOOK]
+                    secondary: [ConnectionOptionType.FORTMATIC, ConnectionOptionType.COINBASE]
                   }
                 : {
                     primary: ConnectionOptionType.METAMASK,
