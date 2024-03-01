@@ -115,7 +115,7 @@ export const RequestPage = () => {
         // Show different views depending on the request method.
         if (request.method === 'dcl_personal_sign') {
           if (targetConfig.skipVerifyCode) {
-            onApproveSignInVerification(true)
+            onApproveSignInVerification()
           } else {
             setView(View.VERIFY_SIGN_IN)
           }
@@ -167,42 +167,39 @@ export const RequestPage = () => {
     }
   }, [])
 
-  const onApproveSignInVerification = useCallback(
-    async (skipTrack?: boolean) => {
-      if (skipTrack !== true) {
-        getAnalytics().track(TrackingEvents.CLICK, {
-          action: ClickEvents.APPROVE_SING_IN
-        })
+  const onApproveSignInVerification = useCallback(async () => {
+    if (!targetConfig.skipVerifyCode) {
+      getAnalytics().track(TrackingEvents.CLICK, {
+        action: ClickEvents.APPROVE_SING_IN
+      })
+    }
+    setIsLoading(true)
+    const provider = providerRef.current
+    try {
+      if (!provider) {
+        throw new Error('Provider not created')
       }
-      setIsLoading(true)
-      const provider = providerRef.current
-      try {
-        if (!provider) {
-          throw new Error('Provider not created')
-        }
 
-        const signer = await provider.getSigner()
-        const signature = await signer.signMessage(requestRef.current.params[0])
-        const result = await authServerFetch('outcome', {
-          requestId,
-          sender: await signer.getAddress(),
-          result: signature
-        })
+      const signer = await provider.getSigner()
+      const signature = await signer.signMessage(requestRef.current.params[0])
+      const result = await authServerFetch('outcome', {
+        requestId,
+        sender: await signer.getAddress(),
+        result: signature
+      })
 
-        if (result.error) {
-          throw new Error(result.error)
-        } else {
-          setView(View.VERIFY_SIGN_IN_COMPLETE)
-        }
-      } catch (e) {
-        setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
-        setView(View.VERIFY_SIGN_IN_ERROR)
-      } finally {
-        setIsLoading(false)
+      if (result.error) {
+        throw new Error(result.error)
+      } else {
+        setView(View.VERIFY_SIGN_IN_COMPLETE)
       }
-    },
-    [setIsLoading]
-  )
+    } catch (e) {
+      setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
+      setView(View.VERIFY_SIGN_IN_ERROR)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [setIsLoading])
 
   const onDenyWalletInteraction = useCallback(() => {
     getAnalytics().track(TrackingEvents.CLICK, {
@@ -267,47 +264,7 @@ export const RequestPage = () => {
 
   const Container = useCallback(
     (props: { children: ReactNode; canChangeAccount?: boolean; isLoading?: boolean }) => {
-      if (targetConfig.showWearablePreview) {
-        return (
-          <div>
-            <div
-              className={`${styles.background} ${
-                (!connectedAccountRef || profile === null) && view !== View.LOADING_REQUEST ? styles.emptyProfile : ''
-              }`}
-            />
-            <div className={styles.main}>
-              <div className={styles.left}>
-                {props.children}
-                {props.canChangeAccount ? (
-                  <div className={styles.changeAccount}>
-                    Use another profile?{' '}
-                    <a href="/auth/login" onClick={onChangeAccount}>
-                      Return to log in
-                    </a>
-                  </div>
-                ) : null}
-              </div>
-              <div className={`${styles.right} ${isLoadingAvatar ? styles.loading : ''}`}>
-                {connectedAccountRef.current && profile !== null ? (
-                  <>
-                    <img src={manDefault} alt="Avatar" className={styles.wearableDefaultImg} />
-                    <WearablePreview
-                      lockBeta={true}
-                      panning={false}
-                      disableBackground={true}
-                      profile={connectedAccountRef.current}
-                      dev={false}
-                      onUpdate={handleLoadWearablePreview}
-                    />
-                    <img src={platformImg} alt="platform" className={styles.wearablePlatform} />
-                  </>
-                ) : null}
-              </div>
-              <CommunityBubble className={styles.communityBubble} />
-            </div>
-          </div>
-        )
-      } else {
+      if (!targetConfig.showWearablePreview) {
         return (
           <div>
             <div
@@ -332,6 +289,46 @@ export const RequestPage = () => {
           </div>
         )
       }
+
+      return (
+        <div>
+          <div
+            className={`${styles.background} ${
+              (!connectedAccountRef || profile === null) && view !== View.LOADING_REQUEST ? styles.emptyProfile : ''
+            }`}
+          />
+          <div className={styles.main}>
+            <div className={styles.left}>
+              {props.children}
+              {props.canChangeAccount ? (
+                <div className={styles.changeAccount}>
+                  Use another profile?{' '}
+                  <a href="/auth/login" onClick={onChangeAccount}>
+                    Return to log in
+                  </a>
+                </div>
+              ) : null}
+            </div>
+            <div className={`${styles.right} ${isLoadingAvatar ? styles.loading : ''}`}>
+              {connectedAccountRef.current && profile !== null ? (
+                <>
+                  <img src={manDefault} alt="Avatar" className={styles.wearableDefaultImg} />
+                  <WearablePreview
+                    lockBeta={true}
+                    panning={false}
+                    disableBackground={true}
+                    profile={connectedAccountRef.current}
+                    dev={false}
+                    onUpdate={handleLoadWearablePreview}
+                  />
+                  <img src={platformImg} alt="platform" className={styles.wearablePlatform} />
+                </>
+              ) : null}
+            </div>
+            <CommunityBubble className={styles.communityBubble} />
+          </div>
+        </div>
+      )
     },
     [isLoadingAvatar, view]
   )
@@ -395,13 +392,7 @@ export const RequestPage = () => {
             <Icon name="times circle" />
             No, it doesn't
           </Button>
-          <Button
-            inverted
-            loading={isLoading}
-            disabled={isLoading}
-            onClick={() => onApproveSignInVerification()}
-            className={styles.yesButton}
-          >
+          <Button inverted loading={isLoading} disabled={isLoading} onClick={onApproveSignInVerification} className={styles.yesButton}>
             <Icon name="check circle" />
             Yes, they are the same
           </Button>

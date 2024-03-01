@@ -69,7 +69,7 @@ export const CallbackPage = () => {
       // Wait 800 ms for the tracking to be completed
       await wait(800)
 
-      // If the flag is enabled, proceed with the simplified avatar setup flow.
+      // If the flag is enabled and the setup is not skipped by config, proceed with the simplified avatar setup flow.
       if (flags[FeatureFlagsKeys.SIMPLIFIED_AVATAR_SETUP] && !targetConfig.skipSetup) {
         // Can only proceed if the connection data has an account. Without the account the profile cannot be fetched.
         // Continues with the original flow if the account is not present.
