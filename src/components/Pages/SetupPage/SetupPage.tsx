@@ -1,25 +1,23 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import classNames from 'classnames'
 import { AuthIdentity } from '@dcl/crypto'
-import { PreviewEmote } from '@dcl/schemas'
 import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import { Checkbox } from 'decentraland-ui/dist/components/Checkbox/Checkbox'
 import { Field } from 'decentraland-ui/dist/components/Field/Field'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
 import { Mobile, NotMobile } from 'decentraland-ui/dist/components/Media/Media'
-import { WearablePreview } from 'decentraland-ui/dist/components/WearablePreview/WearablePreview'
 import { connection } from 'decentraland-connect'
 import { InputOnChangeData } from 'decentraland-ui'
 import backImg from '../../../assets/images/back.svg'
 import diceImg from '../../../assets/images/dice.svg'
 import logoImg from '../../../assets/images/logo.svg'
-import platformImg from '../../../assets/images/Platform.webp'
 import wrongImg from '../../../assets/images/wrong.svg'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { getAnalytics } from '../../../modules/analytics/segment'
 import { ClickEvents, TrackingEvents } from '../../../modules/analytics/types'
 import { fetchProfile } from '../../../modules/profile'
+import { CustomWearablePreview } from '../../CustomWearablePreview'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import { deployProfileFromDefault, subscribeToNewsletter } from './utils'
 import styles from './SetupPage.module.css'
@@ -314,17 +312,7 @@ export const SetupPage = () => {
                 <b>You can customize it later on desktop</b>, where all the magic happens!
               </div>
               <div className={styles.mobilePreviewContainer}>
-                <WearablePreview
-                  lockBeta={true}
-                  panning={false}
-                  disableBackground={true}
-                  profile={profile}
-                  dev={false}
-                  emote={PreviewEmote.WAVE}
-                  disableAutoRotate
-                />
-                <Loader active />
-                <img className={styles.platform} src={platformImg} alt="platform" />
+                <CustomWearablePreview profile={profile} />
               </div>
               <div className={styles.mobileButtons}>
                 <div className={styles.randomize}>
@@ -370,17 +358,7 @@ export const SetupPage = () => {
               </div>
             </div>
             <div className={styles.right}>
-              <WearablePreview
-                lockBeta={true}
-                panning={false}
-                disableBackground={true}
-                profile={profile}
-                dev={false}
-                emote={PreviewEmote.WAVE}
-                disableAutoRotate
-              />
-              <Loader active size="huge" />
-              <img className={styles.platform} src={platformImg} alt="platform" />
+              <CustomWearablePreview profile={profile} />
             </div>
           </div>
         </NotMobile>
@@ -503,17 +481,7 @@ export const SetupPage = () => {
             </div>
           </div>
           <div className={styles.right}>
-            <WearablePreview
-              lockBeta={true}
-              panning={false}
-              disableBackground={true}
-              profile={profile}
-              dev={false}
-              emote={PreviewEmote.WAVE}
-              disableAutoRotate
-            />
-            <Loader active size="huge" />
-            <img className={styles.platform} src={platformImg} alt="platform" />
+            <CustomWearablePreview profile={profile} />
           </div>
         </div>
       </NotMobile>
