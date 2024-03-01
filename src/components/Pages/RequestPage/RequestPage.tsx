@@ -7,10 +7,7 @@ import { Profile } from '@dcl/schemas'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import { CommunityBubble } from 'decentraland-ui/dist/components/CommunityBubble'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
-import { WearablePreview } from 'decentraland-ui/dist/components/WearablePreview/WearablePreview'
 import { connection } from 'decentraland-connect'
-import manDefault from '../../../assets/images/ManDefault.webp'
-import platformImg from '../../../assets/images/Platform.webp'
 import usePageTracking from '../../../hooks/usePageTracking'
 import { getAnalytics } from '../../../modules/analytics/segment'
 import { ClickEvents, TrackingEvents } from '../../../modules/analytics/types'
@@ -18,6 +15,7 @@ import { config } from '../../../modules/config'
 import { fetchProfile } from '../../../modules/profile'
 import { isErrorWithMessage, isRpcError } from '../../../shared/errors'
 import styles from './RequestPage.module.css'
+import { CustomWearablePreview } from '../../CustomWearablePreview'
 
 enum View {
   TIMEOUT,
@@ -52,7 +50,6 @@ export const RequestPage = () => {
   const timeoutRef = useRef<NodeJS.Timeout>()
   const connectedAccountRef = useRef<string>()
   const requestId = params.requestId ?? ''
-  const [isLoadingAvatar, setIsLoadingAvatar] = useState(false)
 
   // Goes to the login page where the user will have to connect a wallet.
   const toLoginPage = useCallback(() => {
@@ -94,7 +91,6 @@ export const RequestPage = () => {
         setProfile(profile)
 
         connectedAccountRef.current = signerAddress
-        setIsLoadingAvatar(true)
 
         // If the sender defined in the request is different than the one that is connected, show an error.
         if (request.sender && request.sender !== signerAddress.toLowerCase()) {
@@ -149,12 +145,6 @@ export const RequestPage = () => {
     } finally {
       setIsLoading(false)
       setView(View.VERIFY_SIGN_IN_DENIED)
-    }
-  }, [])
-
-  const handleLoadWearablePreview = useCallback(params => {
-    if (connectedAccountRef.current && params.profile === connectedAccountRef.current) {
-      setIsLoadingAvatar(false)
     }
   }, [])
 
@@ -272,28 +262,15 @@ export const RequestPage = () => {
                 </div>
               ) : null}
             </div>
-            <div className={`${styles.right} ${isLoadingAvatar ? styles.loading : ''}`}>
-              {connectedAccountRef.current && profile !== null ? (
-                <>
-                  <img src={manDefault} alt="Avatar" className={styles.wearableDefaultImg} />
-                  <WearablePreview
-                    lockBeta={true}
-                    panning={false}
-                    disableBackground={true}
-                    profile={connectedAccountRef.current}
-                    dev={false}
-                    onUpdate={handleLoadWearablePreview}
-                  />
-                  <img src={platformImg} alt="platform" className={styles.wearablePlatform} />
-                </>
-              ) : null}
+            <div className={styles.right}>
+              {connectedAccountRef.current && profile !== null ? <CustomWearablePreview profile={connectedAccountRef.current} /> : null}
             </div>
             <CommunityBubble className={styles.communityBubble} />
           </div>
         </div>
       )
     },
-    [isLoadingAvatar, view]
+    [view]
   )
 
   if (view === View.TIMEOUT) {
