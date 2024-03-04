@@ -47,24 +47,11 @@
 }
 
 .right {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  align-self: center;
-  height: 80vh;
-  position: relative;
+  height: 100%;
 }
 
-:global(.WearablePreview) {
-  background-color: unset;
-  z-index: 1;
-}
-
-.wearablePlatform {
-  bottom: 0;
-  left: calc(50% - 250px);
-  position: absolute;
+.right :global(.CustomWearablePreview) {
+  right: 8%;
 }
 
 .changeAccount {
@@ -159,22 +146,6 @@
 .yesButton:global(.ui.button) i {
   color: green;
   font-size: 20px;
-}
-
-.wearableDefaultImg {
-  filter: blur(5px);
-  display: flex;
-  align-self: center;
-  max-height: 660px;
-  height: 100%;
-  opacity: 0;
-  position: absolute;
-  transition: ease-out 3s;
-  z-index: 1;
-}
-
-.loading .wearableDefaultImg {
-  opacity: 0.9;
 }
 
 .communityBubble {

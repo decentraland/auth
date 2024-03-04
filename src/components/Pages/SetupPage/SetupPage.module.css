@@ -171,24 +171,7 @@
   flex: 1;
   width: 100%;
   position: relative;
-  top: 10%;
-}
-
-.right :global(.WearablePreview) {
-  height: 80%;
-  position: relative;
-}
-
-.right :global(.loader) {
-  top: 30% !important;
-  z-index: 0;
-}
-
-.right .platform {
-  display: block;
-  margin: auto;
-  transform: translateY(-110%);
-  width: 50vh;
+  right: 6.3%;
 }
 
 @media screen and (max-width: 768px) {
@@ -216,20 +199,8 @@
     flex-direction: column;
   }
 
-  .mobilePreviewContainer :global(.WearablePreview) {
+  .mobilePreviewContainer :global(.CustomWearablePreview){
     height: 500px;
-  }
-
-  .mobilePreviewContainer :global(.loader) {
-    top: 30% !important;
-    z-index: 0;
-  }
-
-  .mobilePreviewContainer .platform {
-    position: relative;
-    margin: auto;
-    bottom: 85px;
-    width: 100%;
   }
 
   .mobileButtons {
