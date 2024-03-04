@@ -14,7 +14,7 @@ export const CustomWearablePreview = (props: Props) => {
     const getRepresentation = (bodyShape: 'BaseMale' | 'BaseFemale') => {
       const mainFile = 'platform.glb'
       const baseUrl = import.meta.env.VITE_PUBLIC_URL || window.location.origin
-      
+
       return {
         bodyShapes: [`urn:decentraland:off-chain:base-avatars:${bodyShape}`],
         mainFile,
