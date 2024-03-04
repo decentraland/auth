@@ -122,9 +122,6 @@
 .errorMessage {
   padding: 15px;
   border-radius: 10px;
-  width: 80%;
-  margin: auto;
-  max-width: 500px;
   margin-top: 30px;
   background-color: var(--primary);
   line-break: anywhere;
@@ -157,7 +154,7 @@
 }
 
 
-@media (max-width:500px){
+@media (max-width:767px){
   .main{
     display:flex;
     flex-direction:column
@@ -165,7 +162,6 @@
   .errorMessage {
     padding: 15px;
     border-radius: 10px;
-    max-width: 80%;
     margin-top: 30px;
     background-color: var(--primary);
     color: white;
@@ -174,7 +170,8 @@
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    justify-content: center;
+    justify-content: center; 
+    max-width: inherit;
     width: 100%;
     padding: 20px;
     margin-left:0px
