@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "name": "auth",
+  "build": {
+    "env": {
+      "GEN_STATIC_LOCAL": "true",
+      "VITE_REACT_APP_DCL_DEFAULT_ENV": "dev"
+    }
+  },
+  "github": {
+    "silent": true
+  },
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/"
+    }
+  ]
+}
