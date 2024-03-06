@@ -23,7 +23,13 @@ publicPackageJson.homepage = packageJson.homepage
 if (packageJson.homepage) {
   // github action outputs. Do not touch.
   console.log('::set-output name=public_url::' + packageJson.homepage)
-  console.log('::set-output name=public_path::' + new URL(packageJson.homepage).pathname)
+  let pathname = ""
+  try {
+    pathname = new URL(packageJson.homepage).pathname
+  } catch {
+    pathname = packageJson.homepage
+  }
+  console.log('::set-output name=public_path::' + pathname)
 }
 
 // log stuff
@@ -55,6 +61,11 @@ function getPublicUrls() {
     console.log(`Using CDN as public url: "${cdnUrl}"`)
     return {
       VITE_BASE_URL: cdnUrl
+    }
+  }
+  if (isVercel) {
+    return {
+      VITE_BASE_URL: "/"
     }
   }
   // localhost

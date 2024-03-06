@@ -10,10 +10,11 @@
   "github": {
     "silent": true
   },
-  "rewrites": [
+  "redirects": [
     {
-      "source": "/(.*)",
-      "destination": "/"
+      "source": "/",
+      "destination": "/auth"
     }
-  ]
+  ],
+  "rewrites": [{ "source": "/(.*)", "destination": "/" }]
 }
