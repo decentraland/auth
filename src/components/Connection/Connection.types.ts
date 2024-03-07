@@ -13,21 +13,6 @@ export enum ConnectionOptionType {
   X = 'x'
 }
 
-export const connectionOptionTitles: { [key in ConnectionOptionType]: string } = {
-  [ConnectionOptionType.METAMASK]: 'MetaMask',
-  [ConnectionOptionType.DAPPER]: 'Dapper',
-  [ConnectionOptionType.FORTMATIC]: 'Fortmatic',
-  [ConnectionOptionType.COINBASE]: 'Coinbase',
-  [ConnectionOptionType.SAMSUNG]: 'Samsung Blockchain Wallet',
-  [ConnectionOptionType.WALLET_CONNECT]: 'WalletConnect',
-  [ConnectionOptionType.WALLET_LINK]: 'WalletLink',
-  [ConnectionOptionType.METAMASK_MOBILE]: 'MetaMask Mobile',
-  [ConnectionOptionType.GOOGLE]: 'Google',
-  [ConnectionOptionType.APPLE]: 'Apple',
-  [ConnectionOptionType.DISCORD]: 'Discord',
-  [ConnectionOptionType.X]: 'X'
-}
-
 export type MetamaskEthereumWindow = typeof window.ethereum & { isMetaMask?: boolean }
 
 export type ConnectionI18N = {

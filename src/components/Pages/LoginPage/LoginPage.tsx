@@ -11,7 +11,6 @@ import Image7 from '../../../assets/images/background/image7.webp'
 import Image8 from '../../../assets/images/background/image8.webp'
 import Image9 from '../../../assets/images/background/image9.webp'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
-import { useTargetConfig } from '../../../hooks/targetConfig'
 import usePageTracking from '../../../hooks/usePageTracking'
 import { getAnalytics } from '../../../modules/analytics/segment'
 import { ClickEvents, ConnectionType, TrackingEvents } from '../../../modules/analytics/types'
@@ -23,7 +22,7 @@ import { ConnectionModal, ConnectionModalState } from '../../ConnectionModal'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import { MagicInformationModal } from '../../MagicInformationModal'
 import { WalletInformationModal } from '../../WalletInformationModal'
-import { getIdentitySignature, connectToProvider, isSocialLogin, fromConnectionOptionToProviderType, getIsMobile } from './utils'
+import { getIdentitySignature, connectToProvider, isSocialLogin, fromConnectionOptionToProviderType } from './utils'
 import styles from './LoginPage.module.css'
 
 const BACKGROUND_IMAGES = [Image1, Image2, Image3, Image4, Image5, Image6, Image7, Image8, Image9, Image10]
@@ -36,12 +35,10 @@ export const LoginPage = () => {
   const [showMagicLearnMore, setShowMagicLearnMore] = useState(false)
   const [showConnectionModal, setShowConnectionModal] = useState(false)
   const [currentConnectionType, setCurrentConnectionType] = useState<ConnectionOptionType>()
-  const [isMobile] = useState(getIsMobile())
   const redirectTo = useAfterLoginRedirection()
   const showGuestOption = redirectTo && new URL(redirectTo).pathname.includes('/play')
   const [currentBackgroundIndex, setCurrentBackgroundIndex] = useState(0)
   const { flags } = useContext(FeatureFlagsContext)
-  const [targetConfig] = useTargetConfig()
 
   const handleLearnMore = useCallback(
     (option?: ConnectionOptionType) => {
@@ -116,8 +113,8 @@ export const LoginPage = () => {
           // Wait 800 ms for the tracking to be completed
           await wait(800)
 
-          // If the flag is enabled and the setup is not skipped by config, proceed with the simplified avatar setup flow.
-          if (flags[FeatureFlagsKeys.SIMPLIFIED_AVATAR_SETUP] && !targetConfig.skipSetup) {
+          // If the flag is enabled, proceed with the simplified avatar setup flow.
+          if (flags[FeatureFlagsKeys.SIMPLIFIED_AVATAR_SETUP]) {
             // Can only proceed if the connection data has an account. Without the account the profile cannot be fetched.
             // Continues with the original flow if the account is not present.
             if (connectionData.account) {
@@ -201,17 +198,10 @@ export const LoginPage = () => {
               primary: ConnectionOptionType.GOOGLE,
               secondary: [ConnectionOptionType.DISCORD, ConnectionOptionType.APPLE, ConnectionOptionType.X]
             }}
-            web3Options={
-              isMobile
-                ? {
-                    primary: ConnectionOptionType.WALLET_CONNECT,
-                    secondary: [ConnectionOptionType.FORTMATIC, ConnectionOptionType.COINBASE]
-                  }
-                : {
-                    primary: ConnectionOptionType.METAMASK,
-                    secondary: [ConnectionOptionType.FORTMATIC, ConnectionOptionType.COINBASE, ConnectionOptionType.WALLET_CONNECT]
-                  }
-            }
+            web3Options={{
+              primary: ConnectionOptionType.METAMASK,
+              secondary: [ConnectionOptionType.FORTMATIC, ConnectionOptionType.COINBASE, ConnectionOptionType.WALLET_CONNECT]
+            }}
           />
           {showGuestOption && (
             <div className={styles.guestInfo}>

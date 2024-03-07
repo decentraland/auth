@@ -2,7 +2,7 @@
   display: grid;
   grid-template-columns: 50% 50%;
   height: 100%;
-  position: relative;
+  position: relative
 }
 
 .background {
@@ -95,12 +95,7 @@
 
 @media screen and (max-width: 800px) {
   .main {
-    display: flex;
-    height: auto;
-  }
-
-  .background {
-    display: none;
+    grid-template-columns: 100%;
   }
 
   .main::before {
@@ -108,7 +103,8 @@
   }
 
   .left {
-    padding: 20px;
+    padding-left: 20px;
+    padding-right: 20px;
   }
 }
 

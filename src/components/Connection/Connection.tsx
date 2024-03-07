@@ -11,7 +11,7 @@ import {
   WEB3_PRIMARY_TEST_ID,
   WEB3_SECONDARY_TEST_ID
 } from './constants'
-import { ConnectionOptionType, ConnectionProps, MetamaskEthereumWindow, connectionOptionTitles } from './Connection.types'
+import { ConnectionOptionType, ConnectionProps, MetamaskEthereumWindow } from './Connection.types'
 import styles from './Connection.module.css'
 
 const Primary = ({
@@ -82,8 +82,8 @@ const defaultProps = {
   i18n: {
     title: 'Discover a virtual social world',
     subtitle: 'shaped by its community of creators & explorers.',
-    accessWith: (option: ConnectionOptionType) => `Continue with ${connectionOptionTitles[option]}`,
-    connectWith: (option: ConnectionOptionType) => `Continue with ${connectionOptionTitles[option]}`,
+    accessWith: (option: React.ReactNode) => `Continue with ${option}`,
+    connectWith: (option: React.ReactNode) => `Continue with ${option}`,
     moreOptions: 'More Options',
     socialMessage: (element: React.ReactNode) => <>Access secured by {element}</>,
     web3Message: (learnMore: (value: React.ReactNode) => React.ReactNode) => <>Have a digital wallet? {learnMore('Learn More')}</>
