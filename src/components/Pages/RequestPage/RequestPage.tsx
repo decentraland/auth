@@ -110,11 +110,7 @@ export const RequestPage = () => {
 
         // Show different views depending on the request method.
         if (request.method === 'dcl_personal_sign') {
-          if (targetConfig.skipVerifyCode) {
-            onApproveSignInVerification()
-          } else {
-            setView(View.VERIFY_SIGN_IN)
-          }
+          setView(View.VERIFY_SIGN_IN)
         } else {
           setView(View.WALLET_INTERACTION)
         }
@@ -158,11 +154,9 @@ export const RequestPage = () => {
   }, [])
 
   const onApproveSignInVerification = useCallback(async () => {
-    if (!targetConfig.skipVerifyCode) {
-      getAnalytics().track(TrackingEvents.CLICK, {
-        action: ClickEvents.APPROVE_SING_IN
-      })
-    }
+    getAnalytics().track(TrackingEvents.CLICK, {
+      action: ClickEvents.APPROVE_SING_IN
+    })
     setIsLoading(true)
     const provider = providerRef.current
     try {
