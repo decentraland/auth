@@ -16,7 +16,7 @@ const targetConfigRecord: Record<TargetConfigId, TargetConfig> = {
     explorerText: 'Desktop App'
   },
   alternative: {
-    skipVerifyCode: true,
+    skipVerifyCode: false,
     skipSetup: true,
     showWearablePreview: false,
     explorerText: 'Explorer'
