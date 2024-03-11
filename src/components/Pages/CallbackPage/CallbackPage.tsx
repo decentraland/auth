@@ -87,7 +87,7 @@ export const CallbackPage = () => {
 
       if (redirectTo) {
         // If redirection url is present, redirect the user to that url.
-        window.location.href = decodeURIComponent(redirectTo)
+        window.location.href = redirectTo
       } else {
         // Navigate to the landing page if there is no other place to redirect.
         window.location.href = '/'

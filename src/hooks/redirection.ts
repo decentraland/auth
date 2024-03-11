@@ -22,6 +22,7 @@ export const useAfterLoginRedirection = () => {
     if (redirectToURL.hostname !== window.location.hostname) {
       return undefined
     }
+
     return redirectToURL.href
   } catch (error) {
     console.error("Can't parse redirectTo URL")

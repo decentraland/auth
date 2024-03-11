@@ -207,7 +207,7 @@ export const SetupPage = () => {
 
         // Redirect to the site defined in the search params.
         if (redirectTo) {
-          window.location.href = decodeURIComponent(redirectTo)
+          window.location.href = redirectTo
         } else {
           window.location.href = '/'
         }
@@ -259,7 +259,8 @@ export const SetupPage = () => {
         console.warn('Profile already exists')
 
         if (redirectTo) {
-          window.location.href = decodeURIComponent(redirectTo)
+          console.log('Redirecting to', redirectTo)
+          window.location.href = redirectTo
         } else {
           window.location.href = '/'
         }
