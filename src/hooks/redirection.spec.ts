@@ -16,9 +16,9 @@ describe('when using the redirection hook', () => {
       mockedUseLocation.mockReturnValue({ search: '' } as Location)
     })
 
-    it('should return undefined', () => {
+    it('should return the default site', () => {
       const { result } = renderHook(() => useAfterLoginRedirection())
-      expect(result.current).toBeUndefined()
+      expect(result.current.url).toBe('http://localhost/')
     })
   })
 
@@ -27,9 +27,9 @@ describe('when using the redirection hook', () => {
       mockedUseLocation.mockReturnValue({ search: 'redirectTo=https://test.com' } as Location)
     })
 
-    it('should return undefined', () => {
+    it('should return the invalid redirection URL', () => {
       const { result } = renderHook(() => useAfterLoginRedirection())
-      expect(result.current).toBeUndefined()
+      expect(result.current.url).toBe('http://localhost/auth/invalidRedirection')
     })
   })
 
@@ -40,7 +40,7 @@ describe('when using the redirection hook', () => {
 
     it('should return the local path using the current domain', () => {
       const { result } = renderHook(() => useAfterLoginRedirection())
-      expect(result.current).toBe('http://localhost/test')
+      expect(result.current.url).toBe('http://localhost/test')
     })
   })
 
@@ -51,7 +51,7 @@ describe('when using the redirection hook', () => {
 
     it('should return the local path using the current domain', () => {
       const { result } = renderHook(() => useAfterLoginRedirection())
-      expect(result.current).toBe('http://localhost/test')
+      expect(result.current.url).toBe('http://localhost/test')
     })
   })
 
@@ -60,9 +60,9 @@ describe('when using the redirection hook', () => {
       mockedUseLocation.mockReturnValue({ search: 'redirectTo=//test.com' } as Location)
     })
 
-    it('should return undefined', () => {
+    it('should return the invalid redirection URL', () => {
       const { result } = renderHook(() => useAfterLoginRedirection())
-      expect(result.current).toBeUndefined()
+      expect(result.current.url).toBe('http://localhost/auth/invalidRedirection')
     })
   })
 
@@ -71,9 +71,9 @@ describe('when using the redirection hook', () => {
       mockedUseLocation.mockReturnValue({ search: 'redirectTo=%2F%2Ftest.com' } as Location)
     })
 
-    it('should return undefined', () => {
+    it('should return the invalid redirection URL', () => {
       const { result } = renderHook(() => useAfterLoginRedirection())
-      expect(result.current).toBeUndefined()
+      expect(result.current.url).toBe('http://localhost/auth/invalidRedirection')
     })
   })
 
@@ -82,9 +82,9 @@ describe('when using the redirection hook', () => {
       mockedUseLocation.mockReturnValue({ search: 'redirectTo=%252F%252Ftest.com' } as Location)
     })
 
-    it('should return undefined', () => {
+    it('should return the invalid redirection URL', () => {
       const { result } = renderHook(() => useAfterLoginRedirection())
-      expect(result.current).toBeUndefined()
+      expect(result.current.url).toBe('http://localhost/auth/invalidRedirection')
     })
   })
 
@@ -95,7 +95,7 @@ describe('when using the redirection hook', () => {
 
     it('should return the local path using the current domain', () => {
       const { result } = renderHook(() => useAfterLoginRedirection())
-      expect(result.current).toBe('http://localhost/@test.com')
+      expect(result.current.url).toBe('http://localhost/@test.com')
     })
   })
 
@@ -104,9 +104,9 @@ describe('when using the redirection hook', () => {
       mockedUseLocation.mockReturnValue({ search: 'redirectTo=https://test.com/@localhost' } as Location)
     })
 
-    it('should return undefined', () => {
+    it('should return the invalid redirection URL', () => {
       const { result } = renderHook(() => useAfterLoginRedirection())
-      expect(result.current).toBeUndefined()
+      expect(result.current.url).toBe('http://localhost/auth/invalidRedirection')
     })
   })
 
@@ -115,9 +115,9 @@ describe('when using the redirection hook', () => {
       mockedUseLocation.mockReturnValue({ search: 'redirectTo=https://example.com%5C%5C@localhost' } as Location)
     })
 
-    it('should return undefined', () => {
+    it('should return the invalid redirection URL', () => {
       const { result } = renderHook(() => useAfterLoginRedirection())
-      expect(result.current).toBeUndefined()
+      expect(result.current.url).toBe('http://localhost/auth/invalidRedirection')
     })
   })
 
@@ -128,7 +128,7 @@ describe('when using the redirection hook', () => {
 
     it('should return the URL', () => {
       const { result } = renderHook(() => useAfterLoginRedirection())
-      expect(result.current).toBe('http://localhost/test')
+      expect(result.current.url).toBe('http://localhost/test')
     })
   })
 })
