@@ -2,6 +2,7 @@ import { useLocation } from 'react-router-dom'
 
 type TargetConfigId = 'default' | 'alternative'
 type TargetConfig = {
+  skipVerifyCode: boolean
   skipSetup: boolean
   showWearablePreview: boolean
   explorerText: string
@@ -9,11 +10,13 @@ type TargetConfig = {
 
 const targetConfigRecord: Record<TargetConfigId, TargetConfig> = {
   default: {
+    skipVerifyCode: false,
     skipSetup: false,
     showWearablePreview: true,
     explorerText: 'Desktop App'
   },
   alternative: {
+    skipVerifyCode: true,
     skipSetup: true,
     showWearablePreview: false,
     explorerText: 'Explorer'
