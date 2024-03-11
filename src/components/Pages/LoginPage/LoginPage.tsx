@@ -135,7 +135,7 @@ export const LoginPage = () => {
 
           if (redirectTo) {
             // If a redirection url was provided in the query params, redirect the user to that url.
-            window.location.href = decodeURIComponent(redirectTo)
+            window.location.href = redirectTo
           } else {
             // Redirect the user to the root url if there is no other place to redirect.
             // TODO: Maybe we should add something to the root page, or simply redirect to the profile app.
