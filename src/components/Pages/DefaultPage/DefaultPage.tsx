@@ -2,6 +2,7 @@ import { useCallback, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
 import { connection } from 'decentraland-connect'
+import { locations } from '../../../shared/locations'
 import styles from './DefaultPage.module.css'
 
 export const DefaultPage = () => {
@@ -19,9 +20,9 @@ export const DefaultPage = () => {
   useEffect(() => {
     checkIfConnected().then(isConnected => {
       if (isConnected) {
-        window.location.href = '/'
+        window.location.href = locations.home()
       } else {
-        navigate({ pathname: '/login', search: location.search })
+        navigate({ pathname: locations.login(), search: location.search })
       }
     })
   }, [checkIfConnected, navigate])

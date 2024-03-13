@@ -8,6 +8,7 @@ import { RequestPage } from './components/Pages/RequestPage'
 import { SetupPage } from './components/Pages/SetupPage'
 import { DefaultPage } from './components/Pages/DefaultPage'
 import { CallbackPage } from './components/Pages/CallbackPage'
+import { InvalidRedirectionPage } from './components/Pages/InvalidRedirectionPage'
 import { LoginPage } from './components/Pages/LoginPage'
 import { FeatureFlagsProvider } from './components/FeatureFlagsProvider'
 import { config } from './modules/config'
@@ -24,6 +25,7 @@ ReactDOM.render(
       <BrowserRouter basename="/auth">
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/invalidRedirection" element={<InvalidRedirectionPage />} />
           <Route path="/callback" element={<CallbackPage />} />
           <Route path="/requests/:requestId" element={<RequestPage />} />
           <Route path="/setup" element={<SetupPage />} />

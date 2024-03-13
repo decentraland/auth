@@ -1,15 +1,16 @@
 import { useCallback, useContext, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { ProviderType } from '@dcl/schemas'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import { Modal } from 'decentraland-ui/dist/components/Modal/Modal'
 import { getConfiguration, connection } from 'decentraland-connect'
+import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import usePageTracking from '../../../hooks/usePageTracking'
 import { getAnalytics } from '../../../modules/analytics/segment'
 import { TrackingEvents } from '../../../modules/analytics/types'
 import { fetchProfile } from '../../../modules/profile'
+import { locations } from '../../../shared/locations'
 import { wait } from '../../../shared/time'
 import { ConnectionModal, ConnectionModalState } from '../../ConnectionModal'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
@@ -20,8 +21,8 @@ const MAGIC_KEY = getConfiguration().magic.apiKey
 
 export const CallbackPage = () => {
   usePageTracking()
-  const redirectTo = useAfterLoginRedirection()
-  const navigate = useNavigate()
+  const { url: redirectTo, redirect } = useAfterLoginRedirection()
+  const navigate = useNavigateWithSearchParams()
   const [state, setConnectionModalState] = useState(ConnectionModalState.WAITING_FOR_CONFIRMATION)
   const { flags } = useContext(FeatureFlagsContext)
   const [targetConfig] = useTargetConfig()
@@ -50,7 +51,7 @@ export const CallbackPage = () => {
       setConnectionModalState(ConnectionModalState.WAITING_FOR_CONFIRMATION)
     } catch (error) {
       console.log(error)
-      navigate('/login')
+      navigate(locations.login())
     }
   }, [navigate])
 
@@ -79,24 +80,17 @@ export const CallbackPage = () => {
           // If the connected account does not have a profile, redirect the user to the setup page to create a new one.
           // The setup page should then redirect the user to the url provided as query param if available.
           if (!profile) {
-            window.location.href = '/auth/setup' + (redirectTo ? `?redirectTo=${redirectTo}` : '')
-            return
+            return navigate(locations.setup(redirectTo))
           }
         }
       }
 
-      if (redirectTo) {
-        // If redirection url is present, redirect the user to that url.
-        window.location.href = redirectTo
-      } else {
-        // Navigate to the landing page if there is no other place to redirect.
-        window.location.href = '/'
-      }
+      redirect()
     } catch (error) {
       console.log(error)
-      navigate('/login')
+      navigate(locations.login())
     }
-  }, [navigate, redirectTo, flags])
+  }, [navigate, redirectTo, redirect, flags])
 
   if (state === ConnectionModalState.WAITING_FOR_CONFIRMATION) {
     return (
