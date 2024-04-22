@@ -13,10 +13,12 @@ import backImg from '../../../assets/images/back.svg'
 import diceImg from '../../../assets/images/dice.svg'
 import logoImg from '../../../assets/images/logo.svg'
 import wrongImg from '../../../assets/images/wrong.svg'
+import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { getAnalytics } from '../../../modules/analytics/segment'
 import { ClickEvents, TrackingEvents } from '../../../modules/analytics/types'
 import { fetchProfile } from '../../../modules/profile'
+import { locations } from '../../../shared/locations'
 import { CustomWearablePreview } from '../../CustomWearablePreview'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import { deployProfileFromDefault, subscribeToNewsletter } from './utils'
@@ -41,6 +43,7 @@ const Error = (props: { message: string; className?: string }) => {
 }
 
 export const SetupPage = () => {
+  const navigate = useNavigateWithSearchParams()
   const [initialized, setInitialized] = useState(false)
   const [view, setView] = useState(View.RANDOMIZE)
   const [profile, setProfile] = useState(getRandomDefaultProfile())
@@ -55,7 +58,7 @@ export const SetupPage = () => {
 
   const { initialized: initializedFlags, flags } = useContext(FeatureFlagsContext)
 
-  const redirectTo = useAfterLoginRedirection()
+  const { url: redirectTo, redirect } = useAfterLoginRedirection()
 
   // Validate the name.
   const nameError = useMemo(() => {
@@ -206,11 +209,7 @@ export const SetupPage = () => {
         })
 
         // Redirect to the site defined in the search params.
-        if (redirectTo) {
-          window.location.href = redirectTo
-        } else {
-          window.location.href = '/'
-        }
+        redirect()
       } catch (e) {
         setDeploying(false)
 
@@ -218,24 +217,19 @@ export const SetupPage = () => {
         console.error('There was an error deploying the profile', (e as Error).message)
       }
     },
-    [nameError, emailError, agreeError, name, email, agree, profile, redirectTo]
+    [nameError, emailError, agreeError, name, email, agree, profile, redirect]
   )
 
   // Initialization effect.
   // Will run some checks to see if the user can proceed with the simplified avatar setup flow.
   useEffect(() => {
     ;(async () => {
-      const toLogin = () => {
-        window.location.href = '/auth/login'
-      }
-
       // Check if the wallet is connected.
       try {
         await connection.tryPreviousConnection()
       } catch (e) {
         console.warn('No previous connection found')
-        toLogin()
-        return
+        return navigate(locations.login())
       }
 
       const provider = await connection.getProvider()
@@ -244,8 +238,7 @@ export const SetupPage = () => {
       // Check that there is at least one account connected.
       if (!accounts.length) {
         console.warn('No accounts found')
-        toLogin()
-        return
+        return navigate(locations.login())
       }
 
       const account = accounts[0]
@@ -257,15 +250,7 @@ export const SetupPage = () => {
       // Check that the connected account does not have a profile already.
       if (profile) {
         console.warn('Profile already exists')
-
-        if (redirectTo) {
-          console.log('Redirecting to', redirectTo)
-          window.location.href = redirectTo
-        } else {
-          window.location.href = '/'
-        }
-
-        return
+        return redirect()
       }
 
       const identity = localStorageGetIdentity(account)
@@ -273,15 +258,14 @@ export const SetupPage = () => {
       // Check that the connected account has an identity.
       if (!identity) {
         console.warn('No identity found for the connected account')
-        toLogin()
-        return
+        return navigate(locations.login())
       }
 
       identityRef.current = identity
 
       setInitialized(true)
     })()
-  }, [redirectTo])
+  }, [redirect, navigate])
 
   if (!initialized || !initializedFlags) {
     return (
@@ -293,7 +277,7 @@ export const SetupPage = () => {
   }
 
   if (!flags[FeatureFlagsKeys.SIMPLIFIED_AVATAR_SETUP]) {
-    window.location.href = '/'
+    navigate(locations.home())
     return null
   }
 
