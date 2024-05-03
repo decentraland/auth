@@ -14,6 +14,7 @@ import { getAnalytics } from '../../../modules/analytics/segment'
 import { ClickEvents, TrackingEvents } from '../../../modules/analytics/types'
 import { config } from '../../../modules/config'
 import { fetchProfile } from '../../../modules/profile'
+import { getCurrentConnectionData } from '../../../shared/connection'
 import { isErrorWithMessage, isRpcError } from '../../../shared/errors'
 import { CustomWearablePreview } from '../../CustomWearablePreview'
 import styles from './RequestPage.module.css'
@@ -65,14 +66,14 @@ export const RequestPage = () => {
   useEffect(() => {
     ;(async () => {
       try {
-        // Try to restablish connection with the wallet.
-        const connectionData = await connection.tryPreviousConnection()
-        providerRef.current = new ethers.BrowserProvider(connectionData.provider)
-
+        // Try to re-stablish connection with the wallet.
+        const connectionData = await getCurrentConnectionData()
         // Goes to the login page if no account is returned in the data.
-        if (!connectionData.account) {
+        if (!connectionData) {
           throw new Error('No account connected')
         }
+        const provider = await connection.getProvider()
+        providerRef.current = new ethers.BrowserProvider(provider)
 
         const profile = await fetchProfile(connectionData.account)
 
