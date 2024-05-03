@@ -226,7 +226,7 @@ export const SetupPage = () => {
   useEffect(() => {
     ;(async () => {
       const toLogin = () => {
-        window.location.href = `/auth/login${redirectTo ? `redirectTo=${redirectTo}` : ''}`
+        window.location.href = `/auth/login${redirectTo ? `?redirectTo=${redirectTo}` : ''}`
       }
 
       // Check if the wallet is connected.

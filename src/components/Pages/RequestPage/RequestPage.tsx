@@ -80,11 +80,13 @@ export const RequestPage = () => {
         if (!targetConfig.skipSetup) {
           // Goes to the setup page if the connected account does not have a profile yet.
           if (!profile) {
+            console.log("There's no profile but the user is logged in, going to setup page")
             toSetupPage()
             return
           }
         }
       } catch (e) {
+        console.log("The user isn't logged in, redirecting to the log in page")
         toLoginPage()
         return
       }
