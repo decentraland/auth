@@ -56,7 +56,11 @@ export const RequestPage = () => {
   // Goes to the login page where the user will have to connect a wallet.
   const toLoginPage = useCallback(() => {
     navigate(`/login?redirectTo=${encodeURIComponent(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}`)}`)
-  }, [])
+  }, [requestId, targetConfigId])
+
+  const toSetupPage = useCallback(() => {
+    navigate(`/setup?redirectTo=${encodeURIComponent(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}`)}`)
+  }, [requestId, targetConfigId])
 
   useEffect(() => {
     ;(async () => {
@@ -76,7 +80,7 @@ export const RequestPage = () => {
         if (!targetConfig.skipSetup) {
           // Goes to the setup page if the connected account does not have a profile yet.
           if (!profile) {
-            navigate(`/setup?redirectTo=/auth/requests/${requestId}`)
+            toSetupPage()
             return
           }
         }
@@ -123,7 +127,7 @@ export const RequestPage = () => {
     return () => {
       clearTimeout(timeoutRef.current)
     }
-  }, [])
+  }, [toLoginPage, toSetupPage])
 
   useEffect(() => {
     // The timeout is only necessary on the verify sign in and wallet interaction views.
@@ -240,11 +244,14 @@ export const RequestPage = () => {
     }
   }, [])
 
-  const onChangeAccount = useCallback(async evt => {
-    evt.preventDefault()
-    await connection.disconnect()
-    toLoginPage()
-  }, [])
+  const onChangeAccount = useCallback(
+    async evt => {
+      evt.preventDefault()
+      await connection.disconnect()
+      toLoginPage()
+    },
+    [toLoginPage]
+  )
 
   const Container = useCallback(
     (props: { children: ReactNode; canChangeAccount?: boolean; isLoading?: boolean }) => {
