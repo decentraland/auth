@@ -17,7 +17,7 @@ import { ClickEvents, TrackingEvents } from '../../../modules/analytics/types'
 import { fetchProfile } from '../../../modules/profile'
 import { getCurrentConnectionData } from '../../../shared/connection'
 import { CustomWearablePreview } from '../../CustomWearablePreview'
-import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
+import { FeatureFlagsContext } from '../../FeatureFlagsProvider'
 import { deployProfileFromDefault, subscribeToNewsletter } from './utils'
 import styles from './SetupPage.module.css'
 
@@ -52,7 +52,7 @@ export const SetupPage = () => {
   const accountRef = useRef<string>()
   const identityRef = useRef<AuthIdentity>()
 
-  const { initialized: initializedFlags, flags } = useContext(FeatureFlagsContext)
+  const { initialized: initializedFlags } = useContext(FeatureFlagsContext)
 
   const redirectTo = useAfterLoginRedirection()
 
@@ -269,11 +269,6 @@ export const SetupPage = () => {
         <Loader active size="huge" />
       </div>
     )
-  }
-
-  if (!flags[FeatureFlagsKeys.SIMPLIFIED_AVATAR_SETUP]) {
-    window.location.href = '/'
-    return null
   }
 
   if (view === View.RANDOMIZE) {
