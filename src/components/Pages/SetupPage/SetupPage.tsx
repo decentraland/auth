@@ -1,13 +1,11 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import classNames from 'classnames'
 import { AuthIdentity } from '@dcl/crypto'
-import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import { Checkbox } from 'decentraland-ui/dist/components/Checkbox/Checkbox'
 import { Field } from 'decentraland-ui/dist/components/Field/Field'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
 import { Mobile, NotMobile } from 'decentraland-ui/dist/components/Media/Media'
-import { connection } from 'decentraland-connect'
 import { InputOnChangeData } from 'decentraland-ui'
 import backImg from '../../../assets/images/back.svg'
 import diceImg from '../../../assets/images/dice.svg'
@@ -17,6 +15,7 @@ import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { getAnalytics } from '../../../modules/analytics/segment'
 import { ClickEvents, TrackingEvents } from '../../../modules/analytics/types'
 import { fetchProfile } from '../../../modules/profile'
+import { getCurrentConnectionData } from '../../../shared/connection'
 import { CustomWearablePreview } from '../../CustomWearablePreview'
 import { FeatureFlagsContext } from '../../FeatureFlagsProvider'
 import { deployProfileFromDefault, subscribeToNewsletter } from './utils'
@@ -31,7 +30,7 @@ function getRandomDefaultProfile() {
   return 'default' + (Math.floor(Math.random() * (160 - 1 + 1)) + 1)
 }
 
-const Error = (props: { message: string; className?: string }) => {
+const ErrorMessage = (props: { message: string; className?: string }) => {
   return (
     <div className={classNames(styles.error, props.className)}>
       <img src={wrongImg} />
@@ -226,33 +225,24 @@ export const SetupPage = () => {
   useEffect(() => {
     ;(async () => {
       const toLogin = () => {
-        window.location.href = '/auth/login'
+        window.location.href = `/auth/login${redirectTo ? `?redirectTo=${redirectTo}` : ''}`
       }
 
       // Check if the wallet is connected.
       try {
-        await connection.tryPreviousConnection()
+        const connectionData = await getCurrentConnectionData()
+        if (!connectionData) {
+          throw new Error('No connection data found')
+        }
+        accountRef.current = connectionData.account
+        identityRef.current = connectionData.identity
       } catch (e) {
         console.warn('No previous connection found')
         toLogin()
         return
       }
 
-      const provider = await connection.getProvider()
-      const accounts = (await provider.request({ method: 'eth_accounts' })) as string[]
-
-      // Check that there is at least one account connected.
-      if (!accounts.length) {
-        console.warn('No accounts found')
-        toLogin()
-        return
-      }
-
-      const account = accounts[0]
-
-      accountRef.current = account
-
-      const profile = await fetchProfile(account)
+      const profile = await fetchProfile(accountRef.current)
 
       // Check that the connected account does not have a profile already.
       if (profile) {
@@ -267,17 +257,6 @@ export const SetupPage = () => {
 
         return
       }
-
-      const identity = localStorageGetIdentity(account)
-
-      // Check that the connected account has an identity.
-      if (!identity) {
-        console.warn('No identity found for the connected account')
-        toLogin()
-        return
-      }
-
-      identityRef.current = identity
 
       setInitialized(true)
     })()
@@ -379,7 +358,7 @@ export const SetupPage = () => {
                   label="Username"
                   placeholder="Enter your Username"
                   onChange={handleNameChange}
-                  message={showErrors && nameError ? <Error message={nameError} /> : undefined}
+                  message={showErrors && nameError ? <ErrorMessage message={nameError} /> : undefined}
                 />
               </div>
               <div>
@@ -388,7 +367,7 @@ export const SetupPage = () => {
                   placeholder="Enter your email"
                   message={
                     <>
-                      {showErrors && emailError ? <Error className={styles.emailError} message={emailError} /> : null}
+                      {showErrors && emailError ? <ErrorMessage className={styles.emailError} message={emailError} /> : null}
                       <span>
                         Subscribe to Decentraland's newsletter to receive the latest news about events, updates, contests and more.
                       </span>
@@ -411,7 +390,7 @@ export const SetupPage = () => {
                   .
                 </div>
               </div>
-              {showErrors && agreeError ? <Error className={styles.agreeError} message={agreeError} /> : null}
+              {showErrors && agreeError ? <ErrorMessage className={styles.agreeError} message={agreeError} /> : null}
               <div className={styles.jumpIn}>
                 <Button primary fluid type="submit" disabled={!agree || deploying} loading={deploying}>
                   {continueMessage}
@@ -438,7 +417,7 @@ export const SetupPage = () => {
                     label="Username"
                     placeholder="Enter your username"
                     onChange={handleNameChange}
-                    message={showErrors && nameError ? <Error message={nameError} /> : undefined}
+                    message={showErrors && nameError ? <ErrorMessage message={nameError} /> : undefined}
                   />
                 </div>
                 <div>
@@ -447,7 +426,7 @@ export const SetupPage = () => {
                     placeholder="Enter your email"
                     message={
                       <>
-                        {showErrors && emailError ? <Error className={styles.emailError} message={emailError} /> : null}
+                        {showErrors && emailError ? <ErrorMessage className={styles.emailError} message={emailError} /> : null}
                         <span>
                           Subscribe to Decentraland's newsletter to receive the latest news about events, updates, contests and more.
                         </span>
@@ -467,7 +446,7 @@ export const SetupPage = () => {
                   </a>
                   .
                 </div>
-                {showErrors && agreeError ? <Error className={styles.agreeError} message={agreeError} /> : null}
+                {showErrors && agreeError ? <ErrorMessage className={styles.agreeError} message={agreeError} /> : null}
                 <div className={styles.jumpIn}>
                   <Button primary fluid type="submit" disabled={!agree || deploying} loading={deploying}>
                     {continueMessage}
