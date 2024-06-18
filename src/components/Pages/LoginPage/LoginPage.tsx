@@ -16,7 +16,7 @@ import usePageTracking from '../../../hooks/usePageTracking'
 import { getAnalytics } from '../../../modules/analytics/segment'
 import { ClickEvents, ConnectionType, TrackingEvents } from '../../../modules/analytics/types'
 import { fetchProfile } from '../../../modules/profile'
-import { isErrorWithMessage } from '../../../shared/errors'
+import { isErrorWithMessage, isErrorWithName } from '../../../shared/errors'
 import { wait } from '../../../shared/time'
 import { Connection, ConnectionOptionType } from '../../Connection'
 import { ConnectionModal, ConnectionModalState } from '../../ConnectionModal'
@@ -144,9 +144,13 @@ export const LoginPage = () => {
 
           setShowConnectionModal(false)
         } catch (error) {
-          console.log('Error', JSON.stringify(error))
+          console.log('Error', isErrorWithMessage(error) ? error.message : JSON.stringify(error))
           getAnalytics().track(TrackingEvents.LOGIN_ERROR, { error: isErrorWithMessage(error) ? error.message : error })
-          setConnectionModalState(ConnectionModalState.ERROR)
+          if (isErrorWithName(error) && error.name === 'ErrorUnlockingWallet') {
+            setConnectionModalState(ConnectionModalState.ERROR_LOCKED_WALLET)
+          } else {
+            setConnectionModalState(ConnectionModalState.ERROR)
+          }
         }
       }
     },

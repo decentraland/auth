@@ -6,6 +6,9 @@ export function getConnectionMessage(connectionState: ConnectionModalState, prov
     case ConnectionModalState.ERROR: {
       return 'You did not confirm this action in your digital wallet extension. To continue, please try again.'
     }
+    case ConnectionModalState.ERROR_LOCKED_WALLET: {
+      return 'Your wallet is currently locked. To continue, please unlock your wallet and try again.'
+    }
     case ConnectionModalState.CONNECTING_WALLET:
     case ConnectionModalState.WAITING_FOR_SIGNATURE: {
       return providerType === ProviderType.MAGIC
