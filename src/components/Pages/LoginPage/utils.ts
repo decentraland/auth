@@ -70,7 +70,15 @@ export async function connectToProvider(connectionOption: ConnectionOptionType):
       redirectURI: url.href
     })
   }
-  const connectionData = await connection.connect(providerType)
+
+  let connectionData: ConnectionResponse
+  try {
+    connectionData = await connection.connect(providerType)
+  } catch (error) {
+    console.error('Error connecting to provider', error)
+    throw error
+  }
+
   if (!connectionData.account || !connectionData.provider) {
     throw new Error('Could not get provider')
   }
