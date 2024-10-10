@@ -16,6 +16,7 @@ export function fromConnectionOptionToProviderType(connectionType: ConnectionOpt
     case ConnectionOptionType.X:
     case ConnectionOptionType.GOOGLE:
     case ConnectionOptionType.APPLE:
+    case ConnectionOptionType.FACEBOOK:
       return ProviderType.MAGIC
     case ConnectionOptionType.WALLET_CONNECT:
     case ConnectionOptionType.METAMASK_MOBILE:
@@ -64,6 +65,7 @@ export async function connectToProvider(connectionOption: ConnectionOptionType):
 
     const url = new URL(window.location.href)
     url.pathname = '/auth/callback'
+    console.log('Connecting to provider', connectionOption)
 
     await magic.oauth.loginWithRedirect({
       provider: connectionOption === ConnectionOptionType.X ? 'twitter' : (connectionOption as OAuthProvider),
