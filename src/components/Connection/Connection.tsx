@@ -171,6 +171,7 @@ export const Connection = (props: ConnectionProps): JSX.Element => {
             loadingOption={loadingOption}
           />
         )}
+        {/* <div className={styles.line}></div> */}
         {showMore && hasWeb3SecondaryOptions && (
           <Secondary
             testId={WEB3_SECONDARY_TEST_ID}

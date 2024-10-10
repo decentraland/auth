@@ -10,7 +10,8 @@ export enum ConnectionOptionType {
   GOOGLE = 'google',
   APPLE = 'apple',
   DISCORD = 'discord',
-  X = 'x'
+  X = 'x',
+  FACEBOOK = 'facebook'
 }
 
 export const connectionOptionTitles: { [key in ConnectionOptionType]: string } = {
@@ -25,7 +26,8 @@ export const connectionOptionTitles: { [key in ConnectionOptionType]: string } =
   [ConnectionOptionType.GOOGLE]: 'Google',
   [ConnectionOptionType.APPLE]: 'Apple',
   [ConnectionOptionType.DISCORD]: 'Discord',
-  [ConnectionOptionType.X]: 'X'
+  [ConnectionOptionType.X]: 'X',
+  [ConnectionOptionType.FACEBOOK]: 'Facebook'
 }
 
 export type MetamaskEthereumWindow = typeof window.ethereum & { isMetaMask?: boolean }

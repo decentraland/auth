@@ -88,11 +88,19 @@
   width: 100%;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 24px
+  gap: 24px;
 }
 
 .showMoreSecondaryOptions + .showMoreSecondaryOptions {
   margin-top: 24px;
+}
+
+.showMoreSecondaryOptions + .line {
+  margin-top: 14px;
+}
+
+.line + .showMoreSecondaryOptions {
+  margin-top: 14px;
 }
 
 /* Not showing? */
@@ -107,9 +115,14 @@
 
 @media (max-width: 320px) {
   .showMoreSecondaryOptions {
-      grid-template-columns: repeat(1, 1fr);
-    }
-  .secondaryOptionButton span :global(.ui.button.primary) {
-    margin: auto
+    grid-template-columns: repeat(1, 1fr);
   }
+  .secondaryOptionButton span :global(.ui.button.primary) {
+    margin: auto;
+  }
+}
+
+.line {
+  border: 1px solid white;
+  width: 80%;
 }

@@ -15,6 +15,7 @@
   background-size: cover;
   background-position: right;
   animation: move-background 10s linear infinite alternate;
+  transition: background-image 0.8s;
   z-index: -1;
 }
 
@@ -116,7 +117,7 @@
   from {
     transform: translateX(0);
   }
-  to { 
+  to {
     transform: translateX(10%);
   }
 }
