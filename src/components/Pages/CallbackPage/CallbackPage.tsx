@@ -38,7 +38,7 @@ export const CallbackPage = () => {
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
     // eslint-disable-next-line @typescript-eslint/naming-convention
-    const { OAuthExtension } = await import('@magic-ext/oauth')
+    const { OAuthExtension } = await import('@magic-ext/oauth2')
 
     const magic = new Magic(MAGIC_KEY, {
       extensions: [new OAuthExtension()]
@@ -46,7 +46,7 @@ export const CallbackPage = () => {
 
     try {
       setConnectionModalState(ConnectionModalState.VALIDATING_SIGN_IN)
-      await magic?.oauth.getRedirectResult()
+      await magic?.oauth2.getRedirectResult()
       setConnectionModalState(ConnectionModalState.WAITING_FOR_CONFIRMATION)
     } catch (error) {
       console.log(error)
