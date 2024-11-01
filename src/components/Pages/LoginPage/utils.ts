@@ -1,4 +1,4 @@
-import type { OAuthProvider } from '@magic-ext/oauth2'
+import { OAuthProvider } from '@magic-ext/oauth'
 import { ethers } from 'ethers'
 import { AuthIdentity, Authenticator } from '@dcl/crypto'
 import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
@@ -57,7 +57,7 @@ export async function connectToProvider(connectionOption: ConnectionOptionType):
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
     // eslint-disable-next-line @typescript-eslint/naming-convention
-    const { OAuthExtension } = await import('@magic-ext/oauth2')
+    const { OAuthExtension } = await import('@magic-ext/oauth')
     const magic = new Magic(MAGIC_KEY, {
       extensions: [new OAuthExtension()]
     })
@@ -65,7 +65,7 @@ export async function connectToProvider(connectionOption: ConnectionOptionType):
     const url = new URL(window.location.href)
     url.pathname = '/auth/callback'
 
-    await magic?.oauth2.loginWithRedirect({
+    await magic.oauth.loginWithRedirect({
       provider: connectionOption === ConnectionOptionType.X ? 'twitter' : (connectionOption as OAuthProvider),
       redirectURI: url.href
     })
