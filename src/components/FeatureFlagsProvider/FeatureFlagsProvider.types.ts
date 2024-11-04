@@ -1,8 +1,6 @@
 import { createContext } from 'react'
 
-export enum FeatureFlagsKeys {
-  SIMPLIFIED_AVATAR_SETUP = 'dapps-simplified-avatar-setup'
-}
+export enum FeatureFlagsKeys {}
 
 export type FeatureFlagsContextType = {
   flags: Record<string, boolean>

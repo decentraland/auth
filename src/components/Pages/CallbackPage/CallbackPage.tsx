@@ -13,7 +13,7 @@ import { fetchProfile } from '../../../modules/profile'
 import { locations } from '../../../shared/locations'
 import { wait } from '../../../shared/time'
 import { ConnectionModal, ConnectionModalState } from '../../ConnectionModal'
-import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
+import { FeatureFlagsContext } from '../../FeatureFlagsProvider'
 import { getIdentitySignature } from '../LoginPage/utils'
 import styles from './CallbackPage.module.css'
 
@@ -71,7 +71,7 @@ export const CallbackPage = () => {
       await wait(800)
 
       // If the flag is enabled and the setup is not skipped by config, proceed with the simplified avatar setup flow.
-      if (flags[FeatureFlagsKeys.SIMPLIFIED_AVATAR_SETUP] && !targetConfig.skipSetup) {
+      if (!targetConfig.skipSetup) {
         // Can only proceed if the connection data has an account. Without the account the profile cannot be fetched.
         // Continues with the original flow if the account is not present.
         if (connectionData.account) {

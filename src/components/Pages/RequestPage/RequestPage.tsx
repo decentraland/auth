@@ -1,9 +1,9 @@
 import { ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { Profile } from 'dcl-catalyst-client/dist/client/specs/catalyst.schemas'
 import { ethers, BrowserProvider } from 'ethers'
 import Icon from 'semantic-ui-react/dist/commonjs/elements/Icon/Icon'
 import { io } from 'socket.io-client'
-import { Profile } from '@dcl/schemas'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import { CommunityBubble } from 'decentraland-ui/dist/components/CommunityBubble'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
@@ -14,6 +14,7 @@ import { getAnalytics } from '../../../modules/analytics/segment'
 import { ClickEvents, TrackingEvents } from '../../../modules/analytics/types'
 import { config } from '../../../modules/config'
 import { fetchProfile } from '../../../modules/profile'
+import { getCurrentConnectionData } from '../../../shared/connection'
 import { isErrorWithMessage, isRpcError } from '../../../shared/errors'
 import { CustomWearablePreview } from '../../CustomWearablePreview'
 import styles from './RequestPage.module.css'
@@ -56,19 +57,23 @@ export const RequestPage = () => {
   // Goes to the login page where the user will have to connect a wallet.
   const toLoginPage = useCallback(() => {
     navigate(`/login?redirectTo=${encodeURIComponent(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}`)}`)
-  }, [])
+  }, [requestId, targetConfigId])
+
+  const toSetupPage = useCallback(() => {
+    navigate(`/setup?redirectTo=${encodeURIComponent(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}`)}`)
+  }, [requestId, targetConfigId])
 
   useEffect(() => {
     ;(async () => {
       try {
-        // Try to restablish connection with the wallet.
-        const connectionData = await connection.tryPreviousConnection()
-        providerRef.current = new ethers.BrowserProvider(connectionData.provider)
-
+        // Try to re-stablish connection with the wallet.
+        const connectionData = await getCurrentConnectionData()
         // Goes to the login page if no account is returned in the data.
-        if (!connectionData.account) {
+        if (!connectionData) {
           throw new Error('No account connected')
         }
+        const provider = await connection.getProvider()
+        providerRef.current = new ethers.BrowserProvider(provider)
 
         const profile = await fetchProfile(connectionData.account)
 
@@ -76,11 +81,13 @@ export const RequestPage = () => {
         if (!targetConfig.skipSetup) {
           // Goes to the setup page if the connected account does not have a profile yet.
           if (!profile) {
-            navigate(`/setup?redirectTo=/auth/requests/${requestId}`)
+            console.log("There's no profile but the user is logged in, going to setup page")
+            toSetupPage()
             return
           }
         }
       } catch (e) {
+        console.log("The user isn't logged in, redirecting to the log in page")
         toLoginPage()
         return
       }
@@ -123,7 +130,7 @@ export const RequestPage = () => {
     return () => {
       clearTimeout(timeoutRef.current)
     }
-  }, [])
+  }, [toLoginPage, toSetupPage])
 
   useEffect(() => {
     // The timeout is only necessary on the verify sign in and wallet interaction views.
@@ -240,11 +247,14 @@ export const RequestPage = () => {
     }
   }, [])
 
-  const onChangeAccount = useCallback(async evt => {
-    evt.preventDefault()
-    await connection.disconnect()
-    toLoginPage()
-  }, [])
+  const onChangeAccount = useCallback(
+    async evt => {
+      evt.preventDefault()
+      await connection.disconnect()
+      toLoginPage()
+    },
+    [toLoginPage]
+  )
 
   const Container = useCallback(
     (props: { children: ReactNode; canChangeAccount?: boolean; isLoading?: boolean }) => {

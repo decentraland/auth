@@ -21,7 +21,7 @@ import { locations } from '../../../shared/locations'
 import { wait } from '../../../shared/time'
 import { Connection, ConnectionOptionType } from '../../Connection'
 import { ConnectionModal, ConnectionModalState } from '../../ConnectionModal'
-import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
+import { FeatureFlagsContext } from '../../FeatureFlagsProvider'
 import { MagicInformationModal } from '../../MagicInformationModal'
 import { WalletInformationModal } from '../../WalletInformationModal'
 import { getIdentitySignature, connectToProvider, isSocialLogin, fromConnectionOptionToProviderType, getIsMobile } from './utils'
@@ -118,7 +118,7 @@ export const LoginPage = () => {
           await wait(800)
 
           // If the flag is enabled and the setup is not skipped by config, proceed with the simplified avatar setup flow.
-          if (flags[FeatureFlagsKeys.SIMPLIFIED_AVATAR_SETUP] && !targetConfig.skipSetup) {
+          if (!targetConfig.skipSetup) {
             // Can only proceed if the connection data has an account. Without the account the profile cannot be fetched.
             // Continues with the original flow if the account is not present.
             if (connectionData.account) {
@@ -136,9 +136,13 @@ export const LoginPage = () => {
           redirect()
           setShowConnectionModal(false)
         } catch (error) {
-          console.log('Error', JSON.stringify(error))
+          console.log('Error', isErrorWithMessage(error) ? error.message : JSON.stringify(error))
           getAnalytics().track(TrackingEvents.LOGIN_ERROR, { error: isErrorWithMessage(error) ? error.message : error })
-          setConnectionModalState(ConnectionModalState.ERROR)
+          if (isErrorWithName(error) && error.name === 'ErrorUnlockingWallet') {
+            setConnectionModalState(ConnectionModalState.ERROR_LOCKED_WALLET)
+          } else {
+            setConnectionModalState(ConnectionModalState.ERROR)
+          }
         }
       }
     },

@@ -16,15 +16,17 @@ export const ConnectionModal = (props: ConnectionModalProps) => {
     state === ConnectionModalState.LOADING_MAGIC ||
     state === ConnectionModalState.VALIDATING_SIGN_IN
 
+  const isError = state === ConnectionModalState.ERROR || state === ConnectionModalState.ERROR_LOCKED_WALLET
+
   return (
     <Modal size="tiny" open={open}>
       <ModalNavigation title="" onClose={!isLoading ? onClose : undefined} />
       <div className={styles.main}>
         <div className={styles.content}>
-          {state === ConnectionModalState.ERROR && <img className={styles.errorImage} src={warningSrc} />}
+          {isError && <img className={styles.errorImage} src={warningSrc} />}
           {isLoading && <Loader className={styles.loader} size="huge" inline />}
           <p className={styles.message}>{getConnectionMessage(state, providerType)}</p>
-          {state === ConnectionModalState.ERROR && (
+          {isError && (
             <Button primary onClick={onTryAgain}>
               Try again
             </Button>

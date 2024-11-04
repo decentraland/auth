@@ -2,6 +2,10 @@ export function isErrorWithMessage(error: unknown): error is Error {
   return error !== undefined && error !== null && typeof error === 'object' && 'message' in error
 }
 
+export function isErrorWithName(error: unknown): error is Error {
+  return error !== undefined && error !== null && typeof error === 'object' && 'name' in error
+}
+
 export type RPCError = {
   error: {
     code: number
