@@ -4,7 +4,7 @@
   margin-bottom: 24px;
 }
 
-:global(.ui.modal>.content).content {
+:global(.ui.modal > .content).content {
   display: flex;
   flex-direction: column;
   align-items: center;
