@@ -1,5 +1,4 @@
 import { useState, useCallback, useMemo, useEffect, useContext } from 'react'
-import { useSearchParams } from 'react-router-dom'
 import Image1 from '../../../assets/images/background/image1.webp'
 import Image10 from '../../../assets/images/background/image10.webp'
 import Image2 from '../../../assets/images/background/image2.webp'
@@ -10,6 +9,7 @@ import Image6 from '../../../assets/images/background/image6.webp'
 import Image7 from '../../../assets/images/background/image7.webp'
 import Image8 from '../../../assets/images/background/image8.webp'
 import Image9 from '../../../assets/images/background/image9.webp'
+import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import usePageTracking from '../../../hooks/usePageTracking'
@@ -17,6 +17,7 @@ import { getAnalytics } from '../../../modules/analytics/segment'
 import { ClickEvents, ConnectionType, TrackingEvents } from '../../../modules/analytics/types'
 import { fetchProfile } from '../../../modules/profile'
 import { isErrorWithMessage, isErrorWithName } from '../../../shared/errors'
+import { locations } from '../../../shared/locations'
 import { wait } from '../../../shared/time'
 import { Connection, ConnectionOptionType } from '../../Connection'
 import { ConnectionModal, ConnectionModalState } from '../../ConnectionModal'
@@ -30,14 +31,14 @@ const BACKGROUND_IMAGES = [Image1, Image2, Image3, Image4, Image5, Image6, Image
 
 export const LoginPage = () => {
   usePageTracking()
-  const [searchParams] = useSearchParams()
+  const navigate = useNavigateWithSearchParams()
   const [connectionModalState, setConnectionModalState] = useState(ConnectionModalState.CONNECTING_WALLET)
   const [showLearnMore, setShowLearnMore] = useState(false)
   const [showMagicLearnMore, setShowMagicLearnMore] = useState(false)
   const [showConnectionModal, setShowConnectionModal] = useState(false)
   const [currentConnectionType, setCurrentConnectionType] = useState<ConnectionOptionType>()
   const [isMobile] = useState(getIsMobile())
-  const redirectTo = useAfterLoginRedirection()
+  const { url: redirectTo, redirect } = useAfterLoginRedirection()
   const showGuestOption = redirectTo && new URL(redirectTo).pathname.includes('/play')
   const [currentBackgroundIndex, setCurrentBackgroundIndex] = useState(0)
   const { flags } = useContext(FeatureFlagsContext)
@@ -126,22 +127,13 @@ export const LoginPage = () => {
               // If the connected account does not have a profile, redirect the user to the setup page to create a new one.
               // The setup page should then redirect the user to the url provided as query param if available.
               if (!profile) {
-                window.location.href = '/auth/setup' + (redirectTo ? `?redirectTo=${redirectTo}` : '')
-                setShowConnectionModal(false)
-                return
+                navigate(locations.setup(redirectTo))
+                return setShowConnectionModal(false)
               }
             }
           }
 
-          if (redirectTo) {
-            // If a redirection url was provided in the query params, redirect the user to that url.
-            window.location.href = redirectTo
-          } else {
-            // Redirect the user to the root url if there is no other place to redirect.
-            // TODO: Maybe we should add something to the root page, or simply redirect to the profile app.
-            window.location.href = '/'
-          }
-
+          redirect()
           setShowConnectionModal(false)
         } catch (error) {
           console.log('Error', isErrorWithMessage(error) ? error.message : JSON.stringify(error))
@@ -154,7 +146,7 @@ export const LoginPage = () => {
         }
       }
     },
-    [setConnectionModalState, setShowConnectionModal, setCurrentConnectionType, redirectTo, searchParams, flags]
+    [setConnectionModalState, setShowConnectionModal, setCurrentConnectionType, redirectTo, navigate, redirect, flags]
   )
 
   const handleOnCloseConnectionModal = useCallback(() => {
