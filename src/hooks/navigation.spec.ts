@@ -14,7 +14,7 @@ describe('useNavigateWithSearchParams', () => {
     ;(useLocation as jest.Mock).mockReturnValue(mockLocation)
   })
 
-  describe('when targetConfigId is not present in the current location', () => {
+  describe('when targetConfigId parameter is not present', () => {
     beforeEach(() => {
       ;(useLocation as jest.Mock).mockReturnValue({ search: '' })
     })
@@ -46,7 +46,7 @@ describe('useNavigateWithSearchParams', () => {
     })
   })
 
-  describe('when targetConfigId is present in the current location', () => {
+  describe('when targetConfigId parameter is present', () => {
     beforeEach(() => {
       ;(useLocation as jest.Mock).mockReturnValue({ search: '?targetConfigId=123' })
     })
@@ -132,7 +132,7 @@ describe('useNavigateWithSearchParams', () => {
     })
   })
 
-  describe('when targetConfigId has special characters', () => {
+  describe('when targetConfigId parameter has special characters', () => {
     beforeEach(() => {
       ;(useLocation as jest.Mock).mockReturnValue({ search: '?targetConfigId=%2F%2Fmalicious.com' })
     })
