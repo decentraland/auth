@@ -104,7 +104,7 @@ const targetConfigs: Record<TargetConfigId, TargetConfig> = {
     },
     deepLink: 'decentraland://'
   }
-} as const
+}
 
 const adjustWeb3OptionsForMobile = (config: TargetConfig): TargetConfig => {
   let { primary, secondary, extraOptions } = config.connectionOptions

@@ -54,7 +54,7 @@ export const RequestPage = () => {
   const timeoutRef = useRef<NodeJS.Timeout>()
   const connectedAccountRef = useRef<string>()
   const requestId = params.requestId ?? ''
-  const [targetConfig] = useTargetConfig()
+  const [targetConfig, targetConfigId] = useTargetConfig()
 
   // Goes to the login page where the user will have to connect a wallet.
   const toLoginPage = useCallback(() => {
