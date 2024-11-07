@@ -28,6 +28,15 @@ export const connectionOptionTitles: { [key in ConnectionOptionType]: string } =
   [ConnectionOptionType.X]: 'X'
 }
 
+export function isMagicConnection(option: ConnectionOptionType): boolean {
+  return (
+    option === ConnectionOptionType.X ||
+    option === ConnectionOptionType.APPLE ||
+    option === ConnectionOptionType.GOOGLE ||
+    option === ConnectionOptionType.DISCORD
+  )
+}
+
 export type MetamaskEthereumWindow = typeof window.ethereum & { isMetaMask?: boolean }
 
 export type ConnectionI18N = {
@@ -42,13 +51,10 @@ export type ConnectionI18N = {
 
 export type ConnectionProps = {
   i18n?: ConnectionI18N
-  socialOptions?: {
+  connectionOptions?: {
     primary: ConnectionOptionType
-    secondary: ConnectionOptionType[]
-  }
-  web3Options?: {
-    primary: ConnectionOptionType
-    secondary: ConnectionOptionType[]
+    secondary?: ConnectionOptionType
+    extraOptions?: ConnectionOptionType[]
   }
   className?: string
   loadingOption?: ConnectionOptionType

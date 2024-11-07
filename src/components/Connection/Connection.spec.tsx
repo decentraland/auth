@@ -1,12 +1,6 @@
 import { act, fireEvent, render } from '@testing-library/react'
 import { Connection } from './Connection'
-import {
-  SHOW_MORE_BUTTON_TEST_ID,
-  SOCIAL_PRIMARY_TEST_ID,
-  SOCIAL_SECONDARY_TEST_ID,
-  WEB3_PRIMARY_TEST_ID,
-  WEB3_SECONDARY_TEST_ID
-} from './constants'
+import { EXTRA_TEST_ID, PRIMARY_TEST_ID, SHOW_MORE_BUTTON_TEST_ID } from './constants'
 import { ConnectionOptionType, ConnectionProps } from './Connection.types'
 
 function renderConnection(props: Partial<ConnectionProps>) {
@@ -36,40 +30,28 @@ function renderConnection(props: Partial<ConnectionProps>) {
 let screen: ReturnType<typeof renderConnection>
 
 describe('when rendering the component', () => {
-  let socialOptions: ConnectionProps['socialOptions'] | undefined
-  let web3Options: ConnectionProps['web3Options'] | undefined
+  let connectionOptions: ConnectionProps['connectionOptions']
   let onConnect: jest.Mock
-
-  describe('and there are no social options', () => {
-    beforeEach(() => {
-      socialOptions = undefined
-      screen = renderConnection({ socialOptions })
-    })
-
-    it('should not render the primary social option', () => {
-      const { queryByTestId } = screen
-      expect(queryByTestId(SOCIAL_PRIMARY_TEST_ID)).not.toBeInTheDocument()
-    })
-  })
 
   describe('and there are social options', () => {
     beforeEach(() => {
       onConnect = jest.fn()
-      socialOptions = {
+      connectionOptions = {
         primary: ConnectionOptionType.GOOGLE,
-        secondary: [ConnectionOptionType.APPLE, ConnectionOptionType.X, ConnectionOptionType.DISCORD]
+        secondary: ConnectionOptionType.APPLE,
+        extraOptions: [ConnectionOptionType.X, ConnectionOptionType.DISCORD]
       }
-      screen = renderConnection({ socialOptions, onConnect })
+      screen = renderConnection({ connectionOptions, onConnect })
     })
 
     it('should render the primary social option', () => {
       const { getByTestId } = screen
-      expect(getByTestId(SOCIAL_PRIMARY_TEST_ID)).toBeInTheDocument()
+      expect(getByTestId(PRIMARY_TEST_ID)).toBeInTheDocument()
     })
 
     it('should call the onConnect method prop when clicking the button', () => {
       const { getByTestId } = screen
-      fireEvent.click(getByTestId(`${SOCIAL_PRIMARY_TEST_ID}-${ConnectionOptionType.GOOGLE}-button`))
+      fireEvent.click(getByTestId(`${PRIMARY_TEST_ID}-${ConnectionOptionType.GOOGLE}-button`))
       expect(onConnect).toHaveBeenCalledWith(ConnectionOptionType.GOOGLE)
     })
 
@@ -78,8 +60,8 @@ describe('when rendering the component', () => {
       act(() => {
         fireEvent.click(getByTestId(SHOW_MORE_BUTTON_TEST_ID))
       })
-      socialOptions?.secondary.forEach(option => {
-        expect(getByTestId(`${SOCIAL_SECONDARY_TEST_ID}-${option}-button`)).toBeInTheDocument()
+      connectionOptions?.extraOptions?.forEach(option => {
+        expect(getByTestId(`${EXTRA_TEST_ID}-${option}-button`)).toBeInTheDocument()
       })
     })
 
@@ -88,22 +70,10 @@ describe('when rendering the component', () => {
       act(() => {
         fireEvent.click(getByTestId(SHOW_MORE_BUTTON_TEST_ID))
       })
-      socialOptions?.secondary.forEach(option => {
-        fireEvent.click(getByTestId(`${SOCIAL_SECONDARY_TEST_ID}-${option}-button`))
+      connectionOptions?.extraOptions?.forEach(option => {
+        fireEvent.click(getByTestId(`${EXTRA_TEST_ID}-${option}-button`))
         expect(onConnect).toHaveBeenCalledWith(option)
       })
-    })
-  })
-
-  describe('and there are no primary web3 options', () => {
-    beforeEach(() => {
-      socialOptions = undefined
-      screen = renderConnection({ socialOptions })
-    })
-
-    it('should not render the primary web3 option', () => {
-      const { queryByTestId } = screen
-      expect(queryByTestId(WEB3_PRIMARY_TEST_ID)).not.toBeInTheDocument()
     })
   })
 
@@ -116,12 +86,12 @@ describe('when rendering the component', () => {
         ...window.ethereum,
         isMetaMask: true
       }
-      web3Options = {
+      connectionOptions = {
         primary: ConnectionOptionType.METAMASK,
-        secondary: [ConnectionOptionType.FORTMATIC, ConnectionOptionType.WALLET_CONNECT, ConnectionOptionType.COINBASE]
+        extraOptions: [ConnectionOptionType.FORTMATIC, ConnectionOptionType.WALLET_CONNECT, ConnectionOptionType.COINBASE]
       }
       onConnect = jest.fn()
-      screen = renderConnection({ web3Options, onConnect })
+      screen = renderConnection({ connectionOptions, onConnect })
     })
 
     afterEach(() => {
@@ -130,7 +100,7 @@ describe('when rendering the component', () => {
 
     it('should call the onConnect method prop when clicking the button', () => {
       const { getByTestId } = screen
-      fireEvent.click(getByTestId(`${WEB3_PRIMARY_TEST_ID}-${ConnectionOptionType.METAMASK}-button`))
+      fireEvent.click(getByTestId(`${PRIMARY_TEST_ID}-${ConnectionOptionType.METAMASK}-button`))
       expect(onConnect).toHaveBeenCalledWith(ConnectionOptionType.METAMASK)
     })
   })
@@ -141,12 +111,12 @@ describe('when rendering the component', () => {
     beforeEach(() => {
       oldEthereum = window.ethereum
       window.ethereum = undefined
-      web3Options = {
+      connectionOptions = {
         primary: ConnectionOptionType.METAMASK,
-        secondary: [ConnectionOptionType.FORTMATIC, ConnectionOptionType.WALLET_CONNECT, ConnectionOptionType.COINBASE]
+        extraOptions: [ConnectionOptionType.FORTMATIC, ConnectionOptionType.WALLET_CONNECT, ConnectionOptionType.COINBASE]
       }
       onConnect = jest.fn()
-      screen = renderConnection({ web3Options, onConnect })
+      screen = renderConnection({ connectionOptions, onConnect })
     })
 
     afterEach(() => {
@@ -155,7 +125,7 @@ describe('when rendering the component', () => {
 
     it('should not call the onConnect method prop when clicking the button', () => {
       const { getByTestId } = screen
-      fireEvent.click(getByTestId(`${WEB3_PRIMARY_TEST_ID}-${ConnectionOptionType.METAMASK}-button`))
+      fireEvent.click(getByTestId(`${PRIMARY_TEST_ID}-${ConnectionOptionType.METAMASK}-button`))
       expect(onConnect).not.toHaveBeenCalled()
     })
   })
@@ -163,16 +133,16 @@ describe('when rendering the component', () => {
   describe('and there are web3 options', () => {
     beforeEach(() => {
       onConnect = jest.fn()
-      web3Options = {
+      connectionOptions = {
         primary: ConnectionOptionType.METAMASK,
-        secondary: [ConnectionOptionType.FORTMATIC, ConnectionOptionType.WALLET_CONNECT, ConnectionOptionType.COINBASE]
+        extraOptions: [ConnectionOptionType.FORTMATIC, ConnectionOptionType.WALLET_CONNECT, ConnectionOptionType.COINBASE]
       }
-      screen = renderConnection({ web3Options, onConnect })
+      screen = renderConnection({ connectionOptions, onConnect })
     })
 
     it('should render the primary social option', () => {
       const { getByTestId } = screen
-      expect(getByTestId(WEB3_PRIMARY_TEST_ID)).toBeInTheDocument()
+      expect(getByTestId(PRIMARY_TEST_ID)).toBeInTheDocument()
     })
 
     it('should render all the secondary options', () => {
@@ -180,8 +150,8 @@ describe('when rendering the component', () => {
       act(() => {
         fireEvent.click(getByTestId(SHOW_MORE_BUTTON_TEST_ID))
       })
-      web3Options?.secondary.forEach(option => {
-        expect(getByTestId(`${WEB3_SECONDARY_TEST_ID}-${option}-button`)).toBeInTheDocument()
+      connectionOptions?.extraOptions?.forEach(option => {
+        expect(getByTestId(`${EXTRA_TEST_ID}-${option}-button`)).toBeInTheDocument()
       })
     })
 
@@ -190,8 +160,8 @@ describe('when rendering the component', () => {
       act(() => {
         fireEvent.click(getByTestId(SHOW_MORE_BUTTON_TEST_ID))
       })
-      web3Options?.secondary.forEach(option => {
-        fireEvent.click(getByTestId(`${WEB3_SECONDARY_TEST_ID}-${option}-button`))
+      connectionOptions?.extraOptions?.forEach(option => {
+        fireEvent.click(getByTestId(`${EXTRA_TEST_ID}-${option}-button`))
         expect(onConnect).toHaveBeenCalledWith(option)
       })
     })
@@ -199,9 +169,8 @@ describe('when rendering the component', () => {
 
   describe('and there are no web3 nor social secondary options', () => {
     beforeEach(() => {
-      socialOptions = undefined
-      web3Options = undefined
-      screen = renderConnection({ socialOptions, web3Options })
+      connectionOptions = undefined
+      screen = renderConnection({ connectionOptions })
     })
 
     it('should not render the more options button', () => {

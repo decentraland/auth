@@ -54,7 +54,7 @@ export const RequestPage = () => {
   const timeoutRef = useRef<NodeJS.Timeout>()
   const connectedAccountRef = useRef<string>()
   const requestId = params.requestId ?? ''
-  const [targetConfig, targetConfigId] = useTargetConfig()
+  const [targetConfig] = useTargetConfig()
 
   // Goes to the login page where the user will have to connect a wallet.
   const toLoginPage = useCallback(() => {
@@ -185,6 +185,10 @@ export const RequestPage = () => {
         throw new Error(result.error)
       } else {
         setView(View.VERIFY_SIGN_IN_COMPLETE)
+
+        if (targetConfig.deepLink) {
+          window.location.href = targetConfig.deepLink
+        }
       }
     } catch (e) {
       setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
