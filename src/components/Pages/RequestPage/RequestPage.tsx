@@ -1,5 +1,5 @@
 import { ReactNode, useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/catalyst.schemas'
 import { ethers, BrowserProvider } from 'ethers'
 import Icon from 'semantic-ui-react/dist/commonjs/elements/Icon/Icon'
@@ -8,6 +8,7 @@ import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import { CommunityBubble } from 'decentraland-ui/dist/components/CommunityBubble'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
 import { connection } from 'decentraland-connect'
+import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import usePageTracking from '../../../hooks/usePageTracking'
 import { getAnalytics } from '../../../modules/analytics/segment'
@@ -16,6 +17,7 @@ import { config } from '../../../modules/config'
 import { fetchProfile } from '../../../modules/profile'
 import { getCurrentConnectionData } from '../../../shared/connection'
 import { isErrorWithMessage, isRpcError } from '../../../shared/errors'
+import { locations } from '../../../shared/locations'
 import { CustomWearablePreview } from '../../CustomWearablePreview'
 import styles from './RequestPage.module.css'
 
@@ -40,7 +42,7 @@ enum View {
 export const RequestPage = () => {
   usePageTracking()
   const params = useParams()
-  const navigate = useNavigate()
+  const navigate = useNavigateWithSearchParams()
   const providerRef = useRef<BrowserProvider>()
   const [view, setView] = useState(View.LOADING_REQUEST)
   const [isLoading, setIsLoading] = useState(false)
@@ -56,12 +58,12 @@ export const RequestPage = () => {
 
   // Goes to the login page where the user will have to connect a wallet.
   const toLoginPage = useCallback(() => {
-    navigate(`/login?redirectTo=${encodeURIComponent(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}`)}`)
-  }, [requestId, targetConfigId])
+    navigate(locations.login(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}`))
+  }, [requestId])
 
   const toSetupPage = useCallback(() => {
-    navigate(`/setup?redirectTo=${encodeURIComponent(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}`)}`)
-  }, [requestId, targetConfigId])
+    navigate(locations.setup(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}`))
+  }, [requestId])
 
   useEffect(() => {
     ;(async () => {
