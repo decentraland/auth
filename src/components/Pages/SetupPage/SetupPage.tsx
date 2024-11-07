@@ -233,7 +233,7 @@ export const SetupPage = () => {
         identityRef.current = connectionData.identity
       } catch (e) {
         console.warn('No previous connection found')
-        return navigate(locations.login())
+        return navigate(locations.login(redirectTo))
       }
 
       const profile = await fetchProfile(accountRef.current)
