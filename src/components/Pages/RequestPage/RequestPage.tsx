@@ -320,7 +320,7 @@ export const RequestPage = () => {
     return (
       <Container>
         <div className={styles.errorLogo}></div>
-        <div className={styles.title}>Looks like you took too long and the request has expired</div>
+        <div className={styles.title}>Looks like you took too long and the request has expired. If the expiration time is still running in the Explorer app, check your computer's time to see if it's set correctly</div>
         <div className={styles.description}>Please return to Decentraland's {targetConfig.explorerText} to try again.</div>
         <CloseWindow />
       </Container>
@@ -354,7 +354,7 @@ export const RequestPage = () => {
       <Container>
         <div className={styles.errorLogo}></div>
         <div className={styles.title}>There was an error recovering the request...</div>
-        <div className={styles.description}>The request is not available anymore. Feel free to create a new one and try again.</div>
+        <div className={styles.description}>The request is not available anymore. Feel free to create a new one and try again. If the expiration time is still running in the Explorer app, check your computer's time to see if it's set correctly</div>
         <CloseWindow />
         <div className={styles.errorMessage}>{error}</div>
       </Container>
