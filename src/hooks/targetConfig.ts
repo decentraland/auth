@@ -36,6 +36,14 @@ const defaultConfig: TargetConfig = {
   }
 }
 
+const defaultMobileConfig: TargetConfig = {
+  ...defaultConfig,
+  skipSetup: true,
+  showWearablePreview: false,
+  explorerText: 'Mobile App',
+  deepLink: 'decentraland://'
+}
+
 const targetConfigs: Record<TargetConfigId, TargetConfig> = {
   default: {
     ...defaultConfig
@@ -47,10 +55,7 @@ const targetConfigs: Record<TargetConfigId, TargetConfig> = {
     explorerText: 'Explorer'
   },
   ios: {
-    ...defaultConfig,
-    skipSetup: true,
-    showWearablePreview: false,
-    explorerText: 'Mobile App',
+    ...defaultMobileConfig,
     connectionOptions: {
       primary: ConnectionOptionType.APPLE,
       secondary: ConnectionOptionType.WALLET_CONNECT,
@@ -61,14 +66,10 @@ const targetConfigs: Record<TargetConfigId, TargetConfig> = {
         ConnectionOptionType.FORTMATIC,
         ConnectionOptionType.COINBASE
       ]
-    },
-    deepLink: 'decentraland://'
+    }
   },
   android: {
-    ...defaultConfig,
-    skipSetup: true,
-    showWearablePreview: false,
-    explorerText: 'Mobile App',
+    ...defaultMobileConfig,
     connectionOptions: {
       primary: ConnectionOptionType.GOOGLE,
       secondary: ConnectionOptionType.WALLET_CONNECT,
@@ -79,30 +80,21 @@ const targetConfigs: Record<TargetConfigId, TargetConfig> = {
         ConnectionOptionType.FORTMATIC,
         ConnectionOptionType.COINBASE
       ]
-    },
-    deepLink: 'decentraland://'
+    }
   },
   androidSocial: {
-    ...defaultConfig,
-    skipSetup: true,
-    showWearablePreview: false,
-    explorerText: 'Mobile App',
+    ...defaultMobileConfig,
     connectionOptions: {
       primary: ConnectionOptionType.GOOGLE,
       secondary: ConnectionOptionType.X,
       extraOptions: [ConnectionOptionType.APPLE, ConnectionOptionType.DISCORD]
-    },
-    deepLink: 'decentraland://'
+    }
   },
   androidWeb3: {
-    ...defaultConfig,
-    skipSetup: true,
-    showWearablePreview: false,
-    explorerText: 'Mobile App',
+    ...defaultMobileConfig,
     connectionOptions: {
       primary: ConnectionOptionType.WALLET_CONNECT
-    },
-    deepLink: 'decentraland://'
+    }
   }
 }
 
