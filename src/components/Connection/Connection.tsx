@@ -10,9 +10,9 @@ import {
   ConnectionProps,
   MetamaskEthereumWindow,
   connectionOptionTitles,
-  isMagicConnection
 } from './Connection.types'
 import styles from './Connection.module.css'
+import { isSocialLogin } from '../Pages/LoginPage/utils'
 
 const Primary = ({
   message,
@@ -113,7 +113,7 @@ export const Connection = (props: ConnectionProps): JSX.Element => {
           : undefined
       }
       message={
-        isMagicConnection(option) ? (
+        isSocialLogin(option) ? (
           <>
             {i18n.socialMessage(<div className={styles.primaryMagic} role="img" aria-label="Magic" />)}
             <span className={styles.primaryLearnMore} role="button" onClick={() => onLearnMore(option)}>
@@ -129,7 +129,7 @@ export const Connection = (props: ConnectionProps): JSX.Element => {
         )
       }
     >
-      <>{isMagicConnection(option) ? i18n.accessWith(option) : i18n.connectWith(option)}</>
+      <>{isSocialLogin(option) ? i18n.accessWith(option) : i18n.connectWith(option)}</>
     </Primary>
   )
 
