@@ -1,6 +1,6 @@
 import { act, fireEvent, render } from '@testing-library/react'
 import { Connection } from './Connection'
-import { EXTRA_TEST_ID, PRIMARY_TEST_ID, SHOW_MORE_BUTTON_TEST_ID } from './constants'
+import { EXTRA_TEST_ID, PRIMARY_TEST_ID, SECONDARY_TEST_ID, SHOW_MORE_BUTTON_TEST_ID } from './constants'
 import { ConnectionOptionType, ConnectionProps } from './Connection.types'
 
 function renderConnection(props: Partial<ConnectionProps>) {
@@ -33,7 +33,7 @@ describe('when rendering the component', () => {
   let connectionOptions: ConnectionProps['connectionOptions']
   let onConnect: jest.Mock
 
-  describe('and there are social options', () => {
+  describe('and there are primary, secondary and extra options', () => {
     beforeEach(() => {
       onConnect = jest.fn()
       connectionOptions = {
@@ -44,9 +44,10 @@ describe('when rendering the component', () => {
       screen = renderConnection({ connectionOptions, onConnect })
     })
 
-    it('should render the primary social option', () => {
+    it('should render the primary and secondary option', () => {
       const { getByTestId } = screen
       expect(getByTestId(PRIMARY_TEST_ID)).toBeInTheDocument()
+      expect(getByTestId(SECONDARY_TEST_ID)).toBeInTheDocument()
     })
 
     it('should call the onConnect method prop when clicking the button', () => {
@@ -55,7 +56,7 @@ describe('when rendering the component', () => {
       expect(onConnect).toHaveBeenCalledWith(ConnectionOptionType.GOOGLE)
     })
 
-    it('should render all the secondary options', () => {
+    it('should render all the extra options', () => {
       const { getByTestId } = screen
       act(() => {
         fireEvent.click(getByTestId(SHOW_MORE_BUTTON_TEST_ID))
@@ -130,7 +131,7 @@ describe('when rendering the component', () => {
     })
   })
 
-  describe('and there are web3 options', () => {
+  describe('and there are is not secondary options', () => {
     beforeEach(() => {
       onConnect = jest.fn()
       connectionOptions = {
@@ -140,12 +141,17 @@ describe('when rendering the component', () => {
       screen = renderConnection({ connectionOptions, onConnect })
     })
 
-    it('should render the primary social option', () => {
+    it('should render the primary option', () => {
       const { getByTestId } = screen
       expect(getByTestId(PRIMARY_TEST_ID)).toBeInTheDocument()
     })
 
-    it('should render all the secondary options', () => {
+    it('should not render the secondary', () => {
+      const { queryByTestId } = screen
+      expect(queryByTestId(SECONDARY_TEST_ID)).not.toBeInTheDocument()
+    })
+
+    it('should render all the extra options', () => {
       const { getByTestId } = screen
       act(() => {
         fireEvent.click(getByTestId(SHOW_MORE_BUTTON_TEST_ID))
@@ -167,7 +173,31 @@ describe('when rendering the component', () => {
     })
   })
 
-  describe('and there are no web3 nor social secondary options', () => {
+  describe('and there are primary, but not secondary nor extra options', () => {
+    beforeEach(() => {
+      connectionOptions = {
+        primary: ConnectionOptionType.METAMASK
+      }
+      screen = renderConnection({ connectionOptions })
+    })
+
+    it('should render the primary', () => {
+      const { queryByTestId } = screen
+      expect(queryByTestId(PRIMARY_TEST_ID)).toBeInTheDocument()
+    })
+
+    it('should not render the secondary', () => {
+      const { queryByTestId } = screen
+      expect(queryByTestId(SECONDARY_TEST_ID)).not.toBeInTheDocument()
+    })
+
+    it('should not render the more options button', () => {
+      const { queryByTestId } = screen
+      expect(queryByTestId(SHOW_MORE_BUTTON_TEST_ID)).not.toBeInTheDocument()
+    })
+  })
+
+  describe('and there are no primary nor secondary nor extra options', () => {
     beforeEach(() => {
       connectionOptions = undefined
       screen = renderConnection({ connectionOptions })
