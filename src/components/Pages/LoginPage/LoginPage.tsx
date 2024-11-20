@@ -195,7 +195,7 @@ export const LoginPage = () => {
             loadingOption={currentConnectionType}
             socialOptions={{
               primary: ConnectionOptionType.GOOGLE,
-              secondary: [ConnectionOptionType.DISCORD, ConnectionOptionType.APPLE, ConnectionOptionType.X]
+              secondary: [ConnectionOptionType.DISCORD, ConnectionOptionType.APPLE, ConnectionOptionType.X, ConnectionOptionType.FACEBOOK]
             }}
             web3Options={
               isMobile
