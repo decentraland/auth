@@ -24,7 +24,7 @@ import { ConnectionModal, ConnectionModalState } from '../../ConnectionModal'
 import { FeatureFlagsContext } from '../../FeatureFlagsProvider'
 import { MagicInformationModal } from '../../MagicInformationModal'
 import { WalletInformationModal } from '../../WalletInformationModal'
-import { getIdentitySignature, connectToProvider, isSocialLogin, fromConnectionOptionToProviderType, getIsMobile } from './utils'
+import { getIdentitySignature, connectToProvider, isSocialLogin, fromConnectionOptionToProviderType } from './utils'
 import styles from './LoginPage.module.css'
 
 const BACKGROUND_IMAGES = [Image1, Image2, Image3, Image4, Image5, Image6, Image7, Image8, Image9, Image10]
@@ -37,7 +37,6 @@ export const LoginPage = () => {
   const [showMagicLearnMore, setShowMagicLearnMore] = useState(false)
   const [showConnectionModal, setShowConnectionModal] = useState(false)
   const [currentConnectionType, setCurrentConnectionType] = useState<ConnectionOptionType>()
-  const [isMobile] = useState(getIsMobile())
   const { url: redirectTo, redirect } = useAfterLoginRedirection()
   const showGuestOption = redirectTo && new URL(redirectTo).pathname.includes('/play')
   const [currentBackgroundIndex, setCurrentBackgroundIndex] = useState(0)
@@ -193,21 +192,7 @@ export const LoginPage = () => {
             onLearnMore={handleLearnMore}
             onConnect={handleOnConnect}
             loadingOption={currentConnectionType}
-            socialOptions={{
-              primary: ConnectionOptionType.GOOGLE,
-              secondary: [ConnectionOptionType.DISCORD, ConnectionOptionType.APPLE, ConnectionOptionType.X]
-            }}
-            web3Options={
-              isMobile
-                ? {
-                    primary: ConnectionOptionType.WALLET_CONNECT,
-                    secondary: [ConnectionOptionType.FORTMATIC, ConnectionOptionType.COINBASE]
-                  }
-                : {
-                    primary: ConnectionOptionType.METAMASK,
-                    secondary: [ConnectionOptionType.FORTMATIC, ConnectionOptionType.COINBASE, ConnectionOptionType.WALLET_CONNECT]
-                  }
-            }
+            connectionOptions={targetConfig.connectionOptions}
           />
           {showGuestOption && (
             <div className={styles.guestInfo}>
