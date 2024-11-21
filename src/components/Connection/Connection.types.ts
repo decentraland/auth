@@ -42,13 +42,10 @@ export type ConnectionI18N = {
 
 export type ConnectionProps = {
   i18n?: ConnectionI18N
-  socialOptions?: {
+  connectionOptions?: {
     primary: ConnectionOptionType
-    secondary: ConnectionOptionType[]
-  }
-  web3Options?: {
-    primary: ConnectionOptionType
-    secondary: ConnectionOptionType[]
+    secondary?: ConnectionOptionType
+    extraOptions?: ConnectionOptionType[]
   }
   className?: string
   loadingOption?: ConnectionOptionType
