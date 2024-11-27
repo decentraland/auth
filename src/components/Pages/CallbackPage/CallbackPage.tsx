@@ -1,5 +1,6 @@
-import { useCallback, useContext, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { ProviderType } from '@dcl/schemas'
+import { Env } from '@dcl/ui-env'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import { Modal } from 'decentraland-ui/dist/components/Modal/Modal'
 import { getConfiguration, connection } from 'decentraland-connect'
@@ -9,26 +10,25 @@ import { useTargetConfig } from '../../../hooks/targetConfig'
 import usePageTracking from '../../../hooks/usePageTracking'
 import { getAnalytics } from '../../../modules/analytics/segment'
 import { TrackingEvents } from '../../../modules/analytics/types'
+import { config } from '../../../modules/config'
 import { fetchProfile } from '../../../modules/profile'
 import { locations } from '../../../shared/locations'
 import { wait } from '../../../shared/time'
 import { ConnectionModal, ConnectionModalState } from '../../ConnectionModal'
-import { FeatureFlagsContext } from '../../FeatureFlagsProvider'
 import { getIdentitySignature } from '../LoginPage/utils'
 import styles from './CallbackPage.module.css'
 
-const MAGIC_KEY = getConfiguration().magic.apiKey
+const MAGIC_KEY = config.is(Env.DEVELOPMENT) ? getConfiguration().magic_test.apiKey : getConfiguration().magic.apiKey
 
 export const CallbackPage = () => {
   usePageTracking()
   const { url: redirectTo, redirect } = useAfterLoginRedirection()
   const navigate = useNavigateWithSearchParams()
   const [state, setConnectionModalState] = useState(ConnectionModalState.WAITING_FOR_CONFIRMATION)
-  const { flags } = useContext(FeatureFlagsContext)
   const [targetConfig] = useTargetConfig()
 
   const connectAndGenerateSignature = useCallback(async () => {
-    const connectionData = await connection.connect(ProviderType.MAGIC)
+    const connectionData = await connection.connect(config.is(Env.DEVELOPMENT) ? ProviderType.MAGIC_TEST : ProviderType.MAGIC)
     await getIdentitySignature(connectionData.account?.toLowerCase() ?? '', connectionData.provider)
     return connectionData
   }, [])
@@ -90,7 +90,7 @@ export const CallbackPage = () => {
       console.log(error)
       navigate(locations.login())
     }
-  }, [navigate, redirectTo, redirect, flags])
+  }, [navigate, redirectTo, redirect])
 
   if (state === ConnectionModalState.WAITING_FOR_CONFIRMATION) {
     return (

@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect, useContext } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import Image1 from '../../../assets/images/background/image1.webp'
 import Image10 from '../../../assets/images/background/image10.webp'
 import Image2 from '../../../assets/images/background/image2.webp'
@@ -21,7 +21,6 @@ import { locations } from '../../../shared/locations'
 import { wait } from '../../../shared/time'
 import { Connection, ConnectionOptionType } from '../../Connection'
 import { ConnectionModal, ConnectionModalState } from '../../ConnectionModal'
-import { FeatureFlagsContext } from '../../FeatureFlagsProvider'
 import { MagicInformationModal } from '../../MagicInformationModal'
 import { WalletInformationModal } from '../../WalletInformationModal'
 import { getIdentitySignature, connectToProvider, isSocialLogin, fromConnectionOptionToProviderType } from './utils'
@@ -40,7 +39,6 @@ export const LoginPage = () => {
   const { url: redirectTo, redirect } = useAfterLoginRedirection()
   const showGuestOption = redirectTo && new URL(redirectTo).pathname.includes('/play')
   const [currentBackgroundIndex, setCurrentBackgroundIndex] = useState(0)
-  const { flags } = useContext(FeatureFlagsContext)
   const [targetConfig] = useTargetConfig()
 
   const handleLearnMore = useCallback(
@@ -145,7 +143,7 @@ export const LoginPage = () => {
         }
       }
     },
-    [setConnectionModalState, setShowConnectionModal, setCurrentConnectionType, redirectTo, navigate, redirect, flags]
+    [setConnectionModalState, setShowConnectionModal, setCurrentConnectionType, redirectTo, navigate, redirect]
   )
 
   const handleOnCloseConnectionModal = useCallback(() => {
@@ -158,7 +156,7 @@ export const LoginPage = () => {
     if (currentConnectionType) {
       handleOnConnect(currentConnectionType)
     }
-  }, [currentConnectionType])
+  }, [currentConnectionType, handleOnConnect])
 
   useEffect(() => {
     const backgroundInterval = setInterval(() => {
