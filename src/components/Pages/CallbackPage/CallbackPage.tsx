@@ -42,7 +42,6 @@ export const CallbackPage = () => {
     // eslint-disable-next-line @typescript-eslint/naming-convention
     const { OAuthExtension } = await import('@magic-ext/oauth')
     const MAGIC_KEY = flags[FeatureFlagsKeys.MAGIC_TEST] ? getConfiguration().magic_test.apiKey : getConfiguration().magic.apiKey
-    console.log('Logging in and redirecting using the testing key', MAGIC_KEY)
     const magic = new Magic(MAGIC_KEY, {
       extensions: [new OAuthExtension()]
     })
