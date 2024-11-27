@@ -3,22 +3,18 @@ import { ethers } from 'ethers'
 import { AuthIdentity, Authenticator } from '@dcl/crypto'
 import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
 import { localStorageGetIdentity, localStorageStoreIdentity } from '@dcl/single-sign-on-client'
-import { Env } from '@dcl/ui-env'
 import { connection, getConfiguration, ConnectionResponse, Provider } from 'decentraland-connect'
-import { config } from '../../../modules/config'
 import { ConnectionOptionType } from '../../Connection'
 
 const ONE_MONTH_IN_MINUTES = 60 * 24 * 30
 
-const MAGIC_KEY = config.is(Env.DEVELOPMENT) ? getConfiguration().magic_test.apiKey : getConfiguration().magic.apiKey
-
-export function fromConnectionOptionToProviderType(connectionType: ConnectionOptionType) {
+export function fromConnectionOptionToProviderType(connectionType: ConnectionOptionType, isTesting?: boolean) {
   switch (connectionType) {
     case ConnectionOptionType.DISCORD:
     case ConnectionOptionType.X:
     case ConnectionOptionType.GOOGLE:
     case ConnectionOptionType.APPLE:
-      return config.is(Env.DEVELOPMENT) ? ProviderType.MAGIC_TEST : ProviderType.MAGIC
+      return isTesting ? ProviderType.MAGIC_TEST : ProviderType.MAGIC
     case ConnectionOptionType.WALLET_CONNECT:
     case ConnectionOptionType.METAMASK_MOBILE:
       return ProviderType.WALLET_CONNECT_V2
@@ -51,8 +47,9 @@ async function generateIdentity(address: string, provider: Provider): Promise<Au
   return Authenticator.initializeAuthChain(address, payload, ONE_MONTH_IN_MINUTES, message => signer.signMessage(message))
 }
 
-export async function connectToProvider(connectionOption: ConnectionOptionType): Promise<ConnectionResponse> {
-  const providerType = fromConnectionOptionToProviderType(connectionOption)
+export async function connectToProvider(connectionOption: ConnectionOptionType, isTesting?: boolean): Promise<ConnectionResponse> {
+  const MAGIC_KEY = isTesting ? getConfiguration().magic_test.apiKey : getConfiguration().magic.apiKey
+  const providerType = fromConnectionOptionToProviderType(connectionOption, isTesting)
   if (ProviderType.MAGIC === providerType || ProviderType.MAGIC_TEST === providerType) {
     // eslint-disable-next-line @typescript-eslint/naming-convention
     const { Magic } = await import('magic-sdk')
