@@ -185,6 +185,10 @@ export const RequestPage = () => {
         throw new Error(result.error)
       } else {
         setView(View.VERIFY_SIGN_IN_COMPLETE)
+
+        if (targetConfig.deepLink) {
+          window.location.href = targetConfig.deepLink
+        }
       }
     } catch (e) {
       setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
