@@ -11,7 +11,7 @@ export function getConnectionMessage(connectionState: ConnectionModalState, prov
     }
     case ConnectionModalState.CONNECTING_WALLET:
     case ConnectionModalState.WAITING_FOR_SIGNATURE: {
-      return providerType === ProviderType.MAGIC || providerType === ProviderType.MAGIC_TEST
+      return providerType === ProviderType.MAGIC
         ? 'Almost done! Confirm your request to login Decentraland'
         : 'Confirm in your digital wallet extension to continue.'
     }

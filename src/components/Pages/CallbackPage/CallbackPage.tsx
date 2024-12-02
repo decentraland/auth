@@ -1,6 +1,5 @@
 import { useCallback, useContext, useEffect, useState } from 'react'
 import { ProviderType } from '@dcl/schemas'
-import { Env } from '@dcl/ui-env'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import { Modal } from 'decentraland-ui/dist/components/Modal/Modal'
 import { getConfiguration, connection } from 'decentraland-connect'
@@ -10,29 +9,29 @@ import { useTargetConfig } from '../../../hooks/targetConfig'
 import usePageTracking from '../../../hooks/usePageTracking'
 import { getAnalytics } from '../../../modules/analytics/segment'
 import { TrackingEvents } from '../../../modules/analytics/types'
-import { config } from '../../../modules/config'
 import { fetchProfile } from '../../../modules/profile'
 import { locations } from '../../../shared/locations'
 import { wait } from '../../../shared/time'
 import { ConnectionModal, ConnectionModalState } from '../../ConnectionModal'
-import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
+import { FeatureFlagsContext } from '../../FeatureFlagsProvider'
 import { getIdentitySignature } from '../LoginPage/utils'
 import styles from './CallbackPage.module.css'
+
+const MAGIC_KEY = getConfiguration().magic.apiKey
 
 export const CallbackPage = () => {
   usePageTracking()
   const { url: redirectTo, redirect } = useAfterLoginRedirection()
   const navigate = useNavigateWithSearchParams()
-  const [logInStarted, setLogInStarted] = useState(false)
   const [state, setConnectionModalState] = useState(ConnectionModalState.WAITING_FOR_CONFIRMATION)
-  const { flags, initialized } = useContext(FeatureFlagsContext)
+  const { flags } = useContext(FeatureFlagsContext)
   const [targetConfig] = useTargetConfig()
 
   const connectAndGenerateSignature = useCallback(async () => {
-    const connectionData = await connection.connect(flags[FeatureFlagsKeys.MAGIC_TEST] ? ProviderType.MAGIC_TEST : ProviderType.MAGIC)
+    const connectionData = await connection.connect(ProviderType.MAGIC)
     await getIdentitySignature(connectionData.account?.toLowerCase() ?? '', connectionData.provider)
     return connectionData
-  }, [flags[FeatureFlagsKeys.MAGIC_TEST]])
+  }, [])
 
   const logInAndRedirect = useCallback(async () => {
     // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -41,7 +40,7 @@ export const CallbackPage = () => {
     // @ts-ignore
     // eslint-disable-next-line @typescript-eslint/naming-convention
     const { OAuthExtension } = await import('@magic-ext/oauth')
-    const MAGIC_KEY = flags[FeatureFlagsKeys.MAGIC_TEST] ? getConfiguration().magic_test.apiKey : getConfiguration().magic.apiKey
+
     const magic = new Magic(MAGIC_KEY, {
       extensions: [new OAuthExtension()]
     })
@@ -54,14 +53,11 @@ export const CallbackPage = () => {
       console.log(error)
       navigate(locations.login())
     }
-  }, [navigate, flags[FeatureFlagsKeys.MAGIC_TEST]])
+  }, [navigate])
 
   useEffect(() => {
-    if (((config.is(Env.DEVELOPMENT) && initialized) || !config.is(Env.DEVELOPMENT)) && !logInStarted) {
-      setLogInStarted(true)
-      logInAndRedirect()
-    }
-  }, [logInAndRedirect, initialized, logInStarted])
+    logInAndRedirect()
+  }, [])
 
   const handleContinue = useCallback(async () => {
     try {
@@ -94,7 +90,7 @@ export const CallbackPage = () => {
       console.log(error)
       navigate(locations.login())
     }
-  }, [navigate, redirectTo, connectAndGenerateSignature, redirect])
+  }, [navigate, redirectTo, redirect, flags])
 
   if (state === ConnectionModalState.WAITING_FOR_CONFIRMATION) {
     return (
@@ -113,12 +109,5 @@ export const CallbackPage = () => {
     )
   }
 
-  return (
-    <ConnectionModal
-      open={true}
-      state={state}
-      onTryAgain={connectAndGenerateSignature}
-      providerType={flags[FeatureFlagsKeys.MAGIC_TEST] ? ProviderType.MAGIC_TEST : ProviderType.MAGIC}
-    />
-  )
+  return <ConnectionModal open={true} state={state} onTryAgain={connectAndGenerateSignature} providerType={ProviderType.MAGIC} />
 }

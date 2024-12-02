@@ -1,11 +1,9 @@
 import { createContext } from 'react'
 
-export enum FeatureFlagsKeys {
-  MAGIC_TEST = 'dapps-magic-dev-test'
-}
+export enum FeatureFlagsKeys {}
 
 export type FeatureFlagsContextType = {
-  flags: Partial<Record<FeatureFlagsKeys, boolean>>
+  flags: Record<string, boolean>
   initialized: boolean
 }
 
