@@ -1,36 +1,38 @@
 import { useCallback, useContext, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { ProviderType } from '@dcl/schemas'
+import { Env } from '@dcl/ui-env'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import { Modal } from 'decentraland-ui/dist/components/Modal/Modal'
 import { getConfiguration, connection } from 'decentraland-connect'
+import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import usePageTracking from '../../../hooks/usePageTracking'
 import { getAnalytics } from '../../../modules/analytics/segment'
 import { TrackingEvents } from '../../../modules/analytics/types'
+import { config } from '../../../modules/config'
 import { fetchProfile } from '../../../modules/profile'
+import { locations } from '../../../shared/locations'
 import { wait } from '../../../shared/time'
 import { ConnectionModal, ConnectionModalState } from '../../ConnectionModal'
-import { FeatureFlagsContext } from '../../FeatureFlagsProvider'
+import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import { getIdentitySignature } from '../LoginPage/utils'
 import styles from './CallbackPage.module.css'
 
-const MAGIC_KEY = getConfiguration().magic.apiKey
-
 export const CallbackPage = () => {
   usePageTracking()
-  const redirectTo = useAfterLoginRedirection()
-  const navigate = useNavigate()
+  const { url: redirectTo, redirect } = useAfterLoginRedirection()
+  const navigate = useNavigateWithSearchParams()
+  const [logInStarted, setLogInStarted] = useState(false)
   const [state, setConnectionModalState] = useState(ConnectionModalState.WAITING_FOR_CONFIRMATION)
-  const { flags } = useContext(FeatureFlagsContext)
+  const { flags, initialized } = useContext(FeatureFlagsContext)
   const [targetConfig] = useTargetConfig()
 
   const connectAndGenerateSignature = useCallback(async () => {
-    const connectionData = await connection.connect(ProviderType.MAGIC)
+    const connectionData = await connection.connect(flags[FeatureFlagsKeys.MAGIC_TEST] ? ProviderType.MAGIC_TEST : ProviderType.MAGIC)
     await getIdentitySignature(connectionData.account?.toLowerCase() ?? '', connectionData.provider)
     return connectionData
-  }, [])
+  }, [flags[FeatureFlagsKeys.MAGIC_TEST]])
 
   const logInAndRedirect = useCallback(async () => {
     // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -39,7 +41,7 @@ export const CallbackPage = () => {
     // @ts-ignore
     // eslint-disable-next-line @typescript-eslint/naming-convention
     const { OAuthExtension } = await import('@magic-ext/oauth2')
-
+    const MAGIC_KEY = flags[FeatureFlagsKeys.MAGIC_TEST] ? getConfiguration().magic_test.apiKey : getConfiguration().magic.apiKey
     const magic = new Magic(MAGIC_KEY, {
       extensions: [new OAuthExtension()]
     })
@@ -50,13 +52,16 @@ export const CallbackPage = () => {
       setConnectionModalState(ConnectionModalState.WAITING_FOR_CONFIRMATION)
     } catch (error) {
       console.log(error)
-      navigate('/login')
+      navigate(locations.login())
     }
-  }, [navigate])
+  }, [navigate, flags[FeatureFlagsKeys.MAGIC_TEST]])
 
   useEffect(() => {
-    logInAndRedirect()
-  }, [])
+    if (((config.is(Env.DEVELOPMENT) && initialized) || !config.is(Env.DEVELOPMENT)) && !logInStarted) {
+      setLogInStarted(true)
+      logInAndRedirect()
+    }
+  }, [logInAndRedirect, initialized, logInStarted])
 
   const handleContinue = useCallback(async () => {
     try {
@@ -79,24 +84,17 @@ export const CallbackPage = () => {
           // If the connected account does not have a profile, redirect the user to the setup page to create a new one.
           // The setup page should then redirect the user to the url provided as query param if available.
           if (!profile) {
-            window.location.href = '/auth/setup' + (redirectTo ? `?redirectTo=${redirectTo}` : '')
-            return
+            return navigate(locations.setup(redirectTo))
           }
         }
       }
 
-      if (redirectTo) {
-        // If redirection url is present, redirect the user to that url.
-        window.location.href = redirectTo
-      } else {
-        // Navigate to the landing page if there is no other place to redirect.
-        window.location.href = '/'
-      }
+      redirect()
     } catch (error) {
       console.log(error)
-      navigate('/login')
+      navigate(locations.login())
     }
-  }, [navigate, redirectTo, flags])
+  }, [navigate, redirectTo, connectAndGenerateSignature, redirect])
 
   if (state === ConnectionModalState.WAITING_FOR_CONFIRMATION) {
     return (
@@ -115,5 +113,12 @@ export const CallbackPage = () => {
     )
   }
 
-  return <ConnectionModal open={true} state={state} onTryAgain={connectAndGenerateSignature} providerType={ProviderType.MAGIC} />
+  return (
+    <ConnectionModal
+      open={true}
+      state={state}
+      onTryAgain={connectAndGenerateSignature}
+      providerType={flags[FeatureFlagsKeys.MAGIC_TEST] ? ProviderType.MAGIC_TEST : ProviderType.MAGIC}
+    />
+  )
 }

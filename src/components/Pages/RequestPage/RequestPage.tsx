@@ -1,5 +1,5 @@
 import { ReactNode, useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/catalyst.schemas'
 import { ethers, BrowserProvider } from 'ethers'
 import Icon from 'semantic-ui-react/dist/commonjs/elements/Icon/Icon'
@@ -8,6 +8,7 @@ import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import { CommunityBubble } from 'decentraland-ui/dist/components/CommunityBubble'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
 import { connection } from 'decentraland-connect'
+import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import usePageTracking from '../../../hooks/usePageTracking'
 import { getAnalytics } from '../../../modules/analytics/segment'
@@ -16,6 +17,7 @@ import { config } from '../../../modules/config'
 import { fetchProfile } from '../../../modules/profile'
 import { getCurrentConnectionData } from '../../../shared/connection'
 import { isErrorWithMessage, isRpcError } from '../../../shared/errors'
+import { locations } from '../../../shared/locations'
 import { CustomWearablePreview } from '../../CustomWearablePreview'
 import styles from './RequestPage.module.css'
 
@@ -40,7 +42,7 @@ enum View {
 export const RequestPage = () => {
   usePageTracking()
   const params = useParams()
-  const navigate = useNavigate()
+  const navigate = useNavigateWithSearchParams()
   const providerRef = useRef<BrowserProvider>()
   const [view, setView] = useState(View.LOADING_REQUEST)
   const [isLoading, setIsLoading] = useState(false)
@@ -56,12 +58,12 @@ export const RequestPage = () => {
 
   // Goes to the login page where the user will have to connect a wallet.
   const toLoginPage = useCallback(() => {
-    navigate(`/login?redirectTo=${encodeURIComponent(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}`)}`)
-  }, [requestId, targetConfigId])
+    navigate(locations.login(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}`))
+  }, [requestId])
 
   const toSetupPage = useCallback(() => {
-    navigate(`/setup?redirectTo=${encodeURIComponent(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}`)}`)
-  }, [requestId, targetConfigId])
+    navigate(locations.setup(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}`))
+  }, [requestId])
 
   useEffect(() => {
     ;(async () => {
@@ -183,6 +185,10 @@ export const RequestPage = () => {
         throw new Error(result.error)
       } else {
         setView(View.VERIFY_SIGN_IN_COMPLETE)
+
+        if (targetConfig.deepLink) {
+          window.location.href = targetConfig.deepLink
+        }
       }
     } catch (e) {
       setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
@@ -318,7 +324,10 @@ export const RequestPage = () => {
     return (
       <Container>
         <div className={styles.errorLogo}></div>
-        <div className={styles.title}>Looks like you took too long and the request has expired</div>
+        <div className={styles.title}>
+          Looks like you took too long and the request has expired. If the expiration time is still running in the Explorer app, check your
+          computer's time to see if it's set correctly
+        </div>
         <div className={styles.description}>Please return to Decentraland's {targetConfig.explorerText} to try again.</div>
         <CloseWindow />
       </Container>
@@ -352,7 +361,10 @@ export const RequestPage = () => {
       <Container>
         <div className={styles.errorLogo}></div>
         <div className={styles.title}>There was an error recovering the request...</div>
-        <div className={styles.description}>The request is not available anymore. Feel free to create a new one and try again.</div>
+        <div className={styles.description}>
+          The request is not available anymore. Feel free to create a new one and try again. If the expiration time is still running in the
+          Explorer app, check your computer's time to see if it's set correctly
+        </div>
         <CloseWindow />
         <div className={styles.errorMessage}>{error}</div>
       </Container>
