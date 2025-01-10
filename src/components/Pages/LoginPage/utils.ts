@@ -47,7 +47,11 @@ async function generateIdentity(address: string, provider: Provider): Promise<Au
   return Authenticator.initializeAuthChain(address, payload, ONE_MONTH_IN_MINUTES, message => signer.signMessage(message))
 }
 
-export async function connectToProvider(connectionOption: ConnectionOptionType, isTesting?: boolean): Promise<ConnectionResponse> {
+export async function connectToSocialProvider(
+  connectionOption: ConnectionOptionType,
+  isTesting?: boolean,
+  redirectTo?: string
+): Promise<void> {
   const MAGIC_KEY = isTesting ? getConfiguration().magic_test.apiKey : getConfiguration().magic.apiKey
   const providerType = fromConnectionOptionToProviderType(connectionOption, isTesting)
   if (ProviderType.MAGIC === providerType || ProviderType.MAGIC_TEST === providerType) {
@@ -63,12 +67,18 @@ export async function connectToProvider(connectionOption: ConnectionOptionType, 
 
     const url = new URL(window.location.href)
     url.pathname = '/auth/callback'
+    url.search = ''
 
     await magic?.oauth2.loginWithRedirect({
       provider: connectionOption === ConnectionOptionType.X ? 'twitter' : (connectionOption as OAuthProvider),
-      redirectURI: url.href
+      redirectURI: url.href,
+      customData: redirectTo
     })
   }
+}
+
+export async function connectToProvider(connectionOption: ConnectionOptionType): Promise<ConnectionResponse> {
+  const providerType = fromConnectionOptionToProviderType(connectionOption)
 
   let connectionData: ConnectionResponse
   try {

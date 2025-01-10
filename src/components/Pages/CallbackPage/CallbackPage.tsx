@@ -12,6 +12,7 @@ import { getAnalytics } from '../../../modules/analytics/segment'
 import { TrackingEvents } from '../../../modules/analytics/types'
 import { config } from '../../../modules/config'
 import { fetchProfile } from '../../../modules/profile'
+import { isErrorWithMessage } from '../../../shared/errors'
 import { locations } from '../../../shared/locations'
 import { wait } from '../../../shared/time'
 import { ConnectionModal, ConnectionModalState } from '../../ConnectionModal'
@@ -48,10 +49,13 @@ export const CallbackPage = () => {
 
     try {
       setConnectionModalState(ConnectionModalState.VALIDATING_SIGN_IN)
+      console.log('Search params', document.location.search)
       await magic?.oauth2.getRedirectResult()
       setConnectionModalState(ConnectionModalState.WAITING_FOR_CONFIRMATION)
     } catch (error) {
-      console.log(error)
+      console.error('Error logging in', error)
+      getAnalytics().track(TrackingEvents.LOGIN_ERROR, { error: isErrorWithMessage(error) ? error.message : error })
+      await wait(800)
       navigate(locations.login())
     }
   }, [navigate, flags[FeatureFlagsKeys.MAGIC_TEST]])
