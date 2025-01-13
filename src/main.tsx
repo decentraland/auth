@@ -7,6 +7,7 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { RequestPage } from './components/Pages/RequestPage'
 import { SetupPage } from './components/Pages/SetupPage'
 import { DefaultPage } from './components/Pages/DefaultPage'
+import Intercom from './components/Intercom'
 import { CallbackPage } from './components/Pages/CallbackPage'
 import { InvalidRedirectionPage } from './components/Pages/InvalidRedirectionPage'
 import { LoginPage } from './components/Pages/LoginPage'
@@ -32,6 +33,7 @@ ReactDOM.render(
           <Route path="*" element={<DefaultPage />} />
         </Routes>
       </BrowserRouter>
+      <Intercom appId={config.get('INTERCOM_APP_ID')} settings={{ alignment: 'right' }} />
     </FeatureFlagsProvider>
   </React.StrictMode>,
   document.getElementById('root')
