@@ -4,5 +4,6 @@
   "PEER_URL": "https://peer.decentraland.org",
   "FEATURE_FLAGS_URL": "https://feature-flags.decentraland.org",
   "FEATURE_FLAGS_INTERVAL": "60000",
-  "BUILDER_SERVER_URL": "https://builder-api.decentraland.org"
+  "BUILDER_SERVER_URL": "https://builder-api.decentraland.org",
+  "INTERCOM_APP_ID": "z0h94kay"
 }
