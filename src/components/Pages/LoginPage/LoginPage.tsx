@@ -27,7 +27,13 @@ import { ConnectionModal, ConnectionModalState } from '../../ConnectionModal'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import { MagicInformationModal } from '../../MagicInformationModal'
 import { WalletInformationModal } from '../../WalletInformationModal'
-import { getIdentitySignature, connectToProvider, isSocialLogin, fromConnectionOptionToProviderType } from './utils'
+import {
+  getIdentitySignature,
+  connectToProvider,
+  isSocialLogin,
+  fromConnectionOptionToProviderType,
+  connectToSocialProvider
+} from './utils'
 import styles from './LoginPage.module.css'
 
 const BACKGROUND_IMAGES = [Image1, Image2, Image3, Image4, Image5, Image6, Image7, Image8, Image9, Image10]
@@ -98,7 +104,7 @@ export const LoginPage = () => {
         setConnectionModalState(ConnectionModalState.LOADING_MAGIC)
         // Wait 800 ms for the tracking to be completed
         await wait(800)
-        await connectToProvider(connectionType, flags[FeatureFlagsKeys.MAGIC_TEST])
+        await connectToSocialProvider(connectionType, flags[FeatureFlagsKeys.MAGIC_TEST], redirectTo)
       } else {
         try {
           setShowConnectionModal(true)
@@ -138,7 +144,7 @@ export const LoginPage = () => {
           redirect()
           setShowConnectionModal(false)
         } catch (error) {
-          console.log('Error', isErrorWithMessage(error) ? error.message : JSON.stringify(error))
+          console.error('Error', isErrorWithMessage(error) ? error.message : JSON.stringify(error))
           getAnalytics().track(TrackingEvents.LOGIN_ERROR, { error: isErrorWithMessage(error) ? error.message : error })
           if (isErrorWithName(error) && error.name === 'ErrorUnlockingWallet') {
             setConnectionModalState(ConnectionModalState.ERROR_LOCKED_WALLET)

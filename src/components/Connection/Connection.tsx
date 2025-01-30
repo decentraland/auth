@@ -3,16 +3,11 @@ import classNames from 'classnames'
 import Icon from 'semantic-ui-react/dist/commonjs/elements/Icon/Icon'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import logoSrc from '../../assets/images/logo.svg'
+import { isSocialLogin } from '../Pages/LoginPage/utils'
 import { ConnectionOption } from './ConnectionOption'
 import { EXTRA_TEST_ID, PRIMARY_TEST_ID, SECONDARY_TEST_ID, SHOW_MORE_BUTTON_TEST_ID } from './constants'
-import {
-  ConnectionOptionType,
-  ConnectionProps,
-  MetamaskEthereumWindow,
-  connectionOptionTitles,
-} from './Connection.types'
+import { ConnectionOptionType, ConnectionProps, MetamaskEthereumWindow, connectionOptionTitles } from './Connection.types'
 import styles from './Connection.module.css'
-import { isSocialLogin } from '../Pages/LoginPage/utils'
 
 const Primary = ({
   message,
