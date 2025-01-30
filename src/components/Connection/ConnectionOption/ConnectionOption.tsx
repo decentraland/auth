@@ -12,23 +12,21 @@ export const ConnectionOption = (props: ConnectionIconProps): JSX.Element => {
       position={showTooltip && tooltipPosition ? tooltipPosition : 'top center'}
       disabled={!showTooltip}
       trigger={
-        <span>
-          <Button
-            primary
-            key={type}
-            size="small"
-            data-testid={`${testId}-${type}-button`}
-            className={classNames(className, styles.button)}
-            onClick={() => onClick(type)}
-            disabled={disabled}
-            loading={loading}
-          >
-            {!loading ? (
-              <div role="img" aria-label={type} className={classNames(styles.icon, styles[`icon-${type}`], styles.primaryImage)} />
-            ) : null}
-            {children}
-          </Button>
-        </span>
+        <Button
+          primary
+          key={type}
+          size="small"
+          data-testid={`${testId}-${type}-button`}
+          className={classNames(className, styles.button)}
+          onClick={() => onClick(type)}
+          disabled={disabled}
+          loading={loading}
+        >
+          {!loading ? (
+            <div role="img" aria-label={type} className={classNames(styles.icon, styles[`icon-${type}`], styles.primaryImage)} />
+          ) : null}
+          {children}
+        </Button>
       }
       content={info ?? capitalize(type)}
       on="hover"

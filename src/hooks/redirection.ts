@@ -7,7 +7,20 @@ export const useAfterLoginRedirection = () => {
   const search = new URLSearchParams(location.search)
 
   // Extract 'redirectTo' from current search parameters
-  const redirectToSearchParam = search.get('redirectTo')
+  let redirectToSearchParam = search.get('redirectTo')
+  try {
+    const state = search.get('state')
+    // Decode the state parameter to get the original 'redirectTo'
+    if (state) {
+      const stateRedirectToParam = atob(state)
+      const parsedRedirectTo = JSON.parse(stateRedirectToParam).customData
+      if (parsedRedirectTo) {
+        redirectToSearchParam = parsedRedirectTo ?? null
+      }
+    }
+  } catch (_) {
+    console.error("Can't decode state parameter")
+  }
 
   // Initialize redirectTo with a default value
   let redirectTo = locations.home()

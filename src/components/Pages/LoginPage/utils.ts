@@ -1,4 +1,4 @@
-import { OAuthProvider } from '@magic-ext/oauth'
+import type { OAuthProvider } from '@magic-ext/oauth2'
 import { ethers } from 'ethers'
 import { AuthIdentity, Authenticator } from '@dcl/crypto'
 import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
@@ -47,7 +47,11 @@ async function generateIdentity(address: string, provider: Provider): Promise<Au
   return Authenticator.initializeAuthChain(address, payload, ONE_MONTH_IN_MINUTES, message => signer.signMessage(message))
 }
 
-export async function connectToProvider(connectionOption: ConnectionOptionType, isTesting?: boolean): Promise<ConnectionResponse> {
+export async function connectToSocialProvider(
+  connectionOption: ConnectionOptionType,
+  isTesting?: boolean,
+  redirectTo?: string
+): Promise<void> {
   const MAGIC_KEY = isTesting ? getConfiguration().magic_test.apiKey : getConfiguration().magic.apiKey
   const providerType = fromConnectionOptionToProviderType(connectionOption, isTesting)
   if (ProviderType.MAGIC === providerType || ProviderType.MAGIC_TEST === providerType) {
@@ -56,19 +60,25 @@ export async function connectToProvider(connectionOption: ConnectionOptionType, 
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
     // eslint-disable-next-line @typescript-eslint/naming-convention
-    const { OAuthExtension } = await import('@magic-ext/oauth')
+    const { OAuthExtension } = await import('@magic-ext/oauth2')
     const magic = new Magic(MAGIC_KEY, {
       extensions: [new OAuthExtension()]
     })
 
     const url = new URL(window.location.href)
     url.pathname = '/auth/callback'
+    url.search = ''
 
-    await magic.oauth.loginWithRedirect({
+    await magic?.oauth2.loginWithRedirect({
       provider: connectionOption === ConnectionOptionType.X ? 'twitter' : (connectionOption as OAuthProvider),
-      redirectURI: url.href
+      redirectURI: url.href,
+      customData: redirectTo
     })
   }
+}
+
+export async function connectToProvider(connectionOption: ConnectionOptionType): Promise<ConnectionResponse> {
+  const providerType = fromConnectionOptionToProviderType(connectionOption)
 
   let connectionData: ConnectionResponse
   try {
