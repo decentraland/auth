@@ -144,7 +144,7 @@ export const LoginPage = () => {
           redirect()
           setShowConnectionModal(false)
         } catch (error) {
-          console.log('Error', isErrorWithMessage(error) ? error.message : JSON.stringify(error))
+          console.error('Error', isErrorWithMessage(error) ? error.message : JSON.stringify(error))
           getAnalytics().track(TrackingEvents.LOGIN_ERROR, { error: isErrorWithMessage(error) ? error.message : error })
           if (isErrorWithName(error) && error.name === 'ErrorUnlockingWallet') {
             setConnectionModalState(ConnectionModalState.ERROR_LOCKED_WALLET)

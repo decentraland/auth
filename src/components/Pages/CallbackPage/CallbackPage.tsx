@@ -49,7 +49,6 @@ export const CallbackPage = () => {
 
     try {
       setConnectionModalState(ConnectionModalState.VALIDATING_SIGN_IN)
-      console.log('Search params', document.location.search)
       await magic?.oauth2.getRedirectResult()
       setConnectionModalState(ConnectionModalState.WAITING_FOR_CONFIRMATION)
     } catch (error) {
