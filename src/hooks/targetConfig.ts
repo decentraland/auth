@@ -1,6 +1,7 @@
 import { useLocation, Location } from 'react-router-dom'
 import { ConnectionOptionType } from '../components/Connection'
 import { isMobile } from '../components/Pages/LoginPage/utils'
+import { extractRedirectToFromSearchParameters } from '../shared/locations'
 
 type TargetConfigId = 'default' | 'alternative' | 'ios' | 'android' | 'androidSocial' | 'androidWeb3'
 
@@ -126,7 +127,28 @@ export const _targetConfigs = targetConfigs
 const getTargetConfigId = (location: Location): TargetConfigId => {
   const search = new URLSearchParams(location.search)
   const targetConfigIdParam = search.get('targetConfigId') as TargetConfigId
-  return targetConfigIdParam in targetConfigs ? targetConfigIdParam : 'default'
+  const redirectTo = extractRedirectToFromSearchParameters(search)
+  // Get the targetConfigId from the search parameters or the redirectTo URL
+  if (targetConfigIdParam in targetConfigs) {
+    return targetConfigIdParam
+  } else if (redirectTo) {
+    try {
+      let redirectToUrl: URL
+      if (URL.canParse(redirectTo)) {
+        redirectToUrl = new URL(redirectTo)
+      } else {
+        // Try to parse the redirectTo as a relative URL
+        redirectToUrl = new URL(redirectTo, 'https://someurl.com')
+      }
+      const targetConfigIdFromRedirectTo = redirectToUrl.searchParams.get('targetConfigId') as TargetConfigId
+      if (targetConfigIdFromRedirectTo) {
+        return targetConfigIdFromRedirectTo
+      }
+    } catch (error) {
+      console.error("Can't parse redirectTo URL")
+    }
+  }
+  return 'default'
 }
 
 export const useTargetConfig = (): [TargetConfig, TargetConfigId] => {
