@@ -42,7 +42,7 @@ export const CallbackPage = () => {
       const ethAddress = connectionData.account?.toLowerCase() ?? ''
       getAnalytics().identify({ ethAddress })
       // eslint-disable-next-line @typescript-eslint/naming-convention
-      getAnalytics().track(TrackingEvents.LOGIN_SUCCESS, { eth_address: ethAddress })
+      getAnalytics().track(TrackingEvents.LOGIN_SUCCESS, { eth_address: ethAddress, login_provider: connectionData.providerType })
       // Wait 800 ms for the tracking to be completed
       await wait(800)
 

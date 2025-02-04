@@ -119,8 +119,12 @@ export const LoginPage = () => {
           setConnectionModalState(ConnectionModalState.WAITING_FOR_SIGNATURE)
           await getIdentitySignature(connectionData.account?.toLowerCase() ?? '', connectionData.provider)
 
-          // eslint-disable-next-line @typescript-eslint/naming-convention
-          getAnalytics().track(TrackingEvents.LOGIN_SUCCESS, { eth_address: connectionData.account })
+          getAnalytics().track(TrackingEvents.LOGIN_SUCCESS, {
+            // eslint-disable-next-line @typescript-eslint/naming-convention
+            eth_address: connectionData.account,
+            // eslint-disable-next-line @typescript-eslint/naming-convention
+            login_provider: connectionData.providerType
+          })
           getAnalytics().identify({ ethAddress: connectionData.account })
           // Wait 800 ms for the tracking to be completed
           await wait(800)
