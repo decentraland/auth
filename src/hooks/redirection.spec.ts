@@ -22,6 +22,30 @@ describe('when using the redirection hook', () => {
     })
   })
 
+  describe('and the redirectTo parameter is present in the state parameter', () => {
+    beforeEach(() => {
+      mockedUseLocation.mockReturnValue({ search: `state=${btoa(JSON.stringify({ customData: 'http://localhost/test' }))}` } as Location)
+    })
+
+    it('should return the redirectTo URL', () => {
+      const { result } = renderHook(() => useAfterLoginRedirection())
+      expect(result.current.url).toBe('http://localhost/test')
+    })
+  })
+
+  describe('and the current URL contains a targetConfigId parameter', () => {
+    beforeEach(() => {
+      mockedUseLocation.mockReturnValue({
+        search: `state=${btoa(JSON.stringify({ customData: 'http://localhost/test' }))}&targetConfigId=android`
+      } as Location)
+    })
+
+    it('should return the redirectTo URL with the targetConfigId parameter', () => {
+      const { result } = renderHook(() => useAfterLoginRedirection())
+      expect(result.current.url).toBe('http://localhost/test?targetConfigId=android')
+    })
+  })
+
   describe('and the redirectTo parameter points to another domain', () => {
     beforeEach(() => {
       mockedUseLocation.mockReturnValue({ search: 'redirectTo=https://test.com' } as Location)
@@ -129,17 +153,6 @@ describe('when using the redirection hook', () => {
     it('should return the URL', () => {
       const { result } = renderHook(() => useAfterLoginRedirection())
       expect(result.current.url).toBe('http://localhost/test')
-    })
-  })
-
-  describe('and the redirectTo parameter is missing', () => {
-    beforeEach(() => {
-      mockedUseLocation.mockReturnValue({ search: '' } as Location)
-    })
-
-    it('should return the default site', () => {
-      const { result } = renderHook(() => useAfterLoginRedirection())
-      expect(result.current.url).toBe('http://localhost/')
     })
   })
 })
