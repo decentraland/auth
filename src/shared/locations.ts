@@ -35,3 +35,12 @@ export const extractRedirectToFromSearchParameters = (searchParams: URLSearchPar
 
   return redirectTo
 }
+
+export const canParseURL = (url: string): boolean => {
+  try {
+    new URL(url)
+    return true
+  } catch (error) {
+    return false
+  }
+}
