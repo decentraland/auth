@@ -8,7 +8,7 @@ import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import usePageTracking from '../../../hooks/usePageTracking'
 import { getAnalytics } from '../../../modules/analytics/segment'
-import { TrackingEvents } from '../../../modules/analytics/types'
+import { ConnectionType, TrackingEvents } from '../../../modules/analytics/types'
 import { fetchProfile } from '../../../modules/profile'
 import { isErrorWithMessage } from '../../../shared/errors'
 import { locations } from '../../../shared/locations'
@@ -42,7 +42,7 @@ export const CallbackPage = () => {
       const ethAddress = connectionData.account?.toLowerCase() ?? ''
       getAnalytics().identify({ ethAddress })
       // eslint-disable-next-line @typescript-eslint/naming-convention
-      getAnalytics().track(TrackingEvents.LOGIN_SUCCESS, { eth_address: ethAddress })
+      getAnalytics().track(TrackingEvents.LOGIN_SUCCESS, { eth_address: ethAddress, type: ConnectionType.WEB2 })
       // Wait 800 ms for the tracking to be completed
       await wait(800)
 

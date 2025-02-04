@@ -95,10 +95,11 @@ export const LoginPage = () => {
   const handleOnConnect = useCallback(
     async (connectionType: ConnectionOptionType) => {
       const isLoggingInThroughSocial = isSocialLogin(connectionType)
+      const providerType = isLoggingInThroughSocial ? ConnectionType.WEB2 : ConnectionType.WEB3
       setCurrentConnectionType(connectionType)
       getAnalytics().track(TrackingEvents.LOGIN_CLICK, {
         method: connectionType,
-        type: isLoggingInThroughSocial ? ConnectionType.WEB2 : ConnectionType.WEB3
+        type: providerType
       })
       if (isLoggingInThroughSocial) {
         setConnectionModalState(ConnectionModalState.LOADING_MAGIC)
@@ -119,8 +120,11 @@ export const LoginPage = () => {
           setConnectionModalState(ConnectionModalState.WAITING_FOR_SIGNATURE)
           await getIdentitySignature(connectionData.account?.toLowerCase() ?? '', connectionData.provider)
 
-          // eslint-disable-next-line @typescript-eslint/naming-convention
-          getAnalytics().track(TrackingEvents.LOGIN_SUCCESS, { eth_address: connectionData.account })
+          getAnalytics().track(TrackingEvents.LOGIN_SUCCESS, {
+            // eslint-disable-next-line @typescript-eslint/naming-convention
+            eth_address: connectionData.account,
+            type: providerType
+          })
           getAnalytics().identify({ ethAddress: connectionData.account })
           // Wait 800 ms for the tracking to be completed
           await wait(800)
