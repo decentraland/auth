@@ -1,6 +1,5 @@
 import { useCallback, useContext, useEffect, useState } from 'react'
 import { ProviderType } from '@dcl/schemas'
-import { Env } from '@dcl/ui-env'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import { Modal } from 'decentraland-ui/dist/components/Modal/Modal'
 import { getConfiguration, connection } from 'decentraland-connect'
@@ -10,7 +9,6 @@ import { useTargetConfig } from '../../../hooks/targetConfig'
 import usePageTracking from '../../../hooks/usePageTracking'
 import { getAnalytics } from '../../../modules/analytics/segment'
 import { TrackingEvents } from '../../../modules/analytics/types'
-import { config } from '../../../modules/config'
 import { fetchProfile } from '../../../modules/profile'
 import { isErrorWithMessage } from '../../../shared/errors'
 import { locations } from '../../../shared/locations'
@@ -35,40 +33,11 @@ export const CallbackPage = () => {
     return connectionData
   }, [flags[FeatureFlagsKeys.MAGIC_TEST]])
 
-  const logInAndRedirect = useCallback(async () => {
-    // eslint-disable-next-line @typescript-eslint/naming-convention
-    const { Magic } = await import('magic-sdk')
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
-    // eslint-disable-next-line @typescript-eslint/naming-convention
-    const { OAuthExtension } = await import('@magic-ext/oauth2')
-    const MAGIC_KEY = flags[FeatureFlagsKeys.MAGIC_TEST] ? getConfiguration().magic_test.apiKey : getConfiguration().magic.apiKey
-    const magic = new Magic(MAGIC_KEY, {
-      extensions: [new OAuthExtension()]
-    })
-
-    try {
-      setConnectionModalState(ConnectionModalState.VALIDATING_SIGN_IN)
-      await magic?.oauth2.getRedirectResult()
-      setConnectionModalState(ConnectionModalState.WAITING_FOR_CONFIRMATION)
-    } catch (error) {
-      console.error('Error logging in', error)
-      getAnalytics().track(TrackingEvents.LOGIN_ERROR, { error: isErrorWithMessage(error) ? error.message : error })
-      await wait(800)
-      navigate(locations.login())
-    }
-  }, [navigate, flags[FeatureFlagsKeys.MAGIC_TEST]])
-
-  useEffect(() => {
-    if (((config.is(Env.DEVELOPMENT) && initialized) || !config.is(Env.DEVELOPMENT)) && !logInStarted) {
-      setLogInStarted(true)
-      logInAndRedirect()
-    }
-  }, [logInAndRedirect, initialized, logInStarted])
-
   const handleContinue = useCallback(async () => {
     try {
-      setConnectionModalState(ConnectionModalState.WAITING_FOR_SIGNATURE)
+      if (!flags[FeatureFlagsKeys.DAPPS_MAGIC_AUTO_SIGN]) {
+        setConnectionModalState(ConnectionModalState.WAITING_FOR_SIGNATURE)
+      }
       const connectionData = await connectAndGenerateSignature()
       const ethAddress = connectionData.account?.toLowerCase() ?? ''
       getAnalytics().identify({ ethAddress })
@@ -97,7 +66,43 @@ export const CallbackPage = () => {
       console.log(error)
       navigate(locations.login())
     }
-  }, [navigate, redirectTo, connectAndGenerateSignature, redirect])
+  }, [navigate, redirectTo, connectAndGenerateSignature, redirect, flags[FeatureFlagsKeys.DAPPS_MAGIC_AUTO_SIGN]])
+
+  const logInAndRedirect = useCallback(async () => {
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    const { Magic } = await import('magic-sdk')
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    const { OAuthExtension } = await import('@magic-ext/oauth2')
+    const MAGIC_KEY = flags[FeatureFlagsKeys.MAGIC_TEST] ? getConfiguration().magic_test.apiKey : getConfiguration().magic.apiKey
+    const magic = new Magic(MAGIC_KEY, {
+      extensions: [new OAuthExtension()]
+    })
+
+    try {
+      setConnectionModalState(ConnectionModalState.VALIDATING_SIGN_IN)
+      await magic?.oauth2.getRedirectResult()
+      // If the flag is enabled, proceed with the simplified avatar setup flow.
+      if (flags[FeatureFlagsKeys.DAPPS_MAGIC_AUTO_SIGN]) {
+        handleContinue()
+      } else {
+        setConnectionModalState(ConnectionModalState.WAITING_FOR_CONFIRMATION)
+      }
+    } catch (error) {
+      console.error('Error logging in', error)
+      getAnalytics().track(TrackingEvents.LOGIN_ERROR, { error: isErrorWithMessage(error) ? error.message : error })
+      await wait(800)
+      navigate(locations.login())
+    }
+  }, [navigate, handleContinue, flags[FeatureFlagsKeys.MAGIC_TEST], flags[FeatureFlagsKeys.DAPPS_MAGIC_AUTO_SIGN]])
+
+  useEffect(() => {
+    if (!logInStarted && initialized) {
+      setLogInStarted(true)
+      logInAndRedirect()
+    }
+  }, [logInAndRedirect, initialized, logInStarted])
 
   if (state === ConnectionModalState.WAITING_FOR_CONFIRMATION) {
     return (
