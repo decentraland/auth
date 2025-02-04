@@ -1,7 +1,7 @@
 import { useLocation, Location } from 'react-router-dom'
 import { ConnectionOptionType } from '../components/Connection'
 import { isMobile } from '../components/Pages/LoginPage/utils'
-import { extractRedirectToFromSearchParameters, canParseURL } from '../shared/locations'
+import { extractRedirectToFromSearchParameters } from '../shared/locations'
 
 type TargetConfigId = 'default' | 'alternative' | 'ios' | 'android' | 'androidSocial' | 'androidWeb3'
 
@@ -133,14 +133,14 @@ const getTargetConfigId = (location: Location): TargetConfigId => {
     return targetConfigIdParam
   } else if (redirectTo) {
     try {
-      let redirectToUrl: URL
-      if (canParseURL(redirectTo)) {
-        redirectToUrl = new URL(redirectTo)
+      let searchParams: URLSearchParams
+      // If the redirectTo is a relative URL, we need to parse it as a search params
+      if (redirectTo.startsWith('/')) {
+        searchParams = new URLSearchParams(redirectTo)
       } else {
-        // Try to parse the redirectTo as a relative URL
-        redirectToUrl = new URL(redirectTo, 'https://someurl.com')
+        searchParams = new URL(redirectTo).searchParams
       }
-      const targetConfigIdFromRedirectTo = redirectToUrl.searchParams.get('targetConfigId') as TargetConfigId
+      const targetConfigIdFromRedirectTo = searchParams.get('targetConfigId') as TargetConfigId
       if (targetConfigIdFromRedirectTo) {
         return targetConfigIdFromRedirectTo
       }
