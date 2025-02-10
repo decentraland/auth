@@ -75,8 +75,7 @@ const Secondary = ({
 
 const defaultProps = {
   i18n: {
-    title: 'Discover a virtual social world',
-    subtitle: 'shaped by its community of creators & explorers.',
+    title: 'Sign In to Decentraland',
     accessWith: (option: ConnectionOptionType) => `Continue with ${connectionOptionTitles[option]}`,
     connectWith: (option: ConnectionOptionType) => `Continue with ${connectionOptionTitles[option]}`,
     moreOptions: 'More Options',
@@ -134,7 +133,6 @@ export const Connection = (props: ConnectionProps): JSX.Element => {
       <img className={styles.dclLogo} src={logoSrc} alt="Decentraland logo" />
       <div>
         <h1 className={styles.title}>{i18n.title}</h1>
-        <h2 className={styles.subtitle}>{i18n.subtitle}</h2>
         {connectionOptions && renderPrimary(connectionOptions.primary, PRIMARY_TEST_ID)}
         {connectionOptions?.secondary && renderPrimary(connectionOptions.secondary, SECONDARY_TEST_ID)}
       </div>
