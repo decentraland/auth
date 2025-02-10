@@ -88,7 +88,7 @@ const defaultProps = {
 export const Connection = (props: ConnectionProps): JSX.Element => {
   const { i18n = defaultProps.i18n, onConnect, onLearnMore, connectionOptions, className, loadingOption } = props
 
-  const [showMore, setShowMore] = useState(false)
+  const [showMore, setShowMore] = useState(true)
   const handleShowMore = useCallback(() => {
     setShowMore(!showMore)
   }, [showMore])
