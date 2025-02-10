@@ -56,21 +56,33 @@ describe('when rendering the component', () => {
       expect(onConnect).toHaveBeenCalledWith(ConnectionOptionType.GOOGLE)
     })
 
-    it('should render all the extra options', () => {
+    it('should render all the extra options by default', () => {
       const { getByTestId } = screen
-      act(() => {
-        fireEvent.click(getByTestId(SHOW_MORE_BUTTON_TEST_ID))
-      })
+
       connectionOptions?.extraOptions?.forEach(option => {
         expect(getByTestId(`${EXTRA_TEST_ID}-${option}-button`)).toBeInTheDocument()
       })
     })
 
-    it("should call the onConnect method prop when clicking one of the secondary options' button", () => {
-      const { getByTestId } = screen
+    it('should hide the extra options when clicking the show more button', () => {
+      const { getByTestId, queryByTestId } = screen
+
+      // First verify options are visible initially
+      connectionOptions?.extraOptions?.forEach(option => {
+        expect(getByTestId(`${EXTRA_TEST_ID}-${option}-button`)).toBeInTheDocument()
+      })
+
+      // Click the show more button
       act(() => {
         fireEvent.click(getByTestId(SHOW_MORE_BUTTON_TEST_ID))
       })
+      connectionOptions?.extraOptions?.forEach(option => {
+        expect(queryByTestId(`${EXTRA_TEST_ID}-${option}-button`)).not.toBeInTheDocument()
+      })
+    })
+
+    it("should call the onConnect method prop when clicking one of the secondary options' button", () => {
+      const { getByTestId } = screen
       connectionOptions?.extraOptions?.forEach(option => {
         fireEvent.click(getByTestId(`${EXTRA_TEST_ID}-${option}-button`))
         expect(onConnect).toHaveBeenCalledWith(option)
@@ -151,11 +163,8 @@ describe('when rendering the component', () => {
       expect(queryByTestId(SECONDARY_TEST_ID)).not.toBeInTheDocument()
     })
 
-    it('should render all the extra options', () => {
+    it('should render all the extra options by default', () => {
       const { getByTestId } = screen
-      act(() => {
-        fireEvent.click(getByTestId(SHOW_MORE_BUTTON_TEST_ID))
-      })
       connectionOptions?.extraOptions?.forEach(option => {
         expect(getByTestId(`${EXTRA_TEST_ID}-${option}-button`)).toBeInTheDocument()
       })
@@ -163,9 +172,6 @@ describe('when rendering the component', () => {
 
     it("should call the onConnect method prop when clicking one of the secondary options' button", () => {
       const { getByTestId } = screen
-      act(() => {
-        fireEvent.click(getByTestId(SHOW_MORE_BUTTON_TEST_ID))
-      })
       connectionOptions?.extraOptions?.forEach(option => {
         fireEvent.click(getByTestId(`${EXTRA_TEST_ID}-${option}-button`))
         expect(onConnect).toHaveBeenCalledWith(option)
