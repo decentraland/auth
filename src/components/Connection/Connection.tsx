@@ -88,13 +88,14 @@ const defaultProps = {
 export const Connection = (props: ConnectionProps): JSX.Element => {
   const { i18n = defaultProps.i18n, onConnect, onLearnMore, connectionOptions, className, loadingOption } = props
 
-  const [showMore, setShowMore] = useState(true)
+  const hasExtraOptions = connectionOptions?.extraOptions && connectionOptions.extraOptions.length > 0
+
+  const [showMore, setShowMore] = useState(hasExtraOptions)
   const handleShowMore = useCallback(() => {
     setShowMore(!showMore)
   }, [showMore])
 
   const isMetamaskAvailable = (window.ethereum as MetamaskEthereumWindow)?.isMetaMask
-  const hasExtraOptions = connectionOptions?.extraOptions && connectionOptions.extraOptions.length > 0
 
   const renderPrimary = (option: ConnectionOptionType, testId: string) => (
     <Primary
