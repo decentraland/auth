@@ -97,7 +97,7 @@ export const RequestPage = () => {
       try {
         const signer = await providerRef.current.getSigner()
         const signerAddress = await signer.getAddress()
-        getAnalytics().identify({ ethAddress: signerAddress })
+        getAnalytics()?.identify({ ethAddress: signerAddress })
         // Recover the request from the auth server.
         const request = await authServerFetch('recover', { requestId })
         requestRef.current = request
@@ -144,7 +144,7 @@ export const RequestPage = () => {
 
   const onDenyVerifySignIn = useCallback(async () => {
     setIsLoading(true)
-    getAnalytics().track(TrackingEvents.CLICK, {
+    getAnalytics()?.track(TrackingEvents.CLICK, {
       action: ClickEvents.DENY_SIGN_IN
     })
     try {
@@ -163,7 +163,7 @@ export const RequestPage = () => {
   }, [])
 
   const onApproveSignInVerification = useCallback(async () => {
-    getAnalytics().track(TrackingEvents.CLICK, {
+    getAnalytics()?.track(TrackingEvents.CLICK, {
       action: ClickEvents.APPROVE_SING_IN
     })
     setIsLoading(true)
@@ -199,7 +199,7 @@ export const RequestPage = () => {
   }, [setIsLoading])
 
   const onDenyWalletInteraction = useCallback(() => {
-    getAnalytics().track(TrackingEvents.CLICK, {
+    getAnalytics()?.track(TrackingEvents.CLICK, {
       action: ClickEvents.DENY_WALLET_INTERACTION
     })
     setView(View.WALLET_INTERACTION_DENIED)
@@ -215,7 +215,7 @@ export const RequestPage = () => {
 
       const signer = await provider.getSigner()
       const result = await provider.send(requestRef.current.method, requestRef.current.params)
-      getAnalytics().track(TrackingEvents.CLICK, {
+      getAnalytics()?.track(TrackingEvents.CLICK, {
         action: ClickEvents.APPROVE_WALLET_INTERACTION,
         method: requestRef.current.method
       })
