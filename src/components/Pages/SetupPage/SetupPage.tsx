@@ -119,7 +119,7 @@ export const SetupPage = () => {
 
   // Sets a random default profile.
   const handleRandomize = useCallback(() => {
-    getAnalytics().track(TrackingEvents.CLICK, {
+    getAnalytics()?.track(TrackingEvents.CLICK, {
       action: ClickEvents.RANDOMIZE
     })
 
@@ -128,7 +128,7 @@ export const SetupPage = () => {
 
   // Confirms the current default profile and goes to the form view.
   const handleContinue = useCallback(() => {
-    getAnalytics().track(TrackingEvents.AVATAR_EDIT_SUCCESS, {
+    getAnalytics()?.track(TrackingEvents.AVATAR_EDIT_SUCCESS, {
       // eslint-disable-next-line @typescript-eslint/naming-convention
       eth_address: accountRef.current,
       // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -141,7 +141,7 @@ export const SetupPage = () => {
 
   // Goes back into the randomize view to select a new default profile.
   const handleBack = useCallback(() => {
-    getAnalytics().track(TrackingEvents.CLICK, {
+    getAnalytics()?.track(TrackingEvents.CLICK, {
       action: ClickEvents.BACK_TO_AVATAR_RANDOMIZATION_VIEW
     })
 
@@ -159,7 +159,7 @@ export const SetupPage = () => {
     async (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault()
 
-      getAnalytics().track(TrackingEvents.CLICK, {
+      getAnalytics()?.track(TrackingEvents.CLICK, {
         action: ClickEvents.SUBMIT_PROFILE
       })
 
@@ -198,7 +198,7 @@ export const SetupPage = () => {
           }
         }
 
-        getAnalytics().track(TrackingEvents.TERMS_OF_SERVICE_SUCCESS, {
+        getAnalytics()?.track(TrackingEvents.TERMS_OF_SERVICE_SUCCESS, {
           // eslint-disable-next-line @typescript-eslint/naming-convention
           eth_address: accountRef.current,
           // eslint-disable-next-line @typescript-eslint/naming-convention

@@ -40,9 +40,9 @@ export const CallbackPage = () => {
       }
       const connectionData = await connectAndGenerateSignature()
       const ethAddress = connectionData.account?.toLowerCase() ?? ''
-      getAnalytics().identify({ ethAddress })
+      getAnalytics()?.identify({ ethAddress })
       // eslint-disable-next-line @typescript-eslint/naming-convention
-      getAnalytics().track(TrackingEvents.LOGIN_SUCCESS, { eth_address: ethAddress, type: ConnectionType.WEB2 })
+      getAnalytics()?.track(TrackingEvents.LOGIN_SUCCESS, { eth_address: ethAddress, type: ConnectionType.WEB2 })
       // Wait 800 ms for the tracking to be completed
       await wait(800)
 
@@ -91,7 +91,7 @@ export const CallbackPage = () => {
       }
     } catch (error) {
       console.error('Error logging in', error)
-      getAnalytics().track(TrackingEvents.LOGIN_ERROR, { error: isErrorWithMessage(error) ? error.message : error })
+      getAnalytics()?.track(TrackingEvents.LOGIN_ERROR, { error: isErrorWithMessage(error) ? error.message : error })
       await wait(800)
       navigate(locations.login())
     }

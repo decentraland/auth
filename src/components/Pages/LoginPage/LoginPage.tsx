@@ -55,7 +55,7 @@ export const LoginPage = () => {
   const handleLearnMore = useCallback(
     (option?: ConnectionOptionType) => {
       const isLearningMoreAboutMagic = option && isSocialLogin(option)
-      getAnalytics().track(TrackingEvents.CLICK, {
+      getAnalytics()?.track(TrackingEvents.CLICK, {
         action: ClickEvents.LEARN_MORE,
         type: isLearningMoreAboutMagic ? 'Learn more about Magic' : 'Learn more about wallets'
       })
@@ -79,7 +79,7 @@ export const LoginPage = () => {
 
   const handleGuestLogin = useCallback(async () => {
     // Wait 800 ms for the tracking to be completed
-    getAnalytics().track(TrackingEvents.LOGIN_CLICK, { type: 'guest' })
+    getAnalytics()?.track(TrackingEvents.LOGIN_CLICK, { type: 'guest' })
     await wait(800)
   }, [])
 
@@ -97,7 +97,7 @@ export const LoginPage = () => {
       const isLoggingInThroughSocial = isSocialLogin(connectionType)
       const providerType = isLoggingInThroughSocial ? ConnectionType.WEB2 : ConnectionType.WEB3
       setCurrentConnectionType(connectionType)
-      getAnalytics().track(TrackingEvents.LOGIN_CLICK, {
+      getAnalytics()?.track(TrackingEvents.LOGIN_CLICK, {
         method: connectionType,
         type: providerType
       })
@@ -120,12 +120,12 @@ export const LoginPage = () => {
           setConnectionModalState(ConnectionModalState.WAITING_FOR_SIGNATURE)
           await getIdentitySignature(connectionData.account?.toLowerCase() ?? '', connectionData.provider)
 
-          getAnalytics().track(TrackingEvents.LOGIN_SUCCESS, {
+          getAnalytics()?.track(TrackingEvents.LOGIN_SUCCESS, {
             // eslint-disable-next-line @typescript-eslint/naming-convention
             eth_address: connectionData.account,
             type: providerType
           })
-          getAnalytics().identify({ ethAddress: connectionData.account })
+          getAnalytics()?.identify({ ethAddress: connectionData.account })
           // Wait 800 ms for the tracking to be completed
           await wait(800)
 
@@ -149,7 +149,7 @@ export const LoginPage = () => {
           setShowConnectionModal(false)
         } catch (error) {
           console.error('Error', isErrorWithMessage(error) ? error.message : JSON.stringify(error))
-          getAnalytics().track(TrackingEvents.LOGIN_ERROR, { error: isErrorWithMessage(error) ? error.message : error })
+          getAnalytics()?.track(TrackingEvents.LOGIN_ERROR, { error: isErrorWithMessage(error) ? error.message : error })
           if (isErrorWithName(error) && error.name === 'ErrorUnlockingWallet') {
             setConnectionModalState(ConnectionModalState.ERROR_LOCKED_WALLET)
           } else {
