@@ -7,4 +7,4 @@
   Decentraland Auth UI
 </h1>
 
-The Decentraland Auth UI repository contains the UI code to belonging to the https://decentraland.org/auth site.
+The Decentraland Auth UI repository contains the UI code to belonging to the https://decentraland.org/auth site
