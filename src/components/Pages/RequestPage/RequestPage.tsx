@@ -297,7 +297,6 @@ export const RequestPage = () => {
   )
 
   const handleApproveWalletInteraction = useCallback(async () => {
-    console.log('Handle approve')
     if (isUserUsingWeb2Wallet && flags[FeatureFlagsKeys.DAPPS_MAGIC_AUTO_SIGN]) {
       setIsTransactionModalOpen(true)
     } else {
