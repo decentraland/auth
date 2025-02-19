@@ -1,12 +1,14 @@
-import { ReactNode, useCallback, useEffect, useRef, useState } from 'react'
+import { ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/catalyst.schemas'
-import { ethers, BrowserProvider } from 'ethers'
+import { ethers, BrowserProvider, formatEther } from 'ethers'
 import Icon from 'semantic-ui-react/dist/commonjs/elements/Icon/Icon'
 import { io } from 'socket.io-client'
+import { ChainId } from '@dcl/schemas'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import { CommunityBubble } from 'decentraland-ui/dist/components/CommunityBubble'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
+import { Web2TransactionModal } from 'decentraland-ui/dist/components/Web2TransactionModal'
 import { connection } from 'decentraland-connect'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useTargetConfig } from '../../../hooks/targetConfig'
@@ -19,6 +21,7 @@ import { getCurrentConnectionData } from '../../../shared/connection'
 import { isErrorWithMessage, isRpcError } from '../../../shared/errors'
 import { locations } from '../../../shared/locations'
 import { CustomWearablePreview } from '../../CustomWearablePreview'
+import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import styles from './RequestPage.module.css'
 
 enum View {
@@ -44,9 +47,17 @@ export const RequestPage = () => {
   const params = useParams()
   const navigate = useNavigateWithSearchParams()
   const providerRef = useRef<BrowserProvider>()
+  const [isUserUsingWeb2Wallet, setIsUserUsingWeb2Wallet] = useState(false)
+  const { flags, initialized } = useContext(FeatureFlagsContext)
   const [view, setView] = useState(View.LOADING_REQUEST)
   const [isLoading, setIsLoading] = useState(false)
   const [profile, setProfile] = useState<Profile | null>()
+  const [walletInfo, setWalletInfo] = useState<{
+    balance: bigint
+    chainId: number
+  }>()
+  const [transactionGasCost, setTransactionGasCost] = useState<bigint>()
+  const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false)
   // TODO: Add a type for the request.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const requestRef = useRef<any>()
@@ -66,7 +77,7 @@ export const RequestPage = () => {
   }, [requestId])
 
   useEffect(() => {
-    ;(async () => {
+    const loadRequest = async () => {
       try {
         // Try to re-stablish connection with the wallet.
         const connectionData = await getCurrentConnectionData()
@@ -75,6 +86,7 @@ export const RequestPage = () => {
           throw new Error('No account connected')
         }
         const provider = await connection.getProvider()
+        setIsUserUsingWeb2Wallet(!!provider.isMagic)
         providerRef.current = new ethers.BrowserProvider(provider)
 
         const profile = await fetchProfile(connectionData.account)
@@ -116,10 +128,26 @@ export const RequestPage = () => {
         timeoutRef.current = setTimeout(() => {
           setView(View.TIMEOUT)
         }, new Date(request.expiration).getTime() - Date.now())
-
         // Show different views depending on the request method.
         if (request.method === 'dcl_personal_sign') {
           setView(View.VERIFY_SIGN_IN)
+        } else if (request.method === 'eth_sendTransaction') {
+          try {
+            const signer = await providerRef.current.getSigner()
+            const userBalance = await providerRef.current.getBalance(signer.address)
+            setWalletInfo({
+              balance: userBalance,
+              chainId: await providerRef.current.getNetwork().then(network => Number(network.chainId))
+            })
+            const gasPrice = (await providerRef.current.getFeeData()).gasPrice ?? BigInt(0)
+            const transactionGasCost = await signer.estimateGas(request.params[0])
+            const totalGasCost = gasPrice * transactionGasCost
+            setTransactionGasCost(totalGasCost)
+          } catch (e) {
+            console.error('Error estimating gas', e)
+          } finally {
+            setView(View.WALLET_INTERACTION)
+          }
         } else {
           setView(View.WALLET_INTERACTION)
         }
@@ -127,12 +155,16 @@ export const RequestPage = () => {
         setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
         setView(View.LOADING_ERROR)
       }
-    })()
+    }
+
+    if (initialized) {
+      loadRequest()
+    }
 
     return () => {
       clearTimeout(timeoutRef.current)
     }
-  }, [toLoginPage, toSetupPage])
+  }, [toLoginPage, toSetupPage, initialized])
 
   useEffect(() => {
     // The timeout is only necessary on the verify sign in and wallet interaction views.
@@ -199,6 +231,7 @@ export const RequestPage = () => {
   }, [setIsLoading])
 
   const onDenyWalletInteraction = useCallback(() => {
+    setIsTransactionModalOpen(false)
     getAnalytics()?.track(TrackingEvents.CLICK, {
       action: ClickEvents.DENY_WALLET_INTERACTION
     })
@@ -207,6 +240,7 @@ export const RequestPage = () => {
 
   const onApproveWalletInteraction = useCallback(async () => {
     setIsLoading(true)
+    setIsTransactionModalOpen(false)
     const provider = providerRef.current
     try {
       if (!provider) {
@@ -261,6 +295,15 @@ export const RequestPage = () => {
     },
     [toLoginPage]
   )
+
+  const handleApproveWalletInteraction = useCallback(async () => {
+    console.log('Handle approve')
+    if (isUserUsingWeb2Wallet && flags[FeatureFlagsKeys.DAPPS_MAGIC_AUTO_SIGN]) {
+      setIsTransactionModalOpen(true)
+    } else {
+      await onApproveWalletInteraction()
+    }
+  }, [isUserUsingWeb2Wallet, onApproveWalletInteraction, flags[FeatureFlagsKeys.DAPPS_MAGIC_AUTO_SIGN]])
 
   const Container = useCallback(
     (props: { children: ReactNode; canChangeAccount?: boolean; isLoading?: boolean }) => {
@@ -423,14 +466,27 @@ export const RequestPage = () => {
   if (view === View.WALLET_INTERACTION && requestRef.current) {
     return (
       <Container canChangeAccount isLoading={isLoading}>
+        <Web2TransactionModal
+          isOpen={isTransactionModalOpen}
+          transactionCostAmount={formatEther((transactionGasCost ?? 0).toString())}
+          userBalanceAmount={formatEther((walletInfo?.balance ?? 0).toString())}
+          chainId={walletInfo?.chainId ?? ChainId.ETHEREUM_MAINNET}
+          onAccept={onApproveWalletInteraction}
+          onClose={onDenyWalletInteraction}
+          onReject={onDenyWalletInteraction}
+        />
         <div className={styles.logo}></div>
-        <div className={styles.title}>The {targetConfig.explorerText} wants to interact with your wallet.</div>
-        <div className={styles.description}>Review the following data carefully on your wallet before approving it.</div>
+        <div className={styles.title}>
+          {isUserUsingWeb2Wallet
+            ? 'A scene wants to access your Decentraland account assets'
+            : `The ${targetConfig.explorerText} wants to interact with your wallet`}
+        </div>
+        <div className={styles.description}>Only proceed if you are aware of all transaction details and trust this scene.</div>
         <div className={styles.buttons}>
           <Button inverted disabled={isLoading} onClick={onDenyWalletInteraction}>
             Deny
           </Button>
-          <Button primary disabled={isLoading} loading={isLoading} onClick={onApproveWalletInteraction}>
+          <Button primary disabled={isLoading} loading={isLoading} onClick={handleApproveWalletInteraction}>
             Allow
           </Button>
         </div>
