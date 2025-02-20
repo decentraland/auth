@@ -14,7 +14,7 @@ import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import usePageTracking from '../../../hooks/usePageTracking'
 import { getAnalytics } from '../../../modules/analytics/segment'
-import { ClickEvents, TrackingEvents } from '../../../modules/analytics/types'
+import { ClickEvents, RequestInteractionType, TrackingEvents } from '../../../modules/analytics/types'
 import { config } from '../../../modules/config'
 import { fetchProfile } from '../../../modules/profile'
 import { getCurrentConnectionData } from '../../../shared/connection'
@@ -138,7 +138,8 @@ export const RequestPage = () => {
         // Show different views depending on the request method.
         if (request.method === 'dcl_personal_sign') {
           setView(View.VERIFY_SIGN_IN)
-          getAnalytics()?.track(TrackingEvents.VERIFY_SIGN_IN_REQUEST_TYPE, {
+          getAnalytics()?.track(TrackingEvents.REQUEST_INTERACTION, {
+            type: RequestInteractionType.VERIFY_SIGN_IN,
             browserTime: Date.now(),
             requestTime: new Date(request.expiration).getTime(),
             requestType: requestRef.current?.method
@@ -161,7 +162,8 @@ export const RequestPage = () => {
             setView(View.WALLET_INTERACTION)
           }
         } else {
-          getAnalytics()?.track(TrackingEvents.WALLET_INTERACTION_REQUEST_TYPE, {
+          getAnalytics()?.track(TrackingEvents.REQUEST_INTERACTION, {
+            type: RequestInteractionType.WALLET_INTERACTION,
             requestType: requestRef.current?.method
           })
           setView(View.WALLET_INTERACTION)

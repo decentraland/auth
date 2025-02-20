@@ -7,8 +7,12 @@ export enum TrackingEvents {
   TERMS_OF_SERVICE_SUCCESS = 'Terms of service success',
   REQUEST_EXPIRED = 'Expired request',
   REQUEST_LOADING_ERROR = 'Error loading request',
-  WALLET_INTERACTION_REQUEST_TYPE = 'Wallet interaction request type',
-  VERIFY_SIGN_IN_REQUEST_TYPE = 'Verify sign in request type'
+  REQUEST_INTERACTION = 'Request interaction'
+}
+
+export enum RequestInteractionType {
+  VERIFY_SIGN_IN = 'Verify sign in',
+  WALLET_INTERACTION = 'Wallet interaction'
 }
 
 export enum ClickEvents {
