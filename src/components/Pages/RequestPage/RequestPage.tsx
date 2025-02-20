@@ -14,7 +14,7 @@ import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import usePageTracking from '../../../hooks/usePageTracking'
 import { getAnalytics } from '../../../modules/analytics/segment'
-import { ClickEvents, TrackingEvents } from '../../../modules/analytics/types'
+import { ClickEvents, RequestInteractionType, TrackingEvents } from '../../../modules/analytics/types'
 import { config } from '../../../modules/config'
 import { fetchProfile } from '../../../modules/profile'
 import { getCurrentConnectionData } from '../../../shared/connection'
@@ -60,7 +60,7 @@ export const RequestPage = () => {
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false)
   // TODO: Add a type for the request.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const requestRef = useRef<any>()
+  const requestRef = useRef<{ method: string; params: any[]; code?: number }>()
   const [error, setError] = useState<string>()
   const timeoutRef = useRef<NodeJS.Timeout>()
   const connectedAccountRef = useRef<string>()
@@ -78,6 +78,8 @@ export const RequestPage = () => {
 
   useEffect(() => {
     const loadRequest = async () => {
+      const timeTheSiteStartedLoading = Date.now()
+
       try {
         // Try to re-stablish connection with the wallet.
         const connectionData = await getCurrentConnectionData()
@@ -126,11 +128,22 @@ export const RequestPage = () => {
 
         // Initialize the timeout to display the timeout view when the request expires.
         timeoutRef.current = setTimeout(() => {
+          getAnalytics()?.track(TrackingEvents.REQUEST_EXPIRED, {
+            browserTime: Date.now(),
+            requestTime: new Date(request.expiration).getTime(),
+            timeTheSiteStartedLoading
+          })
           setView(View.TIMEOUT)
         }, new Date(request.expiration).getTime() - Date.now())
         // Show different views depending on the request method.
         if (request.method === 'dcl_personal_sign') {
           setView(View.VERIFY_SIGN_IN)
+          getAnalytics()?.track(TrackingEvents.REQUEST_INTERACTION, {
+            type: RequestInteractionType.VERIFY_SIGN_IN,
+            browserTime: Date.now(),
+            requestTime: new Date(request.expiration).getTime(),
+            requestType: requestRef.current?.method
+          })
         } else if (request.method === 'eth_sendTransaction') {
           try {
             const signer = await providerRef.current.getSigner()
@@ -149,10 +162,19 @@ export const RequestPage = () => {
             setView(View.WALLET_INTERACTION)
           }
         } else {
+          getAnalytics()?.track(TrackingEvents.REQUEST_INTERACTION, {
+            type: RequestInteractionType.WALLET_INTERACTION,
+            requestType: requestRef.current?.method
+          })
           setView(View.WALLET_INTERACTION)
         }
       } catch (e) {
         setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
+        getAnalytics()?.track(TrackingEvents.REQUEST_LOADING_ERROR, {
+          browserTime: Date.now(),
+          requestType: requestRef.current?.method,
+          timeTheSiteStartedLoading
+        })
         setView(View.LOADING_ERROR)
       }
     }
@@ -206,7 +228,7 @@ export const RequestPage = () => {
       }
 
       const signer = await provider.getSigner()
-      const signature = await signer.signMessage(requestRef.current.params[0])
+      const signature = await signer.signMessage(requestRef.current?.params[0])
       const result = await authServerFetch('outcome', {
         requestId,
         sender: await signer.getAddress(),
@@ -247,11 +269,15 @@ export const RequestPage = () => {
         throw new Error('Provider not created')
       }
 
+      if (!requestRef.current?.method) {
+        throw new Error('Method not found')
+      }
+
       const signer = await provider.getSigner()
-      const result = await provider.send(requestRef.current.method, requestRef.current.params)
+      const result = await provider.send(requestRef.current?.method, requestRef.current?.params)
       getAnalytics()?.track(TrackingEvents.CLICK, {
         action: ClickEvents.APPROVE_WALLET_INTERACTION,
-        method: requestRef.current.method
+        method: requestRef.current?.method
       })
       const fetchResult = await authServerFetch('outcome', {
         requestId,
@@ -421,7 +447,7 @@ export const RequestPage = () => {
         <div className={styles.logo}></div>
         <div className={styles.title}>Verify Sign In</div>
         <div className={styles.description}>Do you see the same verification number on your {targetConfig.explorerText}?</div>
-        <div className={styles.code}>{requestRef.current.code}</div>
+        <div className={styles.code}>{requestRef.current?.code}</div>
         <div className={styles.buttons}>
           <Button inverted disabled={isLoading} onClick={onDenyVerifySignIn} className={styles.noButton}>
             <Icon name="times circle" />
