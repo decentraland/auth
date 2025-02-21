@@ -1,12 +1,12 @@
 import { ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
+import { captureException } from '@sentry/react'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/catalyst.schemas'
 import { ethers, BrowserProvider, formatEther } from 'ethers'
 import Icon from 'semantic-ui-react/dist/commonjs/elements/Icon/Icon'
 import { io } from 'socket.io-client'
 import { ChainId } from '@dcl/schemas'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
-import { CommunityBubble } from 'decentraland-ui/dist/components/CommunityBubble'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
 import { Web2TransactionModal } from 'decentraland-ui/dist/components/Web2TransactionModal'
 import { connection } from 'decentraland-connect'
@@ -170,6 +170,7 @@ export const RequestPage = () => {
         }
       } catch (e) {
         setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
+        captureException(e)
         getAnalytics()?.track(TrackingEvents.REQUEST_LOADING_ERROR, {
           browserTime: Date.now(),
           requestType: requestRef.current?.method,
@@ -292,6 +293,7 @@ export const RequestPage = () => {
       }
     } catch (e) {
       console.error('Wallet error', JSON.stringify(e))
+      captureException(e)
       const signer = await providerRef.current?.getSigner()
       if (signer) {
         if (isRpcError(e)) {
@@ -352,7 +354,6 @@ export const RequestPage = () => {
                   </div>
                 ) : null}
               </div>
-              <CommunityBubble className={styles.communityBubble} />
             </div>
           </div>
         )
@@ -380,7 +381,6 @@ export const RequestPage = () => {
             <div className={styles.right}>
               {connectedAccountRef.current && profile !== null ? <CustomWearablePreview profile={connectedAccountRef.current} /> : null}
             </div>
-            <CommunityBubble className={styles.communityBubble} />
           </div>
         </div>
       )

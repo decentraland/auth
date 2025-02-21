@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo, useEffect, useContext } from 'react'
+import { captureException } from '@sentry/react'
 import { Env } from '@dcl/ui-env'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
 import Image1 from '../../../assets/images/background/image1.webp'
@@ -149,6 +150,7 @@ export const LoginPage = () => {
           setShowConnectionModal(false)
         } catch (error) {
           console.error('Error', isErrorWithMessage(error) ? error.message : JSON.stringify(error))
+          captureException(error)
           getAnalytics()?.track(TrackingEvents.LOGIN_ERROR, { error: isErrorWithMessage(error) ? error.message : error })
           if (isErrorWithName(error) && error.name === 'ErrorUnlockingWallet') {
             setConnectionModalState(ConnectionModalState.ERROR_LOCKED_WALLET)
