@@ -1,5 +1,5 @@
 {
-  "ENVIRONMENT": "production",
+  "ENVIRONMENT": "staging",
   "AUTH_SERVER_URL": "https://auth-api.decentraland.today",
   "SEGMENT_API_KEY": "FQqbzV2KeUKe2RPOeFkedKRPkJAFsU9r",
   "PEER_URL": "https://peer-testing.decentraland.org",
