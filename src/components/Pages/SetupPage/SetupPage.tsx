@@ -1,4 +1,5 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { captureException } from '@sentry/react'
 import classNames from 'classnames'
 import { AuthIdentity } from '@dcl/crypto'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
@@ -212,6 +213,7 @@ export const SetupPage = () => {
           try {
             await subscribeToNewsletter(email)
           } catch (e) {
+            captureException(e)
             console.warn('There was an error subscribing to the newsletter', (e as Error).message)
           }
         }
@@ -228,6 +230,7 @@ export const SetupPage = () => {
         // Redirect to the site defined in the search params.
         redirect()
       } catch (e) {
+        captureException(e)
         setDeployError(isErrorWithMessage(e) ? e.message : 'Unknown error')
         setDeploying(false)
 
