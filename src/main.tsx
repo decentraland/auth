@@ -15,6 +15,7 @@ import { FeatureFlagsProvider } from './components/FeatureFlagsProvider'
 import { config } from './modules/config'
 import { getAnalytics } from './modules/analytics/segment'
 import './modules/analytics/snippet'
+import './modules/analytics/sentry'
 import 'decentraland-ui/dist/themes/alternative/dark-theme.css'
 import './index.css'
 

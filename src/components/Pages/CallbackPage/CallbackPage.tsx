@@ -1,4 +1,5 @@
 import { useCallback, useContext, useEffect, useState } from 'react'
+import { captureException } from '@sentry/react'
 import { ProviderType } from '@dcl/schemas'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import { Modal } from 'decentraland-ui/dist/components/Modal/Modal'
@@ -64,6 +65,7 @@ export const CallbackPage = () => {
       redirect()
     } catch (error) {
       console.log(error)
+      captureException(error)
       navigate(locations.login())
     }
   }, [navigate, redirectTo, connectAndGenerateSignature, redirect, flags[FeatureFlagsKeys.DAPPS_MAGIC_AUTO_SIGN]])
@@ -91,6 +93,7 @@ export const CallbackPage = () => {
       }
     } catch (error) {
       console.error('Error logging in', error)
+      captureException(error)
       getAnalytics()?.track(TrackingEvents.LOGIN_ERROR, { error: isErrorWithMessage(error) ? error.message : error })
       await wait(800)
       navigate(locations.login())
