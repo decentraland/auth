@@ -18,6 +18,7 @@ import { getAnalytics } from '../../../modules/analytics/segment'
 import { ClickEvents, TrackingEvents } from '../../../modules/analytics/types'
 import { fetchProfile } from '../../../modules/profile'
 import { getCurrentConnectionData } from '../../../shared/connection'
+import { isErrorWithMessage } from '../../../shared/errors'
 import { locations } from '../../../shared/locations'
 import { CustomWearablePreview } from '../../CustomWearablePreview'
 import { FeatureFlagsContext } from '../../FeatureFlagsProvider'
@@ -33,7 +34,7 @@ function getRandomDefaultProfile() {
   return 'default' + (Math.floor(Math.random() * (160 - 1 + 1)) + 1)
 }
 
-const ErrorMessage = (props: { message: string; className?: string }) => {
+const InputErrorMessage = (props: { message: string; className?: string }) => {
   return (
     <div className={classNames(styles.error, props.className)}>
       <img src={wrongImg} />
@@ -41,6 +42,14 @@ const ErrorMessage = (props: { message: string; className?: string }) => {
     </div>
   )
 }
+
+const DeployErrorMessage = (props: { message: string }) => (
+  <div className={styles.errorMessage}>
+    <h4>An error occurred while creating your account</h4>
+    <p>Please, contact support with the following error message:</p>
+    <p>{props.message}</p>
+  </div>
+)
 
 export const SetupPage = () => {
   const navigate = useNavigateWithSearchParams()
@@ -52,6 +61,7 @@ export const SetupPage = () => {
   const [agree, setAgree] = useState(false)
   const [showErrors, setShowErrors] = useState(false)
   const [deploying, setDeploying] = useState(false)
+  const [deployError, setDeployError] = useState<string | null>(null)
 
   const accountRef = useRef<string>()
   const identityRef = useRef<AuthIdentity>()
@@ -142,6 +152,13 @@ export const SetupPage = () => {
 
   // Goes back into the randomize view to select a new default profile.
   const handleBack = useCallback(() => {
+    // Clear input values.
+    setName('')
+    setEmail('')
+    setAgree(false)
+    setShowErrors(false)
+    setDeployError(null)
+
     getAnalytics()?.track(TrackingEvents.CLICK, {
       action: ClickEvents.BACK_TO_AVATAR_RANDOMIZATION_VIEW
     })
@@ -180,6 +197,7 @@ export const SetupPage = () => {
 
       try {
         setDeploying(true)
+        setDeployError(null)
 
         // Deploy a new profile for the user based on the selected default profile.
         await deployProfileFromDefault({
@@ -213,6 +231,7 @@ export const SetupPage = () => {
         redirect()
       } catch (e) {
         captureException(e)
+        setDeployError(isErrorWithMessage(e) ? e.message : 'Unknown error')
         setDeploying(false)
 
         // TODO: Display a proper error on the page to show the user.
@@ -347,16 +366,18 @@ export const SetupPage = () => {
                   label="Username"
                   placeholder="Enter your Username"
                   onChange={handleNameChange}
-                  message={showErrors && nameError ? <ErrorMessage message={nameError} /> : undefined}
+                  value={name}
+                  message={showErrors && nameError ? <InputErrorMessage message={nameError} /> : undefined}
                 />
               </div>
               <div>
                 <Field
                   label="Email (optional)"
                   placeholder="Enter your email"
+                  value={email}
                   message={
                     <>
-                      {showErrors && emailError ? <ErrorMessage className={styles.emailError} message={emailError} /> : null}
+                      {showErrors && emailError ? <InputErrorMessage className={styles.emailError} message={emailError} /> : null}
                       <span>
                         Subscribe to Decentraland's newsletter to receive the latest news about events, updates, contests and more.
                       </span>
@@ -366,7 +387,7 @@ export const SetupPage = () => {
                 />
               </div>
               <div className={styles.agree}>
-                <Checkbox onChange={handleAgreeChange} />
+                <Checkbox onChange={handleAgreeChange} checked={agree} />
                 <div>
                   I agree with Decentraland's&nbsp;
                   <a target="_blank" rel="noopener noreferrer" href="https://decentraland.org/terms/">
@@ -379,13 +400,14 @@ export const SetupPage = () => {
                   .
                 </div>
               </div>
-              {showErrors && agreeError ? <ErrorMessage className={styles.agreeError} message={agreeError} /> : null}
+              {showErrors && agreeError ? <InputErrorMessage className={styles.agreeError} message={agreeError} /> : null}
               <div className={styles.jumpIn}>
                 <Button primary fluid type="submit" disabled={!agree || deploying} loading={deploying}>
                   {continueMessage}
                 </Button>
               </div>
             </form>
+            {deployError ? <DeployErrorMessage message={deployError} /> : null}
           </div>
         </div>
       </Mobile>
@@ -406,16 +428,18 @@ export const SetupPage = () => {
                     label="Username"
                     placeholder="Enter your username"
                     onChange={handleNameChange}
-                    message={showErrors && nameError ? <ErrorMessage message={nameError} /> : undefined}
+                    value={name}
+                    message={showErrors && nameError ? <InputErrorMessage message={nameError} /> : undefined}
                   />
                 </div>
                 <div>
                   <Field
                     label="Email (optional)"
                     placeholder="Enter your email"
+                    value={email}
                     message={
                       <>
-                        {showErrors && emailError ? <ErrorMessage className={styles.emailError} message={emailError} /> : null}
+                        {showErrors && emailError ? <InputErrorMessage className={styles.emailError} message={emailError} /> : null}
                         <span>
                           Subscribe to Decentraland's newsletter to receive the latest news about events, updates, contests and more.
                         </span>
@@ -425,7 +449,7 @@ export const SetupPage = () => {
                   />
                 </div>
                 <div className={styles.agree}>
-                  <Checkbox onChange={handleAgreeChange} />I agree with Decentraland's&nbsp;
+                  <Checkbox onChange={handleAgreeChange} checked={agree} />I agree with Decentraland's&nbsp;
                   <a target="_blank" rel="noopener noreferrer" href="https://decentraland.org/terms/">
                     Terms of use
                   </a>
@@ -435,13 +459,14 @@ export const SetupPage = () => {
                   </a>
                   .
                 </div>
-                {showErrors && agreeError ? <ErrorMessage className={styles.agreeError} message={agreeError} /> : null}
+                {showErrors && agreeError ? <InputErrorMessage className={styles.agreeError} message={agreeError} /> : null}
                 <div className={styles.jumpIn}>
                   <Button primary fluid type="submit" disabled={!agree || deploying} loading={deploying}>
                     {continueMessage}
                   </Button>
                 </div>
               </form>
+              {deployError ? <DeployErrorMessage message={deployError} /> : null}
             </div>
           </div>
           <div className={styles.right}>
