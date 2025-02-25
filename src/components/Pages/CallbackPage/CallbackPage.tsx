@@ -24,7 +24,7 @@ export const CallbackPage = () => {
   const { url: redirectTo, redirect } = useAfterLoginRedirection()
   const navigate = useNavigateWithSearchParams()
   const [logInStarted, setLogInStarted] = useState(false)
-  const [state, setConnectionModalState] = useState(ConnectionModalState.WAITING_FOR_CONFIRMATION)
+  const [state, setConnectionModalState] = useState(ConnectionModalState.VALIDATING_SIGN_IN)
   const { flags, initialized } = useContext(FeatureFlagsContext)
   const [targetConfig] = useTargetConfig()
 
@@ -83,7 +83,9 @@ export const CallbackPage = () => {
     })
 
     try {
-      setConnectionModalState(ConnectionModalState.VALIDATING_SIGN_IN)
+      if (!flags[FeatureFlagsKeys.DAPPS_MAGIC_AUTO_SIGN]) {
+        setConnectionModalState(ConnectionModalState.VALIDATING_SIGN_IN)
+      }
       await magic?.oauth2.getRedirectResult()
       // If the flag is enabled, proceed with the simplified avatar setup flow.
       if (flags[FeatureFlagsKeys.DAPPS_MAGIC_AUTO_SIGN]) {
