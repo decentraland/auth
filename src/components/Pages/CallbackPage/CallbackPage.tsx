@@ -7,7 +7,6 @@ import { getConfiguration, connection } from 'decentraland-connect'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { useTargetConfig } from '../../../hooks/targetConfig'
-import usePageTracking from '../../../hooks/usePageTracking'
 import { getAnalytics } from '../../../modules/analytics/segment'
 import { ConnectionType, TrackingEvents } from '../../../modules/analytics/types'
 import { fetchProfile } from '../../../modules/profile'
@@ -20,7 +19,6 @@ import { getIdentitySignature } from '../LoginPage/utils'
 import styles from './CallbackPage.module.css'
 
 export const CallbackPage = () => {
-  usePageTracking()
   const { url: redirectTo, redirect } = useAfterLoginRedirection()
   const navigate = useNavigateWithSearchParams()
   const [logInStarted, setLogInStarted] = useState(false)

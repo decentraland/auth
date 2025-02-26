@@ -1,4 +1,5 @@
 import { PropsWithChildren, useEffect, useRef, useState } from 'react'
+import { captureException } from '@sentry/react'
 import { config } from '../../modules/config'
 import { defaultFeatureFlagsContextValue, FeatureFlagsContext } from './FeatureFlagsProvider.types'
 
@@ -11,10 +12,16 @@ export const FeatureFlagsProvider = (props: PropsWithChildren<unknown>) => {
     ;(async () => {
       if (shouldFetch) {
         setShouldFetch(false)
-        const baseUrl = config.get('FEATURE_FLAGS_URL')
-        const response = await fetch(`${baseUrl}/dapps.json`)
-        const json = await response.json()
-        setValue({ ...value, flags: json.flags, initialized: true })
+        try {
+          const baseUrl = config.get('FEATURE_FLAGS_URL')
+          const response = await fetch(`${baseUrl}/dapps.json`)
+          const json = await response.json()
+          setValue({ ...value, flags: json.flags, initialized: true })
+        } catch (error) {
+          captureException(error)
+          setValue({ ...value, flags: {}, initialized: true })
+          console.error('Error fetching feature flags', error)
+        }
       }
     })()
   }, [shouldFetch])

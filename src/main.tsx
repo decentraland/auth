@@ -1,9 +1,9 @@
 /* eslint-disable import/order */
 /* eslint-disable @typescript-eslint/naming-convention */
 import 'semantic-ui-css/semantic.min.css'
-import React from 'react'
+import React, { useEffect } from 'react'
 import ReactDOM from 'react-dom'
-import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { RequestPage } from './components/Pages/RequestPage'
 import { SetupPage } from './components/Pages/SetupPage'
 import { DefaultPage } from './components/Pages/DefaultPage'
@@ -21,18 +21,31 @@ import './index.css'
 
 getAnalytics()?.load(config.get('SEGMENT_API_KEY'))
 
+const SiteRoutes = () => {
+  const location = useLocation()
+  const analytics = getAnalytics()
+
+  useEffect(() => {
+    analytics?.page()
+  }, [location, analytics])
+
+  return (
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/invalidRedirection" element={<InvalidRedirectionPage />} />
+      <Route path="/callback" element={<CallbackPage />} />
+      <Route path="/requests/:requestId" element={<RequestPage />} />
+      <Route path="/setup" element={<SetupPage />} />
+      <Route path="*" element={<DefaultPage />} />
+    </Routes>
+  )
+}
+
 ReactDOM.render(
   <React.StrictMode>
     <FeatureFlagsProvider>
       <BrowserRouter basename="/auth">
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/invalidRedirection" element={<InvalidRedirectionPage />} />
-          <Route path="/callback" element={<CallbackPage />} />
-          <Route path="/requests/:requestId" element={<RequestPage />} />
-          <Route path="/setup" element={<SetupPage />} />
-          <Route path="*" element={<DefaultPage />} />
-        </Routes>
+        <SiteRoutes />
       </BrowserRouter>
       <Intercom appId={config.get('INTERCOM_APP_ID')} settings={{ alignment: 'right' }} />
     </FeatureFlagsProvider>
