@@ -12,7 +12,6 @@ import { Web2TransactionModal } from 'decentraland-ui/dist/components/Web2Transa
 import { connection } from 'decentraland-connect'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useTargetConfig } from '../../../hooks/targetConfig'
-import usePageTracking from '../../../hooks/usePageTracking'
 import { getAnalytics } from '../../../modules/analytics/segment'
 import { ClickEvents, RequestInteractionType, TrackingEvents } from '../../../modules/analytics/types'
 import { config } from '../../../modules/config'
@@ -43,7 +42,6 @@ enum View {
 }
 
 export const RequestPage = () => {
-  usePageTracking()
   const params = useParams()
   const navigate = useNavigateWithSearchParams()
   const providerRef = useRef<BrowserProvider>()
