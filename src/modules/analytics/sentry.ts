@@ -12,5 +12,16 @@ init({
   // Session Replay
   replaysSessionSampleRate: 0.01,
   replaysOnErrorSampleRate: 0.01,
-  enabled: !config.is(Env.DEVELOPMENT)
+  enabled: !config.is(Env.DEVELOPMENT),
+  beforeSend(event) {
+    // Filter out exceptions from GTM and STAG
+    if (
+      event.exception?.values?.some(exception =>
+        exception.stacktrace?.frames?.some(frame => frame.filename?.includes('gtm') || frame.filename?.includes('stag'))
+      )
+    ) {
+      return null
+    }
+    return event
+  }
 })
