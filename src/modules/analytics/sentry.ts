@@ -12,5 +12,6 @@ init({
   // Session Replay
   replaysSessionSampleRate: 0.01,
   replaysOnErrorSampleRate: 0.01,
-  enabled: !config.is(Env.DEVELOPMENT)
+  enabled: !config.is(Env.DEVELOPMENT),
+  ignoreErrors: ["Cannot read properties of undefined (reading 'track')"]
 })
