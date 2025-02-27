@@ -101,10 +101,17 @@ export const LoginPage = () => {
         type: providerType
       })
       if (isLoggingInThroughSocial) {
-        setConnectionModalState(ConnectionModalState.LOADING_MAGIC)
-        // Wait 800 ms for the tracking to be completed
-        await wait(800)
-        await connectToSocialProvider(connectionType, flags[FeatureFlagsKeys.MAGIC_TEST], redirectTo)
+        try {
+          setConnectionModalState(ConnectionModalState.LOADING_MAGIC)
+          // Wait 800 ms for the tracking to be completed
+          await wait(800)
+          await connectToSocialProvider(connectionType, flags[FeatureFlagsKeys.MAGIC_TEST], redirectTo)
+        } catch (error) {
+          console.error('Error', isErrorWithMessage(error) ? error.message : JSON.stringify(error))
+          captureException(error, { tags: { isWeb2Wallet: true, connectionType } })
+          getAnalytics()?.track(TrackingEvents.LOGIN_ERROR, { error: isErrorWithMessage(error) ? error.message : error })
+          setConnectionModalState(ConnectionModalState.ERROR)
+        }
       } else {
         try {
           setShowConnectionModal(true)
@@ -148,7 +155,7 @@ export const LoginPage = () => {
           setShowConnectionModal(false)
         } catch (error) {
           console.error('Error', isErrorWithMessage(error) ? error.message : JSON.stringify(error))
-          captureException(error)
+          captureException(error, { tags: { isWeb2Wallet: true, connectionType } })
           getAnalytics()?.track(TrackingEvents.LOGIN_ERROR, { error: isErrorWithMessage(error) ? error.message : error })
           if (isErrorWithName(error) && error.name === 'ErrorUnlockingWallet') {
             setConnectionModalState(ConnectionModalState.ERROR_LOCKED_WALLET)
