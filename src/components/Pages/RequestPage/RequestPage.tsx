@@ -5,7 +5,7 @@ import { Profile } from 'dcl-catalyst-client/dist/client/specs/catalyst.schemas'
 import { ethers, BrowserProvider, formatEther } from 'ethers'
 import Icon from 'semantic-ui-react/dist/commonjs/elements/Icon/Icon'
 import { io } from 'socket.io-client'
-import { ChainId } from '@dcl/schemas'
+import { ChainId, ProviderType } from '@dcl/schemas'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
 import { Web2TransactionModal } from 'decentraland-ui/dist/components/Web2TransactionModal'
@@ -77,10 +77,11 @@ export const RequestPage = () => {
   useEffect(() => {
     const loadRequest = async () => {
       const timeTheSiteStartedLoading = Date.now()
+      let connectionData: Awaited<ReturnType<typeof getCurrentConnectionData>> | null = null
 
       try {
         // Try to re-stablish connection with the wallet.
-        const connectionData = await getCurrentConnectionData()
+        connectionData = await getCurrentConnectionData()
         // Goes to the login page if no account is returned in the data.
         if (!connectionData) {
           throw new Error('No account connected')
@@ -168,7 +169,9 @@ export const RequestPage = () => {
         }
       } catch (e) {
         setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
-        captureException(e)
+        captureException(e, {
+          tags: { isWeb2Wallet: connectionData?.providerType === ProviderType.MAGIC, providerType: connectionData?.providerType }
+        })
         getAnalytics()?.track(TrackingEvents.REQUEST_LOADING_ERROR, {
           browserTime: Date.now(),
           requestType: requestRef.current?.method,
@@ -245,11 +248,12 @@ export const RequestPage = () => {
       }
     } catch (e) {
       setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
+      captureException(e, { tags: { isWeb2Wallet: isUserUsingWeb2Wallet } })
       setView(View.VERIFY_SIGN_IN_ERROR)
     } finally {
       setIsLoading(false)
     }
-  }, [setIsLoading])
+  }, [setIsLoading, isUserUsingWeb2Wallet])
 
   const onDenyWalletInteraction = useCallback(() => {
     setIsTransactionModalOpen(false)
@@ -291,7 +295,7 @@ export const RequestPage = () => {
       }
     } catch (e) {
       console.error('Wallet error', JSON.stringify(e))
-      captureException(e)
+      captureException(e, { tags: { isWeb2Wallet: isUserUsingWeb2Wallet } })
       const signer = await providerRef.current?.getSigner()
       if (signer) {
         if (isRpcError(e)) {
@@ -311,7 +315,7 @@ export const RequestPage = () => {
       setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
       setView(View.WALLET_INTERACTION_ERROR)
     }
-  }, [])
+  }, [isUserUsingWeb2Wallet])
 
   const onChangeAccount = useCallback(
     async evt => {
