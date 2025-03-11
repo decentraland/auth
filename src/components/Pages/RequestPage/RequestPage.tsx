@@ -1,4 +1,4 @@
-import { ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react'
+import { ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { captureException } from '@sentry/react'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/catalyst.schemas'
@@ -20,7 +20,6 @@ import { getCurrentConnectionData } from '../../../shared/connection'
 import { isErrorWithMessage, isRpcError } from '../../../shared/errors'
 import { locations } from '../../../shared/locations'
 import { CustomWearablePreview } from '../../CustomWearablePreview'
-import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import styles from './RequestPage.module.css'
 
 enum View {
@@ -46,7 +45,6 @@ export const RequestPage = () => {
   const navigate = useNavigateWithSearchParams()
   const providerRef = useRef<BrowserProvider>()
   const [isUserUsingWeb2Wallet, setIsUserUsingWeb2Wallet] = useState(false)
-  const { flags, initialized } = useContext(FeatureFlagsContext)
   const [view, setView] = useState(View.LOADING_REQUEST)
   const [isLoading, setIsLoading] = useState(false)
   const [profile, setProfile] = useState<Profile | null>()
@@ -181,14 +179,12 @@ export const RequestPage = () => {
       }
     }
 
-    if (initialized) {
-      loadRequest()
-    }
+    loadRequest()
 
     return () => {
       clearTimeout(timeoutRef.current)
     }
-  }, [toLoginPage, toSetupPage, initialized])
+  }, [toLoginPage, toSetupPage])
 
   useEffect(() => {
     // The timeout is only necessary on the verify sign in and wallet interaction views.
@@ -327,12 +323,12 @@ export const RequestPage = () => {
   )
 
   const handleApproveWalletInteraction = useCallback(async () => {
-    if (isUserUsingWeb2Wallet && flags[FeatureFlagsKeys.DAPPS_MAGIC_AUTO_SIGN]) {
+    if (isUserUsingWeb2Wallet) {
       setIsTransactionModalOpen(true)
     } else {
       await onApproveWalletInteraction()
     }
-  }, [isUserUsingWeb2Wallet, onApproveWalletInteraction, flags[FeatureFlagsKeys.DAPPS_MAGIC_AUTO_SIGN]])
+  }, [isUserUsingWeb2Wallet, onApproveWalletInteraction])
 
   const Container = useCallback(
     (props: { children: ReactNode; canChangeAccount?: boolean; isLoading?: boolean }) => {
