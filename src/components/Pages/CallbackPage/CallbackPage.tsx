@@ -1,8 +1,6 @@
 import { useCallback, useContext, useEffect, useState } from 'react'
 import { captureException } from '@sentry/react'
 import { ProviderType } from '@dcl/schemas'
-import { Button } from 'decentraland-ui/dist/components/Button/Button'
-import { Modal } from 'decentraland-ui/dist/components/Modal/Modal'
 import { getConfiguration, connection } from 'decentraland-connect'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
@@ -16,13 +14,11 @@ import { wait } from '../../../shared/time'
 import { ConnectionModal, ConnectionModalState } from '../../ConnectionModal'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import { getIdentitySignature } from '../LoginPage/utils'
-import styles from './CallbackPage.module.css'
 
 export const CallbackPage = () => {
   const { url: redirectTo, redirect } = useAfterLoginRedirection()
   const navigate = useNavigateWithSearchParams()
   const [logInStarted, setLogInStarted] = useState(false)
-  const [state, setConnectionModalState] = useState(ConnectionModalState.VALIDATING_SIGN_IN)
   const { flags, initialized } = useContext(FeatureFlagsContext)
   const [targetConfig] = useTargetConfig()
 
@@ -34,9 +30,6 @@ export const CallbackPage = () => {
 
   const handleContinue = useCallback(async () => {
     try {
-      if (!flags[FeatureFlagsKeys.DAPPS_MAGIC_AUTO_SIGN]) {
-        setConnectionModalState(ConnectionModalState.WAITING_FOR_SIGNATURE)
-      }
       const connectionData = await connectAndGenerateSignature()
       const ethAddress = connectionData.account?.toLowerCase() ?? ''
       getAnalytics()?.identify({ ethAddress })
@@ -66,7 +59,7 @@ export const CallbackPage = () => {
       captureException(error)
       navigate(locations.login())
     }
-  }, [navigate, redirectTo, connectAndGenerateSignature, redirect, flags[FeatureFlagsKeys.DAPPS_MAGIC_AUTO_SIGN]])
+  }, [navigate, redirectTo, connectAndGenerateSignature, redirect])
 
   const logInAndRedirect = useCallback(async () => {
     // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -81,16 +74,8 @@ export const CallbackPage = () => {
     })
 
     try {
-      if (!flags[FeatureFlagsKeys.DAPPS_MAGIC_AUTO_SIGN]) {
-        setConnectionModalState(ConnectionModalState.VALIDATING_SIGN_IN)
-      }
       await magic?.oauth2.getRedirectResult()
-      // If the flag is enabled, proceed with the simplified avatar setup flow.
-      if (flags[FeatureFlagsKeys.DAPPS_MAGIC_AUTO_SIGN]) {
-        handleContinue()
-      } else {
-        setConnectionModalState(ConnectionModalState.WAITING_FOR_CONFIRMATION)
-      }
+      handleContinue()
     } catch (error) {
       console.error('Error logging in', error)
       captureException(error)
@@ -98,7 +83,7 @@ export const CallbackPage = () => {
       await wait(800)
       navigate(locations.login())
     }
-  }, [navigate, handleContinue, flags[FeatureFlagsKeys.MAGIC_TEST], flags[FeatureFlagsKeys.DAPPS_MAGIC_AUTO_SIGN]])
+  }, [navigate, handleContinue, flags[FeatureFlagsKeys.MAGIC_TEST]])
 
   useEffect(() => {
     if (!logInStarted && initialized) {
@@ -107,27 +92,10 @@ export const CallbackPage = () => {
     }
   }, [logInAndRedirect, initialized, logInStarted])
 
-  if (state === ConnectionModalState.WAITING_FOR_CONFIRMATION) {
-    return (
-      <Modal size="tiny" open>
-        <div className={styles.container}>
-          <h3 className={styles.title}>Confirm your login</h3>
-          <div className={styles.info}>
-            <span>The next step only verifies your identity.</span>
-            <span>No payments or transactions will occur without your explicit approval.</span>
-          </div>
-          <Button primary onClick={handleContinue}>
-            Continue
-          </Button>
-        </div>
-      </Modal>
-    )
-  }
-
   return (
     <ConnectionModal
       open={true}
-      state={state}
+      state={ConnectionModalState.WAITING_FOR_SIGNATURE}
       onTryAgain={connectAndGenerateSignature}
       providerType={flags[FeatureFlagsKeys.MAGIC_TEST] ? ProviderType.MAGIC_TEST : ProviderType.MAGIC}
     />
