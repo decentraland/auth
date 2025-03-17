@@ -1,4 +1,4 @@
-import { OAuthProvider } from '@magic-ext/oauth'
+import type { OAuthProvider } from '@magic-ext/oauth2'
 import { ethers } from 'ethers'
 import { AuthIdentity, Authenticator } from '@dcl/crypto'
 import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
@@ -8,15 +8,13 @@ import { ConnectionOptionType } from '../../Connection'
 
 const ONE_MONTH_IN_MINUTES = 60 * 24 * 30
 
-const MAGIC_KEY = getConfiguration().magic.apiKey
-
-export function fromConnectionOptionToProviderType(connectionType: ConnectionOptionType) {
+export function fromConnectionOptionToProviderType(connectionType: ConnectionOptionType, isTesting?: boolean) {
   switch (connectionType) {
     case ConnectionOptionType.DISCORD:
     case ConnectionOptionType.X:
     case ConnectionOptionType.GOOGLE:
     case ConnectionOptionType.APPLE:
-      return ProviderType.MAGIC
+      return isTesting ? ProviderType.MAGIC_TEST : ProviderType.MAGIC
     case ConnectionOptionType.WALLET_CONNECT:
     case ConnectionOptionType.METAMASK_MOBILE:
       return ProviderType.WALLET_CONNECT_V2
@@ -49,27 +47,38 @@ async function generateIdentity(address: string, provider: Provider): Promise<Au
   return Authenticator.initializeAuthChain(address, payload, ONE_MONTH_IN_MINUTES, message => signer.signMessage(message))
 }
 
-export async function connectToProvider(connectionOption: ConnectionOptionType): Promise<ConnectionResponse> {
-  const providerType = fromConnectionOptionToProviderType(connectionOption)
-  if (ProviderType.MAGIC === providerType) {
+export async function connectToSocialProvider(
+  connectionOption: ConnectionOptionType,
+  isTesting?: boolean,
+  redirectTo?: string
+): Promise<void> {
+  const MAGIC_KEY = isTesting ? getConfiguration().magic_test.apiKey : getConfiguration().magic.apiKey
+  const providerType = fromConnectionOptionToProviderType(connectionOption, isTesting)
+  if (ProviderType.MAGIC === providerType || ProviderType.MAGIC_TEST === providerType) {
     // eslint-disable-next-line @typescript-eslint/naming-convention
     const { Magic } = await import('magic-sdk')
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
     // eslint-disable-next-line @typescript-eslint/naming-convention
-    const { OAuthExtension } = await import('@magic-ext/oauth')
+    const { OAuthExtension } = await import('@magic-ext/oauth2')
     const magic = new Magic(MAGIC_KEY, {
       extensions: [new OAuthExtension()]
     })
 
     const url = new URL(window.location.href)
     url.pathname = '/auth/callback'
+    url.search = ''
 
-    await magic.oauth.loginWithRedirect({
+    await magic?.oauth2.loginWithRedirect({
       provider: connectionOption === ConnectionOptionType.X ? 'twitter' : (connectionOption as OAuthProvider),
-      redirectURI: url.href
+      redirectURI: url.href,
+      customData: redirectTo
     })
   }
+}
+
+export async function connectToProvider(connectionOption: ConnectionOptionType): Promise<ConnectionResponse> {
+  const providerType = fromConnectionOptionToProviderType(connectionOption)
 
   let connectionData: ConnectionResponse
   try {
@@ -106,7 +115,7 @@ export async function getIdentitySignature(address: string, provider: Provider):
   return identity
 }
 
-export function getIsMobile() {
+export function isMobile() {
   const userAgent = navigator.userAgent
   return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent)
 }

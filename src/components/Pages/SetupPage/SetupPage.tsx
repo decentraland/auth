@@ -1,4 +1,5 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { captureException } from '@sentry/react'
 import classNames from 'classnames'
 import { AuthIdentity } from '@dcl/crypto'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
@@ -11,11 +12,14 @@ import backImg from '../../../assets/images/back.svg'
 import diceImg from '../../../assets/images/dice.svg'
 import logoImg from '../../../assets/images/logo.svg'
 import wrongImg from '../../../assets/images/wrong.svg'
+import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { getAnalytics } from '../../../modules/analytics/segment'
 import { ClickEvents, TrackingEvents } from '../../../modules/analytics/types'
 import { fetchProfile } from '../../../modules/profile'
 import { getCurrentConnectionData } from '../../../shared/connection'
+import { isErrorWithMessage } from '../../../shared/errors'
+import { locations } from '../../../shared/locations'
 import { CustomWearablePreview } from '../../CustomWearablePreview'
 import { FeatureFlagsContext } from '../../FeatureFlagsProvider'
 import { deployProfileFromDefault, subscribeToNewsletter } from './utils'
@@ -30,7 +34,7 @@ function getRandomDefaultProfile() {
   return 'default' + (Math.floor(Math.random() * (160 - 1 + 1)) + 1)
 }
 
-const ErrorMessage = (props: { message: string; className?: string }) => {
+const InputErrorMessage = (props: { message: string; className?: string }) => {
   return (
     <div className={classNames(styles.error, props.className)}>
       <img src={wrongImg} />
@@ -39,7 +43,16 @@ const ErrorMessage = (props: { message: string; className?: string }) => {
   )
 }
 
+const DeployErrorMessage = (props: { message: string }) => (
+  <div className={styles.errorMessage}>
+    <h4>An error occurred while creating your account</h4>
+    <p>Please, contact support with the following error message:</p>
+    <p>{props.message}</p>
+  </div>
+)
+
 export const SetupPage = () => {
+  const navigate = useNavigateWithSearchParams()
   const [initialized, setInitialized] = useState(false)
   const [view, setView] = useState(View.RANDOMIZE)
   const [profile, setProfile] = useState(getRandomDefaultProfile())
@@ -48,13 +61,14 @@ export const SetupPage = () => {
   const [agree, setAgree] = useState(false)
   const [showErrors, setShowErrors] = useState(false)
   const [deploying, setDeploying] = useState(false)
+  const [deployError, setDeployError] = useState<string | null>(null)
 
   const accountRef = useRef<string>()
   const identityRef = useRef<AuthIdentity>()
 
   const { initialized: initializedFlags } = useContext(FeatureFlagsContext)
 
-  const redirectTo = useAfterLoginRedirection()
+  const { url: redirectTo, redirect } = useAfterLoginRedirection()
 
   // Validate the name.
   const nameError = useMemo(() => {
@@ -116,7 +130,7 @@ export const SetupPage = () => {
 
   // Sets a random default profile.
   const handleRandomize = useCallback(() => {
-    getAnalytics().track(TrackingEvents.CLICK, {
+    getAnalytics()?.track(TrackingEvents.CLICK, {
       action: ClickEvents.RANDOMIZE
     })
 
@@ -125,7 +139,7 @@ export const SetupPage = () => {
 
   // Confirms the current default profile and goes to the form view.
   const handleContinue = useCallback(() => {
-    getAnalytics().track(TrackingEvents.AVATAR_EDIT_SUCCESS, {
+    getAnalytics()?.track(TrackingEvents.AVATAR_EDIT_SUCCESS, {
       // eslint-disable-next-line @typescript-eslint/naming-convention
       eth_address: accountRef.current,
       // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -138,7 +152,14 @@ export const SetupPage = () => {
 
   // Goes back into the randomize view to select a new default profile.
   const handleBack = useCallback(() => {
-    getAnalytics().track(TrackingEvents.CLICK, {
+    // Clear input values.
+    setName('')
+    setEmail('')
+    setAgree(false)
+    setShowErrors(false)
+    setDeployError(null)
+
+    getAnalytics()?.track(TrackingEvents.CLICK, {
       action: ClickEvents.BACK_TO_AVATAR_RANDOMIZATION_VIEW
     })
 
@@ -156,7 +177,7 @@ export const SetupPage = () => {
     async (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault()
 
-      getAnalytics().track(TrackingEvents.CLICK, {
+      getAnalytics()?.track(TrackingEvents.CLICK, {
         action: ClickEvents.SUBMIT_PROFILE
       })
 
@@ -176,6 +197,7 @@ export const SetupPage = () => {
 
       try {
         setDeploying(true)
+        setDeployError(null)
 
         // Deploy a new profile for the user based on the selected default profile.
         await deployProfileFromDefault({
@@ -191,11 +213,12 @@ export const SetupPage = () => {
           try {
             await subscribeToNewsletter(email)
           } catch (e) {
+            captureException(e)
             console.warn('There was an error subscribing to the newsletter', (e as Error).message)
           }
         }
 
-        getAnalytics().track(TrackingEvents.TERMS_OF_SERVICE_SUCCESS, {
+        getAnalytics()?.track(TrackingEvents.TERMS_OF_SERVICE_SUCCESS, {
           // eslint-disable-next-line @typescript-eslint/naming-convention
           eth_address: accountRef.current,
           // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -205,29 +228,23 @@ export const SetupPage = () => {
         })
 
         // Redirect to the site defined in the search params.
-        if (redirectTo) {
-          window.location.href = redirectTo
-        } else {
-          window.location.href = '/'
-        }
+        redirect()
       } catch (e) {
+        captureException(e)
+        setDeployError(isErrorWithMessage(e) ? e.message : 'Unknown error')
         setDeploying(false)
 
         // TODO: Display a proper error on the page to show the user.
         console.error('There was an error deploying the profile', (e as Error).message)
       }
     },
-    [nameError, emailError, agreeError, name, email, agree, profile, redirectTo]
+    [nameError, emailError, agreeError, name, email, agree, profile, redirect]
   )
 
   // Initialization effect.
   // Will run some checks to see if the user can proceed with the simplified avatar setup flow.
   useEffect(() => {
     ;(async () => {
-      const toLogin = () => {
-        window.location.href = `/auth/login${redirectTo ? `?redirectTo=${redirectTo}` : ''}`
-      }
-
       // Check if the wallet is connected.
       try {
         const connectionData = await getCurrentConnectionData()
@@ -238,8 +255,7 @@ export const SetupPage = () => {
         identityRef.current = connectionData.identity
       } catch (e) {
         console.warn('No previous connection found')
-        toLogin()
-        return
+        return navigate(locations.login(redirectTo))
       }
 
       const profile = await fetchProfile(accountRef.current)
@@ -247,20 +263,12 @@ export const SetupPage = () => {
       // Check that the connected account does not have a profile already.
       if (profile) {
         console.warn('Profile already exists')
-
-        if (redirectTo) {
-          console.log('Redirecting to', redirectTo)
-          window.location.href = redirectTo
-        } else {
-          window.location.href = '/'
-        }
-
-        return
+        return redirect()
       }
 
       setInitialized(true)
     })()
-  }, [redirectTo])
+  }, [redirect, navigate])
 
   if (!initialized || !initializedFlags) {
     return (
@@ -358,16 +366,18 @@ export const SetupPage = () => {
                   label="Username"
                   placeholder="Enter your Username"
                   onChange={handleNameChange}
-                  message={showErrors && nameError ? <ErrorMessage message={nameError} /> : undefined}
+                  value={name}
+                  message={showErrors && nameError ? <InputErrorMessage message={nameError} /> : undefined}
                 />
               </div>
               <div>
                 <Field
                   label="Email (optional)"
                   placeholder="Enter your email"
+                  value={email}
                   message={
                     <>
-                      {showErrors && emailError ? <ErrorMessage className={styles.emailError} message={emailError} /> : null}
+                      {showErrors && emailError ? <InputErrorMessage className={styles.emailError} message={emailError} /> : null}
                       <span>
                         Subscribe to Decentraland's newsletter to receive the latest news about events, updates, contests and more.
                       </span>
@@ -377,7 +387,7 @@ export const SetupPage = () => {
                 />
               </div>
               <div className={styles.agree}>
-                <Checkbox onChange={handleAgreeChange} />
+                <Checkbox onChange={handleAgreeChange} checked={agree} />
                 <div>
                   I agree with Decentraland's&nbsp;
                   <a target="_blank" rel="noopener noreferrer" href="https://decentraland.org/terms/">
@@ -390,13 +400,14 @@ export const SetupPage = () => {
                   .
                 </div>
               </div>
-              {showErrors && agreeError ? <ErrorMessage className={styles.agreeError} message={agreeError} /> : null}
+              {showErrors && agreeError ? <InputErrorMessage className={styles.agreeError} message={agreeError} /> : null}
               <div className={styles.jumpIn}>
                 <Button primary fluid type="submit" disabled={!agree || deploying} loading={deploying}>
                   {continueMessage}
                 </Button>
               </div>
             </form>
+            {deployError ? <DeployErrorMessage message={deployError} /> : null}
           </div>
         </div>
       </Mobile>
@@ -417,16 +428,18 @@ export const SetupPage = () => {
                     label="Username"
                     placeholder="Enter your username"
                     onChange={handleNameChange}
-                    message={showErrors && nameError ? <ErrorMessage message={nameError} /> : undefined}
+                    value={name}
+                    message={showErrors && nameError ? <InputErrorMessage message={nameError} /> : undefined}
                   />
                 </div>
                 <div>
                   <Field
                     label="Email (optional)"
                     placeholder="Enter your email"
+                    value={email}
                     message={
                       <>
-                        {showErrors && emailError ? <ErrorMessage className={styles.emailError} message={emailError} /> : null}
+                        {showErrors && emailError ? <InputErrorMessage className={styles.emailError} message={emailError} /> : null}
                         <span>
                           Subscribe to Decentraland's newsletter to receive the latest news about events, updates, contests and more.
                         </span>
@@ -436,7 +449,7 @@ export const SetupPage = () => {
                   />
                 </div>
                 <div className={styles.agree}>
-                  <Checkbox onChange={handleAgreeChange} />I agree with Decentraland's&nbsp;
+                  <Checkbox onChange={handleAgreeChange} checked={agree} />I agree with Decentraland's&nbsp;
                   <a target="_blank" rel="noopener noreferrer" href="https://decentraland.org/terms/">
                     Terms of use
                   </a>
@@ -446,13 +459,14 @@ export const SetupPage = () => {
                   </a>
                   .
                 </div>
-                {showErrors && agreeError ? <ErrorMessage className={styles.agreeError} message={agreeError} /> : null}
+                {showErrors && agreeError ? <InputErrorMessage className={styles.agreeError} message={agreeError} /> : null}
                 <div className={styles.jumpIn}>
                   <Button primary fluid type="submit" disabled={!agree || deploying} loading={deploying}>
                     {continueMessage}
                   </Button>
                 </div>
               </form>
+              {deployError ? <DeployErrorMessage message={deployError} /> : null}
             </div>
           </div>
           <div className={styles.right}>
