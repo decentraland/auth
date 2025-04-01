@@ -5,7 +5,7 @@ import { Profile } from 'dcl-catalyst-client/dist/client/specs/catalyst.schemas'
 import { ethers, BrowserProvider, formatEther } from 'ethers'
 import Icon from 'semantic-ui-react/dist/commonjs/elements/Icon/Icon'
 import { io } from 'socket.io-client'
-import { ChainId, ProviderType } from '@dcl/schemas'
+import { ChainId } from '@dcl/schemas'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
 import { Web2TransactionModal } from 'decentraland-ui/dist/components/Web2TransactionModal'
@@ -16,7 +16,7 @@ import { getAnalytics } from '../../../modules/analytics/segment'
 import { ClickEvents, RequestInteractionType, TrackingEvents } from '../../../modules/analytics/types'
 import { config } from '../../../modules/config'
 import { fetchProfile } from '../../../modules/profile'
-import { getCurrentConnectionData } from '../../../shared/connection'
+import { useCurrentConnectionData } from '../../../shared/connection/hooks'
 import { isErrorWithMessage, isRpcError } from '../../../shared/errors'
 import { locations } from '../../../shared/locations'
 import { CustomWearablePreview } from '../../CustomWearablePreview'
@@ -43,8 +43,8 @@ enum View {
 export const RequestPage = () => {
   const params = useParams()
   const navigate = useNavigateWithSearchParams()
-  const providerRef = useRef<BrowserProvider>()
-  const [isUserUsingWeb2Wallet, setIsUserUsingWeb2Wallet] = useState(false)
+  const { isLoading: isConnecting, account, provider, providerType } = useCurrentConnectionData()
+  const browserProvider = useRef<BrowserProvider>()
   const [view, setView] = useState(View.LOADING_REQUEST)
   const [isLoading, setIsLoading] = useState(false)
   const [profile, setProfile] = useState<Profile | null>()
@@ -62,6 +62,7 @@ export const RequestPage = () => {
   const connectedAccountRef = useRef<string>()
   const requestId = params.requestId ?? ''
   const [targetConfig, targetConfigId] = useTargetConfig()
+  const isUserUsingWeb2Wallet = !!provider?.isMagic
 
   // Goes to the login page where the user will have to connect a wallet.
   const toLoginPage = useCallback(() => {
@@ -73,49 +74,34 @@ export const RequestPage = () => {
   }, [requestId])
 
   useEffect(() => {
+    if (isConnecting) return
+
+    if (!account || !provider || !providerType) {
+      toLoginPage()
+      return
+    }
+
     const loadRequest = async () => {
       const timeTheSiteStartedLoading = Date.now()
-      let connectionData: Awaited<ReturnType<typeof getCurrentConnectionData>> | null = null
+      browserProvider.current = new ethers.BrowserProvider(provider)
+      const profile = await fetchProfile(account)
 
-      try {
-        // Try to re-stablish connection with the wallet.
-        connectionData = await getCurrentConnectionData()
-        // Goes to the login page if no account is returned in the data.
-        if (!connectionData) {
-          throw new Error('No account connected')
-        }
-        const provider = await connection.getProvider()
-        setIsUserUsingWeb2Wallet(!!provider.isMagic)
-        providerRef.current = new ethers.BrowserProvider(provider)
-
-        const profile = await fetchProfile(connectionData.account)
-
-        // `alternative` has its own set up
-        if (!targetConfig.skipSetup) {
-          // Goes to the setup page if the connected account does not have a profile yet.
-          if (!profile) {
-            console.log("There's no profile but the user is logged in, going to setup page")
-            toSetupPage()
-            return
-          }
-        }
-      } catch (e) {
-        console.log("The user isn't logged in, redirecting to the log in page")
-        toLoginPage()
+      // `alternative` has its own set up
+      if (!targetConfig.skipSetup && !profile) {
+        // Goes to the setup page if the connected account does not have a profile yet.
+        console.log("There's no profile but the user is logged in, going to setup page")
+        toSetupPage()
         return
       }
+      setProfile(profile)
 
       try {
-        const signer = await providerRef.current.getSigner()
+        const signer = await browserProvider.current.getSigner()
         const signerAddress = await signer.getAddress()
         getAnalytics()?.identify({ ethAddress: signerAddress })
         // Recover the request from the auth server.
         const request = await authServerFetch('recover', { requestId })
         requestRef.current = request
-        const profile = await fetchProfile(signerAddress)
-        setProfile(profile)
-
-        connectedAccountRef.current = signerAddress
 
         // If the sender defined in the request is different than the one that is connected, show an error.
         if (request.sender && request.sender !== signerAddress.toLowerCase()) {
@@ -143,13 +129,13 @@ export const RequestPage = () => {
           })
         } else if (request.method === 'eth_sendTransaction') {
           try {
-            const signer = await providerRef.current.getSigner()
-            const userBalance = await providerRef.current.getBalance(signer.address)
+            const signer = await browserProvider.current.getSigner()
+            const userBalance = await browserProvider.current.getBalance(signer.address)
             setWalletInfo({
               balance: userBalance,
-              chainId: await providerRef.current.getNetwork().then(network => Number(network.chainId))
+              chainId: await browserProvider.current.getNetwork().then(network => Number(network.chainId))
             })
-            const gasPrice = (await providerRef.current.getFeeData()).gasPrice ?? BigInt(0)
+            const gasPrice = (await browserProvider.current.getFeeData()).gasPrice ?? BigInt(0)
             const transactionGasCost = await signer.estimateGas(request.params[0])
             const totalGasCost = gasPrice * transactionGasCost
             setTransactionGasCost(totalGasCost)
@@ -168,7 +154,7 @@ export const RequestPage = () => {
       } catch (e) {
         setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
         captureException(e, {
-          tags: { isWeb2Wallet: connectionData?.providerType === ProviderType.MAGIC, providerType: connectionData?.providerType }
+          tags: { isWeb2Wallet: isUserUsingWeb2Wallet, providerType }
         })
         getAnalytics()?.track(TrackingEvents.REQUEST_LOADING_ERROR, {
           browserTime: Date.now(),
@@ -184,7 +170,7 @@ export const RequestPage = () => {
     return () => {
       clearTimeout(timeoutRef.current)
     }
-  }, [toLoginPage, toSetupPage])
+  }, [toLoginPage, toSetupPage, account, provider, providerType, isConnecting])
 
   useEffect(() => {
     // The timeout is only necessary on the verify sign in and wallet interaction views.
@@ -200,7 +186,7 @@ export const RequestPage = () => {
       action: ClickEvents.DENY_SIGN_IN
     })
     try {
-      const signer = await providerRef.current?.getSigner()
+      const signer = await browserProvider.current?.getSigner()
       if (signer) {
         await authServerFetch('outcome', {
           requestId,
@@ -219,7 +205,7 @@ export const RequestPage = () => {
       action: ClickEvents.APPROVE_SING_IN
     })
     setIsLoading(true)
-    const provider = providerRef.current
+    const provider = browserProvider.current
     try {
       if (!provider) {
         throw new Error('Provider not created')
@@ -262,7 +248,7 @@ export const RequestPage = () => {
   const onApproveWalletInteraction = useCallback(async () => {
     setIsLoading(true)
     setIsTransactionModalOpen(false)
-    const provider = providerRef.current
+    const provider = browserProvider.current
     try {
       if (!provider) {
         throw new Error('Provider not created')
@@ -292,7 +278,7 @@ export const RequestPage = () => {
     } catch (e) {
       console.error('Wallet error', JSON.stringify(e))
       captureException(e, { tags: { isWeb2Wallet: isUserUsingWeb2Wallet } })
-      const signer = await providerRef.current?.getSigner()
+      const signer = await browserProvider.current?.getSigner()
       if (signer) {
         if (isRpcError(e)) {
           await authServerFetch('outcome', {
@@ -332,31 +318,6 @@ export const RequestPage = () => {
 
   const Container = useCallback(
     (props: { children: ReactNode; canChangeAccount?: boolean; isLoading?: boolean }) => {
-      if (!targetConfig.showWearablePreview) {
-        return (
-          <div>
-            <div
-              className={`${styles.background} ${
-                (!connectedAccountRef || profile === null) && view !== View.LOADING_REQUEST ? styles.emptyProfile : ''
-              }`}
-            />
-            <div className={styles.main}>
-              <div className={styles.left}>
-                {props.children}
-                {props.canChangeAccount ? (
-                  <div className={styles.changeAccount}>
-                    Use another profile?{' '}
-                    <a href="/auth/login" onClick={onChangeAccount}>
-                      Return to log in
-                    </a>
-                  </div>
-                ) : null}
-              </div>
-            </div>
-          </div>
-        )
-      }
-
       return (
         <div>
           <div
@@ -376,9 +337,11 @@ export const RequestPage = () => {
                 </div>
               ) : null}
             </div>
-            <div className={styles.right}>
-              {connectedAccountRef.current && profile !== null ? <CustomWearablePreview profile={connectedAccountRef.current} /> : null}
-            </div>
+            {targetConfig.showWearablePreview && (
+              <div className={styles.right}>
+                {connectedAccountRef.current && profile !== null ? <CustomWearablePreview profile={connectedAccountRef.current} /> : null}
+              </div>
+            )}
           </div>
         </div>
       )

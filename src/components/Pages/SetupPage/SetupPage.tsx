@@ -1,12 +1,11 @@
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { captureException } from '@sentry/react'
 import classNames from 'classnames'
-import { AuthIdentity } from '@dcl/crypto'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import { Checkbox } from 'decentraland-ui/dist/components/Checkbox/Checkbox'
 import { Field } from 'decentraland-ui/dist/components/Field/Field'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
-import { Mobile, NotMobile } from 'decentraland-ui/dist/components/Media/Media'
+import { useMobileMediaQuery } from 'decentraland-ui/dist/components/Media/Media'
 import { InputOnChangeData } from 'decentraland-ui'
 import backImg from '../../../assets/images/back.svg'
 import diceImg from '../../../assets/images/dice.svg'
@@ -17,14 +16,12 @@ import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { getAnalytics } from '../../../modules/analytics/segment'
 import { ClickEvents, TrackingEvents } from '../../../modules/analytics/types'
 import { fetchProfile } from '../../../modules/profile'
-import { getCurrentConnectionData } from '../../../shared/connection'
+import { useCurrentConnectionData } from '../../../shared/connection/hooks'
 import { isErrorWithMessage } from '../../../shared/errors'
 import { locations } from '../../../shared/locations'
 import { CustomWearablePreview } from '../../CustomWearablePreview'
-import { FeatureFlagsContext } from '../../FeatureFlagsProvider'
 import { deployProfileFromDefault, subscribeToNewsletter } from './utils'
 import styles from './SetupPage.module.css'
-
 enum View {
   RANDOMIZE,
   FORM
@@ -52,7 +49,6 @@ const DeployErrorMessage = (props: { message: string }) => (
 )
 
 export const SetupPage = () => {
-  const navigate = useNavigateWithSearchParams()
   const [initialized, setInitialized] = useState(false)
   const [view, setView] = useState(View.RANDOMIZE)
   const [profile, setProfile] = useState(getRandomDefaultProfile())
@@ -62,13 +58,10 @@ export const SetupPage = () => {
   const [showErrors, setShowErrors] = useState(false)
   const [deploying, setDeploying] = useState(false)
   const [deployError, setDeployError] = useState<string | null>(null)
-
-  const accountRef = useRef<string>()
-  const identityRef = useRef<AuthIdentity>()
-
-  const { initialized: initializedFlags } = useContext(FeatureFlagsContext)
-
+  const isMobile = useMobileMediaQuery()
   const { url: redirectTo, redirect } = useAfterLoginRedirection()
+  const { isLoading: isConnecting, account, identity } = useCurrentConnectionData()
+  const navigate = useNavigateWithSearchParams()
 
   // Validate the name.
   const nameError = useMemo(() => {
@@ -141,7 +134,7 @@ export const SetupPage = () => {
   const handleContinue = useCallback(() => {
     getAnalytics()?.track(TrackingEvents.AVATAR_EDIT_SUCCESS, {
       // eslint-disable-next-line @typescript-eslint/naming-convention
-      eth_address: accountRef.current,
+      eth_address: account,
       // eslint-disable-next-line @typescript-eslint/naming-convention
       is_guest: false,
       profile
@@ -190,7 +183,7 @@ export const SetupPage = () => {
 
       // These refs should have values at this point.
       // If they don't, it means that there was something wrong on the initialization effect.
-      if (!accountRef.current || !identityRef.current) {
+      if (!account || !identity) {
         console.warn('No account or identity found.')
         return
       }
@@ -201,8 +194,8 @@ export const SetupPage = () => {
 
         // Deploy a new profile for the user based on the selected default profile.
         await deployProfileFromDefault({
-          connectedAccount: accountRef.current,
-          connectedAccountIdentity: identityRef.current,
+          connectedAccount: account,
+          connectedAccountIdentity: identity,
           defaultProfile: profile,
           deploymentProfileName: name
         })
@@ -220,7 +213,7 @@ export const SetupPage = () => {
 
         getAnalytics()?.track(TrackingEvents.TERMS_OF_SERVICE_SUCCESS, {
           // eslint-disable-next-line @typescript-eslint/naming-convention
-          eth_address: accountRef.current,
+          eth_address: account,
           // eslint-disable-next-line @typescript-eslint/naming-convention
           is_guest: false,
           email: email || undefined,
@@ -244,21 +237,16 @@ export const SetupPage = () => {
   // Initialization effect.
   // Will run some checks to see if the user can proceed with the simplified avatar setup flow.
   useEffect(() => {
+    if (isConnecting) return
+
+    if (!account || !identity) {
+      console.warn('No previous connection found')
+      return navigate(locations.login(redirectTo))
+    }
+
     ;(async () => {
       // Check if the wallet is connected.
-      try {
-        const connectionData = await getCurrentConnectionData()
-        if (!connectionData) {
-          throw new Error('No connection data found')
-        }
-        accountRef.current = connectionData.account
-        identityRef.current = connectionData.identity
-      } catch (e) {
-        console.warn('No previous connection found')
-        return navigate(locations.login(redirectTo))
-      }
-
-      const profile = await fetchProfile(accountRef.current)
+      const profile = await fetchProfile(account)
 
       // Check that the connected account does not have a profile already.
       if (profile) {
@@ -268,9 +256,9 @@ export const SetupPage = () => {
 
       setInitialized(true)
     })()
-  }, [redirect, navigate])
+  }, [redirect, navigate, account, identity, isConnecting])
 
-  if (!initialized || !initializedFlags) {
+  if (!initialized) {
     return (
       <div className={styles.container}>
         <div className={styles.background} />
@@ -281,199 +269,127 @@ export const SetupPage = () => {
 
   if (view === View.RANDOMIZE) {
     return (
-      <>
-        <Mobile>
-          <div className={styles.container}>
-            <div className={styles.background} />
-            <div className={styles.mobileContainer}>
-              <img className={styles.logo} src={logoImg} alt="logo" />
-              <div className={styles.title}>Welcome to Decentraland!</div>
-              <div className={styles.meetYourAvatar}>First, Meet Your Avatar</div>
-              <div className={styles.meetYourAvatarDescription}>
-                Choose an avatar to start your journey.
-                <br />
-                <b>You can customize it later on desktop</b>, where all the magic happens!
-              </div>
-              <div className={styles.mobilePreviewContainer}>
-                <CustomWearablePreview profile={profile} />
-              </div>
-              <div className={styles.mobileButtons}>
-                <div className={styles.randomize}>
-                  <Button compact inverted onClick={handleRandomize}>
-                    <img src={diceImg} alt="diceImg" />
-                    <span>randomize</span>
-                  </Button>
-                </div>
-                <div className={styles.continue}>
-                  <Button compact primary onClick={handleContinue}>
-                    Continue
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </Mobile>
-        <NotMobile>
-          <div className={styles.container}>
-            <div className={styles.background} />
-            <div className={styles.left}>
-              <div className={styles.leftInner}>
-                <img className={styles.logo} src={logoImg} alt="logo" />
-                <div className={styles.title}>Welcome to Decentraland!</div>
-                <div className={styles.subtitle}>Your journey begins here</div>
-                <div className={styles.meetYourAvatar}>First, Meet Your Avatar</div>
-                <div className={styles.meetYourAvatarDescription}>
+      <div className={styles.container}>
+        <div className={styles.background} />
+        <div className={isMobile ? styles.mobileContainer : styles.left}>
+          <div className={isMobile ? undefined : styles.leftInner}>
+            <img className={styles.logo} src={logoImg} alt="logo" />
+            <div className={styles.title}>Welcome to Decentraland!</div>
+
+            {!isMobile && <div className={styles.subtitle}>Your journey begins here</div>}
+
+            <div className={styles.meetYourAvatar}>First, Meet Your Avatar</div>
+            <div className={styles.meetYourAvatarDescription}>
+              {isMobile ? (
+                <>
+                  Choose an avatar to start your journey.
+                  <br />
+                  <b>You can customize it later on desktop</b>, where all the magic happens!
+                </>
+              ) : (
+                <>
                   Say hi to your new digital self!
                   <br />
                   Don't worry, of course they're not quite 'you' yet—soon you'll be able to customize them to your heart's content.
-                </div>
-                <div className={styles.randomize}>
-                  <Button compact inverted onClick={handleRandomize}>
-                    <img src={diceImg} alt="diceImg" />
-                    <span>randomize</span>
-                  </Button>
-                </div>
-                <div className={styles.continue}>
-                  <Button primary fluid onClick={handleContinue}>
-                    Continue
-                  </Button>
-                </div>
+                </>
+              )}
+            </div>
+
+            {isMobile && (
+              <div className={styles.mobilePreviewContainer}>
+                <CustomWearablePreview profile={profile} />
+              </div>
+            )}
+
+            <div className={isMobile ? styles.mobileButtons : undefined}>
+              <div className={styles.randomize}>
+                <Button compact inverted onClick={handleRandomize}>
+                  <img src={diceImg} alt="diceImg" />
+                  <span>randomize</span>
+                </Button>
+              </div>
+              <div className={styles.continue}>
+                <Button compact={isMobile} primary fluid={!isMobile} onClick={handleContinue}>
+                  Continue
+                </Button>
               </div>
             </div>
-            <div className={styles.right}>
-              <CustomWearablePreview profile={profile} />
-            </div>
           </div>
-        </NotMobile>
-      </>
+        </div>
+
+        {!isMobile && (
+          <div className={styles.right}>
+            <CustomWearablePreview profile={profile} />
+          </div>
+        )}
+      </div>
     )
   }
 
   return (
-    <>
-      <Mobile>
-        <div className={styles.container}>
-          <div className={styles.background} />
-          <div className={styles.mobileContainer}>
-            <div className={styles.back} onClick={handleBack}>
-              <img src={backImg} alt="backImg" />
-              <span>BACK</span>
+    <div className={styles.container}>
+      <div className={styles.background} />
+      <div className={isMobile ? styles.mobileContainer : styles.left}>
+        <div className={isMobile ? undefined : styles.leftInner}>
+          {!isMobile && <img className={styles.logoSmall} src={logoImg} alt="logo" />}
+          <div className={styles.back} onClick={handleBack}>
+            <img src={backImg} alt="backImg" />
+            <span>BACK</span>
+          </div>
+          <div className={styles.title}>Complete your Profile</div>
+          <form onSubmit={handleSubmit}>
+            <div className={styles.name}>
+              <Field
+                label="Username"
+                placeholder="Enter your username"
+                onChange={handleNameChange}
+                value={name}
+                message={showErrors && nameError ? <InputErrorMessage message={nameError} /> : undefined}
+              />
             </div>
-            <div className={classNames(styles.title, styles.mobileCompleteYourProfile)}>Complete your Profile</div>
-            <form onSubmit={handleSubmit}>
-              <div className={styles.name}>
-                <Field
-                  label="Username"
-                  placeholder="Enter your Username"
-                  onChange={handleNameChange}
-                  value={name}
-                  message={showErrors && nameError ? <InputErrorMessage message={nameError} /> : undefined}
-                />
-              </div>
+            <div>
+              <Field
+                label="Email (optional)"
+                placeholder="Enter your email"
+                value={email}
+                message={
+                  <>
+                    {showErrors && emailError ? <InputErrorMessage className={styles.emailError} message={emailError} /> : null}
+                    <span>Subscribe to Decentraland's newsletter to receive the latest news about events, updates, contests and more.</span>
+                  </>
+                }
+                onChange={handleEmailChange}
+              />
+            </div>
+            <div className={styles.agree}>
+              <Checkbox onChange={handleAgreeChange} checked={agree} />
               <div>
-                <Field
-                  label="Email (optional)"
-                  placeholder="Enter your email"
-                  value={email}
-                  message={
-                    <>
-                      {showErrors && emailError ? <InputErrorMessage className={styles.emailError} message={emailError} /> : null}
-                      <span>
-                        Subscribe to Decentraland's newsletter to receive the latest news about events, updates, contests and more.
-                      </span>
-                    </>
-                  }
-                  onChange={handleEmailChange}
-                />
+                I agree with Decentraland's&nbsp;
+                <a target="_blank" rel="noopener noreferrer" href="https://decentraland.org/terms/">
+                  Terms of use
+                </a>
+                &nbsp;and&nbsp;
+                <a target="_blank" rel="noopener noreferrer" href="https://decentraland.org/privacy">
+                  Privacy policy
+                </a>
+                .
               </div>
-              <div className={styles.agree}>
-                <Checkbox onChange={handleAgreeChange} checked={agree} />
-                <div>
-                  I agree with Decentraland's&nbsp;
-                  <a target="_blank" rel="noopener noreferrer" href="https://decentraland.org/terms/">
-                    Terms of use
-                  </a>
-                  &nbsp;and&nbsp;
-                  <a target="_blank" rel="noopener noreferrer" href="https://decentraland.org/privacy">
-                    Privacy policy
-                  </a>
-                  .
-                </div>
-              </div>
-              {showErrors && agreeError ? <InputErrorMessage className={styles.agreeError} message={agreeError} /> : null}
-              <div className={styles.jumpIn}>
-                <Button primary fluid type="submit" disabled={!agree || deploying} loading={deploying}>
-                  {continueMessage}
-                </Button>
-              </div>
-            </form>
-            {deployError ? <DeployErrorMessage message={deployError} /> : null}
-          </div>
-        </div>
-      </Mobile>
-      <NotMobile>
-        <div className={styles.container}>
-          <div className={styles.background} />
-          <div className={styles.left}>
-            <div className={styles.leftInner}>
-              <img className={styles.logoSmall} src={logoImg} alt="logo" />
-              <div className={styles.back} onClick={handleBack}>
-                <img src={backImg} alt="backImg" />
-                <span>BACK</span>
-              </div>
-              <div className={styles.title}>Complete your Profile</div>
-              <form onSubmit={handleSubmit}>
-                <div className={styles.name}>
-                  <Field
-                    label="Username"
-                    placeholder="Enter your username"
-                    onChange={handleNameChange}
-                    value={name}
-                    message={showErrors && nameError ? <InputErrorMessage message={nameError} /> : undefined}
-                  />
-                </div>
-                <div>
-                  <Field
-                    label="Email (optional)"
-                    placeholder="Enter your email"
-                    value={email}
-                    message={
-                      <>
-                        {showErrors && emailError ? <InputErrorMessage className={styles.emailError} message={emailError} /> : null}
-                        <span>
-                          Subscribe to Decentraland's newsletter to receive the latest news about events, updates, contests and more.
-                        </span>
-                      </>
-                    }
-                    onChange={handleEmailChange}
-                  />
-                </div>
-                <div className={styles.agree}>
-                  <Checkbox onChange={handleAgreeChange} checked={agree} />I agree with Decentraland's&nbsp;
-                  <a target="_blank" rel="noopener noreferrer" href="https://decentraland.org/terms/">
-                    Terms of use
-                  </a>
-                  &nbsp;and&nbsp;
-                  <a target="_blank" rel="noopener noreferrer" href="https://decentraland.org/privacy">
-                    Privacy policy
-                  </a>
-                  .
-                </div>
-                {showErrors && agreeError ? <InputErrorMessage className={styles.agreeError} message={agreeError} /> : null}
-                <div className={styles.jumpIn}>
-                  <Button primary fluid type="submit" disabled={!agree || deploying} loading={deploying}>
-                    {continueMessage}
-                  </Button>
-                </div>
-              </form>
-              {deployError ? <DeployErrorMessage message={deployError} /> : null}
             </div>
-          </div>
-          <div className={styles.right}>
-            <CustomWearablePreview profile={profile} />
-          </div>
+            {showErrors && agreeError ? <InputErrorMessage className={styles.agreeError} message={agreeError} /> : null}
+            <div className={styles.jumpIn}>
+              <Button primary fluid type="submit" disabled={!agree || deploying} loading={deploying}>
+                {continueMessage}
+              </Button>
+            </div>
+          </form>
+          {deployError ? <DeployErrorMessage message={deployError} /> : null}
         </div>
-      </NotMobile>
-    </>
+      </div>
+      {!isMobile && (
+        <div className={styles.right}>
+          <CustomWearablePreview profile={profile} />
+        </div>
+      )}
+    </div>
   )
 }

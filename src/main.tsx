@@ -31,12 +31,12 @@ const SiteRoutes = () => {
 
   return (
     <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/invalidRedirection" element={<InvalidRedirectionPage />} />
-      <Route path="/callback" element={<CallbackPage />} />
-      <Route path="/requests/:requestId" element={<RequestPage />} />
-      <Route path="/setup" element={<SetupPage />} />
-      <Route path="*" element={<DefaultPage />} />
+      <Route path="/login" Component={LoginPage} />
+      <Route path="/invalidRedirection" Component={InvalidRedirectionPage} />
+      <Route path="/callback" Component={CallbackPage} />
+      <Route path="/requests/:requestId" Component={RequestPage} />
+      <Route path="/setup" Component={SetupPage} />
+      <Route path="*" Component={DefaultPage} />
     </Routes>
   )
 }
