@@ -16,7 +16,7 @@ import { getAnalytics } from '../../../modules/analytics/segment'
 import { ClickEvents, RequestInteractionType, TrackingEvents } from '../../../modules/analytics/types'
 import { config } from '../../../modules/config'
 import { fetchProfile } from '../../../modules/profile'
-import { useCurrentConnectionData } from '../../../shared/connection/hook'
+import { useCurrentConnectionData } from '../../../shared/connection/hooks'
 import { isErrorWithMessage, isRpcError } from '../../../shared/errors'
 import { locations } from '../../../shared/locations'
 import { CustomWearablePreview } from '../../CustomWearablePreview'
@@ -77,7 +77,6 @@ export const RequestPage = () => {
     if (isConnecting) return
 
     if (!account || !provider || !providerType) {
-      console.log("The user isn't logged in, redirecting to the log in page")
       toLoginPage()
       return
     }
@@ -88,13 +87,11 @@ export const RequestPage = () => {
       const profile = await fetchProfile(account)
 
       // `alternative` has its own set up
-      if (!targetConfig.skipSetup) {
+      if (!targetConfig.skipSetup && !profile) {
         // Goes to the setup page if the connected account does not have a profile yet.
-        if (!profile) {
-          console.log("There's no profile but the user is logged in, going to setup page")
-          toSetupPage()
-          return
-        }
+        console.log("There's no profile but the user is logged in, going to setup page")
+        toSetupPage()
+        return
       }
       setProfile(profile)
 

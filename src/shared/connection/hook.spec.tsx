@@ -2,7 +2,7 @@ import { act } from '@testing-library/react'
 import { renderHook } from '@testing-library/react-hooks'
 import { ProviderType } from '@dcl/schemas'
 import { getCurrentConnectionData, ConnectionData } from './connection'
-import { useCurrentConnectionData } from './hook'
+import { useCurrentConnectionData } from './hooks'
 
 // Mock the connection module
 jest.mock('./connection')
