@@ -3,6 +3,7 @@ import { io } from 'socket.io-client'
 import { getAnalytics } from '../../modules/analytics/segment'
 import { RequestInteractionType, TrackingEvents } from '../../modules/analytics/types'
 import { config } from '../../modules/config'
+import { isErrorWithMessage } from '../errors'
 import { DifferentSenderError, ExpiredRequestError, OutcomeError } from './errors'
 
 export type RecoverResponse = {
@@ -42,37 +43,29 @@ export const createAuthServerClient = (authServerUrl?: string) => {
 
   const sendSuccessfulOutcome = async (requestId: string, sender: string, result: any): Promise<void> => {
     try {
-      const response = await request<OutcomeResponse>('outcome', {
+      await request<OutcomeResponse>('outcome', {
         requestId,
         sender,
         result
       })
-
-      if (response.error) {
-        throw new OutcomeError(response.error)
-      }
     } catch (e) {
       console.error('Error sending outcome', e)
       captureException(e)
-      throw e
+      throw new OutcomeError(isErrorWithMessage(e) ? e.message : 'Unknown error')
     }
   }
 
   const sendFailedOutcome = async (requestId: string, sender: string, error: { code: number; message: string }): Promise<void> => {
     try {
-      const response = await request<OutcomeResponse>('outcome', {
+      await request<OutcomeResponse>('outcome', {
         requestId,
         sender,
         error
       })
-
-      if (response.error) {
-        throw new OutcomeError(response.error)
-      }
     } catch (e) {
       console.error('Error sending outcome', e)
       captureException(e)
-      throw e
+      throw new OutcomeError(isErrorWithMessage(e) ? e.message : 'Unknown error')
     }
   }
 
@@ -81,6 +74,10 @@ export const createAuthServerClient = (authServerUrl?: string) => {
 
     try {
       response = await request<RecoverResponse>('recover', { requestId })
+
+      if (response.error) {
+        throw new Error(response.error)
+      }
 
       // If the sender defined in the request is different than the one that is connected, show an error.
       if (response.sender && response.sender !== signerAddress.toLowerCase()) {
