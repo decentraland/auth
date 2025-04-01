@@ -4,7 +4,6 @@ import { captureException } from '@sentry/react'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/catalyst.schemas'
 import { ethers, BrowserProvider, formatEther } from 'ethers'
 import Icon from 'semantic-ui-react/dist/commonjs/elements/Icon/Icon'
-import { io } from 'socket.io-client'
 import { ChainId } from '@dcl/schemas'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
@@ -13,9 +12,9 @@ import { connection } from 'decentraland-connect'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import { getAnalytics } from '../../../modules/analytics/segment'
-import { ClickEvents, RequestInteractionType, TrackingEvents } from '../../../modules/analytics/types'
-import { config } from '../../../modules/config'
+import { ClickEvents, TrackingEvents } from '../../../modules/analytics/types'
 import { fetchProfile } from '../../../modules/profile'
+import { createAuthServerClient, RecoverResponse, ExpiredRequestError, DifferentSenderError } from '../../../shared/auth'
 import { useCurrentConnectionData } from '../../../shared/connection/hook'
 import { isErrorWithMessage, isRpcError } from '../../../shared/errors'
 import { locations } from '../../../shared/locations'
@@ -56,14 +55,14 @@ export const RequestPage = () => {
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false)
   // TODO: Add a type for the request.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const requestRef = useRef<{ method: string; params: any[]; code?: number }>()
+  const requestRef = useRef<RecoverResponse>()
   const [error, setError] = useState<string>()
   const timeoutRef = useRef<NodeJS.Timeout>()
   const connectedAccountRef = useRef<string>()
   const requestId = params.requestId ?? ''
   const [targetConfig, targetConfigId] = useTargetConfig()
   const isUserUsingWeb2Wallet = !!provider?.isMagic
-
+  const authServerClient = useRef(createAuthServerClient())
   // Goes to the login page where the user will have to connect a wallet.
   const toLoginPage = useCallback(() => {
     navigate(locations.login(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}`))
@@ -103,14 +102,8 @@ export const RequestPage = () => {
         const signerAddress = await signer.getAddress()
         getAnalytics()?.identify({ ethAddress: signerAddress })
         // Recover the request from the auth server.
-        const request = await authServerFetch('recover', { requestId })
+        const request = await authServerClient.current.recover(requestId, signerAddress)
         requestRef.current = request
-
-        // If the sender defined in the request is different than the one that is connected, show an error.
-        if (request.sender && request.sender !== signerAddress.toLowerCase()) {
-          setView(View.DIFFERENT_ACCOUNT)
-          return
-        }
 
         // Initialize the timeout to display the timeout view when the request expires.
         timeoutRef.current = setTimeout(() => {
@@ -121,49 +114,43 @@ export const RequestPage = () => {
           })
           setView(View.TIMEOUT)
         }, new Date(request.expiration).getTime() - Date.now())
+
         // Show different views depending on the request method.
-        if (request.method === 'dcl_personal_sign') {
-          setView(View.VERIFY_SIGN_IN)
-          getAnalytics()?.track(TrackingEvents.REQUEST_INTERACTION, {
-            type: RequestInteractionType.VERIFY_SIGN_IN,
-            browserTime: Date.now(),
-            requestTime: new Date(request.expiration).getTime(),
-            requestType: requestRef.current?.method
-          })
-        } else if (request.method === 'eth_sendTransaction') {
-          try {
-            const signer = await browserProvider.current.getSigner()
-            const userBalance = await browserProvider.current.getBalance(signer.address)
-            setWalletInfo({
-              balance: userBalance,
-              chainId: await browserProvider.current.getNetwork().then(network => Number(network.chainId))
-            })
-            const gasPrice = (await browserProvider.current.getFeeData()).gasPrice ?? BigInt(0)
-            const transactionGasCost = await signer.estimateGas(request.params[0])
-            const totalGasCost = gasPrice * transactionGasCost
-            setTransactionGasCost(totalGasCost)
-          } catch (e) {
-            console.error('Error estimating gas', e)
-          } finally {
+        switch (request.method) {
+          case 'dcl_personal_sign':
+            setView(View.VERIFY_SIGN_IN)
+            break
+          case 'eth_sendTransaction':
+            try {
+              const signer = await browserProvider.current.getSigner()
+              const userBalance = await browserProvider.current.getBalance(signer.address)
+              setWalletInfo({
+                balance: userBalance,
+                chainId: await browserProvider.current.getNetwork().then(network => Number(network.chainId))
+              })
+              const gasPrice = (await browserProvider.current.getFeeData()).gasPrice ?? BigInt(0)
+              const transactionGasCost = await signer.estimateGas(request.params?.[0])
+              const totalGasCost = gasPrice * transactionGasCost
+              setTransactionGasCost(totalGasCost)
+            } catch (e) {
+              console.error('Error estimating gas', e)
+            } finally {
+              setView(View.WALLET_INTERACTION)
+            }
+            break
+          default:
             setView(View.WALLET_INTERACTION)
-          }
-        } else {
-          getAnalytics()?.track(TrackingEvents.REQUEST_INTERACTION, {
-            type: RequestInteractionType.WALLET_INTERACTION,
-            requestType: requestRef.current?.method
-          })
-          setView(View.WALLET_INTERACTION)
         }
       } catch (e) {
+        if (e instanceof DifferentSenderError) {
+          setView(View.DIFFERENT_ACCOUNT)
+          return
+        } else if (e instanceof ExpiredRequestError) {
+          setView(View.TIMEOUT)
+          return
+        }
+
         setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
-        captureException(e, {
-          tags: { isWeb2Wallet: isUserUsingWeb2Wallet, providerType }
-        })
-        getAnalytics()?.track(TrackingEvents.REQUEST_LOADING_ERROR, {
-          browserTime: Date.now(),
-          requestType: requestRef.current?.method,
-          timeTheSiteStartedLoading
-        })
         setView(View.LOADING_ERROR)
       }
     }
@@ -191,10 +178,9 @@ export const RequestPage = () => {
     try {
       const signer = await browserProvider.current?.getSigner()
       if (signer) {
-        await authServerFetch('outcome', {
-          requestId,
-          sender: await signer.getAddress(),
-          error: { code: -32003, message: 'Transaction rejected' }
+        await authServerClient.current.sendFailedOutcome(requestId, await signer.getAddress(), {
+          code: -32003,
+          message: 'Transaction rejected'
         })
       }
     } finally {
@@ -215,21 +201,13 @@ export const RequestPage = () => {
       }
 
       const signer = await provider.getSigner()
-      const signature = await signer.signMessage(requestRef.current?.params[0])
-      const result = await authServerFetch('outcome', {
-        requestId,
-        sender: await signer.getAddress(),
-        result: signature
-      })
+      const signature = await signer.signMessage(requestRef.current?.params?.[0])
+      await authServerClient.current.sendSuccessfulOutcome(requestId, await signer.getAddress(), signature)
 
-      if (result.error) {
-        throw new Error(result.error)
-      } else {
-        setView(View.VERIFY_SIGN_IN_COMPLETE)
+      setView(View.VERIFY_SIGN_IN_COMPLETE)
 
-        if (targetConfig.deepLink) {
-          window.location.href = targetConfig.deepLink
-        }
+      if (targetConfig.deepLink) {
+        window.location.href = targetConfig.deepLink
       }
     } catch (e) {
       setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
@@ -262,38 +240,24 @@ export const RequestPage = () => {
       }
 
       const signer = await provider.getSigner()
-      const result = await provider.send(requestRef.current?.method, requestRef.current?.params)
+      const result = await provider.send(requestRef.current?.method, requestRef.current?.params ?? [])
       getAnalytics()?.track(TrackingEvents.CLICK, {
         action: ClickEvents.APPROVE_WALLET_INTERACTION,
         method: requestRef.current?.method
       })
-      const fetchResult = await authServerFetch('outcome', {
-        requestId,
-        sender: await signer.getAddress(),
-        result
-      })
-
-      if (fetchResult.error) {
-        throw new Error(fetchResult.error)
-      } else {
-        setView(View.WALLET_INTERACTION_COMPLETE)
-      }
+      await authServerClient.current.sendSuccessfulOutcome(requestId, await signer.getAddress(), result)
+      setView(View.WALLET_INTERACTION_COMPLETE)
     } catch (e) {
       console.error('Wallet error', JSON.stringify(e))
       captureException(e, { tags: { isWeb2Wallet: isUserUsingWeb2Wallet } })
       const signer = await browserProvider.current?.getSigner()
       if (signer) {
         if (isRpcError(e)) {
-          await authServerFetch('outcome', {
-            requestId,
-            sender: await signer.getAddress(),
-            error: e.error
-          })
+          await authServerClient.current.sendFailedOutcome(requestId, await signer.getAddress(), e.error)
         } else {
-          await authServerFetch('outcome', {
-            requestId,
-            sender: await signer.getAddress(),
-            error: { code: 999, message: isErrorWithMessage(e) ? e.message : 'Unknown error' }
+          await authServerClient.current.sendFailedOutcome(requestId, await signer.getAddress(), {
+            code: 999,
+            message: isErrorWithMessage(e) ? e.message : 'Unknown error'
           })
         }
       }
@@ -526,24 +490,4 @@ export const RequestPage = () => {
 
 const CloseWindow = () => {
   return <div className={styles.closeWindow}>You can close this window.</div>
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const authServerFetch = async (ev: string, msg: any) => {
-  const authServerUrl = config.get('AUTH_SERVER_URL')
-  const socket = io(authServerUrl)
-
-  await new Promise<void>(resolve => {
-    socket.on('connect', resolve)
-  })
-
-  const response = await socket.emitWithAck(ev, msg)
-
-  socket.close()
-
-  if (response.error) {
-    throw new Error(response.error)
-  }
-
-  return response
 }
