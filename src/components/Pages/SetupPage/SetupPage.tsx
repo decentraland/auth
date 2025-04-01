@@ -237,6 +237,7 @@ export const SetupPage = () => {
   // Initialization effect.
   // Will run some checks to see if the user can proceed with the simplified avatar setup flow.
   useEffect(() => {
+    console.log('isConnecting', isConnecting)
     if (isConnecting) return
 
     if (!account || !identity) {
