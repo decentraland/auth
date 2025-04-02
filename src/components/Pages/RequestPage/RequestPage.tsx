@@ -248,15 +248,13 @@ export const RequestPage = () => {
       console.error('Wallet error', JSON.stringify(e))
       captureException(e, { tags: { isWeb2Wallet: isUserUsingWeb2Wallet } })
       const signer = await browserProvider.current?.getSigner()
-      if (signer) {
-        if (isRpcError(e)) {
-          await authServerClient.current.sendFailedOutcome(requestId, await signer.getAddress(), e.error)
-        } else {
-          await authServerClient.current.sendFailedOutcome(requestId, await signer.getAddress(), {
-            code: 999,
-            message: isErrorWithMessage(e) ? e.message : 'Unknown error'
-          })
-        }
+      if (signer && isRpcError(e)) {
+        await authServerClient.current.sendFailedOutcome(requestId, await signer.getAddress(), e.error)
+      } else if (signer && !isRpcError(e)) {
+        await authServerClient.current.sendFailedOutcome(requestId, await signer.getAddress(), {
+          code: 999,
+          message: isErrorWithMessage(e) ? e.message : 'Unknown error'
+        })
       }
       setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
       setView(View.WALLET_INTERACTION_ERROR)
