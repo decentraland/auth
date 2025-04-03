@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { captureException } from '@sentry/react'
 import classNames from 'classnames'
@@ -25,6 +25,7 @@ import { isErrorWithMessage } from '../../../shared/errors'
 import { locations } from '../../../shared/locations'
 import { ConnectionModal, ConnectionModalState } from '../../ConnectionModal'
 import { CustomWearablePreview } from '../../CustomWearablePreview'
+import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import { DifferentAccountError } from '../RequestPage/Views/DifferentAccountError'
 import { RecoverError } from '../RequestPage/Views/RecoverError'
 import { SignInComplete } from '../RequestPage/Views/SignInComplete'
@@ -67,6 +68,7 @@ const DeployErrorMessage = (props: { message: string }) => (
 export const SetupPage = () => {
   const [urlSearchParams] = useSearchParams()
   const [isConnectionModalOpen, setIsConnectionModalOpen] = useState(false)
+  const { flags, initialized: initializedFlags } = useContext(FeatureFlagsContext)
   const [initialized, setInitialized] = useState(false)
   const [view, setView] = useState(View.RANDOMIZE)
   const [profile, setProfile] = useState(getRandomDefaultProfile())
@@ -311,7 +313,7 @@ export const SetupPage = () => {
         })
 
         // If the site to be redirect to is a request site, we need to recover the request and sign in.
-        if (requestId && provider) {
+        if (requestId && provider && flags[FeatureFlagsKeys.LOGIN_ON_SETUP]) {
           await signRequest(provider, requestId, account)
         } else {
           redirect()
@@ -325,13 +327,26 @@ export const SetupPage = () => {
         console.error('There was an error deploying the profile', (e as Error).message)
       }
     },
-    [nameError, requestId, emailError, agreeError, name, email, agree, profile, provider, redirect, signRequest]
+    [
+      nameError,
+      requestId,
+      emailError,
+      agreeError,
+      name,
+      email,
+      agree,
+      profile,
+      provider,
+      flags[FeatureFlagsKeys.LOGIN_ON_SETUP],
+      redirect,
+      signRequest
+    ]
   )
 
   // Initialization effect.
   // Will run some checks to see if the user can proceed with the simplified avatar setup flow.
   useEffect(() => {
-    if (isConnecting) return
+    if (isConnecting || !initializedFlags) return
 
     if (!account || !identity) {
       console.warn('No previous connection found')
@@ -350,7 +365,7 @@ export const SetupPage = () => {
 
       setInitialized(true)
     })()
-  }, [redirect, navigate, account, identity, isConnecting])
+  }, [redirect, navigate, account, identity, isConnecting, initializedFlags, flags])
 
   if (!initialized) {
     return (
