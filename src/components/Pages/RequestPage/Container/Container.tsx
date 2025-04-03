@@ -1,4 +1,5 @@
 import { ReactNode, useCallback } from 'react'
+import { useMobileMediaQuery } from 'decentraland-ui/dist/components/Media/Media'
 import { connection } from 'decentraland-connect'
 import { useNavigateWithSearchParams } from '../../../../hooks/navigation'
 import { useTargetConfig } from '../../../../hooks/targetConfig'
@@ -12,6 +13,7 @@ export const Container = (props: { children: ReactNode; requestId?: string; canC
 
   const [targetConfig, targetConfigId] = useTargetConfig()
   const navigate = useNavigateWithSearchParams()
+  const isMobile = useMobileMediaQuery()
   const { account } = useCurrentConnectionData()
 
   const onChangeAccount = useCallback(
@@ -39,7 +41,9 @@ export const Container = (props: { children: ReactNode; requestId?: string; canC
           ) : null}
         </div>
         {/* This assumes that the user has a profile */}
-        {targetConfig.showWearablePreview && account && <div className={styles.right}>{<CustomWearablePreview profile={account} />}</div>}
+        {targetConfig.showWearablePreview && account && !isMobile && (
+          <div className={styles.right}>{<CustomWearablePreview profile={account} />}</div>
+        )}
       </div>
     </div>
   )
