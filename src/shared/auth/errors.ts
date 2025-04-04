@@ -5,13 +5,13 @@ export class DifferentSenderError extends Error {
 }
 
 export class ExpiredRequestError extends Error {
-  constructor(public readonly requestId: string, public readonly expiration: string) {
-    super(`The request ${requestId} has expired at ${expiration}`)
+  constructor(public readonly requestId: string, public readonly expiration?: string) {
+    super(`The request ${requestId} has expired${expiration ? ` at ${expiration}` : ''}`)
   }
 }
 
-export class OutcomeError extends Error {
-  constructor(error: string) {
-    super(error)
+export class RequestNotFoundError extends Error {
+  constructor(public readonly requestId: string) {
+    super(`The request ${requestId} was not found`)
   }
 }

@@ -1,14 +1,12 @@
-import { ReactNode, useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { captureException } from '@sentry/react'
-import { Profile } from 'dcl-catalyst-client/dist/client/specs/catalyst.schemas'
 import { ethers, BrowserProvider, formatEther } from 'ethers'
 import Icon from 'semantic-ui-react/dist/commonjs/elements/Icon/Icon'
 import { ChainId } from '@dcl/schemas'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
 import { Web2TransactionModal } from 'decentraland-ui/dist/components/Web2TransactionModal'
-import { connection } from 'decentraland-connect'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import { getAnalytics } from '../../../modules/analytics/segment'
@@ -18,7 +16,16 @@ import { createAuthServerClient, RecoverResponse, ExpiredRequestError, Different
 import { useCurrentConnectionData } from '../../../shared/connection'
 import { isErrorWithMessage, isRpcError } from '../../../shared/errors'
 import { locations } from '../../../shared/locations'
-import { CustomWearablePreview } from '../../CustomWearablePreview'
+import { Container } from './Container'
+import { DeniedSignIn } from './Views/DeniedSignIn'
+import { DeniedWalletInteraction } from './Views/DeniedWalletInteraction'
+import { DifferentAccountError } from './Views/DifferentAccountError'
+import { RecoverError } from './Views/RecoverError'
+import { SignInComplete } from './Views/SignInComplete'
+import { SigningError } from './Views/SigningError'
+import { TimeoutError } from './Views/TimeoutError'
+import viewStyles from './Views/Views.module.css'
+import { WalletInteractionComplete } from './Views/WalletInteractionComplete'
 import styles from './RequestPage.module.css'
 
 enum View {
@@ -46,19 +53,15 @@ export const RequestPage = () => {
   const browserProvider = useRef<BrowserProvider>()
   const [view, setView] = useState(View.LOADING_REQUEST)
   const [isLoading, setIsLoading] = useState(false)
-  const [profile, setProfile] = useState<Profile | null>()
   const [walletInfo, setWalletInfo] = useState<{
     balance: bigint
     chainId: number
   }>()
   const [transactionGasCost, setTransactionGasCost] = useState<bigint>()
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false)
-  // TODO: Add a type for the request.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const requestRef = useRef<RecoverResponse>()
   const [error, setError] = useState<string>()
   const timeoutRef = useRef<NodeJS.Timeout>()
-  const connectedAccountRef = useRef<string>()
   const requestId = params.requestId ?? ''
   const [targetConfig, targetConfigId] = useTargetConfig()
   const isUserUsingWeb2Wallet = !!provider?.isMagic
@@ -92,7 +95,6 @@ export const RequestPage = () => {
         toSetupPage()
         return
       }
-      setProfile(profile)
 
       try {
         const signer = await browserProvider.current.getSigner()
@@ -261,15 +263,6 @@ export const RequestPage = () => {
     }
   }, [isUserUsingWeb2Wallet])
 
-  const onChangeAccount = useCallback(
-    async evt => {
-      evt.preventDefault()
-      await connection.disconnect()
-      toLoginPage()
-    },
-    [toLoginPage]
-  )
-
   const handleApproveWalletInteraction = useCallback(async () => {
     if (isUserUsingWeb2Wallet) {
       setIsTransactionModalOpen(true)
@@ -278,211 +271,79 @@ export const RequestPage = () => {
     }
   }, [isUserUsingWeb2Wallet, onApproveWalletInteraction])
 
-  const Container = useCallback(
-    (props: { children: ReactNode; canChangeAccount?: boolean; isLoading?: boolean }) => {
+  switch (view) {
+    case View.TIMEOUT:
+      return <TimeoutError requestId={requestId} />
+    case View.DIFFERENT_ACCOUNT:
+      return <DifferentAccountError />
+    case View.LOADING_ERROR:
+      return <RecoverError error={error} />
+    case View.VERIFY_SIGN_IN_ERROR:
+    case View.WALLET_INTERACTION_ERROR:
+      return <SigningError error={error} />
+    case View.VERIFY_SIGN_IN_COMPLETE:
+      return <SignInComplete />
+    case View.VERIFY_SIGN_IN_DENIED:
+      return <DeniedSignIn />
+    case View.WALLET_INTERACTION_COMPLETE:
+      return <WalletInteractionComplete />
+    case View.WALLET_INTERACTION_DENIED:
+      return <DeniedWalletInteraction />
+    case View.LOADING_REQUEST:
       return (
-        <div>
-          <div
-            className={`${styles.background} ${
-              (!connectedAccountRef || profile === null) && view !== View.LOADING_REQUEST ? styles.emptyProfile : ''
-            }`}
-          />
-          <div className={styles.main}>
-            <div className={styles.left}>
-              {props.children}
-              {props.canChangeAccount ? (
-                <div className={styles.changeAccount}>
-                  Use another profile?{' '}
-                  <a href="/auth/login" onClick={onChangeAccount}>
-                    Return to log in
-                  </a>
-                </div>
-              ) : null}
-            </div>
-            {targetConfig.showWearablePreview && (
-              <div className={styles.right}>
-                {connectedAccountRef.current && profile !== null ? <CustomWearablePreview profile={connectedAccountRef.current} /> : null}
-              </div>
-            )}
-          </div>
-        </div>
-      )
-    },
-    [view]
-  )
-
-  if (view === View.TIMEOUT) {
-    return (
-      <Container>
-        <div className={styles.errorLogo}></div>
-        <div className={styles.title}>
-          Looks like you took too long and the request has expired. If the expiration time is still running in the Explorer app, check your
-          computer's time to see if it's set correctly
-        </div>
-        <div className={styles.description}>Please return to Decentraland's {targetConfig.explorerText} to try again.</div>
-        <CloseWindow />
-      </Container>
-    )
-  }
-
-  if (view === View.DIFFERENT_ACCOUNT) {
-    return (
-      <Container canChangeAccount>
-        <div className={styles.errorLogo}></div>
-        <div className={styles.title}>Looks like you are connected with a different account.</div>
-        <div className={styles.description}>Please change your wallet account to the one connected to the {targetConfig.explorerText}.</div>
-      </Container>
-    )
-  }
-
-  // Loading
-
-  if (view === View.LOADING_REQUEST) {
-    return (
-      <Container>
-        <div className={styles.left}>
+        <Container>
           <Loader active size="huge" />
-        </div>
-      </Container>
-    )
+        </Container>
+      )
+    case View.VERIFY_SIGN_IN:
+      return (
+        <Container canChangeAccount>
+          <div className={viewStyles.logo}></div>
+          <div className={viewStyles.title}>Verify Sign In</div>
+          <div className={viewStyles.description}>Do you see the same verification number on your {targetConfig.explorerText}?</div>
+          <div className={styles.code}>{requestRef.current?.code}</div>
+          <div className={styles.buttons}>
+            <Button inverted disabled={isLoading} onClick={onDenyVerifySignIn} className={styles.noButton}>
+              <Icon name="times circle" />
+              No, it doesn't
+            </Button>
+            <Button inverted loading={isLoading} disabled={isLoading} onClick={onApproveSignInVerification} className={styles.yesButton}>
+              <Icon name="check circle" />
+              Yes, they are the same
+            </Button>
+          </div>
+        </Container>
+      )
+    case View.WALLET_INTERACTION:
+      return (
+        <Container canChangeAccount>
+          <Web2TransactionModal
+            isOpen={isTransactionModalOpen}
+            transactionCostAmount={formatEther((transactionGasCost ?? 0).toString())}
+            userBalanceAmount={formatEther((walletInfo?.balance ?? 0).toString())}
+            chainId={walletInfo?.chainId ?? ChainId.ETHEREUM_MAINNET}
+            onAccept={onApproveWalletInteraction}
+            onClose={onDenyWalletInteraction}
+            onReject={onDenyWalletInteraction}
+          />
+          <div className={viewStyles.logo}></div>
+          <div className={viewStyles.title}>
+            {isUserUsingWeb2Wallet
+              ? 'A scene wants to access your Decentraland account assets'
+              : `The ${targetConfig.explorerText} wants to interact with your wallet`}
+          </div>
+          <div className={viewStyles.description}>Only proceed if you are aware of all transaction details and trust this scene.</div>
+          <div className={styles.buttons}>
+            <Button inverted disabled={isLoading} onClick={onDenyWalletInteraction}>
+              Deny
+            </Button>
+            <Button primary disabled={isLoading} loading={isLoading} onClick={handleApproveWalletInteraction}>
+              Allow
+            </Button>
+          </div>
+        </Container>
+      )
+    default:
+      return null
   }
-
-  if (view === View.LOADING_ERROR) {
-    return (
-      <Container>
-        <div className={styles.errorLogo}></div>
-        <div className={styles.title}>There was an error recovering the request...</div>
-        <div className={styles.description}>
-          The request is not available anymore. Feel free to create a new one and try again. If the expiration time is still running in the
-          Explorer app, check your computer's time to see if it's set correctly
-        </div>
-        <CloseWindow />
-        <div className={styles.errorMessage}>{error}</div>
-      </Container>
-    )
-  }
-
-  // Verify Sign In
-
-  if (view === View.VERIFY_SIGN_IN && requestRef.current) {
-    return (
-      <Container canChangeAccount isLoading={isLoading}>
-        <div className={styles.logo}></div>
-        <div className={styles.title}>Verify Sign In</div>
-        <div className={styles.description}>Do you see the same verification number on your {targetConfig.explorerText}?</div>
-        <div className={styles.code}>{requestRef.current?.code}</div>
-        <div className={styles.buttons}>
-          <Button inverted disabled={isLoading} onClick={onDenyVerifySignIn} className={styles.noButton}>
-            <Icon name="times circle" />
-            No, it doesn't
-          </Button>
-          <Button inverted loading={isLoading} disabled={isLoading} onClick={onApproveSignInVerification} className={styles.yesButton}>
-            <Icon name="check circle" />
-            Yes, they are the same
-          </Button>
-        </div>
-      </Container>
-    )
-  }
-
-  if (view === View.VERIFY_SIGN_IN_DENIED) {
-    return (
-      <Container canChangeAccount>
-        <div className={styles.errorLogo}></div>
-        <div className={styles.title}>Did the number not match, or was this action not taken by you?</div>
-        <div className={styles.description}>
-          If you're trying to sign in, retry the action. If this action was not initiated by you, dismiss this message.
-        </div>
-        <CloseWindow />
-      </Container>
-    )
-  }
-
-  if (view === View.VERIFY_SIGN_IN_COMPLETE) {
-    return (
-      <Container>
-        <div className={styles.logo}></div>
-        <div className={styles.title}>Your account is ready!</div>
-        <div className={styles.description}>Return to the {targetConfig.explorerText} and enjoy Decentraland.</div>
-        <CloseWindow />
-      </Container>
-    )
-  }
-
-  // Wallet Interaction
-
-  if (view === View.WALLET_INTERACTION && requestRef.current) {
-    return (
-      <Container canChangeAccount isLoading={isLoading}>
-        <Web2TransactionModal
-          isOpen={isTransactionModalOpen}
-          transactionCostAmount={formatEther((transactionGasCost ?? 0).toString())}
-          userBalanceAmount={formatEther((walletInfo?.balance ?? 0).toString())}
-          chainId={walletInfo?.chainId ?? ChainId.ETHEREUM_MAINNET}
-          onAccept={onApproveWalletInteraction}
-          onClose={onDenyWalletInteraction}
-          onReject={onDenyWalletInteraction}
-        />
-        <div className={styles.logo}></div>
-        <div className={styles.title}>
-          {isUserUsingWeb2Wallet
-            ? 'A scene wants to access your Decentraland account assets'
-            : `The ${targetConfig.explorerText} wants to interact with your wallet`}
-        </div>
-        <div className={styles.description}>Only proceed if you are aware of all transaction details and trust this scene.</div>
-        <div className={styles.buttons}>
-          <Button inverted disabled={isLoading} onClick={onDenyWalletInteraction}>
-            Deny
-          </Button>
-          <Button primary disabled={isLoading} loading={isLoading} onClick={handleApproveWalletInteraction}>
-            Allow
-          </Button>
-        </div>
-      </Container>
-    )
-  }
-
-  if (view === View.WALLET_INTERACTION_DENIED) {
-    return (
-      <Container>
-        <div className={styles.errorLogo}></div>
-        <div className={styles.title}>Was this action not initiated by you?</div>
-        <div className={styles.description}>If this action was not initiated by you, dismiss this message.</div>
-        <CloseWindow />
-      </Container>
-    )
-  }
-
-  if (view === View.WALLET_INTERACTION_COMPLETE) {
-    return (
-      <Container>
-        <div className={styles.logo}></div>
-        <div className={styles.title}>Wallet interaction complete</div>
-        <div className={styles.description}>The action has been executed successfully.</div>
-        <CloseWindow />
-      </Container>
-    )
-  }
-
-  // Shared
-
-  if (view === View.VERIFY_SIGN_IN_ERROR || view === View.WALLET_INTERACTION_ERROR) {
-    return (
-      <Container>
-        <div className={styles.errorLogo}></div>
-        <div className={styles.title}>There was an error while trying to submit the request.</div>
-        <div className={styles.description}>
-          Return to the {targetConfig.explorerText} to try again, or contact support if the error persists.
-        </div>
-        <CloseWindow />
-        <div className={styles.errorMessage}>{error}</div>
-      </Container>
-    )
-  }
-
-  return null
-}
-
-const CloseWindow = () => {
-  return <div className={styles.closeWindow}>You can close this window.</div>
 }
