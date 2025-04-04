@@ -95,7 +95,7 @@ export const CallbackPage = () => {
   return (
     <ConnectionModal
       open={true}
-      state={ConnectionModalState.WAITING_FOR_SIGNATURE}
+      state={ConnectionModalState.VALIDATING_SIGN_IN}
       onTryAgain={connectAndGenerateSignature}
       providerType={flags[FeatureFlagsKeys.MAGIC_TEST] ? ProviderType.MAGIC_TEST : ProviderType.MAGIC}
     />
