@@ -6,7 +6,7 @@ export class DifferentSenderError extends Error {
 
 export class ExpiredRequestError extends Error {
   constructor(public readonly requestId: string, public readonly expiration?: string) {
-    super(`The request ${requestId} has expired ${expiration ? `at ${expiration}` : ''}`)
+    super(`The request ${requestId} has expired${expiration ? ` at ${expiration}` : ''}`)
   }
 }
 
