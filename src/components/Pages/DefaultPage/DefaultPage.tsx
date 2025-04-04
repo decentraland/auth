@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
-import { getCurrentConnectionData } from '../../../shared/connection'
+import { getCurrentConnectionData } from '../../../shared/connection/connection'
 import { locations } from '../../../shared/locations'
 import styles from './DefaultPage.module.css'
 

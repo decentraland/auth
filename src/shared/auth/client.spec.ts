@@ -2,7 +2,7 @@ import { io } from 'socket.io-client'
 import { getAnalytics } from '../../modules/analytics/segment'
 import { config } from '../../modules/config'
 import { createAuthServerClient, RecoverResponse } from './client'
-import { DifferentSenderError, ExpiredRequestError, OutcomeError } from './errors'
+import { DifferentSenderError, ExpiredRequestError, RequestNotFoundError } from './errors'
 
 // Mock dependencies
 jest.mock('socket.io-client')
@@ -167,14 +167,40 @@ describe('createAuthServerClient', () => {
     })
 
     describe('when the response contains an error', () => {
-      const errorMessage = 'Outcome error'
-
+      let message: { error: string }
       beforeEach(() => {
-        mockEmitWithAck.mockResolvedValueOnce({ error: errorMessage })
+        message = { error: 'an error' }
+        mockEmitWithAck.mockResolvedValueOnce(message)
       })
 
-      it('should throw an OutcomeError', async () => {
-        await expect(client.sendSuccessfulOutcome(mockRequestId, mockSender, {})).rejects.toBeInstanceOf(OutcomeError)
+      describe('when the error is an expiration error', () => {
+        beforeEach(() => {
+          message.error = 'Request has expired'
+        })
+
+        it('should propagate the expiration error', async () => {
+          await expect(client.sendSuccessfulOutcome(mockRequestId, mockSender, {})).rejects.toBeInstanceOf(ExpiredRequestError)
+        })
+      })
+
+      describe('when the error is a not found error', () => {
+        beforeEach(() => {
+          message.error = 'Request not found'
+        })
+
+        it('should propagate the not found error', async () => {
+          await expect(client.sendSuccessfulOutcome(mockRequestId, mockSender, {})).rejects.toBeInstanceOf(RequestNotFoundError)
+        })
+      })
+
+      describe('when the error is a different error', () => {
+        beforeEach(() => {
+          message.error = 'Unknown error'
+        })
+
+        it('should propagate the error', async () => {
+          await expect(client.sendSuccessfulOutcome(mockRequestId, mockSender, {})).rejects.toThrow(message.error)
+        })
       })
     })
 
@@ -217,14 +243,40 @@ describe('createAuthServerClient', () => {
     })
 
     describe('when the response contains an error', () => {
-      const errorMessage = 'Outcome error'
-
+      let message: { error: string }
       beforeEach(() => {
-        mockEmitWithAck.mockResolvedValueOnce({ error: errorMessage })
+        message = { error: 'an error' }
+        mockEmitWithAck.mockResolvedValueOnce(message)
       })
 
-      it('should throw an OutcomeError', async () => {
-        await expect(client.sendFailedOutcome(mockRequestId, mockSender, mockError)).rejects.toBeInstanceOf(OutcomeError)
+      describe('when the error is an expiration error', () => {
+        beforeEach(() => {
+          message.error = 'Request has expired'
+        })
+
+        it('should propagate the expiration error', async () => {
+          await expect(client.sendSuccessfulOutcome(mockRequestId, mockSender, {})).rejects.toBeInstanceOf(ExpiredRequestError)
+        })
+      })
+
+      describe('when the error is a not found error', () => {
+        beforeEach(() => {
+          message.error = 'Request not found'
+        })
+
+        it('should propagate the not found error', async () => {
+          await expect(client.sendSuccessfulOutcome(mockRequestId, mockSender, {})).rejects.toBeInstanceOf(RequestNotFoundError)
+        })
+      })
+
+      describe('when the error is a different error', () => {
+        beforeEach(() => {
+          message.error = 'Unknown error'
+        })
+
+        it('should propagate the error', async () => {
+          await expect(client.sendSuccessfulOutcome(mockRequestId, mockSender, {})).rejects.toThrow(message.error)
+        })
       })
     })
 

@@ -2,7 +2,8 @@ import { createContext } from 'react'
 
 export enum FeatureFlagsKeys {
   MAGIC_TEST = 'dapps-magic-dev-test',
-  DAPPS_MAGIC_AUTO_SIGN = 'dapps-magic-auto-sign'
+  DAPPS_MAGIC_AUTO_SIGN = 'dapps-magic-auto-sign',
+  LOGIN_ON_SETUP = 'dapps-login-on-setup'
 }
 
 export type FeatureFlagsContextType = {

@@ -4,7 +4,7 @@ import { getAnalytics } from '../../modules/analytics/segment'
 import { RequestInteractionType, TrackingEvents } from '../../modules/analytics/types'
 import { config } from '../../modules/config'
 import { isErrorWithMessage } from '../errors'
-import { DifferentSenderError, ExpiredRequestError, OutcomeError } from './errors'
+import { DifferentSenderError, ExpiredRequestError, RequestNotFoundError } from './errors'
 
 export type RecoverResponse = {
   sender: string
@@ -19,10 +19,15 @@ export type OutcomeResponse = {
   error?: string
 }
 
+type OutcomeError = { code: number; message: string }
+
 export const createAuthServerClient = (authServerUrl?: string) => {
   const url = authServerUrl ?? config.get('AUTH_SERVER_URL')
 
-  const request = async <T>(event: string, message: any): Promise<T> => {
+  const request = async <T>(
+    event: string,
+    message: { requestId: string; sender?: string; result?: any; error?: OutcomeError }
+  ): Promise<T> => {
     const socket = io(url)
 
     await new Promise<void>(resolve => {
@@ -34,7 +39,11 @@ export const createAuthServerClient = (authServerUrl?: string) => {
     // Close client, we don't need it anymore
     socket.close()
 
-    if (response.error) {
+    if (response.error?.includes('not found')) {
+      throw new RequestNotFoundError(message.requestId)
+    } else if (response.error?.includes('has expired')) {
+      throw new ExpiredRequestError(message.requestId)
+    } else if (response.error) {
       throw new Error(response.error)
     }
 
@@ -51,11 +60,11 @@ export const createAuthServerClient = (authServerUrl?: string) => {
     } catch (e) {
       console.error('Error sending outcome', e)
       captureException(e)
-      throw new OutcomeError(isErrorWithMessage(e) ? e.message : 'Unknown error')
+      throw e
     }
   }
 
-  const sendFailedOutcome = async (requestId: string, sender: string, error: { code: number; message: string }): Promise<void> => {
+  const sendFailedOutcome = async (requestId: string, sender: string, error: OutcomeError): Promise<void> => {
     try {
       await request<OutcomeResponse>('outcome', {
         requestId,
@@ -65,7 +74,7 @@ export const createAuthServerClient = (authServerUrl?: string) => {
     } catch (e) {
       console.error('Error sending outcome', e)
       captureException(e)
-      throw new OutcomeError(isErrorWithMessage(e) ? e.message : 'Unknown error')
+      throw e
     }
   }
 
@@ -116,7 +125,8 @@ export const createAuthServerClient = (authServerUrl?: string) => {
       captureException(e)
       getAnalytics()?.track(TrackingEvents.REQUEST_LOADING_ERROR, {
         browserTime: Date.now(),
-        requestType: response?.method ?? 'Unknown'
+        requestType: response?.method ?? 'Unknown',
+        error: isErrorWithMessage(e) ? e.message : 'Unknown error'
       })
       throw e
     }
