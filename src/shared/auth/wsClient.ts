@@ -5,23 +5,9 @@ import { RequestInteractionType, TrackingEvents } from '../../modules/analytics/
 import { config } from '../../modules/config'
 import { isErrorWithMessage } from '../errors'
 import { DifferentSenderError, ExpiredRequestError, RequestNotFoundError } from './errors'
+import { OutcomeError, OutcomeResponse, RecoverResponse } from './types'
 
-export type RecoverResponse = {
-  sender: string
-  expiration: string
-  method: string
-  code?: string
-  error?: string
-  params?: any[]
-}
-
-export type OutcomeResponse = {
-  error?: string
-}
-
-type OutcomeError = { code: number; message: string }
-
-export const createAuthServerClient = (authServerUrl?: string) => {
+export const createAuthServerWsClient = (authServerUrl?: string) => {
   const url = authServerUrl ?? config.get('AUTH_SERVER_URL')
 
   const request = async <T>(
@@ -78,7 +64,7 @@ export const createAuthServerClient = (authServerUrl?: string) => {
     }
   }
 
-  const recover = async (requestId: string, signerAddress: string) => {
+  const recover = async (requestId: string, signerAddress: string): Promise<RecoverResponse> => {
     let response: RecoverResponse | undefined
 
     try {

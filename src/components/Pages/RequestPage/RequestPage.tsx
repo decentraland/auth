@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { captureException } from '@sentry/react'
 import { ethers, BrowserProvider, formatEther } from 'ethers'
@@ -12,10 +12,17 @@ import { useTargetConfig } from '../../../hooks/targetConfig'
 import { getAnalytics } from '../../../modules/analytics/segment'
 import { ClickEvents, TrackingEvents } from '../../../modules/analytics/types'
 import { fetchProfile } from '../../../modules/profile'
-import { createAuthServerClient, RecoverResponse, ExpiredRequestError, DifferentSenderError } from '../../../shared/auth'
+import {
+  createAuthServerHttpClient,
+  createAuthServerWsClient,
+  RecoverResponse,
+  ExpiredRequestError,
+  DifferentSenderError
+} from '../../../shared/auth'
 import { useCurrentConnectionData } from '../../../shared/connection'
 import { isErrorWithMessage, isRpcError } from '../../../shared/errors'
 import { locations } from '../../../shared/locations'
+import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
 import { Container } from './Container'
 import { DeniedSignIn } from './Views/DeniedSignIn'
 import { DeniedWalletInteraction } from './Views/DeniedWalletInteraction'
@@ -50,6 +57,7 @@ export const RequestPage = () => {
   const params = useParams()
   const navigate = useNavigateWithSearchParams()
   const { isLoading: isConnecting, account, provider, providerType } = useCurrentConnectionData()
+  const { flags, initialized: initializedFlags } = useContext(FeatureFlagsContext)
   const browserProvider = useRef<BrowserProvider>()
   const [view, setView] = useState(View.LOADING_REQUEST)
   const [isLoading, setIsLoading] = useState(false)
@@ -65,7 +73,7 @@ export const RequestPage = () => {
   const requestId = params.requestId ?? ''
   const [targetConfig, targetConfigId] = useTargetConfig()
   const isUserUsingWeb2Wallet = !!provider?.isMagic
-  const authServerClient = useRef(createAuthServerClient())
+  const authServerClient = useRef(createAuthServerWsClient())
   // Goes to the login page where the user will have to connect a wallet.
   const toLoginPage = useCallback(() => {
     navigate(locations.login(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}`))
@@ -76,11 +84,21 @@ export const RequestPage = () => {
   }, [requestId])
 
   useEffect(() => {
+    // Wait for the user to be connected.
     if (isConnecting) return
 
+    // Check if the user is connected.
     if (!account || !provider || !providerType) {
       toLoginPage()
       return
+    }
+
+    // Wait for the features to be initialized.
+    if (!initializedFlags) return
+
+    // Initialize the auth server client.
+    if (flags[FeatureFlagsKeys.HTTP_AUTH]) {
+      authServerClient.current = createAuthServerHttpClient()
     }
 
     const loadRequest = async () => {
