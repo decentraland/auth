@@ -177,7 +177,7 @@ export const RequestPage = () => {
     return () => {
       clearTimeout(timeoutRef.current)
     }
-  }, [toLoginPage, toSetupPage, account, provider, providerType, isConnecting])
+  }, [toLoginPage, toSetupPage, account, provider, providerType, isConnecting, initializedFlags])
 
   useEffect(() => {
     // The timeout is only necessary on the verify sign in and wallet interaction views.
