@@ -19,7 +19,7 @@ import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { getAnalytics } from '../../../modules/analytics/segment'
 import { ClickEvents, TrackingEvents } from '../../../modules/analytics/types'
 import { fetchProfile } from '../../../modules/profile'
-import { createAuthServerClient, ExpiredRequestError, RecoverResponse } from '../../../shared/auth'
+import { createAuthServerHttpClient, createAuthServerWsClient, ExpiredRequestError, RecoverResponse } from '../../../shared/auth'
 import { useCurrentConnectionData } from '../../../shared/connection/hooks'
 import { isErrorWithMessage } from '../../../shared/errors'
 import { locations } from '../../../shared/locations'
@@ -82,7 +82,7 @@ export const SetupPage = () => {
   const isMobile = useMobileMediaQuery()
   const { url: redirectTo, redirect } = useAfterLoginRedirection()
   const { isLoading: isConnecting, account, identity, provider, providerType } = useCurrentConnectionData()
-  const authServerClient = useRef(createAuthServerClient())
+  const authServerClient = useRef(createAuthServerWsClient())
   const navigate = useNavigateWithSearchParams()
 
   const requestId = useMemo(() => {
@@ -361,6 +361,12 @@ export const SetupPage = () => {
       if (profile) {
         console.warn('Profile already exists')
         return redirect()
+      }
+
+      if (flags[FeatureFlagsKeys.HTTP_AUTH]) {
+        authServerClient.current = createAuthServerHttpClient()
+      } else {
+        authServerClient.current = createAuthServerWsClient()
       }
 
       setInitialized(true)
