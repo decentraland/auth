@@ -1,8 +1,7 @@
 import { PropsWithChildren, useEffect, useRef, useState } from 'react'
 import { config } from '../../modules/config'
+import { THIRTY_SECONDS } from '../../shared/time'
 import { defaultFeatureFlagsContextValue, FeatureFlagsContext } from './FeatureFlagsProvider.types'
-
-const THIRTY_SECONDS = 30 * 1000
 
 export const FeatureFlagsProvider = (props: PropsWithChildren<unknown>) => {
   const [value, setValue] = useState(defaultFeatureFlagsContextValue)
