@@ -157,6 +157,10 @@ describe('createAuthServerClient', () => {
 
         expect(mockFetch).toHaveBeenCalledWith(mockUrl + '/v2/outcomes/' + mockRequestId, {
           method: 'POST',
+          headers: {
+            // eslint-disable-next-line @typescript-eslint/naming-convention
+            'Content-Type': 'application/json'
+          },
           body: JSON.stringify({
             sender: mockSender,
             result: mockResult
@@ -240,6 +244,10 @@ describe('createAuthServerClient', () => {
 
         expect(mockFetch).toHaveBeenCalledWith(mockUrl + '/v2/outcomes/' + mockRequestId, {
           method: 'POST',
+          headers: {
+            // eslint-disable-next-line @typescript-eslint/naming-convention
+            'Content-Type': 'application/json'
+          },
           body: JSON.stringify({
             sender: mockSender,
             error: mockError
