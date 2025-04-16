@@ -10,7 +10,7 @@ export const TimeoutError = ({ requestId }: { requestId: string }) => {
       <div className={styles.errorLogo}></div>
       <div className={styles.title}>Looks like you took too long and the request has expired.</div>
       <div className={styles.subtitle}>
-        If the expiration time is still running in the Explorer app, check your computer's time to see if it's set correctly
+        If the expiration time is still running in the Explorer app, check your computer's time to see if it's set correctly.
       </div>
       <div className={styles.description}>Please return to Decentraland's {targetConfig.explorerText} to try again.</div>
       <CloseWindow />
