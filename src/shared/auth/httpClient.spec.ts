@@ -1,11 +1,9 @@
-import { io } from 'socket.io-client'
 import { getAnalytics } from '../../modules/analytics/segment'
 import { config } from '../../modules/config'
-import { createAuthServerClient, RecoverResponse } from './client'
 import { DifferentSenderError, ExpiredRequestError, RequestNotFoundError } from './errors'
-
+import { createAuthServerHttpClient } from './httpClient'
+import { RecoverResponse } from './types'
 // Mock dependencies
-jest.mock('socket.io-client')
 jest.mock('@sentry/react')
 jest.mock('../../modules/analytics/segment')
 jest.mock('../../modules/config')
@@ -21,39 +19,27 @@ describe('createAuthServerClient', () => {
   const mockSignerAddress = '0xMockSignerAddress'
   const mockSignerAddressLower = '0xmocksigneraddress'
 
-  // Mock socket and its methods
-  const mockEmitWithAck = jest.fn()
-  const mockClose = jest.fn()
-  const mockOn = jest.fn()
-  const mockSocket = {
-    on: mockOn,
-    emitWithAck: mockEmitWithAck,
-    close: mockClose
-  }
-
-  // Mock analytics
-  const mockTrack = jest.fn()
-  const mockAnalytics = { track: mockTrack }
+  // Mock fetch
+  let mockFetch: jest.Mock
 
   beforeEach(() => {
     // Reset all mocks
     jest.clearAllMocks()
 
-    // Setup socket.io mock
-    ;(io as jest.Mock).mockReturnValue(mockSocket)
+    // Mock analytics
+    const mockTrack = jest.fn()
+    mockFetch = jest.fn()
+    const mockAnalytics = { track: mockTrack }
+
+    // Setup fetch mock
+    // Mock fetch implementation
+    global.fetch = mockFetch
 
     // Setup config mock
     ;(config.get as jest.Mock).mockReturnValue(mockUrl)
 
     // Setup analytics mock
     ;(getAnalytics as jest.Mock).mockReturnValue(mockAnalytics)
-
-    // Setup socket connect event handler
-    mockOn.mockImplementation((event, callback) => {
-      if (event === 'connect') {
-        callback()
-      }
-    })
   })
 
   afterEach(() => {
@@ -61,36 +47,34 @@ describe('createAuthServerClient', () => {
   })
 
   describe('when recovering a request', () => {
-    let client: ReturnType<typeof createAuthServerClient>
+    let client: ReturnType<typeof createAuthServerHttpClient>
     let mockResponse: RecoverResponse
 
     beforeEach(() => {
-      client = createAuthServerClient()
+      client = createAuthServerHttpClient()
 
       mockResponse = {
         sender: mockSignerAddressLower,
         expiration: new Date(Date.now() + 3600000).toISOString(), // 1 hour in the future
         method: 'dcl_personal_sign'
       }
-
-      mockEmitWithAck.mockResolvedValueOnce(mockResponse)
     })
 
     describe('when the request is successful', () => {
       beforeEach(() => {
-        // No additional setup needed
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockResponse)
+        })
       })
 
-      it('should connect to the server and emit the recover event', async () => {
+      it('should recover the given request', async () => {
         await client.recover(mockRequestId, mockSignerAddress)
 
-        expect(io).toHaveBeenCalledWith(mockUrl)
-        expect(mockOn).toHaveBeenCalledWith('connect', expect.any(Function))
-        expect(mockEmitWithAck).toHaveBeenCalledWith('recover', { requestId: mockRequestId })
-        expect(mockClose).toHaveBeenCalled()
+        expect(mockFetch).toHaveBeenCalledWith(mockUrl + '/v2/requests/' + mockRequestId, { method: 'GET' })
       })
 
-      it('should return the response if everything is valid', async () => {
+      it('should return the response', async () => {
         const result = await client.recover(mockRequestId, mockSignerAddress)
 
         expect(result).toEqual(mockResponse)
@@ -102,6 +86,11 @@ describe('createAuthServerClient', () => {
 
       beforeEach(() => {
         mockResponse.error = errorMessage
+        mockFetch.mockResolvedValueOnce({
+          ok: false,
+          status: 500,
+          json: () => Promise.resolve({ error: errorMessage })
+        })
       })
 
       it('should throw an error with the error message', async () => {
@@ -112,6 +101,10 @@ describe('createAuthServerClient', () => {
     describe('when the sender does not match', () => {
       beforeEach(() => {
         mockResponse.sender = 'different-sender'
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockResponse)
+        })
       })
 
       it('should throw a DifferentSenderError', async () => {
@@ -122,6 +115,10 @@ describe('createAuthServerClient', () => {
     describe('when the request is expired', () => {
       beforeEach(() => {
         mockResponse.expiration = new Date(Date.now() - 3600000).toISOString() // 1 hour in the past
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockResponse)
+        })
       })
 
       it('should throw an ExpiredRequestError', async () => {
@@ -131,8 +128,7 @@ describe('createAuthServerClient', () => {
 
     describe('when the request fails due to network error', () => {
       beforeEach(() => {
-        mockEmitWithAck.mockReset()
-        mockEmitWithAck.mockRejectedValueOnce(new Error('Network error'))
+        mockFetch.mockRejectedValueOnce(new Error('Network error'))
       })
 
       it('should throw the network error', async () => {
@@ -142,27 +138,30 @@ describe('createAuthServerClient', () => {
   })
 
   describe('when sending a successful outcome', () => {
-    let client: ReturnType<typeof createAuthServerClient>
-    const mockResult = { success: true }
+    let client: ReturnType<typeof createAuthServerHttpClient>
+    const mockResult = 'someResult'
 
     beforeEach(() => {
-      client = createAuthServerClient()
+      client = createAuthServerHttpClient()
     })
 
     describe('when the request is successful', () => {
       beforeEach(() => {
-        mockEmitWithAck.mockResolvedValueOnce({})
+        mockFetch.mockResolvedValueOnce({
+          ok: true
+        })
       })
 
-      it('should emit the outcome event with success result', async () => {
+      it('should send the successful outcome and resolve', async () => {
         await client.sendSuccessfulOutcome(mockRequestId, mockSender, mockResult)
 
-        expect(mockEmitWithAck).toHaveBeenCalledWith('outcome', {
-          requestId: mockRequestId,
-          sender: mockSender,
-          result: mockResult
+        expect(mockFetch).toHaveBeenCalledWith(mockUrl + '/v2/outcomes/' + mockRequestId, {
+          method: 'POST',
+          body: JSON.stringify({
+            sender: mockSender,
+            result: mockResult
+          })
         })
-        expect(mockClose).toHaveBeenCalled()
       })
     })
 
@@ -170,7 +169,10 @@ describe('createAuthServerClient', () => {
       let message: { error: string }
       beforeEach(() => {
         message = { error: 'an error' }
-        mockEmitWithAck.mockResolvedValueOnce(message)
+        mockFetch.mockResolvedValueOnce({
+          ok: false,
+          json: () => Promise.resolve(message)
+        })
       })
 
       describe('when the error is an expiration error', () => {
@@ -208,7 +210,7 @@ describe('createAuthServerClient', () => {
       const error = new Error('Network error')
 
       beforeEach(() => {
-        mockEmitWithAck.mockRejectedValueOnce(error)
+        mockFetch.mockRejectedValueOnce(error)
       })
 
       it('should handle and rethrow the error', async () => {
@@ -218,35 +220,43 @@ describe('createAuthServerClient', () => {
   })
 
   describe('when sending a failed outcome', () => {
-    let client: ReturnType<typeof createAuthServerClient>
-    const mockError = { code: 400, message: 'Bad request' }
+    let client: ReturnType<typeof createAuthServerHttpClient>
+    let mockError: { code: number; message: string }
 
     beforeEach(() => {
-      client = createAuthServerClient()
+      client = createAuthServerHttpClient()
+      mockError = { code: 400, message: 'Bad request' }
     })
 
     describe('when the request is successful', () => {
       beforeEach(() => {
-        mockEmitWithAck.mockResolvedValueOnce({})
+        mockFetch.mockResolvedValueOnce({
+          ok: true
+        })
       })
 
-      it('should emit the outcome event with error details', async () => {
+      it('should send the failed outcome and resolve', async () => {
         await client.sendFailedOutcome(mockRequestId, mockSender, mockError)
 
-        expect(mockEmitWithAck).toHaveBeenCalledWith('outcome', {
-          requestId: mockRequestId,
-          sender: mockSender,
-          error: mockError
+        expect(mockFetch).toHaveBeenCalledWith(mockUrl + '/v2/outcomes/' + mockRequestId, {
+          method: 'POST',
+          body: JSON.stringify({
+            sender: mockSender,
+            error: mockError
+          })
         })
-        expect(mockClose).toHaveBeenCalled()
       })
     })
 
     describe('when the response contains an error', () => {
       let message: { error: string }
+
       beforeEach(() => {
         message = { error: 'an error' }
-        mockEmitWithAck.mockResolvedValueOnce(message)
+        mockFetch.mockResolvedValueOnce({
+          ok: false,
+          json: () => Promise.resolve(message)
+        })
       })
 
       describe('when the error is an expiration error', () => {
@@ -284,7 +294,7 @@ describe('createAuthServerClient', () => {
       const error = new Error('Network error')
 
       beforeEach(() => {
-        mockEmitWithAck.mockRejectedValueOnce(error)
+        mockFetch.mockRejectedValueOnce(error)
       })
 
       it('should handle and rethrow the error', async () => {
