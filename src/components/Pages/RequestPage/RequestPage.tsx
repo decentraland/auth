@@ -110,7 +110,7 @@ export const RequestPage = () => {
       // `alternative` has its own set up
       if ((!targetConfig.skipSetup && !profile) || (profile && !isProfileComplete(profile))) {
         // Goes to the setup page if the connected account does not have a profile yet.
-        console.log("There's no profile but the user is logged in, going to setup page")
+        console.log("There's no profile or the profile is not complete but the user is logged in, going to setup page")
         toSetupPage()
         return
       }
