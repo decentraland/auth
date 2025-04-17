@@ -22,6 +22,7 @@ import {
 import { useCurrentConnectionData } from '../../../shared/connection'
 import { isErrorWithMessage, isRpcError } from '../../../shared/errors'
 import { locations } from '../../../shared/locations'
+import { isProfileComplete } from '../../../shared/profile'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
 import { Container } from './Container'
 import { DeniedSignIn } from './Views/DeniedSignIn'
@@ -107,7 +108,7 @@ export const RequestPage = () => {
       const profile = await fetchProfile(account)
 
       // `alternative` has its own set up
-      if (!targetConfig.skipSetup && !profile) {
+      if ((!targetConfig.skipSetup && !profile) || (profile && !isProfileComplete(profile))) {
         // Goes to the setup page if the connected account does not have a profile yet.
         console.log("There's no profile but the user is logged in, going to setup page")
         toSetupPage()
