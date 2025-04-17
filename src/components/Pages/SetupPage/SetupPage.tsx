@@ -23,6 +23,7 @@ import { createAuthServerHttpClient, createAuthServerWsClient, ExpiredRequestErr
 import { useCurrentConnectionData } from '../../../shared/connection/hooks'
 import { isErrorWithMessage } from '../../../shared/errors'
 import { locations } from '../../../shared/locations'
+import { isProfileComplete } from '../../../shared/profile'
 import { ConnectionModal, ConnectionModalState } from '../../ConnectionModal'
 import { CustomWearablePreview } from '../../CustomWearablePreview'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
@@ -358,7 +359,7 @@ export const SetupPage = () => {
       const profile = await fetchProfile(account)
 
       // Check that the connected account does not have a profile already.
-      if (profile) {
+      if (profile && isProfileComplete(profile)) {
         console.warn('Profile already exists')
         return redirect()
       }
