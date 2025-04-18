@@ -21,6 +21,7 @@ import { config } from '../../../modules/config'
 import { fetchProfile } from '../../../modules/profile'
 import { isErrorWithMessage, isErrorWithName } from '../../../shared/errors'
 import { locations } from '../../../shared/locations'
+import { isProfileComplete } from '../../../shared/profile'
 import { wait } from '../../../shared/time'
 import { Connection, ConnectionOptionType } from '../../Connection'
 import { ConnectionModal, ConnectionModalState } from '../../ConnectionModal'
@@ -137,7 +138,7 @@ export const LoginPage = () => {
 
               // If the connected account does not have a profile, redirect the user to the setup page to create a new one.
               // The setup page should then redirect the user to the url provided as query param if available.
-              if (!profile) {
+              if (!profile || (profile && !isProfileComplete(profile))) {
                 navigate(locations.setup(redirectTo))
                 return setShowConnectionModal(false)
               }
