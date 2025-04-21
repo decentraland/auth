@@ -216,12 +216,12 @@ export const SetupPage = () => {
     }
   }, [])
   const handleAgreeChange = useCallback(() => {
-    setAgree(!agree)
+    setAgree(prev => !prev)
     if (!hasCheckedAgree.current) {
       getAnalytics()?.track(TrackingEvents.CHECK_TERMS_OF_SERVICE)
       hasCheckedAgree.current = true
     }
-  }, [agree])
+  }, [])
   const signRequest = useCallback(
     async (provider: Provider, requestId: string, account: string) => {
       let request: RecoverResponse | null = null
