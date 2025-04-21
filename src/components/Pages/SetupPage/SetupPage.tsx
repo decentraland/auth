@@ -67,6 +67,9 @@ const DeployErrorMessage = (props: { message: string }) => (
 )
 
 export const SetupPage = () => {
+  const hasStartedToWriteSomethingInName = useRef(false)
+  const hasStartedToWriteSomethingInEmail = useRef(false)
+  const hasCheckedAgree = useRef(false)
   const [urlSearchParams] = useSearchParams()
   const [isConnectionModalOpen, setIsConnectionModalOpen] = useState(false)
   const { flags, initialized: initializedFlags } = useContext(FeatureFlagsContext)
@@ -198,9 +201,27 @@ export const SetupPage = () => {
   }, [])
 
   // Form input handlers.
-  const handleNameChange = useCallback((_e: unknown, data: InputOnChangeData) => setName(data.value), [])
-  const handleEmailChange = useCallback((_e: unknown, data: InputOnChangeData) => setEmail(data.value), [])
-  const handleAgreeChange = useCallback(() => setAgree(!agree), [agree])
+  const handleNameChange = useCallback((_e: unknown, data: InputOnChangeData) => {
+    setName(data.value)
+    if (!hasStartedToWriteSomethingInName.current) {
+      getAnalytics()?.track(TrackingEvents.START_ADDING_NAME)
+      hasStartedToWriteSomethingInName.current = true
+    }
+  }, [])
+  const handleEmailChange = useCallback((_e: unknown, data: InputOnChangeData) => {
+    setEmail(data.value)
+    if (!hasStartedToWriteSomethingInEmail.current) {
+      getAnalytics()?.track(TrackingEvents.START_ADDING_EMAIL)
+      hasStartedToWriteSomethingInEmail.current = true
+    }
+  }, [])
+  const handleAgreeChange = useCallback(() => {
+    setAgree(prev => !prev)
+    if (!hasCheckedAgree.current) {
+      getAnalytics()?.track(TrackingEvents.CHECK_TERMS_OF_SERVICE)
+      hasCheckedAgree.current = true
+    }
+  }, [])
   const signRequest = useCallback(
     async (provider: Provider, requestId: string, account: string) => {
       let request: RecoverResponse | null = null
