@@ -319,7 +319,7 @@ export const RequestPage = () => {
         <Container canChangeAccount>
           <div className={viewStyles.logo}></div>
           <div className={viewStyles.title}>Verify Sign In</div>
-          <div className={viewStyles.description}>Do you see the same verification number on your {targetConfig.explorerText}?</div>
+          <div className={viewStyles.description}>Does the verification number below match the one in the {targetConfig.explorerText}?</div>
           <div className={styles.code}>{requestRef.current?.code}</div>
           <div className={styles.buttons}>
             <Button inverted disabled={isLoading} onClick={onDenyVerifySignIn} className={styles.noButton}>
