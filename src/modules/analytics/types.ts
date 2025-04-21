@@ -7,7 +7,10 @@ export enum TrackingEvents {
   TERMS_OF_SERVICE_SUCCESS = 'Terms of service success',
   REQUEST_EXPIRED = 'Expired request',
   REQUEST_LOADING_ERROR = 'Error loading request',
-  REQUEST_INTERACTION = 'Request interaction'
+  REQUEST_INTERACTION = 'Request interaction',
+  START_ADDING_NAME = 'Start adding name',
+  START_ADDING_EMAIL = 'Start adding email',
+  CHECK_TERMS_OF_SERVICE = 'Check terms of service'
 }
 
 export enum RequestInteractionType {
