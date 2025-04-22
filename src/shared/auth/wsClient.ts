@@ -5,7 +5,7 @@ import { RequestInteractionType, TrackingEvents } from '../../modules/analytics/
 import { config } from '../../modules/config'
 import { isErrorWithMessage } from '../errors'
 import { DifferentSenderError, ExpiredRequestError, RequestNotFoundError } from './errors'
-import { OutcomeError, OutcomeResponse, RecoverResponse } from './types'
+import { OutcomeError, OutcomeResponse, RecoverResponse, ValidationResponse } from './types'
 
 export const createAuthServerWsClient = (authServerUrl?: string) => {
   const url = authServerUrl ?? config.get('AUTH_SERVER_URL')
@@ -118,5 +118,15 @@ export const createAuthServerWsClient = (authServerUrl?: string) => {
     }
   }
 
-  return { recover, sendSuccessfulOutcome, sendFailedOutcome }
+  const notifyRequestNeedsValidation = async (requestId: string): Promise<void> => {
+    try {
+      await request<ValidationResponse>('validation', { requestId })
+    } catch (e) {
+      console.error('Error notifying request needs validation', e)
+      captureException(e)
+      throw e
+    }
+  }
+
+  return { recover, sendSuccessfulOutcome, sendFailedOutcome, notifyRequestNeedsValidation }
 }
