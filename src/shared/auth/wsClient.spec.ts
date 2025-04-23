@@ -309,7 +309,7 @@ describe('createAuthServerClient', () => {
       it('should notify the request needs validation and resolve', async () => {
         await client.notifyRequestNeedsValidation(mockRequestId)
 
-        expect(mockEmitWithAck).toHaveBeenCalledWith('validation', { requestId: mockRequestId })
+        expect(mockEmitWithAck).toHaveBeenCalledWith('request-validation-status', { requestId: mockRequestId })
         expect(mockClose).toHaveBeenCalled()
       })
     })
