@@ -293,4 +293,75 @@ describe('createAuthServerClient', () => {
       })
     })
   })
+
+  describe('when notifying that a request needs validation', () => {
+    let client: ReturnType<typeof createAuthServerWsClient>
+
+    beforeEach(() => {
+      client = createAuthServerWsClient()
+    })
+
+    describe('when the request is successful', () => {
+      beforeEach(() => {
+        mockEmitWithAck.mockResolvedValueOnce({})
+      })
+
+      it('should notify the request needs validation and resolve', async () => {
+        await client.notifyRequestNeedsValidation(mockRequestId)
+
+        expect(mockEmitWithAck).toHaveBeenCalledWith('request-validation-status', { requestId: mockRequestId })
+        expect(mockClose).toHaveBeenCalled()
+      })
+    })
+
+    describe('when the response contains an error', () => {
+      let message: { error: string }
+      beforeEach(() => {
+        message = { error: 'an error' }
+        mockEmitWithAck.mockResolvedValueOnce(message)
+      })
+
+      describe('when the error is an expiration error', () => {
+        beforeEach(() => {
+          message.error = 'Request has expired'
+        })
+
+        it('should propagate the expiration error', async () => {
+          await expect(client.notifyRequestNeedsValidation(mockRequestId)).rejects.toBeInstanceOf(ExpiredRequestError)
+        })
+      })
+
+      describe('when the error is a not found error', () => {
+        beforeEach(() => {
+          message.error = 'Request not found'
+        })
+
+        it('should propagate the not found error', async () => {
+          await expect(client.notifyRequestNeedsValidation(mockRequestId)).rejects.toBeInstanceOf(RequestNotFoundError)
+        })
+      })
+
+      describe('when the error is a different error', () => {
+        beforeEach(() => {
+          message.error = 'Unknown error'
+        })
+
+        it('should propagate the error', async () => {
+          await expect(client.notifyRequestNeedsValidation(mockRequestId)).rejects.toThrow(message.error)
+        })
+      })
+    })
+
+    describe('when the request fails due to network error', () => {
+      const error = new Error('Network error')
+
+      beforeEach(() => {
+        mockEmitWithAck.mockRejectedValueOnce(error)
+      })
+
+      it('should handle and rethrow the error', async () => {
+        await expect(client.notifyRequestNeedsValidation(mockRequestId)).rejects.toThrow('Network error')
+      })
+    })
+  })
 })

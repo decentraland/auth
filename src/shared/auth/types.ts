@@ -12,3 +12,7 @@ export type OutcomeResponse = {
 }
 
 export type OutcomeError = { code: number; message: string }
+
+export type ValidationResponse = {
+  error?: string
+}

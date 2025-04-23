@@ -29,7 +29,7 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
 
   const sendSuccessfulOutcome = async (requestId: string, sender: string, result: any): Promise<void> => {
     try {
-      const response = await fetch(baseUrl + '/v2/outcomes/' + requestId, {
+      const response = await fetch(baseUrl + '/v2/requests/' + requestId + '/outcome', {
         method: 'POST',
         headers: {
           // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -53,7 +53,7 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
 
   const sendFailedOutcome = async (requestId: string, sender: string, error: OutcomeError): Promise<void> => {
     try {
-      const response = await fetch(baseUrl + '/v2/outcomes/' + requestId, {
+      const response = await fetch(baseUrl + '/v2/requests/' + requestId + '/outcome', {
         method: 'POST',
         headers: {
           // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -133,5 +133,21 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
     }
   }
 
-  return { recover, sendSuccessfulOutcome, sendFailedOutcome }
+  const notifyRequestNeedsValidation = async (requestId: string) => {
+    try {
+      const response = await fetch(baseUrl + '/v2/requests/' + requestId + '/validation', {
+        method: 'POST'
+      })
+
+      if (!response.ok) {
+        await extractError(response, requestId)
+      }
+    } catch (e) {
+      console.error('Error notifying request needs validation', e)
+      captureException(e)
+      throw e
+    }
+  }
+
+  return { recover, sendSuccessfulOutcome, sendFailedOutcome, notifyRequestNeedsValidation }
 }
