@@ -155,7 +155,7 @@ describe('createAuthServerClient', () => {
       it('should send the successful outcome and resolve', async () => {
         await client.sendSuccessfulOutcome(mockRequestId, mockSender, mockResult)
 
-        expect(mockFetch).toHaveBeenCalledWith(mockUrl + '/v2/outcomes/' + mockRequestId, {
+        expect(mockFetch).toHaveBeenCalledWith(mockUrl + '/v2/requests/' + mockRequestId + '/outcome', {
           method: 'POST',
           headers: {
             // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -242,7 +242,7 @@ describe('createAuthServerClient', () => {
       it('should send the failed outcome and resolve', async () => {
         await client.sendFailedOutcome(mockRequestId, mockSender, mockError)
 
-        expect(mockFetch).toHaveBeenCalledWith(mockUrl + '/v2/outcomes/' + mockRequestId, {
+        expect(mockFetch).toHaveBeenCalledWith(mockUrl + '/v2/requests/' + mockRequestId + '/outcome', {
           method: 'POST',
           headers: {
             // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -307,6 +307,53 @@ describe('createAuthServerClient', () => {
 
       it('should handle and rethrow the error', async () => {
         await expect(client.sendFailedOutcome(mockRequestId, mockSender, mockError)).rejects.toThrow('Network error')
+      })
+    })
+  })
+
+  describe('when notifying that a request needs validation', () => {
+    let client: ReturnType<typeof createAuthServerHttpClient>
+
+    beforeEach(() => {
+      client = createAuthServerHttpClient()
+    })
+
+    describe('when the request is successful', () => {
+      beforeEach(() => {
+        mockFetch.mockResolvedValueOnce({
+          ok: true
+        })
+      })
+
+      it('should notify the request needs validation and resolve', async () => {
+        await client.notifyRequestNeedsValidation(mockRequestId)
+
+        expect(mockFetch).toHaveBeenCalledWith(mockUrl + '/v2/requests/' + mockRequestId + '/validation', { method: 'POST' })
+      })
+    })
+
+    describe('when the request fails due to network error', () => {
+      const error = new Error('Network error')
+
+      beforeEach(() => {
+        mockFetch.mockRejectedValueOnce(error)
+      })
+
+      it('should handle and rethrow the error', async () => {
+        await expect(client.notifyRequestNeedsValidation(mockRequestId)).rejects.toThrow('Network error')
+      })
+    })
+
+    describe('when the response contains an error', () => {
+      beforeEach(() => {
+        mockFetch.mockResolvedValueOnce({
+          ok: false,
+          json: () => Promise.resolve({ error: 'an error' })
+        })
+      })
+
+      it('should handle and rethrow the error', async () => {
+        await expect(client.notifyRequestNeedsValidation(mockRequestId)).rejects.toThrow('an error')
       })
     })
   })

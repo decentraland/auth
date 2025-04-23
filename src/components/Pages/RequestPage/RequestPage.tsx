@@ -123,6 +123,12 @@ export const RequestPage = () => {
         const request = await authServerClient.current.recover(requestId, signerAddress)
         requestRef.current = request
 
+        if (flags[FeatureFlagsKeys.LOGIN_ON_SETUP]) {
+          // Notify the auth server that the request needs validation.
+          // This will make the explorer show the verification code to the user.
+          await authServerClient.current.notifyRequestNeedsValidation(requestId)
+        }
+
         // Initialize the timeout to display the timeout view when the request expires.
         timeoutRef.current = setTimeout(() => {
           getAnalytics()?.track(TrackingEvents.REQUEST_EXPIRED, {
