@@ -294,7 +294,7 @@ export const RequestPage = () => {
     case View.TIMEOUT:
       return <TimeoutError requestId={requestId} />
     case View.DIFFERENT_ACCOUNT:
-      return <DifferentAccountError />
+      return <DifferentAccountError requestId={requestId} />
     case View.LOADING_ERROR:
       return <RecoverError error={error} />
     case View.VERIFY_SIGN_IN_ERROR:
@@ -303,7 +303,7 @@ export const RequestPage = () => {
     case View.VERIFY_SIGN_IN_COMPLETE:
       return <SignInComplete />
     case View.VERIFY_SIGN_IN_DENIED:
-      return <DeniedSignIn />
+      return <DeniedSignIn requestId={requestId} />
     case View.WALLET_INTERACTION_COMPLETE:
       return <WalletInteractionComplete />
     case View.WALLET_INTERACTION_DENIED:
@@ -316,7 +316,7 @@ export const RequestPage = () => {
       )
     case View.VERIFY_SIGN_IN:
       return (
-        <Container canChangeAccount>
+        <Container canChangeAccount requestId={requestId}>
           <div className={viewStyles.logo}></div>
           <div className={viewStyles.title}>Verify Sign In</div>
           <div className={viewStyles.description}>Does the verification number below match the one in the {targetConfig.explorerText}?</div>
@@ -335,7 +335,7 @@ export const RequestPage = () => {
       )
     case View.WALLET_INTERACTION:
       return (
-        <Container canChangeAccount>
+        <Container canChangeAccount requestId={requestId}>
           <Web2TransactionModal
             isOpen={isTransactionModalOpen}
             transactionCostAmount={formatEther((transactionGasCost ?? 0).toString())}
