@@ -120,7 +120,7 @@ export const createAuthServerWsClient = (authServerUrl?: string) => {
 
   const notifyRequestNeedsValidation = async (requestId: string): Promise<void> => {
     try {
-      await request<ValidationResponse>('validation', { requestId })
+      await request<ValidationResponse>('request-validation-status', { requestId })
     } catch (e) {
       console.error('Error notifying request needs validation', e)
       captureException(e)
