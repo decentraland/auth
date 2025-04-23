@@ -406,7 +406,7 @@ export const SetupPage = () => {
 
   switch (view) {
     case View.DIFFERENT_ACCOUNT:
-      return <DifferentAccountError />
+      return <DifferentAccountError requestId={requestId ?? ''} />
     case View.RECOVER_ERROR:
       return <RecoverError error={requestError} />
     case View.SIGN_IN_COMPLETE:
