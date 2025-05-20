@@ -7,5 +7,6 @@
   "SENTRY_DSN": "https://d0ec8d688f4d9827a270acece39153b0@o4504361728212992.ingest.us.sentry.io/4508858418266112",
   "FEATURE_FLAGS_INTERVAL": "60000",
   "BUILDER_SERVER_URL": "https://builder-api.decentraland.today",
-  "INTERCOM_APP_ID": "z0h94kay"
+  "INTERCOM_APP_ID": "z0h94kay",
+  "REFERRAL_SERVER_URL": "https://referral-server.decentraland.today"
 }

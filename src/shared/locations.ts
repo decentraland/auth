@@ -1,7 +1,10 @@
 export const locations = {
   home: () => '/',
   login: (redirectTo?: string) => `/login${redirectTo ? `?redirectTo=${encodeURIComponent(redirectTo)}` : ''}`,
-  setup: (redirectTo?: string) => `/setup${redirectTo ? `?redirectTo=${encodeURIComponent(redirectTo)}` : ''}`
+  setup: (redirectTo?: string, referrer?: string | null) =>
+    `/setup${redirectTo ? `?redirectTo=${encodeURIComponent(redirectTo)}` : ''}${
+      referrer ? `${redirectTo ? '&' : '?'}referrer=${encodeURIComponent(referrer)}` : ''
+    }`
 }
 
 export const extractRedirectToFromSearchParameters = (searchParams: URLSearchParams): string => {

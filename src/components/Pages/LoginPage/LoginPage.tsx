@@ -139,7 +139,9 @@ export const LoginPage = () => {
               // If the connected account does not have a profile, redirect the user to the setup page to create a new one.
               // The setup page should then redirect the user to the url provided as query param if available.
               if (!profile || (profile && !isProfileComplete(profile))) {
-                navigate(locations.setup(redirectTo))
+                const url = new URL(window.location.href)
+                const referrer = url.searchParams.get('referrer')
+                navigate(locations.setup(redirectTo, referrer))
                 return setShowConnectionModal(false)
               }
             }

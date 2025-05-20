@@ -3,12 +3,14 @@ import { useSearchParams } from 'react-router-dom'
 import { captureException } from '@sentry/react'
 import classNames from 'classnames'
 import { BrowserProvider } from 'ethers'
+import { EthAddress } from '@dcl/schemas'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import { Checkbox } from 'decentraland-ui/dist/components/Checkbox/Checkbox'
 import { Field } from 'decentraland-ui/dist/components/Field/Field'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
 import { useMobileMediaQuery } from 'decentraland-ui/dist/components/Media/Media'
 import type { Provider } from 'decentraland-connect'
+import fetch from 'decentraland-crypto-fetch'
 import { InputOnChangeData } from 'decentraland-ui'
 import backImg from '../../../assets/images/back.svg'
 import diceImg from '../../../assets/images/dice.svg'
@@ -18,6 +20,7 @@ import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { getAnalytics } from '../../../modules/analytics/segment'
 import { ClickEvents, TrackingEvents } from '../../../modules/analytics/types'
+import { config } from '../../../modules/config'
 import { fetchProfile } from '../../../modules/profile'
 import { createAuthServerHttpClient, createAuthServerWsClient, ExpiredRequestError, RecoverResponse } from '../../../shared/auth'
 import { useCurrentConnectionData } from '../../../shared/connection/hooks'
@@ -394,6 +397,24 @@ export const SetupPage = () => {
       setInitialized(true)
     })()
   }, [redirect, navigate, account, identity, isConnecting, initializedFlags, flags])
+
+  useEffect(() => {
+    const url = config.get('REFERRAL_SERVER_URL')
+    const referrer = urlSearchParams.get('referrer')
+
+    if (url && identity && referrer && EthAddress.validate(referrer)) {
+      fetch(`${url}/referral-progress`, {
+        method: 'POST',
+        headers: {
+          contentType: 'application/json'
+        },
+        body: JSON.stringify({
+          referrer
+        }),
+        identity
+      })
+    }
+  }, [urlSearchParams, identity])
 
   if (!initialized) {
     return (

@@ -81,7 +81,9 @@ export const RequestPage = () => {
   }, [requestId])
 
   const toSetupPage = useCallback(() => {
-    navigate(locations.setup(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}`))
+    const url = new URL(window.location.href)
+    const referrer = url.searchParams.get('referrer')
+    navigate(locations.setup(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}`, referrer))
   }, [requestId])
 
   useEffect(() => {
