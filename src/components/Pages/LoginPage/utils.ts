@@ -66,8 +66,9 @@ export async function connectToSocialProvider(
     })
 
     const url = new URL(window.location.href)
+    const referrer = url.searchParams.get('referrer')
     url.pathname = '/auth/callback'
-    url.search = ''
+    url.search = referrer ? `referrer=${referrer}` : ''
 
     await magic?.oauth2.loginWithRedirect({
       provider: connectionOption === ConnectionOptionType.X ? 'twitter' : (connectionOption as OAuthProvider),
