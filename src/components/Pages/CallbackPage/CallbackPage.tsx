@@ -48,8 +48,16 @@ export const CallbackPage = () => {
           // If the connected account does not have a profile, redirect the user to the setup page to create a new one.
           // The setup page should then redirect the user to the url provided as query param if available.
           if (!profile) {
+            let referrer
             const url = new URL(window.location.href)
-            const referrer = url.searchParams.get('referrer')
+            const state = url.searchParams.get('state')
+            if (state) {
+              const stateRedirectToParam = atob(state)
+
+              const parsedCustomData = JSON.parse(stateRedirectToParam).customData
+              referrer = JSON.parse(parsedCustomData).referrer
+            }
+
             return navigate(locations.setup(redirectTo, referrer))
           }
         }

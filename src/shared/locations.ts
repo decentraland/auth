@@ -15,7 +15,7 @@ export const extractRedirectToFromSearchParameters = (searchParams: URLSearchPar
     // Decode the state parameter to get the original 'redirectTo'
     if (state) {
       const stateRedirectToParam = atob(state)
-      const parsedRedirectTo = JSON.parse(stateRedirectToParam).customData
+      const parsedRedirectTo = JSON.parse(JSON.parse(stateRedirectToParam).customData).redirectTo
       if (parsedRedirectTo) {
         redirectToSearchParam = parsedRedirectTo ?? null
       }
