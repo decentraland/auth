@@ -403,16 +403,35 @@ export const SetupPage = () => {
     const referrer = urlSearchParams.get('referrer')
 
     if (url && identity && referrer && EthAddress.validate(referrer)) {
-      fetch(`${url}/referral-progress`, {
-        method: 'POST',
-        headers: {
-          contentType: 'application/json'
-        },
-        body: JSON.stringify({
-          referrer
-        }),
-        identity
-      })
+      try {
+        fetch(`${url}/referral-progress`, {
+          method: 'POST',
+          headers: {
+            contentType: 'application/json'
+          },
+          body: JSON.stringify({
+            referrer
+          }),
+          identity
+        })
+      } catch (error) {
+        // Log locally for debugging
+        console.warn('Failed to track referral progress:', {
+          error,
+          referrer,
+          url
+        })
+        // Send to Sentry for monitoring
+        captureException(error, {
+          tags: {
+            feature: 'referral-progress',
+            referrer
+          },
+          extra: {
+            url
+          }
+        })
+      }
     }
   }, [urlSearchParams, identity])
 
