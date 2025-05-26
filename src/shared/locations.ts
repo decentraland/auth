@@ -1,3 +1,5 @@
+import { EthAddress } from '@dcl/schemas'
+
 export const locations = {
   home: () => '/',
   login: (redirectTo?: string) => `/login${redirectTo ? `?redirectTo=${encodeURIComponent(redirectTo)}` : ''}`,
@@ -52,6 +54,10 @@ export const extractReferrerFromSearchParameters = (searchParams: URLSearchParam
     }
   } catch (_) {
     console.error("Can't decode state parameter")
+  }
+
+  if (referrerSearchParam && !EthAddress.validate(referrerSearchParam)) {
+    return null
   }
 
   return referrerSearchParam

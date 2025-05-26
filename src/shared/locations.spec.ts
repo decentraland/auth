@@ -91,13 +91,13 @@ describe('locations', () => {
 
     beforeEach(() => {
       searchParams = new URLSearchParams()
-      referrer = 'https://example.com'
+      referrer = '0x742d35Cc6634C0532925a3b844Bc454e4438f44e'
       stateData = {
         customData: JSON.stringify({ referrer })
       }
       encodedState = btoa(JSON.stringify(stateData))
-      stateReferrer = 'https://from-state.com'
-      directReferrer = 'https://direct.com'
+      stateReferrer = '0x123f681646d4a755815f9cb19e1accc6a1d88f53'
+      directReferrer = '0x456f681646d4a755815f9cb19e1accc6a1d88f53'
     })
 
     describe('when no referrer is provided', () => {
@@ -113,11 +113,11 @@ describe('locations', () => {
       })
     })
 
-    describe('when referrer contains special characters', () => {
-      it('returns decoded referrer with special characters', () => {
-        const specialReferrer = 'https://example.com?param=value&other=123'
-        searchParams = new URLSearchParams(`referrer=${encodeURIComponent(specialReferrer)}`)
-        expect(extractReferrerFromSearchParameters(searchParams)).toBe(specialReferrer)
+    describe('when referrer is invalid', () => {
+      it('returns null for invalid address', () => {
+        const invalidReferrer = '0xinvalid'
+        searchParams = new URLSearchParams(`referrer=${encodeURIComponent(invalidReferrer)}`)
+        expect(extractReferrerFromSearchParameters(searchParams)).toBeNull()
       })
     })
 
