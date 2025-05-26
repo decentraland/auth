@@ -185,7 +185,7 @@ export const SetupPage = () => {
     })
 
     setView(View.FORM)
-  }, [profile])
+  }, [profile, account])
 
   // Goes back into the randomize view to select a new default profile.
   const handleBack = useCallback(() => {
