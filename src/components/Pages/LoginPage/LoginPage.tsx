@@ -20,7 +20,7 @@ import { ClickEvents, ConnectionType, TrackingEvents } from '../../../modules/an
 import { config } from '../../../modules/config'
 import { fetchProfile } from '../../../modules/profile'
 import { isErrorWithMessage, isErrorWithName } from '../../../shared/errors'
-import { locations } from '../../../shared/locations'
+import { extractReferrerFromSearchParameters, locations } from '../../../shared/locations'
 import { isProfileComplete } from '../../../shared/profile'
 import { wait } from '../../../shared/time'
 import { Connection, ConnectionOptionType } from '../../Connection'
@@ -139,8 +139,8 @@ export const LoginPage = () => {
               // If the connected account does not have a profile, redirect the user to the setup page to create a new one.
               // The setup page should then redirect the user to the url provided as query param if available.
               if (!profile || (profile && !isProfileComplete(profile))) {
-                const url = new URL(window.location.href)
-                const referrer = url.searchParams.get('referrer')
+                const search = new URLSearchParams(window.location.search)
+                const referrer = extractReferrerFromSearchParameters(search)
                 navigate(locations.setup(redirectTo, referrer))
                 return setShowConnectionModal(false)
               }
