@@ -38,3 +38,21 @@ export const extractRedirectToFromSearchParameters = (searchParams: URLSearchPar
 
   return redirectTo
 }
+
+export const extractReferrerFromSearchParameters = (searchParams: URLSearchParams): string | null => {
+  let referrerSearchParam = searchParams.get('referrer')
+  try {
+    const state = searchParams.get('state')
+    if (state) {
+      const stateReferrerParam = atob(state)
+      const parsedReferrer = JSON.parse(JSON.parse(stateReferrerParam).customData).referrer
+      if (parsedReferrer) {
+        referrerSearchParam = parsedReferrer ?? null
+      }
+    }
+  } catch (_) {
+    console.error("Can't decode state parameter")
+  }
+
+  return referrerSearchParam
+}
