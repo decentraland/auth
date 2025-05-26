@@ -21,7 +21,7 @@ import {
 } from '../../../shared/auth'
 import { useCurrentConnectionData } from '../../../shared/connection'
 import { isErrorWithMessage, isRpcError } from '../../../shared/errors'
-import { locations } from '../../../shared/locations'
+import { extractReferrerFromSearchParameters, locations } from '../../../shared/locations'
 import { isProfileComplete } from '../../../shared/profile'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
 import { Container } from './Container'
@@ -81,8 +81,8 @@ export const RequestPage = () => {
   }, [requestId])
 
   const toSetupPage = useCallback(() => {
-    const url = new URL(window.location.href)
-    const referrer = url.searchParams.get('referrer')
+    const search = new URLSearchParams(window.location.search)
+    const referrer = extractReferrerFromSearchParameters(search)
     navigate(locations.setup(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}`, referrer))
   }, [requestId])
 
