@@ -9,7 +9,7 @@ import { getAnalytics } from '../../../modules/analytics/segment'
 import { ConnectionType, TrackingEvents } from '../../../modules/analytics/types'
 import { fetchProfile } from '../../../modules/profile'
 import { isErrorWithMessage } from '../../../shared/errors'
-import { locations } from '../../../shared/locations'
+import { locations, extractReferrerFromSearchParameters } from '../../../shared/locations'
 import { wait } from '../../../shared/time'
 import { ConnectionModal, ConnectionModalState } from '../../ConnectionModal'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
@@ -28,38 +28,41 @@ export const CallbackPage = () => {
     return connectionData
   }, [flags[FeatureFlagsKeys.MAGIC_TEST]])
 
-  const handleContinue = useCallback(async () => {
-    try {
-      const connectionData = await connectAndGenerateSignature()
-      const ethAddress = connectionData.account?.toLowerCase() ?? ''
-      getAnalytics()?.identify({ ethAddress })
-      // eslint-disable-next-line @typescript-eslint/naming-convention
-      getAnalytics()?.track(TrackingEvents.LOGIN_SUCCESS, { eth_address: ethAddress, type: ConnectionType.WEB2 })
-      // Wait 800 ms for the tracking to be completed
-      await wait(800)
+  const handleContinue = useCallback(
+    async (referrer: string | null) => {
+      try {
+        const connectionData = await connectAndGenerateSignature()
+        const ethAddress = connectionData.account?.toLowerCase() ?? ''
+        getAnalytics()?.identify({ ethAddress })
+        // eslint-disable-next-line @typescript-eslint/naming-convention
+        getAnalytics()?.track(TrackingEvents.LOGIN_SUCCESS, { eth_address: ethAddress, type: ConnectionType.WEB2 })
+        // Wait 800 ms for the tracking to be completed
+        await wait(800)
 
-      // If the flag is enabled and the setup is not skipped by config, proceed with the simplified avatar setup flow.
-      if (!targetConfig.skipSetup) {
-        // Can only proceed if the connection data has an account. Without the account the profile cannot be fetched.
-        // Continues with the original flow if the account is not present.
-        if (connectionData.account) {
-          const profile = await fetchProfile(connectionData.account)
+        // If the flag is enabled and the setup is not skipped by config, proceed with the simplified avatar setup flow.
+        if (!targetConfig.skipSetup) {
+          // Can only proceed if the connection data has an account. Without the account the profile cannot be fetched.
+          // Continues with the original flow if the account is not present.
+          if (connectionData.account) {
+            const profile = await fetchProfile(connectionData.account)
 
-          // If the connected account does not have a profile, redirect the user to the setup page to create a new one.
-          // The setup page should then redirect the user to the url provided as query param if available.
-          if (!profile) {
-            return navigate(locations.setup(redirectTo))
+            // If the connected account does not have a profile, redirect the user to the setup page to create a new one.
+            // The setup page should then redirect the user to the url provided as query param if available.
+            if (!profile) {
+              return navigate(locations.setup(redirectTo, referrer))
+            }
           }
         }
-      }
 
-      redirect()
-    } catch (error) {
-      console.log(error)
-      captureException(error)
-      navigate(locations.login())
-    }
-  }, [navigate, redirectTo, connectAndGenerateSignature, redirect])
+        redirect()
+      } catch (error) {
+        console.log(error)
+        captureException(error)
+        navigate(locations.login())
+      }
+    },
+    [navigate, redirectTo, connectAndGenerateSignature, redirect]
+  )
 
   const logInAndRedirect = useCallback(async () => {
     // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -74,8 +77,10 @@ export const CallbackPage = () => {
     })
 
     try {
+      const search = new URLSearchParams(window.location.search)
+      const referrer = extractReferrerFromSearchParameters(search)
       await magic?.oauth2.getRedirectResult()
-      handleContinue()
+      handleContinue(referrer)
     } catch (error) {
       console.error('Error logging in', error)
       captureException(error)

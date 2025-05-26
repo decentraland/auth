@@ -36,6 +36,7 @@
     "classnames": "^2.3.2",
     "dcl-catalyst-client": "^21.5.5",
     "decentraland-connect": "^9.1.0",
+    "decentraland-crypto-fetch": "^2.0.1",
     "decentraland-ui": "^6.13.0",
     "ethers": "^6.8.0",
     "isbot": "^5.1.22",

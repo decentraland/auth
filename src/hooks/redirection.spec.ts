@@ -24,7 +24,9 @@ describe('when using the redirection hook', () => {
 
   describe('and the redirectTo parameter is present in the state parameter', () => {
     beforeEach(() => {
-      mockedUseLocation.mockReturnValue({ search: `state=${btoa(JSON.stringify({ customData: 'http://localhost/test' }))}` } as Location)
+      mockedUseLocation.mockReturnValue({
+        search: `state=${btoa(JSON.stringify({ customData: JSON.stringify({ redirectTo: 'http://localhost/test' }) }))}`
+      } as Location)
     })
 
     it('should return the redirectTo URL', () => {
@@ -36,7 +38,9 @@ describe('when using the redirection hook', () => {
   describe('and the current URL contains a targetConfigId parameter', () => {
     beforeEach(() => {
       mockedUseLocation.mockReturnValue({
-        search: `state=${btoa(JSON.stringify({ customData: 'http://localhost/test' }))}&targetConfigId=android`
+        search: `state=${btoa(
+          JSON.stringify({ customData: JSON.stringify({ redirectTo: 'http://localhost/test' }) })
+        )}&targetConfigId=android`
       } as Location)
     })
 
