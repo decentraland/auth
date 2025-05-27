@@ -317,6 +317,33 @@ export const SetupPage = () => {
           deploymentProfileName: name
         })
 
+        const url = config.get('REFERRAL_SERVER_URL')
+
+        try {
+          fetch(`${url}/referral-progress`, {
+            method: 'PATCH',
+            headers: {
+              contentType: 'application/json'
+            },
+            identity
+          })
+        } catch (error) {
+          // Log locally for debugging
+          console.warn('Failed to track referral progress:', {
+            error,
+            account,
+            url
+          })
+          // Send to Sentry for monitoring
+          captureException(error, {
+            tags: {
+              feature: 'referral-progress',
+              account,
+              url
+            }
+          })
+        }
+
         // Subscribe to the newsletter only if the user has provided an email.
         if (email) {
           // Given that the subscription is an extra step, we don't want to block the user if it fails.
