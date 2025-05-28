@@ -434,10 +434,7 @@ export const SetupPage = () => {
         fetch(`${url}/test`, {
           method: 'POST',
           headers: {
-            contentType: 'application/json',
-            accessControlAllowOrigin: 'https://decentraland.zone',
-            referer: 'https://decentraland.zone',
-            origin: 'https://decentraland.zone'
+            contentType: 'application/json'
           }
         })
         fetch(`${url}/referral-progress`, {
