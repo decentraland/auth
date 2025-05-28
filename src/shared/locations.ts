@@ -1,7 +1,12 @@
+import { EthAddress } from '@dcl/schemas'
+
 export const locations = {
   home: () => '/',
   login: (redirectTo?: string) => `/login${redirectTo ? `?redirectTo=${encodeURIComponent(redirectTo)}` : ''}`,
-  setup: (redirectTo?: string) => `/setup${redirectTo ? `?redirectTo=${encodeURIComponent(redirectTo)}` : ''}`
+  setup: (redirectTo?: string, referrer?: string | null) =>
+    `/setup${redirectTo ? `?redirectTo=${encodeURIComponent(redirectTo)}` : ''}${
+      referrer ? `${redirectTo ? '&' : '?'}referrer=${encodeURIComponent(referrer)}` : ''
+    }`
 }
 
 export const extractRedirectToFromSearchParameters = (searchParams: URLSearchParams): string => {
@@ -12,7 +17,7 @@ export const extractRedirectToFromSearchParameters = (searchParams: URLSearchPar
     // Decode the state parameter to get the original 'redirectTo'
     if (state) {
       const stateRedirectToParam = atob(state)
-      const parsedRedirectTo = JSON.parse(stateRedirectToParam).customData
+      const parsedRedirectTo = JSON.parse(JSON.parse(stateRedirectToParam).customData).redirectTo
       if (parsedRedirectTo) {
         redirectToSearchParam = parsedRedirectTo ?? null
       }
@@ -34,4 +39,26 @@ export const extractRedirectToFromSearchParameters = (searchParams: URLSearchPar
   }
 
   return redirectTo
+}
+
+export const extractReferrerFromSearchParameters = (searchParams: URLSearchParams): string | null => {
+  let referrerSearchParam = searchParams.get('referrer')
+  try {
+    const state = searchParams.get('state')
+    if (state) {
+      const stateReferrerParam = atob(state)
+      const parsedReferrer = JSON.parse(JSON.parse(stateReferrerParam).customData).referrer
+      if (parsedReferrer) {
+        referrerSearchParam = parsedReferrer ?? null
+      }
+    }
+  } catch (_) {
+    console.error("Can't decode state parameter")
+  }
+
+  if (referrerSearchParam && !EthAddress.validate(referrerSearchParam)) {
+    return null
+  }
+
+  return referrerSearchParam
 }

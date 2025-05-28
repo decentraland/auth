@@ -32,7 +32,7 @@ describe('useTargetConfig', () => {
   describe('when a targetConfigId is provided through the redirectTo parameter', () => {
     beforeEach(() => {
       ;(useLocation as jest.Mock).mockReturnValue({
-        search: `state=${btoa(JSON.stringify({ customData: 'http://localhost/test?targetConfigId=ios' }))}`
+        search: `state=${btoa(JSON.stringify({ customData: JSON.stringify({ redirectTo: 'http://localhost/test?targetConfigId=ios' }) }))}`
       })
       ;(isMobile as jest.Mock).mockReturnValue(false)
     })

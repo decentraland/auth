@@ -4,6 +4,7 @@ import { AuthIdentity, Authenticator } from '@dcl/crypto'
 import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
 import { localStorageGetIdentity, localStorageStoreIdentity } from '@dcl/single-sign-on-client'
 import { connection, getConfiguration, ConnectionResponse, Provider } from 'decentraland-connect'
+import { extractReferrerFromSearchParameters } from '../../../shared/locations'
 import { ConnectionOptionType } from '../../Connection'
 
 const ONE_MONTH_IN_MINUTES = 60 * 24 * 30
@@ -66,13 +67,15 @@ export async function connectToSocialProvider(
     })
 
     const url = new URL(window.location.href)
+    const search = new URLSearchParams(window.location.search)
+    const referrer = extractReferrerFromSearchParameters(search)
     url.pathname = '/auth/callback'
     url.search = ''
 
     await magic?.oauth2.loginWithRedirect({
       provider: connectionOption === ConnectionOptionType.X ? 'twitter' : (connectionOption as OAuthProvider),
       redirectURI: url.href,
-      customData: redirectTo
+      customData: JSON.stringify({ redirectTo, referrer })
     })
   }
 }
