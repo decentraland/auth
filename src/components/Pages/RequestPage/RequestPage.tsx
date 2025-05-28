@@ -224,9 +224,13 @@ export const RequestPage = () => {
         throw new Error('Provider not created')
       }
 
+      console.log("Approve sign in verification - Getting the provider's signer")
       const signer = await provider.getSigner()
+      console.log("Approve sign in verification - Got the provider's signer. Signing the message")
       const signature = await signer.signMessage(requestRef.current?.params?.[0])
+      console.log('Approve sign in verification - Signed the message. Sending the outcome to the server...')
       await authServerClient.current.sendSuccessfulOutcome(requestId, await signer.getAddress(), signature)
+      console.log('Approve sign in verification - Outcome sent')
 
       setView(View.VERIFY_SIGN_IN_COMPLETE)
 
@@ -236,6 +240,7 @@ export const RequestPage = () => {
     } catch (e) {
       setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
       captureException(e, { tags: { isWeb2Wallet: isUserUsingWeb2Wallet } })
+      console.error('An error occurred when approving the sign in verification', e)
       setView(View.VERIFY_SIGN_IN_ERROR)
     } finally {
       setIsLoading(false)
