@@ -431,6 +431,15 @@ export const SetupPage = () => {
 
     if (url && identity && referrer && EthAddress.validate(referrer)) {
       try {
+        fetch(`${url}/test`, {
+          method: 'POST',
+          headers: {
+            contentType: 'application/json',
+            accessControlAllowOrigin: 'https://decentraland.zone',
+            referer: 'https://decentraland.zone',
+            origin: 'https://decentraland.zone'
+          }
+        })
         fetch(`${url}/referral-progress`, {
           method: 'POST',
           headers: {
