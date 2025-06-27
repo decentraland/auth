@@ -37,7 +37,7 @@
     "dcl-catalyst-client": "^21.5.5",
     "decentraland-connect": "^9.1.0",
     "decentraland-crypto-fetch": "^2.0.1",
-    "decentraland-ui": "^6.17.1",
+    "decentraland-ui": "^6.17.2",
     "ethers": "^6.8.0",
     "isbot": "^5.1.22",
     "magic-sdk": "^27.0.0",
