@@ -69,6 +69,8 @@ const DeployErrorMessage = (props: { message: string }) => (
   </div>
 )
 
+const REFERRAL_SERVER_URL = config.get('REFERRAL_SERVER_URL')
+
 export const SetupPage = () => {
   const hasStartedToWriteSomethingInName = useRef(false)
   const hasStartedToWriteSomethingInEmail = useRef(false)
@@ -91,6 +93,7 @@ export const SetupPage = () => {
   const { isLoading: isConnecting, account, identity, provider, providerType } = useCurrentConnectionData()
   const authServerClient = useRef(createAuthServerWsClient())
   const navigate = useNavigateWithSearchParams()
+  const referrer = urlSearchParams.get('referrer')
 
   const requestId = useMemo(() => {
     // Grab the request id from redirectTo parameter.
@@ -317,10 +320,8 @@ export const SetupPage = () => {
           deploymentProfileName: name
         })
 
-        const url = config.get('REFERRAL_SERVER_URL')
-
         try {
-          fetch(`${url}/referral-progress`, {
+          await fetch(`${REFERRAL_SERVER_URL}/referral-progress`, {
             method: 'PATCH',
             headers: {
               contentType: 'application/json'
@@ -332,14 +333,14 @@ export const SetupPage = () => {
           console.warn('Failed to track referral progress:', {
             error,
             account,
-            url
+            url: REFERRAL_SERVER_URL
           })
           // Send to Sentry for monitoring
           captureException(error, {
             tags: {
               feature: 'referral-progress',
               account,
-              url
+              url: REFERRAL_SERVER_URL
             }
           })
         }
@@ -421,46 +422,41 @@ export const SetupPage = () => {
         authServerClient.current = createAuthServerWsClient()
       }
 
+      if (referrer && EthAddress.validate(referrer)) {
+        try {
+          await fetch(`${REFERRAL_SERVER_URL}/referral-progress`, {
+            method: 'POST',
+            headers: {
+              contentType: 'application/json'
+            },
+            body: JSON.stringify({
+              referrer
+            }),
+            identity
+          })
+        } catch (error) {
+          // Log locally for debugging
+          console.warn('Failed to track referral progress:', {
+            error,
+            referrer,
+            url: REFERRAL_SERVER_URL
+          })
+          // Send to Sentry for monitoring
+          captureException(error, {
+            tags: {
+              feature: 'referral-progress',
+              referrer
+            },
+            extra: {
+              url: REFERRAL_SERVER_URL
+            }
+          })
+        }
+      }
+
       setInitialized(true)
     })()
-  }, [redirect, navigate, account, identity, isConnecting, initializedFlags, flags])
-
-  useEffect(() => {
-    const url = config.get('REFERRAL_SERVER_URL')
-    const referrer = urlSearchParams.get('referrer')
-
-    if (url && identity && referrer && EthAddress.validate(referrer)) {
-      try {
-        fetch(`${url}/referral-progress`, {
-          method: 'POST',
-          headers: {
-            contentType: 'application/json'
-          },
-          body: JSON.stringify({
-            referrer
-          }),
-          identity
-        })
-      } catch (error) {
-        // Log locally for debugging
-        console.warn('Failed to track referral progress:', {
-          error,
-          referrer,
-          url
-        })
-        // Send to Sentry for monitoring
-        captureException(error, {
-          tags: {
-            feature: 'referral-progress',
-            referrer
-          },
-          extra: {
-            url
-          }
-        })
-      }
-    }
-  }, [urlSearchParams, identity])
+  }, [redirect, navigate, account, identity, isConnecting, initializedFlags, flags, referrer])
 
   if (!initialized) {
     return (
