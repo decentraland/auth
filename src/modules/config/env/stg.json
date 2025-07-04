@@ -8,5 +8,5 @@
   "FEATURE_FLAGS_INTERVAL": "60000",
   "BUILDER_SERVER_URL": "https://builder-api.decentraland.today",
   "INTERCOM_APP_ID": "z0h94kay",
-  "REFERRAL_SERVER_URL": "https://referral-server.decentraland.today"
+  "REFERRAL_SERVER_URL": "https://social-api.decentraland.zone/v1"
 }
