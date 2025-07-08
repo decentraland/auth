@@ -1,16 +1,25 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { PreviewEmote } from '@dcl/schemas'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
 import { WearablePreview } from 'decentraland-ui/dist/components/WearablePreview/WearablePreview'
+import { config } from '../../modules/config'
+import { FeatureFlagsContext, FeatureFlagsKeys } from '../FeatureFlagsProvider/FeatureFlagsProvider.types'
 import { Props } from './CustomWearablePreview.types'
 import './CustomWearablePreview.css'
 
 export const CustomWearablePreview = (props: Props) => {
+  const { flags, initialized: initializedFlags } = useContext(FeatureFlagsContext)
+
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => setIsLoading(true), [props.profile])
+  const isUnityWearablePreviewEnabled = flags[FeatureFlagsKeys.UNITY_WEARABLE_PREVIEW]
 
   const platformDefinition = useMemo(() => {
+    if (isUnityWearablePreviewEnabled) {
+      return ''
+    }
+
     const getRepresentation = (bodyShape: 'BaseMale' | 'BaseFemale') => {
       const mainFile = 'platform.glb'
       const baseUrl = import.meta.env.VITE_BASE_URL || window.location.origin
@@ -34,22 +43,29 @@ export const CustomWearablePreview = (props: Props) => {
         }
       })
     )
-  }, [])
+  }, [isUnityWearablePreviewEnabled])
 
   const handleOnLoad = useCallback(() => setIsLoading(false), [])
+
+  if (!initializedFlags) {
+    return null
+  }
 
   return (
     <div className="CustomWearablePreview">
       <WearablePreview
+        base64s={[platformDefinition]}
+        baseUrl={config.get('WEARABLE_PREVIEW_URL')}
+        cameraY={0.2}
+        dev={false}
+        disableAutoRotate
+        disableBackground={true}
+        emote={PreviewEmote.WAVE}
         lockBeta={true}
         panning={false}
-        disableBackground={true}
         profile={props.profile}
-        dev={false}
-        emote={PreviewEmote.WAVE}
-        disableAutoRotate
-        cameraY={0.2}
-        base64s={[platformDefinition]}
+        unity={isUnityWearablePreviewEnabled}
+        unityMode="authentication"
         onLoad={handleOnLoad}
       />
       {isLoading ? <Loader active={true} size="huge" /> : null}
