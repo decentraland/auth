@@ -320,29 +320,31 @@ export const SetupPage = () => {
           deploymentProfileName: name
         })
 
-        try {
-          await fetch(`${REFERRAL_SERVER_URL}/referral-progress`, {
-            method: 'PATCH',
-            headers: {
-              contentType: 'application/json'
-            },
-            identity
-          })
-        } catch (error) {
-          // Log locally for debugging
-          console.warn('Failed to track referral progress:', {
-            error,
-            account,
-            url: REFERRAL_SERVER_URL
-          })
-          // Send to Sentry for monitoring
-          captureException(error, {
-            tags: {
-              feature: 'referral-progress',
+        if (referrer && EthAddress.validate(referrer)) {
+          try {
+            await fetch(`${REFERRAL_SERVER_URL}/referral-progress`, {
+              method: 'PATCH',
+              headers: {
+                contentType: 'application/json'
+              },
+              identity
+            })
+          } catch (error) {
+            // Log locally for debugging
+            console.warn('Failed to track referral progress:', {
+              error,
               account,
               url: REFERRAL_SERVER_URL
-            }
-          })
+            })
+            // Send to Sentry for monitoring
+            captureException(error, {
+              tags: {
+                feature: 'referral-progress',
+                account,
+                url: REFERRAL_SERVER_URL
+              }
+            })
+          }
         }
 
         // Subscribe to the newsletter only if the user has provided an email.
@@ -390,6 +392,7 @@ export const SetupPage = () => {
       agree,
       profile,
       provider,
+      referrer,
       flags[FeatureFlagsKeys.LOGIN_ON_SETUP],
       redirect,
       signRequest
