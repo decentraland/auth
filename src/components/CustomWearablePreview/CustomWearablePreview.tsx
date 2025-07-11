@@ -1,5 +1,6 @@
 import { useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { PreviewEmote } from '@dcl/schemas'
+import { Env } from '@dcl/ui-env'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
 import { WearablePreview } from 'decentraland-ui/dist/components/WearablePreview/WearablePreview'
 import { config } from '../../modules/config'
@@ -57,7 +58,7 @@ export const CustomWearablePreview = (props: Props) => {
         base64s={[platformDefinition]}
         baseUrl={config.get('WEARABLE_PREVIEW_URL')}
         cameraY={0.2}
-        dev={false}
+        dev={config.is(Env.DEVELOPMENT)}
         disableAutoRotate
         disableBackground={true}
         emote={PreviewEmote.WAVE}
