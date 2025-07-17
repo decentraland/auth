@@ -425,6 +425,19 @@ export const SetupPage = () => {
         authServerClient.current = createAuthServerWsClient()
       }
 
+      if (provider?.isMagic) {
+        try {
+          const storedEmail = localStorage.getItem('dcl_magic_user_email')
+          if (storedEmail) {
+            setEmail(storedEmail)
+            // Clear the stored email after using it
+            localStorage.removeItem('dcl_magic_user_email')
+          }
+        } catch (error) {
+          console.warn('Failed to get user email from localStorage:', error)
+        }
+      }
+
       if (referrer && EthAddress.validate(referrer)) {
         try {
           await fetch(`${REFERRAL_SERVER_URL}/referral-progress`, {
@@ -459,7 +472,7 @@ export const SetupPage = () => {
 
       setInitialized(true)
     })()
-  }, [redirect, navigate, account, identity, isConnecting, initializedFlags, flags, referrer])
+  }, [redirect, navigate, account, identity, isConnecting, initializedFlags, flags, referrer, provider])
 
   if (!initialized) {
     return (
