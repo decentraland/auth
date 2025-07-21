@@ -79,7 +79,13 @@ export const CallbackPage = () => {
     try {
       const search = new URLSearchParams(window.location.search)
       const referrer = extractReferrerFromSearchParameters(search)
-      await magic?.oauth2.getRedirectResult()
+      const result = await magic?.oauth2.getRedirectResult()
+
+      // Store user email in localStorage if available
+      if (result?.oauth?.userInfo?.email) {
+        localStorage.setItem('dcl_magic_user_email', result.oauth.userInfo.email)
+      }
+
       handleContinue(referrer)
     } catch (error) {
       console.error('Error logging in', error)
