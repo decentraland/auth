@@ -16,7 +16,7 @@ export const useAuthFlow = () => {
   const [targetConfig] = useTargetConfig()
 
   const shouldUseTestMagic = useCallback(() => {
-    return flags[FeatureFlagsKeys.MAGIC_TEST]
+    return Boolean(flags[FeatureFlagsKeys.MAGIC_TEST])
   }, [flags])
 
   const connectToMagic = useCallback(async () => {
@@ -31,8 +31,6 @@ export const useAuthFlow = () => {
 
         if (!profile && !flags[FeatureFlagsKeys.NEW_ONBOARDING_FLOW]) {
           return navigate(locations.setup(redirectTo, referrer))
-        } else if (!profile && flags[FeatureFlagsKeys.NEW_ONBOARDING_FLOW]) {
-          return navigate(locations.avatarSetup(redirectTo, referrer))
         } else if (profile && !isProfileComplete(profile)) {
           return navigate(locations.setup(redirectTo, referrer))
         }
