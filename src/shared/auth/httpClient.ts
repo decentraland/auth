@@ -1,8 +1,7 @@
-import { captureException } from '@sentry/react'
 import { getAnalytics } from '../../modules/analytics/segment'
 import { RequestInteractionType, TrackingEvents } from '../../modules/analytics/types'
 import { config } from '../../modules/config'
-import { isErrorWithMessage } from '../errors'
+import { handleError } from '../utils/errorHandler'
 import { DifferentSenderError, ExpiredRequestError, RequestNotFoundError } from './errors'
 import { OutcomeError, RecoverResponse } from './types'
 export const createAuthServerHttpClient = (authServerUrl?: string) => {
@@ -45,8 +44,7 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
         await extractError(response, requestId)
       }
     } catch (e) {
-      console.error('Error sending outcome', e)
-      captureException(e)
+      handleError(e, 'Error sending outcome')
       throw e
     }
   }
@@ -69,8 +67,7 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
         await extractError(response, requestId)
       }
     } catch (e) {
-      console.error('Error sending outcome', e)
-      captureException(e)
+      handleError(e, 'Error sending outcome')
       throw e
     }
   }
@@ -122,12 +119,15 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
 
       return recoverResponse
     } catch (e) {
-      console.error('Error recovering request', e)
-      captureException(e)
+      handleError(e, 'Error recovering request', {
+        trackingData: {
+          browserTime: Date.now(),
+          requestType: recoverResponse?.method ?? 'Unknown'
+        }
+      })
       getAnalytics()?.track(TrackingEvents.REQUEST_LOADING_ERROR, {
         browserTime: Date.now(),
-        requestType: recoverResponse?.method ?? 'Unknown',
-        error: isErrorWithMessage(e) ? e.message : 'Unknown error'
+        requestType: recoverResponse?.method ?? 'Unknown'
       })
       throw e
     }
@@ -143,8 +143,7 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
         await extractError(response, requestId)
       }
     } catch (e) {
-      console.error('Error notifying request needs validation', e)
-      captureException(e)
+      handleError(e, 'Error notifying request needs validation')
       throw e
     }
   }
