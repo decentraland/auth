@@ -15,14 +15,10 @@ export const useAuthFlow = () => {
   const { flags } = useContext(FeatureFlagsContext)
   const [targetConfig] = useTargetConfig()
 
-  const shouldUseTestMagic = useCallback(() => {
-    return Boolean(flags[FeatureFlagsKeys.MAGIC_TEST])
-  }, [flags])
-
   const connectToMagic = useCallback(async () => {
-    const providerType = shouldUseTestMagic() ? ProviderType.MAGIC_TEST : ProviderType.MAGIC
+    const providerType = flags[FeatureFlagsKeys.MAGIC_TEST] ? ProviderType.MAGIC_TEST : ProviderType.MAGIC
     return await connection.connect(providerType)
-  }, [shouldUseTestMagic])
+  }, [flags[FeatureFlagsKeys.MAGIC_TEST]])
 
   const checkProfileAndRedirect = useCallback(
     async (account: string, referrer: string | null, redirect: () => void) => {
@@ -42,14 +38,13 @@ export const useAuthFlow = () => {
   )
 
   const getMagicConfig = useCallback(
-    () => (shouldUseTestMagic() ? getConfiguration().magic_test : getConfiguration().magic),
-    [shouldUseTestMagic]
+    () => (flags[FeatureFlagsKeys.MAGIC_TEST] ? getConfiguration().magic_test : getConfiguration().magic),
+    [flags[FeatureFlagsKeys.MAGIC_TEST]]
   )
 
   return {
     checkProfileAndRedirect,
     connectToMagic,
-    getMagicConfig,
-    shouldUseTestMagic
+    getMagicConfig
   }
 }

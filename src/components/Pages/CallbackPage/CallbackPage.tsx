@@ -1,4 +1,5 @@
 import { useCallback, useContext, useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { ProviderType } from '@dcl/schemas'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
@@ -9,15 +10,16 @@ import { extractReferrerFromSearchParameters, locations } from '../../../shared/
 import { handleError } from '../../../shared/utils/errorHandler'
 import { createMagicInstance } from '../../../shared/utils/magicSdk'
 import { ConnectionModal, ConnectionModalState } from '../../ConnectionModal'
-import { FeatureFlagsContext } from '../../FeatureFlagsProvider'
+import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import { getIdentitySignature } from '../LoginPage/utils'
 
 export const CallbackPage = () => {
   const { redirect } = useAfterLoginRedirection()
   const navigate = useNavigateWithSearchParams()
+  const [searchParams] = useSearchParams()
   const [logInStarted, setLogInStarted] = useState(false)
-  const { initialized } = useContext(FeatureFlagsContext)
-  const { connectToMagic, checkProfileAndRedirect, shouldUseTestMagic } = useAuthFlow()
+  const { initialized, flags } = useContext(FeatureFlagsContext)
+  const { connectToMagic, checkProfileAndRedirect } = useAuthFlow()
   const { trackLoginSuccess } = useAnalytics()
 
   const connectAndGenerateSignature = useCallback(async () => {
@@ -48,9 +50,8 @@ export const CallbackPage = () => {
 
   const logInAndRedirect = useCallback(async () => {
     try {
-      const magic = await createMagicInstance(shouldUseTestMagic())
-      const search = new URLSearchParams(window.location.search)
-      const referrer = extractReferrerFromSearchParameters(search)
+      const magic = await createMagicInstance(!!flags[FeatureFlagsKeys.MAGIC_TEST])
+      const referrer = extractReferrerFromSearchParameters(searchParams)
       const result = await magic?.oauth2.getRedirectResult()
 
       // Store user email in localStorage if available
@@ -65,7 +66,7 @@ export const CallbackPage = () => {
       })
       navigate(locations.login())
     }
-  }, [navigate, handleContinue, shouldUseTestMagic])
+  }, [navigate, handleContinue, flags[FeatureFlagsKeys.MAGIC_TEST], searchParams])
 
   useEffect(() => {
     if (!logInStarted && initialized) {
@@ -79,7 +80,7 @@ export const CallbackPage = () => {
       open={true}
       state={ConnectionModalState.VALIDATING_SIGN_IN}
       onTryAgain={connectAndGenerateSignature}
-      providerType={shouldUseTestMagic() ? ProviderType.MAGIC_TEST : ProviderType.MAGIC}
+      providerType={flags[FeatureFlagsKeys.MAGIC_TEST] ? ProviderType.MAGIC_TEST : ProviderType.MAGIC}
     />
   )
 }

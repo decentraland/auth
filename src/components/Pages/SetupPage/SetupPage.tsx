@@ -206,21 +206,21 @@ export const SetupPage = () => {
   // Form input handlers.
   const handleNameChange = useCallback(
     (_e: unknown, data: InputOnChangeData) => {
-    setName(data.value)
-    if (!hasStartedToWriteSomethingInName.current) {
+      setName(data.value)
+      if (!hasStartedToWriteSomethingInName.current) {
         trackStartAddingName()
-      hasStartedToWriteSomethingInName.current = true
-    }
+        hasStartedToWriteSomethingInName.current = true
+      }
     },
     [trackStartAddingName]
   )
   const handleEmailChange = useCallback(
     (_e: unknown, data: InputOnChangeData) => {
-    setEmail(data.value)
-    if (!hasStartedToWriteSomethingInEmail.current) {
+      setEmail(data.value)
+      if (!hasStartedToWriteSomethingInEmail.current) {
         trackStartAddingEmail()
-      hasStartedToWriteSomethingInEmail.current = true
-    }
+        hasStartedToWriteSomethingInEmail.current = true
+      }
     },
     [trackStartAddingEmail]
   )

@@ -1,5 +1,5 @@
 import { useCallback, useContext, useEffect, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { ethers, BrowserProvider, formatEther } from 'ethers'
 import Icon from 'semantic-ui-react/dist/commonjs/elements/Icon/Icon'
 import { ChainId } from '@dcl/schemas'
@@ -57,6 +57,7 @@ enum View {
 
 export const RequestPage = () => {
   const params = useParams()
+  const [searchParams] = useSearchParams()
   const navigate = useNavigateWithSearchParams()
   const { isLoading: isConnecting, account, provider, providerType } = useCurrentConnectionData()
   const { flags, initialized: initializedFlags } = useContext(FeatureFlagsContext)
@@ -83,10 +84,10 @@ export const RequestPage = () => {
   }, [requestId])
 
   const toSetupPage = useCallback(() => {
-    const search = new URLSearchParams(window.location.search)
-    const referrer = extractReferrerFromSearchParameters(search)
+    const referrer = extractReferrerFromSearchParameters(searchParams)
+
     navigate(locations.setup(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}`, referrer))
-  }, [requestId])
+  }, [requestId, flags[FeatureFlagsKeys.NEW_ONBOARDING_FLOW], searchParams])
 
   useEffect(() => {
     // Wait for the user to be connected.

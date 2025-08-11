@@ -22,7 +22,7 @@ import { extractReferrerFromSearchParameters } from '../../../shared/locations'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { Connection, ConnectionOptionType } from '../../Connection'
 import { ConnectionModal, ConnectionModalState } from '../../ConnectionModal'
-import { FeatureFlagsContext } from '../../FeatureFlagsProvider'
+import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import { MagicInformationModal } from '../../MagicInformationModal'
 import { WalletInformationModal } from '../../WalletInformationModal'
 import {
@@ -43,11 +43,11 @@ export const LoginPage = () => {
   const [showConnectionModal, setShowConnectionModal] = useState(false)
   const [currentConnectionType, setCurrentConnectionType] = useState<ConnectionOptionType>()
   const { url: redirectTo, redirect } = useAfterLoginRedirection()
-  const { initialized } = useContext(FeatureFlagsContext)
+  const { initialized, flags } = useContext(FeatureFlagsContext)
   const showGuestOption = redirectTo && new URL(redirectTo).pathname.includes('/play')
   const [currentBackgroundIndex, setCurrentBackgroundIndex] = useState(0)
   const [targetConfig] = useTargetConfig()
-  const { checkProfileAndRedirect, shouldUseTestMagic } = useAuthFlow()
+  const { checkProfileAndRedirect } = useAuthFlow()
   const { trackClick, trackLoginClick, trackLoginSuccess, trackGuestLogin } = useAnalytics()
 
   const handleLearnMore = useCallback(
@@ -101,7 +101,7 @@ export const LoginPage = () => {
       try {
         if (isLoggingInThroughSocial) {
           setConnectionModalState(ConnectionModalState.LOADING_MAGIC)
-          await connectToSocialProvider(connectionType, shouldUseTestMagic(), redirectTo)
+          await connectToSocialProvider(connectionType, flags[FeatureFlagsKeys.MAGIC_TEST], redirectTo)
         } else {
           setShowConnectionModal(true)
           setConnectionModalState(ConnectionModalState.CONNECTING_WALLET)
@@ -115,12 +115,12 @@ export const LoginPage = () => {
             type: providerType
           })
 
-                const search = new URLSearchParams(window.location.search)
-                const referrer = extractReferrerFromSearchParameters(search)
+          const search = new URLSearchParams(window.location.search)
+          const referrer = extractReferrerFromSearchParameters(search)
 
           await checkProfileAndRedirect(connectionData.account ?? '', referrer, () => {
-          redirect()
-          setShowConnectionModal(false)
+            redirect()
+            setShowConnectionModal(false)
           })
         }
       } catch (error) {
@@ -143,7 +143,7 @@ export const LoginPage = () => {
       setShowConnectionModal,
       setCurrentConnectionType,
       redirectTo,
-      shouldUseTestMagic,
+      flags[FeatureFlagsKeys.MAGIC_TEST],
       trackLoginClick,
       trackLoginSuccess,
       checkProfileAndRedirect,
