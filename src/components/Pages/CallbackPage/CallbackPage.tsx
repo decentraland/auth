@@ -1,84 +1,73 @@
 import { useCallback, useContext, useEffect, useState } from 'react'
-import { captureException } from '@sentry/react'
+import { useSearchParams } from 'react-router-dom'
 import { ProviderType } from '@dcl/schemas'
-import { getConfiguration, connection } from 'decentraland-connect'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
-import { useTargetConfig } from '../../../hooks/targetConfig'
-import { getAnalytics } from '../../../modules/analytics/segment'
-import { ConnectionType, TrackingEvents } from '../../../modules/analytics/types'
-import { fetchProfile } from '../../../modules/profile'
-import { isErrorWithMessage } from '../../../shared/errors'
-import { locations, extractReferrerFromSearchParameters } from '../../../shared/locations'
-import { wait } from '../../../shared/time'
+import { useAnalytics } from '../../../hooks/useAnalytics'
+import { useAuthFlow } from '../../../hooks/useAuthFlow'
+import { ConnectionType } from '../../../modules/analytics/types'
+import { extractReferrerFromSearchParameters, locations } from '../../../shared/locations'
+import { handleError } from '../../../shared/utils/errorHandler'
+import { createMagicInstance } from '../../../shared/utils/magicSdk'
 import { ConnectionModal, ConnectionModalState } from '../../ConnectionModal'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import { getIdentitySignature } from '../LoginPage/utils'
 
 export const CallbackPage = () => {
-  const { url: redirectTo, redirect } = useAfterLoginRedirection()
+  const { redirect } = useAfterLoginRedirection()
   const navigate = useNavigateWithSearchParams()
+  const [searchParams] = useSearchParams()
   const [logInStarted, setLogInStarted] = useState(false)
-  const { flags, initialized } = useContext(FeatureFlagsContext)
-  const [targetConfig] = useTargetConfig()
+  const { initialized, flags } = useContext(FeatureFlagsContext)
+  const { connectToMagic, checkProfileAndRedirect } = useAuthFlow()
+  const { trackLoginSuccess } = useAnalytics()
 
   const connectAndGenerateSignature = useCallback(async () => {
-    const connectionData = await connection.connect(flags[FeatureFlagsKeys.MAGIC_TEST] ? ProviderType.MAGIC_TEST : ProviderType.MAGIC)
+    if (!initialized) {
+      return undefined
+    }
+
+    const connectionData = await connectToMagic()
+    if (!connectionData) {
+      return undefined
+    }
+
     await getIdentitySignature(connectionData.account?.toLowerCase() ?? '', connectionData.provider)
     return connectionData
-  }, [flags[FeatureFlagsKeys.MAGIC_TEST]])
+  }, [connectToMagic, initialized])
 
   const handleContinue = useCallback(
     async (referrer: string | null) => {
+      if (!initialized) {
+        return
+      }
+
       try {
         const connectionData = await connectAndGenerateSignature()
-        const ethAddress = connectionData.account?.toLowerCase() ?? ''
-        getAnalytics()?.identify({ ethAddress })
-        // eslint-disable-next-line @typescript-eslint/naming-convention
-        getAnalytics()?.track(TrackingEvents.LOGIN_SUCCESS, { eth_address: ethAddress, type: ConnectionType.WEB2 })
-        // Wait 800 ms for the tracking to be completed
-        await wait(800)
-
-        // If the flag is enabled and the setup is not skipped by config, proceed with the simplified avatar setup flow.
-        if (!targetConfig.skipSetup) {
-          // Can only proceed if the connection data has an account. Without the account the profile cannot be fetched.
-          // Continues with the original flow if the account is not present.
-          if (connectionData.account) {
-            const profile = await fetchProfile(connectionData.account)
-
-            // If the connected account does not have a profile, redirect the user to the setup page to create a new one.
-            // The setup page should then redirect the user to the url provided as query param if available.
-            if (!profile) {
-              return navigate(locations.setup(redirectTo, referrer))
-            }
-          }
+        if (!connectionData) {
+          return
         }
 
-        redirect()
+        const ethAddress = connectionData.account?.toLowerCase() ?? ''
+
+        await trackLoginSuccess({
+          ethAddress,
+          type: ConnectionType.WEB2
+        })
+
+        await checkProfileAndRedirect(connectionData.account ?? '', referrer, redirect)
       } catch (error) {
-        console.log(error)
-        captureException(error)
+        handleError(error, 'Error in callback continue flow')
         navigate(locations.login())
       }
     },
-    [navigate, redirectTo, connectAndGenerateSignature, redirect]
+    [navigate, connectAndGenerateSignature, redirect, trackLoginSuccess, checkProfileAndRedirect, initialized]
   )
 
   const logInAndRedirect = useCallback(async () => {
-    // eslint-disable-next-line @typescript-eslint/naming-convention
-    const { Magic } = await import('magic-sdk')
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
-    // eslint-disable-next-line @typescript-eslint/naming-convention
-    const { OAuthExtension } = await import('@magic-ext/oauth2')
-    const MAGIC_KEY = flags[FeatureFlagsKeys.MAGIC_TEST] ? getConfiguration().magic_test.apiKey : getConfiguration().magic.apiKey
-    const magic = new Magic(MAGIC_KEY, {
-      extensions: [new OAuthExtension()]
-    })
-
     try {
-      const search = new URLSearchParams(window.location.search)
-      const referrer = extractReferrerFromSearchParameters(search)
+      const magic = await createMagicInstance(!!flags[FeatureFlagsKeys.MAGIC_TEST])
+      const referrer = extractReferrerFromSearchParameters(searchParams)
       const result = await magic?.oauth2.getRedirectResult()
 
       // Store user email in localStorage if available
@@ -88,13 +77,12 @@ export const CallbackPage = () => {
 
       handleContinue(referrer)
     } catch (error) {
-      console.error('Error logging in', error)
-      captureException(error)
-      getAnalytics()?.track(TrackingEvents.LOGIN_ERROR, { error: isErrorWithMessage(error) ? error.message : error })
-      await wait(800)
+      handleError(error, 'Error logging in with Magic SDK', {
+        skipTracking: false
+      })
       navigate(locations.login())
     }
-  }, [navigate, handleContinue, flags[FeatureFlagsKeys.MAGIC_TEST]])
+  }, [navigate, handleContinue, flags[FeatureFlagsKeys.MAGIC_TEST], searchParams])
 
   useEffect(() => {
     if (!logInStarted && initialized) {

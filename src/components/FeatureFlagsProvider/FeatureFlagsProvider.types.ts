@@ -5,7 +5,8 @@ export enum FeatureFlagsKeys {
   DAPPS_MAGIC_AUTO_SIGN = 'dapps-magic-auto-sign',
   LOGIN_ON_SETUP = 'dapps-login-on-setup',
   HTTP_AUTH = 'dapps-http-auth',
-  UNITY_WEARABLE_PREVIEW = 'dapps-unity-wearable-preview'
+  UNITY_WEARABLE_PREVIEW = 'dapps-unity-wearable-preview',
+  NEW_ONBOARDING_FLOW = 'dapps-new-onboarding-flow'
 }
 
 export type FeatureFlagsContextType = {

@@ -1,5 +1,5 @@
 import React from 'react'
-import { isErrorWithMessage } from '../../shared/errors'
+import { handleError } from '../../shared/utils/errorHandler'
 import { IntercomWidget } from './IntercomWidget'
 import { DefaultProps, Props } from './Intercom.types'
 
@@ -54,7 +54,7 @@ export default class Intercom extends React.PureComponent<Props> {
       await this.widget.inject()
       this.widget.render(data)
     } catch (error) {
-      console.error('Could not render intercom', isErrorWithMessage(error) ? error.message : 'Unknown error')
+      handleError(error, 'Could not render intercom', { skipTracking: true })
     }
   }
 
