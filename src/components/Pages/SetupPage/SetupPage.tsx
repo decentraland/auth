@@ -1,6 +1,5 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { captureException } from '@sentry/react'
 import classNames from 'classnames'
 import { BrowserProvider } from 'ethers'
 import { EthAddress } from '@dcl/schemas'
@@ -10,7 +9,6 @@ import { Field } from 'decentraland-ui/dist/components/Field/Field'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
 import { useMobileMediaQuery } from 'decentraland-ui/dist/components/Media/Media'
 import type { Provider } from 'decentraland-connect'
-import fetch from 'decentraland-crypto-fetch'
 import { InputOnChangeData } from 'decentraland-ui'
 import backImg from '../../../assets/images/back.svg'
 import diceImg from '../../../assets/images/dice.svg'
@@ -18,15 +16,15 @@ import logoImg from '../../../assets/images/logo.svg'
 import wrongImg from '../../../assets/images/wrong.svg'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
-import { getAnalytics } from '../../../modules/analytics/segment'
-import { ClickEvents, TrackingEvents } from '../../../modules/analytics/types'
-import { config } from '../../../modules/config'
+import { useAnalytics } from '../../../hooks/useAnalytics'
+import { useTrackReferral } from '../../../hooks/useTrackReferral'
+import { ClickEvents } from '../../../modules/analytics/types'
 import { fetchProfile } from '../../../modules/profile'
 import { createAuthServerHttpClient, createAuthServerWsClient, ExpiredRequestError, RecoverResponse } from '../../../shared/auth'
 import { useCurrentConnectionData } from '../../../shared/connection/hooks'
-import { isErrorWithMessage } from '../../../shared/errors'
 import { locations } from '../../../shared/locations'
 import { isProfileComplete } from '../../../shared/profile'
+import { handleError } from '../../../shared/utils/errorHandler'
 import { ConnectionModal, ConnectionModalState } from '../../ConnectionModal'
 import { CustomWearablePreview } from '../../CustomWearablePreview'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
@@ -69,12 +67,11 @@ const DeployErrorMessage = (props: { message: string }) => (
   </div>
 )
 
-const REFERRAL_SERVER_URL = config.get('REFERRAL_SERVER_URL')
-
 export const SetupPage = () => {
   const hasStartedToWriteSomethingInName = useRef(false)
   const hasStartedToWriteSomethingInEmail = useRef(false)
   const hasCheckedAgree = useRef(false)
+  const hasTrackedReferral = useRef(false)
   const [urlSearchParams] = useSearchParams()
   const [isConnectionModalOpen, setIsConnectionModalOpen] = useState(false)
   const { flags, initialized: initializedFlags } = useContext(FeatureFlagsContext)
@@ -94,6 +91,15 @@ export const SetupPage = () => {
   const authServerClient = useRef(createAuthServerWsClient())
   const navigate = useNavigateWithSearchParams()
   const referrer = urlSearchParams.get('referrer')
+  const {
+    trackClick,
+    trackAvatarEditSuccess,
+    trackTermsOfServiceSuccess,
+    trackStartAddingName,
+    trackStartAddingEmail,
+    trackCheckTermsOfService
+  } = useAnalytics()
+  const { track: trackReferral } = useTrackReferral()
 
   const requestId = useMemo(() => {
     // Grab the request id from redirectTo parameter.
@@ -170,25 +176,20 @@ export const SetupPage = () => {
 
   // Sets a random default profile.
   const handleRandomize = useCallback(() => {
-    getAnalytics()?.track(TrackingEvents.CLICK, {
-      action: ClickEvents.RANDOMIZE
-    })
-
+    trackClick(ClickEvents.RANDOMIZE)
     setProfile(getRandomDefaultProfile())
-  }, [])
+  }, [trackClick])
 
   // Confirms the current default profile and goes to the form view.
   const handleContinue = useCallback(() => {
-    getAnalytics()?.track(TrackingEvents.AVATAR_EDIT_SUCCESS, {
-      // eslint-disable-next-line @typescript-eslint/naming-convention
-      eth_address: account,
-      // eslint-disable-next-line @typescript-eslint/naming-convention
-      is_guest: false,
+    trackAvatarEditSuccess({
+      ethAddress: account,
+      isGuest: false,
       profile
     })
 
     setView(View.FORM)
-  }, [profile, account])
+  }, [profile, account, trackAvatarEditSuccess])
 
   // Goes back into the randomize view to select a new default profile.
   const handleBack = useCallback(() => {
@@ -199,35 +200,39 @@ export const SetupPage = () => {
     setShowErrors(false)
     setDeployError(null)
 
-    getAnalytics()?.track(TrackingEvents.CLICK, {
-      action: ClickEvents.BACK_TO_AVATAR_RANDOMIZATION_VIEW
-    })
+    trackClick(ClickEvents.BACK_TO_AVATAR_RANDOMIZATION_VIEW)
 
     setView(View.RANDOMIZE)
-  }, [])
+  }, [trackClick])
 
   // Form input handlers.
-  const handleNameChange = useCallback((_e: unknown, data: InputOnChangeData) => {
-    setName(data.value)
-    if (!hasStartedToWriteSomethingInName.current) {
-      getAnalytics()?.track(TrackingEvents.START_ADDING_NAME)
-      hasStartedToWriteSomethingInName.current = true
-    }
-  }, [])
-  const handleEmailChange = useCallback((_e: unknown, data: InputOnChangeData) => {
-    setEmail(data.value)
-    if (!hasStartedToWriteSomethingInEmail.current) {
-      getAnalytics()?.track(TrackingEvents.START_ADDING_EMAIL)
-      hasStartedToWriteSomethingInEmail.current = true
-    }
-  }, [])
+  const handleNameChange = useCallback(
+    (_e: unknown, data: InputOnChangeData) => {
+      setName(data.value)
+      if (!hasStartedToWriteSomethingInName.current) {
+        trackStartAddingName()
+        hasStartedToWriteSomethingInName.current = true
+      }
+    },
+    [trackStartAddingName]
+  )
+  const handleEmailChange = useCallback(
+    (_e: unknown, data: InputOnChangeData) => {
+      setEmail(data.value)
+      if (!hasStartedToWriteSomethingInEmail.current) {
+        trackStartAddingEmail()
+        hasStartedToWriteSomethingInEmail.current = true
+      }
+    },
+    [trackStartAddingEmail]
+  )
   const handleAgreeChange = useCallback(() => {
     setAgree(prev => !prev)
     if (!hasCheckedAgree.current) {
-      getAnalytics()?.track(TrackingEvents.CHECK_TERMS_OF_SERVICE)
+      trackCheckTermsOfService()
       hasCheckedAgree.current = true
     }
-  }, [])
+  }, [trackCheckTermsOfService])
   const signRequest = useCallback(
     async (provider: Provider, requestId: string, account: string) => {
       let request: RecoverResponse | null = null
@@ -243,9 +248,8 @@ export const SetupPage = () => {
         if (e instanceof ExpiredRequestError) {
           setView(View.TIMEOUT_ERROR)
         } else {
-          captureException(e)
-          console.error('Error recovering request', e)
-          setRequestError(isErrorWithMessage(e) ? e.message : 'Unknown error')
+          const errorMessage = handleError(e, 'Error recovering request')
+          setRequestError(errorMessage)
           setView(View.RECOVER_ERROR)
         }
         return
@@ -272,11 +276,11 @@ export const SetupPage = () => {
       } catch (e) {
         // Hide the modal to sign the request
         setIsConnectionModalOpen(false)
-        captureException(e)
         if (e instanceof ExpiredRequestError) {
           setView(View.TIMEOUT_ERROR)
         } else {
-          setRequestError(isErrorWithMessage(e) ? e.message : 'Unknown error')
+          const errorMessage = handleError(e, 'Error signing request')
+          setRequestError(errorMessage)
           setView(View.SIGNING_ERROR)
         }
       }
@@ -290,9 +294,7 @@ export const SetupPage = () => {
     async (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault()
 
-      getAnalytics()?.track(TrackingEvents.CLICK, {
-        action: ClickEvents.SUBMIT_PROFILE
-      })
+      trackClick(ClickEvents.SUBMIT_PROFILE)
 
       setShowErrors(true)
 
@@ -322,28 +324,9 @@ export const SetupPage = () => {
 
         if (referrer && EthAddress.validate(referrer)) {
           try {
-            await fetch(`${REFERRAL_SERVER_URL}/referral-progress`, {
-              method: 'PATCH',
-              headers: {
-                contentType: 'application/json'
-              },
-              identity
-            })
+            await trackReferral(referrer, 'PATCH')
           } catch (error) {
-            // Log locally for debugging
-            console.warn('Failed to track referral progress:', {
-              error,
-              account,
-              url: REFERRAL_SERVER_URL
-            })
-            // Send to Sentry for monitoring
-            captureException(error, {
-              tags: {
-                feature: 'referral-progress',
-                account,
-                url: REFERRAL_SERVER_URL
-              }
-            })
+            // Error is already handled in trackReferral
           }
         }
 
@@ -353,16 +336,13 @@ export const SetupPage = () => {
           try {
             await subscribeToNewsletter(email)
           } catch (e) {
-            captureException(e)
-            console.warn('There was an error subscribing to the newsletter', (e as Error).message)
+            handleError(e, 'Error subscribing to newsletter', { skipTracking: true })
           }
         }
 
-        getAnalytics()?.track(TrackingEvents.TERMS_OF_SERVICE_SUCCESS, {
-          // eslint-disable-next-line @typescript-eslint/naming-convention
-          eth_address: account,
-          // eslint-disable-next-line @typescript-eslint/naming-convention
-          is_guest: false,
+        trackTermsOfServiceSuccess({
+          ethAddress: account,
+          isGuest: false,
           email: email || undefined,
           name
         })
@@ -374,12 +354,9 @@ export const SetupPage = () => {
           redirect()
         }
       } catch (e) {
-        captureException(e)
-        setDeployError(isErrorWithMessage(e) ? e.message : 'Unknown error')
+        const errorMessage = handleError(e, 'Error deploying profile')
+        setDeployError(errorMessage)
         setDeploying(false)
-
-        // TODO: Display a proper error on the page to show the user.
-        console.error('There was an error deploying the profile', (e as Error).message)
       }
     },
     [
@@ -395,7 +372,11 @@ export const SetupPage = () => {
       referrer,
       flags[FeatureFlagsKeys.LOGIN_ON_SETUP],
       redirect,
-      signRequest
+      signRequest,
+      trackClick,
+      trackTermsOfServiceSuccess,
+      account,
+      identity
     ]
   )
 
@@ -438,35 +419,12 @@ export const SetupPage = () => {
         }
       }
 
-      if (referrer && EthAddress.validate(referrer)) {
+      if (referrer && EthAddress.validate(referrer) && !hasTrackedReferral.current) {
         try {
-          await fetch(`${REFERRAL_SERVER_URL}/referral-progress`, {
-            method: 'POST',
-            headers: {
-              contentType: 'application/json'
-            },
-            body: JSON.stringify({
-              referrer
-            }),
-            identity
-          })
+          await trackReferral(referrer, 'POST')
+          hasTrackedReferral.current = true
         } catch (error) {
-          // Log locally for debugging
-          console.warn('Failed to track referral progress:', {
-            error,
-            referrer,
-            url: REFERRAL_SERVER_URL
-          })
-          // Send to Sentry for monitoring
-          captureException(error, {
-            tags: {
-              feature: 'referral-progress',
-              referrer
-            },
-            extra: {
-              url: REFERRAL_SERVER_URL
-            }
-          })
+          // Error is already handled in trackReferral
         }
       }
 

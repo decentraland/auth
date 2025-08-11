@@ -1,6 +1,5 @@
 import { useCallback, useContext, useEffect, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
-import { captureException } from '@sentry/react'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { ethers, BrowserProvider, formatEther } from 'ethers'
 import Icon from 'semantic-ui-react/dist/commonjs/elements/Icon/Icon'
 import { ChainId } from '@dcl/schemas'
@@ -9,6 +8,7 @@ import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
 import { Web2TransactionModal } from 'decentraland-ui/dist/components/Web2TransactionModal'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useTargetConfig } from '../../../hooks/targetConfig'
+import { useAnalytics } from '../../../hooks/useAnalytics'
 import { getAnalytics } from '../../../modules/analytics/segment'
 import { ClickEvents, TrackingEvents } from '../../../modules/analytics/types'
 import { fetchProfile } from '../../../modules/profile'
@@ -23,6 +23,7 @@ import { useCurrentConnectionData } from '../../../shared/connection'
 import { isErrorWithMessage, isRpcError } from '../../../shared/errors'
 import { extractReferrerFromSearchParameters, locations } from '../../../shared/locations'
 import { isProfileComplete } from '../../../shared/profile'
+import { handleError } from '../../../shared/utils/errorHandler'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
 import { Container } from './Container'
 import { DeniedSignIn } from './Views/DeniedSignIn'
@@ -56,9 +57,11 @@ enum View {
 
 export const RequestPage = () => {
   const params = useParams()
+  const [searchParams] = useSearchParams()
   const navigate = useNavigateWithSearchParams()
   const { isLoading: isConnecting, account, provider, providerType } = useCurrentConnectionData()
   const { flags, initialized: initializedFlags } = useContext(FeatureFlagsContext)
+  const { trackClick } = useAnalytics()
   const browserProvider = useRef<BrowserProvider>()
   const [view, setView] = useState(View.LOADING_REQUEST)
   const [isLoading, setIsLoading] = useState(false)
@@ -81,10 +84,10 @@ export const RequestPage = () => {
   }, [requestId])
 
   const toSetupPage = useCallback(() => {
-    const search = new URLSearchParams(window.location.search)
-    const referrer = extractReferrerFromSearchParameters(search)
+    const referrer = extractReferrerFromSearchParameters(searchParams)
+
     navigate(locations.setup(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}`, referrer))
-  }, [requestId])
+  }, [requestId, flags[FeatureFlagsKeys.NEW_ONBOARDING_FLOW], searchParams])
 
   useEffect(() => {
     // Wait for the user to be connected.
@@ -198,9 +201,7 @@ export const RequestPage = () => {
 
   const onDenyVerifySignIn = useCallback(async () => {
     setIsLoading(true)
-    getAnalytics()?.track(TrackingEvents.CLICK, {
-      action: ClickEvents.DENY_SIGN_IN
-    })
+    trackClick(ClickEvents.DENY_SIGN_IN)
     try {
       const signer = await browserProvider.current?.getSigner()
       if (signer) {
@@ -216,9 +217,7 @@ export const RequestPage = () => {
   }, [])
 
   const onApproveSignInVerification = useCallback(async () => {
-    getAnalytics()?.track(TrackingEvents.CLICK, {
-      action: ClickEvents.APPROVE_SING_IN
-    })
+    trackClick(ClickEvents.APPROVE_SING_IN)
     setIsLoading(true)
     const provider = browserProvider.current
     try {
@@ -240,9 +239,10 @@ export const RequestPage = () => {
         window.location.href = targetConfig.deepLink
       }
     } catch (e) {
-      setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
-      captureException(e, { tags: { isWeb2Wallet: isUserUsingWeb2Wallet } })
-      console.error('An error occurred when approving the sign in verification', e)
+      const errorMessage = handleError(e, 'Error approving sign in verification', {
+        sentryTags: { isWeb2Wallet: isUserUsingWeb2Wallet }
+      })
+      setError(errorMessage)
       setView(View.VERIFY_SIGN_IN_ERROR)
     } finally {
       setIsLoading(false)
@@ -251,9 +251,7 @@ export const RequestPage = () => {
 
   const onDenyWalletInteraction = useCallback(() => {
     setIsTransactionModalOpen(false)
-    getAnalytics()?.track(TrackingEvents.CLICK, {
-      action: ClickEvents.DENY_WALLET_INTERACTION
-    })
+    trackClick(ClickEvents.DENY_WALLET_INTERACTION)
     setView(View.WALLET_INTERACTION_DENIED)
   }, [])
 
@@ -272,15 +270,15 @@ export const RequestPage = () => {
 
       const signer = await provider.getSigner()
       const result = await provider.send(requestRef.current?.method, requestRef.current?.params ?? [])
-      getAnalytics()?.track(TrackingEvents.CLICK, {
-        action: ClickEvents.APPROVE_WALLET_INTERACTION,
+      trackClick(ClickEvents.APPROVE_WALLET_INTERACTION, {
         method: requestRef.current?.method
       })
       await authServerClient.current.sendSuccessfulOutcome(requestId, await signer.getAddress(), result)
       setView(View.WALLET_INTERACTION_COMPLETE)
     } catch (e) {
-      console.error('Wallet error', JSON.stringify(e))
-      captureException(e, { tags: { isWeb2Wallet: isUserUsingWeb2Wallet } })
+      handleError(e, 'Wallet interaction error', {
+        sentryTags: { isWeb2Wallet: isUserUsingWeb2Wallet }
+      })
       const signer = await browserProvider.current?.getSigner()
       if (signer && isRpcError(e)) {
         await authServerClient.current.sendFailedOutcome(requestId, await signer.getAddress(), e.error)

@@ -8,6 +8,8 @@ export enum TrackingEvents {
   REQUEST_EXPIRED = 'Expired request',
   REQUEST_LOADING_ERROR = 'Error loading request',
   REQUEST_INTERACTION = 'Request interaction',
+  REQUEST_OUTCOME_SUCCESS = 'Request outcome sent successfully',
+  REQUEST_OUTCOME_FAILED = 'Request outcome sent with error',
   START_ADDING_NAME = 'Start adding name',
   START_ADDING_EMAIL = 'Start adding email',
   CHECK_TERMS_OF_SERVICE = 'Check terms of service'

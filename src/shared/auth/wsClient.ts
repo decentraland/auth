@@ -1,9 +1,8 @@
-import { captureException } from '@sentry/react'
 import { io } from 'socket.io-client'
-import { getAnalytics } from '../../modules/analytics/segment'
 import { RequestInteractionType, TrackingEvents } from '../../modules/analytics/types'
 import { config } from '../../modules/config'
-import { isErrorWithMessage } from '../errors'
+import { trackEvent } from '../utils/analytics'
+import { handleError } from '../utils/errorHandler'
 import { DifferentSenderError, ExpiredRequestError, RequestNotFoundError } from './errors'
 import { OutcomeError, OutcomeResponse, RecoverResponse, ValidationResponse } from './types'
 
@@ -44,8 +43,7 @@ export const createAuthServerWsClient = (authServerUrl?: string) => {
         result
       })
     } catch (e) {
-      console.error('Error sending outcome', e)
-      captureException(e)
+      handleError(e, 'Error sending outcome')
       throw e
     }
   }
@@ -58,8 +56,7 @@ export const createAuthServerWsClient = (authServerUrl?: string) => {
         error
       })
     } catch (e) {
-      console.error('Error sending outcome', e)
-      captureException(e)
+      handleError(e, 'Error sending outcome')
       throw e
     }
   }
@@ -85,7 +82,7 @@ export const createAuthServerWsClient = (authServerUrl?: string) => {
 
       switch (response.method) {
         case 'dcl_personal_sign':
-          getAnalytics()?.track(TrackingEvents.REQUEST_INTERACTION, {
+          trackEvent(TrackingEvents.REQUEST_INTERACTION, {
             type: RequestInteractionType.VERIFY_SIGN_IN,
             browserTime: Date.now(),
             requestTime: new Date(response.expiration).getTime(),
@@ -93,13 +90,13 @@ export const createAuthServerWsClient = (authServerUrl?: string) => {
           })
           break
         case 'eth_sendTransaction':
-          getAnalytics()?.track(TrackingEvents.REQUEST_INTERACTION, {
+          trackEvent(TrackingEvents.REQUEST_INTERACTION, {
             type: RequestInteractionType.WALLET_INTERACTION,
             requestType: response.method
           })
           break
         default:
-          getAnalytics()?.track(TrackingEvents.REQUEST_INTERACTION, {
+          trackEvent(TrackingEvents.REQUEST_INTERACTION, {
             type: RequestInteractionType.WALLET_INTERACTION,
             requestType: response.method
           })
@@ -107,12 +104,12 @@ export const createAuthServerWsClient = (authServerUrl?: string) => {
 
       return response
     } catch (e) {
-      console.error('Error recovering request', e)
-      captureException(e)
-      getAnalytics()?.track(TrackingEvents.REQUEST_LOADING_ERROR, {
-        browserTime: Date.now(),
-        requestType: response?.method ?? 'Unknown',
-        error: isErrorWithMessage(e) ? e.message : 'Unknown error'
+      handleError(e, 'Error recovering request', {
+        trackingData: {
+          browserTime: Date.now(),
+          requestType: response?.method ?? 'Unknown'
+        },
+        trackingEvent: TrackingEvents.REQUEST_LOADING_ERROR
       })
       throw e
     }
@@ -122,8 +119,7 @@ export const createAuthServerWsClient = (authServerUrl?: string) => {
     try {
       await request<ValidationResponse>('request-validation-status', { requestId })
     } catch (e) {
-      console.error('Error notifying request needs validation', e)
-      captureException(e)
+      handleError(e, 'Error notifying request needs validation')
       throw e
     }
   }
