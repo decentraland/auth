@@ -71,6 +71,7 @@ export const SetupPage = () => {
   const hasStartedToWriteSomethingInName = useRef(false)
   const hasStartedToWriteSomethingInEmail = useRef(false)
   const hasCheckedAgree = useRef(false)
+  const hasTrackedReferral = useRef(false)
   const [urlSearchParams] = useSearchParams()
   const [isConnectionModalOpen, setIsConnectionModalOpen] = useState(false)
   const { flags, initialized: initializedFlags } = useContext(FeatureFlagsContext)
@@ -418,9 +419,10 @@ export const SetupPage = () => {
         }
       }
 
-      if (referrer && EthAddress.validate(referrer)) {
+      if (referrer && EthAddress.validate(referrer) && !hasTrackedReferral.current) {
         try {
           await trackReferral(referrer, 'POST')
+          hasTrackedReferral.current = true
         } catch (error) {
           // Error is already handled in trackReferral
         }
