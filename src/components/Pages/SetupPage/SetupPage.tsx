@@ -17,9 +17,9 @@ import wrongImg from '../../../assets/images/wrong.svg'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { useAnalytics } from '../../../hooks/useAnalytics'
+import { useTrackReferral } from '../../../hooks/useTrackReferral'
 import { ClickEvents } from '../../../modules/analytics/types'
 import { fetchProfile } from '../../../modules/profile'
-import { trackReferralProgress } from '../../../modules/referral/referralService'
 import { createAuthServerHttpClient, createAuthServerWsClient, ExpiredRequestError, RecoverResponse } from '../../../shared/auth'
 import { useCurrentConnectionData } from '../../../shared/connection/hooks'
 import { locations } from '../../../shared/locations'
@@ -98,6 +98,7 @@ export const SetupPage = () => {
     trackStartAddingEmail,
     trackCheckTermsOfService
   } = useAnalytics()
+  const { track: trackReferral } = useTrackReferral()
 
   const requestId = useMemo(() => {
     // Grab the request id from redirectTo parameter.
@@ -322,9 +323,9 @@ export const SetupPage = () => {
 
         if (referrer && EthAddress.validate(referrer)) {
           try {
-            await trackReferralProgress(referrer, identity, 'PATCH', account)
+            await trackReferral(referrer, 'PATCH')
           } catch (error) {
-            // Error is already handled in trackReferralProgress
+            // Error is already handled in trackReferral
           }
         }
 
@@ -419,9 +420,9 @@ export const SetupPage = () => {
 
       if (referrer && EthAddress.validate(referrer)) {
         try {
-          await trackReferralProgress(referrer, identity, 'POST')
+          await trackReferral(referrer, 'POST')
         } catch (error) {
-          // Error is already handled in trackReferralProgress
+          // Error is already handled in trackReferral
         }
       }
 
