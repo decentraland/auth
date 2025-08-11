@@ -1,6 +1,6 @@
-import { getAnalytics } from '../../modules/analytics/segment'
 import { RequestInteractionType, TrackingEvents } from '../../modules/analytics/types'
 import { config } from '../../modules/config'
+import { trackEvent } from '../utils/analytics'
 import { handleError } from '../utils/errorHandler'
 import { DifferentSenderError, ExpiredRequestError, RequestNotFoundError } from './errors'
 import { OutcomeError, RecoverResponse } from './types'
@@ -43,6 +43,11 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
       if (!response.ok) {
         await extractError(response, requestId)
       }
+
+      trackEvent(TrackingEvents.REQUEST_OUTCOME_SUCCESS, {
+        type: 'success',
+        method: 'outcome_send'
+      })
     } catch (e) {
       handleError(e, 'Error sending outcome')
       throw e
@@ -66,6 +71,12 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
       if (!response.ok) {
         await extractError(response, requestId)
       }
+
+      trackEvent(TrackingEvents.REQUEST_OUTCOME_FAILED, {
+        type: 'failed',
+        method: 'outcome_send',
+        error: error.message
+      })
     } catch (e) {
       handleError(e, 'Error sending outcome')
       throw e
@@ -97,21 +108,20 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
 
       switch (recoverResponse.method) {
         case 'dcl_personal_sign':
-          getAnalytics()?.track(TrackingEvents.REQUEST_INTERACTION, {
+          trackEvent(TrackingEvents.REQUEST_INTERACTION, {
             type: RequestInteractionType.VERIFY_SIGN_IN,
             browserTime: Date.now(),
-            requestTime: new Date(recoverResponse.expiration).getTime(),
             requestType: recoverResponse?.method
           })
           break
         case 'eth_sendTransaction':
-          getAnalytics()?.track(TrackingEvents.REQUEST_INTERACTION, {
+          trackEvent(TrackingEvents.REQUEST_INTERACTION, {
             type: RequestInteractionType.WALLET_INTERACTION,
             requestType: recoverResponse.method
           })
           break
         default:
-          getAnalytics()?.track(TrackingEvents.REQUEST_INTERACTION, {
+          trackEvent(TrackingEvents.REQUEST_INTERACTION, {
             type: RequestInteractionType.WALLET_INTERACTION,
             requestType: recoverResponse.method
           })
@@ -123,11 +133,8 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
         trackingData: {
           browserTime: Date.now(),
           requestType: recoverResponse?.method ?? 'Unknown'
-        }
-      })
-      getAnalytics()?.track(TrackingEvents.REQUEST_LOADING_ERROR, {
-        browserTime: Date.now(),
-        requestType: recoverResponse?.method ?? 'Unknown'
+        },
+        trackingEvent: TrackingEvents.REQUEST_LOADING_ERROR
       })
       throw e
     }

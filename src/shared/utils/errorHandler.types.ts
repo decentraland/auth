@@ -2,6 +2,7 @@ export interface TrackingData {
   error?: string
   context?: string
   browserTime?: number
+  requestTime?: number
   requestType?: string
   method?: string
   ethAddress?: string
@@ -67,4 +68,5 @@ export interface HandleErrorOptions {
   sentryExtra?: SentryExtra
   skipLogging?: boolean
   skipTracking?: boolean
+  trackingEvent?: string
 }

@@ -1,7 +1,7 @@
 import { captureException } from '@sentry/react'
-import { getAnalytics } from '../../modules/analytics/segment'
 import { TrackingEvents } from '../../modules/analytics/types'
 import { isErrorWithMessage } from '../errors'
+import { trackEvent } from './analytics'
 import { ErrorContext, HandleErrorOptions } from './errorHandler.types'
 
 const handleError = (error: unknown, context: string, options?: HandleErrorOptions) => {
@@ -17,7 +17,8 @@ const handleError = (error: unknown, context: string, options?: HandleErrorOptio
   })
 
   if (!options?.skipTracking) {
-    getAnalytics()?.track(TrackingEvents.LOGIN_ERROR, {
+    const trackingEvent = (options?.trackingEvent as TrackingEvents) || TrackingEvents.LOGIN_ERROR
+    trackEvent(trackingEvent, {
       error: errorMessage,
       context,
       ...options?.trackingData
