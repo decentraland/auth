@@ -33,7 +33,7 @@ export const useAuthFlow = () => {
       if (!targetConfig.skipSetup && account) {
         const profile = await fetchProfile(account)
 
-        if (!profile && !flags[FeatureFlagsKeys.NEW_ONBOARDING_FLOW]) {
+        if (!profile) {
           return navigate(locations.setup(redirectTo, referrer))
         } else if (profile && !isProfileComplete(profile)) {
           return navigate(locations.setup(redirectTo, referrer))
