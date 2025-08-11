@@ -43,7 +43,7 @@ export const LoginPage = () => {
   const [showConnectionModal, setShowConnectionModal] = useState(false)
   const [currentConnectionType, setCurrentConnectionType] = useState<ConnectionOptionType>()
   const { url: redirectTo, redirect } = useAfterLoginRedirection()
-  const { initialized, flags } = useContext(FeatureFlagsContext)
+  const { initialized: flagInitialized, flags } = useContext(FeatureFlagsContext)
   const showGuestOption = redirectTo && new URL(redirectTo).pathname.includes('/play')
   const [currentBackgroundIndex, setCurrentBackgroundIndex] = useState(0)
   const [targetConfig] = useTargetConfig()
@@ -89,6 +89,9 @@ export const LoginPage = () => {
 
   const handleOnConnect = useCallback(
     async (connectionType: ConnectionOptionType) => {
+      if (!flagInitialized) {
+        return
+      }
       const isLoggingInThroughSocial = isSocialLogin(connectionType)
       const providerType = isLoggingInThroughSocial ? ConnectionType.WEB2 : ConnectionType.WEB3
       setCurrentConnectionType(connectionType)
@@ -147,7 +150,8 @@ export const LoginPage = () => {
       trackLoginClick,
       trackLoginSuccess,
       checkProfileAndRedirect,
-      redirect
+      redirect,
+      flagInitialized
     ]
   )
 
@@ -180,7 +184,7 @@ export const LoginPage = () => {
   return (
     <main className={styles.main}>
       <div className={styles.background} style={{ backgroundImage: `url(${BACKGROUND_IMAGES[currentBackgroundIndex]})` }} />
-      {config.is(Env.DEVELOPMENT) && !initialized ? (
+      {config.is(Env.DEVELOPMENT) && !flagInitialized ? (
         <Loader active size="massive" />
       ) : (
         <>

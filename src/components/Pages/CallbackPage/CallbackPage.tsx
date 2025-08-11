@@ -23,15 +23,31 @@ export const CallbackPage = () => {
   const { trackLoginSuccess } = useAnalytics()
 
   const connectAndGenerateSignature = useCallback(async () => {
+    if (!initialized) {
+      return undefined
+    }
+
     const connectionData = await connectToMagic()
+    if (!connectionData) {
+      return undefined
+    }
+
     await getIdentitySignature(connectionData.account?.toLowerCase() ?? '', connectionData.provider)
     return connectionData
-  }, [connectToMagic])
+  }, [connectToMagic, initialized])
 
   const handleContinue = useCallback(
     async (referrer: string | null) => {
+      if (!initialized) {
+        return
+      }
+
       try {
         const connectionData = await connectAndGenerateSignature()
+        if (!connectionData) {
+          return
+        }
+
         const ethAddress = connectionData.account?.toLowerCase() ?? ''
 
         await trackLoginSuccess({
@@ -45,7 +61,7 @@ export const CallbackPage = () => {
         navigate(locations.login())
       }
     },
-    [navigate, connectAndGenerateSignature, redirect, trackLoginSuccess, checkProfileAndRedirect]
+    [navigate, connectAndGenerateSignature, redirect, trackLoginSuccess, checkProfileAndRedirect, initialized]
   )
 
   const logInAndRedirect = useCallback(async () => {

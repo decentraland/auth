@@ -12,16 +12,24 @@ import { useTargetConfig } from './targetConfig'
 export const useAuthFlow = () => {
   const navigate = useNavigateWithSearchParams()
   const { url: redirectTo } = useAfterLoginRedirection()
-  const { flags } = useContext(FeatureFlagsContext)
+  const { flags, initialized: flagInitialized } = useContext(FeatureFlagsContext)
   const [targetConfig] = useTargetConfig()
 
   const connectToMagic = useCallback(async () => {
+    if (!flagInitialized) {
+      return undefined
+    }
+
     const providerType = flags[FeatureFlagsKeys.MAGIC_TEST] ? ProviderType.MAGIC_TEST : ProviderType.MAGIC
     return await connection.connect(providerType)
-  }, [flags[FeatureFlagsKeys.MAGIC_TEST]])
+  }, [flags[FeatureFlagsKeys.MAGIC_TEST], flagInitialized])
 
   const checkProfileAndRedirect = useCallback(
     async (account: string, referrer: string | null, redirect: () => void) => {
+      if (!flagInitialized) {
+        return undefined
+      }
+
       if (!targetConfig.skipSetup && account) {
         const profile = await fetchProfile(account)
 
@@ -34,17 +42,21 @@ export const useAuthFlow = () => {
 
       redirect()
     },
-    [targetConfig.skipSetup, flags, navigate, redirectTo]
+    [targetConfig.skipSetup, flags, navigate, redirectTo, flagInitialized]
   )
 
-  const getMagicConfig = useCallback(
-    () => (flags[FeatureFlagsKeys.MAGIC_TEST] ? getConfiguration().magic_test : getConfiguration().magic),
-    [flags[FeatureFlagsKeys.MAGIC_TEST]]
-  )
+  const getMagicConfig = useCallback(() => {
+    if (!flagInitialized) {
+      return undefined
+    }
+
+    return flags[FeatureFlagsKeys.MAGIC_TEST] ? getConfiguration().magic_test : getConfiguration().magic
+  }, [flags[FeatureFlagsKeys.MAGIC_TEST], flagInitialized])
 
   return {
     checkProfileAndRedirect,
     connectToMagic,
-    getMagicConfig
+    getMagicConfig,
+    isInitialized: flagInitialized
   }
 }
