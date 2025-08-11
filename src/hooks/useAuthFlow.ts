@@ -1,6 +1,6 @@
 import { useCallback, useContext } from 'react'
 import { ProviderType } from '@dcl/schemas'
-import { getConfiguration, connection } from 'decentraland-connect'
+import { connection } from 'decentraland-connect'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../components/FeatureFlagsProvider'
 import { fetchProfile } from '../modules/profile'
 import { locations } from '../shared/locations'
@@ -45,18 +45,9 @@ export const useAuthFlow = () => {
     [targetConfig.skipSetup, flags, navigate, redirectTo, flagInitialized]
   )
 
-  const getMagicConfig = useCallback(() => {
-    if (!flagInitialized) {
-      return undefined
-    }
-
-    return flags[FeatureFlagsKeys.MAGIC_TEST] ? getConfiguration().magic_test : getConfiguration().magic
-  }, [flags[FeatureFlagsKeys.MAGIC_TEST], flagInitialized])
-
   return {
     checkProfileAndRedirect,
     connectToMagic,
-    getMagicConfig,
     isInitialized: flagInitialized
   }
 }
