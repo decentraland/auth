@@ -85,8 +85,11 @@ export const RequestPage = () => {
 
   const toSetupPage = useCallback(() => {
     const referrer = extractReferrerFromSearchParameters(searchParams)
-
-    navigate(locations.setup(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}`, referrer))
+    if (flags[FeatureFlagsKeys.NEW_ONBOARDING_FLOW]) {
+      navigate(locations.avatarSetup(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}`, referrer))
+    } else {
+      navigate(locations.setup(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}`, referrer))
+    }
   }, [requestId, flags[FeatureFlagsKeys.NEW_ONBOARDING_FLOW], searchParams])
 
   useEffect(() => {

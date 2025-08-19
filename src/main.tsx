@@ -4,9 +4,11 @@ import 'semantic-ui-css/semantic.min.css'
 import React, { useEffect } from 'react'
 import ReactDOM from 'react-dom'
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
+import { darkTheme, DclThemeProvider } from 'decentraland-ui2'
 import { RequestPage } from './components/Pages/RequestPage'
 import { SetupPage } from './components/Pages/SetupPage'
 import { DefaultPage } from './components/Pages/DefaultPage'
+import { AvatarSetupPage } from './components/Pages/AvatarSetupPage/AvatarSetupPage'
 import Intercom from './components/Intercom'
 import { CallbackPage } from './components/Pages/CallbackPage'
 import { InvalidRedirectionPage } from './components/Pages/InvalidRedirectionPage'
@@ -36,6 +38,7 @@ const SiteRoutes = () => {
       <Route path="/callback" Component={CallbackPage} />
       <Route path="/requests/:requestId" Component={RequestPage} />
       <Route path="/setup" Component={SetupPage} />
+      <Route path="/avatar-setup" Component={AvatarSetupPage} />
       <Route path="*" Component={DefaultPage} />
     </Routes>
   )
@@ -44,9 +47,11 @@ const SiteRoutes = () => {
 ReactDOM.render(
   <React.StrictMode>
     <FeatureFlagsProvider>
-      <BrowserRouter basename="/auth">
-        <SiteRoutes />
-      </BrowserRouter>
+      <DclThemeProvider theme={darkTheme}>
+        <BrowserRouter basename="/auth">
+          <SiteRoutes />
+        </BrowserRouter>
+      </DclThemeProvider>
       <Intercom appId={config.get('INTERCOM_APP_ID')} settings={{ alignment: 'right' }} />
     </FeatureFlagsProvider>
   </React.StrictMode>,
