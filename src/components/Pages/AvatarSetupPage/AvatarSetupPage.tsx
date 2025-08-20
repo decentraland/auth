@@ -4,7 +4,7 @@ import CircularProgress from '@mui/material/CircularProgress'
 import { BrowserProvider } from 'ethers'
 import { EthAddress, Email } from '@dcl/schemas'
 import type { Provider } from 'decentraland-connect'
-import { WearablePreview, PreviewUnityMode } from 'decentraland-ui2'
+import { WearablePreview, PreviewUnityMode, launchDesktopApp } from 'decentraland-ui2'
 import avatarFloat from '../../../assets/animations/AvatarFloat_Lottie.json'
 import avatarParticles from '../../../assets/animations/AvatarParticles_Lottie.json'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
@@ -35,6 +35,7 @@ import {
   CheckboxInput,
   ContinueButton,
   RightAvatarSection,
+  RightSectionBackground,
   PreloadedWearableContainer,
   DecentralandText,
   AvatarParticles,
@@ -42,7 +43,8 @@ import {
   LoadingContainer,
   ProgressContainer,
   LoadingTitle,
-  LinkCheckbox
+  LinkCheckbox,
+  BackgroundShadow
 } from './AvatarSetupPage.styled'
 import { deployProfileFromAvatarShape } from './utils'
 import { AvatarSetupState, AvatarShape } from './AvatarSetupPage.types'
@@ -60,6 +62,7 @@ const AvatarSetupPage: React.FC = () => {
   const navigate = useNavigateWithSearchParams()
   const referrer = urlSearchParams.get('referrer')
   const { track: trackReferral } = useTrackReferral()
+  const { trackClick, trackTermsOfServiceSuccess } = useAnalytics()
 
   const [state, setState] = useState<AvatarSetupState>({
     username: '',
@@ -69,9 +72,13 @@ const AvatarSetupPage: React.FC = () => {
     isTermsChecked: false,
     isEmailInherited: false
   })
+
   const [deploying, setDeploying] = useState(false)
+
   const [deployError, setDeployError] = useState<string | null>(null)
+
   const [showErrors, setShowErrors] = useState(false)
+
   const [isProcessingMessage, setIsProcessingMessage] = useState(false)
 
   const [isAvatarParticlesAnimationEnded, setIsAvatarParticlesAnimationEnded] = useState(false)
@@ -88,7 +95,40 @@ const AvatarSetupPage: React.FC = () => {
     }
     return requestId
   }, [urlSearchParams])
-  const { trackClick, trackTermsOfServiceSuccess } = useAnalytics()
+
+  const characterCount = useMemo(() => state.username.length, [state.username])
+
+  const hasError = useMemo(() => characterCount > MAX_CHARACTERS, [characterCount])
+
+  const nameError = useMemo(() => {
+    if (!state.username.length) {
+      return 'Please enter your username.'
+    }
+    if (state.username.length >= 15) {
+      return 'Sorry, usernames can have a maximum of 15 characters.'
+    }
+    if (state.username.includes(' ')) {
+      return 'Sorry, spaces are not permitted.'
+    }
+    if (!/^[a-zA-Z0-9]+$/.test(state.username)) {
+      return 'Sorry, special characters (!@#$%) are not permitted.'
+    }
+    return ''
+  }, [state.username])
+
+  const emailError = useMemo(() => {
+    if (state.email && !state.email.includes('@')) {
+      return 'Invalid email, please try again.'
+    }
+    return ''
+  }, [state.email])
+
+  const agreeError = useMemo(() => {
+    if (!state.isTermsChecked) {
+      return 'Please accept the terms of use and privacy policy.'
+    }
+    return ''
+  }, [state.isTermsChecked])
 
   const handleContinueClick = useCallback(() => {
     const validEmail = Email.validate(state.email)
@@ -110,43 +150,6 @@ const AvatarSetupPage: React.FC = () => {
     const value = e.target.value
     setState(prev => ({ ...prev, email: value, hasEmailError: false }))
   }, [])
-
-  const characterCount = useMemo(() => state.username.length, [state.username])
-
-  const hasError = useMemo(() => characterCount > MAX_CHARACTERS, [characterCount])
-
-  // Validate the name
-  const nameError = useMemo(() => {
-    if (!state.username.length) {
-      return 'Please enter your username.'
-    }
-    if (state.username.length >= 15) {
-      return 'Sorry, usernames can have a maximum of 15 characters.'
-    }
-    if (state.username.includes(' ')) {
-      return 'Sorry, spaces are not permitted.'
-    }
-    if (!/^[a-zA-Z0-9]+$/.test(state.username)) {
-      return 'Sorry, special characters (!@#$%) are not permitted.'
-    }
-    return ''
-  }, [state.username])
-
-  // Validate the email
-  const emailError = useMemo(() => {
-    if (state.email && !state.email.includes('@')) {
-      return 'Invalid email, please try again.'
-    }
-    return ''
-  }, [state.email])
-
-  // Validate the agree checkbox
-  const agreeError = useMemo(() => {
-    if (!state.isTermsChecked) {
-      return 'Please accept the terms of use and privacy policy.'
-    }
-    return ''
-  }, [state.isTermsChecked])
 
   const signRequest = useCallback(
     async (provider: Provider, requestId: string, account: string) => {
@@ -248,11 +251,17 @@ const AvatarSetupPage: React.FC = () => {
           name: state.username
         })
 
-        // If the site to be redirect to is a request site, we need to recover the request and sign in
-        if (requestId && provider && flags[FeatureFlagsKeys.LOGIN_ON_SETUP]) {
-          await signRequest(provider, requestId, account)
+        const hasLauncher = await launchDesktopApp({})
+
+        if (hasLauncher) {
+          window.location.href = '/'
         } else {
-          redirect()
+          if (requestId && provider && flags[FeatureFlagsKeys.LOGIN_ON_SETUP]) {
+            // If the site to be redirect to is a request site, we need to recover the request and sign in
+            await signRequest(provider, requestId, account)
+          } else {
+            redirect()
+          }
         }
       } catch (e) {
         const errorMessage = handleError(e, 'Error deploying profile')
@@ -282,13 +291,6 @@ const AvatarSetupPage: React.FC = () => {
       isProcessingMessage
     ]
   )
-
-  useEffect(() => {
-    window.addEventListener('message', handleMessage, false)
-    return () => {
-      window.removeEventListener('message', handleMessage, false)
-    }
-  }, [handleMessage])
 
   const handleTermsChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.checked
@@ -336,6 +338,13 @@ const AvatarSetupPage: React.FC = () => {
   }, [account, flags, provider, referrer, redirect, trackReferral])
 
   useEffect(() => {
+    window.addEventListener('message', handleMessage, false)
+    return () => {
+      window.removeEventListener('message', handleMessage, false)
+    }
+  }, [handleMessage])
+
+  useEffect(() => {
     if (isConnecting || !initializedFlags) return
 
     if (!account || !identity) {
@@ -362,6 +371,7 @@ const AvatarSetupPage: React.FC = () => {
 
   return (
     <MainContainer>
+      <BackgroundShadow />
       <LeftFormSection>
         <DecentralandLogo />
 
@@ -445,6 +455,7 @@ const AvatarSetupPage: React.FC = () => {
       </LeftFormSection>
 
       <RightAvatarSection>
+        <RightSectionBackground />
         {!isAvatarParticlesAnimationEnded && (
           <AvatarParticles
             animationData={avatarParticles}

@@ -1,6 +1,7 @@
 import Lottie from 'lottie-react'
 import { Logo, Box, styled, Typography, TextField, Checkbox, FormControlLabel, Button, Link } from 'decentraland-ui2'
 import CustomWelcomeBackground from '../../../assets/images/background/custom-welcome-background.webp'
+import SetupRightBackground from '../../../assets/images/setup-right-background.webp'
 
 const MainContainer = styled(Box)({
   display: 'flex',
@@ -10,6 +11,15 @@ const MainContainer = styled(Box)({
   backgroundPosition: 'center',
   backgroundRepeat: 'no-repeat',
   fontFamily: 'Arial, sans-serif'
+})
+
+const BackgroundShadow = styled(Box)({
+  background: 'linear-gradient(90deg, #2A0C43 20%, rgba(42,12,67,0) 100%)',
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  width: '100%',
+  height: '100%'
 })
 
 const LoadingTitle = styled(Typography)({
@@ -48,7 +58,8 @@ const LeftFormSection = styled(Box)({
   alignItems: 'flex-start',
   padding: '0 0 0 240px',
   color: 'white',
-  width: '50%'
+  width: '50%',
+  zIndex: 3
 })
 
 const DecentralandLogo = styled(Logo)({
@@ -162,13 +173,27 @@ const CheckboxInput = styled(Checkbox)({
 
 const ContinueButton = styled(Button)({})
 
+const RightSectionBackground = styled(Box)({
+  flex: 1,
+  position: 'absolute',
+  top: '3%',
+  right: 0,
+  width: '105%',
+  height: '100%',
+  backgroundImage: `url(${SetupRightBackground})`,
+  backgroundSize: '100% auto',
+  backgroundPosition: 'center right',
+  backgroundRepeat: 'no-repeat'
+})
+
 const RightAvatarSection = styled(Box)({
   flex: 1,
   display: 'flex',
   justifyContent: 'center',
   alignItems: 'center',
   position: 'relative',
-  width: '1000px'
+  width: '1000px',
+  zIndex: 2
 })
 
 const AvatarParticles = styled(Lottie, {
@@ -197,6 +222,7 @@ const PreloadedWearableContainer = styled(Box, {
 
 export {
   MainContainer,
+  BackgroundShadow,
   LoadingTitle,
   LoadingContainer,
   ProgressContainer,
@@ -214,6 +240,7 @@ export {
   LinkCheckbox,
   CheckboxInput,
   ContinueButton,
+  RightSectionBackground,
   RightAvatarSection,
   AvatarParticles,
   PreloadedWearableContainer
