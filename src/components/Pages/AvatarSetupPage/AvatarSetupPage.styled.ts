@@ -13,14 +13,17 @@ const MainContainer = styled(Box)({
   fontFamily: 'Arial, sans-serif'
 })
 
-const BackgroundShadow = styled(Box)({
+const BackgroundShadow = styled(Box)(({ theme }) => ({
   background: 'linear-gradient(90deg, #2A0C43 20%, rgba(42,12,67,0) 100%)',
   position: 'absolute',
   top: 0,
   left: 0,
   width: '100%',
-  height: '100%'
-})
+  height: '100%',
+  [theme.breakpoints.down('sm')]: {
+    background: 'linear-gradient(180deg, #2A0C43 20%, rgba(42,12,67,0) 100%)'
+  }
+}))
 
 const LoadingTitle = styled(Typography)({
   marginTop: '76px',
@@ -50,7 +53,7 @@ const ProgressContainer = styled(Box)({
   color: 'rgb(235,68,90)'
 })
 
-const LeftFormSection = styled(Box)({
+const LeftFormSection = styled(Box)(({ theme }) => ({
   flex: 1,
   display: 'flex',
   flexDirection: 'column',
@@ -59,8 +62,19 @@ const LeftFormSection = styled(Box)({
   padding: '0 0 0 240px',
   color: 'white',
   width: '50%',
-  zIndex: 3
-})
+  zIndex: 3,
+  [theme.breakpoints.down('lg')]: {
+    padding: '0 0 0 120px'
+  },
+  [theme.breakpoints.down('sm')]: {
+    width: '100%',
+    padding: '0 48px 0'
+  },
+  [theme.breakpoints.down('xs')]: {
+    width: '100%',
+    padding: '0 24px 0'
+  }
+}))
 
 const DecentralandLogo = styled(Logo)({
   fontSize: '63px',
@@ -90,11 +104,14 @@ const DecentralandText = styled('span')({
   letterSpacing: 'inherit'
 })
 
-const InputContainer = styled(Box)({
+const InputContainer = styled(Box)(({ theme }) => ({
   width: '100%',
   maxWidth: '400px',
-  marginBottom: '24px'
-})
+  marginBottom: '24px',
+  [theme.breakpoints.down('sm')]: {
+    maxWidth: '100%'
+  }
+}))
 
 const InputLabel = styled(Typography)({
   fontSize: '24px',
@@ -171,7 +188,11 @@ const CheckboxInput = styled(Checkbox)({
   accentColor: '#FF6B35'
 })
 
-const ContinueButton = styled(Button)({})
+const ContinueButton = styled(Button)(({ theme }) => ({
+  [theme.breakpoints.down('sm')]: {
+    width: '100%'
+  }
+}))
 
 const RightSectionBackground = styled(Box)({
   flex: 1,
@@ -186,15 +207,18 @@ const RightSectionBackground = styled(Box)({
   backgroundRepeat: 'no-repeat'
 })
 
-const RightAvatarSection = styled(Box)({
+const RightAvatarSection = styled(Box)(({ theme }) => ({
   flex: 1,
   display: 'flex',
   justifyContent: 'center',
   alignItems: 'center',
   position: 'relative',
   width: '1000px',
-  zIndex: 2
-})
+  zIndex: 2,
+  [theme.breakpoints.down('sm')]: {
+    display: 'none'
+  }
+}))
 
 const AvatarParticles = styled(Lottie, {
   shouldForwardProp: prop => prop !== 'show'
