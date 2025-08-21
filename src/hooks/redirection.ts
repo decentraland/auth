@@ -19,7 +19,8 @@ export const useAfterLoginRedirection = () => {
     }
 
     // Check if the hostname matches to prevent open redirects
-    if (redirectToURL.hostname !== window.location.hostname) {
+    // TODO: remove vercel validation
+    if (redirectToURL.hostname !== window.location.hostname && !window.location.hostname.includes('decentraland1.vercel.app')) {
       redirectToURL = new URL('/auth/invalidRedirection', window.location.origin)
     }
 
