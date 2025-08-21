@@ -1,4 +1,5 @@
 import Lottie from 'lottie-react'
+import { brand, neutral } from 'decentraland-ui2/dist/theme/colors'
 import { Logo, Box, styled, Typography, TextField, Checkbox, FormControlLabel, Button, Link } from 'decentraland-ui2'
 import CustomWelcomeBackground from '../../../assets/images/background/custom-welcome-background.webp'
 import SetupRightBackground from '../../../assets/images/setup-right-background.webp'
@@ -6,11 +7,14 @@ import SetupRightBackground from '../../../assets/images/setup-right-background.
 const MainContainer = styled(Box)({
   display: 'flex',
   height: '100vh',
+  minHeight: '700px',
   backgroundImage: `url(${CustomWelcomeBackground})`,
   backgroundSize: 'cover',
   backgroundPosition: 'center',
   backgroundRepeat: 'no-repeat',
-  fontFamily: 'Arial, sans-serif'
+  fontFamily: 'Arial, sans-serif',
+  position: 'relative',
+  overflow: 'hidden'
 })
 
 const BackgroundShadow = styled(Box)(({ theme }) => ({
@@ -189,6 +193,15 @@ const CheckboxInput = styled(Checkbox)({
 })
 
 const ContinueButton = styled(Button)(({ theme }) => ({
+  ['&.MuiButton-sizeMedium.MuiButton-containedPrimary']: {
+    padding: '24px 48px',
+    fontSize: '16px',
+    borderRadius: '16px'
+  },
+  ['&.MuiButton-sizeMedium.MuiButton-containedPrimary.Mui-disabled:not(.Mui-focusVisible):not(:hover)']: {
+    backgroundColor: `${brand.ruby}50`,
+    color: `${neutral.softWhite}50`
+  },
   [theme.breakpoints.down('sm')]: {
     width: '100%'
   }
