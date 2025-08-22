@@ -56,7 +56,7 @@ export const CustomWearablePreview = (props: Props) => {
     <div className="CustomWearablePreview">
       <WearablePreview
         base64s={[platformDefinition]}
-        baseUrl={config.get('WEARABLE_PREVIEW_URL')}
+        baseUrl={'https://wearable-preview-git-feat-update-unity-ren-aade4d-decentraland1.vercel.app'}
         cameraY={0.2}
         dev={config.is(Env.DEVELOPMENT)}
         disableAutoRotate
@@ -65,7 +65,7 @@ export const CustomWearablePreview = (props: Props) => {
         lockBeta={true}
         panning={false}
         profile={props.profile}
-        unity={isUnityWearablePreviewEnabled}
+        unity={true}
         unityMode="authentication"
         onLoad={handleOnLoad}
       />
