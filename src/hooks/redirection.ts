@@ -18,8 +18,12 @@ export const useAfterLoginRedirection = () => {
       redirectToURL = new URL(redirectTo)
     }
 
+    // Check if the protocol is safe to prevent XSS attacks
+    if (redirectToURL.protocol !== 'http:' && redirectToURL.protocol !== 'https:') {
+      redirectToURL = new URL('/auth/invalidRedirection', window.location.origin)
+    }
     // Check if the hostname matches to prevent open redirects
-    if (redirectToURL.hostname !== window.location.hostname) {
+    else if (redirectToURL.hostname !== window.location.hostname) {
       redirectToURL = new URL('/auth/invalidRedirection', window.location.origin)
     }
 
