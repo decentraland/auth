@@ -11,7 +11,6 @@ import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { useAnalytics } from '../../../hooks/useAnalytics'
 import { useTrackReferral } from '../../../hooks/useTrackReferral'
-import { ClickEvents } from '../../../modules/analytics/types'
 import { fetchProfile } from '../../../modules/profile'
 import { createAuthServerHttpClient, createAuthServerWsClient, ExpiredRequestError, RecoverResponse } from '../../../shared/auth'
 import { useCurrentConnectionData } from '../../../shared/connection/hooks'
@@ -62,7 +61,7 @@ const AvatarSetupPage: React.FC = () => {
   const navigate = useNavigateWithSearchParams()
   const referrer = urlSearchParams.get('referrer')
   const { track: trackReferral } = useTrackReferral()
-  const { trackClick, trackTermsOfServiceSuccess } = useAnalytics()
+  const { trackClick, trackAvatarEditSuccess, trackTermsOfServiceSuccess, trackCheckTermsOfService } = useAnalytics()
 
   const [state, setState] = useState<AvatarSetupState>({
     username: '',
@@ -139,7 +138,14 @@ const AvatarSetupPage: React.FC = () => {
     setState(prev => ({ ...prev, hasEmailError: false, showWearablePreview: true }))
     const wearablePreviewController = WearablePreview.createController('avatar-preview-configurator')
     wearablePreviewController.scene.setUsername(state.username)
-  }, [state.username, state.email])
+
+    trackTermsOfServiceSuccess({
+      ethAddress: account,
+      isGuest: false,
+      email: state.email || undefined,
+      name: state.username
+    })
+  }, [state.username, state.email, account, trackTermsOfServiceSuccess])
 
   const handleUsernameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value
@@ -200,7 +206,6 @@ const AvatarSetupPage: React.FC = () => {
 
       const avatarShape = event.data.payload.result as AvatarShape
 
-      trackClick(ClickEvents.SUBMIT_PROFILE)
       setShowErrors(true)
 
       // If any of the fields has an error, don't submit
@@ -227,6 +232,13 @@ const AvatarSetupPage: React.FC = () => {
           deploymentProfileName: state.username
         })
 
+        trackAvatarEditSuccess({
+          ethAddress: account,
+          isGuest: false,
+          profile: state.username,
+          avatarShape
+        })
+
         if (referrer && EthAddress.validate(referrer)) {
           try {
             await trackReferral(referrer, 'PATCH')
@@ -244,17 +256,10 @@ const AvatarSetupPage: React.FC = () => {
           }
         }
 
-        trackTermsOfServiceSuccess({
-          ethAddress: account,
-          isGuest: false,
-          email: state.email || undefined,
-          name: state.username
-        })
-
         const hasLauncher = await launchDesktopApp({})
 
         if (hasLauncher) {
-          window.location.href = '/'
+          navigate('/')
         } else {
           if (requestId && provider && flags[FeatureFlagsKeys.LOGIN_ON_SETUP]) {
             // If the site to be redirect to is a request site, we need to recover the request and sign in
@@ -292,10 +297,16 @@ const AvatarSetupPage: React.FC = () => {
     ]
   )
 
-  const handleTermsChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.checked
-    setState(prev => ({ ...prev, isTermsChecked: value }))
-  }, [])
+  const handleTermsChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const value = e.target.checked
+      if (value) {
+        trackCheckTermsOfService()
+      }
+      setState(prev => ({ ...prev, isTermsChecked: value }))
+    },
+    [trackCheckTermsOfService]
+  )
 
   const initializeAvatarSetup = useCallback(async () => {
     if (!account) {
