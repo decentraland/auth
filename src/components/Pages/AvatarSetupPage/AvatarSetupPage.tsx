@@ -283,11 +283,7 @@ const AvatarSetupPage: React.FC = () => {
       return redirect()
     }
 
-    if (flags[FeatureFlagsKeys.HTTP_AUTH]) {
-      authServerClient.current = createAuthServerHttpClient()
-    } else {
-      authServerClient.current = createAuthServerWsClient()
-    }
+    authServerClient.current = flags[FeatureFlagsKeys.HTTP_AUTH] ? createAuthServerHttpClient() : createAuthServerWsClient()
 
     if (provider?.isMagic) {
       try {
