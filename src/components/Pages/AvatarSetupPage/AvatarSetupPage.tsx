@@ -1,18 +1,17 @@
 import React, { useCallback, useState, useMemo, useEffect, useContext, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import CircularProgress from '@mui/material/CircularProgress'
-import { BrowserProvider } from 'ethers'
 import { EthAddress, Email } from '@dcl/schemas'
-import type { Provider } from 'decentraland-connect'
 import { WearablePreview, PreviewUnityMode, launchDesktopApp } from 'decentraland-ui2'
 import avatarFloat from '../../../assets/animations/AvatarFloat_Lottie.json'
 import avatarParticles from '../../../assets/animations/AvatarParticles_Lottie.json'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { useAnalytics } from '../../../hooks/useAnalytics'
+import { useSignRequest } from '../../../hooks/useSignRequest'
 import { useTrackReferral } from '../../../hooks/useTrackReferral'
 import { fetchProfile } from '../../../modules/profile'
-import { createAuthServerHttpClient, createAuthServerWsClient, ExpiredRequestError, RecoverResponse } from '../../../shared/auth'
+import { createAuthServerHttpClient, createAuthServerWsClient } from '../../../shared/auth'
 import { useCurrentConnectionData } from '../../../shared/connection/hooks'
 import { locations } from '../../../shared/locations'
 import { isProfileComplete } from '../../../shared/profile'
@@ -57,7 +56,7 @@ const AvatarSetupPage: React.FC = () => {
   const [initialized, setInitialized] = useState(false)
   const { url: redirectTo, redirect } = useAfterLoginRedirection()
   const { isLoading: isConnecting, account, identity, provider } = useCurrentConnectionData()
-  const authServerClient = useRef(createAuthServerWsClient())
+  const { signRequest, authServerClient } = useSignRequest(redirect)
   const navigate = useNavigateWithSearchParams()
   const referrer = urlSearchParams.get('referrer')
   const { track: trackReferral } = useTrackReferral()
@@ -156,43 +155,6 @@ const AvatarSetupPage: React.FC = () => {
     const value = e.target.value
     setState(prev => ({ ...prev, email: value, hasEmailError: false }))
   }, [])
-
-  const signRequest = useCallback(
-    async (provider: Provider, requestId: string, account: string) => {
-      let request: RecoverResponse | null = null
-      try {
-        request = await authServerClient.current.recover(requestId, account)
-
-        if (request.method !== 'dcl_personal_sign') {
-          redirect()
-        }
-      } catch (e) {
-        if (e instanceof ExpiredRequestError) {
-          console.error('Request expired')
-        } else {
-          handleError(e, 'Error recovering request')
-        }
-        return
-      }
-
-      let signature: string | null = null
-      try {
-        const browserProvider = new BrowserProvider(provider)
-        const signer = await browserProvider.getSigner()
-        signature = await signer.signMessage(request.params?.[0])
-
-        await authServerClient.current.sendSuccessfulOutcome(requestId, account, signature)
-        redirect()
-      } catch (e) {
-        if (e instanceof ExpiredRequestError) {
-          console.error('Request expired during signing')
-        } else {
-          handleError(e, 'Error signing request')
-        }
-      }
-    },
-    [redirect]
-  )
 
   const handleMessage = useCallback(
     async (event: MessageEvent) => {

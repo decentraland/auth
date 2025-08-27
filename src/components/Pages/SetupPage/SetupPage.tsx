@@ -1,14 +1,12 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import classNames from 'classnames'
-import { BrowserProvider } from 'ethers'
 import { EthAddress } from '@dcl/schemas'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import { Checkbox } from 'decentraland-ui/dist/components/Checkbox/Checkbox'
 import { Field } from 'decentraland-ui/dist/components/Field/Field'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
 import { useMobileMediaQuery } from 'decentraland-ui/dist/components/Media/Media'
-import type { Provider } from 'decentraland-connect'
 import { InputOnChangeData } from 'decentraland-ui'
 import backImg from '../../../assets/images/back.svg'
 import diceImg from '../../../assets/images/dice.svg'
@@ -17,10 +15,11 @@ import wrongImg from '../../../assets/images/wrong.svg'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { useAnalytics } from '../../../hooks/useAnalytics'
+import { useSignRequest } from '../../../hooks/useSignRequest'
 import { useTrackReferral } from '../../../hooks/useTrackReferral'
 import { ClickEvents } from '../../../modules/analytics/types'
 import { fetchProfile } from '../../../modules/profile'
-import { createAuthServerHttpClient, createAuthServerWsClient, ExpiredRequestError, RecoverResponse } from '../../../shared/auth'
+import { createAuthServerHttpClient, createAuthServerWsClient } from '../../../shared/auth'
 import { useCurrentConnectionData } from '../../../shared/connection/hooks'
 import { locations } from '../../../shared/locations'
 import { isProfileComplete } from '../../../shared/profile'
@@ -88,7 +87,6 @@ export const SetupPage = () => {
   const isMobile = useMobileMediaQuery()
   const { url: redirectTo, redirect } = useAfterLoginRedirection()
   const { isLoading: isConnecting, account, identity, provider, providerType } = useCurrentConnectionData()
-  const authServerClient = useRef(createAuthServerWsClient())
   const navigate = useNavigateWithSearchParams()
   const referrer = urlSearchParams.get('referrer')
   const {
@@ -233,60 +231,21 @@ export const SetupPage = () => {
       hasCheckedAgree.current = true
     }
   }, [trackCheckTermsOfService])
-  const signRequest = useCallback(
-    async (provider: Provider, requestId: string, account: string) => {
-      let request: RecoverResponse | null = null
-      // Recover the request
-      try {
-        request = await authServerClient.current.recover(requestId, account)
 
-        // Only perform automatic sign ins.
-        if (request.method !== 'dcl_personal_sign') {
-          redirect()
-        }
-      } catch (e) {
-        if (e instanceof ExpiredRequestError) {
-          setView(View.TIMEOUT_ERROR)
-        } else {
-          const errorMessage = handleError(e, 'Error recovering request')
-          setRequestError(errorMessage)
-          setView(View.RECOVER_ERROR)
-        }
-        return
-      }
-
-      // Sign the request and send the outcome.
-      let signature: string | null = null
-      try {
-        if (!provider.isMagic) {
-          // Show the modal to sign the request
-          setIsConnectionModalOpen(true)
-        }
-
-        const browserProvider = new BrowserProvider(provider)
-        const signer = await browserProvider.getSigner()
-        signature = await signer.signMessage(request.params?.[0])
-
-        // Hide the modal to sign the request
-        setIsConnectionModalOpen(false)
-
-        // Send the outcome.
-        await authServerClient.current.sendSuccessfulOutcome(requestId, account, signature)
-        setView(View.SIGN_IN_COMPLETE)
-      } catch (e) {
-        // Hide the modal to sign the request
-        setIsConnectionModalOpen(false)
-        if (e instanceof ExpiredRequestError) {
-          setView(View.TIMEOUT_ERROR)
-        } else {
-          const errorMessage = handleError(e, 'Error signing request')
-          setRequestError(errorMessage)
-          setView(View.SIGNING_ERROR)
-        }
-      }
+  const { signRequest, authServerClient } = useSignRequest(redirect, {
+    onExpiredRequest: () => setView(View.TIMEOUT_ERROR),
+    onRecoverError: error => {
+      setRequestError(error)
+      setView(View.RECOVER_ERROR)
     },
-    [redirect, requestId, provider]
-  )
+    onSigningError: error => {
+      setRequestError(error)
+      setView(View.SIGNING_ERROR)
+    },
+    onSuccess: () => setView(View.SIGN_IN_COMPLETE),
+    onConnectionModalOpen: () => setIsConnectionModalOpen(true),
+    onConnectionModalClose: () => setIsConnectionModalOpen(false)
+  })
 
   // Handles the deployment of a new profile based on the selected default profile.
   // Also subscribes the user to the newsletter if an email is provided.
