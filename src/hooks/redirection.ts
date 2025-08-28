@@ -18,9 +18,12 @@ export const useAfterLoginRedirection = () => {
       redirectToURL = new URL(redirectTo)
     }
 
+    // Check if the protocol is safe to prevent XSS attacks
+    if (redirectToURL.protocol !== 'http:' && redirectToURL.protocol !== 'https:') {
+      redirectToURL = new URL('/auth/invalidRedirection', window.location.origin)
+    }
     // Check if the hostname matches to prevent open redirects
-    // TODO: remove vercel validation
-    if (redirectToURL.hostname !== window.location.hostname && !window.location.hostname.includes('decentraland1.vercel.app')) {
+    if (redirectToURL.hostname !== window.location.hostname) {
       redirectToURL = new URL('/auth/invalidRedirection', window.location.origin)
     }
 
