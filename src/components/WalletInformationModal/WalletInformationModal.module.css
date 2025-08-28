@@ -5,10 +5,15 @@
   justify-content: center;
   width: 100%;
   text-align: center;
+  gap: 40px;
 }
 
-.title {
-  margin-bottom: 40px;
+.infoModal :global(.dcl.modal-navigation) {
+  padding: 0
+}
+
+.infoModal :global(.ui.modal) > :global(.content).infoContent {
+  margin: 60px;
 }
 
 .info {
@@ -16,10 +21,6 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-}
-
-.info + .info {
-  margin-top: 40px;
 }
 
 .infoImage {
@@ -36,4 +37,9 @@
 
 .login {
   background-image: url('../../assets/images/signin.svg');
+}
+
+.infoModal .goBackButton:global(.ui.button.secondary) {
+  color: white;
+  box-shadow: none !important;
 }

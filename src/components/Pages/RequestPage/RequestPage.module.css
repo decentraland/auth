@@ -1,0 +1,41 @@
+.code {
+  font-size: 100px;
+  font-weight: 700;
+  line-height: 121.02px;
+  margin-top: 40px;
+}
+
+.buttons {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 24px;
+  margin-top: 40px;
+  z-index: 1;
+}
+
+.noButton:global(.ui.button),
+.noButton:global(.ui.button):hover,
+.yesButton:global(.ui.button),
+.yesButton:global(.ui.button):hover {
+  background: white;
+  color: black;
+  display: flex;
+}
+
+.noButton:global(.ui.button) i {
+  color: red;
+  font-size: 20px;
+}
+
+.yesButton:global(.ui.button) i {
+  color: green;
+  font-size: 20px;
+}
+
+.communityBubble {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+}

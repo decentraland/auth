@@ -1,0 +1,251 @@
+.container {
+  font-family: system-ui, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  overflow: hidden;
+}
+
+.background {
+  position: fixed;
+  height: 100vh;
+  width: 100vw;
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: right;
+  background-image: url('/src/assets/images/background.svg');
+  z-index: -1;
+}
+
+.left {
+  flex: 1;
+  padding: 1rem;
+  color: white;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.errorMessage {
+  padding: 15px;
+  border-radius: 10px;
+  margin-top: 30px;
+  background-color: var(--primary);
+  line-break: anywhere;
+  color: white;
+}
+
+.container :global(.message) {
+  color: white !important;
+  opacity: 70%;
+}
+
+.container :global(.ui.sub.header) > label {
+  color: white !important;
+  opacity: 70%;
+}
+
+.container input {
+  border-bottom: 2px solid rgba(255, 255, 255, 0.7) !important;
+}
+
+.container input::placeholder {
+  color: white !important;
+  opacity: 70%;
+}
+
+.leftInner {
+  max-width: 500px;
+  display: flex;
+  flex-direction: column;
+}
+
+.logo {
+  width: 64px;
+  height: 64px;
+}
+
+.title {
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 36px;
+  margin-top: 24px;
+}
+
+.subtitle {
+  font-size: 30px;
+  font-weight: 400;
+  line-height: 36px;
+}
+
+.meetYourAvatar {
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 22px;
+  margin-top: 24px;
+}
+
+.meetYourAvatarDescription {
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 17px;
+  margin-top: 24px;
+}
+
+.randomize {
+  margin-top: 16px;
+}
+
+.randomize > :global(.button) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.continue {
+  width: 75%;
+  margin-top: 24px;
+}
+
+.logoSmall {
+  width: 40px;
+  height: 40px;
+}
+
+.back {
+  margin-top: 26px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.back > span {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.name {
+  margin-top: 24px;
+}
+
+.agree {
+  margin-top: 24px;
+  display: flex;
+  align-items: center;
+}
+
+.agree :global(.checkbox) {
+  margin-right: 10px;
+}
+
+.agree :global(.ui.checkbox input[type='checkbox'].hidden ~ label:before) {
+  border: 2px solid rgba(255, 255, 255, 0.7);
+}
+
+.agree a {
+  color: white;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+.error {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.error > img {
+  width: 16px;
+  height: 16px;
+}
+
+.emailError {
+  margin-bottom: 8px;
+}
+
+.agreeError {
+  opacity: 70%;
+  margin-top: 8px;
+  font-size: 15px;
+}
+
+.jumpIn {
+  margin-top: 24px;
+}
+
+.right {
+  flex: 1;
+  width: 100%;
+  position: relative;
+  right: 6.3%;
+}
+
+@media screen and (max-width: 768px) {
+  .container {
+    overflow: unset;
+    height: unset;
+  }
+
+  .mobileContainer {
+    padding: 24px;
+    color: white;
+  }
+
+  .meetYourAvatar {
+    margin-top: 12px;
+  }
+
+  .meetYourAvatarDescription {
+    margin-top: 12px;
+  }
+
+  .mobilePreviewContainer {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .mobilePreviewContainer :global(.CustomWearablePreview) {
+    height: 500px;
+  }
+
+  .mobileButtons {
+    display: flex;
+    gap: 16px;
+  }
+
+  .randomize {
+    flex: 1;
+    margin-top: 0px;
+  }
+
+  .randomize > :global(.button) {
+    width: 100%;
+  }
+
+  .continue {
+    flex: 1;
+    margin-top: 0px;
+    width: unset;
+  }
+
+  .continue > :global(.button) {
+    width: 100%;
+    transform: scale(1.05);
+  }
+
+  .mobileCompleteYourProfile {
+    margin-top: 47px;
+  }
+
+  .mobileContainer :global(.dcl.field) {
+    min-width: unset;
+  }
+
+  .agree {
+    display: flex;
+  }
+}

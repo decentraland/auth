@@ -1,0 +1,60 @@
+.errorLogo {
+  width: 40px;
+  height: 40px;
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: right;
+  background-image: url('/src/assets/images/wrong.svg');
+}
+
+.logo {
+  width: 40px;
+  height: 40px;
+  background-image: url('/src/assets/images/logo.svg');
+}
+
+.title {
+  font-size: 36px;
+  font-weight: 600;
+  line-height: 44px;
+  margin-top: 32px;
+}
+
+.subtitle {
+  font-size: 24px;
+  font-weight: 400;
+  line-height: 29.05px;
+  margin-top: 16px;
+}
+
+.description {
+  font-size: 24px;
+  font-weight: 400;
+  line-height: 29.05px;
+  margin-top: 16px;
+}
+
+.closeWindow {
+  font-size: 16px;
+  font-weight: 400;
+  margin-top: 40px;
+}
+
+.errorMessage {
+  padding: 15px;
+  border-radius: 10px;
+  margin-top: 30px;
+  background-color: var(--primary);
+  line-break: anywhere;
+  color: white;
+}
+
+@media (max-width: 767px) {
+  .errorMessage {
+    padding: 15px;
+    border-radius: 10px;
+    margin-top: 30px;
+    background-color: var(--primary);
+    color: white;
+  }
+}

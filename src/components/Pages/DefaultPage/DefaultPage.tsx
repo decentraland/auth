@@ -1,28 +1,26 @@
-import { useCallback, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect } from 'react'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
-import { connection } from 'decentraland-connect'
+import { useNavigateWithSearchParams } from '../../../hooks/navigation'
+import { getCurrentConnectionData } from '../../../shared/connection/connection'
+import { locations } from '../../../shared/locations'
+import styles from './DefaultPage.module.css'
 
 export const DefaultPage = () => {
-  const navigate = useNavigate()
-  const checkIfConnected = useCallback(async () => {
-    try {
-      const connectionDetails = await connection.tryPreviousConnection()
-      return Boolean(connectionDetails.account && connectionDetails.provider)
-    } catch (error) {
-      return false
-    }
-  }, [])
+  const navigate = useNavigateWithSearchParams()
 
   useEffect(() => {
-    checkIfConnected().then(isConnected => {
-      if (isConnected) {
-        navigate('/user')
+    getCurrentConnectionData().then(connectionData => {
+      if (connectionData) {
+        window.location.href = locations.home()
       } else {
-        navigate('/login')
+        navigate(locations.login())
       }
     })
-  }, [checkIfConnected, navigate])
+  }, [getCurrentConnectionData, navigate])
 
-  return <Loader active size="huge" />
+  return (
+    <div className={styles.main}>
+      <Loader active size="huge" />
+    </div>
+  )
 }

@@ -13,6 +13,23 @@ export enum ConnectionOptionType {
   X = 'x'
 }
 
+export const connectionOptionTitles: { [key in ConnectionOptionType]: string } = {
+  [ConnectionOptionType.METAMASK]: 'MetaMask',
+  [ConnectionOptionType.DAPPER]: 'Dapper',
+  [ConnectionOptionType.FORTMATIC]: 'Fortmatic',
+  [ConnectionOptionType.COINBASE]: 'Coinbase',
+  [ConnectionOptionType.SAMSUNG]: 'Samsung Blockchain Wallet',
+  [ConnectionOptionType.WALLET_CONNECT]: 'WalletConnect',
+  [ConnectionOptionType.WALLET_LINK]: 'WalletLink',
+  [ConnectionOptionType.METAMASK_MOBILE]: 'MetaMask Mobile',
+  [ConnectionOptionType.GOOGLE]: 'Google',
+  [ConnectionOptionType.APPLE]: 'Apple',
+  [ConnectionOptionType.DISCORD]: 'Discord',
+  [ConnectionOptionType.X]: 'X'
+}
+
+export type MetamaskEthereumWindow = typeof window.ethereum & { isMetaMask?: boolean }
+
 export type ConnectionI18N = {
   title: React.ReactNode
   subtitle: React.ReactNode
@@ -25,15 +42,13 @@ export type ConnectionI18N = {
 
 export type ConnectionProps = {
   i18n?: ConnectionI18N
-  socialOptions?: {
+  connectionOptions?: {
     primary: ConnectionOptionType
-    secondary: ConnectionOptionType[]
-  }
-  web3Options?: {
-    primary: ConnectionOptionType
-    secondary: ConnectionOptionType[]
+    secondary?: ConnectionOptionType
+    extraOptions?: ConnectionOptionType[]
   }
   className?: string
+  loadingOption?: ConnectionOptionType
   onConnect: (wallet: ConnectionOptionType) => unknown
-  onLearnMore: () => unknown
+  onLearnMore: (type?: ConnectionOptionType) => unknown
 }

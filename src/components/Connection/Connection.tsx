@@ -1,16 +1,12 @@
 import React, { useCallback, useState } from 'react'
 import classNames from 'classnames'
+import Icon from 'semantic-ui-react/dist/commonjs/elements/Icon/Icon'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import logoSrc from '../../assets/images/logo.svg'
-import { ConnectionIcon } from './ConnectionIcon'
-import {
-  SHOW_MORE_BUTTON_TEST_ID,
-  SOCIAL_PRIMARY_TEST_ID,
-  SOCIAL_SECONDARY_TEST_ID,
-  WEB3_PRIMARY_TEST_ID,
-  WEB3_SECONDARY_TEST_ID
-} from './constants'
-import { ConnectionOptionType, ConnectionProps } from './Connection.types'
+import { isSocialLogin } from '../Pages/LoginPage/utils'
+import { ConnectionOption } from './ConnectionOption'
+import { EXTRA_TEST_ID, PRIMARY_TEST_ID, SECONDARY_TEST_ID, SHOW_MORE_BUTTON_TEST_ID } from './constants'
+import { ConnectionOptionType, ConnectionProps, MetamaskEthereumWindow, connectionOptionTitles } from './Connection.types'
 import styles from './Connection.module.css'
 
 const Primary = ({
@@ -18,27 +14,32 @@ const Primary = ({
   children,
   option,
   testId,
+  loadingOption,
+  error,
   onConnect
 }: {
   message: React.ReactNode
   children: React.ReactChild
   option: ConnectionOptionType
+  loadingOption?: ConnectionOptionType
+  error?: string
   testId?: string
   onConnect: (wallet: ConnectionOptionType) => unknown
 }) => (
   <div className={styles.primary} data-testid={testId}>
     <div className={styles.primaryMessage}>{message}</div>
-    <Button
-      primary
-      size="small"
-      fluid
-      data-testid={`${testId}-button`}
+    <ConnectionOption
+      disabled={!!loadingOption || !!error}
+      loading={loadingOption === option}
+      showTooltip={!!error}
+      type={option}
+      info={error}
+      onClick={onConnect}
       className={classNames(styles.primaryButton, styles.primaryOption)}
-      onClick={() => onConnect(option)}
+      testId={testId}
     >
-      <ConnectionIcon className={styles.primaryImage} type={option} />
       {children}
-    </Button>
+    </ConnectionOption>
   </div>
 )
 
@@ -46,116 +47,118 @@ const Secondary = ({
   options,
   tooltipDirection,
   testId,
+  loadingOption,
   onConnect
 }: {
   options: ConnectionOptionType[]
   tooltipDirection: 'top center' | 'bottom center'
   testId?: string
+  loadingOption?: ConnectionOptionType
   onConnect: (wallet: ConnectionOptionType) => unknown
 }) => (
   <div className={styles.showMoreSecondaryOptions} data-testid={testId}>
     {options.map(option => (
-      <Button
-        primary
+      <ConnectionOption
         key={option}
-        size="small"
-        data-testid={`${testId}-${option}-button`}
         className={classNames(styles.primaryButton, styles.secondaryOptionButton)}
-        onClick={() => onConnect(option)}
-      >
-        <ConnectionIcon className="dui-connection-primary__image" showTooltip tooltipPosition={tooltipDirection} type={option} />
-      </Button>
+        showTooltip
+        tooltipPosition={tooltipDirection}
+        type={option}
+        onClick={onConnect}
+        testId={testId}
+        loading={loadingOption === option}
+        disabled={!!loadingOption}
+      />
     ))}
   </div>
 )
 
 const defaultProps = {
   i18n: {
-    title: 'Unlock Your Virtual World.',
-    subtitle: 'Access your Web3 Account.',
-    accessWith: (option: React.ReactNode) => `Access with ${option}`,
-    connectWith: (option: React.ReactNode) => `Connect with ${option}`,
-    moreOptions: 'Show More Options',
+    title: 'Sign In to Decentraland',
+    accessWith: (option: ConnectionOptionType) => `Continue with ${connectionOptionTitles[option]}`,
+    connectWith: (option: ConnectionOptionType) => `Continue with ${connectionOptionTitles[option]}`,
+    moreOptions: 'More Options',
     socialMessage: (element: React.ReactNode) => <>Access secured by {element}</>,
-    web3Message: (learnMore: (value: React.ReactNode) => React.ReactNode) => <>Curious about wallets? {learnMore('Learn More')}</>
+    web3Message: (learnMore: (value: React.ReactNode) => React.ReactNode) => <>Have a digital wallet? {learnMore('Learn More')}</>
   }
 }
 
 export const Connection = (props: ConnectionProps): JSX.Element => {
-  const { i18n = defaultProps.i18n, onConnect, onLearnMore, socialOptions, web3Options, className } = props
+  const { i18n = defaultProps.i18n, onConnect, onLearnMore, connectionOptions, className, loadingOption } = props
 
-  const [showMore, setShowMore] = useState(false)
+  const hasExtraOptions = connectionOptions?.extraOptions && connectionOptions.extraOptions.length > 0
+
+  const [showMore, setShowMore] = useState(hasExtraOptions)
   const handleShowMore = useCallback(() => {
-    setShowMore(true)
-  }, [])
+    setShowMore(!showMore)
+  }, [showMore])
 
-  const hasSocialSecondaryOptions = socialOptions && socialOptions.secondary && socialOptions.secondary.length > 0
-  const hasWeb3SecondaryOptions = web3Options && web3Options.secondary && web3Options.secondary.length > 0
+  const isMetamaskAvailable = (window.ethereum as MetamaskEthereumWindow)?.isMetaMask
+
+  const renderPrimary = (option: ConnectionOptionType, testId: string) => (
+    <Primary
+      onConnect={onConnect}
+      testId={testId}
+      option={option}
+      loadingOption={loadingOption}
+      error={
+        !isMetamaskAvailable && option === ConnectionOptionType.METAMASK
+          ? 'You need to install the MetaMask Browser Extension to proceed. Please install it and try again.'
+          : undefined
+      }
+      message={
+        isSocialLogin(option) ? (
+          <>
+            {i18n.socialMessage(<div className={styles.primaryMagic} role="img" aria-label="Magic" />)}
+            <span className={styles.primaryLearnMore} role="button" onClick={() => onLearnMore(option)}>
+              Learn More
+            </span>
+          </>
+        ) : (
+          i18n.web3Message(element => (
+            <span className={styles.primaryLearnMore} role="button" onClick={() => onLearnMore(option)}>
+              {element}
+            </span>
+          ))
+        )
+      }
+    >
+      <>{isSocialLogin(option) ? i18n.accessWith(option) : i18n.connectWith(option)}</>
+    </Primary>
+  )
 
   return (
     <div className={classNames(className, styles.connection)}>
       <img className={styles.dclLogo} src={logoSrc} alt="Decentraland logo" />
       <div>
         <h1 className={styles.title}>{i18n.title}</h1>
-        <h2 className={styles.subtitle}>{i18n.subtitle}</h2>
-        {socialOptions ? (
-          <Primary
-            onConnect={onConnect}
-            testId={SOCIAL_PRIMARY_TEST_ID}
-            option={socialOptions?.primary}
-            message={<>{i18n.socialMessage(<div className={styles.primaryMagic} role="img" aria-label="Magic" />)}</>}
-          >
-            <>{i18n.accessWith(socialOptions?.primary)}</>
-          </Primary>
-        ) : null}
-        {web3Options ? (
-          <Primary
-            onConnect={onConnect}
-            testId={WEB3_PRIMARY_TEST_ID}
-            option={web3Options?.primary}
-            message={i18n.web3Message(element => (
-              <span className={styles.primaryLearnMore} role="button" onClick={onLearnMore}>
-                {element}
-              </span>
-            ))}
-          >
-            <>{i18n.connectWith(web3Options?.primary)}</>
-          </Primary>
-        ) : null}
+        {connectionOptions && renderPrimary(connectionOptions.primary, PRIMARY_TEST_ID)}
+        {connectionOptions?.secondary && renderPrimary(connectionOptions.secondary, SECONDARY_TEST_ID)}
       </div>
 
       <div className={styles.showMore}>
-        {!showMore && (hasWeb3SecondaryOptions || hasSocialSecondaryOptions) ? (
+        {hasExtraOptions && (
           <Button
             data-testid={SHOW_MORE_BUTTON_TEST_ID}
-            inverted
-            secondary
+            basic
             size="medium"
             fluid
             className={styles.showMoreButton}
             onClick={handleShowMore}
           >
             {i18n.moreOptions}
+            <Icon name={showMore ? 'chevron up' : 'chevron down'} />
           </Button>
-        ) : (
-          <>
-            {hasSocialSecondaryOptions ? (
-              <Secondary
-                testId={SOCIAL_SECONDARY_TEST_ID}
-                options={socialOptions.secondary}
-                onConnect={onConnect}
-                tooltipDirection="top center"
-              />
-            ) : null}
-            {hasWeb3SecondaryOptions ? (
-              <Secondary
-                testId={WEB3_SECONDARY_TEST_ID}
-                options={web3Options.secondary}
-                onConnect={onConnect}
-                tooltipDirection="bottom center"
-              />
-            ) : null}
-          </>
+        )}
+        {showMore && hasExtraOptions && connectionOptions.extraOptions && (
+          <Secondary
+            testId={EXTRA_TEST_ID}
+            options={connectionOptions.extraOptions}
+            onConnect={onConnect}
+            tooltipDirection="top center"
+            loadingOption={loadingOption}
+          />
         )}
       </div>
     </div>

@@ -1,26 +1,54 @@
 /* eslint-disable import/order */
 /* eslint-disable @typescript-eslint/naming-convention */
 import 'semantic-ui-css/semantic.min.css'
-import React from 'react'
+import React, { useEffect } from 'react'
 import ReactDOM from 'react-dom'
-import { BrowserRouter, Route, Routes } from 'react-router-dom'
-import { UserPage } from './components/Pages/UserPage'
+import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
+import { RequestPage } from './components/Pages/RequestPage'
+import { SetupPage } from './components/Pages/SetupPage'
 import { DefaultPage } from './components/Pages/DefaultPage'
+import Intercom from './components/Intercom'
 import { CallbackPage } from './components/Pages/CallbackPage'
+import { InvalidRedirectionPage } from './components/Pages/InvalidRedirectionPage'
 import { LoginPage } from './components/Pages/LoginPage'
+import { FeatureFlagsProvider } from './components/FeatureFlagsProvider'
+import { config } from './modules/config'
+import { getAnalytics } from './modules/analytics/segment'
+import './modules/analytics/snippet'
+import './modules/analytics/sentry'
 import 'decentraland-ui/dist/themes/alternative/dark-theme.css'
 import './index.css'
 
+getAnalytics()?.load(config.get('SEGMENT_API_KEY'))
+
+const SiteRoutes = () => {
+  const location = useLocation()
+  const analytics = getAnalytics()
+
+  useEffect(() => {
+    analytics?.page()
+  }, [location, analytics])
+
+  return (
+    <Routes>
+      <Route path="/login" Component={LoginPage} />
+      <Route path="/invalidRedirection" Component={InvalidRedirectionPage} />
+      <Route path="/callback" Component={CallbackPage} />
+      <Route path="/requests/:requestId" Component={RequestPage} />
+      <Route path="/setup" Component={SetupPage} />
+      <Route path="*" Component={DefaultPage} />
+    </Routes>
+  )
+}
+
 ReactDOM.render(
   <React.StrictMode>
-    <BrowserRouter>
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/callback" element={<CallbackPage />} />
-        <Route path="/user" element={<UserPage />} />
-        <Route path="*" element={<DefaultPage />} />
-      </Routes>
-    </BrowserRouter>
+    <FeatureFlagsProvider>
+      <BrowserRouter basename="/auth">
+        <SiteRoutes />
+      </BrowserRouter>
+      <Intercom appId={config.get('INTERCOM_APP_ID')} settings={{ alignment: 'right' }} />
+    </FeatureFlagsProvider>
   </React.StrictMode>,
   document.getElementById('root')
 )

@@ -1,20 +1,51 @@
 .main {
-  display: flex;
-  flex-direction: row;
+  display: grid;
+  grid-template-columns: 50% 50%;
   height: 100%;
+  position: relative;
+}
+
+.background {
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  position: absolute;
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: right;
+  animation: move-background 10s linear infinite alternate;
+  z-index: -1;
+}
+
+.main::before {
+  content: '';
+  position: fixed;
+  width: 100%;
+  height: 350%;
+  background: radial-gradient(ellipse at 0 50%, transparent 10%, #e02dd3 40%, #491975 70%);
+  top: -100%;
+  transform: rotate(180deg);
+  overflow: hidden;
 }
 
 .left {
-  width: 50%;
-  background-color: black;
+  width: 100%;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: start;
+  padding: 80px 0;
 }
 
-.connection {
-  max-width: 500px;
+.leftInfo {
+  height: 100%;
+  width: 100%;
+  max-width: 450px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
 }
 
 .right {
@@ -22,10 +53,8 @@
   flex-direction: row;
   align-items: end;
   justify-content: center;
-  width: 50%;
-  background-repeat: no-repeat;
-  background-size: cover;
-  background-image: linear-gradient(to bottom, transparent, black), url('../../../assets/images/join.webp');
+  width: 100%;
+  z-index: 1;
 }
 
 .footer {
@@ -45,4 +74,49 @@
 .footer a {
   color: white;
   text-decoration: underline;
+}
+
+.guestInfo,
+.guestInfo a {
+  color: white;
+  font-size: 16px;
+}
+
+.guestInfo {
+  border-top: 1px solid white;
+  padding-top: 15px;
+  display: flex;
+  gap: 5px;
+}
+
+.guestInfo a {
+  text-decoration: underline;
+}
+
+@media screen and (max-width: 800px) {
+  .main {
+    display: flex;
+    height: auto;
+  }
+
+  .background {
+    display: none;
+  }
+
+  .main::before {
+    background: radial-gradient(ellipse at 0 50%, #e02dd3 0%, #491975 70%);
+  }
+
+  .left {
+    padding: 20px;
+  }
+}
+
+@keyframes move-background {
+  from {
+    transform: translateX(0);
+  }
+  to { 
+    transform: translateX(10%);
+  }
 }

@@ -1,1 +1,13 @@
-{}
+{
+  "ENVIRONMENT": "staging",
+  "AUTH_SERVER_URL": "https://auth-api.decentraland.today",
+  "SEGMENT_API_KEY": "FQqbzV2KeUKe2RPOeFkedKRPkJAFsU9r",
+  "PEER_URL": "https://peer-testing.decentraland.org",
+  "FEATURE_FLAGS_URL": "https://feature-flags.decentraland.org",
+  "SENTRY_DSN": "https://d0ec8d688f4d9827a270acece39153b0@o4504361728212992.ingest.us.sentry.io/4508858418266112",
+  "FEATURE_FLAGS_INTERVAL": "60000",
+  "BUILDER_SERVER_URL": "https://builder-api.decentraland.today",
+  "INTERCOM_APP_ID": "z0h94kay",
+  "REFERRAL_SERVER_URL": "https://social-api.decentraland.zone/v1",
+  "WEARABLE_PREVIEW_URL": "https://wearable-preview.decentraland.today"
+}
