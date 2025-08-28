@@ -32,7 +32,7 @@ export const useAuthFlow = () => {
 
       if (!targetConfig.skipSetup && account) {
         const profile = await fetchProfile(account)
-        const isNewOnboardingFlowEnabled = true // TODO add flags[FeatureFlagsKeys.NEW_ONBOARDING_FLOW] before merging
+        const isNewOnboardingFlowEnabled = flags[FeatureFlagsKeys.NEW_ONBOARDING_FLOW]
         if ((!profile || (profile && !isProfileComplete(profile))) && !isNewOnboardingFlowEnabled) {
           return navigate(locations.setup(redirectTo, referrer))
         } else if ((!profile || (profile && !isProfileComplete(profile))) && isNewOnboardingFlowEnabled) {

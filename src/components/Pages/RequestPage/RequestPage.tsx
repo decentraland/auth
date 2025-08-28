@@ -85,7 +85,7 @@ export const RequestPage = () => {
 
   const toSetupPage = useCallback(() => {
     const referrer = extractReferrerFromSearchParameters(searchParams)
-    const isNewOnboardingFlowEnabled = true // TODO add flags[FeatureFlagsKeys.NEW_ONBOARDING_FLOW] before merging
+    const isNewOnboardingFlowEnabled = flags[FeatureFlagsKeys.NEW_ONBOARDING_FLOW]
     if (isNewOnboardingFlowEnabled) {
       navigate(locations.avatarSetup(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}`, referrer))
     } else {
