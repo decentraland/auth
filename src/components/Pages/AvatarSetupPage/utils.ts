@@ -10,7 +10,7 @@ import { ContentClient, DeploymentParams, ContentHashes, CreateAvatarMetadataPar
  * @returns Configured content client instance
  */
 const createCatalystClient = (): ContentClient => {
-  const peerUrl = config.get('PEER_URL', 'https://peer.decentraland.org')
+  const peerUrl = config.get('PEER_URL', '')
   return createContentClient({ url: peerUrl + '/content', fetcher: createFetchComponent() })
 }
 
