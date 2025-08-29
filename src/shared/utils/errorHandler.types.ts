@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/naming-convention */
+import { AvatarShape } from '../../components/Pages/AvatarSetupPage/AvatarSetupPage.types'
+
 export interface TrackingData {
   error?: string
   context?: string
@@ -6,7 +9,6 @@ export interface TrackingData {
   requestType?: string
   method?: string
   ethAddress?: string
-  // eslint-disable-next-line @typescript-eslint/naming-convention
   eth_address?: string
   type?: string
   feature?: string
@@ -15,13 +17,13 @@ export interface TrackingData {
   referrer?: string
   connectionType?: string
   isWeb2Wallet?: boolean
-  // eslint-disable-next-line @typescript-eslint/naming-convention
   is_guest?: boolean
   action?: string
   email?: string
   name?: string
   profile?: string
   isGuest?: boolean
+  avatar_shape?: AvatarShape
 }
 
 export interface SentryTags {

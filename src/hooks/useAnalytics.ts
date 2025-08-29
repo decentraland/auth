@@ -1,4 +1,6 @@
+/* eslint-disable @typescript-eslint/naming-convention */
 import { useCallback } from 'react'
+import { AvatarShape } from '../components/Pages/AvatarSetupPage/AvatarSetupPage.types'
 import { TrackingEvents, ClickEvents, ConnectionType } from '../modules/analytics/types'
 import { TRACKING_DELAY } from '../shared/constants'
 import { wait } from '../shared/time'
@@ -34,15 +36,17 @@ export const useAnalytics = () => {
     })
   }, [])
 
-  const trackAvatarEditSuccess = useCallback((data: { ethAddress?: string; isGuest: boolean; profile: string }) => {
-    trackEvent(TrackingEvents.AVATAR_EDIT_SUCCESS, {
-      // eslint-disable-next-line @typescript-eslint/naming-convention
-      eth_address: data.ethAddress,
-      // eslint-disable-next-line @typescript-eslint/naming-convention
-      is_guest: data.isGuest,
-      profile: data.profile
-    })
-  }, [])
+  const trackAvatarEditSuccess = useCallback(
+    (data: { ethAddress?: string; isGuest: boolean; profile: string; avatarShape?: AvatarShape }) => {
+      trackEvent(TrackingEvents.AVATAR_EDIT_SUCCESS, {
+        ethAddress: data.ethAddress,
+        is_guest: data.isGuest,
+        profile: data.profile,
+        avatar_shape: data.avatarShape
+      })
+    },
+    []
+  )
 
   const trackTermsOfServiceSuccess = useCallback((data: { ethAddress?: string; isGuest: boolean; email?: string; name: string }) => {
     trackEvent(TrackingEvents.TERMS_OF_SERVICE_SUCCESS, {

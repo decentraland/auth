@@ -2,9 +2,16 @@ import { EthAddress } from '@dcl/schemas'
 
 export const locations = {
   home: () => '/',
-  login: (redirectTo?: string) => `/login${redirectTo ? `?redirectTo=${encodeURIComponent(redirectTo)}` : ''}`,
+  login: (redirectTo?: string, referrer?: string | null) =>
+    `/login${redirectTo ? `?redirectTo=${encodeURIComponent(redirectTo)}` : ''}${
+      referrer ? `${redirectTo ? '&' : '?'}referrer=${encodeURIComponent(referrer)}` : ''
+    }`,
   setup: (redirectTo?: string, referrer?: string | null) =>
     `/setup${redirectTo ? `?redirectTo=${encodeURIComponent(redirectTo)}` : ''}${
+      referrer ? `${redirectTo ? '&' : '?'}referrer=${encodeURIComponent(referrer)}` : ''
+    }`,
+  avatarSetup: (redirectTo?: string, referrer?: string | null) =>
+    `/avatar-setup${redirectTo ? `?redirectTo=${encodeURIComponent(redirectTo)}` : ''}${
       referrer ? `${redirectTo ? '&' : '?'}referrer=${encodeURIComponent(referrer)}` : ''
     }`
 }
