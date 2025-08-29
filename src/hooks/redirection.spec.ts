@@ -159,4 +159,80 @@ describe('when using the redirection hook', () => {
       expect(result.current.url).toBe('http://localhost/test')
     })
   })
+
+  describe('and the redirect function is called with parameters', () => {
+    beforeEach(() => {
+      mockedUseLocation.mockReturnValue({ search: 'redirectTo=http://localhost/test' } as Location)
+    })
+
+    it('should accept parameters without throwing errors', () => {
+      const { result } = renderHook(() => useAfterLoginRedirection())
+
+      expect(() => {
+        result.current.redirect({ user: '0x123', token: 'abc' })
+      }).not.toThrow()
+    })
+
+    it('should work without parameters', () => {
+      const { result } = renderHook(() => useAfterLoginRedirection())
+
+      expect(() => {
+        result.current.redirect()
+      }).not.toThrow()
+    })
+
+    it('should limit the number of parameters to 10', () => {
+      const { result } = renderHook(() => useAfterLoginRedirection())
+      const manyParams: Record<string, string> = {}
+
+      // Create 15 parameters
+      for (let i = 0; i < 15; i++) {
+        manyParams[`param${i}`] = `value${i}`
+      }
+
+      expect(() => {
+        result.current.redirect(manyParams)
+      }).not.toThrow()
+    })
+
+    it('should sanitize parameter keys with invalid characters', () => {
+      const { result } = renderHook(() => useAfterLoginRedirection())
+      const invalidKeyParams: Record<string, string> = {}
+      invalidKeyParams['user@name'] = 'value'
+      invalidKeyParams['key-with-spaces'] = 'value2'
+
+      expect(() => {
+        result.current.redirect(invalidKeyParams)
+      }).not.toThrow()
+    })
+
+    it('should sanitize parameter values with dangerous characters', () => {
+      const { result } = renderHook(() => useAfterLoginRedirection())
+
+      expect(() => {
+        result.current.redirect({
+          user: '<script>alert("xss")</script>',
+          token: 'javascript:alert("xss")'
+        })
+      }).not.toThrow()
+    })
+
+    it('should handle extremely long parameter values', () => {
+      const { result } = renderHook(() => useAfterLoginRedirection())
+      const longValue = 'a'.repeat(2000)
+
+      expect(() => {
+        result.current.redirect({ user: longValue })
+      }).not.toThrow()
+    })
+
+    it('should handle extremely long parameter keys', () => {
+      const { result } = renderHook(() => useAfterLoginRedirection())
+      const longKey = 'a'.repeat(100)
+
+      expect(() => {
+        result.current.redirect({ [longKey]: 'value' })
+      }).not.toThrow()
+    })
+  })
 })
