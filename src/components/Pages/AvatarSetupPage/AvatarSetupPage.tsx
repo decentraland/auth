@@ -227,7 +227,7 @@ const AvatarSetupPage: React.FC = () => {
             // If the site to be redirect to is a request site, we need to recover the request and sign in
             await signRequest(provider, requestId, account)
           } else {
-            redirect()
+            redirect({ user: account })
           }
         }
       } catch (e) {

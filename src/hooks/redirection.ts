@@ -42,9 +42,49 @@ export const useAfterLoginRedirection = () => {
   }
 
   // Create the redirect function
-  const redirect = useCallback(() => {
-    window.location.href = sanitizedRedirectTo
-  }, [sanitizedRedirectTo])
+  const redirect = useCallback(
+    (params?: Record<string, string>) => {
+      let finalUrl = sanitizedRedirectTo
+
+      if (params) {
+        try {
+          const url = new URL(finalUrl)
+
+          // Add parameters to the URL
+          Object.entries(params).forEach(([key, value]) => {
+            if (key && value && typeof key === 'string' && typeof value === 'string') {
+              url.searchParams.set(key, value)
+            }
+          })
+
+          finalUrl = url.href
+        } catch (error) {
+          console.error('Error processing redirect parameters:', error)
+          // Fallback to original URL without parameters if there's an error
+          finalUrl = sanitizedRedirectTo
+        }
+      }
+
+      // Final security check - ensure the URL is still safe
+      try {
+        const finalUrlObj = new URL(finalUrl)
+
+        // Validate protocol (only http and https allowed)
+        if (finalUrlObj.protocol !== 'http:' && finalUrlObj.protocol !== 'https:') {
+          console.error('Invalid protocol in final URL, redirecting to home')
+          window.location.href = locations.home()
+          return
+        }
+
+        window.location.href = finalUrl
+      } catch (error) {
+        console.error('Final URL validation failed:', error)
+        // Ultimate fallback - redirect to home
+        window.location.href = locations.home()
+      }
+    },
+    [sanitizedRedirectTo]
+  )
 
   return { url: sanitizedRedirectTo, redirect }
 }
