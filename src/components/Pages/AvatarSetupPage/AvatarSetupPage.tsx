@@ -439,12 +439,7 @@ const AvatarSetupPage: React.FC = () => {
       </RightAvatarSection>
 
       <PreloadedWearableContainer isVisible={state.showWearablePreview}>
-        <WearablePreview
-          id="avatar-preview-configurator"
-          unity={true}
-          unityMode={PreviewUnityMode.Configurator}
-          baseUrl="https://wearable-preview-git-feat-update-unity-ren-aade4d-decentraland1.vercel.app"
-        />
+        <WearablePreview id="avatar-preview-configurator" unity={true} unityMode={PreviewUnityMode.Configurator} />
       </PreloadedWearableContainer>
     </MainContainer>
   )
