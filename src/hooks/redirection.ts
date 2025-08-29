@@ -23,7 +23,7 @@ export const useAfterLoginRedirection = () => {
       redirectToURL = new URL('/auth/invalidRedirection', window.location.origin)
     }
     // Check if the hostname matches to prevent open redirects
-    else if (redirectToURL.hostname !== window.location.hostname) {
+    if (redirectToURL.hostname !== window.location.hostname) {
       redirectToURL = new URL('/auth/invalidRedirection', window.location.origin)
     }
 
