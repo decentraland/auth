@@ -136,7 +136,7 @@ describe('deployProfileFromAvatarShape', () => {
   })
 
   describe('when all parameters are valid', () => {
-    it('should successfully deploy profile with correct avatar metadata', async () => {
+    it('should download profile and content from catalyst', async () => {
       await expect(deployProfileFromAvatarShape(mockParams)).resolves.not.toThrow()
 
       expect(mockConfig.get).toHaveBeenCalledWith('PEER_URL', '')
@@ -192,7 +192,7 @@ describe('deployProfileFromAvatarShape', () => {
       expect(mockAuthenticator.signPayload).toHaveBeenCalledWith(mockParams.connectedAccountIdentity, mockBuiltEntity.entityId)
     })
 
-    it('should deploy with correct deployment parameters', async () => {
+    it('should deploy with expected id, files and authChain', async () => {
       await deployProfileFromAvatarShape(mockParams)
 
       expect(mockContentClient.deploy).toHaveBeenCalledWith({

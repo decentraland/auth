@@ -10,7 +10,7 @@ import { ContentClient, DeploymentParams, ContentHashes, CreateAvatarMetadataPar
  * @returns Configured content client instance
  */
 const createCatalystClient = (): ContentClient => {
-  const peerUrl = config.get('PEER_URL', '')
+  const peerUrl = config.get('PEER_URL', 'https://peer.decentraland.org')
   return createContentClient({ url: peerUrl + '/content', fetcher: createFetchComponent() })
 }
 
@@ -95,7 +95,7 @@ const deployProfileFromAvatarShape = async ({
 }: DeploymentParams) => {
   try {
     const client = createCatalystClient()
-    // This is used to fake the body and face256 hashes, it's required in Catalyst for not used anymore
+    // This is used to fake the body and face256 hashes, it's required in Catalyst but not used anymore
     const defaultEntity = (await client.fetchEntitiesByPointers(['default1']))[0]
     const contentHashes = createContentHashesMap(defaultEntity.content)
     const { files, bodyFileName, face256FileName } = await downloadAvatarAssets(client, contentHashes)
