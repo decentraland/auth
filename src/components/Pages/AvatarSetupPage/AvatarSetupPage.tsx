@@ -28,6 +28,9 @@ import {
   InputContainer,
   InputLabel,
   TextInput,
+  ErrorText,
+  ErrorContainer,
+  WarningIcon,
   CheckboxContainer,
   CheckboxRow,
   CheckboxInput,
@@ -75,8 +78,6 @@ const AvatarSetupPage: React.FC = () => {
 
   const [deployError, setDeployError] = useState<string | null>(null)
 
-  const [showErrors, setShowErrors] = useState(false)
-
   const [isProcessingMessage, setIsProcessingMessage] = useState(false)
 
   const [isAvatarParticlesAnimationEnded, setIsAvatarParticlesAnimationEnded] = useState(false)
@@ -96,23 +97,11 @@ const AvatarSetupPage: React.FC = () => {
 
   const characterCount = useMemo(() => state.username.length, [state.username])
 
-  const hasError = useMemo(() => characterCount > MAX_CHARACTERS, [characterCount])
-
-  const nameError = useMemo(() => {
-    if (!state.username.length) {
-      return 'Please enter your username.'
-    }
-    if (state.username.length >= 15) {
-      return 'Sorry, usernames can have a maximum of 15 characters.'
-    }
-    if (state.username.includes(' ')) {
-      return 'Sorry, spaces are not permitted.'
-    }
-    if (!/^[a-zA-Z0-9]+$/.test(state.username)) {
-      return 'Sorry, special characters (!@#$%) are not permitted.'
-    }
-    return ''
+  const isUsernameValid = useMemo(() => {
+    return /^[a-zA-Z0-9]*$/.test(state.username)
   }, [state.username])
+
+  const hasError = useMemo(() => characterCount > MAX_CHARACTERS || !isUsernameValid, [characterCount, isUsernameValid])
 
   const emailError = useMemo(() => {
     if (state.email && !state.email.includes('@')) {
@@ -168,10 +157,8 @@ const AvatarSetupPage: React.FC = () => {
 
       const avatarShape = event.data.payload.result as AvatarShape
 
-      setShowErrors(true)
-
       // If any of the fields has an error, don't submit
-      if (nameError || emailError || agreeError) {
+      if (emailError || agreeError || !isUsernameValid) {
         return
       }
 
@@ -239,7 +226,6 @@ const AvatarSetupPage: React.FC = () => {
       }
     },
     [
-      nameError,
       emailError,
       agreeError,
       state.username,
@@ -351,7 +337,7 @@ const AvatarSetupPage: React.FC = () => {
         </WelcomeContainer>
 
         <InputContainer>
-          <InputLabel variant="h5">Username*</InputLabel>
+          <InputLabel variant="h5">Username{state.isEmailInherited ? '' : '*'}</InputLabel>
           <TextInput
             variant="outlined"
             placeholder="Enter your username"
@@ -359,7 +345,17 @@ const AvatarSetupPage: React.FC = () => {
             onChange={handleUsernameChange}
             hasError={hasError}
           />
-          <CharacterCounterComponent characterCount={characterCount} maxCharacters={MAX_CHARACTERS} hasError={hasError} />
+          <CharacterCounterComponent
+            characterCount={characterCount}
+            maxCharacters={MAX_CHARACTERS}
+            hasError={characterCount > MAX_CHARACTERS}
+          />
+          {!isUsernameValid && (
+            <ErrorContainer>
+              <WarningIcon />
+              <ErrorText>Only letters and numbers are supported</ErrorText>
+            </ErrorContainer>
+          )}
         </InputContainer>
 
         {!state.isEmailInherited && (
@@ -372,7 +368,7 @@ const AvatarSetupPage: React.FC = () => {
               onChange={handleEmailChange}
               hasError={state.hasEmailError}
             />
-            <EmailDescription>Subscribe to Decentraland's newsletter for updates on features, events, contests, and more.</EmailDescription>
+            <EmailDescription>Subscribe to newsletter for updates on features, events, contests, and more.</EmailDescription>
           </InputContainer>
         )}
 
@@ -396,26 +392,11 @@ const AvatarSetupPage: React.FC = () => {
         <ContinueButton
           variant="contained"
           onClick={handleContinueClick}
-          disabled={!!nameError || !!emailError || !!agreeError || !state.username || !state.isTermsChecked || deploying}
+          disabled={!!hasError || !isUsernameValid || !!emailError || !!agreeError || !state.username || !state.isTermsChecked || deploying}
         >
           {deploying ? 'DEPLOYING...' : 'CUSTOMIZE MY AVATAR'}
         </ContinueButton>
 
-        {showErrors && nameError && (
-          <InputLabel color="error" sx={{ mt: 1, fontSize: '14px' }}>
-            {nameError}
-          </InputLabel>
-        )}
-        {showErrors && emailError && (
-          <InputLabel color="error" sx={{ mt: 1, fontSize: '14px' }}>
-            {emailError}
-          </InputLabel>
-        )}
-        {showErrors && agreeError && (
-          <InputLabel color="error" sx={{ mt: 1, fontSize: '14px' }}>
-            {agreeError}
-          </InputLabel>
-        )}
         {deployError && (
           <InputLabel color="error" sx={{ mt: 2, fontSize: '14px' }}>
             An error occurred while creating your profile: {deployError}
