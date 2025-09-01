@@ -101,7 +101,7 @@ const AvatarSetupPage: React.FC = () => {
     return /^[a-zA-Z0-9]*$/.test(state.username)
   }, [state.username])
 
-  const hasError = useMemo(() => characterCount > MAX_CHARACTERS || !isUsernameValid, [characterCount, isUsernameValid])
+  const hasUsernameCharacterCount = useMemo(() => characterCount > MAX_CHARACTERS || !isUsernameValid, [characterCount, isUsernameValid])
 
   const emailError = useMemo(() => {
     if (state.email && !state.email.includes('@')) {
@@ -343,7 +343,7 @@ const AvatarSetupPage: React.FC = () => {
             placeholder="Enter your username"
             value={state.username}
             onChange={handleUsernameChange}
-            hasError={hasError}
+            hasError={hasUsernameCharacterCount}
           />
           <CharacterCounterComponent
             characterCount={characterCount}
@@ -392,7 +392,15 @@ const AvatarSetupPage: React.FC = () => {
         <ContinueButton
           variant="contained"
           onClick={handleContinueClick}
-          disabled={!!hasError || !isUsernameValid || !!emailError || !!agreeError || !state.username || !state.isTermsChecked || deploying}
+          disabled={
+            !!hasUsernameCharacterCount ||
+            !isUsernameValid ||
+            !!emailError ||
+            !!agreeError ||
+            !state.username ||
+            !state.isTermsChecked ||
+            deploying
+          }
         >
           {deploying ? 'DEPLOYING...' : 'CUSTOMIZE MY AVATAR'}
         </ContinueButton>
