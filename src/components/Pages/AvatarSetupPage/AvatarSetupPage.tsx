@@ -101,7 +101,7 @@ const AvatarSetupPage: React.FC = () => {
     return /^[a-zA-Z0-9]*$/.test(state.username)
   }, [state.username])
 
-  const hasUsernameCharacterCount = useMemo(() => characterCount > MAX_CHARACTERS || !isUsernameValid, [characterCount, isUsernameValid])
+  const hasValidUsernameCharacterCount = useMemo(() => characterCount > MAX_CHARACTERS || !isUsernameValid, [characterCount, isUsernameValid])
 
   const emailError = useMemo(() => {
     if (state.email && !state.email.includes('@')) {
