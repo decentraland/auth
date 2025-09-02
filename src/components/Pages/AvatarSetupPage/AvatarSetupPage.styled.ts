@@ -1,3 +1,4 @@
+import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined'
 import Lottie from 'lottie-react'
 import { brand, neutral } from 'decentraland-ui2/dist/theme/colors'
 import { Logo, Box, styled, Typography, TextField, Checkbox, FormControlLabel, Button, Link } from 'decentraland-ui2'
@@ -161,6 +162,23 @@ const TextInput = styled(TextField)<{ hasError?: boolean }>(({ hasError }) => ({
   }
 }))
 
+const ErrorContainer = styled(Box)({
+  display: 'flex',
+  alignItems: 'center',
+  gap: '4px'
+})
+
+const ErrorText = styled('span')({
+  color: 'rgba(224, 0, 0, 1)',
+  fontSize: '14px'
+})
+
+const WarningIcon = styled(WarningAmberOutlinedIcon)({
+  color: 'rgba(224, 0, 0, 1)',
+  height: '15px',
+  width: '15px'
+})
+
 const EmailDescription = styled(Typography)({
   fontSize: '14px',
   lineHeight: '100%',
@@ -271,6 +289,9 @@ export {
   InputContainer,
   InputLabel,
   TextInput,
+  ErrorContainer,
+  ErrorText,
+  WarningIcon,
   EmailDescription,
   CheckboxContainer,
   CheckboxRow,
