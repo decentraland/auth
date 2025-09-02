@@ -101,7 +101,10 @@ const AvatarSetupPage: React.FC = () => {
     return /^[a-zA-Z0-9]*$/.test(state.username)
   }, [state.username])
 
-  const hasValidUsernameCharacterCount = useMemo(() => characterCount > MAX_CHARACTERS || !isUsernameValid, [characterCount, isUsernameValid])
+  const hasValidUsernameCharacterCount = useMemo(
+    () => characterCount > MAX_CHARACTERS || !isUsernameValid,
+    [characterCount, isUsernameValid]
+  )
 
   const emailError = useMemo(() => {
     if (state.email && !state.email.includes('@')) {
@@ -343,7 +346,7 @@ const AvatarSetupPage: React.FC = () => {
             placeholder="Enter your username"
             value={state.username}
             onChange={handleUsernameChange}
-            hasError={hasUsernameCharacterCount}
+            hasError={hasValidUsernameCharacterCount}
           />
           <CharacterCounterComponent
             characterCount={characterCount}
@@ -393,7 +396,7 @@ const AvatarSetupPage: React.FC = () => {
           variant="contained"
           onClick={handleContinueClick}
           disabled={
-            !!hasUsernameCharacterCount ||
+            !!hasValidUsernameCharacterCount ||
             !isUsernameValid ||
             !!emailError ||
             !!agreeError ||
