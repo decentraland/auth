@@ -2,6 +2,7 @@ import { useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { ethers, BrowserProvider, formatEther } from 'ethers'
 import Icon from 'semantic-ui-react/dist/commonjs/elements/Icon/Icon'
+import { useAdvancedUserAgentData } from '@dcl/hooks'
 import { ChainId } from '@dcl/schemas'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
@@ -78,6 +79,7 @@ export const RequestPage = () => {
   const [targetConfig, targetConfigId] = useTargetConfig()
   const isUserUsingWeb2Wallet = !!provider?.isMagic
   const authServerClient = useRef(createAuthServerWsClient())
+  const [isLoadingUserAgentData, userAgentData] = useAdvancedUserAgentData()
   // Goes to the login page where the user will have to connect a wallet.
   const toLoginPage = useCallback(() => {
     navigate(locations.login(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}`))
@@ -86,12 +88,14 @@ export const RequestPage = () => {
   const toSetupPage = useCallback(() => {
     const referrer = extractReferrerFromSearchParameters(searchParams)
     const isNewOnboardingFlowEnabled = flags[FeatureFlagsKeys.NEW_ONBOARDING_FLOW]
-    if (isNewOnboardingFlowEnabled) {
+    const isIos = !isLoadingUserAgentData && (userAgentData?.mobile || userAgentData?.tablet) && userAgentData.os.name === 'iOS'
+    const isAvatarSetupFlowAllowed = isNewOnboardingFlowEnabled && !isIos
+    if (isAvatarSetupFlowAllowed) {
       navigate(locations.avatarSetup(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}`, referrer))
     } else {
       navigate(locations.setup(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}`, referrer))
     }
-  }, [requestId, flags[FeatureFlagsKeys.NEW_ONBOARDING_FLOW], searchParams])
+  }, [requestId, flags[FeatureFlagsKeys.NEW_ONBOARDING_FLOW], searchParams, isLoadingUserAgentData, userAgentData])
 
   useEffect(() => {
     // Wait for the user to be connected.
