@@ -437,6 +437,7 @@ export const SetupPage = () => {
 
               {isMobile && (
                 <div className={styles.mobilePreviewContainer}>
+                  <div className={styles.mobilePreviewOverlay}></div>
                   <CustomWearablePreview profile={profile} />
                 </div>
               )}
