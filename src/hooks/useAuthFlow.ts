@@ -1,4 +1,5 @@
 import { useCallback, useContext } from 'react'
+import { useAdvancedUserAgentData } from '@dcl/hooks'
 import { ProviderType } from '@dcl/schemas'
 import { connection } from 'decentraland-connect'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../components/FeatureFlagsProvider'
@@ -14,6 +15,7 @@ export const useAuthFlow = () => {
   const { url: redirectTo } = useAfterLoginRedirection()
   const { flags, initialized: flagInitialized } = useContext(FeatureFlagsContext)
   const [targetConfig] = useTargetConfig()
+  const [isLoadingUserAgentData, userAgentData] = useAdvancedUserAgentData()
 
   const connectToMagic = useCallback(async () => {
     if (!flagInitialized) {
@@ -33,17 +35,19 @@ export const useAuthFlow = () => {
       if (!targetConfig.skipSetup && account) {
         const profile = await fetchProfile(account)
         const isNewOnboardingFlowEnabled = flags[FeatureFlagsKeys.NEW_ONBOARDING_FLOW]
+        const isIos = !isLoadingUserAgentData && (userAgentData?.mobile || userAgentData?.tablet) && userAgentData.os.name === 'iOS'
+        const isAvatarSetupFlowAllowed = isNewOnboardingFlowEnabled && !isIos
         const isProfileIncomplete = !profile || !isProfileComplete(profile)
-        if (isProfileIncomplete && !isNewOnboardingFlowEnabled) {
+        if (isProfileIncomplete && !isAvatarSetupFlowAllowed) {
           return navigate(locations.setup(redirectTo, referrer))
-        } else if (isProfileIncomplete && isNewOnboardingFlowEnabled) {
+        } else if (isProfileIncomplete && isAvatarSetupFlowAllowed) {
           return navigate(locations.avatarSetup(redirectTo, referrer))
         }
       }
 
       redirect()
     },
-    [targetConfig.skipSetup, flags, navigate, redirectTo, flagInitialized]
+    [targetConfig.skipSetup, flags, navigate, redirectTo, flagInitialized, isLoadingUserAgentData, userAgentData]
   )
 
   return {
