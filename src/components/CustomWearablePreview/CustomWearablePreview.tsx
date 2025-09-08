@@ -1,4 +1,5 @@
 import { useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { useAdvancedUserAgentData } from '@dcl/hooks'
 import { PreviewEmote } from '@dcl/schemas'
 import { Env } from '@dcl/ui-env'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
@@ -15,6 +16,11 @@ export const CustomWearablePreview = (props: Props) => {
 
   useEffect(() => setIsLoading(true), [props.profile])
   const isUnityWearablePreviewEnabled = flags[FeatureFlagsKeys.UNITY_WEARABLE_PREVIEW]
+  const [isLoadingUserAgentData, userAgentData] = useAdvancedUserAgentData()
+  const isIos = useMemo(
+    () => !isLoadingUserAgentData && (userAgentData?.mobile || userAgentData?.tablet) && userAgentData.os.name === 'iOS',
+    [isLoadingUserAgentData, userAgentData]
+  )
 
   const platformDefinition = useMemo(() => {
     if (isUnityWearablePreviewEnabled) {
@@ -65,7 +71,7 @@ export const CustomWearablePreview = (props: Props) => {
         lockBeta={true}
         panning={false}
         profile={props.profile}
-        unity={isUnityWearablePreviewEnabled}
+        unity={isUnityWearablePreviewEnabled && !isIos}
         unityMode="authentication"
         onLoad={handleOnLoad}
       />
