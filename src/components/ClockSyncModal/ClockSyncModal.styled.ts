@@ -1,4 +1,4 @@
-import { Box, styled, Typography } from 'decentraland-ui2'
+import { Box, Button, styled, Typography } from 'decentraland-ui2'
 
 const Content = styled(Box)(({ theme }) => ({
   display: 'flex',
@@ -38,7 +38,7 @@ const Actions = styled(Box)(({ theme }) => ({
   justifyContent: 'center'
 }))
 
-const ContinueButton = styled(Box)({
+const ContinueButton = styled(Button)({
   minWidth: '120px'
 })
 

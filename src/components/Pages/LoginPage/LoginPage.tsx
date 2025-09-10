@@ -91,6 +91,26 @@ export const LoginPage = () => {
     return ''
   }, [redirectTo])
 
+  const checkClockSynchronization = useCallback(async (): Promise<boolean> => {
+    try {
+      const httpClient = createAuthServerHttpClient()
+      const healthData = await httpClient.checkHealth()
+      const isSync = isClockSynchronized(healthData.timestamp)
+
+      if (!isSync) {
+        setShowConnectionModal(false)
+        setShowClockSyncModal(true)
+        return false
+      }
+
+      return true
+    } catch (error) {
+      handleError(error, 'Error checking clock synchronization')
+      // If we can't check the clock, proceed with normal flow
+      return true
+    }
+  }, [])
+
   const handleOnConnect = useCallback(
     async (connectionType: ConnectionOptionType) => {
       if (!flagInitialized) {
@@ -159,7 +179,8 @@ export const LoginPage = () => {
       trackLoginSuccess,
       checkProfileAndRedirect,
       redirect,
-      flagInitialized
+      flagInitialized,
+      checkClockSynchronization
     ]
   )
 
@@ -174,26 +195,6 @@ export const LoginPage = () => {
       handleOnConnect(currentConnectionType)
     }
   }, [currentConnectionType, handleOnConnect])
-
-  const checkClockSynchronization = useCallback(async (): Promise<boolean> => {
-    try {
-      const httpClient = createAuthServerHttpClient()
-      const healthData = await httpClient.checkHealth()
-      const isSync = isClockSynchronized(healthData.timestamp)
-
-      if (!isSync) {
-        setShowConnectionModal(false)
-        setShowClockSyncModal(true)
-        return false
-      }
-
-      return true
-    } catch (error) {
-      handleError(error, 'Error checking clock synchronization')
-      // If we can't check the clock, proceed with normal flow
-      return true
-    }
-  }, [])
 
   const handleClockSyncContinue = useCallback(async () => {
     setShowClockSyncModal(false)
