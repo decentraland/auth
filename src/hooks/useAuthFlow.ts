@@ -16,7 +16,7 @@ export const useAuthFlow = () => {
   const { flags, initialized: flagInitialized } = useContext(FeatureFlagsContext)
   const [targetConfig] = useTargetConfig()
   const [isLoadingUserAgentData, userAgentData] = useAdvancedUserAgentData()
-
+  console.log(' >>> userAgentData: ', userAgentData)
   const connectToMagic = useCallback(async () => {
     if (!flagInitialized) {
       return undefined
@@ -36,7 +36,8 @@ export const useAuthFlow = () => {
         const profile = await fetchProfile(account)
         const isNewOnboardingFlowEnabled = flags[FeatureFlagsKeys.NEW_ONBOARDING_FLOW]
         const isIos = !isLoadingUserAgentData && (userAgentData?.mobile || userAgentData?.tablet) && userAgentData.os.name === 'iOS'
-        const isAvatarSetupFlowAllowed = isNewOnboardingFlowEnabled && !isIos
+        const isSafari = !isLoadingUserAgentData && userAgentData?.browser.name === 'Safari'
+        const isAvatarSetupFlowAllowed = isNewOnboardingFlowEnabled && !isIos && !isSafari
         const isProfileIncomplete = !profile || !isProfileComplete(profile)
         if (isProfileIncomplete && !isAvatarSetupFlowAllowed) {
           return navigate(locations.setup(redirectTo, referrer))
