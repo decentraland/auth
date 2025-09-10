@@ -35,7 +35,7 @@ export const useAuthFlow = () => {
       if (targetConfig && !targetConfig.skipSetup && account) {
         const profile = await fetchProfile(account)
         const isNewOnboardingFlowEnabled = flags[FeatureFlagsKeys.NEW_ONBOARDING_FLOW]
-        const isIos = !isLoadingUserAgentData && (userAgentData?.mobile || userAgentData?.tablet) && userAgentData.os.name === 'iOS'
+        const isIos = userAgentData?.os.name === 'iOS'
         const isSafari = !isLoadingUserAgentData && userAgentData?.browser.name === 'Safari'
         const isAvatarSetupFlowAllowed = isNewOnboardingFlowEnabled && !isIos && !isSafari
         const isProfileIncomplete = !profile || !isProfileComplete(profile)

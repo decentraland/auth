@@ -20,7 +20,7 @@ export const CustomWearablePreview = (props: Props) => {
   const isUnityWearablePreviewAllowed = useMemo(() => {
     if (isLoadingUserAgentData) return false
 
-    const isIos = (userAgentData?.mobile || userAgentData?.tablet) && userAgentData.os.name === 'iOS'
+    const isIos = userAgentData?.os.name === 'iOS'
     const isSafari = userAgentData?.browser.name === 'Safari'
 
     return isUnityWearablePreviewEnabled && !isIos && !isSafari
