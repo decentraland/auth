@@ -32,11 +32,12 @@ export const useAuthFlow = () => {
         return undefined
       }
 
-      if (!targetConfig.skipSetup && account) {
+      if (targetConfig && !targetConfig.skipSetup && account) {
         const profile = await fetchProfile(account)
         const isNewOnboardingFlowEnabled = flags[FeatureFlagsKeys.NEW_ONBOARDING_FLOW]
-        const isIos = !isLoadingUserAgentData && (userAgentData?.mobile || userAgentData?.tablet) && userAgentData.os.name === 'iOS'
-        const isAvatarSetupFlowAllowed = isNewOnboardingFlowEnabled && !isIos
+        const isIos = userAgentData?.os.name === 'iOS'
+        const isSafari = !isLoadingUserAgentData && userAgentData?.browser.name === 'Safari'
+        const isAvatarSetupFlowAllowed = isNewOnboardingFlowEnabled && !isIos && !isSafari
         const isProfileIncomplete = !profile || !isProfileComplete(profile)
         if (isProfileIncomplete && !isAvatarSetupFlowAllowed) {
           return navigate(locations.setup(redirectTo, referrer))
@@ -47,7 +48,7 @@ export const useAuthFlow = () => {
 
       redirect()
     },
-    [targetConfig.skipSetup, flags, navigate, redirectTo, flagInitialized, isLoadingUserAgentData, userAgentData]
+    [targetConfig?.skipSetup, flags, navigate, redirectTo, flagInitialized, isLoadingUserAgentData, userAgentData]
   )
 
   return {

@@ -3,7 +3,7 @@ import { useAdvancedUserAgentData } from '@dcl/hooks'
 import { PreviewEmote } from '@dcl/schemas'
 import { Env } from '@dcl/ui-env'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
-import { WearablePreview } from 'decentraland-ui/dist/components/WearablePreview/WearablePreview'
+import { WearablePreview, PreviewUnityMode } from 'decentraland-ui2'
 import { config } from '../../modules/config'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../FeatureFlagsProvider/FeatureFlagsProvider.types'
 import { Props } from './CustomWearablePreview.types'
@@ -17,13 +17,17 @@ export const CustomWearablePreview = (props: Props) => {
   useEffect(() => setIsLoading(true), [props.profile])
   const isUnityWearablePreviewEnabled = flags[FeatureFlagsKeys.UNITY_WEARABLE_PREVIEW]
   const [isLoadingUserAgentData, userAgentData] = useAdvancedUserAgentData()
-  const isIos = useMemo(
-    () => !isLoadingUserAgentData && (userAgentData?.mobile || userAgentData?.tablet) && userAgentData.os.name === 'iOS',
-    [isLoadingUserAgentData, userAgentData]
-  )
+  const isUnityWearablePreviewAllowed = useMemo(() => {
+    if (isLoadingUserAgentData) return false
+
+    const isIos = userAgentData?.os.name === 'iOS'
+    const isSafari = userAgentData?.browser.name === 'Safari'
+
+    return isUnityWearablePreviewEnabled && !isIos && !isSafari
+  }, [isLoadingUserAgentData, userAgentData, isUnityWearablePreviewEnabled])
 
   const platformDefinition = useMemo(() => {
-    if (isUnityWearablePreviewEnabled) {
+    if (isUnityWearablePreviewAllowed) {
       return ''
     }
 
@@ -50,7 +54,7 @@ export const CustomWearablePreview = (props: Props) => {
         }
       })
     )
-  }, [isUnityWearablePreviewEnabled])
+  }, [isUnityWearablePreviewAllowed])
 
   const handleOnLoad = useCallback(() => setIsLoading(false), [])
 
@@ -71,10 +75,11 @@ export const CustomWearablePreview = (props: Props) => {
         lockBeta={true}
         panning={false}
         profile={props.profile}
-        unity={isUnityWearablePreviewEnabled && !isIos}
-        unityMode="authentication"
+        unity={isUnityWearablePreviewAllowed}
+        unityMode={PreviewUnityMode.Authentication}
         onLoad={handleOnLoad}
       />
+
       {isLoading ? <Loader active={true} size="huge" /> : null}
     </div>
   )

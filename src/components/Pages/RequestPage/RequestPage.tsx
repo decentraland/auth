@@ -88,8 +88,9 @@ export const RequestPage = () => {
   const toSetupPage = useCallback(() => {
     const referrer = extractReferrerFromSearchParameters(searchParams)
     const isNewOnboardingFlowEnabled = flags[FeatureFlagsKeys.NEW_ONBOARDING_FLOW]
-    const isIos = !isLoadingUserAgentData && (userAgentData?.mobile || userAgentData?.tablet) && userAgentData.os.name === 'iOS'
-    const isAvatarSetupFlowAllowed = isNewOnboardingFlowEnabled && !isIos
+    const isIos = userAgentData?.os.name === 'iOS'
+    const isSafari = !isLoadingUserAgentData && userAgentData?.browser.name === 'Safari'
+    const isAvatarSetupFlowAllowed = isNewOnboardingFlowEnabled && !isIos && !isSafari
     if (isAvatarSetupFlowAllowed) {
       navigate(locations.avatarSetup(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}`, referrer))
     } else {
