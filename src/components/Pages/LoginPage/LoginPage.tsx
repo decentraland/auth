@@ -125,9 +125,7 @@ export const LoginPage = () => {
           const search = new URLSearchParams(window.location.search)
           const referrer = extractReferrerFromSearchParameters(search)
 
-          // Check clock synchronization before proceeding
           const isClockSync = await checkClockSynchronization()
-          console.log('isClockSync', isClockSync)
 
           if (isClockSync) {
             await checkProfileAndRedirect(connectionData.account ?? '', referrer, () => {
