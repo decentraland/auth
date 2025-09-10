@@ -17,9 +17,12 @@ import { useAnalytics } from '../../../hooks/useAnalytics'
 import { useAuthFlow } from '../../../hooks/useAuthFlow'
 import { ClickEvents, ConnectionType } from '../../../modules/analytics/types'
 import { config } from '../../../modules/config'
+import { createAuthServerHttpClient } from '../../../shared/auth'
 import { isErrorWithName } from '../../../shared/errors'
 import { extractReferrerFromSearchParameters } from '../../../shared/locations'
+import { isClockSynchronized } from '../../../shared/utils/clockSync'
 import { handleError } from '../../../shared/utils/errorHandler'
+import { ClockSyncModal } from '../../ClockSyncModal'
 import { Connection, ConnectionOptionType } from '../../Connection'
 import { ConnectionModal, ConnectionModalState } from '../../ConnectionModal'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
@@ -41,6 +44,7 @@ export const LoginPage = () => {
   const [showLearnMore, setShowLearnMore] = useState(false)
   const [showMagicLearnMore, setShowMagicLearnMore] = useState(false)
   const [showConnectionModal, setShowConnectionModal] = useState(false)
+  const [showClockSyncModal, setShowClockSyncModal] = useState(false)
   const [currentConnectionType, setCurrentConnectionType] = useState<ConnectionOptionType>()
   const { url: redirectTo, redirect } = useAfterLoginRedirection()
   const { initialized: flagInitialized, flags } = useContext(FeatureFlagsContext)
@@ -87,6 +91,26 @@ export const LoginPage = () => {
     return ''
   }, [redirectTo])
 
+  const checkClockSynchronization = useCallback(async (): Promise<boolean> => {
+    try {
+      const httpClient = createAuthServerHttpClient()
+      const healthData = await httpClient.checkHealth()
+      const isSync = isClockSynchronized(healthData.timestamp)
+
+      if (!isSync) {
+        setShowConnectionModal(false)
+        setShowClockSyncModal(true)
+        return false
+      }
+
+      return true
+    } catch (error) {
+      handleError(error, 'Error checking clock synchronization')
+      // If we can't check the clock, proceed with normal flow
+      return true
+    }
+  }, [])
+
   const handleOnConnect = useCallback(
     async (connectionType: ConnectionOptionType) => {
       if (!flagInitialized) {
@@ -121,10 +145,14 @@ export const LoginPage = () => {
           const search = new URLSearchParams(window.location.search)
           const referrer = extractReferrerFromSearchParameters(search)
 
-          await checkProfileAndRedirect(connectionData.account ?? '', referrer, () => {
-            redirect()
-            setShowConnectionModal(false)
-          })
+          const isClockSync = await checkClockSynchronization()
+
+          if (isClockSync) {
+            await checkProfileAndRedirect(connectionData.account ?? '', referrer, () => {
+              redirect()
+              setShowConnectionModal(false)
+            })
+          }
         }
       } catch (error) {
         handleError(error, 'Error during login connection', {
@@ -151,7 +179,8 @@ export const LoginPage = () => {
       trackLoginSuccess,
       checkProfileAndRedirect,
       redirect,
-      flagInitialized
+      flagInitialized,
+      checkClockSynchronization
     ]
   )
 
@@ -166,6 +195,26 @@ export const LoginPage = () => {
       handleOnConnect(currentConnectionType)
     }
   }, [currentConnectionType, handleOnConnect])
+
+  const handleClockSyncContinue = useCallback(async () => {
+    setShowClockSyncModal(false)
+
+    // Get the current connection data and proceed with profile check
+    if (currentConnectionType) {
+      try {
+        const connectionData = await connectToProvider(currentConnectionType)
+        const search = new URLSearchParams(window.location.search)
+        const referrer = extractReferrerFromSearchParameters(search)
+
+        await checkProfileAndRedirect(connectionData.account ?? '', referrer, () => {
+          redirect()
+          setShowConnectionModal(false)
+        })
+      } catch (error) {
+        handleError(error, 'Error during clock sync continue flow')
+      }
+    }
+  }, [currentConnectionType, checkProfileAndRedirect, redirect])
 
   useEffect(() => {
     const backgroundInterval = setInterval(() => {
@@ -190,6 +239,7 @@ export const LoginPage = () => {
         <>
           <WalletInformationModal open={showLearnMore} onClose={handleCloseLearnMore} />
           <MagicInformationModal open={showMagicLearnMore} onClose={handleToggleMagicInfo} />
+          <ClockSyncModal open={showClockSyncModal} onContinue={handleClockSyncContinue} onClose={handleClockSyncContinue} />
           <ConnectionModal
             open={showConnectionModal}
             state={connectionModalState}

@@ -26,7 +26,7 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
     throw new Error('Unknown error')
   }
 
-  const sendSuccessfulOutcome = async (requestId: string, sender: string, result: any): Promise<void> => {
+  const sendSuccessfulOutcome = async (requestId: string, sender: string, result: unknown): Promise<void> => {
     try {
       const response = await fetch(baseUrl + '/v2/requests/' + requestId + '/outcome', {
         method: 'POST',
@@ -155,5 +155,23 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
     }
   }
 
-  return { recover, sendSuccessfulOutcome, sendFailedOutcome, notifyRequestNeedsValidation }
+  const checkHealth = async (): Promise<{ timestamp: number }> => {
+    try {
+      const response = await fetch(baseUrl + '/health/live', {
+        method: 'GET'
+      })
+
+      if (!response.ok) {
+        throw new Error(`Health check failed with status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      return data
+    } catch (e) {
+      handleError(e, 'Error checking auth server health')
+      throw e
+    }
+  }
+
+  return { recover, sendSuccessfulOutcome, sendFailedOutcome, notifyRequestNeedsValidation, checkHealth }
 }
