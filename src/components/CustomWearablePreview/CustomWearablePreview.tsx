@@ -21,6 +21,10 @@ export const CustomWearablePreview = (props: Props) => {
     () => !isLoadingUserAgentData && (userAgentData?.mobile || userAgentData?.tablet) && userAgentData.os.name === 'iOS',
     [isLoadingUserAgentData, userAgentData]
   )
+  const isSafari = useMemo(
+    () => !isLoadingUserAgentData && userAgentData?.browser.name === 'Safari',
+    [isLoadingUserAgentData, userAgentData]
+  )
 
   const platformDefinition = useMemo(() => {
     if (isUnityWearablePreviewEnabled) {
@@ -71,7 +75,7 @@ export const CustomWearablePreview = (props: Props) => {
         lockBeta={true}
         panning={false}
         profile={props.profile}
-        unity={isUnityWearablePreviewEnabled && !isIos}
+        unity={isUnityWearablePreviewEnabled && !isIos && !isSafari}
         unityMode="authentication"
         onLoad={handleOnLoad}
       />
