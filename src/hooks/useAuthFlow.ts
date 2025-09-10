@@ -16,7 +16,7 @@ export const useAuthFlow = () => {
   const { flags, initialized: flagInitialized } = useContext(FeatureFlagsContext)
   const [targetConfig] = useTargetConfig()
   const [isLoadingUserAgentData, userAgentData] = useAdvancedUserAgentData()
-  console.log(' >>> userAgentData: ', userAgentData)
+
   const connectToMagic = useCallback(async () => {
     if (!flagInitialized) {
       return undefined
