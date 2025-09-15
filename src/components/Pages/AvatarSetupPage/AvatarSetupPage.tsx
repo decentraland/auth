@@ -377,7 +377,11 @@ const AvatarSetupPage: React.FC = () => {
 
         <CheckboxContainer>
           {state.isEmailInherited && (
-            <CheckboxRow id="marketing" label="I want to receive marketing and updates" control={<CheckboxInput />} />
+            <CheckboxRow
+              id="marketing"
+              label="Subscribe to newsletter for updates on features, events, contests, and more."
+              control={<CheckboxInput />}
+            />
           )}
           <CheckboxRow
             id="terms"
