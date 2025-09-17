@@ -9,8 +9,8 @@ export const SignInComplete = () => {
   return (
     <Container>
       <div className={styles.logo}></div>
-      <div className={styles.title}>Your account is ready!</div>
-      <div className={styles.description}>Return to the {targetConfig.explorerText} and enjoy Decentraland.</div>
+      <div className={styles.title}>Login Successful!</div>
+      <div className={styles.description}>Return to the {targetConfig.explorerText} to jump in!</div>
       <CloseWindow />
     </Container>
   )
