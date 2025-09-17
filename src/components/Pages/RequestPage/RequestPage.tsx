@@ -2,7 +2,6 @@ import { useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { ethers, BrowserProvider, formatEther } from 'ethers'
 import Icon from 'semantic-ui-react/dist/commonjs/elements/Icon/Icon'
-import { useAdvancedUserAgentData } from '@dcl/hooks'
 import { ChainId } from '@dcl/schemas'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
@@ -25,6 +24,7 @@ import { isErrorWithMessage, isRpcError } from '../../../shared/errors'
 import { extractReferrerFromSearchParameters, locations } from '../../../shared/locations'
 import { isProfileComplete } from '../../../shared/profile'
 import { handleError } from '../../../shared/utils/errorHandler'
+import { checkWebGpuSupport } from '../../../shared/utils/webgpu'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
 import { Container } from './Container'
 import { DeniedSignIn } from './Views/DeniedSignIn'
@@ -79,24 +79,23 @@ export const RequestPage = () => {
   const [targetConfig, targetConfigId] = useTargetConfig()
   const isUserUsingWeb2Wallet = !!provider?.isMagic
   const authServerClient = useRef(createAuthServerWsClient())
-  const [isLoadingUserAgentData, userAgentData] = useAdvancedUserAgentData()
+
   // Goes to the login page where the user will have to connect a wallet.
   const toLoginPage = useCallback(() => {
     navigate(locations.login(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}`))
   }, [requestId])
 
-  const toSetupPage = useCallback(() => {
+  const toSetupPage = useCallback(async () => {
     const referrer = extractReferrerFromSearchParameters(searchParams)
     const isNewOnboardingFlowEnabled = flags[FeatureFlagsKeys.NEW_ONBOARDING_FLOW]
-    const isIos = userAgentData?.os.name === 'iOS'
-    const isSafari = !isLoadingUserAgentData && userAgentData?.browser.name === 'Safari'
-    const isAvatarSetupFlowAllowed = isNewOnboardingFlowEnabled && !isIos && !isSafari
+    const hasWebGPU = await checkWebGpuSupport()
+    const isAvatarSetupFlowAllowed = isNewOnboardingFlowEnabled && hasWebGPU
     if (isAvatarSetupFlowAllowed) {
       navigate(locations.avatarSetup(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}`, referrer))
     } else {
       navigate(locations.setup(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}`, referrer))
     }
-  }, [requestId, flags[FeatureFlagsKeys.NEW_ONBOARDING_FLOW], searchParams, isLoadingUserAgentData, userAgentData])
+  }, [requestId, flags[FeatureFlagsKeys.NEW_ONBOARDING_FLOW], searchParams])
 
   useEffect(() => {
     // Wait for the user to be connected.
@@ -125,7 +124,7 @@ export const RequestPage = () => {
       if ((!targetConfig.skipSetup && !profile) || (profile && !isProfileComplete(profile))) {
         // Goes to the setup page if the connected account does not have a profile yet.
         console.log("There's no profile or the profile is not complete but the user is logged in, going to setup page")
-        toSetupPage()
+        await toSetupPage()
         return
       }
 

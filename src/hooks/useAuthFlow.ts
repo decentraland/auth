@@ -1,11 +1,11 @@
 import { useCallback, useContext } from 'react'
-import { useAdvancedUserAgentData } from '@dcl/hooks'
 import { ProviderType } from '@dcl/schemas'
 import { connection } from 'decentraland-connect'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../components/FeatureFlagsProvider'
 import { fetchProfile } from '../modules/profile'
 import { locations } from '../shared/locations'
 import { isProfileComplete } from '../shared/profile'
+import { checkWebGpuSupport } from '../shared/utils/webgpu'
 import { useNavigateWithSearchParams } from './navigation'
 import { useAfterLoginRedirection } from './redirection'
 import { useTargetConfig } from './targetConfig'
@@ -15,7 +15,6 @@ export const useAuthFlow = () => {
   const { url: redirectTo } = useAfterLoginRedirection()
   const { flags, initialized: flagInitialized } = useContext(FeatureFlagsContext)
   const [targetConfig] = useTargetConfig()
-  const [isLoadingUserAgentData, userAgentData] = useAdvancedUserAgentData()
 
   const connectToMagic = useCallback(async () => {
     if (!flagInitialized) {
@@ -35,9 +34,8 @@ export const useAuthFlow = () => {
       if (targetConfig && !targetConfig.skipSetup && account) {
         const profile = await fetchProfile(account)
         const isNewOnboardingFlowEnabled = flags[FeatureFlagsKeys.NEW_ONBOARDING_FLOW]
-        const isIos = userAgentData?.os.name === 'iOS'
-        const isSafari = !isLoadingUserAgentData && userAgentData?.browser.name === 'Safari'
-        const isAvatarSetupFlowAllowed = isNewOnboardingFlowEnabled && !isIos && !isSafari
+        const hasWebGPU = await checkWebGpuSupport()
+        const isAvatarSetupFlowAllowed = isNewOnboardingFlowEnabled && hasWebGPU
         const isProfileIncomplete = !profile || !isProfileComplete(profile)
         if (isProfileIncomplete && !isAvatarSetupFlowAllowed) {
           return navigate(locations.setup(redirectTo, referrer))
@@ -48,7 +46,7 @@ export const useAuthFlow = () => {
 
       redirect()
     },
-    [targetConfig?.skipSetup, flags, navigate, redirectTo, flagInitialized, isLoadingUserAgentData, userAgentData]
+    [targetConfig?.skipSetup, flags, navigate, redirectTo, flagInitialized]
   )
 
   return {

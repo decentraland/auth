@@ -1,10 +1,10 @@
 import { useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import { useAdvancedUserAgentData } from '@dcl/hooks'
 import { PreviewEmote } from '@dcl/schemas'
 import { Env } from '@dcl/ui-env'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
 import { WearablePreview, PreviewUnityMode } from 'decentraland-ui2'
 import { config } from '../../modules/config'
+import { checkWebGpuSupport } from '../../shared/utils/webgpu'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../FeatureFlagsProvider/FeatureFlagsProvider.types'
 import { Props } from './CustomWearablePreview.types'
 import './CustomWearablePreview.css'
@@ -13,18 +13,24 @@ export const CustomWearablePreview = (props: Props) => {
   const { flags, initialized: initializedFlags } = useContext(FeatureFlagsContext)
 
   const [isLoading, setIsLoading] = useState(true)
+  const [hasWebGPU, setHasWebGPU] = useState(false)
+  const [isCheckingWebGPU, setIsCheckingWebGPU] = useState(true)
 
   useEffect(() => setIsLoading(true), [props.profile])
+
+  useEffect(() => {
+    async function initializeWebGpu() {
+      setIsCheckingWebGPU(true)
+      const webGPUSupported = await checkWebGpuSupport()
+      setHasWebGPU(webGPUSupported)
+      setIsCheckingWebGPU(false)
+    }
+
+    initializeWebGpu()
+  }, [])
+
   const isUnityWearablePreviewEnabled = flags[FeatureFlagsKeys.UNITY_WEARABLE_PREVIEW]
-  const [isLoadingUserAgentData, userAgentData] = useAdvancedUserAgentData()
-  const isUnityWearablePreviewAllowed = useMemo(() => {
-    if (isLoadingUserAgentData) return false
-
-    const isIos = userAgentData?.os.name === 'iOS'
-    const isSafari = userAgentData?.browser.name === 'Safari'
-
-    return isUnityWearablePreviewEnabled && !isIos && !isSafari
-  }, [isLoadingUserAgentData, userAgentData, isUnityWearablePreviewEnabled])
+  const isUnityWearablePreviewAllowed = !!isUnityWearablePreviewEnabled && hasWebGPU && !isCheckingWebGPU
 
   const platformDefinition = useMemo(() => {
     if (isUnityWearablePreviewAllowed) {
