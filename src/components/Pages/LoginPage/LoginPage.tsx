@@ -51,20 +51,8 @@ export const LoginPage = () => {
   const showGuestOption = redirectTo && new URL(redirectTo).pathname.includes('/play')
   const [currentBackgroundIndex, setCurrentBackgroundIndex] = useState(0)
   const [targetConfig] = useTargetConfig()
-  const { checkProfileAndRedirect, isCheckingWebGPU } = useAuthFlow()
-  const [pendingLoginData, setPendingLoginData] = useState<{
-    account: string
-    referrer: string | null
-    redirect: () => void
-  } | null>(null)
+  const { checkProfileAndRedirect } = useAuthFlow()
   const { trackClick, trackLoginClick, trackLoginSuccess, trackGuestLogin } = useAnalytics()
-
-  useEffect(() => {
-    if (pendingLoginData && !isCheckingWebGPU) {
-      checkProfileAndRedirect(pendingLoginData.account, pendingLoginData.referrer, pendingLoginData.redirect)
-      setPendingLoginData(null)
-    }
-  }, [pendingLoginData, isCheckingWebGPU, checkProfileAndRedirect])
 
   const handleLearnMore = useCallback(
     (option?: ConnectionOptionType) => {
@@ -169,13 +157,7 @@ export const LoginPage = () => {
               }
             }
 
-            if (isCheckingWebGPU) {
-              // Si WebGPU aún se está verificando, almacenar los datos para reintentar después
-              setPendingLoginData(loginData)
-            } else {
-              // Si WebGPU ya está verificado, proceder inmediatamente
-              await checkProfileAndRedirect(loginData.account, loginData.referrer, loginData.redirect)
-            }
+            await checkProfileAndRedirect(loginData.account, loginData.referrer, loginData.redirect)
           }
         }
       } catch (error) {

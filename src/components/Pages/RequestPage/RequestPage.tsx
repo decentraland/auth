@@ -79,35 +79,23 @@ export const RequestPage = () => {
   const [targetConfig, targetConfigId] = useTargetConfig()
   const isUserUsingWeb2Wallet = !!provider?.isMagic
   const authServerClient = useRef(createAuthServerWsClient())
-  const [hasWebGPU, setHasWebGPU] = useState(false)
-  const [isCheckingWebGPU, setIsCheckingWebGPU] = useState(true)
-
-  useEffect(() => {
-    async function initializeWebGpu() {
-      setIsCheckingWebGPU(true)
-      const webGPUSupported = await checkWebGpuSupport()
-      setHasWebGPU(webGPUSupported)
-      setIsCheckingWebGPU(false)
-    }
-
-    initializeWebGpu()
-  }, [])
 
   // Goes to the login page where the user will have to connect a wallet.
   const toLoginPage = useCallback(() => {
     navigate(locations.login(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}`))
   }, [requestId])
 
-  const toSetupPage = useCallback(() => {
+  const toSetupPage = useCallback(async () => {
     const referrer = extractReferrerFromSearchParameters(searchParams)
     const isNewOnboardingFlowEnabled = flags[FeatureFlagsKeys.NEW_ONBOARDING_FLOW]
-    const isAvatarSetupFlowAllowed = isNewOnboardingFlowEnabled && hasWebGPU && !isCheckingWebGPU
+    const hasWebGPU = await checkWebGpuSupport()
+    const isAvatarSetupFlowAllowed = isNewOnboardingFlowEnabled && hasWebGPU
     if (isAvatarSetupFlowAllowed) {
       navigate(locations.avatarSetup(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}`, referrer))
     } else {
       navigate(locations.setup(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}`, referrer))
     }
-  }, [requestId, flags[FeatureFlagsKeys.NEW_ONBOARDING_FLOW], searchParams, hasWebGPU, isCheckingWebGPU])
+  }, [requestId, flags[FeatureFlagsKeys.NEW_ONBOARDING_FLOW], searchParams])
 
   useEffect(() => {
     // Wait for the user to be connected.
@@ -136,7 +124,7 @@ export const RequestPage = () => {
       if ((!targetConfig.skipSetup && !profile) || (profile && !isProfileComplete(profile))) {
         // Goes to the setup page if the connected account does not have a profile yet.
         console.log("There's no profile or the profile is not complete but the user is logged in, going to setup page")
-        toSetupPage()
+        await toSetupPage()
         return
       }
 
