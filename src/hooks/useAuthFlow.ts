@@ -1,10 +1,11 @@
-import { useCallback, useContext, useEffect, useState } from 'react'
+import { useCallback, useContext } from 'react'
 import { ProviderType } from '@dcl/schemas'
 import { connection } from 'decentraland-connect'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../components/FeatureFlagsProvider'
 import { fetchProfile } from '../modules/profile'
 import { locations } from '../shared/locations'
 import { isProfileComplete } from '../shared/profile'
+import { checkWebGpuSupport } from '../shared/utils/webgpu'
 import { useNavigateWithSearchParams } from './navigation'
 import { useAfterLoginRedirection } from './redirection'
 import { useTargetConfig } from './targetConfig'
@@ -14,30 +15,6 @@ export const useAuthFlow = () => {
   const { url: redirectTo } = useAfterLoginRedirection()
   const { flags, initialized: flagInitialized } = useContext(FeatureFlagsContext)
   const [targetConfig] = useTargetConfig()
-  const [hasWebGPU, setHasWebGPU] = useState(false)
-  const [isCheckingWebGPU, setIsCheckingWebGPU] = useState(true)
-
-  useEffect(() => {
-    async function checkWebGpu() {
-      setIsCheckingWebGPU(true)
-
-      if (!('gpu' in navigator)) {
-        setHasWebGPU(false)
-        setIsCheckingWebGPU(false)
-        return
-      }
-
-      try {
-        const adapter = await (navigator as unknown as { gpu?: { requestAdapter(): Promise<unknown> } }).gpu?.requestAdapter()
-        setHasWebGPU(!!adapter)
-      } catch {
-        setHasWebGPU(false)
-      } finally {
-        setIsCheckingWebGPU(false)
-      }
-    }
-    checkWebGpu()
-  }, [])
 
   const connectToMagic = useCallback(async () => {
     if (!flagInitialized) {
@@ -54,13 +31,10 @@ export const useAuthFlow = () => {
         return undefined
       }
 
-      if (isCheckingWebGPU) {
-        return undefined
-      }
-
       if (targetConfig && !targetConfig.skipSetup && account) {
         const profile = await fetchProfile(account)
         const isNewOnboardingFlowEnabled = flags[FeatureFlagsKeys.NEW_ONBOARDING_FLOW]
+        const hasWebGPU = await checkWebGpuSupport()
         const isAvatarSetupFlowAllowed = isNewOnboardingFlowEnabled && hasWebGPU
         const isProfileIncomplete = !profile || !isProfileComplete(profile)
         if (isProfileIncomplete && !isAvatarSetupFlowAllowed) {
@@ -72,13 +46,12 @@ export const useAuthFlow = () => {
 
       redirect()
     },
-    [targetConfig?.skipSetup, flags, navigate, redirectTo, flagInitialized, hasWebGPU, isCheckingWebGPU]
+    [targetConfig?.skipSetup, flags, navigate, redirectTo, flagInitialized]
   )
 
   return {
     checkProfileAndRedirect,
     connectToMagic,
-    isInitialized: flagInitialized,
-    isCheckingWebGPU
+    isInitialized: flagInitialized
   }
 }

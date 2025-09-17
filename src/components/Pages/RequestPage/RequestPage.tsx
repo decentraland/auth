@@ -24,6 +24,7 @@ import { isErrorWithMessage, isRpcError } from '../../../shared/errors'
 import { extractReferrerFromSearchParameters, locations } from '../../../shared/locations'
 import { isProfileComplete } from '../../../shared/profile'
 import { handleError } from '../../../shared/utils/errorHandler'
+import { checkWebGpuSupport } from '../../../shared/utils/webgpu'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
 import { Container } from './Container'
 import { DeniedSignIn } from './Views/DeniedSignIn'
@@ -82,26 +83,16 @@ export const RequestPage = () => {
   const [isCheckingWebGPU, setIsCheckingWebGPU] = useState(true)
 
   useEffect(() => {
-    async function checkWebGpu() {
+    async function initializeWebGpu() {
       setIsCheckingWebGPU(true)
-
-      if (!('gpu' in navigator)) {
-        setHasWebGPU(false)
-        setIsCheckingWebGPU(false)
-        return
-      }
-
-      try {
-        const adapter = await (navigator as unknown as { gpu?: { requestAdapter(): Promise<unknown> } }).gpu?.requestAdapter()
-        setHasWebGPU(!!adapter)
-      } catch {
-        setHasWebGPU(false)
-      } finally {
-        setIsCheckingWebGPU(false)
-      }
+      const webGPUSupported = await checkWebGpuSupport()
+      setHasWebGPU(webGPUSupported)
+      setIsCheckingWebGPU(false)
     }
-    checkWebGpu()
+
+    initializeWebGpu()
   }, [])
+
   // Goes to the login page where the user will have to connect a wallet.
   const toLoginPage = useCallback(() => {
     navigate(locations.login(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}`))

@@ -4,6 +4,7 @@ import { Env } from '@dcl/ui-env'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
 import { WearablePreview, PreviewUnityMode } from 'decentraland-ui2'
 import { config } from '../../modules/config'
+import { checkWebGpuSupport } from '../../shared/utils/webgpu'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../FeatureFlagsProvider/FeatureFlagsProvider.types'
 import { Props } from './CustomWearablePreview.types'
 import './CustomWearablePreview.css'
@@ -12,34 +13,23 @@ export const CustomWearablePreview = (props: Props) => {
   const { flags, initialized: initializedFlags } = useContext(FeatureFlagsContext)
 
   const [isLoading, setIsLoading] = useState(true)
-
-  useEffect(() => setIsLoading(true), [props.profile])
-  const isUnityWearablePreviewEnabled = flags[FeatureFlagsKeys.UNITY_WEARABLE_PREVIEW]
   const [hasWebGPU, setHasWebGPU] = useState(false)
   const [isCheckingWebGPU, setIsCheckingWebGPU] = useState(true)
 
+  useEffect(() => setIsLoading(true), [props.profile])
+
   useEffect(() => {
-    async function checkWebGpu() {
+    async function initializeWebGpu() {
       setIsCheckingWebGPU(true)
-
-      if (!('gpu' in navigator)) {
-        setHasWebGPU(false)
-        setIsCheckingWebGPU(false)
-        return
-      }
-
-      try {
-        const adapter = await (navigator as unknown as { gpu?: { requestAdapter(): Promise<unknown> } }).gpu?.requestAdapter()
-        setHasWebGPU(!!adapter)
-      } catch {
-        setHasWebGPU(false)
-      } finally {
-        setIsCheckingWebGPU(false)
-      }
+      const webGPUSupported = await checkWebGpuSupport()
+      setHasWebGPU(webGPUSupported)
+      setIsCheckingWebGPU(false)
     }
-    checkWebGpu()
+
+    initializeWebGpu()
   }, [])
 
+  const isUnityWearablePreviewEnabled = flags[FeatureFlagsKeys.UNITY_WEARABLE_PREVIEW]
   const isUnityWearablePreviewAllowed = !!isUnityWearablePreviewEnabled && hasWebGPU && !isCheckingWebGPU
 
   const platformDefinition = useMemo(() => {
