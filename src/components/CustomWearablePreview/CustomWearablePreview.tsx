@@ -1,5 +1,4 @@
 import { useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import { useAdvancedUserAgentData } from '@dcl/hooks'
 import { PreviewEmote } from '@dcl/schemas'
 import { Env } from '@dcl/ui-env'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
@@ -16,15 +15,25 @@ export const CustomWearablePreview = (props: Props) => {
 
   useEffect(() => setIsLoading(true), [props.profile])
   const isUnityWearablePreviewEnabled = flags[FeatureFlagsKeys.UNITY_WEARABLE_PREVIEW]
-  const [isLoadingUserAgentData, userAgentData] = useAdvancedUserAgentData()
-  const isUnityWearablePreviewAllowed = useMemo(() => {
-    if (isLoadingUserAgentData) return false
+  const [hasWebGPU, setHasWebGPU] = useState(false)
 
-    const isIos = userAgentData?.os.name === 'iOS'
-    const isSafari = userAgentData?.browser.name === 'Safari'
+  useEffect(() => {
+    async function checkWebGpu() {
+      if (!('gpu' in navigator)) {
+        setHasWebGPU(false)
+        return
+      }
+      try {
+        const adapter = await (navigator as unknown as { gpu?: { requestAdapter(): Promise<unknown> } }).gpu?.requestAdapter()
+        setHasWebGPU(!!adapter)
+      } catch {
+        setHasWebGPU(false)
+      }
+    }
+    checkWebGpu()
+  }, [])
 
-    return isUnityWearablePreviewEnabled && !isIos && !isSafari
-  }, [isLoadingUserAgentData, userAgentData, isUnityWearablePreviewEnabled])
+  const isUnityWearablePreviewAllowed = !!isUnityWearablePreviewEnabled && hasWebGPU
 
   const platformDefinition = useMemo(() => {
     if (isUnityWearablePreviewAllowed) {
