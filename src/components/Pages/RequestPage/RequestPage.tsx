@@ -79,18 +79,25 @@ export const RequestPage = () => {
   const isUserUsingWeb2Wallet = !!provider?.isMagic
   const authServerClient = useRef(createAuthServerWsClient())
   const [hasWebGPU, setHasWebGPU] = useState(false)
+  const [isCheckingWebGPU, setIsCheckingWebGPU] = useState(true)
 
   useEffect(() => {
     async function checkWebGpu() {
+      setIsCheckingWebGPU(true)
+
       if (!('gpu' in navigator)) {
         setHasWebGPU(false)
+        setIsCheckingWebGPU(false)
         return
       }
+
       try {
         const adapter = await (navigator as unknown as { gpu?: { requestAdapter(): Promise<unknown> } }).gpu?.requestAdapter()
         setHasWebGPU(!!adapter)
       } catch {
         setHasWebGPU(false)
+      } finally {
+        setIsCheckingWebGPU(false)
       }
     }
     checkWebGpu()
@@ -103,13 +110,13 @@ export const RequestPage = () => {
   const toSetupPage = useCallback(() => {
     const referrer = extractReferrerFromSearchParameters(searchParams)
     const isNewOnboardingFlowEnabled = flags[FeatureFlagsKeys.NEW_ONBOARDING_FLOW]
-    const isAvatarSetupFlowAllowed = isNewOnboardingFlowEnabled && hasWebGPU
+    const isAvatarSetupFlowAllowed = isNewOnboardingFlowEnabled && hasWebGPU && !isCheckingWebGPU
     if (isAvatarSetupFlowAllowed) {
       navigate(locations.avatarSetup(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}`, referrer))
     } else {
       navigate(locations.setup(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}`, referrer))
     }
-  }, [requestId, flags[FeatureFlagsKeys.NEW_ONBOARDING_FLOW], searchParams, hasWebGPU])
+  }, [requestId, flags[FeatureFlagsKeys.NEW_ONBOARDING_FLOW], searchParams, hasWebGPU, isCheckingWebGPU])
 
   useEffect(() => {
     // Wait for the user to be connected.

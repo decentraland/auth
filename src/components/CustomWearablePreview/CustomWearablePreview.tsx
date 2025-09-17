@@ -16,24 +16,31 @@ export const CustomWearablePreview = (props: Props) => {
   useEffect(() => setIsLoading(true), [props.profile])
   const isUnityWearablePreviewEnabled = flags[FeatureFlagsKeys.UNITY_WEARABLE_PREVIEW]
   const [hasWebGPU, setHasWebGPU] = useState(false)
+  const [isCheckingWebGPU, setIsCheckingWebGPU] = useState(true)
 
   useEffect(() => {
     async function checkWebGpu() {
+      setIsCheckingWebGPU(true)
+
       if (!('gpu' in navigator)) {
         setHasWebGPU(false)
+        setIsCheckingWebGPU(false)
         return
       }
+
       try {
         const adapter = await (navigator as unknown as { gpu?: { requestAdapter(): Promise<unknown> } }).gpu?.requestAdapter()
         setHasWebGPU(!!adapter)
       } catch {
         setHasWebGPU(false)
+      } finally {
+        setIsCheckingWebGPU(false)
       }
     }
     checkWebGpu()
   }, [])
 
-  const isUnityWearablePreviewAllowed = !!isUnityWearablePreviewEnabled && hasWebGPU
+  const isUnityWearablePreviewAllowed = !!isUnityWearablePreviewEnabled && hasWebGPU && !isCheckingWebGPU
 
   const platformDefinition = useMemo(() => {
     if (isUnityWearablePreviewAllowed) {

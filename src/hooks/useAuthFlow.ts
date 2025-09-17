@@ -15,18 +15,25 @@ export const useAuthFlow = () => {
   const { flags, initialized: flagInitialized } = useContext(FeatureFlagsContext)
   const [targetConfig] = useTargetConfig()
   const [hasWebGPU, setHasWebGPU] = useState(false)
+  const [isCheckingWebGPU, setIsCheckingWebGPU] = useState(true)
 
   useEffect(() => {
     async function checkWebGpu() {
+      setIsCheckingWebGPU(true)
+
       if (!('gpu' in navigator)) {
         setHasWebGPU(false)
+        setIsCheckingWebGPU(false)
         return
       }
+
       try {
         const adapter = await (navigator as unknown as { gpu?: { requestAdapter(): Promise<unknown> } }).gpu?.requestAdapter()
         setHasWebGPU(!!adapter)
       } catch {
         setHasWebGPU(false)
+      } finally {
+        setIsCheckingWebGPU(false)
       }
     }
     checkWebGpu()
@@ -50,7 +57,7 @@ export const useAuthFlow = () => {
       if (targetConfig && !targetConfig.skipSetup && account) {
         const profile = await fetchProfile(account)
         const isNewOnboardingFlowEnabled = flags[FeatureFlagsKeys.NEW_ONBOARDING_FLOW]
-        const isAvatarSetupFlowAllowed = isNewOnboardingFlowEnabled && hasWebGPU
+        const isAvatarSetupFlowAllowed = isNewOnboardingFlowEnabled && hasWebGPU && !isCheckingWebGPU
         const isProfileIncomplete = !profile || !isProfileComplete(profile)
         if (isProfileIncomplete && !isAvatarSetupFlowAllowed) {
           return navigate(locations.setup(redirectTo, referrer))
@@ -61,7 +68,7 @@ export const useAuthFlow = () => {
 
       redirect()
     },
-    [targetConfig?.skipSetup, flags, navigate, redirectTo, flagInitialized, hasWebGPU]
+    [targetConfig?.skipSetup, flags, navigate, redirectTo, flagInitialized, hasWebGPU, isCheckingWebGPU]
   )
 
   return {
