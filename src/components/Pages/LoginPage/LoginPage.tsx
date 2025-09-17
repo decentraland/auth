@@ -148,16 +148,10 @@ export const LoginPage = () => {
           const isClockSync = await checkClockSynchronization()
 
           if (isClockSync) {
-            const loginData = {
-              account: connectionData.account ?? '',
-              referrer,
-              redirect: () => {
-                redirect()
-                setShowConnectionModal(false)
-              }
-            }
-
-            await checkProfileAndRedirect(loginData.account, loginData.referrer, loginData.redirect)
+            await checkProfileAndRedirect(connectionData.account ?? '', referrer, () => {
+              redirect()
+              setShowConnectionModal(false)
+            })
           }
         }
       } catch (error) {
