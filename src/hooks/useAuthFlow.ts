@@ -54,10 +54,14 @@ export const useAuthFlow = () => {
         return undefined
       }
 
+      if (isCheckingWebGPU) {
+        return undefined
+      }
+
       if (targetConfig && !targetConfig.skipSetup && account) {
         const profile = await fetchProfile(account)
         const isNewOnboardingFlowEnabled = flags[FeatureFlagsKeys.NEW_ONBOARDING_FLOW]
-        const isAvatarSetupFlowAllowed = isNewOnboardingFlowEnabled && hasWebGPU && !isCheckingWebGPU
+        const isAvatarSetupFlowAllowed = isNewOnboardingFlowEnabled && hasWebGPU
         const isProfileIncomplete = !profile || !isProfileComplete(profile)
         if (isProfileIncomplete && !isAvatarSetupFlowAllowed) {
           return navigate(locations.setup(redirectTo, referrer))
@@ -74,6 +78,7 @@ export const useAuthFlow = () => {
   return {
     checkProfileAndRedirect,
     connectToMagic,
-    isInitialized: flagInitialized
+    isInitialized: flagInitialized,
+    isCheckingWebGPU
   }
 }
