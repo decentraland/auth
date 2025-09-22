@@ -72,7 +72,7 @@ export const CustomWearablePreview = (props: Props) => {
     <div className="CustomWearablePreview">
       <WearablePreview
         base64s={[platformDefinition]}
-        baseUrl={config.get('WEARABLE_PREVIEW_URL')}
+        baseUrl="https://wearable-preview-git-chore-update-aang-ren-170d38-decentraland1.vercel.app"
         cameraY={0.2}
         dev={config.is(Env.DEVELOPMENT)}
         disableAutoRotate
