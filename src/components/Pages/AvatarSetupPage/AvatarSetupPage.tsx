@@ -208,6 +208,12 @@ const AvatarSetupPage: React.FC = () => {
           }
         }
 
+        const storedEmail = localStorage.getItem('dcl_magic_user_email')
+        if (storedEmail) {
+          // Clear the stored email after using it
+          localStorage.removeItem('dcl_magic_user_email')
+        }
+
         const hasLauncher = await launchDesktopApp({})
 
         if (hasLauncher) {
@@ -279,8 +285,6 @@ const AvatarSetupPage: React.FC = () => {
         const storedEmail = localStorage.getItem('dcl_magic_user_email')
         if (storedEmail) {
           setState(prev => ({ ...prev, email: storedEmail, isEmailInherited: true }))
-          // Clear the stored email after using it
-          localStorage.removeItem('dcl_magic_user_email')
         }
       } catch (error) {
         console.warn('Failed to get user email from localStorage:', error)
