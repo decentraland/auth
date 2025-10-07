@@ -49,34 +49,20 @@ export async function fetchProfileWithConsistencyCheck(address: string): Promise
       }
     })
 
-    if (!consistencyResult.isConsistent) {
-      // Check if we have any valid entity from inconsistent catalysts
-      // This entity can be used for redeployment to fix the inconsistency
-      const validEntity =
-        consistencyResult.upToDateEntities && consistencyResult.upToDateEntities.length > 0
-          ? consistencyResult.upToDateEntities[0]
-          : undefined
+    const { isConsistent, upToDateEntities = [] } = consistencyResult
+    const entity = upToDateEntities[0]
 
+    if (!isConsistent) {
       return {
         isConsistent: false,
-        entity: validEntity, // Entity for potential redeployment
+        entity, // Entity for potential redeployment (could be undefined)
         error: 'Profile is not consistent across catalysts'
       }
     }
 
-    // If consistent and we have up-to-date entities, return the entity
-    if (consistencyResult.upToDateEntities && consistencyResult.upToDateEntities.length > 0) {
-      const entity = consistencyResult.upToDateEntities[0]
-      return {
-        isConsistent: true,
-        entity: entity
-      }
-    }
-
-    // If no entities found, profile doesn't exist (entity will be undefined)
     return {
       isConsistent: true,
-      entity: undefined
+      entity // Could be undefined if no up-to-date entities found
     }
   } catch (error) {
     console.error('Profile consistency check failed:', error)
@@ -186,18 +172,11 @@ function isRetryableHttpError(error: unknown): boolean {
   if (!error) return true // Unknown error, try next catalyst
 
   // Try to extract status code from various error formats
-  const errorObj = error as any
+  const errorObj = error as { status?: number; statusCode?: number; response?: { status: number } }
   const statusCode = errorObj?.status || errorObj?.statusCode || errorObj?.response?.status
 
-  if (typeof statusCode === 'number') {
-    // Don't retry on 4xx client errors (400-499) - these are likely permanent
-    if (statusCode >= 400 && statusCode < 500) {
-      return false
-    }
-    // Retry on 5xx server errors (500-599) - these might work on another catalyst
-    if (statusCode >= 500) {
-      return true
-    }
+  if (typeof statusCode === 'number' && statusCode >= 400 && statusCode < 500) {
+    return false
   }
 
   // For all other errors (network, parsing, etc.), try next catalyst
