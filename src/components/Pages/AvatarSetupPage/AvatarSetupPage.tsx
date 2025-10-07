@@ -391,8 +391,14 @@ const AvatarSetupPage: React.FC = () => {
             id="terms"
             label={
               <>
-                I agree with Decentraland's <LinkCheckbox href="https://decentraland.org/terms/">Terms of Use</LinkCheckbox> and{' '}
-                <LinkCheckbox href="https://decentraland.org/privacy">Privacy Policy</LinkCheckbox>
+                I agree with Decentraland's{' '}
+                <LinkCheckbox href="https://decentraland.org/terms/" target="_blank">
+                  Terms of Use
+                </LinkCheckbox>{' '}
+                and{' '}
+                <LinkCheckbox href="https://decentraland.org/privacy" target="_blank">
+                  Privacy Policy
+                </LinkCheckbox>
                 .*
               </>
             }
