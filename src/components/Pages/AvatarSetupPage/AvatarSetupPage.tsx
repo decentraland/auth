@@ -71,7 +71,8 @@ const AvatarSetupPage: React.FC = () => {
     hasEmailError: false,
     showWearablePreview: false,
     isTermsChecked: false,
-    isEmailInherited: false
+    isEmailInherited: false,
+    hasWearablePreviewLoaded: false
   })
 
   const [deploying, setDeploying] = useState(false)
@@ -416,7 +417,8 @@ const AvatarSetupPage: React.FC = () => {
             !!agreeError ||
             !state.username ||
             !state.isTermsChecked ||
-            deploying
+            deploying ||
+            !state.hasWearablePreviewLoaded
           }
         >
           {deploying ? 'DEPLOYING...' : 'CUSTOMIZE MY AVATAR'}
@@ -445,7 +447,14 @@ const AvatarSetupPage: React.FC = () => {
       </RightAvatarSection>
 
       <PreloadedWearableContainer isVisible={state.showWearablePreview}>
-        <WearablePreview id="avatar-preview-configurator" unity={true} unityMode={PreviewUnityMode.Configurator} />
+        <WearablePreview
+          id="avatar-preview-configurator"
+          unity={true}
+          unityMode={PreviewUnityMode.Configurator}
+          onLoad={() => {
+            setState(prev => ({ ...prev, hasWearablePreviewLoaded: true }))
+          }}
+        />
       </PreloadedWearableContainer>
     </MainContainer>
   )
