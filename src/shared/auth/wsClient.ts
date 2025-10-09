@@ -3,7 +3,7 @@ import { RequestInteractionType, TrackingEvents } from '../../modules/analytics/
 import { config } from '../../modules/config'
 import { trackEvent } from '../utils/analytics'
 import { handleError } from '../utils/errorHandler'
-import { DifferentSenderError, ExpiredRequestError, RequestNotFoundError } from './errors'
+import { DifferentSenderError, ExpiredRequestError, RequestNotFoundError, IpValidationError } from './errors'
 import { OutcomeError, OutcomeResponse, RecoverResponse, ValidationResponse } from './types'
 
 export const createAuthServerWsClient = (authServerUrl?: string) => {
@@ -28,6 +28,8 @@ export const createAuthServerWsClient = (authServerUrl?: string) => {
       throw new RequestNotFoundError(message.requestId)
     } else if (response.error?.includes('has expired')) {
       throw new ExpiredRequestError(message.requestId)
+    } else if (response.error?.includes('IP validation failed')) {
+      throw new IpValidationError(message.requestId, response.error)
     } else if (response.error) {
       throw new Error(response.error)
     }

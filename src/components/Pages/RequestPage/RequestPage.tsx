@@ -17,7 +17,8 @@ import {
   createAuthServerWsClient,
   RecoverResponse,
   ExpiredRequestError,
-  DifferentSenderError
+  DifferentSenderError,
+  IpValidationError
 } from '../../../shared/auth'
 import { useCurrentConnectionData } from '../../../shared/connection'
 import { isErrorWithMessage, isRpcError } from '../../../shared/errors'
@@ -30,6 +31,7 @@ import { Container } from './Container'
 import { DeniedSignIn } from './Views/DeniedSignIn'
 import { DeniedWalletInteraction } from './Views/DeniedWalletInteraction'
 import { DifferentAccountError } from './Views/DifferentAccountError'
+import { IpValidationError as IpValidationErrorView } from './Views/IpValidationError'
 import { RecoverError } from './Views/RecoverError'
 import { SignInComplete } from './Views/SignInComplete'
 import { SigningError } from './Views/SigningError'
@@ -41,6 +43,7 @@ import styles from './RequestPage.module.css'
 enum View {
   TIMEOUT,
   DIFFERENT_ACCOUNT,
+  IP_VALIDATION_ERROR,
   // Loading
   LOADING_REQUEST,
   LOADING_ERROR,
@@ -74,6 +77,7 @@ export const RequestPage = () => {
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false)
   const requestRef = useRef<RecoverResponse>()
   const [error, setError] = useState<string>()
+  const [ipValidationError, setIpValidationError] = useState<{ requestId: string; reason: string }>()
   const timeoutRef = useRef<NodeJS.Timeout>()
   const requestId = params.requestId ?? ''
   const [targetConfig, targetConfigId] = useTargetConfig()
@@ -188,6 +192,10 @@ export const RequestPage = () => {
         } else if (e instanceof ExpiredRequestError) {
           setView(View.TIMEOUT)
           return
+        } else if (e instanceof IpValidationError) {
+          setIpValidationError({ requestId: e.requestId, reason: e.reason })
+          setView(View.IP_VALIDATION_ERROR)
+          return
         }
 
         setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
@@ -250,11 +258,16 @@ export const RequestPage = () => {
         window.location.href = targetConfig.deepLink
       }
     } catch (e) {
-      const errorMessage = handleError(e, 'Error approving sign in verification', {
-        sentryTags: { isWeb2Wallet: isUserUsingWeb2Wallet }
-      })
-      setError(errorMessage)
-      setView(View.VERIFY_SIGN_IN_ERROR)
+      if (e instanceof IpValidationError) {
+        setIpValidationError({ requestId: e.requestId, reason: e.reason })
+        setView(View.IP_VALIDATION_ERROR)
+      } else {
+        const errorMessage = handleError(e, 'Error approving sign in verification', {
+          sentryTags: { isWeb2Wallet: isUserUsingWeb2Wallet }
+        })
+        setError(errorMessage)
+        setView(View.VERIFY_SIGN_IN_ERROR)
+      }
     } finally {
       setIsLoading(false)
     }
@@ -287,20 +300,25 @@ export const RequestPage = () => {
       await authServerClient.current.sendSuccessfulOutcome(requestId, await signer.getAddress(), result)
       setView(View.WALLET_INTERACTION_COMPLETE)
     } catch (e) {
-      handleError(e, 'Wallet interaction error', {
-        sentryTags: { isWeb2Wallet: isUserUsingWeb2Wallet }
-      })
-      const signer = await browserProvider.current?.getSigner()
-      if (signer && isRpcError(e)) {
-        await authServerClient.current.sendFailedOutcome(requestId, await signer.getAddress(), e.error)
-      } else if (signer && !isRpcError(e)) {
-        await authServerClient.current.sendFailedOutcome(requestId, await signer.getAddress(), {
-          code: 999,
-          message: isErrorWithMessage(e) ? e.message : 'Unknown error'
+      if (e instanceof IpValidationError) {
+        setIpValidationError({ requestId: e.requestId, reason: e.reason })
+        setView(View.IP_VALIDATION_ERROR)
+      } else {
+        handleError(e, 'Wallet interaction error', {
+          sentryTags: { isWeb2Wallet: isUserUsingWeb2Wallet }
         })
+        const signer = await browserProvider.current?.getSigner()
+        if (signer && isRpcError(e)) {
+          await authServerClient.current.sendFailedOutcome(requestId, await signer.getAddress(), e.error)
+        } else if (signer && !isRpcError(e)) {
+          await authServerClient.current.sendFailedOutcome(requestId, await signer.getAddress(), {
+            code: 999,
+            message: isErrorWithMessage(e) ? e.message : 'Unknown error'
+          })
+        }
+        setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
+        setView(View.WALLET_INTERACTION_ERROR)
       }
-      setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
-      setView(View.WALLET_INTERACTION_ERROR)
     }
   }, [isUserUsingWeb2Wallet])
 
@@ -317,6 +335,13 @@ export const RequestPage = () => {
       return <TimeoutError requestId={requestId} />
     case View.DIFFERENT_ACCOUNT:
       return <DifferentAccountError requestId={requestId} />
+    case View.IP_VALIDATION_ERROR:
+      return (
+        <IpValidationErrorView
+          requestId={ipValidationError?.requestId || requestId}
+          reason={ipValidationError?.reason || 'Unknown error'}
+        />
+      )
     case View.LOADING_ERROR:
       return <RecoverError error={error} />
     case View.VERIFY_SIGN_IN_ERROR:

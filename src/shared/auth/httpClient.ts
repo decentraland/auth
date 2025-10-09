@@ -2,7 +2,7 @@ import { RequestInteractionType, TrackingEvents } from '../../modules/analytics/
 import { config } from '../../modules/config'
 import { trackEvent } from '../utils/analytics'
 import { handleError } from '../utils/errorHandler'
-import { DifferentSenderError, ExpiredRequestError, RequestNotFoundError } from './errors'
+import { DifferentSenderError, ExpiredRequestError, RequestNotFoundError, IpValidationError } from './errors'
 import { OutcomeError, RecoverResponse } from './types'
 export const createAuthServerHttpClient = (authServerUrl?: string) => {
   const baseUrl = authServerUrl ?? config.get('AUTH_SERVER_URL')
@@ -19,6 +19,8 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
       throw new RequestNotFoundError(requestId)
     } else if (data.error?.includes('has expired')) {
       throw new ExpiredRequestError(requestId)
+    } else if (data.error?.includes('IP validation failed')) {
+      throw new IpValidationError(requestId, data.error)
     } else if (data.error) {
       throw new Error(data.error)
     }
