@@ -30,7 +30,7 @@ export const useAuthFlow = () => {
   }, [flags[FeatureFlagsKeys.MAGIC_TEST], flagInitialized])
 
   const checkProfileAndRedirect = useCallback(
-    async (account: string, referrer: string | null, redirect: () => void, providedIdentity: AuthIdentity | null) => {
+    async (account: string, referrer: string | null, redirect: () => void, providedIdentity: AuthIdentity | null = null) => {
       if (!flagInitialized) {
         return undefined
       }
