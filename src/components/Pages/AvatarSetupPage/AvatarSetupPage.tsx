@@ -71,7 +71,8 @@ const AvatarSetupPage: React.FC = () => {
     hasEmailError: false,
     showWearablePreview: false,
     isTermsChecked: false,
-    isEmailInherited: false
+    isEmailInherited: false,
+    hasWearablePreviewLoaded: false
   })
 
   const [deploying, setDeploying] = useState(false)
@@ -208,6 +209,12 @@ const AvatarSetupPage: React.FC = () => {
           }
         }
 
+        const storedEmail = localStorage.getItem('dcl_magic_user_email')
+        if (storedEmail) {
+          // Clear the stored email after using it
+          localStorage.removeItem('dcl_magic_user_email')
+        }
+
         const hasLauncher = await launchDesktopApp({})
 
         if (hasLauncher) {
@@ -279,8 +286,6 @@ const AvatarSetupPage: React.FC = () => {
         const storedEmail = localStorage.getItem('dcl_magic_user_email')
         if (storedEmail) {
           setState(prev => ({ ...prev, email: storedEmail, isEmailInherited: true }))
-          // Clear the stored email after using it
-          localStorage.removeItem('dcl_magic_user_email')
         }
       } catch (error) {
         console.warn('Failed to get user email from localStorage:', error)
@@ -387,8 +392,14 @@ const AvatarSetupPage: React.FC = () => {
             id="terms"
             label={
               <>
-                I agree with Decentraland's <LinkCheckbox href="https://decentraland.org/terms/">Terms of Use</LinkCheckbox> and{' '}
-                <LinkCheckbox href="https://decentraland.org/privacy">Privacy Policy</LinkCheckbox>
+                I agree with Decentraland's{' '}
+                <LinkCheckbox href="https://decentraland.org/terms/" target="_blank">
+                  Terms of Use
+                </LinkCheckbox>{' '}
+                and{' '}
+                <LinkCheckbox href="https://decentraland.org/privacy" target="_blank">
+                  Privacy Policy
+                </LinkCheckbox>
                 .*
               </>
             }
@@ -406,7 +417,8 @@ const AvatarSetupPage: React.FC = () => {
             !!agreeError ||
             !state.username ||
             !state.isTermsChecked ||
-            deploying
+            deploying ||
+            !state.hasWearablePreviewLoaded
           }
         >
           {deploying ? 'DEPLOYING...' : 'CUSTOMIZE MY AVATAR'}
@@ -435,7 +447,14 @@ const AvatarSetupPage: React.FC = () => {
       </RightAvatarSection>
 
       <PreloadedWearableContainer isVisible={state.showWearablePreview}>
-        <WearablePreview id="avatar-preview-configurator" unity={true} unityMode={PreviewUnityMode.Configurator} />
+        <WearablePreview
+          id="avatar-preview-configurator"
+          unity={true}
+          unityMode={PreviewUnityMode.Configurator}
+          onLoad={() => {
+            setState(prev => ({ ...prev, hasWearablePreviewLoaded: true }))
+          }}
+        />
       </PreloadedWearableContainer>
     </MainContainer>
   )

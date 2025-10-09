@@ -8,6 +8,7 @@ export interface AvatarSetupState {
   showWearablePreview: boolean
   isTermsChecked: boolean
   isEmailInherited: boolean
+  hasWearablePreviewLoaded: boolean
 }
 
 export interface Color {
