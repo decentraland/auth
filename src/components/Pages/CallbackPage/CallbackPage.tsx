@@ -1,6 +1,7 @@
 import { useCallback, useContext, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { ProviderType } from '@dcl/schemas'
+import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { useAnalytics } from '../../../hooks/useAnalytics'
@@ -55,7 +56,10 @@ export const CallbackPage = () => {
           type: ConnectionType.WEB2
         })
 
-        await checkProfileAndRedirect(connectionData.account ?? '', referrer, redirect)
+        // Get the freshly generated identity from localStorage for Magic flow
+        const freshIdentity = localStorageGetIdentity(ethAddress)
+
+        await checkProfileAndRedirect(connectionData.account ?? '', referrer, redirect, freshIdentity)
       } catch (error) {
         handleError(error, 'Error in callback continue flow')
         navigate(locations.login())
