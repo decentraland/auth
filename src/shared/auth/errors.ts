@@ -15,3 +15,10 @@ export class RequestNotFoundError extends Error {
     super(`The request ${requestId} was not found`)
   }
 }
+
+export class IpValidationError extends Error {
+  constructor(public readonly requestId: string, public readonly reason: string) {
+    super(`IP validation failed: ${reason}`)
+    this.name = 'IpValidationError'
+  }
+}
