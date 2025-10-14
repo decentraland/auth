@@ -6,16 +6,20 @@ export enum FeatureFlagsKeys {
   LOGIN_ON_SETUP = 'dapps-login-on-setup',
   HTTP_AUTH = 'dapps-http-auth',
   UNITY_WEARABLE_PREVIEW = 'dapps-unity-wearable-preview',
-  NEW_ONBOARDING_FLOW = 'dapps-new-onboarding-flow'
+  ONBOARDING_FLOW = 'dapps-onboarding-flow'
 }
+
+type FeatureFlagsVariants = Record<FeatureFlagsKeys, { enabled: boolean; name: string; payload?: { type: string; value: string } }>
 
 export type FeatureFlagsContextType = {
   flags: Partial<Record<FeatureFlagsKeys, boolean>>
+  variants: Partial<FeatureFlagsVariants>
   initialized: boolean
 }
 
 export const defaultFeatureFlagsContextValue: FeatureFlagsContextType = {
   flags: {},
+  variants: {},
   initialized: false
 }
 

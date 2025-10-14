@@ -16,7 +16,8 @@ import { useTargetConfig } from './targetConfig'
 export const useAuthFlow = () => {
   const navigate = useNavigateWithSearchParams()
   const { url: redirectTo } = useAfterLoginRedirection()
-  const { flags, initialized: flagInitialized } = useContext(FeatureFlagsContext)
+  const { flags, variants, initialized: flagInitialized } = useContext(FeatureFlagsContext)
+
   const [targetConfig] = useTargetConfig()
   const { identity } = useCurrentConnectionData()
 
@@ -29,6 +30,9 @@ export const useAuthFlow = () => {
     return await connection.connect(providerType)
   }, [flags[FeatureFlagsKeys.MAGIC_TEST], flagInitialized])
 
+  // TODO: Remove this after testing before merging
+  console.log('variants: ', variants[FeatureFlagsKeys.ONBOARDING_FLOW]?.name)
+
   const checkProfileAndRedirect = useCallback(
     async (account: string, referrer: string | null, redirect: () => void, providedIdentity: AuthIdentity | null = null) => {
       if (!flagInitialized) {
@@ -38,6 +42,9 @@ export const useAuthFlow = () => {
       if (targetConfig && !targetConfig.skipSetup && account) {
         // Check profile consistency across all catalysts
         const consistencyResult = await fetchProfileWithConsistencyCheck(account)
+
+        // Check A/B testing new onboarding flow
+        const isCurrentOnboardingFlowEnabled = variants[FeatureFlagsKeys.ONBOARDING_FLOW]?.name === 'current'
 
         // If profile is not consistent across catalysts, try to redeploy if we have a valid entity
         if (!consistencyResult.isConsistent) {
@@ -58,9 +65,8 @@ export const useAuthFlow = () => {
           }
 
           // Fallback to onboarding flow (original behavior)
-          const isNewOnboardingFlowEnabled = flags[FeatureFlagsKeys.NEW_ONBOARDING_FLOW]
           const hasWebGPU = await checkWebGpuSupport()
-          const isAvatarSetupFlowAllowed = isNewOnboardingFlowEnabled && hasWebGPU
+          const isAvatarSetupFlowAllowed = isCurrentOnboardingFlowEnabled && hasWebGPU
 
           if (isAvatarSetupFlowAllowed) {
             return navigate(locations.avatarSetup(redirectTo, referrer))
@@ -71,9 +77,8 @@ export const useAuthFlow = () => {
 
         // If consistent, check if profile exists and is complete
         const profile: Profile | undefined = consistencyResult.entity?.metadata as Profile
-        const isNewOnboardingFlowEnabled = flags[FeatureFlagsKeys.NEW_ONBOARDING_FLOW]
         const hasWebGPU = await checkWebGpuSupport()
-        const isAvatarSetupFlowAllowed = isNewOnboardingFlowEnabled && hasWebGPU
+        const isAvatarSetupFlowAllowed = isCurrentOnboardingFlowEnabled && hasWebGPU
         const isProfileIncomplete = !profile || !isProfileComplete(profile)
 
         if (isProfileIncomplete && !isAvatarSetupFlowAllowed) {
@@ -85,7 +90,7 @@ export const useAuthFlow = () => {
 
       redirect()
     },
-    [targetConfig?.skipSetup, flags, navigate, redirectTo, flagInitialized, identity]
+    [targetConfig?.skipSetup, variants[FeatureFlagsKeys.ONBOARDING_FLOW], navigate, redirectTo, flagInitialized, identity]
   )
 
   return {
