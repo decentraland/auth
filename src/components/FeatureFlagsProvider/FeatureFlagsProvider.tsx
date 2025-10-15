@@ -19,9 +19,9 @@ export const FeatureFlagsProvider = (props: PropsWithChildren<unknown>) => {
           timeoutId = setTimeout(() => controller.abort(), THIRTY_SECONDS)
           const response = await fetch(`${baseUrl}/dapps.json`, { signal: controller.signal })
           const json = await response.json()
-          setValue({ ...value, flags: json.flags, initialized: true })
+          setValue({ ...value, flags: json.flags, variants: json.variants, initialized: true })
         } catch (error) {
-          setValue({ ...value, flags: {}, initialized: true })
+          setValue({ ...value, flags: {}, variants: {}, initialized: true })
           console.error('Error fetching feature flags', error)
         } finally {
           if (timeoutId) {
