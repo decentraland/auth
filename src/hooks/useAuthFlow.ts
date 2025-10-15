@@ -30,9 +30,6 @@ export const useAuthFlow = () => {
     return await connection.connect(providerType)
   }, [flags[FeatureFlagsKeys.MAGIC_TEST], flagInitialized])
 
-  // TODO: Remove this after testing before merging
-  console.log('variants: ', variants[FeatureFlagsKeys.ONBOARDING_FLOW]?.name)
-
   const checkProfileAndRedirect = useCallback(
     async (account: string, referrer: string | null, redirect: () => void, providedIdentity: AuthIdentity | null = null) => {
       if (!flagInitialized) {
