@@ -61,7 +61,7 @@ export const RequestPage = () => {
   const [searchParams] = useSearchParams()
   const navigate = useNavigateWithSearchParams()
   const { isLoading: isConnecting, account, provider, providerType } = useCurrentConnectionData()
-  const { flags, initialized: initializedFlags } = useContext(FeatureFlagsContext)
+  const { flags, variants, initialized: initializedFlags } = useContext(FeatureFlagsContext)
   const { trackClick } = useAnalytics()
   const browserProvider = useRef<BrowserProvider>()
   const [view, setView] = useState(View.LOADING_REQUEST)
@@ -87,15 +87,18 @@ export const RequestPage = () => {
 
   const toSetupPage = useCallback(async () => {
     const referrer = extractReferrerFromSearchParameters(searchParams)
-    const isNewOnboardingFlowEnabled = flags[FeatureFlagsKeys.NEW_ONBOARDING_FLOW]
+
+    // Check A/B testing new onboarding flow
+    const isCurrentOnboardingFlowEnabled = variants[FeatureFlagsKeys.ONBOARDING_FLOW]?.name === 'current'
+
     const hasWebGPU = await checkWebGpuSupport()
-    const isAvatarSetupFlowAllowed = isNewOnboardingFlowEnabled && hasWebGPU
+    const isAvatarSetupFlowAllowed = isCurrentOnboardingFlowEnabled && hasWebGPU
     if (isAvatarSetupFlowAllowed) {
       navigate(locations.avatarSetup(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}`, referrer))
     } else {
       navigate(locations.setup(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}`, referrer))
     }
-  }, [requestId, flags[FeatureFlagsKeys.NEW_ONBOARDING_FLOW], searchParams])
+  }, [requestId, variants[FeatureFlagsKeys.ONBOARDING_FLOW], searchParams])
 
   useEffect(() => {
     // Wait for the user to be connected.
