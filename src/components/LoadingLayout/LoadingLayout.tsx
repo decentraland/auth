@@ -1,0 +1,80 @@
+import React, { useEffect, useState } from 'react'
+import { ProviderType } from '@dcl/schemas'
+import { Button, CircularProgress } from 'decentraland-ui2'
+import { MainContainer, LoadingContainer, DecentralandLogo, LoadingTitle, ProgressContainer } from './LoadingLayout.styled'
+import { LoadingLayoutState, type LoadingLayoutProps } from './LoadingLayout.type'
+
+const getLoadingLayoutMessage = (loadingState: LoadingLayoutState, providerType: ProviderType | null) => {
+  switch (loadingState) {
+    case LoadingLayoutState.ERROR: {
+      return 'You did not confirm this action in your digital wallet extension. To continue, please try again.'
+    }
+    case LoadingLayoutState.ERROR_LOCKED_WALLET: {
+      return 'Your wallet is currently locked. To continue, please unlock your wallet and try again.'
+    }
+    case LoadingLayoutState.CONNECTING_WALLET:
+    case LoadingLayoutState.WAITING_FOR_SIGNATURE: {
+      return providerType === ProviderType.MAGIC || providerType === ProviderType.MAGIC_TEST
+        ? 'Almost done! Confirm your request to login Decentraland'
+        : 'Confirm in your digital wallet extension to continue.'
+    }
+    case LoadingLayoutState.VALIDATING_SIGN_IN: {
+      return "Just a moment, we're verifying your login credentials..."
+    }
+    case LoadingLayoutState.LOADING_MAGIC: {
+      return 'Redirecting...'
+    }
+  }
+}
+
+const LoadingLayout = React.memo((props: LoadingLayoutProps) => {
+  const { onTryAgain, state, providerType } = props
+  const [hasTimedOut, setHasTimedOut] = useState(false)
+
+  const isLoading =
+    state === LoadingLayoutState.CONNECTING_WALLET ||
+    state === LoadingLayoutState.WAITING_FOR_SIGNATURE ||
+    state === LoadingLayoutState.LOADING_MAGIC ||
+    state === LoadingLayoutState.VALIDATING_SIGN_IN
+
+  const isError = state === LoadingLayoutState.ERROR || state === LoadingLayoutState.ERROR_LOCKED_WALLET || hasTimedOut
+
+  useEffect(() => {
+    if (isLoading && !hasTimedOut) {
+      const timeoutId = setTimeout(() => {
+        setHasTimedOut(true)
+      }, 30000) // 30 segundos
+
+      return () => {
+        clearTimeout(timeoutId)
+      }
+    }
+  }, [isLoading, hasTimedOut])
+
+  useEffect(() => {
+    if (!isLoading) {
+      setHasTimedOut(false)
+    }
+  }, [isLoading])
+
+  return (
+    <MainContainer>
+      <LoadingContainer>
+        <DecentralandLogo />
+        <LoadingTitle variant="h3">{getLoadingLayoutMessage(state, providerType)}</LoadingTitle>
+        {isLoading && (
+          <ProgressContainer>
+            <CircularProgress color="inherit" />
+          </ProgressContainer>
+        )}
+        {isError && (
+          <Button variant="contained" onClick={onTryAgain}>
+            Try again
+          </Button>
+        )}
+      </LoadingContainer>
+    </MainContainer>
+  )
+})
+
+export { LoadingLayout }
