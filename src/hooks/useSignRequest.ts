@@ -1,13 +1,14 @@
 import { useCallback, useRef } from 'react'
 import { BrowserProvider } from 'ethers'
 import type { Provider } from 'decentraland-connect'
-import { createAuthServerWsClient, ExpiredRequestError, RecoverResponse } from '../shared/auth'
+import { createAuthServerWsClient, ExpiredRequestError, IpValidationError, RecoverResponse } from '../shared/auth'
 import { handleError } from '../shared/utils/errorHandler'
 
 interface SignRequestErrorHandlers {
   onExpiredRequest?: () => void
   onRecoverError?: (error: string) => void
   onSigningError?: (error: string) => void
+  onIpValidationError?: (error: string) => void
   onSuccess?: () => void
   onConnectionModalOpen?: () => void
   onConnectionModalClose?: () => void
@@ -33,6 +34,13 @@ export const useSignRequest = (redirect: () => void, errorHandlers?: SignRequest
             errorHandlers.onExpiredRequest()
           } else {
             console.error('Request expired')
+          }
+        } else if (e instanceof IpValidationError) {
+          const errorMessage = handleError(e, 'IP validation failed')
+          if (errorHandlers?.onIpValidationError) {
+            errorHandlers.onIpValidationError(errorMessage)
+          } else if (errorHandlers?.onRecoverError) {
+            errorHandlers.onRecoverError(errorMessage)
           }
         } else {
           const errorMessage = handleError(e, 'Error recovering request')
