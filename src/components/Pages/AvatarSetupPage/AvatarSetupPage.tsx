@@ -11,7 +11,7 @@ import { useAnalytics } from '../../../hooks/useAnalytics'
 import { useSignRequest } from '../../../hooks/useSignRequest'
 import { useTrackReferral } from '../../../hooks/useTrackReferral'
 import { fetchProfile } from '../../../modules/profile'
-import { createAuthServerHttpClient, createAuthServerWsClient } from '../../../shared/auth'
+import { createAuthServerHttpClient, createAuthServerWsClient, IpValidationError } from '../../../shared/auth'
 import { useCurrentConnectionData } from '../../../shared/connection/hooks'
 import { locations } from '../../../shared/locations'
 import { isProfileComplete } from '../../../shared/profile'
@@ -228,8 +228,13 @@ const AvatarSetupPage: React.FC = () => {
           }
         }
       } catch (e) {
-        const errorMessage = handleError(e, 'Error deploying profile')
-        setDeployError(errorMessage)
+        if (e instanceof IpValidationError) {
+          const errorMessage = handleError(e, 'IP validation failed')
+          setDeployError(errorMessage)
+        } else {
+          const errorMessage = handleError(e, 'Error deploying profile')
+          setDeployError(errorMessage)
+        }
         setDeploying(false)
       } finally {
         setIsProcessingMessage(false)

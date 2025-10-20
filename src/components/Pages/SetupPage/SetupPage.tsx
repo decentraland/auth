@@ -28,6 +28,7 @@ import { ConnectionModal, ConnectionModalState } from '../../ConnectionModal'
 import { CustomWearablePreview } from '../../CustomWearablePreview'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import { DifferentAccountError } from '../RequestPage/Views/DifferentAccountError'
+import { IpValidationError as IpValidationErrorView } from '../RequestPage/Views/IpValidationError'
 import { RecoverError } from '../RequestPage/Views/RecoverError'
 import { SignInComplete } from '../RequestPage/Views/SignInComplete'
 import { SigningError } from '../RequestPage/Views/SigningError'
@@ -42,7 +43,8 @@ enum View {
   RECOVER_ERROR,
   SIGN_IN_COMPLETE,
   SIGNING_ERROR,
-  TIMEOUT_ERROR
+  TIMEOUT_ERROR,
+  IP_VALIDATION_ERROR
 }
 
 function getRandomDefaultProfile() {
@@ -242,6 +244,10 @@ export const SetupPage = () => {
       setRequestError(error)
       setView(View.SIGNING_ERROR)
     },
+    onIpValidationError: error => {
+      setRequestError(error)
+      setView(View.IP_VALIDATION_ERROR)
+    },
     onSuccess: () => setView(View.SIGN_IN_COMPLETE),
     onConnectionModalOpen: () => setIsConnectionModalOpen(true),
     onConnectionModalClose: () => setIsConnectionModalOpen(false)
@@ -407,6 +413,8 @@ export const SetupPage = () => {
       return <SigningError error={requestError} />
     case View.TIMEOUT_ERROR:
       return <TimeoutError requestId={requestId ?? ''} />
+    case View.IP_VALIDATION_ERROR:
+      return <IpValidationErrorView requestId={requestId ?? ''} reason={requestError || 'Unknown error'} />
     case View.RANDOMIZE:
       return (
         <div className={styles.container}>
