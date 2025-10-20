@@ -77,7 +77,6 @@ export const RequestPage = () => {
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false)
   const requestRef = useRef<RecoverResponse>()
   const [error, setError] = useState<string>()
-  const [ipValidationError, setIpValidationError] = useState<{ requestId: string; reason: string }>()
   const timeoutRef = useRef<NodeJS.Timeout>()
   const requestId = params.requestId ?? ''
   const [targetConfig, targetConfigId] = useTargetConfig()
@@ -193,7 +192,7 @@ export const RequestPage = () => {
           setView(View.TIMEOUT)
           return
         } else if (e instanceof IpValidationError) {
-          setIpValidationError({ requestId: e.requestId, reason: e.reason })
+          setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
           setView(View.IP_VALIDATION_ERROR)
           return
         }
@@ -259,7 +258,7 @@ export const RequestPage = () => {
       }
     } catch (e) {
       if (e instanceof IpValidationError) {
-        setIpValidationError({ requestId: e.requestId, reason: e.reason })
+        setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
         setView(View.IP_VALIDATION_ERROR)
       } else {
         const errorMessage = handleError(e, 'Error approving sign in verification', {
@@ -301,7 +300,7 @@ export const RequestPage = () => {
       setView(View.WALLET_INTERACTION_COMPLETE)
     } catch (e) {
       if (e instanceof IpValidationError) {
-        setIpValidationError({ requestId: e.requestId, reason: e.reason })
+        setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
         setView(View.IP_VALIDATION_ERROR)
       } else {
         handleError(e, 'Wallet interaction error', {
@@ -336,12 +335,7 @@ export const RequestPage = () => {
     case View.DIFFERENT_ACCOUNT:
       return <DifferentAccountError requestId={requestId} />
     case View.IP_VALIDATION_ERROR:
-      return (
-        <IpValidationErrorView
-          requestId={ipValidationError?.requestId || requestId}
-          reason={ipValidationError?.reason || 'Unknown error'}
-        />
-      )
+      return <IpValidationErrorView requestId={requestId} reason={error || 'Unknown error'} />
     case View.LOADING_ERROR:
       return <RecoverError error={error} />
     case View.VERIFY_SIGN_IN_ERROR:
