@@ -39,3 +39,13 @@
   bottom: 20px;
   right: 20px;
 }
+
+.timeoutMessage {
+  margin-top: 20px;
+  padding: 12px;
+  background-color: #ff6b6b;
+  color: white;
+  border-radius: 8px;
+  text-align: center;
+  font-size: 14px;
+}
