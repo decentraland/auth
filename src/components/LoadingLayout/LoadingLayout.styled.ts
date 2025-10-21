@@ -39,6 +39,12 @@ const LoadingTitle = styled(Typography)({
   verticalAlign: 'middle'
 })
 
+const ErrorButtonContainer = styled(Box)({
+  display: 'flex',
+  justifyContent: 'center',
+  alignItems: 'center',
+  marginTop: '24px'
+})
 const ProgressContainer = styled(Box)({
   display: 'flex',
   justifyContent: 'center',
@@ -46,4 +52,4 @@ const ProgressContainer = styled(Box)({
   color: 'rgb(235,68,90)'
 })
 
-export { MainContainer, LoadingContainer, DecentralandLogo, LoadingTitle, ProgressContainer }
+export { MainContainer, LoadingContainer, DecentralandLogo, LoadingTitle, ProgressContainer, ErrorButtonContainer }

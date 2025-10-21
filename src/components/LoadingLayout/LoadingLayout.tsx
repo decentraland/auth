@@ -1,7 +1,14 @@
 import React, { useEffect, useState } from 'react'
 import { ProviderType } from '@dcl/schemas'
 import { Button, CircularProgress } from 'decentraland-ui2'
-import { MainContainer, LoadingContainer, DecentralandLogo, LoadingTitle, ProgressContainer } from './LoadingLayout.styled'
+import {
+  MainContainer,
+  LoadingContainer,
+  DecentralandLogo,
+  LoadingTitle,
+  ProgressContainer,
+  ErrorButtonContainer
+} from './LoadingLayout.styled'
 import { LoadingLayoutState, type LoadingLayoutProps } from './LoadingLayout.type'
 
 const getLoadingLayoutMessage = (loadingState: LoadingLayoutState, providerType: ProviderType | null) => {
@@ -68,9 +75,11 @@ const LoadingLayout = React.memo((props: LoadingLayoutProps) => {
           </ProgressContainer>
         )}
         {isError && (
-          <Button variant="contained" onClick={onTryAgain}>
-            Try again
-          </Button>
+          <ErrorButtonContainer>
+            <Button variant="contained" onClick={onTryAgain}>
+              Try again
+            </Button>
+          </ErrorButtonContainer>
         )}
       </LoadingContainer>
     </MainContainer>
