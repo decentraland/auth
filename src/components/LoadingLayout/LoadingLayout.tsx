@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { ProviderType } from '@dcl/schemas'
 import { Button, CircularProgress } from 'decentraland-ui2'
 import {
@@ -11,7 +11,7 @@ import {
 } from './LoadingLayout.styled'
 import { LoadingLayoutState, type LoadingLayoutProps } from './LoadingLayout.type'
 
-const getLoadingLayoutMessage = (loadingState: LoadingLayoutState, providerType: ProviderType | null) => {
+const getLoadingLayoutMessage = (loadingState: LoadingLayoutState, providerType: ProviderType | null, hasTimedOut: boolean) => {
   switch (loadingState) {
     case LoadingLayoutState.ERROR: {
       return 'You did not confirm this action in your digital wallet extension. To continue, please try again.'
@@ -23,6 +23,8 @@ const getLoadingLayoutMessage = (loadingState: LoadingLayoutState, providerType:
     case LoadingLayoutState.WAITING_FOR_SIGNATURE: {
       return providerType === ProviderType.MAGIC || providerType === ProviderType.MAGIC_TEST
         ? 'Almost done! Confirm your request to login Decentraland'
+        : hasTimedOut
+        ? "Confirm in your digital wallet extension to continue. Please check that you're logged in your wallet extension and try again"
         : 'Confirm in your digital wallet extension to continue.'
     }
     case LoadingLayoutState.VALIDATING_SIGN_IN: {
@@ -64,19 +66,27 @@ const LoadingLayout = React.memo((props: LoadingLayoutProps) => {
     }
   }, [isLoading])
 
+  const handleTryAgain = useCallback(() => {
+    if (hasTimedOut) {
+      setHasTimedOut(false)
+    }
+
+    onTryAgain()
+  }, [onTryAgain, hasTimedOut, setHasTimedOut])
+
   return (
     <MainContainer>
       <LoadingContainer>
         <DecentralandLogo />
-        <LoadingTitle variant="h3">{getLoadingLayoutMessage(state, providerType)}</LoadingTitle>
-        {isLoading && (
+        <LoadingTitle variant="h3">{getLoadingLayoutMessage(state, providerType, hasTimedOut)}</LoadingTitle>
+        {isLoading && !hasTimedOut && (
           <ProgressContainer>
             <CircularProgress color="inherit" />
           </ProgressContainer>
         )}
         {isError && (
           <ErrorButtonContainer>
-            <Button variant="contained" onClick={onTryAgain}>
+            <Button variant="contained" onClick={handleTryAgain}>
               Try again
             </Button>
           </ErrorButtonContainer>

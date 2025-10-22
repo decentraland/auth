@@ -19,7 +19,8 @@ const LoadingContainer = styled(Box)({
   justifyContent: 'center',
   alignItems: 'center',
   marginLeft: 'auto',
-  marginRight: 'auto'
+  marginRight: 'auto',
+  maxWidth: '600px'
 })
 
 const DecentralandLogo = styled(Logo)({
