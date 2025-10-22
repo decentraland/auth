@@ -1,5 +1,6 @@
 import { useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline'
 import { ethers, BrowserProvider, formatEther } from 'ethers'
 import Icon from 'semantic-ui-react/dist/commonjs/elements/Icon/Icon'
 import { ChainId } from '@dcl/schemas'
@@ -390,7 +391,16 @@ export const RequestPage = () => {
               Yes, they are the same
             </Button>
           </div>
-          {hasTimedOut && <div className={styles.timeoutMessage}>The operation has taken too long. Please try again.</div>}
+          {hasTimedOut && (
+            <div className={styles.timeoutMessage}>
+              <ErrorOutlineIcon fontSize="large" sx={{ color: '#fb3b3b' }} />
+              <div>
+                You might be logged out of your wallet extension.
+                <br />
+                Please check that you're logged in and try again.
+              </div>
+            </div>
+          )}
         </Container>
       )
     case View.WALLET_INTERACTION:
