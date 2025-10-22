@@ -24,7 +24,7 @@ const getLoadingLayoutMessage = (loadingState: LoadingLayoutState, providerType:
       return providerType === ProviderType.MAGIC || providerType === ProviderType.MAGIC_TEST
         ? 'Almost done! Confirm your request to login Decentraland'
         : hasTimedOut
-        ? "Confirm in your digital wallet extension to continue. Please check that you're logged in your wallet extension and try again"
+        ? "You must confirm in your wallet extension to continue. Please make sure you're logged into the extension and try again."
         : 'Confirm in your digital wallet extension to continue.'
     }
     case LoadingLayoutState.VALIDATING_SIGN_IN: {
