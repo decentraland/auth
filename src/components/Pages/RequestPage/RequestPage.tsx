@@ -69,6 +69,7 @@ export const RequestPage = () => {
   const browserProvider = useRef<BrowserProvider>()
   const [view, setView] = useState(View.LOADING_REQUEST)
   const [isLoading, setIsLoading] = useState(false)
+  const [hasTimedOut, setHasTimedOut] = useState(false)
   const [walletInfo, setWalletInfo] = useState<{
     balance: bigint
     chainId: number
@@ -78,6 +79,7 @@ export const RequestPage = () => {
   const requestRef = useRef<RecoverResponse>()
   const [error, setError] = useState<string>()
   const timeoutRef = useRef<NodeJS.Timeout>()
+  const signTimeoutRef = useRef<NodeJS.Timeout>()
   const requestId = params.requestId ?? ''
   const [targetConfig, targetConfigId] = useTargetConfig()
   const isUserUsingWeb2Wallet = !!provider?.isMagic
@@ -206,6 +208,7 @@ export const RequestPage = () => {
 
     return () => {
       clearTimeout(timeoutRef.current)
+      clearTimeout(signTimeoutRef.current)
     }
   }, [toLoginPage, toSetupPage, account, provider, providerType, isConnecting, initializedFlags])
 
@@ -237,7 +240,14 @@ export const RequestPage = () => {
   const onApproveSignInVerification = useCallback(async () => {
     trackClick(ClickEvents.APPROVE_SING_IN)
     setIsLoading(true)
+    setHasTimedOut(false)
     const provider = browserProvider.current
+
+    signTimeoutRef.current = setTimeout(() => {
+      setHasTimedOut(true)
+      setIsLoading(false)
+    }, 30000) // 30 segundos
+
     try {
       if (!provider) {
         throw new Error('Provider not created')
@@ -251,12 +261,20 @@ export const RequestPage = () => {
       await authServerClient.current.sendSuccessfulOutcome(requestId, await signer.getAddress(), signature)
       console.log('Approve sign in verification - Outcome sent')
 
+      if (signTimeoutRef.current) {
+        clearTimeout(signTimeoutRef.current)
+      }
+
       setView(View.VERIFY_SIGN_IN_COMPLETE)
 
       if (targetConfig.deepLink) {
         window.location.href = targetConfig.deepLink
       }
     } catch (e) {
+      if (signTimeoutRef.current) {
+        clearTimeout(signTimeoutRef.current)
+      }
+
       if (e instanceof IpValidationError) {
         setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
         setView(View.IP_VALIDATION_ERROR)
@@ -270,7 +288,7 @@ export const RequestPage = () => {
     } finally {
       setIsLoading(false)
     }
-  }, [setIsLoading, isUserUsingWeb2Wallet])
+  }, [setIsLoading, isUserUsingWeb2Wallet, isLoading])
 
   const onDenyWalletInteraction = useCallback(() => {
     setIsTransactionModalOpen(false)
@@ -372,6 +390,7 @@ export const RequestPage = () => {
               Yes, they are the same
             </Button>
           </div>
+          {hasTimedOut && <div className={styles.timeoutMessage}>The operation has taken too long. Please try again.</div>}
         </Container>
       )
     case View.WALLET_INTERACTION:
