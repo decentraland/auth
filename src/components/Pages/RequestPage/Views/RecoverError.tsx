@@ -1,3 +1,4 @@
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline'
 import { Container } from '../Container'
 import { CloseWindow } from './CloseWindow'
 import styles from './Views.module.css'
@@ -11,6 +12,8 @@ export const RecoverError = ({ error }: { error: React.ReactNode }) => (
       Explorer app, check your computer's time to see if it's set correctly.
     </div>
     <CloseWindow />
-    <div className={styles.errorMessage}>{error}</div>
+    <div className={styles.errorMessage}>
+      <ErrorOutlineIcon fontSize="large" sx={{ color: '#fb3b3b' }} /> {error}
+    </div>
   </Container>
 )
