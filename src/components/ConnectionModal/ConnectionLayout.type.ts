@@ -1,6 +1,6 @@
 import { ProviderType } from '@dcl/schemas'
 
-enum LoadingLayoutState {
+enum ConnectionLayoutState {
   CONNECTING_WALLET = 'CONNECTING_WALLET',
   WAITING_FOR_SIGNATURE = 'WAITING_FOR_SIGNATURE',
   ERROR = 'ERROR',
@@ -10,11 +10,11 @@ enum LoadingLayoutState {
   ERROR_LOCKED_WALLET = 'ERROR_LOCKED_WALLET'
 }
 
-type LoadingLayoutProps = {
+type ConnectionLayoutProps = {
   onTryAgain: () => void
-  state: LoadingLayoutState
+  state: ConnectionLayoutState
   providerType: ProviderType | null
 }
 
-export { LoadingLayoutState }
-export type { LoadingLayoutProps }
+export { ConnectionLayoutState }
+export type { ConnectionLayoutProps }

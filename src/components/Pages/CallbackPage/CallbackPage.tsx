@@ -10,9 +10,11 @@ import { ConnectionType } from '../../../modules/analytics/types'
 import { extractReferrerFromSearchParameters, locations } from '../../../shared/locations'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { createMagicInstance } from '../../../shared/utils/magicSdk'
-import { ConnectionModal, ConnectionModalState } from '../../ConnectionModal'
+import { ConnectionLayout } from '../../ConnectionModal/ConnectionLayout'
+import { ConnectionLayoutState } from '../../ConnectionModal/ConnectionLayout.type'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import { getIdentitySignature } from '../LoginPage/utils'
+import { Container, Wrapper } from './CallbackPage.styled'
 
 export const CallbackPage = () => {
   const { redirect } = useAfterLoginRedirection()
@@ -96,11 +98,14 @@ export const CallbackPage = () => {
   }, [logInAndRedirect, initialized, logInStarted])
 
   return (
-    <ConnectionModal
-      open={true}
-      state={ConnectionModalState.VALIDATING_SIGN_IN}
-      onTryAgain={connectAndGenerateSignature}
-      providerType={flags[FeatureFlagsKeys.MAGIC_TEST] ? ProviderType.MAGIC_TEST : ProviderType.MAGIC}
-    />
+    <Container>
+      <Wrapper>
+        <ConnectionLayout
+          state={ConnectionLayoutState.VALIDATING_SIGN_IN}
+          providerType={flags[FeatureFlagsKeys.MAGIC_TEST] ? ProviderType.MAGIC_TEST : ProviderType.MAGIC}
+          onTryAgain={connectAndGenerateSignature}
+        />
+      </Wrapper>
+    </Container>
   )
 }
