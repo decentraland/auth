@@ -60,4 +60,12 @@ const ProgressContainer = styled(Box)({
   color: 'rgb(235,68,90)'
 })
 
-export { ConnectionContainer, DecentralandLogo, TextWrapper, ConnectionTitle, TroubleSigningInText, ProgressContainer, ErrorButtonContainer }
+export {
+  ConnectionContainer,
+  DecentralandLogo,
+  TextWrapper,
+  ConnectionTitle,
+  TroubleSigningInText,
+  ProgressContainer,
+  ErrorButtonContainer
+}
