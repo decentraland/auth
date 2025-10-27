@@ -19,7 +19,8 @@ import {
   RecoverResponse,
   ExpiredRequestError,
   DifferentSenderError,
-  IpValidationError
+  IpValidationError,
+  TimedOutError
 } from '../../../shared/auth'
 import { useCurrentConnectionData } from '../../../shared/connection'
 import { isErrorWithMessage, isRpcError } from '../../../shared/errors'
@@ -243,28 +244,33 @@ export const RequestPage = () => {
     setIsLoading(true)
     setHasTimedOut(false)
     const provider = browserProvider.current
+    let hasTimeouted = false
+
+    if (!provider) {
+      setIsLoading(false)
+      throw new Error('Provider not created')
+    }
+
+    console.log("Approve sign in verification - Getting the provider's signer")
+    const signer = await provider.getSigner()
 
     signTimeoutRef.current = setTimeout(() => {
+      hasTimeouted = true
       setHasTimedOut(true)
       setIsLoading(false)
-    }, 30000) // 30 segundos
+    }, 30000)
 
     try {
-      if (!provider) {
-        throw new Error('Provider not created')
-      }
-
-      console.log("Approve sign in verification - Getting the provider's signer")
-      const signer = await provider.getSigner()
       console.log("Approve sign in verification - Got the provider's signer. Signing the message")
       const signature = await signer.signMessage(requestRef.current?.params?.[0])
+
+      if (hasTimeouted) {
+        throw new TimedOutError()
+      }
+
       console.log('Approve sign in verification - Signed the message. Sending the outcome to the server...')
       await authServerClient.current.sendSuccessfulOutcome(requestId, await signer.getAddress(), signature)
       console.log('Approve sign in verification - Outcome sent')
-
-      if (signTimeoutRef.current) {
-        clearTimeout(signTimeoutRef.current)
-      }
 
       setView(View.VERIFY_SIGN_IN_COMPLETE)
 
@@ -272,8 +278,8 @@ export const RequestPage = () => {
         window.location.href = targetConfig.deepLink
       }
     } catch (e) {
-      if (signTimeoutRef.current) {
-        clearTimeout(signTimeoutRef.current)
+      if (e instanceof TimedOutError) {
+        return
       }
 
       if (e instanceof IpValidationError) {
@@ -287,7 +293,12 @@ export const RequestPage = () => {
         setView(View.VERIFY_SIGN_IN_ERROR)
       }
     } finally {
-      setIsLoading(false)
+      if (signTimeoutRef.current) {
+        clearTimeout(signTimeoutRef.current)
+      }
+      if (!hasTimeouted) {
+        setIsLoading(false)
+      }
     }
   }, [setIsLoading, isUserUsingWeb2Wallet, isLoading])
 
