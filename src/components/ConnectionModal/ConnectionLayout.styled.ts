@@ -34,15 +34,20 @@ const ConnectionTitle = styled(Typography)(({ theme }) => ({
   verticalAlign: 'middle'
 }))
 
-const TroubleSigningInText = styled(Typography)(({ theme }) => ({
-  marginTop: theme.spacing(4),
-  marginBottom: theme.spacing(4),
+const TroubleSigningInTitle = styled(Typography)(({ theme }) => ({
   fontWeight: '500',
   fontStyle: 'Medium',
   fontSize: '24px',
   lineHeight: '133%',
   letterSpacing: '0px',
-  textAlign: 'left'
+  textAlign: 'center',
+  width: '100%',
+  marginBottom: theme.spacing(8)
+}))
+
+const TroubleSigningInText = styled(TroubleSigningInTitle)(({ theme }) => ({
+  textAlign: 'left',
+  marginBottom: theme.spacing(3)
 }))
 
 const ErrorButtonContainer = styled(Box)(({ theme }) => ({
@@ -53,18 +58,20 @@ const ErrorButtonContainer = styled(Box)(({ theme }) => ({
   marginBottom: theme.spacing(4)
 }))
 
-const ProgressContainer = styled(Box)({
+const ProgressContainer = styled(Box)(({ theme }) => ({
   display: 'flex',
   justifyContent: 'center',
   alignItems: 'center',
-  color: 'rgb(235,68,90)'
-})
+  color: 'rgb(235,68,90)',
+  marginBottom: theme.spacing(3)
+}))
 
 export {
   ConnectionContainer,
   DecentralandLogo,
   TextWrapper,
   ConnectionTitle,
+  TroubleSigningInTitle,
   TroubleSigningInText,
   ProgressContainer,
   ErrorButtonContainer

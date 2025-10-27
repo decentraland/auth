@@ -8,7 +8,8 @@ import {
   ProgressContainer,
   ErrorButtonContainer,
   TextWrapper,
-  TroubleSigningInText
+  TroubleSigningInText,
+  TroubleSigningInTitle
 } from './ConnectionLayout.styled'
 import { ConnectionLayoutState, type ConnectionLayoutProps } from './ConnectionLayout.type'
 
@@ -53,7 +54,7 @@ const ConnectionLayout = React.memo((props: ConnectionLayoutProps) => {
     if (isLoading && !hasTimedOut) {
       const timeoutId = setTimeout(() => {
         setHasTimedOut(true)
-      }, 30000)
+      }, 1000)
 
       return () => {
         clearTimeout(timeoutId)
@@ -81,7 +82,7 @@ const ConnectionLayout = React.memo((props: ConnectionLayoutProps) => {
       {!hasTimedOut && <ConnectionTitle>{getConnectionLayoutMessage(state, providerType, hasTimedOut)}</ConnectionTitle>}
       {hasTimedOut && (
         <TextWrapper>
-          <TroubleSigningInText>Trouble Signing In?</TroubleSigningInText>
+          <TroubleSigningInTitle>Trouble Signing In?</TroubleSigningInTitle>
           <TroubleSigningInText>
             1. Check if your wallet extension has a pending a sign request—approve it to continue.
           </TroubleSigningInText>
