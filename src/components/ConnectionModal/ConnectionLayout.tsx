@@ -91,7 +91,7 @@ const ConnectionLayout = React.memo((props: ConnectionLayoutProps) => {
           </TroubleSigningInText>
         </TextWrapper>
       )}
-      {isLoading && !hasTimedOut && (
+      {isLoading && (
         <ProgressContainer>
           <CircularProgress color="inherit" />
         </ProgressContainer>
