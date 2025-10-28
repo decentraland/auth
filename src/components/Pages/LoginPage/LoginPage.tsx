@@ -24,7 +24,8 @@ import { isClockSynchronized } from '../../../shared/utils/clockSync'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { ClockSyncModal } from '../../ClockSyncModal'
 import { Connection, ConnectionOptionType } from '../../Connection'
-import { ConnectionModal, ConnectionModalState } from '../../ConnectionModal'
+import { ConnectionModal } from '../../ConnectionModal'
+import { ConnectionLayoutState } from '../../ConnectionModal/ConnectionLayout.type'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import { MagicInformationModal } from '../../MagicInformationModal'
 import { WalletInformationModal } from '../../WalletInformationModal'
@@ -40,10 +41,10 @@ import styles from './LoginPage.module.css'
 const BACKGROUND_IMAGES = [Image1, Image2, Image3, Image4, Image5, Image6, Image7, Image8, Image9, Image10]
 
 export const LoginPage = () => {
-  const [connectionModalState, setConnectionModalState] = useState(ConnectionModalState.CONNECTING_WALLET)
+  const [loadingState, setLoadingState] = useState(ConnectionLayoutState.CONNECTING_WALLET)
   const [showLearnMore, setShowLearnMore] = useState(false)
   const [showMagicLearnMore, setShowMagicLearnMore] = useState(false)
-  const [showConnectionModal, setShowConnectionModal] = useState(false)
+  const [showConnectionLayout, setShowConnectionLayout] = useState(false)
   const [showClockSyncModal, setShowClockSyncModal] = useState(false)
   const [currentConnectionType, setCurrentConnectionType] = useState<ConnectionOptionType>()
   const { url: redirectTo, redirect } = useAfterLoginRedirection()
@@ -98,7 +99,7 @@ export const LoginPage = () => {
       const isSync = isClockSynchronized(healthData.timestamp)
 
       if (!isSync) {
-        setShowConnectionModal(false)
+        setShowConnectionLayout(false)
         setShowClockSyncModal(true)
         return false
       }
@@ -127,14 +128,14 @@ export const LoginPage = () => {
 
       try {
         if (isLoggingInThroughSocial) {
-          setConnectionModalState(ConnectionModalState.LOADING_MAGIC)
+          setLoadingState(ConnectionLayoutState.LOADING_MAGIC)
           await connectToSocialProvider(connectionType, flags[FeatureFlagsKeys.MAGIC_TEST], redirectTo)
         } else {
-          setShowConnectionModal(true)
-          setConnectionModalState(ConnectionModalState.CONNECTING_WALLET)
+          setShowConnectionLayout(true)
+          setLoadingState(ConnectionLayoutState.CONNECTING_WALLET)
           const connectionData = await connectToProvider(connectionType)
 
-          setConnectionModalState(ConnectionModalState.WAITING_FOR_SIGNATURE)
+          setLoadingState(ConnectionLayoutState.WAITING_FOR_SIGNATURE)
           await getIdentitySignature(connectionData.account?.toLowerCase() ?? '', connectionData.provider)
 
           await trackLoginSuccess({
@@ -150,7 +151,7 @@ export const LoginPage = () => {
           if (isClockSync) {
             await checkProfileAndRedirect(connectionData.account ?? '', referrer, () => {
               redirect()
-              setShowConnectionModal(false)
+              setShowConnectionLayout(false)
             })
           }
         }
@@ -163,15 +164,15 @@ export const LoginPage = () => {
         })
 
         if (isErrorWithName(error) && error.name === 'ErrorUnlockingWallet') {
-          setConnectionModalState(ConnectionModalState.ERROR_LOCKED_WALLET)
+          setLoadingState(ConnectionLayoutState.ERROR_LOCKED_WALLET)
         } else {
-          setConnectionModalState(ConnectionModalState.ERROR)
+          setLoadingState(ConnectionLayoutState.ERROR)
         }
       }
     },
     [
-      setConnectionModalState,
-      setShowConnectionModal,
+      setLoadingState,
+      setShowConnectionLayout,
       setCurrentConnectionType,
       redirectTo,
       flags[FeatureFlagsKeys.MAGIC_TEST],
@@ -185,10 +186,10 @@ export const LoginPage = () => {
   )
 
   const handleOnCloseConnectionModal = useCallback(() => {
-    setShowConnectionModal(false)
+    setShowConnectionLayout(false)
     setCurrentConnectionType(undefined)
-    setConnectionModalState(ConnectionModalState.CONNECTING_WALLET)
-  }, [setShowConnectionModal])
+    setLoadingState(ConnectionLayoutState.CONNECTING_WALLET)
+  }, [setShowConnectionLayout])
 
   const handleTryAgain = useCallback(() => {
     if (currentConnectionType) {
@@ -208,7 +209,7 @@ export const LoginPage = () => {
 
         await checkProfileAndRedirect(connectionData.account ?? '', referrer, () => {
           redirect()
-          setShowConnectionModal(false)
+          setShowConnectionLayout(false)
         })
       } catch (error) {
         handleError(error, 'Error during clock sync continue flow')
@@ -241,8 +242,8 @@ export const LoginPage = () => {
           <MagicInformationModal open={showMagicLearnMore} onClose={handleToggleMagicInfo} />
           <ClockSyncModal open={showClockSyncModal} onContinue={handleClockSyncContinue} onClose={handleClockSyncContinue} />
           <ConnectionModal
-            open={showConnectionModal}
-            state={connectionModalState}
+            open={showConnectionLayout}
+            state={loadingState}
             onClose={handleOnCloseConnectionModal}
             onTryAgain={handleTryAgain}
             providerType={currentConnectionType ? fromConnectionOptionToProviderType(currentConnectionType) : null}

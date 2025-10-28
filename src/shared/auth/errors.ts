@@ -22,3 +22,10 @@ export class IpValidationError extends Error {
     this.name = 'IpValidationError'
   }
 }
+
+export class TimedOutError extends Error {
+  constructor() {
+    super('The signing operation timed out')
+    this.name = 'TimedOutError'
+  }
+}

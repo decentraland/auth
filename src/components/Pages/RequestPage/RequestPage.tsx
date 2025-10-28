@@ -1,5 +1,6 @@
 import { useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline'
 import { ethers, BrowserProvider, formatEther } from 'ethers'
 import Icon from 'semantic-ui-react/dist/commonjs/elements/Icon/Icon'
 import { ChainId } from '@dcl/schemas'
@@ -18,7 +19,8 @@ import {
   RecoverResponse,
   ExpiredRequestError,
   DifferentSenderError,
-  IpValidationError
+  IpValidationError,
+  TimedOutError
 } from '../../../shared/auth'
 import { useCurrentConnectionData } from '../../../shared/connection'
 import { isErrorWithMessage, isRpcError } from '../../../shared/errors'
@@ -69,6 +71,7 @@ export const RequestPage = () => {
   const browserProvider = useRef<BrowserProvider>()
   const [view, setView] = useState(View.LOADING_REQUEST)
   const [isLoading, setIsLoading] = useState(false)
+  const [hasTimedOut, setHasTimedOut] = useState(false)
   const [walletInfo, setWalletInfo] = useState<{
     balance: bigint
     chainId: number
@@ -78,6 +81,7 @@ export const RequestPage = () => {
   const requestRef = useRef<RecoverResponse>()
   const [error, setError] = useState<string>()
   const timeoutRef = useRef<NodeJS.Timeout>()
+  const signTimeoutRef = useRef<NodeJS.Timeout>()
   const requestId = params.requestId ?? ''
   const [targetConfig, targetConfigId] = useTargetConfig()
   const isUserUsingWeb2Wallet = !!provider?.isMagic
@@ -206,6 +210,7 @@ export const RequestPage = () => {
 
     return () => {
       clearTimeout(timeoutRef.current)
+      clearTimeout(signTimeoutRef.current)
     }
   }, [toLoginPage, toSetupPage, account, provider, providerType, isConnecting, initializedFlags])
 
@@ -237,16 +242,32 @@ export const RequestPage = () => {
   const onApproveSignInVerification = useCallback(async () => {
     trackClick(ClickEvents.APPROVE_SING_IN)
     setIsLoading(true)
+    setHasTimedOut(false)
     const provider = browserProvider.current
-    try {
-      if (!provider) {
-        throw new Error('Provider not created')
-      }
+    let hasTimeouted = false
 
-      console.log("Approve sign in verification - Getting the provider's signer")
-      const signer = await provider.getSigner()
+    if (!provider) {
+      setIsLoading(false)
+      throw new Error('Provider not created')
+    }
+
+    console.log("Approve sign in verification - Getting the provider's signer")
+    const signer = await provider.getSigner()
+
+    signTimeoutRef.current = setTimeout(() => {
+      hasTimeouted = true
+      setHasTimedOut(true)
+      setIsLoading(false)
+    }, 30000)
+
+    try {
       console.log("Approve sign in verification - Got the provider's signer. Signing the message")
       const signature = await signer.signMessage(requestRef.current?.params?.[0])
+
+      if (hasTimeouted) {
+        throw new TimedOutError()
+      }
+
       console.log('Approve sign in verification - Signed the message. Sending the outcome to the server...')
       await authServerClient.current.sendSuccessfulOutcome(requestId, await signer.getAddress(), signature)
       console.log('Approve sign in verification - Outcome sent')
@@ -257,6 +278,10 @@ export const RequestPage = () => {
         window.location.href = targetConfig.deepLink
       }
     } catch (e) {
+      if (e instanceof TimedOutError) {
+        return
+      }
+
       if (e instanceof IpValidationError) {
         setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
         setView(View.IP_VALIDATION_ERROR)
@@ -268,9 +293,14 @@ export const RequestPage = () => {
         setView(View.VERIFY_SIGN_IN_ERROR)
       }
     } finally {
-      setIsLoading(false)
+      if (signTimeoutRef.current) {
+        clearTimeout(signTimeoutRef.current)
+      }
+      if (!hasTimeouted) {
+        setIsLoading(false)
+      }
     }
-  }, [setIsLoading, isUserUsingWeb2Wallet])
+  }, [setIsLoading, isUserUsingWeb2Wallet, isLoading])
 
   const onDenyWalletInteraction = useCallback(() => {
     setIsTransactionModalOpen(false)
@@ -372,6 +402,16 @@ export const RequestPage = () => {
               Yes, they are the same
             </Button>
           </div>
+          {hasTimedOut && (
+            <div className={styles.timeoutMessage}>
+              <ErrorOutlineIcon fontSize="large" sx={{ color: '#fb3b3b' }} />
+              <div>
+                You might be logged out of your wallet extension.
+                <br />
+                Please check that you're logged in and try again.
+              </div>
+            </div>
+          )}
         </Container>
       )
     case View.WALLET_INTERACTION:
