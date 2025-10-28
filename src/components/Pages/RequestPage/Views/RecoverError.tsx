@@ -1,5 +1,6 @@
 import { Container } from '../Container'
 import { CloseWindow } from './CloseWindow'
+import { ErrorMessageIcon } from './RecoverError.styled'
 import styles from './Views.module.css'
 
 export const RecoverError = ({ error }: { error: React.ReactNode }) => (
@@ -11,6 +12,8 @@ export const RecoverError = ({ error }: { error: React.ReactNode }) => (
       Explorer app, check your computer's time to see if it's set correctly.
     </div>
     <CloseWindow />
-    <div className={styles.errorMessage}>{error}</div>
+    <div className={styles.errorMessage}>
+      <ErrorMessageIcon /> {error}
+    </div>
   </Container>
 )

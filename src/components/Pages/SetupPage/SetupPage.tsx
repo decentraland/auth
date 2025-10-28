@@ -24,7 +24,8 @@ import { useCurrentConnectionData } from '../../../shared/connection/hooks'
 import { locations } from '../../../shared/locations'
 import { isProfileComplete } from '../../../shared/profile'
 import { handleError } from '../../../shared/utils/errorHandler'
-import { ConnectionModal, ConnectionModalState } from '../../ConnectionModal'
+import { ConnectionModal } from '../../ConnectionModal'
+import { ConnectionLayoutState } from '../../ConnectionModal/ConnectionLayout.type'
 import { CustomWearablePreview } from '../../CustomWearablePreview'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import { DifferentAccountError } from '../RequestPage/Views/DifferentAccountError'
@@ -479,7 +480,7 @@ export const SetupPage = () => {
           <div className={styles.background} />
           <ConnectionModal
             open={isConnectionModalOpen}
-            state={ConnectionModalState.WAITING_FOR_SIGNATURE}
+            state={ConnectionLayoutState.WAITING_FOR_SIGNATURE}
             providerType={providerType ?? null}
             onTryAgain={() => undefined}
           />

@@ -1,3 +1,4 @@
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline'
 import { Container } from '../Container'
 import { CloseWindow } from './CloseWindow'
 import styles from './Views.module.css'
@@ -13,9 +14,12 @@ export const IpValidationError = ({ requestId, reason }: { requestId: string; re
       </div>
       <CloseWindow />
       <div className={styles.errorMessage}>
-        <strong>Request ID:</strong> {requestId}
-        <br />
-        <strong>Reason:</strong> {reason}
+        <ErrorOutlineIcon fontSize="large" sx={{ color: '#fb3b3b' }} />
+        <div>
+          <strong>Request ID:</strong> {requestId}
+          <br />
+          <strong>Reason:</strong> {reason}
+        </div>
       </div>
     </Container>
   )
