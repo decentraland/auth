@@ -54,7 +54,7 @@ const ConnectionLayout = React.memo((props: ConnectionLayoutProps) => {
     if (isLoading && !hasTimedOut) {
       const timeoutId = setTimeout(() => {
         setHasTimedOut(true)
-      }, 1000)
+      }, 30000)
 
       return () => {
         clearTimeout(timeoutId)
