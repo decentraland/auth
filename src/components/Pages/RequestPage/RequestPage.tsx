@@ -28,7 +28,7 @@ import { extractReferrerFromSearchParameters, locations } from '../../../shared/
 import { isProfileComplete } from '../../../shared/profile'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { checkWebGpuSupport } from '../../../shared/utils/webgpu'
-import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
+import { FeatureFlagsContext, FeatureFlagsKeys, OnboardingFlowVariant } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
 import { Container } from './Container'
 import { DeniedSignIn } from './Views/DeniedSignIn'
 import { DeniedWalletInteraction } from './Views/DeniedWalletInteraction'
@@ -96,7 +96,7 @@ export const RequestPage = () => {
     const referrer = extractReferrerFromSearchParameters(searchParams)
 
     // Check A/B testing new onboarding flow
-    const isFlowV2OnboardingFlowEnabled = variants[FeatureFlagsKeys.ONBOARDING_FLOW]?.name === 'V2'
+    const isFlowV2OnboardingFlowEnabled = variants[FeatureFlagsKeys.ONBOARDING_FLOW]?.name === OnboardingFlowVariant.V2
 
     const hasWebGPU = await checkWebGpuSupport()
     const isAvatarSetupFlowAllowed = isFlowV2OnboardingFlowEnabled && hasWebGPU

@@ -9,6 +9,11 @@ export enum FeatureFlagsKeys {
   ONBOARDING_FLOW = 'dapps-onboarding-flow'
 }
 
+export enum OnboardingFlowVariant {
+  V1 = 'V1',
+  V2 = 'V2'
+}
+
 type FeatureFlagsVariants = Record<FeatureFlagsKeys, { enabled: boolean; name: string; payload?: { type: string; value: string } }>
 
 export type FeatureFlagsContextType = {

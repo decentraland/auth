@@ -3,7 +3,7 @@ import type { Profile } from 'dcl-catalyst-client/dist/client/specs/catalyst.sch
 import { AuthIdentity } from '@dcl/crypto'
 import { ProviderType } from '@dcl/schemas'
 import { connection } from 'decentraland-connect'
-import { FeatureFlagsContext, FeatureFlagsKeys } from '../components/FeatureFlagsProvider'
+import { FeatureFlagsContext, FeatureFlagsKeys, OnboardingFlowVariant } from '../components/FeatureFlagsProvider'
 import { fetchProfileWithConsistencyCheck, redeployExistingProfile } from '../modules/profile'
 import { useCurrentConnectionData } from '../shared/connection/hook'
 import { locations } from '../shared/locations'
@@ -70,7 +70,7 @@ export const useAuthFlow = () => {
         const consistencyResult = await fetchProfileWithConsistencyCheck(account)
 
         // Check A/B testing new onboarding flow
-        const isFlowV2OnboardingFlowEnabled = variants[FeatureFlagsKeys.ONBOARDING_FLOW]?.name === 'V2'
+        const isFlowV2OnboardingFlowEnabled = variants[FeatureFlagsKeys.ONBOARDING_FLOW]?.name === OnboardingFlowVariant.V2
 
         // If profile is not consistent across catalysts, try to redeploy if we have a valid entity
         if (!consistencyResult.isConsistent) {
