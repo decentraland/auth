@@ -70,7 +70,7 @@ export const useAuthFlow = () => {
         const consistencyResult = await fetchProfileWithConsistencyCheck(account)
 
         // Check A/B testing new onboarding flow
-        const isCurrentOnboardingFlowEnabled = variants[FeatureFlagsKeys.ONBOARDING_FLOW]?.name === 'current'
+        const isFlowV2OnboardingFlowEnabled = variants[FeatureFlagsKeys.ONBOARDING_FLOW]?.name === 'V2'
 
         // If profile is not consistent across catalysts, try to redeploy if we have a valid entity
         if (!consistencyResult.isConsistent) {
@@ -92,7 +92,7 @@ export const useAuthFlow = () => {
 
           // Fallback to onboarding flow (original behavior)
           const hasWebGPU = await checkWebGpuSupport()
-          const isAvatarSetupFlowAllowed = isCurrentOnboardingFlowEnabled && hasWebGPU
+          const isAvatarSetupFlowAllowed = isFlowV2OnboardingFlowEnabled && hasWebGPU
 
           if (isAvatarSetupFlowAllowed) {
             return navigate(locations.avatarSetup(redirectTo, referrer))
@@ -104,7 +104,7 @@ export const useAuthFlow = () => {
         // If consistent, check if profile exists and is complete
         const profile: Profile | undefined = consistencyResult.entity?.metadata as Profile
         const hasWebGPU = await checkWebGpuSupport()
-        const isAvatarSetupFlowAllowed = isCurrentOnboardingFlowEnabled && hasWebGPU
+        const isAvatarSetupFlowAllowed = isFlowV2OnboardingFlowEnabled && hasWebGPU
         const isProfileIncomplete = !profile || !isProfileComplete(profile)
 
         if (isProfileIncomplete && !isAvatarSetupFlowAllowed) {

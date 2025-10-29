@@ -96,10 +96,10 @@ export const RequestPage = () => {
     const referrer = extractReferrerFromSearchParameters(searchParams)
 
     // Check A/B testing new onboarding flow
-    const isCurrentOnboardingFlowEnabled = variants[FeatureFlagsKeys.ONBOARDING_FLOW]?.name === 'current'
+    const isFlowV2OnboardingFlowEnabled = variants[FeatureFlagsKeys.ONBOARDING_FLOW]?.name === 'V2'
 
     const hasWebGPU = await checkWebGpuSupport()
-    const isAvatarSetupFlowAllowed = isCurrentOnboardingFlowEnabled && hasWebGPU
+    const isAvatarSetupFlowAllowed = isFlowV2OnboardingFlowEnabled && hasWebGPU
     if (isAvatarSetupFlowAllowed) {
       navigate(locations.avatarSetup(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}`, referrer))
     } else {
