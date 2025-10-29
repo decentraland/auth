@@ -3,7 +3,7 @@ import type { Profile } from 'dcl-catalyst-client/dist/client/specs/catalyst.sch
 import { AuthIdentity } from '@dcl/crypto'
 import { ProviderType } from '@dcl/schemas'
 import { connection } from 'decentraland-connect'
-import { FeatureFlagsContext, FeatureFlagsKeys } from '../components/FeatureFlagsProvider'
+import { FeatureFlagsContext, FeatureFlagsKeys, OnboardingFlowVariant } from '../components/FeatureFlagsProvider'
 import { fetchProfileWithConsistencyCheck, redeployExistingProfile } from '../modules/profile'
 import { useCurrentConnectionData } from '../shared/connection/hook'
 import { locations } from '../shared/locations'
@@ -13,6 +13,16 @@ import { useNavigateWithSearchParams } from './navigation'
 import { useAfterLoginRedirection } from './redirection'
 import { useTargetConfig } from './targetConfig'
 
+/**
+ * Custom hook that manages authentication flow logic including Magic connection
+ * and profile validation with redirects based on profile state and feature flags.
+ *
+ * @returns {{
+ *   checkProfileAndRedirect: (account: string, referrer: string | null, redirect: () => void, providedIdentity?: AuthIdentity | null) => Promise<void>,
+ *   connectToMagic: () => Promise<import('decentraland-connect').ConnectionResponse | undefined>,
+ *   isInitialized: boolean
+ * }} Authentication flow utilities and initialization status
+ */
 export const useAuthFlow = () => {
   const navigate = useNavigateWithSearchParams()
   const { url: redirectTo } = useAfterLoginRedirection()
@@ -21,6 +31,13 @@ export const useAuthFlow = () => {
   const [targetConfig] = useTargetConfig()
   const { identity } = useCurrentConnectionData()
 
+  /**
+   * Connects to the Magic wallet provider based on the current feature flag configuration.
+   * Returns undefined if feature flags are not yet initialized.
+   *
+   * @returns {Promise<import('decentraland-connect').ConnectionResponse | undefined>} Resolves with the connection data,
+   * or undefined when feature flags are not ready
+   */
   const connectToMagic = useCallback(async () => {
     if (!flagInitialized) {
       return undefined
@@ -30,6 +47,18 @@ export const useAuthFlow = () => {
     return await connection.connect(providerType)
   }, [flags[FeatureFlagsKeys.MAGIC_TEST], flagInitialized])
 
+  /**
+   * Checks profile consistency across catalysts and redirects based on profile state.
+   * Handles profile redeployment if inconsistent, and navigates to setup/avatar setup
+   * flows based on feature flags and WebGPU support.
+   *
+   * @param {string} account - The user's account address
+   * @param {string | null} referrer - The referrer URL string or null
+   * @param {() => void} redirect - Callback function to execute for successful redirect
+   * @param {AuthIdentity | null} [providedIdentity] - Optional authentication identity to use for redeployment.
+   * Falls back to hook identity if not provided.
+   * @returns {Promise<void>} A promise that resolves after the navigation or redirect completes
+   */
   const checkProfileAndRedirect = useCallback(
     async (account: string, referrer: string | null, redirect: () => void, providedIdentity: AuthIdentity | null = null) => {
       if (!flagInitialized) {
@@ -41,7 +70,7 @@ export const useAuthFlow = () => {
         const consistencyResult = await fetchProfileWithConsistencyCheck(account)
 
         // Check A/B testing new onboarding flow
-        const isCurrentOnboardingFlowEnabled = variants[FeatureFlagsKeys.ONBOARDING_FLOW]?.name === 'current'
+        const isFlowV2OnboardingFlowEnabled = variants[FeatureFlagsKeys.ONBOARDING_FLOW]?.name === OnboardingFlowVariant.V2
 
         // If profile is not consistent across catalysts, try to redeploy if we have a valid entity
         if (!consistencyResult.isConsistent) {
@@ -63,7 +92,7 @@ export const useAuthFlow = () => {
 
           // Fallback to onboarding flow (original behavior)
           const hasWebGPU = await checkWebGpuSupport()
-          const isAvatarSetupFlowAllowed = isCurrentOnboardingFlowEnabled && hasWebGPU
+          const isAvatarSetupFlowAllowed = isFlowV2OnboardingFlowEnabled && hasWebGPU
 
           if (isAvatarSetupFlowAllowed) {
             return navigate(locations.avatarSetup(redirectTo, referrer))
@@ -75,7 +104,7 @@ export const useAuthFlow = () => {
         // If consistent, check if profile exists and is complete
         const profile: Profile | undefined = consistencyResult.entity?.metadata as Profile
         const hasWebGPU = await checkWebGpuSupport()
-        const isAvatarSetupFlowAllowed = isCurrentOnboardingFlowEnabled && hasWebGPU
+        const isAvatarSetupFlowAllowed = isFlowV2OnboardingFlowEnabled && hasWebGPU
         const isProfileIncomplete = !profile || !isProfileComplete(profile)
 
         if (isProfileIncomplete && !isAvatarSetupFlowAllowed) {
