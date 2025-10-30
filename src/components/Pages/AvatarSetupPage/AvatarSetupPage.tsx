@@ -322,7 +322,7 @@ const AvatarSetupPage: React.FC = () => {
     if (state.username !== '' && state.isTermsChecked && state.hasWearablePreviewLoaded && !state.hasEmailError) {
       handleContinueClick()
     }
-  }, [handleContinueClick, state.hasWearablePreviewLoaded])
+  }, [state.hasWearablePreviewLoaded])
 
   useEffect(() => {
     if (isConnecting || !initializedFlags) return
