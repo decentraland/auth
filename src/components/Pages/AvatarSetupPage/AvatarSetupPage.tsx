@@ -66,11 +66,11 @@ const AvatarSetupPage: React.FC = () => {
   const { trackClick, trackAvatarEditSuccess, trackTermsOfServiceSuccess, trackCheckTermsOfService } = useAnalytics()
 
   const [state, setState] = useState<AvatarSetupState>({
-    username: localStorage.getItem('dcl_avatar_setup_username') || '',
-    email: localStorage.getItem('dcl_avatar_setup_email') || '',
+    username: sessionStorage.getItem('dcl_avatar_setup_username') || '',
+    email: sessionStorage.getItem('dcl_avatar_setup_email') || '',
     hasEmailError: false,
     showWearablePreview: false,
-    isTermsChecked: localStorage.getItem('dcl_avatar_setup_is_terms_checked') === 'true' || false,
+    isTermsChecked: sessionStorage.getItem('dcl_avatar_setup_is_terms_checked') === 'true' || false,
     isEmailInherited: false,
     hasWearablePreviewLoaded: false
   })
@@ -142,13 +142,13 @@ const AvatarSetupPage: React.FC = () => {
   const handleUsernameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value
     setState(prev => ({ ...prev, username: value }))
-    localStorage.setItem('dcl_avatar_setup_username', value)
+    sessionStorage.setItem('dcl_avatar_setup_username', value)
   }, [])
 
   const handleEmailChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value
     setState(prev => ({ ...prev, email: value, hasEmailError: false }))
-    localStorage.setItem('dcl_avatar_setup_email', value)
+    sessionStorage.setItem('dcl_avatar_setup_email', value)
   }, [])
 
   const handleMessage = useCallback(
@@ -216,9 +216,9 @@ const AvatarSetupPage: React.FC = () => {
           // Clear the stored email after using it
           localStorage.removeItem('dcl_magic_user_email')
         }
-        localStorage.removeItem('dcl_avatar_setup_username')
-        localStorage.removeItem('dcl_avatar_setup_email')
-        localStorage.removeItem('dcl_avatar_setup_is_terms_checked')
+        sessionStorage.removeItem('dcl_avatar_setup_username')
+        sessionStorage.removeItem('dcl_avatar_setup_email')
+        sessionStorage.removeItem('dcl_avatar_setup_is_terms_checked')
 
         const hasLauncher = await launchDesktopApp({})
 
@@ -270,7 +270,7 @@ const AvatarSetupPage: React.FC = () => {
       const value = e.target.checked
       if (value) {
         trackCheckTermsOfService()
-        localStorage.setItem('dcl_avatar_setup_is_terms_checked', 'true')
+        sessionStorage.setItem('dcl_avatar_setup_is_terms_checked', 'true')
       }
       setState(prev => ({ ...prev, isTermsChecked: value }))
     },
