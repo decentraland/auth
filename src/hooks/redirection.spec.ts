@@ -235,4 +235,107 @@ describe('when using the redirection hook', () => {
       }).not.toThrow()
     })
   })
+
+  describe('and the redirect function is called with overrideUrl', () => {
+    beforeEach(() => {
+      mockedUseLocation.mockReturnValue({ search: 'redirectTo=http://localhost/test' } as Location)
+    })
+
+    describe('and the overrideUrl is a valid local path', () => {
+      let overrideUrl: string
+
+      beforeEach(() => {
+        overrideUrl = '/new-path'
+      })
+
+      it('should accept overrideUrl without throwing errors', () => {
+        const { result } = renderHook(() => useAfterLoginRedirection())
+
+        expect(() => {
+          result.current.redirect(undefined, overrideUrl)
+        }).not.toThrow()
+      })
+
+      it('should accept overrideUrl with parameters without throwing errors', () => {
+        const { result } = renderHook(() => useAfterLoginRedirection())
+
+        expect(() => {
+          result.current.redirect({ user: '0x123' }, overrideUrl)
+        }).not.toThrow()
+      })
+    })
+
+    describe('and the overrideUrl is a valid full URL', () => {
+      let overrideUrl: string
+
+      beforeEach(() => {
+        overrideUrl = 'http://localhost/custom-path'
+      })
+
+      it('should accept overrideUrl without throwing errors', () => {
+        const { result } = renderHook(() => useAfterLoginRedirection())
+
+        expect(() => {
+          result.current.redirect(undefined, overrideUrl)
+        }).not.toThrow()
+      })
+    })
+
+    describe('and the overrideUrl points to another domain', () => {
+      let overrideUrl: string
+
+      beforeEach(() => {
+        overrideUrl = 'https://malicious.com/path'
+      })
+
+      it('should fallback to default redirect when hostname does not match', () => {
+        const { result } = renderHook(() => useAfterLoginRedirection())
+        const originalLocation = window.location.href
+
+        expect(() => {
+          result.current.redirect(undefined, overrideUrl)
+        }).not.toThrow()
+
+        window.location.href = originalLocation
+      })
+    })
+
+    describe('and the overrideUrl has an invalid protocol', () => {
+      let overrideUrl: string
+
+      beforeEach(() => {
+        overrideUrl = 'javascript:alert("xss")'
+      })
+
+      it('should fallback to default redirect when protocol is invalid', () => {
+        const { result } = renderHook(() => useAfterLoginRedirection())
+        const originalLocation = window.location.href
+
+        expect(() => {
+          result.current.redirect(undefined, overrideUrl)
+        }).not.toThrow()
+
+        window.location.href = originalLocation
+      })
+    })
+
+    describe('and the overrideUrl is invalid', () => {
+      let overrideUrl: string
+
+      beforeEach(() => {
+        overrideUrl = 'not-a-valid-url'
+      })
+
+      it('should fallback to default redirect when URL cannot be parsed', () => {
+        const { result } = renderHook(() => useAfterLoginRedirection())
+        const originalLocation = window.location.href
+
+        expect(() => {
+          result.current.redirect(undefined, overrideUrl)
+        }).not.toThrow()
+
+        window.location.href = originalLocation
+      })
+    })
+  })
 })
