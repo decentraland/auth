@@ -10,6 +10,7 @@ import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { useAnalytics } from '../../../hooks/useAnalytics'
 import { useSignRequest } from '../../../hooks/useSignRequest'
 import { useTrackReferral } from '../../../hooks/useTrackReferral'
+import { config } from '../../../modules/config'
 import { fetchProfile } from '../../../modules/profile'
 import { createAuthServerHttpClient, createAuthServerWsClient, IpValidationError } from '../../../shared/auth'
 import { useCurrentConnectionData } from '../../../shared/connection/hooks'
@@ -229,7 +230,7 @@ const AvatarSetupPage: React.FC = () => {
             // If the site to be redirect to is a request site, we need to recover the request and sign in
             await signRequest(provider, requestId, account)
           } else {
-            redirect({ user: account })
+            redirect({ user: account }, config.get('DOWNLOAD_URL'))
           }
         }
       } catch (e) {
