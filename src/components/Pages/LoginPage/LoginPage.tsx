@@ -23,7 +23,7 @@ import { extractReferrerFromSearchParameters } from '../../../shared/locations'
 import { isClockSynchronized } from '../../../shared/utils/clockSync'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { ClockSyncModal } from '../../ClockSyncModal'
-import { Connection, ConnectionOptionType } from '../../Connection'
+import { ConnectionOptionType, ConnectionNew } from '../../Connection'
 import { ConnectionModal } from '../../ConnectionModal'
 import { ConnectionLayoutState } from '../../ConnectionModal/ConnectionLayout.type'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
@@ -39,8 +39,13 @@ import {
 import styles from './LoginPage.module.css'
 
 const BACKGROUND_IMAGES = [Image1, Image2, Image3, Image4, Image5, Image6, Image7, Image8, Image9, Image10]
+const NEW_USER_PARAM_VARIANTS = ['newUser', 'newuser', 'new-user', 'new_user']
 
 export const LoginPage = () => {
+  const isNewUser = useMemo(() => {
+    const search = new URLSearchParams(window.location.search)
+    return NEW_USER_PARAM_VARIANTS.some(variant => search.has(variant))
+  }, [])
   const [loadingState, setLoadingState] = useState(ConnectionLayoutState.CONNECTING_WALLET)
   const [showLearnMore, setShowLearnMore] = useState(false)
   const [showMagicLearnMore, setShowMagicLearnMore] = useState(false)
@@ -49,6 +54,8 @@ export const LoginPage = () => {
   const [currentConnectionType, setCurrentConnectionType] = useState<ConnectionOptionType>()
   const { url: redirectTo, redirect } = useAfterLoginRedirection()
   const { initialized: flagInitialized, flags } = useContext(FeatureFlagsContext)
+
+  // TODO: remove /play from redirectTo
   const showGuestOption = redirectTo && new URL(redirectTo).pathname.includes('/play')
   const [currentBackgroundIndex, setCurrentBackgroundIndex] = useState(0)
   const [targetConfig] = useTargetConfig()
@@ -250,11 +257,12 @@ export const LoginPage = () => {
           />
           <div className={styles.left}>
             <div className={styles.leftInfo}>
-              <Connection
+              <ConnectionNew
                 onLearnMore={handleLearnMore}
                 onConnect={handleOnConnect}
                 loadingOption={currentConnectionType}
                 connectionOptions={targetConfig.connectionOptions}
+                isNewUser={isNewUser}
               />
               {showGuestOption && (
                 <div className={styles.guestInfo}>
