@@ -49,6 +49,7 @@ export type ConnectionProps = {
   }
   className?: string
   loadingOption?: ConnectionOptionType
+  isNewUser?: boolean
   onConnect: (wallet: ConnectionOptionType) => unknown
   onLearnMore: (type?: ConnectionOptionType) => unknown
 }
