@@ -9,5 +9,6 @@
   "BUILDER_SERVER_URL": "https://builder-api.decentraland.zone",
   "INTERCOM_APP_ID": "z0h94kay",
   "REFERRAL_SERVER_URL": "https://social-api.decentraland.zone/v1",
-  "WEARABLE_PREVIEW_URL": "https://wearable-preview.decentraland.zone"
+  "WEARABLE_PREVIEW_URL": "https://wearable-preview.decentraland.zone",
+  "DOWNLOAD_URL": "https://decentraland.zone/download"
 }
