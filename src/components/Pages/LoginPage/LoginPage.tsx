@@ -1,6 +1,12 @@
 import { useState, useCallback, useMemo, useEffect, useContext } from 'react'
 import { Env } from '@dcl/ui-env'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
+import ImageNew1 from '../../../assets/images/background/image-new1.webp'
+import ImageNew2 from '../../../assets/images/background/image-new2.webp'
+import ImageNew3 from '../../../assets/images/background/image-new3.webp'
+import ImageNew4 from '../../../assets/images/background/image-new4.webp'
+import ImageNew5 from '../../../assets/images/background/image-new5.webp'
+import ImageNew6 from '../../../assets/images/background/image-new6.webp'
 import Image1 from '../../../assets/images/background/image1.webp'
 import Image10 from '../../../assets/images/background/image10.webp'
 import Image2 from '../../../assets/images/background/image2.webp'
@@ -39,6 +45,7 @@ import {
 import styles from './LoginPage.module.css'
 
 const BACKGROUND_IMAGES = [Image1, Image2, Image3, Image4, Image5, Image6, Image7, Image8, Image9, Image10]
+const NEW_USER_BACKGROUND_IMAGES = [ImageNew1, ImageNew2, ImageNew3, ImageNew4, ImageNew5, ImageNew6]
 const NEW_USER_PARAM_VARIANTS = ['newUser', 'newuser', 'new-user', 'new_user']
 
 export const LoginPage = () => {
@@ -227,7 +234,7 @@ export const LoginPage = () => {
   useEffect(() => {
     const backgroundInterval = setInterval(() => {
       setCurrentBackgroundIndex(index => {
-        if (index === BACKGROUND_IMAGES.length - 1) {
+        if (index === (isNewUser ? NEW_USER_BACKGROUND_IMAGES.length - 1 : BACKGROUND_IMAGES.length - 1)) {
           return 0
         }
         return index + 1
@@ -240,7 +247,14 @@ export const LoginPage = () => {
 
   return (
     <main className={styles.main}>
-      <div className={styles.background} style={{ backgroundImage: `url(${BACKGROUND_IMAGES[currentBackgroundIndex]})` }} />
+      <div
+        className={styles.background}
+        style={{
+          backgroundImage: `url(${
+            isNewUser ? NEW_USER_BACKGROUND_IMAGES[currentBackgroundIndex] : BACKGROUND_IMAGES[currentBackgroundIndex]
+          })`
+        }}
+      />
       {config.is(Env.DEVELOPMENT) && !flagInitialized ? (
         <Loader active size="massive" />
       ) : (
