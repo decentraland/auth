@@ -20,7 +20,6 @@ const Title = styled(Typography)(({ theme }) => ({
   boxSizing: 'border-box',
   display: 'block',
   fontWeight: '600',
-  height: '38.5703px',
   letterSpacing: '0.13132px'
 }))
 
