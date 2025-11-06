@@ -1,15 +1,6 @@
-import React from 'react'
-import { SecondaryOptionButton, ShowMoreSecondaryOptions } from './ConnectionSecondaryButton.styled'
 import { ConnectionOption } from './ConnectionOption'
-import { ConnectionOptionType } from './Connection.types'
-
-export type ConnectionSecondaryButtonProps = {
-  options: ConnectionOptionType[]
-  tooltipDirection?: 'top center' | 'bottom center'
-  testId?: string
-  loadingOption?: ConnectionOptionType
-  onConnect: (wallet: ConnectionOptionType) => unknown
-}
+import { SecondaryOptionButton, ShowMoreSecondaryOptions } from './ConnectionSecondaryButton.styled'
+import { ConnectionSecondaryButtonProps } from './ConnectionSecondaryButton.types'
 
 export const ConnectionSecondaryButton = ({
   options,
@@ -34,4 +25,3 @@ export const ConnectionSecondaryButton = ({
     ))}
   </ShowMoreSecondaryOptions>
 )
-

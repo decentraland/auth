@@ -1,4 +1,4 @@
-import { Box, styled } from 'decentraland-ui2'
+import { Box, Button, styled } from 'decentraland-ui2'
 import magicSvg from '../../assets/images/magic.svg'
 
 const PrimaryContainer = styled(Box)(({ theme }) => ({
@@ -47,12 +47,73 @@ const PrimaryOption = styled(Box)({
   width: '100%'
 })
 
+const PrimaryButton = styled(Button)<{ isNewUser?: boolean }>(({ theme, isNewUser }) => ({
+  width: '100%',
+  display: 'flex',
+  flexDirection: 'row',
+  alignItems: 'center',
+  backgroundColor: theme.palette.common.white,
+  color: theme.palette.common.black,
+  fontWeight: 600,
+  height: '46px',
+  justifyContent: isNewUser ? 'flex-start' : 'center',
+  gap: 0,
+  transition: 'transform 0.2s ease-in-out',
+  ['&.MuiButton-root']: {
+    backgroundColor: theme.palette.common.white,
+    color: theme.palette.common.black
+  },
+  ['& .MuiButton-startIcon']: {
+    margin: 0,
+    marginRight: theme.spacing(1)
+  },
+  ['&:hover']: {
+    backgroundColor: theme.palette.common.white,
+    color: theme.palette.common.black,
+    transform: 'translateY(-2px)'
+  },
+  ['&:active']: {
+    backgroundColor: theme.palette.common.white,
+    color: theme.palette.common.black,
+    transform: 'translateY(0)'
+  },
+  ['&:focus']: {
+    backgroundColor: theme.palette.common.white,
+    color: theme.palette.common.black
+  },
+  ['&:focus-visible']: {
+    backgroundColor: theme.palette.common.white,
+    color: theme.palette.common.black
+  },
+  ['&.MuiButton-text']: {
+    backgroundColor: theme.palette.common.white,
+    color: theme.palette.common.black
+  },
+  ['&.MuiButton-text:hover']: {
+    backgroundColor: theme.palette.common.white,
+    color: theme.palette.common.black,
+    transform: 'translateY(-2px)'
+  },
+  ['&.MuiButton-text:active']: {
+    backgroundColor: theme.palette.common.white,
+    color: theme.palette.common.black,
+    transform: 'translateY(0)'
+  }
+}))
+
+const PrimaryButtonWrapper = styled(Box)<{ isNewUser?: boolean }>(({ isNewUser }) => ({
+  display: 'flex',
+  justifyContent: 'space-between',
+  width: isNewUser ? '100%' : 'auto'
+}))
+
 export {
   PrimaryContainer,
   PrimaryLearnMore,
   PrimaryMagic,
   PrimaryMessage,
   PrimaryOption,
-  PrimaryOptionWrapper
+  PrimaryOptionWrapper,
+  PrimaryButton,
+  PrimaryButtonWrapper
 }
-

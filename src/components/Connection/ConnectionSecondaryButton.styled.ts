@@ -27,8 +27,4 @@ const SecondaryOptionButton = styled(Box)(({ theme }) => ({
   }
 }))
 
-export {
-  SecondaryOptionButton,
-  ShowMoreSecondaryOptions
-}
-
+export { SecondaryOptionButton, ShowMoreSecondaryOptions }

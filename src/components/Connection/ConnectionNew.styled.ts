@@ -9,7 +9,10 @@ const ConnectionContainer = styled(Box)(({ theme }) => ({
 }))
 
 const DclLogoContainer = styled(Box)(({ theme }) => ({
-  marginBottom: theme.spacing(3)
+  marginBottom: theme.spacing(3),
+  display: 'flex',
+  alignItems: 'center',
+  gap: theme.spacing(1)
 }))
 
 const Title = styled(Typography)(({ theme }) => ({

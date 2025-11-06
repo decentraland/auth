@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react'
-import { Logo } from 'decentraland-ui2'
+import { Logo, Typography } from 'decentraland-ui2'
 import {
   ChevronIcon,
   ChevronUpIcon,
@@ -39,6 +39,11 @@ export const ConnectionNew = (props: ConnectionProps): JSX.Element => {
     <ConnectionContainer className={className}>
       <DclLogoContainer>
         <Logo size="large" />
+        {isNewUser && (
+          <Typography sx={{ fontFamily: 'DecentralandHero' }} variant="h3">
+            Decentraland
+          </Typography>
+        )}
       </DclLogoContainer>
       <div>
         <Title>{i18n.title}</Title>
@@ -55,6 +60,7 @@ export const ConnectionNew = (props: ConnectionProps): JSX.Element => {
             }}
             onConnect={onConnect}
             onLearnMore={onLearnMore}
+            isNewUser={isNewUser}
           />
         )}
         {connectionOptions?.secondary && (
@@ -70,6 +76,7 @@ export const ConnectionNew = (props: ConnectionProps): JSX.Element => {
             }}
             onConnect={onConnect}
             onLearnMore={onLearnMore}
+            isNewUser={isNewUser}
           />
         )}
       </div>
