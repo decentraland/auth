@@ -7,4 +7,3 @@ export type ConnectionSecondaryButtonProps = {
   loadingOption?: ConnectionOptionType
   onConnect: (wallet: ConnectionOptionType) => unknown
 }
-

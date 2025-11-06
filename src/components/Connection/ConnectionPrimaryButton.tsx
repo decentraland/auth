@@ -54,6 +54,7 @@ export const ConnectionPrimaryButton = ({
       <PrimaryOptionWrapper>
         <PrimaryOption>
           <PrimaryButton
+            data-testid={testId ? `${testId}-${option}-button` : undefined}
             startIcon={!isLoading && <ConnectionIcon type={option} />}
             disabled={!!loadingOption || !!error}
             onClick={() => onConnect(option)}
