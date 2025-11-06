@@ -1,13 +1,26 @@
 import React, { useCallback, useState } from 'react'
-import classNames from 'classnames'
-import Icon from 'semantic-ui-react/dist/commonjs/elements/Icon/Icon'
-import { Button } from 'decentraland-ui/dist/components/Button/Button'
-import logoSrc from '../../assets/images/logo.svg'
+import { Logo } from 'decentraland-ui2'
 import { isSocialLogin } from '../Pages/LoginPage/utils'
+import {
+  ChevronIcon,
+  ChevronUpIcon,
+  ConnectionContainer,
+  DclLogoContainer,
+  PrimaryContainer,
+  PrimaryLearnMore,
+  PrimaryMagic,
+  PrimaryMessage,
+  PrimaryOption,
+  PrimaryOptionWrapper,
+  SecondaryOptionButton,
+  ShowMoreButton,
+  ShowMoreContainer,
+  ShowMoreSecondaryOptions,
+  Title
+} from './ConnectionNew.styled'
 import { ConnectionOption } from './ConnectionOption'
 import { EXTRA_TEST_ID, PRIMARY_TEST_ID, SECONDARY_TEST_ID, SHOW_MORE_BUTTON_TEST_ID } from './constants'
 import { ConnectionOptionType, ConnectionProps, MetamaskEthereumWindow, connectionOptionTitles } from './Connection.types'
-import styles from './Connection.module.css'
 
 const Primary = ({
   message,
@@ -26,21 +39,24 @@ const Primary = ({
   testId?: string
   onConnect: (wallet: ConnectionOptionType) => unknown
 }) => (
-  <div className={styles.primary} data-testid={testId}>
-    <div className={styles.primaryMessage}>{message}</div>
-    <ConnectionOption
-      disabled={!!loadingOption || !!error}
-      loading={loadingOption === option}
-      showTooltip={!!error}
-      type={option}
-      info={error}
-      onClick={onConnect}
-      className={classNames(styles.primaryButton, styles.primaryOption)}
-      testId={testId}
-    >
-      {children}
-    </ConnectionOption>
-  </div>
+  <PrimaryContainer data-testid={testId}>
+    <PrimaryMessage>{message}</PrimaryMessage>
+    <PrimaryOptionWrapper>
+      <PrimaryOption>
+        <ConnectionOption
+          disabled={!!loadingOption || !!error}
+          loading={loadingOption === option}
+          showTooltip={!!error}
+          type={option}
+          info={error}
+          onClick={onConnect}
+          testId={testId}
+        >
+          {children}
+        </ConnectionOption>
+      </PrimaryOption>
+    </PrimaryOptionWrapper>
+  </PrimaryContainer>
 )
 
 const Secondary = ({
@@ -56,21 +72,21 @@ const Secondary = ({
   loadingOption?: ConnectionOptionType
   onConnect: (wallet: ConnectionOptionType) => unknown
 }) => (
-  <div className={styles.showMoreSecondaryOptions} data-testid={testId}>
+  <ShowMoreSecondaryOptions data-testid={testId}>
     {options.map(option => (
-      <ConnectionOption
-        key={option}
-        className={classNames(styles.primaryButton, styles.secondaryOptionButton)}
-        showTooltip
-        tooltipPosition={tooltipDirection}
-        type={option}
-        onClick={onConnect}
-        testId={testId}
-        loading={loadingOption === option}
-        disabled={!!loadingOption}
-      />
+      <SecondaryOptionButton key={option}>
+        <ConnectionOption
+          showTooltip
+          tooltipPosition={tooltipDirection}
+          type={option}
+          onClick={onConnect}
+          testId={testId}
+          loading={loadingOption === option}
+          disabled={!!loadingOption}
+        />
+      </SecondaryOptionButton>
     ))}
-  </div>
+  </ShowMoreSecondaryOptions>
 )
 
 const defaultProps = {
@@ -84,8 +100,7 @@ const defaultProps = {
   }
 }
 
-// TODO: remove this component once the new connection component is fully tested
-export const Connection = (props: ConnectionProps): JSX.Element => {
+export const ConnectionNew = (props: ConnectionProps): JSX.Element => {
   const { i18n = defaultProps.i18n, onConnect, onLearnMore, connectionOptions, className, loadingOption, isNewUser } = props
 
   const hasExtraOptions = connectionOptions?.extraOptions && connectionOptions.extraOptions.length > 0
@@ -111,16 +126,16 @@ export const Connection = (props: ConnectionProps): JSX.Element => {
       message={
         isSocialLogin(option) ? (
           <>
-            {i18n.socialMessage(<div className={styles.primaryMagic} role="img" aria-label="Magic" />)}
-            <span className={styles.primaryLearnMore} role="button" onClick={() => onLearnMore(option)}>
+            {i18n.socialMessage(<PrimaryMagic role="img" aria-label="Magic" />)}
+            <PrimaryLearnMore role="button" onClick={() => onLearnMore(option)}>
               Learn More
-            </span>
+            </PrimaryLearnMore>
           </>
         ) : (
           i18n.web3Message(element => (
-            <span className={styles.primaryLearnMore} role="button" onClick={() => onLearnMore(option)}>
+            <PrimaryLearnMore role="button" onClick={() => onLearnMore(option)}>
               {element}
-            </span>
+            </PrimaryLearnMore>
           ))
         )
       }
@@ -130,27 +145,22 @@ export const Connection = (props: ConnectionProps): JSX.Element => {
   )
 
   return (
-    <div className={classNames(className, styles.connection)}>
-      <img className={styles.dclLogo} src={logoSrc} alt="Decentraland logo" />
+    <ConnectionContainer className={className}>
+      <DclLogoContainer>
+        <Logo size="large" />
+      </DclLogoContainer>
       <div>
-        <h1 className={styles.title}>{i18n.title}</h1>
+        <Title>{i18n.title}</Title>
         {connectionOptions && renderPrimary(connectionOptions.primary, PRIMARY_TEST_ID)}
         {connectionOptions?.secondary && renderPrimary(connectionOptions.secondary, SECONDARY_TEST_ID)}
       </div>
 
-      <div className={styles.showMore}>
+      <ShowMoreContainer>
         {hasExtraOptions && (
-          <Button
-            data-testid={SHOW_MORE_BUTTON_TEST_ID}
-            basic
-            size="medium"
-            fluid
-            className={styles.showMoreButton}
-            onClick={handleShowMore}
-          >
+          <ShowMoreButton data-testid={SHOW_MORE_BUTTON_TEST_ID} variant="text" fullWidth onClick={handleShowMore}>
             {i18n.moreOptions}
-            <Icon name={showMore ? 'chevron up' : 'chevron down'} />
-          </Button>
+            {showMore ? <ChevronUpIcon /> : <ChevronIcon />}
+          </ShowMoreButton>
         )}
         {showMore && hasExtraOptions && connectionOptions.extraOptions && (
           <Secondary
@@ -161,7 +171,7 @@ export const Connection = (props: ConnectionProps): JSX.Element => {
             loadingOption={loadingOption}
           />
         )}
-      </div>
-    </div>
+      </ShowMoreContainer>
+    </ConnectionContainer>
   )
 }
