@@ -1,4 +1,3 @@
-import React from 'react'
 import NavigateNextRoundedIcon from '@mui/icons-material/NavigateNextRounded'
 import { isSocialLogin } from '../Pages/LoginPage/utils'
 import { ConnectionIcon } from './ConnectionIcon'
