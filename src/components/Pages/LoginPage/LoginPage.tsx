@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo, useEffect, useContext } from 'react'
+import classNames from 'classnames'
 import { Env } from '@dcl/ui-env'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
 import ImageNew1 from '../../../assets/images/background/image-new1.webp'
@@ -21,7 +22,7 @@ import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import { useAnalytics } from '../../../hooks/useAnalytics'
 import { useAuthFlow } from '../../../hooks/useAuthFlow'
-import { ClickEvents, ConnectionType } from '../../../modules/analytics/types'
+import { ConnectionType } from '../../../modules/analytics/types'
 import { config } from '../../../modules/config'
 import { createAuthServerHttpClient } from '../../../shared/auth'
 import { isErrorWithName } from '../../../shared/errors'
@@ -29,12 +30,10 @@ import { extractReferrerFromSearchParameters } from '../../../shared/locations'
 import { isClockSynchronized } from '../../../shared/utils/clockSync'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { ClockSyncModal } from '../../ClockSyncModal'
-import { ConnectionOptionType, ConnectionNew } from '../../Connection'
+import { ConnectionOptionType, Connection } from '../../Connection'
 import { ConnectionModal } from '../../ConnectionModal'
 import { ConnectionLayoutState } from '../../ConnectionModal/ConnectionLayout.type'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
-import { MagicInformationModal } from '../../MagicInformationModal'
-import { WalletInformationModal } from '../../WalletInformationModal'
 import {
   getIdentitySignature,
   connectToProvider,
@@ -54,8 +53,6 @@ export const LoginPage = () => {
     return NEW_USER_PARAM_VARIANTS.some(variant => search.has(variant))
   }, [])
   const [loadingState, setLoadingState] = useState(ConnectionLayoutState.CONNECTING_WALLET)
-  const [showLearnMore, setShowLearnMore] = useState(false)
-  const [showMagicLearnMore, setShowMagicLearnMore] = useState(false)
   const [showConnectionLayout, setShowConnectionLayout] = useState(false)
   const [showClockSyncModal, setShowClockSyncModal] = useState(false)
   const [currentConnectionType, setCurrentConnectionType] = useState<ConnectionOptionType>()
@@ -67,31 +64,7 @@ export const LoginPage = () => {
   const [currentBackgroundIndex, setCurrentBackgroundIndex] = useState(0)
   const [targetConfig] = useTargetConfig()
   const { checkProfileAndRedirect } = useAuthFlow()
-  const { trackClick, trackLoginClick, trackLoginSuccess, trackGuestLogin } = useAnalytics()
-
-  const handleLearnMore = useCallback(
-    (option?: ConnectionOptionType) => {
-      const isLearningMoreAboutMagic = option && isSocialLogin(option)
-      trackClick(ClickEvents.LEARN_MORE, {
-        type: isLearningMoreAboutMagic ? 'Learn more about Magic' : 'Learn more about wallets'
-      })
-      if (isLearningMoreAboutMagic) {
-        setShowMagicLearnMore(true)
-      } else {
-        setShowLearnMore(true)
-      }
-    },
-    [setShowLearnMore, setShowMagicLearnMore, showLearnMore, trackClick]
-  )
-
-  const handleCloseLearnMore = useCallback(() => {
-    setShowLearnMore(false)
-    setShowMagicLearnMore(false)
-  }, [setShowLearnMore, setShowMagicLearnMore])
-
-  const handleToggleMagicInfo = useCallback(() => {
-    setShowMagicLearnMore(!showMagicLearnMore)
-  }, [setShowMagicLearnMore, showMagicLearnMore])
+  const { trackLoginClick, trackLoginSuccess, trackGuestLogin } = useAnalytics()
 
   const handleGuestLogin = useCallback(async () => {
     await trackGuestLogin()
@@ -246,7 +219,7 @@ export const LoginPage = () => {
   }, [])
 
   return (
-    <main className={styles.main}>
+    <main className={classNames(styles.main, isNewUser && styles.newUserMain)}>
       <div
         className={styles.background}
         style={{
@@ -259,8 +232,6 @@ export const LoginPage = () => {
         <Loader active size="massive" />
       ) : (
         <>
-          <WalletInformationModal open={showLearnMore} onClose={handleCloseLearnMore} />
-          <MagicInformationModal open={showMagicLearnMore} onClose={handleToggleMagicInfo} />
           <ClockSyncModal open={showClockSyncModal} onContinue={handleClockSyncContinue} onClose={handleClockSyncContinue} />
           <ConnectionModal
             open={showConnectionLayout}
@@ -271,8 +242,7 @@ export const LoginPage = () => {
           />
           <div className={styles.left}>
             <div className={styles.leftInfo}>
-              <ConnectionNew
-                onLearnMore={handleLearnMore}
+              <Connection
                 onConnect={handleOnConnect}
                 loadingOption={currentConnectionType}
                 connectionOptions={targetConfig.connectionOptions}

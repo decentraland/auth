@@ -7,9 +7,6 @@ const ShowMoreSecondaryOptions = styled(Box)(({ theme }) => ({
   gap: theme.spacing(3),
   ['& + &']: {
     marginTop: theme.spacing(2)
-  },
-  [theme.breakpoints.down('xs')]: {
-    gridTemplateColumns: 'repeat(1, 1fr)'
   }
 }))
 

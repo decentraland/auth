@@ -3,9 +3,6 @@ import { isSocialLogin } from '../Pages/LoginPage/utils'
 import { ConnectionIcon } from './ConnectionIcon'
 import {
   PrimaryContainer,
-  PrimaryLearnMore,
-  PrimaryMagic,
-  PrimaryMessage,
   PrimaryOption,
   PrimaryOptionWrapper,
   PrimaryButton,
@@ -20,8 +17,7 @@ export const ConnectionPrimaryButton = ({
   loadingOption,
   i18n,
   isNewUser,
-  onConnect,
-  onLearnMore
+  onConnect
 }: ConnectionPrimaryButtonProps): JSX.Element => {
   const isMetamaskAvailable = (window.ethereum as MetamaskEthereumWindow)?.isMetaMask
   const error =
@@ -29,27 +25,11 @@ export const ConnectionPrimaryButton = ({
       ? 'You need to install the MetaMask Browser Extension to proceed. Please install it and try again.'
       : undefined
 
-  const message = isSocialLogin(option) ? (
-    <>
-      {i18n.socialMessage(<PrimaryMagic role="img" aria-label="Magic" />)}
-      <PrimaryLearnMore role="button" onClick={() => onLearnMore(option)}>
-        Learn More
-      </PrimaryLearnMore>
-    </>
-  ) : (
-    i18n.web3Message(element => (
-      <PrimaryLearnMore role="button" onClick={() => onLearnMore(option)}>
-        {element}
-      </PrimaryLearnMore>
-    ))
-  )
-
   const children = <>{isSocialLogin(option) ? i18n.accessWith(option) : i18n.connectWith(option)}</>
   const isLoading = loadingOption === option
 
   return (
     <PrimaryContainer data-testid={testId}>
-      {!isNewUser && <PrimaryMessage>{message}</PrimaryMessage>}
       <PrimaryOptionWrapper>
         <PrimaryOption>
           <PrimaryButton
@@ -61,7 +41,7 @@ export const ConnectionPrimaryButton = ({
           >
             <PrimaryButtonWrapper isNewUser={isNewUser}>
               {children}
-              {isNewUser && <NavigateNextRoundedIcon />}
+              {isNewUser && <NavigateNextRoundedIcon fontSize="large" />}
             </PrimaryButtonWrapper>
           </PrimaryButton>
         </PrimaryOption>

@@ -1,81 +1,25 @@
 import React, { useCallback, useState } from 'react'
-import classNames from 'classnames'
-import Icon from 'semantic-ui-react/dist/commonjs/elements/Icon/Icon'
-import { Button } from 'decentraland-ui/dist/components/Button/Button'
-import logoSrc from '../../assets/images/logo.svg'
-import { isSocialLogin } from '../Pages/LoginPage/utils'
-import { ConnectionOption } from './ConnectionOption'
+import { Logo } from 'decentraland-ui2'
+import {
+  ChevronIcon,
+  ChevronUpIcon,
+  ConnectionContainer,
+  DclLogoContainer,
+  ShowMoreButton,
+  ShowMoreContainer,
+  Title,
+  MainContentContainer,
+  DecentralandText
+} from './Connection.styled'
+import { ConnectionPrimaryButton } from './ConnectionPrimaryButton'
+import { ConnectionSecondaryButton } from './ConnectionSecondaryButton'
 import { EXTRA_TEST_ID, PRIMARY_TEST_ID, SECONDARY_TEST_ID, SHOW_MORE_BUTTON_TEST_ID } from './constants'
-import { ConnectionOptionType, ConnectionProps, MetamaskEthereumWindow, connectionOptionTitles } from './Connection.types'
-import styles from './Connection.module.css'
-
-const Primary = ({
-  message,
-  children,
-  option,
-  testId,
-  loadingOption,
-  error,
-  onConnect
-}: {
-  message: React.ReactNode
-  children: React.ReactChild
-  option: ConnectionOptionType
-  loadingOption?: ConnectionOptionType
-  error?: string
-  testId?: string
-  onConnect: (wallet: ConnectionOptionType) => unknown
-}) => (
-  <div className={styles.primary} data-testid={testId}>
-    <div className={styles.primaryMessage}>{message}</div>
-    <ConnectionOption
-      disabled={!!loadingOption || !!error}
-      loading={loadingOption === option}
-      showTooltip={!!error}
-      type={option}
-      info={error}
-      onClick={onConnect}
-      className={classNames(styles.primaryButton, styles.primaryOption)}
-      testId={testId}
-    >
-      {children}
-    </ConnectionOption>
-  </div>
-)
-
-const Secondary = ({
-  options,
-  tooltipDirection,
-  testId,
-  loadingOption,
-  onConnect
-}: {
-  options: ConnectionOptionType[]
-  tooltipDirection: 'top center' | 'bottom center'
-  testId?: string
-  loadingOption?: ConnectionOptionType
-  onConnect: (wallet: ConnectionOptionType) => unknown
-}) => (
-  <div className={styles.showMoreSecondaryOptions} data-testid={testId}>
-    {options.map(option => (
-      <ConnectionOption
-        key={option}
-        className={classNames(styles.primaryButton, styles.secondaryOptionButton)}
-        showTooltip
-        tooltipPosition={tooltipDirection}
-        type={option}
-        onClick={onConnect}
-        testId={testId}
-        loading={loadingOption === option}
-        disabled={!!loadingOption}
-      />
-    ))}
-  </div>
-)
+import { ConnectionOptionType, ConnectionProps, connectionOptionTitles } from './Connection.types'
 
 const defaultProps = {
   i18n: {
     title: 'Sign In to Decentraland',
+    titleNewUser: 'Create an Account to Jump In',
     accessWith: (option: ConnectionOptionType) => `Continue with ${connectionOptionTitles[option]}`,
     connectWith: (option: ConnectionOptionType) => `Continue with ${connectionOptionTitles[option]}`,
     moreOptions: 'More Options',
@@ -84,9 +28,8 @@ const defaultProps = {
   }
 }
 
-// TODO: remove this component once the new connection component is fully tested
 export const Connection = (props: ConnectionProps): JSX.Element => {
-  const { i18n = defaultProps.i18n, onConnect, onLearnMore, connectionOptions, className, loadingOption, isNewUser } = props
+  const { i18n = defaultProps.i18n, onConnect, connectionOptions, className, loadingOption, isNewUser } = props
 
   const hasExtraOptions = connectionOptions?.extraOptions && connectionOptions.extraOptions.length > 0
 
@@ -95,65 +38,55 @@ export const Connection = (props: ConnectionProps): JSX.Element => {
     setShowMore(!showMore)
   }, [showMore])
 
-  const isMetamaskAvailable = (window.ethereum as MetamaskEthereumWindow)?.isMetaMask
-
-  const renderPrimary = (option: ConnectionOptionType, testId: string) => (
-    <Primary
-      onConnect={onConnect}
-      testId={testId}
-      option={option}
-      loadingOption={loadingOption}
-      error={
-        !isMetamaskAvailable && option === ConnectionOptionType.METAMASK
-          ? 'You need to install the MetaMask Browser Extension to proceed. Please install it and try again.'
-          : undefined
-      }
-      message={
-        isSocialLogin(option) ? (
-          <>
-            {i18n.socialMessage(<div className={styles.primaryMagic} role="img" aria-label="Magic" />)}
-            <span className={styles.primaryLearnMore} role="button" onClick={() => onLearnMore(option)}>
-              Learn More
-            </span>
-          </>
-        ) : (
-          i18n.web3Message(element => (
-            <span className={styles.primaryLearnMore} role="button" onClick={() => onLearnMore(option)}>
-              {element}
-            </span>
-          ))
-        )
-      }
-    >
-      <>{isSocialLogin(option) ? i18n.accessWith(option) : i18n.connectWith(option)}</>
-    </Primary>
-  )
-
   return (
-    <div className={classNames(className, styles.connection)}>
-      <img className={styles.dclLogo} src={logoSrc} alt="Decentraland logo" />
-      <div>
-        <h1 className={styles.title}>{i18n.title}</h1>
-        {connectionOptions && renderPrimary(connectionOptions.primary, PRIMARY_TEST_ID)}
-        {connectionOptions?.secondary && renderPrimary(connectionOptions.secondary, SECONDARY_TEST_ID)}
-      </div>
+    <ConnectionContainer className={className}>
+      <DclLogoContainer>
+        <Logo size="huge" />
+        {isNewUser && <DecentralandText>Decentraland</DecentralandText>}
+      </DclLogoContainer>
+      <MainContentContainer>
+        <Title isNewUser={isNewUser}>{isNewUser ? i18n.titleNewUser : i18n.title}</Title>
+        {connectionOptions && (
+          <ConnectionPrimaryButton
+            option={connectionOptions.primary}
+            testId={PRIMARY_TEST_ID}
+            loadingOption={loadingOption}
+            i18n={{
+              accessWith: i18n.accessWith,
+              connectWith: i18n.connectWith,
+              socialMessage: i18n.socialMessage,
+              web3Message: i18n.web3Message
+            }}
+            onConnect={onConnect}
+            isNewUser={isNewUser}
+          />
+        )}
+        {connectionOptions?.secondary && (
+          <ConnectionPrimaryButton
+            option={connectionOptions.secondary}
+            testId={SECONDARY_TEST_ID}
+            loadingOption={loadingOption}
+            i18n={{
+              accessWith: i18n.accessWith,
+              connectWith: i18n.connectWith,
+              socialMessage: i18n.socialMessage,
+              web3Message: i18n.web3Message
+            }}
+            onConnect={onConnect}
+            isNewUser={isNewUser}
+          />
+        )}
+      </MainContentContainer>
 
-      <div className={styles.showMore}>
+      <ShowMoreContainer>
         {hasExtraOptions && (
-          <Button
-            data-testid={SHOW_MORE_BUTTON_TEST_ID}
-            basic
-            size="medium"
-            fluid
-            className={styles.showMoreButton}
-            onClick={handleShowMore}
-          >
+          <ShowMoreButton data-testid={SHOW_MORE_BUTTON_TEST_ID} variant="text" fullWidth onClick={handleShowMore}>
             {i18n.moreOptions}
-            <Icon name={showMore ? 'chevron up' : 'chevron down'} />
-          </Button>
+            {showMore ? <ChevronUpIcon /> : <ChevronIcon />}
+          </ShowMoreButton>
         )}
         {showMore && hasExtraOptions && connectionOptions.extraOptions && (
-          <Secondary
+          <ConnectionSecondaryButton
             testId={EXTRA_TEST_ID}
             options={connectionOptions.extraOptions}
             onConnect={onConnect}
@@ -161,7 +94,7 @@ export const Connection = (props: ConnectionProps): JSX.Element => {
             loadingOption={loadingOption}
           />
         )}
-      </div>
-    </div>
+      </ShowMoreContainer>
+    </ConnectionContainer>
   )
 }

@@ -15,5 +15,4 @@ export type ConnectionPrimaryButtonProps = {
   i18n: ConnectionPrimaryButtonI18N
   isNewUser?: boolean
   onConnect: (wallet: ConnectionOptionType) => unknown
-  onLearnMore: (type?: ConnectionOptionType) => unknown
 }

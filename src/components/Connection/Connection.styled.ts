@@ -5,19 +5,31 @@ import { Box, Button, styled, Typography } from 'decentraland-ui2'
 const ConnectionContainer = styled(Box)(({ theme }) => ({
   color: theme.palette.common.white,
   display: 'flex',
-  flexDirection: 'column'
+  flexDirection: 'column',
+  [theme.breakpoints.down('xs')]: {
+    marginTop: theme.spacing(4)
+  }
 }))
 
 const DclLogoContainer = styled(Box)(({ theme }) => ({
   marginBottom: theme.spacing(3),
   display: 'flex',
   alignItems: 'center',
-  gap: theme.spacing(1)
+  gap: theme.spacing(1.5)
 }))
 
-const Title = styled(Typography)(({ theme }) => ({
-  marginBottom: theme.spacing(7),
-  fontSize: '30px',
+const DecentralandText = styled(Typography)({
+  fontFamily: 'DecentralandHero',
+  fontSize: '48px'
+})
+
+const MainContentContainer = styled(Box)(({ theme }) => ({
+  marginTop: theme.spacing(17.5)
+}))
+
+const Title = styled(Typography)<{ isNewUser?: boolean }>(({ theme, isNewUser }) => ({
+  marginBottom: isNewUser ? theme.spacing(4) : theme.spacing(7),
+  fontSize: '24px',
   color: theme.palette.common.white,
   boxSizing: 'border-box',
   display: 'block',
@@ -75,4 +87,14 @@ const ShowMoreButton = styled(Button)(({ theme }) => ({
 const ChevronIcon = styled(ExpandMoreIcon)({})
 const ChevronUpIcon = styled(ExpandLessIcon)({})
 
-export { ChevronIcon, ChevronUpIcon, ConnectionContainer, DclLogoContainer, ShowMoreButton, ShowMoreContainer, Title }
+export {
+  ChevronIcon,
+  ChevronUpIcon,
+  ConnectionContainer,
+  DclLogoContainer,
+  DecentralandText,
+  MainContentContainer,
+  ShowMoreButton,
+  ShowMoreContainer,
+  Title
+}

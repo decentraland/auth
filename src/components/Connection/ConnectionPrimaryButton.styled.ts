@@ -1,5 +1,4 @@
 import { Box, Button, styled } from 'decentraland-ui2'
-import magicSvg from '../../assets/images/magic.svg'
 
 const PrimaryContainer = styled(Box)(({ theme }) => ({
   ['& + &']: {
@@ -15,20 +14,6 @@ const PrimaryMessage = styled(Box)(({ theme }) => ({
   marginBottom: theme.spacing(2.375),
   gap: theme.spacing(1.5)
 }))
-
-const PrimaryMagic = styled('div')({
-  backgroundImage: `url(${magicSvg})`,
-  backgroundRepeat: 'no-repeat',
-  backgroundPosition: 'center',
-  backgroundSize: 'contain',
-  width: '66px',
-  height: '24px'
-})
-
-const PrimaryLearnMore = styled('span')({
-  textDecoration: 'underline',
-  cursor: 'pointer'
-})
 
 const PrimaryOptionWrapper = styled(Box)(({ theme }) => ({
   width: '100%',
@@ -53,12 +38,14 @@ const PrimaryButton = styled(Button)<{ isNewUser?: boolean }>(({ theme, isNewUse
   flexDirection: 'row',
   alignItems: 'center',
   backgroundColor: theme.palette.common.white,
-  color: theme.palette.common.black,
   fontWeight: 600,
   height: '46px',
   justifyContent: isNewUser ? 'flex-start' : 'center',
   gap: 0,
   transition: 'transform 0.2s ease-in-out',
+  [theme.breakpoints.down('sm')]: {
+    height: '58px'
+  },
   ['&.MuiButton-root']: {
     backgroundColor: theme.palette.common.white,
     color: theme.palette.common.black
@@ -69,12 +56,10 @@ const PrimaryButton = styled(Button)<{ isNewUser?: boolean }>(({ theme, isNewUse
   },
   ['&:hover']: {
     backgroundColor: theme.palette.common.white,
-    color: theme.palette.common.black,
     transform: 'translateY(-2px)'
   },
   ['&:active']: {
     backgroundColor: theme.palette.common.white,
-    color: theme.palette.common.black,
     transform: 'translateY(0)'
   },
   ['&:focus']: {
@@ -91,29 +76,21 @@ const PrimaryButton = styled(Button)<{ isNewUser?: boolean }>(({ theme, isNewUse
   },
   ['&.MuiButton-text:hover']: {
     backgroundColor: theme.palette.common.white,
-    color: theme.palette.common.black,
     transform: 'translateY(-2px)'
   },
   ['&.MuiButton-text:active']: {
     backgroundColor: theme.palette.common.white,
-    color: theme.palette.common.black,
     transform: 'translateY(0)'
   }
 }))
 
-const PrimaryButtonWrapper = styled(Box)<{ isNewUser?: boolean }>(({ isNewUser }) => ({
+const PrimaryButtonWrapper = styled(Box)<{ isNewUser?: boolean }>(({ isNewUser, theme }) => ({
   display: 'flex',
+  alignItems: 'center',
   justifyContent: 'space-between',
-  width: isNewUser ? '100%' : 'auto'
+  width: isNewUser ? '100%' : 'auto',
+  color: theme.palette.common.black,
+  fontSize: '14px'
 }))
 
-export {
-  PrimaryContainer,
-  PrimaryLearnMore,
-  PrimaryMagic,
-  PrimaryMessage,
-  PrimaryOption,
-  PrimaryOptionWrapper,
-  PrimaryButton,
-  PrimaryButtonWrapper
-}
+export { PrimaryContainer, PrimaryMessage, PrimaryOption, PrimaryOptionWrapper, PrimaryButton, PrimaryButtonWrapper }
