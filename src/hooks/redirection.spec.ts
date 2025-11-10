@@ -288,7 +288,7 @@ describe('when using the redirection hook', () => {
         overrideUrl = 'https://malicious.com/path'
       })
 
-      it('should fallback to default redirect when hostname does not match', () => {
+      it('should fallback to default redirect', () => {
         const { result } = renderHook(() => useAfterLoginRedirection())
         const originalLocation = window.location.href
 
@@ -307,7 +307,7 @@ describe('when using the redirection hook', () => {
         overrideUrl = 'javascript:alert("xss")'
       })
 
-      it('should fallback to default redirect when protocol is invalid', () => {
+      it('should fallback to default redirect', () => {
         const { result } = renderHook(() => useAfterLoginRedirection())
         const originalLocation = window.location.href
 
@@ -326,7 +326,7 @@ describe('when using the redirection hook', () => {
         overrideUrl = 'not-a-valid-url'
       })
 
-      it('should fallback to default redirect when URL cannot be parsed', () => {
+      it('should fallback to default redirect', () => {
         const { result } = renderHook(() => useAfterLoginRedirection())
         const originalLocation = window.location.href
 
