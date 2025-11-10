@@ -162,7 +162,7 @@ describe('useNavigateWithSearchParams', () => {
       }).toThrow('Invalid path provided')
     })
 
-    it('should throw an error when navigate is called with an empty path', () => {
+    it('should throw an error for empty path', () => {
       const { result } = renderHook(() => useNavigateWithSearchParams())
 
       expect(() => {

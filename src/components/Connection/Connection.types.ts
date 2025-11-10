@@ -32,6 +32,7 @@ export type MetamaskEthereumWindow = typeof window.ethereum & { isMetaMask?: boo
 
 export type ConnectionI18N = {
   title: React.ReactNode
+  titleNewUser: React.ReactNode
   subtitle: React.ReactNode
   accessWith: (option: ConnectionOptionType) => React.ReactNode
   connectWith: (option: ConnectionOptionType) => React.ReactNode
@@ -51,5 +52,4 @@ export type ConnectionProps = {
   loadingOption?: ConnectionOptionType
   isNewUser?: boolean
   onConnect: (wallet: ConnectionOptionType) => unknown
-  onLearnMore: (type?: ConnectionOptionType) => unknown
 }
