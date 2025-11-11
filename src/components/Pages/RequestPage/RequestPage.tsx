@@ -7,11 +7,13 @@ import { ChainId } from '@dcl/schemas'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
 import { Web2TransactionModal } from 'decentraland-ui/dist/components/Web2TransactionModal'
+import { ContractName, getContract, getContractName, sendMetaTransaction } from 'decentraland-transactions'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import { useAnalytics } from '../../../hooks/useAnalytics'
 import { getAnalytics } from '../../../modules/analytics/segment'
 import { ClickEvents, TrackingEvents } from '../../../modules/analytics/types'
+import { config } from '../../../modules/config'
 import { fetchProfile } from '../../../modules/profile'
 import {
   createAuthServerHttpClient,
@@ -30,6 +32,7 @@ import { handleError } from '../../../shared/utils/errorHandler'
 import { checkWebGpuSupport } from '../../../shared/utils/webgpu'
 import { FeatureFlagsContext, FeatureFlagsKeys, OnboardingFlowVariant } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
 import { Container } from './Container'
+import { getNetworkProvider, getConnectedProvider, isDecentralandContractAddress } from './utils'
 import { DeniedSignIn } from './Views/DeniedSignIn'
 import { DeniedWalletInteraction } from './Views/DeniedWalletInteraction'
 import { DifferentAccountError } from './Views/DifferentAccountError'
@@ -322,11 +325,48 @@ export const RequestPage = () => {
       }
 
       const signer = await provider.getSigner()
-      const result = await provider.send(requestRef.current?.method, requestRef.current?.params ?? [])
+      const signerAddress = await signer.getAddress()
+      const chainId = ['production', 'staging'].includes(config.get('ENVIRONMENT').toLowerCase())
+        ? ChainId.MATIC_MAINNET
+        : ChainId.MATIC_AMOY
+
+      const toAddress = requestRef.current?.params?.[0].to as string
+
+      let contractName: ContractName | null = null
+      let result: string | null = null
+
+      // Try to get the contract name from the to address. If it fails, check if it's a Decentraland collection contract address.
+      // If it's a Decentraland collection contract address, use the ERC721CollectionV2 contract.
+      try {
+        contractName = getContractName(toAddress)
+      } catch (error) {
+        const isAcceptedAddress = await isDecentralandContractAddress(toAddress.toLowerCase())
+        if (isAcceptedAddress) {
+          contractName = ContractName.ERC721CollectionV2
+        }
+      }
+
+      if (contractName) {
+        const connectedProvider = await getConnectedProvider()
+        if (!connectedProvider) {
+          throw new Error('Provider not connected')
+        }
+
+        const networkProvider = await getNetworkProvider(chainId)
+        const contract = getContract(contractName, chainId)
+        contract.address = toAddress
+
+        result = await sendMetaTransaction(connectedProvider, networkProvider, requestRef.current?.params?.[0].data as string, contract, {
+          serverURL: config.get('META_TRANSACTION_SERVER_URL')
+        })
+      } else {
+        result = await provider.send(requestRef.current?.method, requestRef.current?.params ?? [])
+      }
+
       trackClick(ClickEvents.APPROVE_WALLET_INTERACTION, {
         method: requestRef.current?.method
       })
-      await authServerClient.current.sendSuccessfulOutcome(requestId, await signer.getAddress(), result)
+      await authServerClient.current.sendSuccessfulOutcome(requestId, signerAddress, result)
       setView(View.WALLET_INTERACTION_COMPLETE)
     } catch (e) {
       if (e instanceof IpValidationError) {
@@ -336,15 +376,23 @@ export const RequestPage = () => {
         handleError(e, 'Wallet interaction error', {
           sentryTags: { isWeb2Wallet: isUserUsingWeb2Wallet }
         })
-        const signer = await browserProvider.current?.getSigner()
-        if (signer && isRpcError(e)) {
-          await authServerClient.current.sendFailedOutcome(requestId, await signer.getAddress(), e.error)
-        } else if (signer && !isRpcError(e)) {
-          await authServerClient.current.sendFailedOutcome(requestId, await signer.getAddress(), {
-            code: 999,
-            message: isErrorWithMessage(e) ? e.message : 'Unknown error'
-          })
+
+        // Try to send failed outcome, but don't let it prevent showing the error view
+        try {
+          const signer = await browserProvider.current?.getSigner()
+          if (signer && isRpcError(e)) {
+            await authServerClient.current.sendFailedOutcome(requestId, await signer.getAddress(), e.error)
+          } else if (signer && !isRpcError(e)) {
+            await authServerClient.current.sendFailedOutcome(requestId, await signer.getAddress(), {
+              code: 999,
+              message: isErrorWithMessage(e) ? e.message : 'Unknown error'
+            })
+          }
+        } catch (failedOutcomeError) {
+          // Log the error but don't prevent the error view from showing
+          console.error('Failed to send failed outcome:', failedOutcomeError)
         }
+
         setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
         setView(View.WALLET_INTERACTION_ERROR)
       }
