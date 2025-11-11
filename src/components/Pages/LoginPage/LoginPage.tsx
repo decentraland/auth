@@ -1,6 +1,13 @@
 import { useState, useCallback, useMemo, useEffect, useContext } from 'react'
+import classNames from 'classnames'
 import { Env } from '@dcl/ui-env'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
+import ImageNew1 from '../../../assets/images/background/image-new1.webp'
+import ImageNew2 from '../../../assets/images/background/image-new2.webp'
+import ImageNew3 from '../../../assets/images/background/image-new3.webp'
+import ImageNew4 from '../../../assets/images/background/image-new4.webp'
+import ImageNew5 from '../../../assets/images/background/image-new5.webp'
+import ImageNew6 from '../../../assets/images/background/image-new6.webp'
 import Image1 from '../../../assets/images/background/image1.webp'
 import Image10 from '../../../assets/images/background/image10.webp'
 import Image2 from '../../../assets/images/background/image2.webp'
@@ -15,7 +22,7 @@ import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import { useAnalytics } from '../../../hooks/useAnalytics'
 import { useAuthFlow } from '../../../hooks/useAuthFlow'
-import { ClickEvents, ConnectionType } from '../../../modules/analytics/types'
+import { ConnectionType } from '../../../modules/analytics/types'
 import { config } from '../../../modules/config'
 import { createAuthServerHttpClient } from '../../../shared/auth'
 import { isErrorWithName } from '../../../shared/errors'
@@ -23,12 +30,10 @@ import { extractReferrerFromSearchParameters } from '../../../shared/locations'
 import { isClockSynchronized } from '../../../shared/utils/clockSync'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { ClockSyncModal } from '../../ClockSyncModal'
-import { ConnectionOptionType, ConnectionNew } from '../../Connection'
+import { ConnectionOptionType, Connection } from '../../Connection'
 import { ConnectionModal } from '../../ConnectionModal'
 import { ConnectionLayoutState } from '../../ConnectionModal/ConnectionLayout.type'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
-import { MagicInformationModal } from '../../MagicInformationModal'
-import { WalletInformationModal } from '../../WalletInformationModal'
 import {
   getIdentitySignature,
   connectToProvider,
@@ -39,6 +44,7 @@ import {
 import styles from './LoginPage.module.css'
 
 const BACKGROUND_IMAGES = [Image1, Image2, Image3, Image4, Image5, Image6, Image7, Image8, Image9, Image10]
+const NEW_USER_BACKGROUND_IMAGES = [ImageNew1, ImageNew2, ImageNew3, ImageNew4, ImageNew5, ImageNew6]
 const NEW_USER_PARAM_VARIANTS = ['newUser', 'newuser', 'new-user', 'new_user']
 
 export const LoginPage = () => {
@@ -47,8 +53,6 @@ export const LoginPage = () => {
     return NEW_USER_PARAM_VARIANTS.some(variant => search.has(variant))
   }, [])
   const [loadingState, setLoadingState] = useState(ConnectionLayoutState.CONNECTING_WALLET)
-  const [showLearnMore, setShowLearnMore] = useState(false)
-  const [showMagicLearnMore, setShowMagicLearnMore] = useState(false)
   const [showConnectionLayout, setShowConnectionLayout] = useState(false)
   const [showClockSyncModal, setShowClockSyncModal] = useState(false)
   const [currentConnectionType, setCurrentConnectionType] = useState<ConnectionOptionType>()
@@ -60,31 +64,7 @@ export const LoginPage = () => {
   const [currentBackgroundIndex, setCurrentBackgroundIndex] = useState(0)
   const [targetConfig] = useTargetConfig()
   const { checkProfileAndRedirect } = useAuthFlow()
-  const { trackClick, trackLoginClick, trackLoginSuccess, trackGuestLogin } = useAnalytics()
-
-  const handleLearnMore = useCallback(
-    (option?: ConnectionOptionType) => {
-      const isLearningMoreAboutMagic = option && isSocialLogin(option)
-      trackClick(ClickEvents.LEARN_MORE, {
-        type: isLearningMoreAboutMagic ? 'Learn more about Magic' : 'Learn more about wallets'
-      })
-      if (isLearningMoreAboutMagic) {
-        setShowMagicLearnMore(true)
-      } else {
-        setShowLearnMore(true)
-      }
-    },
-    [setShowLearnMore, setShowMagicLearnMore, showLearnMore, trackClick]
-  )
-
-  const handleCloseLearnMore = useCallback(() => {
-    setShowLearnMore(false)
-    setShowMagicLearnMore(false)
-  }, [setShowLearnMore, setShowMagicLearnMore])
-
-  const handleToggleMagicInfo = useCallback(() => {
-    setShowMagicLearnMore(!showMagicLearnMore)
-  }, [setShowMagicLearnMore, showMagicLearnMore])
+  const { trackLoginClick, trackLoginSuccess, trackGuestLogin } = useAnalytics()
 
   const handleGuestLogin = useCallback(async () => {
     await trackGuestLogin()
@@ -227,7 +207,7 @@ export const LoginPage = () => {
   useEffect(() => {
     const backgroundInterval = setInterval(() => {
       setCurrentBackgroundIndex(index => {
-        if (index === BACKGROUND_IMAGES.length - 1) {
+        if (index === (isNewUser ? NEW_USER_BACKGROUND_IMAGES.length - 1 : BACKGROUND_IMAGES.length - 1)) {
           return 0
         }
         return index + 1
@@ -239,14 +219,19 @@ export const LoginPage = () => {
   }, [])
 
   return (
-    <main className={styles.main}>
-      <div className={styles.background} style={{ backgroundImage: `url(${BACKGROUND_IMAGES[currentBackgroundIndex]})` }} />
+    <main className={classNames(styles.main, isNewUser && styles.newUserMain)}>
+      <div
+        className={styles.background}
+        style={{
+          backgroundImage: `url(${
+            isNewUser ? NEW_USER_BACKGROUND_IMAGES[currentBackgroundIndex] : BACKGROUND_IMAGES[currentBackgroundIndex]
+          })`
+        }}
+      />
       {config.is(Env.DEVELOPMENT) && !flagInitialized ? (
         <Loader active size="massive" />
       ) : (
         <>
-          <WalletInformationModal open={showLearnMore} onClose={handleCloseLearnMore} />
-          <MagicInformationModal open={showMagicLearnMore} onClose={handleToggleMagicInfo} />
           <ClockSyncModal open={showClockSyncModal} onContinue={handleClockSyncContinue} onClose={handleClockSyncContinue} />
           <ConnectionModal
             open={showConnectionLayout}
@@ -257,8 +242,7 @@ export const LoginPage = () => {
           />
           <div className={styles.left}>
             <div className={styles.leftInfo}>
-              <ConnectionNew
-                onLearnMore={handleLearnMore}
+              <Connection
                 onConnect={handleOnConnect}
                 loadingOption={currentConnectionType}
                 connectionOptions={targetConfig.connectionOptions}

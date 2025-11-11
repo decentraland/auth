@@ -1,6 +1,6 @@
 .main {
   display: grid;
-  grid-template-columns: 50% 50%;
+  grid-template-columns: 40% 60%;
   height: 100%;
   position: relative;
 }
@@ -29,6 +29,10 @@
   overflow: hidden;
 }
 
+.main.newUserMain::before {
+  background: linear-gradient(89.65deg, rgba(149, 45, 198, 0) 29.59%, rgba(94, 30, 130, 0.559754) 39.08%, rgba(75, 25, 106, 0.750004) 45.36%, rgba(64, 23, 93, 0.859976) 54.22%, #32134C 72.84%);
+}
+
 .left {
   width: 100%;
   z-index: 1;
@@ -42,7 +46,7 @@
 .leftInfo {
   height: 100%;
   width: 100%;
-  max-width: 450px;
+  max-width: 420px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -93,6 +97,12 @@
   text-decoration: underline;
 }
 
+@media screen and (max-width: 1440px) {
+  .main {
+    grid-template-columns: 50% 50%;
+  }
+}
+
 @media screen and (max-width: 800px) {
   .main {
     display: flex;
@@ -105,6 +115,10 @@
 
   .main::before {
     background: radial-gradient(ellipse at 0 50%, #e02dd3 0%, #491975 70%);
+  }
+
+  .main.newUserMain::before {
+    background: linear-gradient(144.23deg, #491975 10.31%, #D72CCD 102.43%);
   }
 
   .left {
