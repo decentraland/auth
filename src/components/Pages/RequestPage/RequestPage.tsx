@@ -7,7 +7,7 @@ import { ChainId } from '@dcl/schemas'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
 import { Web2TransactionModal } from 'decentraland-ui/dist/components/Web2TransactionModal'
-import { ContractName, getContract, getContractName, sendMetaTransaction } from 'decentraland-transactions'
+import { getContract, sendMetaTransaction } from 'decentraland-transactions'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import { useAnalytics } from '../../../hooks/useAnalytics'
@@ -32,17 +32,28 @@ import { handleError } from '../../../shared/utils/errorHandler'
 import { checkWebGpuSupport } from '../../../shared/utils/webgpu'
 import { FeatureFlagsContext, FeatureFlagsKeys, OnboardingFlowVariant } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
 import { Container } from './Container'
-import { getNetworkProvider, getConnectedProvider, isDecentralandContractAddress } from './utils'
-import { DeniedSignIn } from './Views/DeniedSignIn'
-import { DeniedWalletInteraction } from './Views/DeniedWalletInteraction'
-import { DifferentAccountError } from './Views/DifferentAccountError'
-import { IpValidationError as IpValidationErrorView } from './Views/IpValidationError'
-import { RecoverError } from './Views/RecoverError'
-import { SignInComplete } from './Views/SignInComplete'
-import { SigningError } from './Views/SigningError'
-import { TimeoutError } from './Views/TimeoutError'
+import {
+  getNetworkProvider,
+  getConnectedProvider,
+  checkMetaTransactionSupport,
+  getMetaTransactionChainId,
+  decodeNftTransferData,
+  fetchNftMetadata,
+  fetchUserProfile
+} from './utils'
+import {
+  DeniedSignIn,
+  DeniedWalletInteraction,
+  DifferentAccountError,
+  IpValidationError as IpValidationErrorView,
+  NFTTransferView,
+  RecoverError,
+  SignInComplete,
+  SigningError,
+  TimeoutError,
+  WalletInteractionComplete
+} from './Views'
 import viewStyles from './Views/Views.module.css'
-import { WalletInteractionComplete } from './Views/WalletInteractionComplete'
 import styles from './RequestPage.module.css'
 
 enum View {
@@ -59,6 +70,7 @@ enum View {
   VERIFY_SIGN_IN_COMPLETE,
   // Wallet Interaction
   WALLET_INTERACTION,
+  WALLET_NFT_INTERACTION,
   WALLET_INTERACTION_DENIED,
   WALLET_INTERACTION_ERROR,
   WALLET_INTERACTION_COMPLETE
@@ -80,6 +92,15 @@ export const RequestPage = () => {
     chainId: number
   }>()
   const [transactionGasCost, setTransactionGasCost] = useState<bigint>()
+  const [nftTransferData, setNftTransferData] = useState<{
+    imageUrl: string
+    tokenId: string
+    toAddress: string
+    contractAddress: string
+    name?: string
+    description?: string
+    recipientName?: string
+  } | null>(null)
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false)
   const requestRef = useRef<RecoverResponse>()
   const [error, setError] = useState<string>()
@@ -170,24 +191,76 @@ export const RequestPage = () => {
           case 'dcl_personal_sign':
             setView(View.VERIFY_SIGN_IN)
             break
-          case 'eth_sendTransaction':
+          case 'eth_sendTransaction': {
+            // Get wallet info first
+            const signer = await browserProvider.current.getSigner()
+            const userBalance = await browserProvider.current.getBalance(signer.address)
+            const currentChainId = await browserProvider.current.getNetwork().then(network => Number(network.chainId))
+            setWalletInfo({
+              balance: userBalance,
+              chainId: currentChainId
+            })
+
+            // Check if this is an NFT transfer that will use meta transactions BEFORE gas estimation
+            const transactionData = request.params?.[0]?.data as string | undefined
+            const contractAddress = request.params?.[0]?.to as string | undefined
+
+            console.log('Transaction data:', transactionData)
+            console.log('Contract address:', contractAddress)
+
+            if (transactionData && contractAddress) {
+              const { willUseMetaTransaction, contractName } = await checkMetaTransactionSupport(contractAddress)
+
+              console.log('Will use meta transactions:', willUseMetaTransaction)
+              console.log('Contract name:', contractName)
+
+              // If it will use meta transactions, check if it's an NFT transfer
+              if (willUseMetaTransaction && contractName) {
+                const chainId = getMetaTransactionChainId()
+                const contract = getContract(contractName, chainId)
+
+                console.log('Checking if this is an NFT transfer...')
+                const transferData = decodeNftTransferData(transactionData, contract.abi)
+
+                if (transferData) {
+                  console.log('NFT transfer detected, fetching metadata and recipient profile...')
+                  const [metadata, recipientName] = await Promise.all([
+                    fetchNftMetadata(contractAddress, contract.abi, transferData.tokenId, browserProvider.current),
+                    fetchUserProfile(transferData.toAddress)
+                  ])
+                  console.log('Metadata:', metadata)
+                  console.log('Recipient name:', recipientName)
+                  if (metadata?.imageUrl) {
+                    setNftTransferData({
+                      imageUrl: metadata.imageUrl,
+                      tokenId: transferData.tokenId,
+                      toAddress: transferData.toAddress,
+                      contractAddress,
+                      name: metadata.name,
+                      description: metadata.description,
+                      recipientName: recipientName || undefined
+                    })
+                    setView(View.WALLET_NFT_INTERACTION)
+                    break
+                  }
+                }
+              }
+            }
+
+            // Only estimate gas if it's not an NFT transfer (regular transactions need it)
             try {
-              const signer = await browserProvider.current.getSigner()
-              const userBalance = await browserProvider.current.getBalance(signer.address)
-              setWalletInfo({
-                balance: userBalance,
-                chainId: await browserProvider.current.getNetwork().then(network => Number(network.chainId))
-              })
               const gasPrice = (await browserProvider.current.getFeeData()).gasPrice ?? BigInt(0)
               const transactionGasCost = await signer.estimateGas(request.params?.[0])
               const totalGasCost = gasPrice * transactionGasCost
               setTransactionGasCost(totalGasCost)
             } catch (e) {
-              console.error('Error estimating gas', e)
-            } finally {
-              setView(View.WALLET_INTERACTION)
+              console.error('Error estimating gas (may be normal for meta transactions)', e)
             }
+
+            // Show regular wallet interaction view
+            setView(View.WALLET_INTERACTION)
             break
+          }
           default:
             setView(View.WALLET_INTERACTION)
         }
@@ -220,7 +293,7 @@ export const RequestPage = () => {
   useEffect(() => {
     // The timeout is only necessary on the verify sign in and wallet interaction views.
     // We can clear it out when the user is shown another view to prevent the timeout from triggering somewhere not intended.
-    if (view !== View.VERIFY_SIGN_IN && view !== View.WALLET_INTERACTION) {
+    if (view !== View.VERIFY_SIGN_IN && view !== View.WALLET_INTERACTION && view !== View.WALLET_NFT_INTERACTION) {
       clearTimeout(timeoutRef.current)
     }
   }, [view])
@@ -306,8 +379,26 @@ export const RequestPage = () => {
   }, [setIsLoading, isUserUsingWeb2Wallet, isLoading])
 
   const onDenyWalletInteraction = useCallback(() => {
+    setIsLoading(true)
     setIsTransactionModalOpen(false)
     trackClick(ClickEvents.DENY_WALLET_INTERACTION)
+
+    // Send failed outcome notification asynchronously without blocking the UI
+    ;(async () => {
+      try {
+        const signer = await browserProvider.current?.getSigner()
+        if (signer) {
+          await authServerClient.current.sendFailedOutcome(requestId, await signer.getAddress(), {
+            code: -32003,
+            message: 'Transaction rejected'
+          })
+        }
+      } catch (error) {
+        console.error('Failed to send denied notification:', error)
+      }
+    })()
+
+    setIsLoading(false)
     setView(View.WALLET_INTERACTION_DENIED)
   }, [])
 
@@ -326,27 +417,19 @@ export const RequestPage = () => {
 
       const signer = await provider.getSigner()
       const signerAddress = await signer.getAddress()
-      const chainId = ['production', 'staging'].includes(config.get('ENVIRONMENT').toLowerCase())
-        ? ChainId.MATIC_MAINNET
-        : ChainId.MATIC_AMOY
+      const chainId = getMetaTransactionChainId()
+      const toAddress = requestRef.current?.params?.[0]?.to
 
-      const toAddress = requestRef.current?.params?.[0].to as string
-
-      let contractName: ContractName | null = null
-      let result: string | null = null
-
-      // Try to get the contract name from the to address. If it fails, check if it's a Decentraland collection contract address.
-      // If it's a Decentraland collection contract address, use the ERC721CollectionV2 contract.
-      try {
-        contractName = getContractName(toAddress)
-      } catch (error) {
-        const isAcceptedAddress = await isDecentralandContractAddress(toAddress.toLowerCase())
-        if (isAcceptedAddress) {
-          contractName = ContractName.ERC721CollectionV2
-        }
+      if (!toAddress) {
+        throw new Error('Contract address not found in transaction parameters')
       }
 
-      if (contractName) {
+      let result: string | null = null
+
+      // Check if this contract will use meta transactions
+      const { willUseMetaTransaction, contractName } = await checkMetaTransactionSupport(toAddress)
+
+      if (willUseMetaTransaction && contractName) {
         const connectedProvider = await getConnectedProvider()
         if (!connectedProvider) {
           throw new Error('Provider not connected')
@@ -462,6 +545,27 @@ export const RequestPage = () => {
           )}
         </Container>
       )
+    case View.WALLET_NFT_INTERACTION:
+      return nftTransferData ? (
+        <>
+          <Web2TransactionModal
+            isOpen={isTransactionModalOpen}
+            transactionCostAmount={formatEther((transactionGasCost ?? 0).toString())}
+            userBalanceAmount={formatEther((walletInfo?.balance ?? 0).toString())}
+            chainId={walletInfo?.chainId ?? ChainId.ETHEREUM_MAINNET}
+            onAccept={onApproveWalletInteraction}
+            onClose={onDenyWalletInteraction}
+            onReject={onDenyWalletInteraction}
+          />
+          <NFTTransferView
+            nftData={nftTransferData}
+            isLoading={isLoading}
+            onDeny={onDenyWalletInteraction}
+            onApprove={handleApproveWalletInteraction}
+            requestId={requestId}
+          />
+        </>
+      ) : null
     case View.WALLET_INTERACTION:
       return (
         <Container canChangeAccount requestId={requestId}>
