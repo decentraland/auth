@@ -5,20 +5,6 @@ import { connection, Provider } from 'decentraland-connect'
 import { ContractName, getContractName } from 'decentraland-transactions'
 import { config } from '../../../modules/config'
 
-type Profile = {
-  avatars: Array<{
-    name?: string
-    description?: string
-    ethAddress: string
-    hasClaimedName: boolean
-    avatar?: {
-      snapshots?: {
-        face256?: string
-      }
-    }
-  }>
-}
-
 export async function getConnectedProvider(): Promise<Provider | null> {
   try {
     return await connection.getProvider()
@@ -45,23 +31,6 @@ export async function getNetworkProvider(chainId: ChainId): Promise<Provider> {
     }
   }
   return connection.createProvider(ProviderType.NETWORK, chainId)
-}
-
-export async function getProviderChainId(provider: Provider): Promise<number> {
-  const providerChainId = (await provider.request({
-    method: 'eth_chainId',
-    params: []
-  })) as string | number
-
-  let chainId: number
-
-  if (typeof providerChainId === 'string') {
-    chainId = parseInt(providerChainId, 16)
-  } else {
-    chainId = providerChainId
-  }
-
-  return chainId
 }
 
 /**
@@ -111,35 +80,6 @@ export async function checkMetaTransactionSupport(
       return { willUseMetaTransaction: true, contractName: ContractName.ERC721CollectionV2 }
     }
     return { willUseMetaTransaction: false, contractName: null }
-  }
-}
-
-/**
- * Fetches a user's profile name from the Decentraland peer
- * @param address The Ethereum address of the user
- * @returns The user's name, or null if not found
- */
-export async function fetchUserProfile(address: string): Promise<string | null> {
-  try {
-    const peerUrl = config.get('PEER_URL')
-    const response = await fetch(`${peerUrl}/lambdas/profiles/${address.toLowerCase()}`)
-
-    if (!response.ok) {
-      console.error('Failed to fetch user profile:', response.statusText)
-      return null
-    }
-
-    const data: Profile = await response.json()
-
-    if (!data.avatars || data.avatars.length === 0) {
-      return null
-    }
-
-    const avatar = data.avatars[0]
-    return avatar.name || avatar.ethAddress
-  } catch (error) {
-    console.error('Error fetching user profile:', error)
-    return null
   }
 }
 

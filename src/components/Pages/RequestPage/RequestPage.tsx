@@ -38,8 +38,7 @@ import {
   checkMetaTransactionSupport,
   getMetaTransactionChainId,
   decodeNftTransferData,
-  fetchNftMetadata,
-  fetchUserProfile
+  fetchNftMetadata
 } from './utils'
 import {
   DeniedSignIn,
@@ -217,31 +216,24 @@ export const RequestPage = () => {
             const transactionData = request.params?.[0]?.data as string | undefined
             const contractAddress = request.params?.[0]?.to as string | undefined
 
-            console.log('Transaction data:', transactionData)
-            console.log('Contract address:', contractAddress)
-
             if (transactionData && contractAddress) {
               const { willUseMetaTransaction, contractName } = await checkMetaTransactionSupport(contractAddress)
-
-              console.log('Will use meta transactions:', willUseMetaTransaction)
-              console.log('Contract name:', contractName)
 
               // If it will use meta transactions, check if it's an NFT transfer
               if (willUseMetaTransaction && contractName) {
                 const chainId = getMetaTransactionChainId()
                 const contract = getContract(contractName, chainId)
 
-                console.log('Checking if this is an NFT transfer...')
                 const transferData = decodeNftTransferData(transactionData, contract.abi)
 
                 if (transferData) {
-                  console.log('NFT transfer detected, fetching metadata and recipient profile...')
-                  const [metadata, recipientName] = await Promise.all([
+                  const [metadata, recipientProfile] = await Promise.all([
                     fetchNftMetadata(contractAddress, contract.abi, transferData.tokenId, browserProvider.current),
-                    fetchUserProfile(transferData.toAddress)
+                    fetchProfile(transferData.toAddress)
                   ])
-                  console.log('Metadata:', metadata)
-                  console.log('Recipient name:', recipientName)
+
+                  const recipientName = recipientProfile?.avatars?.[0]?.name || recipientProfile?.avatars?.[0]?.ethAddress || undefined
+
                   if (metadata?.imageUrl) {
                     setNftTransferData({
                       imageUrl: metadata.imageUrl,
@@ -250,7 +242,7 @@ export const RequestPage = () => {
                       contractAddress,
                       name: metadata.name,
                       description: metadata.description,
-                      recipientName: recipientName || undefined
+                      recipientName
                     })
                     setView(View.WALLET_NFT_INTERACTION)
                     break
