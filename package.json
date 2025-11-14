@@ -34,7 +34,7 @@
     "@well-known-components/fetch-component": "^2.0.2",
     "ajv": "^8.12.0",
     "classnames": "^2.3.2",
-    "dcl-catalyst-client": "^21.8.1",
+    "dcl-catalyst-client": "^21.9.0",
     "decentraland-connect": "^9.1.0",
     "decentraland-crypto-fetch": "^2.0.1",
     "decentraland-transactions": "^2.24.1",

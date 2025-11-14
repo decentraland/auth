@@ -14,7 +14,7 @@ import { useAnalytics } from '../../../hooks/useAnalytics'
 import { getAnalytics } from '../../../modules/analytics/segment'
 import { ClickEvents, TrackingEvents } from '../../../modules/analytics/types'
 import { config } from '../../../modules/config'
-import { fetchProfile } from '../../../modules/profile'
+import { fetchProfile, fetchProfileWithConsistencyCheck, redeployExistingProfile } from '../../../modules/profile'
 import {
   createAuthServerHttpClient,
   createAuthServerWsClient,
@@ -80,7 +80,7 @@ export const RequestPage = () => {
   const params = useParams()
   const [searchParams] = useSearchParams()
   const navigate = useNavigateWithSearchParams()
-  const { isLoading: isConnecting, account, provider, providerType } = useCurrentConnectionData()
+  const { isLoading: isConnecting, account, provider, providerType, identity } = useCurrentConnectionData()
   const { flags, variants, initialized: initializedFlags } = useContext(FeatureFlagsContext)
   const { trackClick } = useAnalytics()
   const browserProvider = useRef<BrowserProvider>()
@@ -152,6 +152,18 @@ export const RequestPage = () => {
     const loadRequest = async () => {
       const timeTheSiteStartedLoading = Date.now()
       browserProvider.current = new ethers.BrowserProvider(provider)
+
+      const consistencyResult = await fetchProfileWithConsistencyCheck(account)
+      console.log('Loading request - Consistency result', consistencyResult)
+      if (!consistencyResult.isConsistent && consistencyResult.entity && identity) {
+        try {
+          await redeployExistingProfile(consistencyResult.entity, account, identity)
+        } catch (error) {
+          console.warn('Profile redeployment failed, falling back to login page:', error)
+          toLoginPage()
+        }
+      }
+
       const profile = await fetchProfile(account)
 
       // `alternative` has its own set up
@@ -288,7 +300,7 @@ export const RequestPage = () => {
       clearTimeout(timeoutRef.current)
       clearTimeout(signTimeoutRef.current)
     }
-  }, [toLoginPage, toSetupPage, account, provider, providerType, isConnecting, initializedFlags])
+  }, [toLoginPage, toSetupPage, account, provider, providerType, isConnecting, initializedFlags, identity])
 
   useEffect(() => {
     // The timeout is only necessary on the verify sign in and wallet interaction views.
