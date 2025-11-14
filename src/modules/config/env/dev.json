@@ -10,5 +10,6 @@
   "INTERCOM_APP_ID": "z0h94kay",
   "REFERRAL_SERVER_URL": "https://social-api.decentraland.zone/v1",
   "WEARABLE_PREVIEW_URL": "https://wearable-preview.decentraland.zone",
-  "DOWNLOAD_URL": "https://decentraland.zone/download"
+  "DOWNLOAD_URL": "https://decentraland.zone/download",
+  "META_TRANSACTION_SERVER_URL": "https://transactions-api.decentraland.zone/v1"
 }
