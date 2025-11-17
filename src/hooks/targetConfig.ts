@@ -22,7 +22,7 @@ type TargetConfig = {
 const defaultConfig: TargetConfig = {
   skipSetup: false,
   showWearablePreview: true,
-  explorerText: 'Decentraland app',
+  explorerText: 'Decentraland',
   connectionOptions: {
     primary: ConnectionOptionType.GOOGLE,
     secondary: ConnectionOptionType.METAMASK,

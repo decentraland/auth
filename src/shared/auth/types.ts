@@ -9,6 +9,13 @@ export type RecoverResponse = {
 
 export type OutcomeResponse = {
   error?: string
+  token?: string
+  deepLink?: string
+}
+
+export type TokenResponse = {
+  token: string
+  deepLink: string
 }
 
 export type OutcomeError = { code: number; message: string }
