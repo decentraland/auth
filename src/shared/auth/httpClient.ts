@@ -3,7 +3,7 @@ import { config } from '../../modules/config'
 import { trackEvent } from '../utils/analytics'
 import { handleError } from '../utils/errorHandler'
 import { DifferentSenderError, ExpiredRequestError, RequestNotFoundError, IpValidationError } from './errors'
-import { OutcomeError, RecoverResponse } from './types'
+import { OutcomeError, OutcomeResponse, RecoverResponse } from './types'
 export const createAuthServerHttpClient = (authServerUrl?: string) => {
   const baseUrl = authServerUrl ?? config.get('AUTH_SERVER_URL')
 
