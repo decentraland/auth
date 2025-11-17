@@ -30,6 +30,7 @@ import { handleError } from '../../../shared/utils/errorHandler'
 import { checkWebGpuSupport } from '../../../shared/utils/webgpu'
 import { FeatureFlagsContext, FeatureFlagsKeys, OnboardingFlowVariant } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
 import { Container } from './Container'
+import { ContinueInApp } from './Views/ContinueInApp'
 import { DeniedSignIn } from './Views/DeniedSignIn'
 import { DeniedWalletInteraction } from './Views/DeniedWalletInteraction'
 import { DifferentAccountError } from './Views/DifferentAccountError'
@@ -54,6 +55,8 @@ enum View {
   VERIFY_SIGN_IN_DENIED,
   VERIFY_SIGN_IN_ERROR,
   VERIFY_SIGN_IN_COMPLETE,
+  // Token Flow
+  TOKEN_CONTINUE_IN_APP,
   // Wallet Interaction
   WALLET_INTERACTION,
   WALLET_INTERACTION_DENIED,
@@ -80,6 +83,7 @@ export const RequestPage = () => {
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false)
   const requestRef = useRef<RecoverResponse>()
   const [error, setError] = useState<string>()
+  const [tokenData, setTokenData] = useState<{ token: string; deepLink: string }>()
   const timeoutRef = useRef<NodeJS.Timeout>()
   const signTimeoutRef = useRef<NodeJS.Timeout>()
   const requestId = params.requestId ?? ''
@@ -165,6 +169,7 @@ export const RequestPage = () => {
         // Show different views depending on the request method.
         switch (request.method) {
           case 'dcl_personal_sign':
+          case 'dcl_personal_sign_with_token':
             setView(View.VERIFY_SIGN_IN)
             break
           case 'eth_sendTransaction':
@@ -269,13 +274,20 @@ export const RequestPage = () => {
       }
 
       console.log('Approve sign in verification - Signed the message. Sending the outcome to the server...')
-      await authServerClient.current.sendSuccessfulOutcome(requestId, await signer.getAddress(), signature)
+      const response = await authServerClient.current.sendSuccessfulOutcome(requestId, await signer.getAddress(), signature)
       console.log('Approve sign in verification - Outcome sent')
 
-      setView(View.VERIFY_SIGN_IN_COMPLETE)
-
-      if (targetConfig.deepLink) {
-        window.location.href = targetConfig.deepLink
+      // Check if this is token flow
+      if (requestRef.current?.method === 'dcl_personal_sign_with_token' && response.token && response.deepLink) {
+        // Token flow - show "Continue in app" screen
+        setTokenData({ token: response.token, deepLink: response.deepLink })
+        setView(View.TOKEN_CONTINUE_IN_APP)
+      } else {
+        // Traditional flow - go directly to complete
+        setView(View.VERIFY_SIGN_IN_COMPLETE)
+        if (targetConfig.deepLink) {
+          window.location.href = targetConfig.deepLink
+        }
       }
     } catch (e) {
       if (e instanceof TimedOutError) {
@@ -359,6 +371,18 @@ export const RequestPage = () => {
     }
   }, [isUserUsingWeb2Wallet, onApproveWalletInteraction])
 
+  const onContinueInApp = useCallback(() => {
+    if (!tokenData?.deepLink) return
+
+    trackClick(ClickEvents.TOKEN_DEEP_LINK_OPENED)
+
+    // Open the deep link
+    window.location.href = tokenData.deepLink
+
+    // Show completion view
+    setView(View.VERIFY_SIGN_IN_COMPLETE)
+  }, [tokenData, trackClick])
+
   switch (view) {
     case View.TIMEOUT:
       return <TimeoutError requestId={requestId} />
@@ -373,6 +397,8 @@ export const RequestPage = () => {
       return <SigningError error={error} />
     case View.VERIFY_SIGN_IN_COMPLETE:
       return <SignInComplete />
+    case View.TOKEN_CONTINUE_IN_APP:
+      return <ContinueInApp onContinue={onContinueInApp} requestId={requestId} />
     case View.VERIFY_SIGN_IN_DENIED:
       return <DeniedSignIn requestId={requestId} />
     case View.WALLET_INTERACTION_COMPLETE:
@@ -385,21 +411,33 @@ export const RequestPage = () => {
           <Loader active size="huge" />
         </Container>
       )
-    case View.VERIFY_SIGN_IN:
+    case View.VERIFY_SIGN_IN: {
+      const isTokenFlow = requestRef.current?.method === 'dcl_personal_sign_with_token'
+
       return (
         <Container canChangeAccount requestId={requestId}>
           <div className={viewStyles.logo}></div>
           <div className={viewStyles.title}>Verify Sign In</div>
-          <div className={viewStyles.description}>Does the verification number below match the one in the {targetConfig.explorerText}?</div>
-          <div className={styles.code}>{requestRef.current?.code}</div>
+
+          {!isTokenFlow && (
+            <>
+              <div className={viewStyles.description}>
+                Does the verification number below match the one in the {targetConfig.explorerText}?
+              </div>
+              <div className={styles.code}>{requestRef.current?.code}</div>
+            </>
+          )}
+
+          {isTokenFlow && <div className={viewStyles.description}>Please confirm you want to sign in to {targetConfig.explorerText}</div>}
+
           <div className={styles.buttons}>
             <Button inverted disabled={isLoading} onClick={onDenyVerifySignIn} className={styles.noButton}>
               <Icon name="times circle" />
-              No, it doesn't
+              {isTokenFlow ? 'Cancel' : "No, it doesn't"}
             </Button>
             <Button inverted loading={isLoading} disabled={isLoading} onClick={onApproveSignInVerification} className={styles.yesButton}>
               <Icon name="check circle" />
-              Yes, they are the same
+              {isTokenFlow ? 'Sign In' : 'Yes, they are the same'}
             </Button>
           </div>
           {hasTimedOut && (
@@ -414,6 +452,7 @@ export const RequestPage = () => {
           )}
         </Container>
       )
+    }
     case View.WALLET_INTERACTION:
       return (
         <Container canChangeAccount requestId={requestId}>

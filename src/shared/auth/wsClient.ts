@@ -37,13 +37,14 @@ export const createAuthServerWsClient = (authServerUrl?: string) => {
     return response
   }
 
-  const sendSuccessfulOutcome = async (requestId: string, sender: string, result: any): Promise<void> => {
+  const sendSuccessfulOutcome = async (requestId: string, sender: string, result: any): Promise<OutcomeResponse> => {
     try {
-      await request<OutcomeResponse>('outcome', {
+      const response = await request<OutcomeResponse>('outcome', {
         requestId,
         sender,
         result
       })
+      return response
     } catch (e) {
       handleError(e, 'Error sending outcome')
       throw e
@@ -84,6 +85,7 @@ export const createAuthServerWsClient = (authServerUrl?: string) => {
 
       switch (response.method) {
         case 'dcl_personal_sign':
+        case 'dcl_personal_sign_with_token':
           trackEvent(TrackingEvents.REQUEST_INTERACTION, {
             type: RequestInteractionType.VERIFY_SIGN_IN,
             browserTime: Date.now(),
