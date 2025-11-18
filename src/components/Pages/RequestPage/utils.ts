@@ -1,4 +1,6 @@
+import { Profile } from 'dcl-catalyst-client/dist/client/specs/catalyst.schemas'
 import { ethers } from 'ethers'
+import { Rarity } from '@dcl/schemas'
 import { ChainId } from '@dcl/schemas/dist/dapps/chain-id'
 import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
 import { connection, Provider } from 'decentraland-connect'
@@ -130,7 +132,7 @@ export async function fetchNftMetadata(
   contractABI: object[],
   tokenId: string,
   provider: ethers.BrowserProvider
-): Promise<{ imageUrl: string; name?: string; description?: string } | null> {
+): Promise<{ imageUrl: string; name?: string; description?: string; rarity?: Rarity } | null> {
   try {
     // Use the provided contract ABI to interact with the NFT contract
     const contract = new ethers.Contract(contractAddress, contractABI, provider)
@@ -155,13 +157,78 @@ export async function fetchNftMetadata(
 
     const imageUrl = metadata.image || metadata.image_url
 
+    // Extract rarity from attributes
+    let rarity: Rarity | undefined
+    if (metadata.attributes && Array.isArray(metadata.attributes)) {
+      // eslint-disable-next-line @typescript-eslint/naming-convention
+      const rarityAttribute = metadata.attributes.find((attr: { trait_type: string; value: string }) => attr.trait_type === 'Rarity')
+      if (rarityAttribute && rarityAttribute.value) {
+        // Map the string value to the Rarity enum
+        const rarityValue = rarityAttribute.value.toLowerCase()
+        switch (rarityValue) {
+          case 'unique':
+            rarity = Rarity.UNIQUE
+            break
+          case 'mythic':
+            rarity = Rarity.MYTHIC
+            break
+          case 'exotic':
+            rarity = Rarity.EXOTIC
+            break
+          case 'legendary':
+            rarity = Rarity.LEGENDARY
+            break
+          case 'epic':
+            rarity = Rarity.EPIC
+            break
+          case 'rare':
+            rarity = Rarity.RARE
+            break
+          case 'uncommon':
+            rarity = Rarity.UNCOMMON
+            break
+          case 'common':
+            rarity = Rarity.COMMON
+            break
+          default:
+            rarity = Rarity.UNIQUE // Default to UNIQUE if unknown
+        }
+      }
+    }
+
     return {
       imageUrl,
       name: metadata.name,
-      description: metadata.description
+      description: metadata.description,
+      rarity
     }
   } catch (error) {
     console.error('Error fetching NFT metadata:', error)
     return null
   }
+}
+
+/**
+ * Formats the recipient name based on whether they have claimed their name
+ * @param recipientProfile The recipient's profile
+ * @param fallbackAddress The fallback address to use if no profile is found
+ * @returns Formatted recipient name
+ */
+export function formatRecipientName(recipientProfile: Profile | undefined | null, fallbackAddress: string): string {
+  const recipientAvatar = recipientProfile?.avatars?.[0]
+  const recipientAddress = recipientAvatar?.ethAddress || fallbackAddress
+
+  // If no name exists, return the address
+  if (!recipientAvatar?.name) {
+    return recipientAddress
+  }
+
+  // If name is claimed, show just the name
+  if (recipientAvatar.hasClaimedName) {
+    return recipientAvatar.name
+  }
+
+  // If name is not claimed, show name#last4
+  const last4 = recipientAddress.slice(-4)
+  return `${recipientAvatar.name}#${last4}`
 }

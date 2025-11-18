@@ -1,10 +1,9 @@
-import { useState } from 'react'
 import { Rarity } from '@dcl/schemas'
 import { AssetImage } from 'decentraland-ui2/dist/components/AssetImage'
-import { Box, Button, styled, AvatarFace, Typography, CircularProgress, Alert } from 'decentraland-ui2'
+import { Box, styled, AvatarFace, Typography, Alert } from 'decentraland-ui2'
 import { NFTTransferContainer } from '../Container'
 import { formatRecipientName } from '../utils'
-import { NFTTransferViewProps } from './NFTTransferView.types'
+import { NFTTransferCompleteViewProps } from './NFTTransferCompleteView.types'
 
 const CenteredContent = styled(Box)({
   display: 'flex',
@@ -54,68 +53,28 @@ const NFTName = styled(Box)({
 })
 
 // eslint-disable-next-line @typescript-eslint/naming-convention
-const WarningAlert = styled(Alert)({
-  marginBottom: '32px',
+const InfoAlert = styled(Alert)({
   width: '100%',
   maxWidth: '400px',
-  background: 'transparent',
-  color: 'white',
+  marginTop: '24px',
+  background: '#00000033',
   alignSelf: 'center',
   justifyContent: 'center',
+  color: 'white',
   // eslint-disable-next-line @typescript-eslint/naming-convention
   '& .MuiAlert-icon': {
     color: 'white'
   }
 })
 
-const ButtonsContainer = styled(Box)({
-  display: 'flex',
-  gap: '16px',
-  width: '100%',
-  maxWidth: '400px'
-})
-
-const CancelButton = styled(Button)({
-  borderRadius: '12px',
-  background: 'rgba(0, 0, 0, 0.40)',
-  color: 'white'
-})
-
-const ConfirmButton = styled(Button)({
-  borderRadius: '12px'
-})
-
-const LoadingContainer = styled(Box)({
-  display: 'flex',
-  flexDirection: 'row',
-  alignItems: 'center',
-  gap: '16px',
-  marginTop: '24px'
-})
-
-const LoadingText = styled(Typography)({
-  fontSize: '18px',
-  fontWeight: 400,
-  fontStyle: 'normal',
-  lineHeight: '100%',
-  letterSpacing: '0px',
-  color: 'rgba(255, 255, 255, 0.9)'
-})
-
-export const NFTTransferView = ({ nftData, isLoading, onDeny, onApprove }: NFTTransferViewProps) => {
-  const [isProcessing, setIsProcessing] = useState(false)
+export const NFTTransferCompleteView = ({ nftData }: NFTTransferCompleteViewProps) => {
   const recipientAvatar = nftData.recipientProfile?.avatars?.[0]
   const recipientName = formatRecipientName(nftData.recipientProfile, nftData.toAddress)
-
-  const handleApprove = async () => {
-    setIsProcessing(true)
-    await onApprove()
-  }
 
   return (
     <NFTTransferContainer>
       <CenteredContent>
-        <Title>{isProcessing ? 'Sending Gift to' : 'Confirm Gift for'}</Title>
+        <Title>Gift Sent to</Title>
 
         <RecipientContainer>
           {recipientAvatar && <AvatarFace size="small" avatar={recipientAvatar as unknown as Parameters<typeof AvatarFace>[0]['avatar']} />}
@@ -128,23 +87,7 @@ export const NFTTransferView = ({ nftData, isLoading, onDeny, onApprove }: NFTTr
 
         {nftData.name && <NFTName>{nftData.name}</NFTName>}
 
-        {!isProcessing && <WarningAlert severity="info">Gifting an item cannot be undone</WarningAlert>}
-
-        {isProcessing ? (
-          <LoadingContainer>
-            <CircularProgress size={30} sx={{ color: 'red' }} />
-            <LoadingText>Processing Authorization</LoadingText>
-          </LoadingContainer>
-        ) : (
-          <ButtonsContainer>
-            <CancelButton variant="text" size="large" disabled={isLoading} onClick={onDeny} fullWidth>
-              CANCEL
-            </CancelButton>
-            <ConfirmButton variant="contained" size="large" disabled={isLoading} onClick={handleApprove} fullWidth>
-              CONFIRM & SEND
-            </ConfirmButton>
-          </ButtonsContainer>
-        )}
+        <InfoAlert severity="info">You can close this tab and return to the Decentraland app</InfoAlert>
       </CenteredContent>
     </NFTTransferContainer>
   )

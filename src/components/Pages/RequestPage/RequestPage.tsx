@@ -32,6 +32,7 @@ import { handleError } from '../../../shared/utils/errorHandler'
 import { checkWebGpuSupport } from '../../../shared/utils/webgpu'
 import { FeatureFlagsContext, FeatureFlagsKeys, OnboardingFlowVariant } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
 import { Container } from './Container'
+import { NFTTransferData } from './types'
 import {
   getNetworkProvider,
   getConnectedProvider,
@@ -46,6 +47,7 @@ import {
   DifferentAccountError,
   IpValidationError as IpValidationErrorView,
   NFTTransferView,
+  NFTTransferCompleteView,
   RecoverError,
   SignInComplete,
   SigningError,
@@ -72,7 +74,8 @@ enum View {
   WALLET_NFT_INTERACTION,
   WALLET_INTERACTION_DENIED,
   WALLET_INTERACTION_ERROR,
-  WALLET_INTERACTION_COMPLETE
+  WALLET_INTERACTION_COMPLETE,
+  WALLET_NFT_INTERACTION_COMPLETE
 }
 
 export const RequestPage = () => {
@@ -91,15 +94,7 @@ export const RequestPage = () => {
     chainId: number
   }>()
   const [transactionGasCost, setTransactionGasCost] = useState<bigint>()
-  const [nftTransferData, setNftTransferData] = useState<{
-    imageUrl: string
-    tokenId: string
-    toAddress: string
-    contractAddress: string
-    name?: string
-    description?: string
-    recipientName?: string
-  } | null>(null)
+  const [nftTransferData, setNftTransferData] = useState<NFTTransferData | null>(null)
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false)
   const requestRef = useRef<RecoverResponse>()
   const [error, setError] = useState<string>()
@@ -231,9 +226,7 @@ export const RequestPage = () => {
                     fetchNftMetadata(contractAddress, contract.abi, transferData.tokenId, browserProvider.current),
                     fetchProfile(transferData.toAddress)
                   ])
-
-                  const recipientName = recipientProfile?.avatars?.[0]?.name || recipientProfile?.avatars?.[0]?.ethAddress || undefined
-
+                  console.log('NFT transfer data', metadata, recipientProfile)
                   if (metadata?.imageUrl) {
                     setNftTransferData({
                       imageUrl: metadata.imageUrl,
@@ -242,7 +235,8 @@ export const RequestPage = () => {
                       contractAddress,
                       name: metadata.name,
                       description: metadata.description,
-                      recipientName
+                      rarity: metadata.rarity,
+                      recipientProfile: recipientProfile || undefined
                     })
                     setView(View.WALLET_NFT_INTERACTION)
                     break
@@ -454,7 +448,14 @@ export const RequestPage = () => {
         method: requestRef.current?.method
       })
       await authServerClient.current.sendSuccessfulOutcome(requestId, signerAddress, result)
-      setView(View.WALLET_INTERACTION_COMPLETE)
+
+      if (nftTransferData) {
+        console.log('Setting view to WALLET_NFT_INTERACTION_COMPLETE')
+        setView(View.WALLET_NFT_INTERACTION_COMPLETE)
+      } else {
+        console.log('Setting view to WALLET_INTERACTION_COMPLETE')
+        setView(View.WALLET_INTERACTION_COMPLETE)
+      }
     } catch (e) {
       if (e instanceof IpValidationError) {
         setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
@@ -483,8 +484,10 @@ export const RequestPage = () => {
         setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
         setView(View.WALLET_INTERACTION_ERROR)
       }
+    } finally {
+      setIsLoading(false)
     }
-  }, [isUserUsingWeb2Wallet])
+  }, [isUserUsingWeb2Wallet, nftTransferData, requestId])
 
   const handleApproveWalletInteraction = useCallback(async () => {
     if (isUserUsingWeb2Wallet) {
@@ -512,6 +515,8 @@ export const RequestPage = () => {
       return <DeniedSignIn requestId={requestId} />
     case View.WALLET_INTERACTION_COMPLETE:
       return <WalletInteractionComplete />
+    case View.WALLET_NFT_INTERACTION_COMPLETE:
+      return nftTransferData ? <NFTTransferCompleteView nftData={nftTransferData} /> : null
     case View.WALLET_INTERACTION_DENIED:
       return <DeniedWalletInteraction />
     case View.LOADING_REQUEST:
@@ -566,7 +571,6 @@ export const RequestPage = () => {
             isLoading={isLoading}
             onDeny={onDenyWalletInteraction}
             onApprove={handleApproveWalletInteraction}
-            requestId={requestId}
           />
         </>
       ) : null
