@@ -48,6 +48,7 @@ import {
   IpValidationError as IpValidationErrorView,
   NFTTransferView,
   NFTTransferCompleteView,
+  NFTTransferCanceledView,
   RecoverError,
   SignInComplete,
   SigningError,
@@ -73,6 +74,7 @@ enum View {
   WALLET_INTERACTION,
   WALLET_NFT_INTERACTION,
   WALLET_INTERACTION_DENIED,
+  WALLET_NFT_INTERACTION_DENIED,
   WALLET_INTERACTION_ERROR,
   WALLET_INTERACTION_COMPLETE,
   WALLET_NFT_INTERACTION_COMPLETE
@@ -397,8 +399,13 @@ export const RequestPage = () => {
     })()
 
     setIsLoading(false)
-    setView(View.WALLET_INTERACTION_DENIED)
-  }, [])
+    // Set appropriate view based on whether it's an NFT transfer
+    if (nftTransferData) {
+      setView(View.WALLET_NFT_INTERACTION_DENIED)
+    } else {
+      setView(View.WALLET_INTERACTION_DENIED)
+    }
+  }, [nftTransferData, requestId])
 
   const onApproveWalletInteraction = useCallback(async () => {
     setIsLoading(true)
@@ -519,6 +526,8 @@ export const RequestPage = () => {
       return nftTransferData ? <NFTTransferCompleteView nftData={nftTransferData} /> : null
     case View.WALLET_INTERACTION_DENIED:
       return <DeniedWalletInteraction />
+    case View.WALLET_NFT_INTERACTION_DENIED:
+      return nftTransferData ? <NFTTransferCanceledView nftData={nftTransferData} /> : null
     case View.LOADING_REQUEST:
       return (
         <Container>

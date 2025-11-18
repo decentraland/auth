@@ -1,11 +1,9 @@
-import Lottie from 'lottie-react'
 import { Rarity } from '@dcl/schemas'
 import { AssetImage } from 'decentraland-ui2/dist/components/AssetImage'
 import { Box, styled, AvatarFace, Typography, Alert } from 'decentraland-ui2'
-import successAnimation from '../../../../assets/animations/successAnimation_Lottie.json'
 import { NFTTransferContainer } from '../Container'
 import { formatRecipientName } from '../utils'
-import { NFTTransferCompleteViewProps } from './NFTTransferCompleteView.types'
+import { NFTTransferCanceledViewProps } from './NFTTransferCanceledView.types'
 
 const CenteredContent = styled(Box)({
   display: 'flex',
@@ -27,16 +25,24 @@ const Title = styled(Typography)({
   marginBottom: '24px'
 })
 
-const RecipientContainer = styled(Box)({
+const SecondaryText = styled(Box)({
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
   gap: '12px',
-  marginBottom: '32px'
+  marginBottom: '32px',
+  fontSize: '18px',
+  flexWrap: 'wrap'
+})
+
+const RecipientInfo = styled(Box)({
+  display: 'flex',
+  alignItems: 'center',
+  gap: '8px'
 })
 
 const RecipientName = styled(Box)({
-  fontSize: '20px',
+  fontSize: '18px',
   fontWeight: 600
 })
 
@@ -45,20 +51,7 @@ const NFTImageWrapper = styled(Box)({
   height: '260px',
   marginBottom: '16px',
   borderRadius: '16px',
-  overflow: 'visible',
-  position: 'relative'
-})
-
-// eslint-disable-next-line @typescript-eslint/naming-convention
-const SuccessAnimation = styled(Lottie)({
-  position: 'absolute',
-  top: '50%',
-  left: '50%',
-  transform: 'translate(-50%, -50%)',
-  width: '400px',
-  height: '400px',
-  pointerEvents: 'none',
-  zIndex: 10
+  overflow: 'hidden'
 })
 
 const NFTName = styled(Box)({
@@ -67,6 +60,7 @@ const NFTName = styled(Box)({
   marginBottom: '24px'
 })
 
+// eslint-disable-next-line @typescript-eslint/naming-convention
 const InfoAlert = styled(Alert)({
   width: '100%',
   maxWidth: '400px',
@@ -81,23 +75,27 @@ const InfoAlert = styled(Alert)({
   }
 })
 
-export const NFTTransferCompleteView = ({ nftData }: NFTTransferCompleteViewProps) => {
+export const NFTTransferCanceledView = ({ nftData }: NFTTransferCanceledViewProps) => {
   const recipientAvatar = nftData.recipientProfile?.avatars?.[0]
   const recipientName = formatRecipientName(nftData.recipientProfile, nftData.toAddress)
 
   return (
     <NFTTransferContainer>
       <CenteredContent>
-        <Title>Gift Sent to</Title>
+        <Title>Gift Canceled</Title>
 
-        <RecipientContainer>
-          {recipientAvatar && <AvatarFace size="small" avatar={recipientAvatar as unknown as Parameters<typeof AvatarFace>[0]['avatar']} />}
-          <RecipientName>{recipientName}</RecipientName>
-        </RecipientContainer>
+        <SecondaryText>
+          Your gift wasn&apos;t delivered to
+          <RecipientInfo>
+            {recipientAvatar && (
+              <AvatarFace size="small" avatar={recipientAvatar as unknown as Parameters<typeof AvatarFace>[0]['avatar']} />
+            )}
+            <RecipientName>{recipientName}</RecipientName>
+          </RecipientInfo>
+        </SecondaryText>
 
         <NFTImageWrapper>
           <AssetImage src={nftData.imageUrl} name={nftData.name || `NFT #${nftData.tokenId}`} rarity={nftData.rarity || Rarity.COMMON} />
-          <SuccessAnimation animationData={successAnimation} loop={true} />
         </NFTImageWrapper>
 
         {nftData.name && <NFTName>{nftData.name}</NFTName>}
