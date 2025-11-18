@@ -1,5 +1,6 @@
 import { ReactNode } from 'react'
 import { Box, styled } from 'decentraland-ui2'
+import customWelcomeBackground from '../../../../assets/images/background/custom-welcome-background.webp'
 
 const Background = styled('div')({
   position: 'fixed',
@@ -8,7 +9,7 @@ const Background = styled('div')({
   backgroundSize: 'cover',
   backgroundRepeat: 'no-repeat',
   backgroundPosition: 'right',
-  backgroundImage: "url('/src/assets/images/background/custom-welcome-background.webp')"
+  backgroundImage: `url(${customWelcomeBackground})`
 })
 
 const Main = styled(Box)({
