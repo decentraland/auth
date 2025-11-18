@@ -42,7 +42,7 @@ export async function getNetworkProvider(chainId: ChainId): Promise<Provider> {
  */
 export async function isDecentralandContractAddress(address: string): Promise<boolean> {
   try {
-    const transactionApiUrl = config.get('META_TRANSACTION_SERVER_URL')
+    const transactionApiUrl = `${config.get('META_TRANSACTION_SERVER_URL')}/v1`
     const response = await fetch(`${transactionApiUrl}/contracts/${address}`)
 
     if (response.status === 200) {

@@ -378,25 +378,22 @@ export const RequestPage = () => {
     }
   }, [setIsLoading, isUserUsingWeb2Wallet, isLoading])
 
-  const onDenyWalletInteraction = useCallback(() => {
+  const onDenyWalletInteraction = useCallback(async () => {
     setIsLoading(true)
     setIsTransactionModalOpen(false)
     trackClick(ClickEvents.DENY_WALLET_INTERACTION)
 
-    // Send failed outcome notification asynchronously without blocking the UI
-    ;(async () => {
-      try {
-        const signer = await browserProvider.current?.getSigner()
-        if (signer) {
-          await authServerClient.current.sendFailedOutcome(requestId, await signer.getAddress(), {
-            code: -32003,
-            message: 'Transaction rejected'
-          })
-        }
-      } catch (error) {
-        console.error('Failed to send denied notification:', error)
+    try {
+      const signer = await browserProvider.current?.getSigner()
+      if (signer) {
+        await authServerClient.current.sendFailedOutcome(requestId, await signer.getAddress(), {
+          code: -32003,
+          message: 'Transaction rejected'
+        })
       }
-    })()
+    } catch (error) {
+      console.error('Failed to send denied notification:', error)
+    }
 
     setIsLoading(false)
     // Set appropriate view based on whether it's an NFT transfer
@@ -445,7 +442,7 @@ export const RequestPage = () => {
         contract.address = toAddress
 
         result = await sendMetaTransaction(connectedProvider, networkProvider, requestRef.current?.params?.[0].data as string, contract, {
-          serverURL: config.get('META_TRANSACTION_SERVER_URL')
+          serverURL: `${config.get('META_TRANSACTION_SERVER_URL')}/v1`
         })
       } else {
         result = await provider.send(requestRef.current?.method, requestRef.current?.params ?? [])

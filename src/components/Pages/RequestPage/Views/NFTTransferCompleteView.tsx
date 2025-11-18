@@ -1,10 +1,10 @@
 import Lottie from 'lottie-react'
 import { Rarity } from '@dcl/schemas'
 import { AssetImage } from 'decentraland-ui2/dist/components/AssetImage'
-import { Box, styled, AvatarFace, Typography, Alert } from 'decentraland-ui2'
+import { Box, styled, Typography, Alert, Profile } from 'decentraland-ui2'
 import successAnimation from '../../../../assets/animations/successAnimation_Lottie.json'
 import { NFTTransferContainer } from '../Container'
-import { formatRecipientName } from '../utils'
+import { ProfileAvatar } from '../types'
 import { NFTTransferCompleteViewProps } from './NFTTransferCompleteView.types'
 
 const CenteredContent = styled(Box)({
@@ -27,17 +27,8 @@ const Title = styled(Typography)({
   marginBottom: '24px'
 })
 
-const RecipientContainer = styled(Box)({
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: '12px',
+const RecipientProfile = styled(Box)({
   marginBottom: '32px'
-})
-
-const RecipientName = styled(Box)({
-  fontSize: '20px',
-  fontWeight: 600
 })
 
 const NFTImageWrapper = styled(Box)({
@@ -83,17 +74,15 @@ const InfoAlert = styled(Alert)({
 
 export const NFTTransferCompleteView = ({ nftData }: NFTTransferCompleteViewProps) => {
   const recipientAvatar = nftData.recipientProfile?.avatars?.[0]
-  const recipientName = formatRecipientName(nftData.recipientProfile, nftData.toAddress)
 
   return (
     <NFTTransferContainer>
       <CenteredContent>
         <Title>Gift Sent to</Title>
 
-        <RecipientContainer>
-          {recipientAvatar && <AvatarFace size="small" avatar={recipientAvatar as unknown as Parameters<typeof AvatarFace>[0]['avatar']} />}
-          <RecipientName>{recipientName}</RecipientName>
-        </RecipientContainer>
+        <RecipientProfile>
+          <Profile address={nftData.toAddress} avatar={recipientAvatar as ProfileAvatar} size="large" inline />
+        </RecipientProfile>
 
         <NFTImageWrapper>
           <AssetImage src={nftData.imageUrl} name={nftData.name || `NFT #${nftData.tokenId}`} rarity={nftData.rarity || Rarity.COMMON} />
