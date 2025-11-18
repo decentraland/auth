@@ -1,4 +1,3 @@
-import { Profile } from 'dcl-catalyst-client/dist/client/specs/catalyst.schemas'
 import { ethers } from 'ethers'
 import { Rarity } from '@dcl/schemas'
 import { ChainId } from '@dcl/schemas/dist/dapps/chain-id'
@@ -126,109 +125,78 @@ export function decodeNftTransferData(data: string, contractABI: object[]): { to
  * @param tokenId The token ID
  * @param provider The ethers provider
  * @returns Object containing image URL and other metadata
+ * @throws Error if tokenURI is not found or metadata cannot be fetched
  */
 export async function fetchNftMetadata(
   contractAddress: string,
   contractABI: object[],
   tokenId: string,
   provider: ethers.BrowserProvider
-): Promise<{ imageUrl: string; name?: string; description?: string; rarity?: Rarity } | null> {
-  try {
-    // Use the provided contract ABI to interact with the NFT contract
-    const contract = new ethers.Contract(contractAddress, contractABI, provider)
-    const tokenUri = await contract.tokenURI(tokenId)
+): Promise<{ imageUrl: string; name?: string; description?: string; rarity?: Rarity }> {
+  // Use the provided contract ABI to interact with the NFT contract
+  const contract = new ethers.Contract(contractAddress, contractABI, provider)
+  const tokenUri = await contract.tokenURI(tokenId)
 
-    if (!tokenUri) {
-      console.error('No tokenURI returned')
-      return null
-    }
+  if (!tokenUri) {
+    throw new Error(`No tokenURI returned for token ${tokenId} at contract ${contractAddress}`)
+  }
 
-    // Handle IPFS URIs
-    const metadataUrl = tokenUri
+  // Handle IPFS URIs
+  const metadataUrl = tokenUri
 
-    // Fetch the metadata JSON
-    const metadataResponse = await fetch(metadataUrl)
-    if (!metadataResponse.ok) {
-      console.error('Failed to fetch metadata:', metadataResponse.statusText)
-      return null
-    }
+  // Fetch the metadata JSON
+  const metadataResponse = await fetch(metadataUrl)
+  if (!metadataResponse.ok) {
+    throw new Error(`Failed to fetch metadata from ${metadataUrl}: ${metadataResponse.status} ${metadataResponse.statusText}`)
+  }
 
-    const metadata = await metadataResponse.json()
+  const metadata = await metadataResponse.json()
 
-    const imageUrl = metadata.image || metadata.image_url
+  const imageUrl = metadata.image || metadata.image_url
 
-    // Extract rarity from attributes
-    let rarity: Rarity | undefined
-    if (metadata.attributes && Array.isArray(metadata.attributes)) {
-      // eslint-disable-next-line @typescript-eslint/naming-convention
-      const rarityAttribute = metadata.attributes.find((attr: { trait_type: string; value: string }) => attr.trait_type === 'Rarity')
-      if (rarityAttribute && rarityAttribute.value) {
-        // Map the string value to the Rarity enum
-        const rarityValue = rarityAttribute.value.toLowerCase()
-        switch (rarityValue) {
-          case 'unique':
-            rarity = Rarity.UNIQUE
-            break
-          case 'mythic':
-            rarity = Rarity.MYTHIC
-            break
-          case 'exotic':
-            rarity = Rarity.EXOTIC
-            break
-          case 'legendary':
-            rarity = Rarity.LEGENDARY
-            break
-          case 'epic':
-            rarity = Rarity.EPIC
-            break
-          case 'rare':
-            rarity = Rarity.RARE
-            break
-          case 'uncommon':
-            rarity = Rarity.UNCOMMON
-            break
-          case 'common':
-            rarity = Rarity.COMMON
-            break
-          default:
-            rarity = Rarity.UNIQUE // Default to UNIQUE if unknown
-        }
+  // Extract rarity from attributes
+  let rarity: Rarity | undefined
+  if (metadata.attributes && Array.isArray(metadata.attributes)) {
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    const rarityAttribute = metadata.attributes.find((attr: { trait_type: string; value: string }) => attr.trait_type === 'Rarity')
+    if (rarityAttribute && rarityAttribute.value) {
+      // Map the string value to the Rarity enum
+      const rarityValue = rarityAttribute.value.toLowerCase()
+      switch (rarityValue) {
+        case 'unique':
+          rarity = Rarity.UNIQUE
+          break
+        case 'mythic':
+          rarity = Rarity.MYTHIC
+          break
+        case 'exotic':
+          rarity = Rarity.EXOTIC
+          break
+        case 'legendary':
+          rarity = Rarity.LEGENDARY
+          break
+        case 'epic':
+          rarity = Rarity.EPIC
+          break
+        case 'rare':
+          rarity = Rarity.RARE
+          break
+        case 'uncommon':
+          rarity = Rarity.UNCOMMON
+          break
+        case 'common':
+          rarity = Rarity.COMMON
+          break
+        default:
+          rarity = Rarity.UNIQUE // Default to UNIQUE if unknown
       }
     }
-
-    return {
-      imageUrl,
-      name: metadata.name,
-      description: metadata.description,
-      rarity
-    }
-  } catch (error) {
-    console.error('Error fetching NFT metadata:', error)
-    return null
-  }
-}
-
-/**
- * Formats the recipient name based on whether they have claimed their name
- * @param recipientProfile The recipient's profile
- * @param fallbackAddress The fallback address to use if no profile is found
- * @returns Formatted recipient name
- */
-export function formatRecipientName(recipientProfile: Profile | undefined | null, fallbackAddress: string): string {
-  const recipientAvatar = recipientProfile?.avatars?.[0]
-  const recipientAddress = recipientAvatar?.ethAddress || fallbackAddress
-
-  // If no name exists, return the address
-  if (!recipientAvatar?.name) {
-    return recipientAddress
   }
 
-  // If name is claimed, show just the name
-  if (recipientAvatar.hasClaimedName) {
-    return recipientAvatar.name
+  return {
+    imageUrl,
+    name: metadata.name,
+    description: metadata.description,
+    rarity
   }
-
-  // If name is not claimed, show name#last4
-  const last4 = recipientAddress.slice(-4)
-  return `${recipientAvatar.name}#${last4}`
 }

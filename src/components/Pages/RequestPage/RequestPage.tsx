@@ -200,36 +200,35 @@ export const RequestPage = () => {
             setView(View.VERIFY_SIGN_IN)
             break
           case 'eth_sendTransaction': {
-            // Get wallet info first
-            const signer = await browserProvider.current.getSigner()
-            const userBalance = await browserProvider.current.getBalance(signer.address)
-            const currentChainId = await browserProvider.current.getNetwork().then(network => Number(network.chainId))
-            setWalletInfo({
-              balance: userBalance,
-              chainId: currentChainId
-            })
+            try {
+              // Get wallet info first
+              const signer = await browserProvider.current.getSigner()
+              const userBalance = await browserProvider.current.getBalance(signer.address)
+              const currentChainId = await browserProvider.current.getNetwork().then(network => Number(network.chainId))
+              setWalletInfo({
+                balance: userBalance,
+                chainId: currentChainId
+              })
 
-            // Check if this is an NFT transfer that will use meta transactions BEFORE gas estimation
-            const transactionData = request.params?.[0]?.data as string | undefined
-            const contractAddress = request.params?.[0]?.to as string | undefined
+              // Check if this is an NFT transfer that will use meta transactions BEFORE gas estimation
+              const transactionData = request.params?.[0]?.data as string | undefined
+              const contractAddress = request.params?.[0]?.to as string | undefined
 
-            if (transactionData && contractAddress) {
-              const { willUseMetaTransaction, contractName } = await checkMetaTransactionSupport(contractAddress)
+              if (transactionData && contractAddress) {
+                const { willUseMetaTransaction, contractName } = await checkMetaTransactionSupport(contractAddress)
 
-              // If it will use meta transactions, check if it's an NFT transfer
-              if (willUseMetaTransaction && contractName) {
-                const chainId = getMetaTransactionChainId()
-                const contract = getContract(contractName, chainId)
+                // If it will use meta transactions, check if it's an NFT transfer
+                if (willUseMetaTransaction && contractName) {
+                  const chainId = getMetaTransactionChainId()
+                  const contract = getContract(contractName, chainId)
 
-                const transferData = decodeNftTransferData(transactionData, contract.abi)
+                  const transferData = decodeNftTransferData(transactionData, contract.abi)
 
-                if (transferData) {
-                  const [metadata, recipientProfile] = await Promise.all([
-                    fetchNftMetadata(contractAddress, contract.abi, transferData.tokenId, browserProvider.current),
-                    fetchProfile(transferData.toAddress)
-                  ])
-                  console.log('NFT transfer data', metadata, recipientProfile)
-                  if (metadata?.imageUrl) {
+                  if (transferData) {
+                    const [metadata, recipientProfile] = await Promise.all([
+                      fetchNftMetadata(contractAddress, contract.abi, transferData.tokenId, browserProvider.current),
+                      fetchProfile(transferData.toAddress)
+                    ])
                     setNftTransferData({
                       imageUrl: metadata.imageUrl,
                       tokenId: transferData.tokenId,
@@ -245,10 +244,7 @@ export const RequestPage = () => {
                   }
                 }
               }
-            }
 
-            // Only estimate gas if it's not an NFT transfer (regular transactions need it)
-            try {
               const gasPrice = (await browserProvider.current.getFeeData()).gasPrice ?? BigInt(0)
               const transactionGasCost = await signer.estimateGas(request.params?.[0])
               const totalGasCost = gasPrice * transactionGasCost
