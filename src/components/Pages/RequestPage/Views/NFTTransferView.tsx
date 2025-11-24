@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Rarity } from '@dcl/schemas'
 import { AssetImage } from 'decentraland-ui2/dist/components/AssetImage'
-import { Box, Button, styled, Typography, CircularProgress, circularProgressClasses } from 'decentraland-ui2'
 import { NFTTransferContainer } from '../Container'
 import { ProfileAvatar } from '../types'
 import {
@@ -12,67 +11,18 @@ import {
   NFTImageWrapper,
   NFTName,
   WarningAlert
-} from './NFTTransferComponents'
+} from './NFTTransferComponents.styled'
+import {
+  ButtonsContainer,
+  CancelButton,
+  ConfirmButton,
+  LoadingContainer,
+  LoadingText,
+  ProgressContainer,
+  ProgressTrack,
+  ProgressSpinner
+} from './NFTTransferView.styled'
 import { NFTTransferViewProps } from './NFTTransferView.types'
-
-const ButtonsContainer = styled(Box)({
-  display: 'flex',
-  gap: '16px',
-  width: '100%',
-  maxWidth: '400px'
-})
-
-const CancelButton = styled(Button)({
-  borderRadius: '12px',
-  background: 'rgba(0, 0, 0, 0.40)',
-  color: 'white',
-  // eslint-disable-next-line @typescript-eslint/naming-convention
-  '&:hover': {
-    background: 'rgba(0, 0, 0, 0.60)',
-    color: 'white !important'
-  }
-})
-
-const ConfirmButton = styled(Button)({
-  borderRadius: '12px'
-})
-
-const LoadingContainer = styled(Box)({
-  display: 'flex',
-  flexDirection: 'row',
-  alignItems: 'center',
-  gap: '16px',
-  marginTop: '24px'
-})
-
-const LoadingText = styled(Typography)({
-  fontSize: '18px',
-  fontWeight: 400,
-  fontStyle: 'normal',
-  lineHeight: '100%',
-  letterSpacing: '0px',
-  color: 'white'
-})
-
-const ProgressContainer = styled(Box)({
-  position: 'relative',
-  display: 'inline-flex'
-})
-
-const ProgressTrack = styled(CircularProgress)({
-  color: '#e0e0e0'
-})
-
-const ProgressSpinner = styled(CircularProgress)({
-  color: '#ff2d55',
-  animationDuration: '550ms',
-  position: 'absolute',
-  left: 0,
-  // eslint-disable-next-line @typescript-eslint/naming-convention
-  [`& .${circularProgressClasses.circle}`]: {
-    strokeLinecap: 'round'
-  }
-})
 
 const CircularProgressWithTrack = () => {
   return (
