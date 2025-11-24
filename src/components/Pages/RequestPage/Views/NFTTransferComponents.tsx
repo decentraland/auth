@@ -26,7 +26,11 @@ export const RecipientProfile = styled(Box)({
 
 export const RecipientProfileText = styled(Profile)({
   fontWeight: '700',
-  fontSize: '22px'
+  fontSize: '22px',
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  '& span': {
+    fontWeight: '700 !important'
+  }
 })
 
 export const NFTImageWrapper = styled(Box)({

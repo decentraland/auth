@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Rarity } from '@dcl/schemas'
 import { AssetImage } from 'decentraland-ui2/dist/components/AssetImage'
-import { Box, Button, styled, Typography, CircularProgress } from 'decentraland-ui2'
+import { Box, Button, styled, Typography, CircularProgress, circularProgressClasses } from 'decentraland-ui2'
 import { NFTTransferContainer } from '../Container'
 import { ProfileAvatar } from '../types'
 import {
@@ -54,6 +54,35 @@ const LoadingText = styled(Typography)({
   color: 'white'
 })
 
+const ProgressContainer = styled(Box)({
+  position: 'relative',
+  display: 'inline-flex'
+})
+
+const ProgressTrack = styled(CircularProgress)({
+  color: '#e0e0e0'
+})
+
+const ProgressSpinner = styled(CircularProgress)({
+  color: '#ff2d55',
+  animationDuration: '550ms',
+  position: 'absolute',
+  left: 0,
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  [`& .${circularProgressClasses.circle}`]: {
+    strokeLinecap: 'round'
+  }
+})
+
+const CircularProgressWithTrack = () => {
+  return (
+    <ProgressContainer>
+      <ProgressTrack variant="determinate" value={100} size={40} thickness={4} />
+      <ProgressSpinner variant="indeterminate" disableShrink size={40} thickness={4} />
+    </ProgressContainer>
+  )
+}
+
 export const NFTTransferView = ({ nftData, isLoading, onDeny, onApprove }: NFTTransferViewProps) => {
   const [isProcessing, setIsProcessing] = useState(false)
   const recipientAvatar = nftData.recipientProfile?.avatars?.[0]
@@ -82,7 +111,7 @@ export const NFTTransferView = ({ nftData, isLoading, onDeny, onApprove }: NFTTr
 
         {isProcessing ? (
           <LoadingContainer>
-            <CircularProgress size={30} sx={{ color: 'red' }} />
+            <CircularProgressWithTrack />
             <LoadingText>Processing Authorization</LoadingText>
           </LoadingContainer>
         ) : (
