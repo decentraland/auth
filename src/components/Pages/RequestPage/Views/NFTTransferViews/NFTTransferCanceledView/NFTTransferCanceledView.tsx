@@ -1,9 +1,9 @@
 import { Rarity } from '@dcl/schemas'
 import { AssetImage } from 'decentraland-ui2/dist/components/AssetImage'
-import { NFTTransferContainer } from '../Container'
-import { ProfileAvatar } from '../types'
+import { NFTTransferContainer } from '../../../Container'
+import { ProfileAvatar } from '../../../types'
+import { CenteredContent, Title, RecipientProfileText, NFTImageWrapper, NFTName, InfoAlert } from '../NFTTransferComponents.styled'
 import { SecondaryText } from './NFTTransferCanceledView.styled'
-import { CenteredContent, Title, RecipientProfileText, NFTImageWrapper, NFTName, InfoAlert } from './NFTTransferComponents.styled'
 import { NFTTransferCanceledViewProps } from './NFTTransferCanceledView.types'
 
 export const NFTTransferCanceledView = ({ nftData }: NFTTransferCanceledViewProps) => {

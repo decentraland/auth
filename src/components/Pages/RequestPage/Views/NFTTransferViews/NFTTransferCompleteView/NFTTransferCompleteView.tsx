@@ -1,10 +1,10 @@
 import { Rarity } from '@dcl/schemas'
 import { AssetImage } from 'decentraland-ui2/dist/components/AssetImage'
-import successAnimation from '../../../../assets/animations/successAnimation_Lottie.json'
-import { NFTTransferContainer } from '../Container'
-import { ProfileAvatar } from '../types'
+import successAnimation from '../../../../../../assets/animations/successAnimation_Lottie.json'
+import { NFTTransferContainer } from '../../../Container'
+import { ProfileAvatar } from '../../../types'
+import { CenteredContent, Title, RecipientProfile, RecipientProfileText, NFTName, InfoAlert } from '../NFTTransferComponents.styled'
 import { NFTImageWrapper, SuccessAnimation } from './NFTTransferCompleteView.styled'
-import { CenteredContent, Title, RecipientProfile, RecipientProfileText, NFTName, InfoAlert } from './NFTTransferComponents.styled'
 import { NFTTransferCompleteViewProps } from './NFTTransferCompleteView.types'
 
 export const NFTTransferCompleteView = ({ nftData }: NFTTransferCompleteViewProps) => {
@@ -26,7 +26,7 @@ export const NFTTransferCompleteView = ({ nftData }: NFTTransferCompleteViewProp
 
         {nftData.name && <NFTName>{nftData.name}</NFTName>}
 
-        <InfoAlert severity="info">You can close this tab and return to the Decentraland app</InfoAlert>
+        <InfoAlert severity="info">You can close this tab and return to the Decentraland app.</InfoAlert>
       </CenteredContent>
     </NFTTransferContainer>
   )

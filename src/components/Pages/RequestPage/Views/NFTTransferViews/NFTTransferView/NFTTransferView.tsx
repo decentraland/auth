@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { Rarity } from '@dcl/schemas'
 import { AssetImage } from 'decentraland-ui2/dist/components/AssetImage'
-import { NFTTransferContainer } from '../Container'
-import { ProfileAvatar } from '../types'
+import { NFTTransferContainer } from '../../../Container'
+import { ProfileAvatar } from '../../../types'
 import {
   CenteredContent,
   Title,
@@ -11,7 +11,7 @@ import {
   NFTImageWrapper,
   NFTName,
   WarningAlert
-} from './NFTTransferComponents.styled'
+} from '../NFTTransferComponents.styled'
 import {
   ButtonsContainer,
   CancelButton,

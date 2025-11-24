@@ -1,4 +1,4 @@
-import { NFTTransferData } from '../types'
+import { NFTTransferData } from '../../../types'
 
 export type NFTTransferViewProps = {
   nftData: NFTTransferData
