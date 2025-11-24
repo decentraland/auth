@@ -1,29 +1,10 @@
 import { Rarity } from '@dcl/schemas'
 import { AssetImage } from 'decentraland-ui2/dist/components/AssetImage'
-import { Box, styled, Typography, Alert, Profile } from 'decentraland-ui2'
+import { Box, styled } from 'decentraland-ui2'
 import { NFTTransferContainer } from '../Container'
 import { ProfileAvatar } from '../types'
+import { CenteredContent, Title, RecipientProfileText, NFTImageWrapper, NFTName, InfoAlert } from './NFTTransferComponents'
 import { NFTTransferCanceledViewProps } from './NFTTransferCanceledView.types'
-
-const CenteredContent = styled(Box)({
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  justifyContent: 'center',
-  textAlign: 'center',
-  width: '100%',
-  maxWidth: '500px'
-})
-
-const Title = styled(Typography)({
-  fontSize: '36px',
-  fontWeight: '600',
-  fontStyle: 'normal',
-  lineHeight: '100%',
-  letterSpacing: '0px',
-  textAlign: 'center',
-  marginBottom: '24px'
-})
 
 const SecondaryText = styled(Box)({
   display: 'flex',
@@ -33,35 +14,6 @@ const SecondaryText = styled(Box)({
   marginBottom: '32px',
   fontSize: '18px',
   flexWrap: 'wrap'
-})
-
-const NFTImageWrapper = styled(Box)({
-  width: '260px',
-  height: '260px',
-  marginBottom: '16px',
-  borderRadius: '16px',
-  overflow: 'hidden'
-})
-
-const NFTName = styled(Box)({
-  fontSize: '18px',
-  fontWeight: 600,
-  marginBottom: '24px'
-})
-
-// eslint-disable-next-line @typescript-eslint/naming-convention
-const InfoAlert = styled(Alert)({
-  width: '100%',
-  maxWidth: '400px',
-  marginTop: '24px',
-  background: '#00000033',
-  alignSelf: 'center',
-  justifyContent: 'center',
-  color: 'white',
-  // eslint-disable-next-line @typescript-eslint/naming-convention
-  '& .MuiAlert-icon': {
-    color: 'white'
-  }
 })
 
 export const NFTTransferCanceledView = ({ nftData }: NFTTransferCanceledViewProps) => {
@@ -74,7 +26,7 @@ export const NFTTransferCanceledView = ({ nftData }: NFTTransferCanceledViewProp
 
         <SecondaryText>
           Your gift wasn&apos;t delivered to
-          <Profile address={nftData.toAddress} avatar={recipientAvatar as ProfileAvatar} size="large" inline />
+          <RecipientProfileText address={nftData.toAddress} avatar={recipientAvatar as ProfileAvatar} size="huge" inline />
         </SecondaryText>
 
         <NFTImageWrapper>

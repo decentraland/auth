@@ -1,63 +1,19 @@
 import { useState } from 'react'
 import { Rarity } from '@dcl/schemas'
 import { AssetImage } from 'decentraland-ui2/dist/components/AssetImage'
-import { Box, Button, styled, Typography, CircularProgress, Alert, Profile } from 'decentraland-ui2'
+import { Box, Button, styled, Typography, CircularProgress } from 'decentraland-ui2'
 import { NFTTransferContainer } from '../Container'
 import { ProfileAvatar } from '../types'
+import {
+  CenteredContent,
+  Title,
+  RecipientProfile,
+  RecipientProfileText,
+  NFTImageWrapper,
+  NFTName,
+  WarningAlert
+} from './NFTTransferComponents'
 import { NFTTransferViewProps } from './NFTTransferView.types'
-
-const CenteredContent = styled(Box)({
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  justifyContent: 'center',
-  textAlign: 'center',
-  width: '100%',
-  maxWidth: '500px'
-})
-
-const Title = styled(Typography)({
-  fontSize: '36px',
-  fontWeight: '600',
-  fontStyle: 'normal',
-  lineHeight: '100%',
-  letterSpacing: '0px',
-  textAlign: 'center',
-  marginBottom: '24px'
-})
-
-const RecipientProfile = styled(Box)({
-  marginBottom: '32px'
-})
-
-const NFTImageWrapper = styled(Box)({
-  width: '260px',
-  height: '260px',
-  marginBottom: '16px',
-  borderRadius: '16px',
-  overflow: 'hidden'
-})
-
-const NFTName = styled(Box)({
-  fontSize: '18px',
-  fontWeight: 600,
-  marginBottom: '24px'
-})
-
-// eslint-disable-next-line @typescript-eslint/naming-convention
-const WarningAlert = styled(Alert)({
-  marginBottom: '32px',
-  width: '100%',
-  maxWidth: '400px',
-  background: 'transparent',
-  color: 'white',
-  alignSelf: 'center',
-  justifyContent: 'center',
-  // eslint-disable-next-line @typescript-eslint/naming-convention
-  '& .MuiAlert-icon': {
-    color: 'white'
-  }
-})
 
 const ButtonsContainer = styled(Box)({
   display: 'flex',
@@ -69,7 +25,12 @@ const ButtonsContainer = styled(Box)({
 const CancelButton = styled(Button)({
   borderRadius: '12px',
   background: 'rgba(0, 0, 0, 0.40)',
-  color: 'white'
+  color: 'white',
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  '&:hover': {
+    background: 'rgba(0, 0, 0, 0.60)',
+    color: 'white !important'
+  }
 })
 
 const ConfirmButton = styled(Button)({
@@ -90,7 +51,7 @@ const LoadingText = styled(Typography)({
   fontStyle: 'normal',
   lineHeight: '100%',
   letterSpacing: '0px',
-  color: 'rgba(255, 255, 255, 0.9)'
+  color: 'white'
 })
 
 export const NFTTransferView = ({ nftData, isLoading, onDeny, onApprove }: NFTTransferViewProps) => {
@@ -108,7 +69,7 @@ export const NFTTransferView = ({ nftData, isLoading, onDeny, onApprove }: NFTTr
         <Title>{isProcessing ? 'Sending Gift to' : 'Confirm Gift for'}</Title>
 
         <RecipientProfile>
-          <Profile address={nftData.toAddress} avatar={recipientAvatar as ProfileAvatar} size="large" inline />
+          <RecipientProfileText address={nftData.toAddress} avatar={recipientAvatar as ProfileAvatar} size="huge" inline />
         </RecipientProfile>
 
         <NFTImageWrapper>

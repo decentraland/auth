@@ -1,37 +1,14 @@
 import Lottie from 'lottie-react'
 import { Rarity } from '@dcl/schemas'
 import { AssetImage } from 'decentraland-ui2/dist/components/AssetImage'
-import { Box, styled, Typography, Alert, Profile } from 'decentraland-ui2'
+import { styled } from 'decentraland-ui2'
 import successAnimation from '../../../../assets/animations/successAnimation_Lottie.json'
 import { NFTTransferContainer } from '../Container'
 import { ProfileAvatar } from '../types'
+import { CenteredContent, Title, RecipientProfile, RecipientProfileText, NFTName, InfoAlert } from './NFTTransferComponents'
 import { NFTTransferCompleteViewProps } from './NFTTransferCompleteView.types'
 
-const CenteredContent = styled(Box)({
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  justifyContent: 'center',
-  textAlign: 'center',
-  width: '100%',
-  maxWidth: '500px'
-})
-
-const Title = styled(Typography)({
-  fontSize: '36px',
-  fontWeight: '600',
-  fontStyle: 'normal',
-  lineHeight: '100%',
-  letterSpacing: '0px',
-  textAlign: 'center',
-  marginBottom: '24px'
-})
-
-const RecipientProfile = styled(Box)({
-  marginBottom: '32px'
-})
-
-const NFTImageWrapper = styled(Box)({
+const NFTImageWrapper = styled('div')({
   width: '260px',
   height: '260px',
   marginBottom: '16px',
@@ -52,26 +29,6 @@ const SuccessAnimation = styled(Lottie)({
   zIndex: 10
 })
 
-const NFTName = styled(Box)({
-  fontSize: '18px',
-  fontWeight: 600,
-  marginBottom: '24px'
-})
-
-const InfoAlert = styled(Alert)({
-  width: '100%',
-  maxWidth: '400px',
-  marginTop: '24px',
-  background: '#00000033',
-  alignSelf: 'center',
-  justifyContent: 'center',
-  color: 'white',
-  // eslint-disable-next-line @typescript-eslint/naming-convention
-  '& .MuiAlert-icon': {
-    color: 'white'
-  }
-})
-
 export const NFTTransferCompleteView = ({ nftData }: NFTTransferCompleteViewProps) => {
   const recipientAvatar = nftData.recipientProfile?.avatars?.[0]
 
@@ -81,7 +38,7 @@ export const NFTTransferCompleteView = ({ nftData }: NFTTransferCompleteViewProp
         <Title>Gift Sent to</Title>
 
         <RecipientProfile>
-          <Profile address={nftData.toAddress} avatar={recipientAvatar as ProfileAvatar} size="large" inline />
+          <RecipientProfileText address={nftData.toAddress} avatar={recipientAvatar as ProfileAvatar} size="huge" inline />
         </RecipientProfile>
 
         <NFTImageWrapper>
