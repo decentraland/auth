@@ -132,7 +132,7 @@ export async function fetchNftMetadata(
   contractABI: object[],
   tokenId: string,
   provider: ethers.BrowserProvider
-): Promise<{ imageUrl: string; name?: string; description?: string; rarity?: Rarity }> {
+): Promise<{ imageUrl: string; name: string; description: string; rarity: Rarity }> {
   // Use the provided contract ABI to interact with the NFT contract
   const contract = new ethers.Contract(contractAddress, contractABI, provider)
   const tokenUri = await contract.tokenURI(tokenId)
@@ -155,7 +155,7 @@ export async function fetchNftMetadata(
   const imageUrl = metadata.image || metadata.image_url
 
   // Extract rarity from attributes
-  let rarity: Rarity | undefined
+  let rarity: Rarity = Rarity.COMMON
   if (metadata.attributes && Array.isArray(metadata.attributes)) {
     // eslint-disable-next-line @typescript-eslint/naming-convention
     const rarityAttribute = metadata.attributes.find((attr: { trait_type: string; value: string }) => attr.trait_type === 'Rarity')
@@ -188,7 +188,7 @@ export async function fetchNftMetadata(
           rarity = Rarity.COMMON
           break
         default:
-          rarity = Rarity.UNIQUE // Default to UNIQUE if unknown
+          rarity = Rarity.COMMON
       }
     }
   }

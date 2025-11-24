@@ -7,9 +7,9 @@ export type NFTTransferData = {
   tokenId: string
   toAddress: string
   contractAddress: string
-  name?: string
-  description?: string
-  rarity?: Rarity
+  name: string
+  description: string
+  rarity: Rarity
   recipientProfile?: Profile
 }
 

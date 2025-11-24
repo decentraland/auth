@@ -444,7 +444,7 @@ describe('when testing fetchNftMetadata', () => {
         imageUrl: 'https://example.com/image.png',
         name: 'Test NFT',
         description: 'A test NFT',
-        rarity: undefined
+        rarity: Rarity.COMMON
       })
     })
   })
@@ -570,7 +570,7 @@ describe('when testing fetchNftMetadata', () => {
       expect(result.rarity).toBe(Rarity.COMMON)
     })
 
-    it('should default to unique for unknown rarity values', async () => {
+    it('should default to common for unknown rarity values', async () => {
       const metadata = {
         image: 'https://example.com/image.png',
         attributes: [{ trait_type: 'Rarity', value: 'Unknown' }]
@@ -582,7 +582,7 @@ describe('when testing fetchNftMetadata', () => {
       } as any)
 
       const result = await fetchNftMetadata(contractAddress, contractABI, tokenId, mockProvider)
-      expect(result.rarity).toBe(Rarity.UNIQUE)
+      expect(result.rarity).toBe(Rarity.COMMON)
     })
   })
 
