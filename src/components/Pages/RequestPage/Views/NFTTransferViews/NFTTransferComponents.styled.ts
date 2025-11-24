@@ -7,7 +7,7 @@ export const CenteredContent = styled(Box)({
   justifyContent: 'center',
   textAlign: 'center',
   width: '100%',
-  maxWidth: '500px'
+  maxWidth: '600px'
 })
 
 export const Title = styled(Typography)({
@@ -50,7 +50,6 @@ export const NFTName = styled(Box)({
 // eslint-disable-next-line @typescript-eslint/naming-convention
 export const InfoAlert = styled(Alert)({
   width: '100%',
-  maxWidth: '600px',
   marginTop: '18px',
   background: '#00000033',
   alignSelf: 'center',
