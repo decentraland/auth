@@ -148,7 +148,8 @@ describe('createAuthServerClient', () => {
     describe('when the request is successful', () => {
       beforeEach(() => {
         mockFetch.mockResolvedValueOnce({
-          ok: true
+          ok: true,
+          json: () => Promise.resolve({})
         })
       })
 
