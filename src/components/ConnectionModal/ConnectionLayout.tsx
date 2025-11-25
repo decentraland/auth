@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback } from 'react'
+import React, { useCallback } from 'react'
 import { ProviderType } from '@dcl/schemas'
 import { Button, CircularProgress } from 'decentraland-ui2'
 import { ConnectionContainer, DecentralandLogo, ConnectionTitle, ProgressContainer, ErrorButtonContainer } from './ConnectionLayout.styled'
@@ -37,14 +37,6 @@ const ConnectionLayout = React.memo((props: ConnectionLayoutProps) => {
     state === ConnectionLayoutState.VALIDATING_SIGN_IN
 
   const isError = state === ConnectionLayoutState.ERROR || state === ConnectionLayoutState.ERROR_LOCKED_WALLET
-
-  useEffect(() => {
-    if (isLoading) {
-      setTimeout(() => {
-        onTryAgain()
-      }, 30000)
-    }
-  }, [isLoading, onTryAgain])
 
   const handleTryAgain = useCallback(() => {
     onTryAgain()
