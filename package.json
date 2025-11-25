@@ -22,7 +22,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/decentraland/auth.git"
+    "url": "git+https://github.com/decentraland/auth.git"
   },
   "dependencies": {
     "@dcl/crypto": "^3.4.5",
