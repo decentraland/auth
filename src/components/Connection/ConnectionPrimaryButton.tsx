@@ -26,7 +26,6 @@ export const ConnectionPrimaryButton = ({
       : undefined
 
   const children = <>{isSocialLogin(option) ? i18n.accessWith(option) : i18n.connectWith(option)}</>
-  const isLoading = loadingOption === option
 
   return (
     <PrimaryContainer data-testid={testId}>
@@ -35,7 +34,7 @@ export const ConnectionPrimaryButton = ({
           <PrimaryButton
             data-testid={testId ? `${testId}-${option}-button` : undefined}
             startIcon={<ConnectionIcon type={option} />}
-            disabled={isLoading || !!error}
+            disabled={!!loadingOption || !!error}
             onClick={() => onConnect(option)}
             isNewUser={isNewUser}
           >
