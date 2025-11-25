@@ -1,19 +1,10 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useCallback } from 'react'
 import { ProviderType } from '@dcl/schemas'
 import { Button, CircularProgress } from 'decentraland-ui2'
-import {
-  ConnectionContainer,
-  DecentralandLogo,
-  ConnectionTitle,
-  ProgressContainer,
-  ErrorButtonContainer,
-  TextWrapper,
-  TroubleSigningInText,
-  TroubleSigningInTitle
-} from './ConnectionLayout.styled'
+import { ConnectionContainer, DecentralandLogo, ConnectionTitle, ProgressContainer, ErrorButtonContainer } from './ConnectionLayout.styled'
 import { ConnectionLayoutState, type ConnectionLayoutProps } from './ConnectionLayout.type'
 
-const getConnectionLayoutMessage = (loadingState: ConnectionLayoutState, providerType: ProviderType | null, hasTimedOut: boolean) => {
+const getConnectionLayoutMessage = (loadingState: ConnectionLayoutState, providerType: ProviderType | null) => {
   switch (loadingState) {
     case ConnectionLayoutState.ERROR: {
       return 'You did not confirm this action in your digital wallet extension. To continue, please try again.'
@@ -25,8 +16,6 @@ const getConnectionLayoutMessage = (loadingState: ConnectionLayoutState, provide
     case ConnectionLayoutState.WAITING_FOR_SIGNATURE: {
       return providerType === ProviderType.MAGIC || providerType === ProviderType.MAGIC_TEST
         ? 'Almost done! Confirm your request to login Decentraland'
-        : hasTimedOut
-        ? "You must confirm in your wallet extension to continue. Please make sure you're logged into the extension and try again."
         : 'Confirm in your digital wallet extension to continue.'
     }
     case ConnectionLayoutState.VALIDATING_SIGN_IN: {
@@ -40,7 +29,6 @@ const getConnectionLayoutMessage = (loadingState: ConnectionLayoutState, provide
 
 const ConnectionLayout = React.memo((props: ConnectionLayoutProps) => {
   const { onTryAgain, state, providerType } = props
-  const [hasTimedOut, setHasTimedOut] = useState(false)
 
   const isLoading =
     state === ConnectionLayoutState.CONNECTING_WALLET ||
@@ -51,46 +39,21 @@ const ConnectionLayout = React.memo((props: ConnectionLayoutProps) => {
   const isError = state === ConnectionLayoutState.ERROR || state === ConnectionLayoutState.ERROR_LOCKED_WALLET
 
   useEffect(() => {
-    if (isLoading && !hasTimedOut) {
-      const timeoutId = setTimeout(() => {
-        setHasTimedOut(true)
+    if (isLoading) {
+      setTimeout(() => {
+        onTryAgain()
       }, 30000)
-
-      return () => {
-        clearTimeout(timeoutId)
-      }
     }
-  }, [isLoading, hasTimedOut])
-
-  useEffect(() => {
-    if (!isLoading) {
-      setHasTimedOut(false)
-    }
-  }, [isLoading])
+  }, [isLoading, onTryAgain])
 
   const handleTryAgain = useCallback(() => {
-    if (hasTimedOut) {
-      setHasTimedOut(false)
-    }
-
     onTryAgain()
-  }, [onTryAgain, hasTimedOut, setHasTimedOut])
+  }, [onTryAgain])
 
   return (
     <ConnectionContainer>
       <DecentralandLogo size="huge" />
-      {!hasTimedOut && <ConnectionTitle>{getConnectionLayoutMessage(state, providerType, hasTimedOut)}</ConnectionTitle>}
-      {hasTimedOut && (
-        <TextWrapper>
-          <TroubleSigningInTitle>Trouble Signing In?</TroubleSigningInTitle>
-          <TroubleSigningInText>
-            1. Check if your wallet extension has a pending a sign request—approve it to continue.
-          </TroubleSigningInText>
-          <TroubleSigningInText>
-            2. If you're logged out of your wallet extension, sign in and refresh this page to try again.
-          </TroubleSigningInText>
-        </TextWrapper>
-      )}
+      <ConnectionTitle>{getConnectionLayoutMessage(state, providerType)}</ConnectionTitle>
       {isLoading && (
         <ProgressContainer>
           <CircularProgress color="inherit" />
