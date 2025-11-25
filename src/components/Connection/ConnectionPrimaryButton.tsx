@@ -34,8 +34,8 @@ export const ConnectionPrimaryButton = ({
         <PrimaryOption>
           <PrimaryButton
             data-testid={testId ? `${testId}-${option}-button` : undefined}
-            startIcon={!isLoading && <ConnectionIcon type={option} />}
-            disabled={!!loadingOption || !!error}
+            startIcon={<ConnectionIcon type={option} />}
+            disabled={isLoading || !!error}
             onClick={() => onConnect(option)}
             isNewUser={isNewUser}
           >
