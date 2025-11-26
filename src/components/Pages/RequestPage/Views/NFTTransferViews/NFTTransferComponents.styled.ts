@@ -26,10 +26,15 @@ export const RecipientProfile = styled(Box)({
 
 export const RecipientProfileText = styled(Profile)({
   fontWeight: '700',
-  fontSize: '22px',
+  fontSize: '24px',
   // eslint-disable-next-line @typescript-eslint/naming-convention
   '& span': {
     fontWeight: '700 !important'
+  },
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  '& .MuiAvatar-root': {
+    width: '40px',
+    height: '40px'
   }
 })
 
@@ -52,14 +57,17 @@ export const InfoAlert = styled(Alert)({
   width: '100%',
   marginTop: '18px',
   background: '#00000033',
+  borderRadius: '12px',
   alignSelf: 'center',
+  alignItems: 'center',
   justifyContent: 'center',
   color: 'white',
   fontSize: '18px',
   // eslint-disable-next-line @typescript-eslint/naming-convention
   '& .MuiAlert-icon': {
     color: 'white',
-    marginRight: '6px'
+    marginRight: '6px',
+    alignItems: 'center'
   }
 })
 
@@ -70,11 +78,13 @@ export const WarningAlert = styled(Alert)({
   background: 'transparent',
   color: 'white',
   alignSelf: 'center',
+  alignItems: 'center',
   justifyContent: 'center',
   fontSize: '18px',
   // eslint-disable-next-line @typescript-eslint/naming-convention
   '& .MuiAlert-icon': {
     color: 'white',
-    marginRight: '6px'
+    marginRight: '6px',
+    alignItems: 'center'
   }
 })

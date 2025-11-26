@@ -27,8 +27,8 @@ import { NFTTransferViewProps } from './NFTTransferView.types'
 const CircularProgressWithTrack = () => {
   return (
     <ProgressContainer>
-      <ProgressTrack variant="determinate" value={100} size={40} thickness={4} />
-      <ProgressSpinner variant="indeterminate" disableShrink size={40} thickness={4} />
+      <ProgressTrack variant="determinate" value={100} size={30} thickness={4} />
+      <ProgressSpinner variant="indeterminate" disableShrink size={30} thickness={4} />
     </ProgressContainer>
   )
 }
@@ -66,7 +66,7 @@ export const NFTTransferView = ({ nftData, isLoading, onDeny, onApprove }: NFTTr
           </LoadingContainer>
         ) : (
           <ButtonsContainer>
-            <CancelButton variant="text" size="large" disabled={isLoading} onClick={onDeny} fullWidth>
+            <CancelButton variant="contained" size="large" disabled={isLoading} onClick={onDeny} fullWidth>
               CANCEL
             </CancelButton>
             <ConfirmButton variant="contained" size="large" disabled={isLoading} onClick={handleApprove} fullWidth>

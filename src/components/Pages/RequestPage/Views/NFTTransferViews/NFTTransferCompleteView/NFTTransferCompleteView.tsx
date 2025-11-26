@@ -4,7 +4,7 @@ import successAnimation from '../../../../../../assets/animations/successAnimati
 import { NFTTransferContainer } from '../../../Container'
 import { ProfileAvatar } from '../../../types'
 import { CenteredContent, Title, RecipientProfile, RecipientProfileText, NFTName, InfoAlert } from '../NFTTransferComponents.styled'
-import { NFTImageWrapper, SuccessAnimation } from './NFTTransferCompleteView.styled'
+import { NFTImageWrapper, NFTImageContainer, SuccessAnimation } from './NFTTransferCompleteView.styled'
 import { NFTTransferCompleteViewProps } from './NFTTransferCompleteView.types'
 
 export const NFTTransferCompleteView = ({ nftData }: NFTTransferCompleteViewProps) => {
@@ -20,7 +20,9 @@ export const NFTTransferCompleteView = ({ nftData }: NFTTransferCompleteViewProp
         </RecipientProfile>
 
         <NFTImageWrapper>
-          <AssetImage src={nftData.imageUrl} name={nftData.name || `NFT #${nftData.tokenId}`} rarity={nftData.rarity || Rarity.COMMON} />
+          <NFTImageContainer>
+            <AssetImage src={nftData.imageUrl} name={nftData.name || `NFT #${nftData.tokenId}`} rarity={nftData.rarity || Rarity.COMMON} />
+          </NFTImageContainer>
           <SuccessAnimation animationData={successAnimation} loop={true} />
         </NFTImageWrapper>
 

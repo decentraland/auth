@@ -8,12 +8,11 @@ export const ButtonsContainer = styled(Box)({
 })
 
 export const CancelButton = styled(Button)({
-  borderRadius: '12px',
-  background: 'rgba(0, 0, 0, 0.40)',
-  color: 'white',
+  background: 'rgba(0, 0, 0, 0.40) !important',
+  color: 'white !important',
   // eslint-disable-next-line @typescript-eslint/naming-convention
   '&:hover': {
-    background: 'rgba(0, 0, 0, 0.60)',
+    background: 'rgba(0, 0, 0, 0.60) !important',
     color: 'white !important'
   }
 })
