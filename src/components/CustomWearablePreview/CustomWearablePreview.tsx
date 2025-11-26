@@ -1,8 +1,9 @@
 import { useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { PreviewEmote } from '@dcl/schemas'
+import { PreviewUnityMode } from '@dcl/schemas/dist/dapps/preview'
 import { Env } from '@dcl/ui-env'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
-import { WearablePreview, PreviewUnityMode } from 'decentraland-ui2'
+import { WearablePreview } from 'decentraland-ui2'
 import { config } from '../../modules/config'
 import { checkWebGpuSupport } from '../../shared/utils/webgpu'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../FeatureFlagsProvider/FeatureFlagsProvider.types'
@@ -82,7 +83,7 @@ export const CustomWearablePreview = (props: Props) => {
         panning={false}
         profile={props.profile}
         unity={isUnityWearablePreviewAllowed}
-        unityMode={PreviewUnityMode.Authentication}
+        unityMode={PreviewUnityMode.AUTH}
         onLoad={handleOnLoad}
       />
 
