@@ -3,12 +3,12 @@ import { createLambdasClient, createContentClient, DeploymentBuilder } from 'dcl
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/catalyst.schemas'
 import { getCatalystServersFromCache } from 'dcl-catalyst-client/dist/contracts-snapshots'
 import { AuthIdentity, Authenticator } from '@dcl/crypto'
-import { Entity, EntityType } from '@dcl/schemas'
+import { EntityType } from '@dcl/schemas'
 import { config } from '../config'
 
 export interface ConsistencyResult {
   isConsistent: boolean
-  entity?: Entity
+  profile?: Profile
   error?: string
 }
 
@@ -29,40 +29,34 @@ export async function fetchProfileWithConsistencyCheck(address: string): Promise
     const environment = config.get('ENVIRONMENT')
     const network = environment === 'development' ? 'sepolia' : 'mainnet'
 
-    // Create content client for consistency check
-    const PEER_URL = config.get('PEER_URL')
-    const client = createContentClient({
-      url: PEER_URL + '/content',
-      fetcher: createFetchComponent()
-    })
-
     // Get all catalyst servers for the network and remove the current peer to avoid duplicated fetches
     const catalystServers = getCatalystServersFromCache(network)
-    const catalystUrls = catalystServers
-      .map(server => `${server.address}/content`)
-      .filter(url => url.toLowerCase() !== `${PEER_URL}/content`.toLowerCase())
+    const catalystUrls = catalystServers.map(server => `${server.address}/lambdas`)
 
-    // Check pointer consistency across all catalysts
-    const consistencyResult = await client.checkPointerConsistency(address, {
-      parallel: {
-        urls: catalystUrls
-      }
-    })
+    const profiles = await Promise.all(
+      catalystUrls.map(url => {
+        const client = createLambdasClient({ url, fetcher: createFetchComponent() })
+        return client.getAvatarDetails(address)
+      })
+    )
 
-    const { isConsistent, upToDateEntities = [] } = consistencyResult
-    const entity = upToDateEntities[0]
-
-    if (!isConsistent) {
+    if (profiles.length === 0) {
       return {
         isConsistent: false,
-        entity, // Entity for potential redeployment (could be undefined)
-        error: 'Profile is not consistent across catalysts'
+        error: 'No profiles found'
       }
     }
 
+    const isConsistent = profiles.length === catalystUrls.length ? true : false
+
+    const newestProfile = profiles.reduce((acc, profile) => {
+      return (acc.timestamp ?? 0) > (profile.timestamp ?? 0) ? acc : profile
+    }, profiles[0])
+
     return {
-      isConsistent: true,
-      entity // Could be undefined if no up-to-date entities found
+      isConsistent,
+      profile: newestProfile,
+      error: undefined
     }
   } catch (error) {
     console.error('Profile consistency check failed:', error)
@@ -75,7 +69,7 @@ export async function fetchProfileWithConsistencyCheck(address: string): Promise
 }
 
 export async function redeployExistingProfile(
-  entity: Entity,
+  profile: Profile,
   connectedAccount: string,
   connectedAccountIdentity: AuthIdentity
 ): Promise<void> {
@@ -97,7 +91,7 @@ export async function redeployExistingProfile(
     const catalystUrl = catalystUrls[attempt]
 
     try {
-      await attemptRedeployment(entity, connectedAccount, connectedAccountIdentity, catalystUrl)
+      await attemptRedeployment(profile, connectedAccount, connectedAccountIdentity, catalystUrl)
       // If successful, exit the retry loop
       console.log(`Profile redeployment successful using catalyst: ${catalystUrl}`)
       return
@@ -121,7 +115,7 @@ export async function redeployExistingProfile(
 }
 
 async function attemptRedeployment(
-  entity: Entity,
+  profile: Profile,
   connectedAccount: string,
   connectedAccountIdentity: AuthIdentity,
   catalystUrl: string
@@ -129,7 +123,11 @@ async function attemptRedeployment(
   const client = createContentClient({ url: catalystUrl, fetcher: createFetchComponent() })
 
   // Extract file hashes from entity.content
-  const contentHashesByFile = entity.content.reduce((acc, next) => ({ ...acc, [next.file]: next.hash }), {} as Record<string, string>)
+  // Extract profile snapshot files
+  const contentHashesByFile = Object.entries(profile.avatars?.[0]?.avatar?.snapshots ?? {}).reduce(
+    (acc, [file, hash]) => ({ ...acc, [file]: hash }),
+    {} as Record<string, string>
+  )
 
   // Download required assets (body.png and face256.png are typically required)
   const bodyFile = 'body.png'
@@ -146,7 +144,8 @@ async function attemptRedeployment(
   files.set(face256File, new Uint8Array(faceBuffer))
 
   // Use existing profile metadata to preserve user customizations
-  const existingProfile = entity.metadata
+  // TODO: check full metadata build ????
+  const existingProfile = profile.avatars?.[0]?.avatar
 
   // Build deployment entity with fresh timestamp
   const deploymentEntity = await DeploymentBuilder.buildEntity({
