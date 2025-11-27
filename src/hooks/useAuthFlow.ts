@@ -79,9 +79,9 @@ export const useAuthFlow = () => {
           const userIdentity = providedIdentity ?? identity
 
           // If we have a valid entity and user identity, attempt redeployment
-          if (consistencyResult.entity && userIdentity) {
+          if (consistencyResult.profile && userIdentity) {
             try {
-              await redeployExistingProfile(consistencyResult.entity, account, userIdentity)
+              await redeployExistingProfile(consistencyResult.profile, account, userIdentity)
               // If redeployment succeeds, continue with the login flow
               return redirect()
             } catch (error) {
@@ -102,7 +102,7 @@ export const useAuthFlow = () => {
         }
 
         // If consistent, check if profile exists and is complete
-        const profile: Profile | undefined = consistencyResult.entity?.metadata as Profile
+        const profile: Profile | undefined = consistencyResult.profile
         const hasWebGPU = await checkWebGpuSupport()
         const isAvatarSetupFlowAllowed = isFlowV2OnboardingFlowEnabled && hasWebGPU
         const isProfileIncomplete = !profile || !isProfileComplete(profile)
