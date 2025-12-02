@@ -267,7 +267,7 @@ describe('when testing checkMetaTransactionSupport', () => {
     })
   })
 
-  describe('and the contract is not known but is a valid Decentraland contract', () => {
+  describe('and the contract is not known but is a valid Decentraland collection contract', () => {
     beforeEach(() => {
       jest.mocked(getContractName).mockImplementationOnce(() => {
         throw new Error('Unknown contract')
@@ -318,6 +318,10 @@ describe('when testing decodeNftTransferData', () => {
   beforeEach(() => {
     contractABI = [{ type: 'function', name: 'transferFrom' }]
     transactionData = '0x23b872dd'
+    mockInterface = {
+      parseTransaction: jest.fn()
+    }
+    jest.mocked(ethers.Interface).mockImplementation(() => mockInterface)
   })
 
   afterEach(() => {
@@ -331,10 +335,7 @@ describe('when testing decodeNftTransferData', () => {
       mockDecodedData = {
         args: ['0xfrom', '0xto', BigInt(123)]
       }
-      mockInterface = {
-        parseTransaction: jest.fn().mockReturnValueOnce(mockDecodedData)
-      }
-      jest.mocked(ethers.Interface).mockImplementationOnce(() => mockInterface)
+      mockInterface.parseTransaction.mockReturnValueOnce(mockDecodedData)
     })
 
     it('should return the tokenId and toAddress', () => {
@@ -370,10 +371,7 @@ describe('when testing decodeNftTransferData', () => {
 
   describe('and parsing the transaction fails', () => {
     beforeEach(() => {
-      mockInterface = {
-        parseTransaction: jest.fn().mockReturnValueOnce(null)
-      }
-      jest.mocked(ethers.Interface).mockImplementationOnce(() => mockInterface)
+      mockInterface.parseTransaction.mockReturnValueOnce(null)
     })
 
     it('should return null', () => {
@@ -384,12 +382,9 @@ describe('when testing decodeNftTransferData', () => {
 
   describe('and decoding throws an error', () => {
     beforeEach(() => {
-      mockInterface = {
-        parseTransaction: jest.fn().mockImplementationOnce(() => {
-          throw new Error('Decoding error')
-        })
-      }
-      jest.mocked(ethers.Interface).mockImplementationOnce(() => mockInterface)
+      mockInterface.parseTransaction.mockImplementationOnce(() => {
+        throw new Error('Decoding error')
+      })
     })
 
     it('should return null', () => {
@@ -511,78 +506,38 @@ describe('when testing fetchNftMetadata', () => {
     })
   })
 
-  describe('and all rarity values are handled correctly', () => {
+  describe.each([
+    ['unique', 'Unique', Rarity.UNIQUE],
+    ['mythic', 'Mythic', Rarity.MYTHIC],
+    ['epic', 'Epic', Rarity.EPIC],
+    ['legendary', 'Legendary', Rarity.LEGENDARY],
+    ['rare', 'Rare', Rarity.RARE],
+    ['uncommon', 'Uncommon', Rarity.UNCOMMON],
+    ['common', 'Common', Rarity.COMMON],
+    ['unknown', 'Unknown', Rarity.COMMON]
+  ])('and the NFT metadata has the %s rarity', (rarityName, rarityValue, expectedRarity) => {
     let tokenUri: string
+    let metadata: any
 
     beforeEach(() => {
       tokenUri = 'https://example.com/token/123'
+      metadata = {
+        image: 'https://example.com/image.png',
+        attributes: [{ trait_type: 'Rarity', value: rarityValue }]
+      }
       mockContract = {
-        tokenURI: jest.fn().mockResolvedValue(tokenUri)
-      }
-    })
-
-    afterEach(() => {
-      jest.clearAllMocks()
-    })
-
-    it('should map unique rarity correctly', async () => {
-      const metadata = {
-        image: 'https://example.com/image.png',
-        attributes: [{ trait_type: 'Rarity', value: 'Unique' }]
+        tokenURI: jest.fn().mockResolvedValueOnce(tokenUri)
       }
       jest.mocked(ethers.Contract).mockImplementationOnce(() => mockContract)
       jest.mocked(fetch).mockResolvedValueOnce({
         ok: true,
         json: jest.fn().mockResolvedValueOnce(metadata)
       } as any)
-
-      const result = await fetchNftMetadata(contractAddress, contractABI, tokenId, mockProvider)
-      expect(result.rarity).toBe(Rarity.UNIQUE)
     })
 
-    it('should map mythic rarity correctly', async () => {
-      const metadata = {
-        image: 'https://example.com/image.png',
-        attributes: [{ trait_type: 'Rarity', value: 'Mythic' }]
-      }
-      jest.mocked(ethers.Contract).mockImplementationOnce(() => mockContract)
-      jest.mocked(fetch).mockResolvedValueOnce({
-        ok: true,
-        json: jest.fn().mockResolvedValueOnce(metadata)
-      } as any)
-
+    it('should correctly map the rarity', async () => {
       const result = await fetchNftMetadata(contractAddress, contractABI, tokenId, mockProvider)
-      expect(result.rarity).toBe(Rarity.MYTHIC)
-    })
-
-    it('should map common rarity correctly', async () => {
-      const metadata = {
-        image: 'https://example.com/image.png',
-        attributes: [{ trait_type: 'Rarity', value: 'Common' }]
-      }
-      jest.mocked(ethers.Contract).mockImplementationOnce(() => mockContract)
-      jest.mocked(fetch).mockResolvedValueOnce({
-        ok: true,
-        json: jest.fn().mockResolvedValueOnce(metadata)
-      } as any)
-
-      const result = await fetchNftMetadata(contractAddress, contractABI, tokenId, mockProvider)
-      expect(result.rarity).toBe(Rarity.COMMON)
-    })
-
-    it('should default to common for unknown rarity values', async () => {
-      const metadata = {
-        image: 'https://example.com/image.png',
-        attributes: [{ trait_type: 'Rarity', value: 'Unknown' }]
-      }
-      jest.mocked(ethers.Contract).mockImplementationOnce(() => mockContract)
-      jest.mocked(fetch).mockResolvedValueOnce({
-        ok: true,
-        json: jest.fn().mockResolvedValueOnce(metadata)
-      } as any)
-
-      const result = await fetchNftMetadata(contractAddress, contractABI, tokenId, mockProvider)
-      expect(result.rarity).toBe(Rarity.COMMON)
+      expect(result.rarity).toBe(expectedRarity)
     })
   })
 

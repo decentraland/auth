@@ -210,15 +210,16 @@ export const RequestPage = () => {
                 chainId: currentChainId
               })
 
-              // Check if this is an NFT transfer that will use meta transactions BEFORE gas estimation
+              // Check if this is an NFT transfer by trying to decode the transaction data
               const transactionData = request.params?.[0]?.data as string | undefined
               const contractAddress = request.params?.[0]?.to as string | undefined
 
               if (transactionData && contractAddress) {
-                const { willUseMetaTransaction, contractName } = await checkMetaTransactionSupport(contractAddress)
+                // Try to decode as NFT transfer - if successful, show NFT transfer view
+                // This works for any NFT transfer that matches our transfer signature
+                const { contractName } = await checkMetaTransactionSupport(contractAddress)
 
-                // If it will use meta transactions, check if it's an NFT transfer
-                if (willUseMetaTransaction && contractName) {
+                if (contractName) {
                   const chainId = getMetaTransactionChainId()
                   const contract = getContract(contractName, chainId)
 
