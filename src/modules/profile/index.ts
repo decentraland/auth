@@ -1,8 +1,9 @@
 import { createFetchComponent } from '@well-known-components/fetch-component'
 import { createLambdasClient, createContentClient, DeploymentBuilder } from 'dcl-catalyst-client'
-import { Profile, ProfileAvatarsItemAvatarSnapshots } from 'dcl-catalyst-client/dist/client/specs/catalyst.schemas'
+import { Profile } from 'dcl-catalyst-client/dist/client/specs/catalyst.schemas'
 import { getCatalystServersFromCache } from 'dcl-catalyst-client/dist/contracts-snapshots'
 import { AuthIdentity, Authenticator } from '@dcl/crypto'
+import { hashV1 } from '@dcl/hashing'
 import { EntityType } from '@dcl/schemas'
 import { config } from '../config'
 
@@ -123,10 +124,9 @@ async function attemptRedeployment(
 ): Promise<void> {
   const client = createContentClient({ url: catalystUrl, fetcher: createFetchComponent() })
 
-  // Extract file hashes from entity.content
-  // Extract profile snapshot files
-  const contentHashesByFile = Object.entries(profile.avatars?.[0]?.avatar?.snapshots ?? {}).reduce(
-    (acc, [file, hash]) => ({ ...acc, [file]: hash }),
+  // Extract file urls from avatar snapshots
+  const contentUrlsByFile = Object.entries(profile.avatars?.[0]?.avatar?.snapshots ?? {}).reduce(
+    (acc, [file, url]) => ({ ...acc, [file]: url }),
     {} as Record<string, string>
   )
 
@@ -135,8 +135,8 @@ async function attemptRedeployment(
   const face256File = 'face256'
 
   const [bodyBuffer, faceBuffer] = await Promise.all([
-    client.downloadContent(extractHash(contentHashesByFile[bodyFile])),
-    client.downloadContent(extractHash(contentHashesByFile[face256File]))
+    fetch(contentUrlsByFile[bodyFile]).then(response => response.arrayBuffer()),
+    fetch(contentUrlsByFile[face256File]).then(response => response.arrayBuffer())
   ])
 
   // Prepare files map for deployment
@@ -144,12 +144,15 @@ async function attemptRedeployment(
   files.set(`${bodyFile}.png`, new Uint8Array(bodyBuffer))
   files.set(`${face256File}.png`, new Uint8Array(faceBuffer))
 
+  // Build profile metadata with fresh snapshots
+  const metadata = await buildProfileMetadata(profile, files)
+
   // Build deployment entity with fresh timestamp
   const deploymentEntity = await DeploymentBuilder.buildEntity({
     type: EntityType.PROFILE,
     pointers: [connectedAccount],
-    metadata: buildProfileMetadata(profile), // Preserve existing profile data
-    timestamp: Date.now(), // Only update timestamp for fresh deployment
+    metadata,
+    timestamp: Date.now(),
     files
   })
 
@@ -161,24 +164,17 @@ async function attemptRedeployment(
   })
 }
 
-function extractHash(snapshotUrl: string): string {
-  const hash = snapshotUrl.match(/\/entities\/([a-z0-9]+)\//)?.[1]
-  if (!hash) {
-    throw new Error('Invalid snapshot URL')
-  }
-  return hash
-}
+export async function buildProfileMetadata(profile: Profile, files: Map<string, Uint8Array>): Promise<Partial<Profile>> {
+  // Build snapshots object with fresh hashes
+  const adaptSnapshot = async ([file, content]: [string, Uint8Array]) => [file.replace('.png', ''), await hashV1(content)]
+  const snapshots = Object.fromEntries(await Promise.all(Array.from(files.entries()).map(adaptSnapshot)))
 
-export function buildProfileMetadata(profile: Profile): Partial<Profile> {
   return {
     avatars: profile.avatars?.map(avatar => ({
       ...avatar,
       avatar: {
         ...avatar.avatar,
-        snapshots: Object.entries(avatar.avatar?.snapshots ?? {}).reduce(
-          (acc, [key, url]) => ({ ...acc, [key]: extractHash(url) }),
-          {} as ProfileAvatarsItemAvatarSnapshots
-        )
+        snapshots
       }
     }))
   }
