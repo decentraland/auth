@@ -1,6 +1,6 @@
 import { createFetchComponent } from '@well-known-components/fetch-component'
 import { createLambdasClient, createContentClient, DeploymentBuilder } from 'dcl-catalyst-client'
-import { Profile } from 'dcl-catalyst-client/dist/client/specs/catalyst.schemas'
+import { Profile, ProfileAvatarsItemAvatarSnapshots } from 'dcl-catalyst-client/dist/client/specs/catalyst.schemas'
 import { getCatalystServersFromCache } from 'dcl-catalyst-client/dist/contracts-snapshots'
 import { AuthIdentity, Authenticator } from '@dcl/crypto'
 import { EntityType } from '@dcl/schemas'
@@ -47,14 +47,15 @@ export async function fetchProfileWithConsistencyCheck(address: string): Promise
       }
     }
 
-    const isConsistent = profiles.length === catalystUrls.length ? true : false
+    const allProfilesExist = profiles.length === catalystUrls.length
+    const allProfilesHaveSameTimestamp = profiles.every(profile => profile.timestamp === profiles[0]?.timestamp)
 
     const newestProfile = profiles.reduce((acc, profile) => {
       return (acc.timestamp ?? 0) > (profile.timestamp ?? 0) ? acc : profile
     }, profiles[0])
 
     return {
-      isConsistent,
+      isConsistent: allProfilesExist && allProfilesHaveSameTimestamp,
       profile: newestProfile,
       error: undefined
     }
@@ -130,28 +131,24 @@ async function attemptRedeployment(
   )
 
   // Download required assets (body.png and face256.png are typically required)
-  const bodyFile = 'body.png'
-  const face256File = 'face256.png'
+  const bodyFile = 'body'
+  const face256File = 'face256'
 
   const [bodyBuffer, faceBuffer] = await Promise.all([
-    client.downloadContent(contentHashesByFile[bodyFile]),
-    client.downloadContent(contentHashesByFile[face256File])
+    client.downloadContent(extractHash(contentHashesByFile[bodyFile])),
+    client.downloadContent(extractHash(contentHashesByFile[face256File]))
   ])
 
   // Prepare files map for deployment
   const files = new Map<string, Uint8Array>()
-  files.set(bodyFile, new Uint8Array(bodyBuffer))
-  files.set(face256File, new Uint8Array(faceBuffer))
-
-  // Use existing profile metadata to preserve user customizations
-  // TODO: check full metadata build ????
-  const existingProfile = profile.avatars?.[0]?.avatar
+  files.set(`${bodyFile}.png`, new Uint8Array(bodyBuffer))
+  files.set(`${face256File}.png`, new Uint8Array(faceBuffer))
 
   // Build deployment entity with fresh timestamp
   const deploymentEntity = await DeploymentBuilder.buildEntity({
     type: EntityType.PROFILE,
     pointers: [connectedAccount],
-    metadata: existingProfile, // Preserve existing profile data
+    metadata: buildProfileMetadata(profile), // Preserve existing profile data
     timestamp: Date.now(), // Only update timestamp for fresh deployment
     files
   })
@@ -162,6 +159,29 @@ async function attemptRedeployment(
     files: deploymentEntity.files,
     authChain: Authenticator.signPayload(connectedAccountIdentity, deploymentEntity.entityId)
   })
+}
+
+function extractHash(snapshotUrl: string): string {
+  const hash = snapshotUrl.match(/\/entities\/([a-z0-9]+)\//)?.[1]
+  if (!hash) {
+    throw new Error('Invalid snapshot URL')
+  }
+  return hash
+}
+
+export function buildProfileMetadata(profile: Profile): Partial<Profile> {
+  return {
+    avatars: profile.avatars?.map(avatar => ({
+      ...avatar,
+      avatar: {
+        ...avatar.avatar,
+        snapshots: Object.entries(avatar.avatar?.snapshots ?? {}).reduce(
+          (acc, [key, url]) => ({ ...acc, [key]: extractHash(url) }),
+          {} as ProfileAvatarsItemAvatarSnapshots
+        )
+      }
+    }))
+  }
 }
 
 function isRetryableHttpError(error: unknown): boolean {
