@@ -7,11 +7,13 @@ import { ChainId } from '@dcl/schemas'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
 import { Web2TransactionModal } from 'decentraland-ui/dist/components/Web2TransactionModal'
+import { getContract, sendMetaTransaction, ContractName } from 'decentraland-transactions'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import { useAnalytics } from '../../../hooks/useAnalytics'
 import { getAnalytics } from '../../../modules/analytics/segment'
 import { ClickEvents, TrackingEvents } from '../../../modules/analytics/types'
+import { config } from '../../../modules/config'
 import { fetchProfile, fetchProfileWithConsistencyCheck, redeployExistingProfile } from '../../../modules/profile'
 import {
   createAuthServerHttpClient,
@@ -30,16 +32,30 @@ import { handleError } from '../../../shared/utils/errorHandler'
 import { checkWebGpuSupport } from '../../../shared/utils/webgpu'
 import { FeatureFlagsContext, FeatureFlagsKeys, OnboardingFlowVariant } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
 import { Container } from './Container'
-import { DeniedSignIn } from './Views/DeniedSignIn'
-import { DeniedWalletInteraction } from './Views/DeniedWalletInteraction'
-import { DifferentAccountError } from './Views/DifferentAccountError'
-import { IpValidationError as IpValidationErrorView } from './Views/IpValidationError'
-import { RecoverError } from './Views/RecoverError'
-import { SignInComplete } from './Views/SignInComplete'
-import { SigningError } from './Views/SigningError'
-import { TimeoutError } from './Views/TimeoutError'
+import { NFTTransferData } from './types'
+import {
+  getNetworkProvider,
+  getConnectedProvider,
+  checkMetaTransactionSupport,
+  getMetaTransactionChainId,
+  decodeNftTransferData,
+  fetchNftMetadata
+} from './utils'
+import {
+  DeniedSignIn,
+  DeniedWalletInteraction,
+  DifferentAccountError,
+  IpValidationError as IpValidationErrorView,
+  NFTTransferView,
+  NFTTransferCompleteView,
+  NFTTransferCanceledView,
+  RecoverError,
+  SignInComplete,
+  SigningError,
+  TimeoutError,
+  WalletInteractionComplete
+} from './Views'
 import viewStyles from './Views/Views.module.css'
-import { WalletInteractionComplete } from './Views/WalletInteractionComplete'
 import styles from './RequestPage.module.css'
 
 enum View {
@@ -56,9 +72,12 @@ enum View {
   VERIFY_SIGN_IN_COMPLETE,
   // Wallet Interaction
   WALLET_INTERACTION,
+  WALLET_NFT_INTERACTION,
   WALLET_INTERACTION_DENIED,
+  WALLET_NFT_INTERACTION_DENIED,
   WALLET_INTERACTION_ERROR,
-  WALLET_INTERACTION_COMPLETE
+  WALLET_INTERACTION_COMPLETE,
+  WALLET_NFT_INTERACTION_COMPLETE
 }
 
 export const RequestPage = () => {
@@ -77,6 +96,7 @@ export const RequestPage = () => {
     chainId: number
   }>()
   const [transactionGasCost, setTransactionGasCost] = useState<bigint>()
+  const [nftTransferData, setNftTransferData] = useState<NFTTransferData | null>(null)
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false)
   const requestRef = useRef<RecoverResponse>()
   const [error, setError] = useState<string>()
@@ -179,24 +199,60 @@ export const RequestPage = () => {
           case 'dcl_personal_sign':
             setView(View.VERIFY_SIGN_IN)
             break
-          case 'eth_sendTransaction':
+          case 'eth_sendTransaction': {
             try {
+              // Get wallet info first
               const signer = await browserProvider.current.getSigner()
               const userBalance = await browserProvider.current.getBalance(signer.address)
+              const currentChainId = await browserProvider.current.getNetwork().then(network => Number(network.chainId))
               setWalletInfo({
                 balance: userBalance,
-                chainId: await browserProvider.current.getNetwork().then(network => Number(network.chainId))
+                chainId: currentChainId
               })
+
+              // Check if this is an NFT transfer by trying to decode the transaction data
+              const transactionData = request.params?.[0]?.data as string | undefined
+              const contractAddress = request.params?.[0]?.to as string | undefined
+
+              if (transactionData && contractAddress) {
+                // Try to decode as NFT transfer using CollectionV2 contract
+                // If it decodes successfully, it's an NFT transfer
+                const chainId = getMetaTransactionChainId()
+                const contract = getContract(ContractName.ERC721CollectionV2, chainId)
+                const transferData = decodeNftTransferData(transactionData, contract.abi)
+
+                if (transferData) {
+                  const [metadata, recipientProfile] = await Promise.all([
+                    fetchNftMetadata(contractAddress, contract.abi, transferData.tokenId, browserProvider.current),
+                    fetchProfile(transferData.toAddress)
+                  ])
+                  setNftTransferData({
+                    imageUrl: metadata.imageUrl,
+                    tokenId: transferData.tokenId,
+                    toAddress: transferData.toAddress,
+                    contractAddress,
+                    name: metadata.name,
+                    description: metadata.description,
+                    rarity: metadata.rarity,
+                    recipientProfile: recipientProfile || undefined
+                  })
+                  setView(View.WALLET_NFT_INTERACTION)
+                  break
+                }
+              }
+
               const gasPrice = (await browserProvider.current.getFeeData()).gasPrice ?? BigInt(0)
               const transactionGasCost = await signer.estimateGas(request.params?.[0])
               const totalGasCost = gasPrice * transactionGasCost
               setTransactionGasCost(totalGasCost)
             } catch (e) {
-              console.error('Error estimating gas', e)
-            } finally {
-              setView(View.WALLET_INTERACTION)
+              console.error('Error estimating gas (may be normal for meta transactions)', e)
             }
+
+            // Show regular wallet interaction view
+            setView(View.WALLET_INTERACTION)
             break
+          }
           default:
             setView(View.WALLET_INTERACTION)
         }
@@ -229,7 +285,7 @@ export const RequestPage = () => {
   useEffect(() => {
     // The timeout is only necessary on the verify sign in and wallet interaction views.
     // We can clear it out when the user is shown another view to prevent the timeout from triggering somewhere not intended.
-    if (view !== View.VERIFY_SIGN_IN && view !== View.WALLET_INTERACTION) {
+    if (view !== View.VERIFY_SIGN_IN && view !== View.WALLET_INTERACTION && view !== View.WALLET_NFT_INTERACTION) {
       clearTimeout(timeoutRef.current)
     }
   }, [view])
@@ -314,11 +370,31 @@ export const RequestPage = () => {
     }
   }, [setIsLoading, isUserUsingWeb2Wallet, isLoading])
 
-  const onDenyWalletInteraction = useCallback(() => {
+  const onDenyWalletInteraction = useCallback(async () => {
+    setIsLoading(true)
     setIsTransactionModalOpen(false)
     trackClick(ClickEvents.DENY_WALLET_INTERACTION)
-    setView(View.WALLET_INTERACTION_DENIED)
-  }, [])
+
+    try {
+      const signer = await browserProvider.current?.getSigner()
+      if (signer) {
+        await authServerClient.current.sendFailedOutcome(requestId, await signer.getAddress(), {
+          code: -32003,
+          message: 'Transaction rejected'
+        })
+      }
+    } catch (error) {
+      console.error('Failed to send denied notification:', error)
+    }
+
+    setIsLoading(false)
+    // Set appropriate view based on whether it's an NFT transfer
+    if (nftTransferData) {
+      setView(View.WALLET_NFT_INTERACTION_DENIED)
+    } else {
+      setView(View.WALLET_INTERACTION_DENIED)
+    }
+  }, [nftTransferData, requestId])
 
   const onApproveWalletInteraction = useCallback(async () => {
     setIsLoading(true)
@@ -334,12 +410,48 @@ export const RequestPage = () => {
       }
 
       const signer = await provider.getSigner()
-      const result = await provider.send(requestRef.current?.method, requestRef.current?.params ?? [])
+      const signerAddress = await signer.getAddress()
+      const chainId = getMetaTransactionChainId()
+      const toAddress = requestRef.current?.params?.[0]?.to
+
+      if (!toAddress) {
+        throw new Error('Contract address not found in transaction parameters')
+      }
+
+      let result: string | null = null
+
+      // Check if this contract will use meta transactions
+      const { willUseMetaTransaction, contractName } = await checkMetaTransactionSupport(toAddress)
+
+      if (willUseMetaTransaction && contractName) {
+        const connectedProvider = await getConnectedProvider()
+        if (!connectedProvider) {
+          throw new Error('Provider not connected')
+        }
+
+        const networkProvider = await getNetworkProvider(chainId)
+        const contract = getContract(contractName, chainId)
+        contract.address = toAddress
+
+        result = await sendMetaTransaction(connectedProvider, networkProvider, requestRef.current?.params?.[0].data as string, contract, {
+          serverURL: `${config.get('META_TRANSACTION_SERVER_URL')}/v1`
+        })
+      } else {
+        result = await provider.send(requestRef.current?.method, requestRef.current?.params ?? [])
+      }
+
       trackClick(ClickEvents.APPROVE_WALLET_INTERACTION, {
         method: requestRef.current?.method
       })
-      await authServerClient.current.sendSuccessfulOutcome(requestId, await signer.getAddress(), result)
-      setView(View.WALLET_INTERACTION_COMPLETE)
+      await authServerClient.current.sendSuccessfulOutcome(requestId, signerAddress, result)
+
+      if (nftTransferData) {
+        console.log('Setting view to WALLET_NFT_INTERACTION_COMPLETE')
+        setView(View.WALLET_NFT_INTERACTION_COMPLETE)
+      } else {
+        console.log('Setting view to WALLET_INTERACTION_COMPLETE')
+        setView(View.WALLET_INTERACTION_COMPLETE)
+      }
     } catch (e) {
       if (e instanceof IpValidationError) {
         setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
@@ -348,20 +460,30 @@ export const RequestPage = () => {
         handleError(e, 'Wallet interaction error', {
           sentryTags: { isWeb2Wallet: isUserUsingWeb2Wallet }
         })
-        const signer = await browserProvider.current?.getSigner()
-        if (signer && isRpcError(e)) {
-          await authServerClient.current.sendFailedOutcome(requestId, await signer.getAddress(), e.error)
-        } else if (signer && !isRpcError(e)) {
-          await authServerClient.current.sendFailedOutcome(requestId, await signer.getAddress(), {
-            code: 999,
-            message: isErrorWithMessage(e) ? e.message : 'Unknown error'
-          })
+
+        // Try to send failed outcome, but don't let it prevent showing the error view
+        try {
+          const signer = await browserProvider.current?.getSigner()
+          if (signer && isRpcError(e)) {
+            await authServerClient.current.sendFailedOutcome(requestId, await signer.getAddress(), e.error)
+          } else if (signer && !isRpcError(e)) {
+            await authServerClient.current.sendFailedOutcome(requestId, await signer.getAddress(), {
+              code: 999,
+              message: isErrorWithMessage(e) ? e.message : 'Unknown error'
+            })
+          }
+        } catch (failedOutcomeError) {
+          // Log the error but don't prevent the error view from showing
+          console.error('Failed to send failed outcome:', failedOutcomeError)
         }
+
         setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
         setView(View.WALLET_INTERACTION_ERROR)
       }
+    } finally {
+      setIsLoading(false)
     }
-  }, [isUserUsingWeb2Wallet])
+  }, [isUserUsingWeb2Wallet, nftTransferData, requestId])
 
   const handleApproveWalletInteraction = useCallback(async () => {
     if (isUserUsingWeb2Wallet) {
@@ -389,8 +511,12 @@ export const RequestPage = () => {
       return <DeniedSignIn requestId={requestId} />
     case View.WALLET_INTERACTION_COMPLETE:
       return <WalletInteractionComplete />
+    case View.WALLET_NFT_INTERACTION_COMPLETE:
+      return nftTransferData ? <NFTTransferCompleteView nftData={nftTransferData} /> : null
     case View.WALLET_INTERACTION_DENIED:
       return <DeniedWalletInteraction />
+    case View.WALLET_NFT_INTERACTION_DENIED:
+      return nftTransferData ? <NFTTransferCanceledView nftData={nftTransferData} /> : null
     case View.LOADING_REQUEST:
       return (
         <Container>
@@ -426,6 +552,26 @@ export const RequestPage = () => {
           )}
         </Container>
       )
+    case View.WALLET_NFT_INTERACTION:
+      return nftTransferData ? (
+        <>
+          <Web2TransactionModal
+            isOpen={isTransactionModalOpen}
+            transactionCostAmount={formatEther((transactionGasCost ?? 0).toString())}
+            userBalanceAmount={formatEther((walletInfo?.balance ?? 0).toString())}
+            chainId={walletInfo?.chainId ?? ChainId.ETHEREUM_MAINNET}
+            onAccept={onApproveWalletInteraction}
+            onClose={onDenyWalletInteraction}
+            onReject={onDenyWalletInteraction}
+          />
+          <NFTTransferView
+            nftData={nftTransferData}
+            isLoading={isLoading}
+            onDeny={onDenyWalletInteraction}
+            onApprove={handleApproveWalletInteraction}
+          />
+        </>
+      ) : null
     case View.WALLET_INTERACTION:
       return (
         <Container canChangeAccount requestId={requestId}>
