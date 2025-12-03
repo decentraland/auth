@@ -2,7 +2,8 @@ import React, { useCallback, useState, useMemo, useEffect, useContext, useRef } 
 import { useSearchParams } from 'react-router-dom'
 import CircularProgress from '@mui/material/CircularProgress'
 import { EthAddress, Email } from '@dcl/schemas'
-import { WearablePreview, PreviewUnityMode, launchDesktopApp } from 'decentraland-ui2'
+import { PreviewUnityMode } from '@dcl/schemas/dist/dapps/preview'
+import { WearablePreview, launchDesktopApp } from 'decentraland-ui2'
 import avatarFloat from '../../../assets/animations/AvatarFloat_Lottie.json'
 import avatarParticles from '../../../assets/animations/AvatarParticles_Lottie.json'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
@@ -468,7 +469,7 @@ const AvatarSetupPage: React.FC = () => {
         <WearablePreview
           id="avatar-preview-configurator"
           unity={true}
-          unityMode={PreviewUnityMode.Configurator}
+          unityMode={PreviewUnityMode.CONFIG}
           onLoad={() => {
             setState(prev => ({ ...prev, hasWearablePreviewLoaded: true }))
           }}
