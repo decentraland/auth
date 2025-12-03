@@ -515,7 +515,7 @@ describe('when testing fetchNftMetadata', () => {
     ['uncommon', 'Uncommon', Rarity.UNCOMMON],
     ['common', 'Common', Rarity.COMMON],
     ['unknown', 'Unknown', Rarity.COMMON]
-  ])('and the NFT metadata has the %s rarity', (rarityName, rarityValue, expectedRarity) => {
+  ])('and the NFT metadata has the %s rarity', (_rarityName, rarityValue, expectedRarity) => {
     let tokenUri: string
     let metadata: any
 
