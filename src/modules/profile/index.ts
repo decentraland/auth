@@ -1,15 +1,16 @@
 import { createFetchComponent } from '@well-known-components/fetch-component'
 import { createLambdasClient, createContentClient, DeploymentBuilder } from 'dcl-catalyst-client'
-import { Profile } from 'dcl-catalyst-client/dist/client/specs/catalyst.schemas'
+import { Profile, ProfileAvatarsItem } from 'dcl-catalyst-client/dist/client/specs/catalyst.schemas'
 import { getCatalystServersFromCache } from 'dcl-catalyst-client/dist/contracts-snapshots'
 import { AuthIdentity, Authenticator } from '@dcl/crypto'
 import { hashV1 } from '@dcl/hashing'
-import { EntityType } from '@dcl/schemas'
+import { EntityType, Entity } from '@dcl/schemas'
 import { config } from '../config'
 
 export interface ConsistencyResult {
   isConsistent: boolean
   profile?: Profile
+  profileFetchedFrom?: string
   error?: string
 }
 
@@ -32,33 +33,42 @@ export async function fetchProfileWithConsistencyCheck(address: string): Promise
 
     // Get all catalyst servers for the network and remove the current peer to avoid duplicated fetches
     const catalystServers = getCatalystServersFromCache(network)
-    const catalystUrls = catalystServers.map(server => `${server.address}/lambdas`)
+    const catalystUrls = catalystServers.map(server => `${server.address}`)
 
-    const profiles = await Promise.all(
-      catalystUrls.map(url => {
-        const client = createLambdasClient({ url, fetcher: createFetchComponent() })
-        return client.getAvatarDetails(address)
+    const profileResults = await Promise.all(
+      catalystUrls.map(async url => {
+        try {
+          const client = createLambdasClient({ url: url + '/lambdas', fetcher: createFetchComponent() })
+          const profile = await client.getAvatarDetails(address)
+          return { profile, url }
+        } catch {
+          // Profile doesn't exist on this catalyst (404) or fetch failed
+          return null
+        }
       })
     )
 
-    if (profiles.length === 0) {
+    const profilesWithUrls = profileResults.filter(result => result !== null)
+
+    if (profilesWithUrls.length === 0) {
       return {
         isConsistent: false,
         error: 'No profiles found'
       }
     }
 
-    const allProfilesExist = profiles.length === catalystUrls.length
-    const allProfilesHaveSameTimestamp = profiles.every(profile => profile.timestamp === profiles[0]?.timestamp)
+    const allProfilesExist = profilesWithUrls.length === catalystUrls.length
+    const allProfilesHaveSameTimestamp =
+      profilesWithUrls.every(({ profile }) => profile.timestamp === profilesWithUrls[0]?.profile.timestamp) && false
 
-    const newestProfile = profiles.reduce((acc, profile) => {
-      return (acc.timestamp ?? 0) > (profile.timestamp ?? 0) ? acc : profile
-    }, profiles[0])
+    const newest = profilesWithUrls.reduce((acc, current) => {
+      return (acc.profile.timestamp ?? 0) > (current.profile.timestamp ?? 0) ? acc : current
+    }, profilesWithUrls[0])
 
     return {
       isConsistent: allProfilesExist && allProfilesHaveSameTimestamp,
-      profile: newestProfile,
-      error: undefined
+      profile: newest.profile,
+      profileFetchedFrom: newest.url
     }
   } catch (error) {
     console.error('Profile consistency check failed:', error)
@@ -175,6 +185,64 @@ export async function buildProfileMetadata(profile: Profile, files: Map<string, 
       avatar: {
         ...avatar.avatar,
         snapshots
+      }
+    }))
+  }
+}
+
+export async function redeployExistingProfileWithContentServerData(
+  catalystUrl: string,
+  connectedAccount: string,
+  connectedAccountIdentity: AuthIdentity
+): Promise<void> {
+  const client = createContentClient({ url: catalystUrl + '/content', fetcher: createFetchComponent() })
+
+  // Download profile entity from content server
+  const entity = (await client.fetchEntitiesByPointers([connectedAccount]))?.[0]
+  if (!entity) {
+    throw new Error('Profile entity not found')
+  }
+
+  // Download required assets (body.png and face256.png are typically required)
+  const bodyFile = 'body.png'
+  const face256File = 'face256.png'
+
+  // Extract file hashes from entity.content
+  const contentHashesByFile = entity.content.reduce((acc, next) => ({ ...acc, [next.file]: next.hash }), {} as Record<string, string>)
+
+  const [bodyBuffer, faceBuffer] = await Promise.all([
+    client.downloadContent(contentHashesByFile[bodyFile]),
+    client.downloadContent(contentHashesByFile[face256File])
+  ])
+
+  const files = new Map<string, Uint8Array>()
+  files.set(`${bodyFile}`, new Uint8Array(bodyBuffer))
+  files.set(`${face256File}`, new Uint8Array(faceBuffer))
+
+  const metadata = await buildMetadataWithEmptyWearables(entity)
+
+  const deploymentEntity = await DeploymentBuilder.buildEntity({
+    type: EntityType.PROFILE,
+    pointers: [connectedAccount],
+    metadata,
+    timestamp: Date.now(),
+    files
+  })
+
+  await client.deploy({
+    entityId: deploymentEntity.entityId,
+    files: deploymentEntity.files,
+    authChain: Authenticator.signPayload(connectedAccountIdentity, deploymentEntity.entityId)
+  })
+}
+
+async function buildMetadataWithEmptyWearables(entity: Entity): Promise<Partial<Profile>> {
+  return {
+    avatars: entity.metadata?.avatars?.map((avatar: ProfileAvatarsItem) => ({
+      ...avatar,
+      avatar: {
+        ...avatar.avatar,
+        wearables: []
       }
     }))
   }
