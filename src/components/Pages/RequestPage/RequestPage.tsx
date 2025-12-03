@@ -7,7 +7,7 @@ import { ChainId } from '@dcl/schemas'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
 import { Web2TransactionModal } from 'decentraland-ui/dist/components/Web2TransactionModal'
-import { getContract, sendMetaTransaction } from 'decentraland-transactions'
+import { getContract, sendMetaTransaction, ContractName } from 'decentraland-transactions'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import { useAnalytics } from '../../../hooks/useAnalytics'
@@ -215,34 +215,29 @@ export const RequestPage = () => {
               const contractAddress = request.params?.[0]?.to as string | undefined
 
               if (transactionData && contractAddress) {
-                // Try to decode as NFT transfer - if successful, show NFT transfer view
-                // This works for any NFT transfer that matches our transfer signature
-                const { contractName } = await checkMetaTransactionSupport(contractAddress)
+                // Try to decode as NFT transfer using CollectionV2 contract
+                // If it decodes successfully, it's an NFT transfer
+                const chainId = getMetaTransactionChainId()
+                const contract = getContract(ContractName.ERC721CollectionV2, chainId)
+                const transferData = decodeNftTransferData(transactionData, contract.abi)
 
-                if (contractName) {
-                  const chainId = getMetaTransactionChainId()
-                  const contract = getContract(contractName, chainId)
-
-                  const transferData = decodeNftTransferData(transactionData, contract.abi)
-
-                  if (transferData) {
-                    const [metadata, recipientProfile] = await Promise.all([
-                      fetchNftMetadata(contractAddress, contract.abi, transferData.tokenId, browserProvider.current),
-                      fetchProfile(transferData.toAddress)
-                    ])
-                    setNftTransferData({
-                      imageUrl: metadata.imageUrl,
-                      tokenId: transferData.tokenId,
-                      toAddress: transferData.toAddress,
-                      contractAddress,
-                      name: metadata.name,
-                      description: metadata.description,
-                      rarity: metadata.rarity,
-                      recipientProfile: recipientProfile || undefined
-                    })
-                    setView(View.WALLET_NFT_INTERACTION)
-                    break
-                  }
+                if (transferData) {
+                  const [metadata, recipientProfile] = await Promise.all([
+                    fetchNftMetadata(contractAddress, contract.abi, transferData.tokenId, browserProvider.current),
+                    fetchProfile(transferData.toAddress)
+                  ])
+                  setNftTransferData({
+                    imageUrl: metadata.imageUrl,
+                    tokenId: transferData.tokenId,
+                    toAddress: transferData.toAddress,
+                    contractAddress,
+                    name: metadata.name,
+                    description: metadata.description,
+                    rarity: metadata.rarity,
+                    recipientProfile: recipientProfile || undefined
+                  })
+                  setView(View.WALLET_NFT_INTERACTION)
+                  break
                 }
               }
 
