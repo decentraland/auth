@@ -58,8 +58,9 @@ export async function fetchProfileWithConsistencyCheck(address: string): Promise
     }
 
     const allProfilesExist = profilesWithUrls.length === catalystUrls.length
-    const allProfilesHaveSameTimestamp =
-      profilesWithUrls.every(({ profile }) => profile.timestamp === profilesWithUrls[0]?.profile.timestamp) && false
+    const allProfilesHaveSameTimestamp = profilesWithUrls.every(
+      ({ profile }) => profile.timestamp === profilesWithUrls[0]?.profile.timestamp
+    )
 
     const newest = profilesWithUrls.reduce((acc, current) => {
       return (acc.profile.timestamp ?? 0) > (current.profile.timestamp ?? 0) ? acc : current
@@ -85,26 +86,60 @@ export async function redeployExistingProfile(
   connectedAccount: string,
   connectedAccountIdentity: AuthIdentity
 ): Promise<void> {
-  // Get all available catalyst servers for rotation
-  const environment = config.get('ENVIRONMENT')
-  const network = environment === 'development' ? 'sepolia' : 'mainnet'
-  const catalystServers = getCatalystServersFromCache(network)
+  const snapshotUrls = Object.entries(profile.avatars?.[0]?.avatar?.snapshots ?? {}).reduce(
+    (acc, [file, url]) => ({ ...acc, [file]: url }),
+    {} as Record<string, string>
+  )
 
-  // Prepare catalyst URLs for rotation, starting with the current PEER_URL
-  const PEER_URL = config.get('PEER_URL')
-  const catalystUrls = [
-    PEER_URL + '/content',
-    ...catalystServers.map(server => server.address + '/content').filter(url => url !== PEER_URL + '/content')
-  ]
+  const [bodyBuffer, faceBuffer] = await Promise.all([
+    fetch(snapshotUrls['body']).then(response => response.arrayBuffer()),
+    fetch(snapshotUrls['face256']).then(response => response.arrayBuffer())
+  ])
 
-  const MAX_ATTEMPTS = Math.min(catalystUrls.length, 3) // Try up to 3 catalysts or all available
+  const files = createSnapshotFilesMap(bodyBuffer, faceBuffer)
+  const metadata = await buildProfileMetadata(profile, files)
+
+  await redeployWithCatalystRotation(connectedAccount, connectedAccountIdentity, files, metadata)
+}
+
+export async function redeployExistingProfileWithContentServerData(
+  catalystUrl: string,
+  connectedAccount: string,
+  connectedAccountIdentity: AuthIdentity
+): Promise<void> {
+  const client = createContentClient({ url: catalystUrl + '/content', fetcher: createFetchComponent() })
+  const entity = (await client.fetchEntitiesByPointers([connectedAccount]))?.[0]
+  if (!entity) {
+    throw new Error('Profile entity not found')
+  }
+
+  const contentHashesByFile = entity.content.reduce((acc, next) => ({ ...acc, [next.file]: next.hash }), {} as Record<string, string>)
+
+  const [bodyBuffer, faceBuffer] = await Promise.all([
+    client.downloadContent(contentHashesByFile['body.png']),
+    client.downloadContent(contentHashesByFile['face256.png'])
+  ])
+
+  const files = createSnapshotFilesMap(bodyBuffer, faceBuffer)
+  const metadata = buildMetadataWithEmptyWearables(entity)
+
+  await redeployWithCatalystRotation(connectedAccount, connectedAccountIdentity, files, metadata)
+}
+
+async function redeployWithCatalystRotation(
+  connectedAccount: string,
+  connectedAccountIdentity: AuthIdentity,
+  files: Map<string, Uint8Array>,
+  metadata: Partial<Profile>
+): Promise<void> {
+  const catalystUrls = getCatalystUrlsForRotation()
+  const MAX_ATTEMPTS = Math.min(catalystUrls.length, 3)
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const catalystUrl = catalystUrls[attempt]
 
     try {
-      await attemptRedeployment(profile, connectedAccount, connectedAccountIdentity, catalystUrl)
-      // If successful, exit the retry loop
+      await attemptRedeployment(catalystUrl, connectedAccount, connectedAccountIdentity, files, metadata)
       console.log(`Profile redeployment successful using catalyst: ${catalystUrl}`)
       return
     } catch (error) {
@@ -127,37 +162,14 @@ export async function redeployExistingProfile(
 }
 
 async function attemptRedeployment(
-  profile: Profile,
+  catalystUrl: string,
   connectedAccount: string,
   connectedAccountIdentity: AuthIdentity,
-  catalystUrl: string
+  files: Map<string, Uint8Array>,
+  metadata: Partial<Profile>
 ): Promise<void> {
   const client = createContentClient({ url: catalystUrl, fetcher: createFetchComponent() })
 
-  // Extract file urls from avatar snapshots
-  const contentUrlsByFile = Object.entries(profile.avatars?.[0]?.avatar?.snapshots ?? {}).reduce(
-    (acc, [file, url]) => ({ ...acc, [file]: url }),
-    {} as Record<string, string>
-  )
-
-  // Download required assets (body.png and face256.png are typically required)
-  const bodyFile = 'body'
-  const face256File = 'face256'
-
-  const [bodyBuffer, faceBuffer] = await Promise.all([
-    fetch(contentUrlsByFile[bodyFile]).then(response => response.arrayBuffer()),
-    fetch(contentUrlsByFile[face256File]).then(response => response.arrayBuffer())
-  ])
-
-  // Prepare files map for deployment
-  const files = new Map<string, Uint8Array>()
-  files.set(`${bodyFile}.png`, new Uint8Array(bodyBuffer))
-  files.set(`${face256File}.png`, new Uint8Array(faceBuffer))
-
-  // Build profile metadata with fresh snapshots
-  const metadata = await buildProfileMetadata(profile, files)
-
-  // Build deployment entity with fresh timestamp
   const deploymentEntity = await DeploymentBuilder.buildEntity({
     type: EntityType.PROFILE,
     pointers: [connectedAccount],
@@ -166,7 +178,6 @@ async function attemptRedeployment(
     files
   })
 
-  // Deploy the profile using the user's ephemeral identity
   await client.deploy({
     entityId: deploymentEntity.entityId,
     files: deploymentEntity.files,
@@ -174,8 +185,23 @@ async function attemptRedeployment(
   })
 }
 
+function getCatalystUrlsForRotation(): string[] {
+  const environment = config.get('ENVIRONMENT')
+  const network = environment === 'development' ? 'sepolia' : 'mainnet'
+  const catalystServers = getCatalystServersFromCache(network)
+  const PEER_URL = config.get('PEER_URL')
+
+  return [PEER_URL + '/content', ...catalystServers.map(server => server.address + '/content').filter(url => url !== PEER_URL + '/content')]
+}
+
+function createSnapshotFilesMap(bodyBuffer: ArrayBuffer | Buffer, faceBuffer: ArrayBuffer | Buffer): Map<string, Uint8Array> {
+  const files = new Map<string, Uint8Array>()
+  files.set('body.png', new Uint8Array(bodyBuffer))
+  files.set('face256.png', new Uint8Array(faceBuffer))
+  return files
+}
+
 export async function buildProfileMetadata(profile: Profile, files: Map<string, Uint8Array>): Promise<Partial<Profile>> {
-  // Build snapshots object with fresh hashes
   const adaptSnapshot = async ([file, content]: [string, Uint8Array]) => [file.replace('.png', ''), await hashV1(content)]
   const snapshots = Object.fromEntries(await Promise.all(Array.from(files.entries()).map(adaptSnapshot)))
 
@@ -190,53 +216,7 @@ export async function buildProfileMetadata(profile: Profile, files: Map<string, 
   }
 }
 
-export async function redeployExistingProfileWithContentServerData(
-  catalystUrl: string,
-  connectedAccount: string,
-  connectedAccountIdentity: AuthIdentity
-): Promise<void> {
-  const client = createContentClient({ url: catalystUrl + '/content', fetcher: createFetchComponent() })
-
-  // Download profile entity from content server
-  const entity = (await client.fetchEntitiesByPointers([connectedAccount]))?.[0]
-  if (!entity) {
-    throw new Error('Profile entity not found')
-  }
-
-  // Download required assets (body.png and face256.png are typically required)
-  const bodyFile = 'body.png'
-  const face256File = 'face256.png'
-
-  // Extract file hashes from entity.content
-  const contentHashesByFile = entity.content.reduce((acc, next) => ({ ...acc, [next.file]: next.hash }), {} as Record<string, string>)
-
-  const [bodyBuffer, faceBuffer] = await Promise.all([
-    client.downloadContent(contentHashesByFile[bodyFile]),
-    client.downloadContent(contentHashesByFile[face256File])
-  ])
-
-  const files = new Map<string, Uint8Array>()
-  files.set(`${bodyFile}`, new Uint8Array(bodyBuffer))
-  files.set(`${face256File}`, new Uint8Array(faceBuffer))
-
-  const metadata = await buildMetadataWithEmptyWearables(entity)
-
-  const deploymentEntity = await DeploymentBuilder.buildEntity({
-    type: EntityType.PROFILE,
-    pointers: [connectedAccount],
-    metadata,
-    timestamp: Date.now(),
-    files
-  })
-
-  await client.deploy({
-    entityId: deploymentEntity.entityId,
-    files: deploymentEntity.files,
-    authChain: Authenticator.signPayload(connectedAccountIdentity, deploymentEntity.entityId)
-  })
-}
-
-async function buildMetadataWithEmptyWearables(entity: Entity): Promise<Partial<Profile>> {
+function buildMetadataWithEmptyWearables(entity: Entity): Partial<Profile> {
   return {
     avatars: entity.metadata?.avatars?.map((avatar: ProfileAvatarsItem) => ({
       ...avatar,
