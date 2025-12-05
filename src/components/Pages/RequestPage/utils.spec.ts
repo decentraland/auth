@@ -6,7 +6,7 @@ import { Rarity } from '@dcl/schemas'
 import { ChainId } from '@dcl/schemas/dist/dapps/chain-id'
 import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
 import { connection } from 'decentraland-connect'
-import { ContractName, getContractName } from 'decentraland-transactions'
+import { ContractName, getContractName, getContract } from 'decentraland-transactions'
 import { config } from '../../../modules/config'
 import {
   getConnectedProvider,
@@ -14,6 +14,7 @@ import {
   isDecentralandContractAddress,
   checkMetaTransactionSupport,
   decodeNftTransferData,
+  decodeManaTransferData,
   fetchNftMetadata,
   getMetaTransactionChainId
 } from './utils'
@@ -390,6 +391,134 @@ describe('when testing decodeNftTransferData', () => {
     it('should return null', () => {
       const result = decodeNftTransferData(transactionData, contractABI)
       expect(result).toBeNull()
+    })
+  })
+})
+
+describe('when testing decodeManaTransferData', () => {
+  let transactionData: string
+  let mockInterface: any
+  let mockContract: any
+
+  beforeEach(() => {
+    jest.mocked(config.get).mockReturnValue('production')
+    mockInterface = {
+      parseTransaction: jest.fn()
+    }
+    mockContract = {
+      abi: [{ type: 'function', name: 'transfer' }]
+    }
+    jest.mocked(ethers.Interface).mockImplementation(() => mockInterface)
+    jest.mocked(getContract).mockReturnValue(mockContract)
+  })
+
+  afterEach(() => {
+    jest.resetAllMocks()
+  })
+
+  describe('and the transaction data is a valid ERC20 transfer', () => {
+    let mockDecodedData: any
+
+    beforeEach(() => {
+      transactionData =
+        '0xa9059cbb000000000000000000000000abcdef1234567890abcdef1234567890abcdef12000000000000000000000000000000000000000000000000016345785d8a0000'
+      mockContract = {
+        abi: [{ type: 'function', name: 'transfer' }]
+      }
+      mockDecodedData = {
+        args: ['0xabcdef1234567890abcdef1234567890abcdef12', BigInt('100000000000000000')]
+      }
+      mockInterface.parseTransaction.mockReturnValueOnce(mockDecodedData)
+      jest.mocked(ethers.formatEther).mockReturnValueOnce('0.1')
+    })
+
+    it('should return the manaAmount and toAddress', () => {
+      const result = decodeManaTransferData(transactionData)
+      expect(result).toEqual({
+        manaAmount: '0.1',
+        toAddress: '0xabcdef1234567890abcdef1234567890abcdef12'
+      })
+    })
+  })
+
+  describe('and the transaction data is empty', () => {
+    beforeEach(() => {
+      transactionData = ''
+    })
+
+    it('should return null', () => {
+      const result = decodeManaTransferData(transactionData)
+      expect(result).toBeNull()
+    })
+  })
+
+  describe('and the transaction data is too short', () => {
+    beforeEach(() => {
+      transactionData = '0x1234'
+    })
+
+    it('should return null', () => {
+      const result = decodeManaTransferData(transactionData)
+      expect(result).toBeNull()
+    })
+  })
+
+  describe('and the transaction data is not a transfer function', () => {
+    beforeEach(() => {
+      transactionData = '0x12345678000000000000000000000000abcdef1234567890abcdef1234567890abcdef12'
+    })
+
+    it('should return null', () => {
+      const result = decodeManaTransferData(transactionData)
+      expect(result).toBeNull()
+    })
+  })
+
+  describe('and parsing the transaction fails', () => {
+    beforeEach(() => {
+      transactionData = '0xa9059cbb000000000000000000000000abcdef1234567890abcdef1234567890abcdef12'
+      mockInterface.parseTransaction.mockReturnValueOnce(null)
+    })
+
+    it('should return null', () => {
+      const result = decodeManaTransferData(transactionData)
+      expect(result).toBeNull()
+    })
+  })
+
+  describe('and decoding throws an error', () => {
+    beforeEach(() => {
+      transactionData = '0xa9059cbb000000000000000000000000abcdef1234567890abcdef1234567890abcdef12'
+      mockInterface.parseTransaction.mockImplementationOnce(() => {
+        throw new Error('Decoding error')
+      })
+    })
+
+    it('should return null', () => {
+      const result = decodeManaTransferData(transactionData)
+      expect(result).toBeNull()
+    })
+  })
+
+  describe('and the transaction has a large amount', () => {
+    let mockDecodedData: any
+
+    beforeEach(() => {
+      transactionData = '0xa9059cbb000000000000000000000000abcdef1234567890abcdef1234567890abcdef12'
+      // 1000 MANA in wei (1000 * 10^18)
+      mockDecodedData = {
+        args: ['0xabcdef1234567890abcdef1234567890abcdef12', BigInt('1000000000000000000000')]
+      }
+      mockInterface.parseTransaction.mockReturnValueOnce(mockDecodedData)
+      jest.mocked(ethers.formatEther).mockReturnValueOnce('1000.0')
+    })
+
+    it('should correctly convert large amounts from wei to MANA', () => {
+      const result = decodeManaTransferData(transactionData)
+      expect(result).toEqual({
+        manaAmount: '1000.0',
+        toAddress: '0xabcdef1234567890abcdef1234567890abcdef12'
+      })
     })
   })
 })
