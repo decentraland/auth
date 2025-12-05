@@ -1,5 +1,5 @@
 /**
- * NFT Transfer specific styled components
+ * MANA Transfer specific styled components
  * Most shared components are imported from SharedTransferComponents.styled.ts
  */
 export {
@@ -7,8 +7,8 @@ export {
   Title,
   RecipientProfile,
   RecipientProfileText,
-  AssetImageWrapper as NFTImageWrapper,
-  ItemName as NFTName,
-  InfoAlert,
-  WarningAlert
+  AssetImageWrapper as SceneImageWrapper,
+  ItemName as SceneName,
+  Label as CreatorLabel,
+  InfoAlert
 } from '../SharedTransferComponents.styled'
