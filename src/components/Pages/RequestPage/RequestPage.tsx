@@ -230,7 +230,8 @@ export const RequestPage = () => {
                     toAddress: manaData.toAddress,
                     recipientProfile: recipientProfile || undefined,
                     sceneName: 'Genesis Plaza', // TODO: Get actual scene name
-                    sceneImageUrl: 'https://peer.decentraland.org/content/contents/QmScenePlaceholder' // TODO: Get actual scene image
+                    sceneImageUrl:
+                      'https://peer.decentraland.org/content/contents/bafkreidj26s7aenyxfthfdibnqonzqm5ptc4iamml744gmcyuokewkr76y' // TODO: Get actual scene image
                   })
                   setView(View.WALLET_MANA_INTERACTION)
                   break

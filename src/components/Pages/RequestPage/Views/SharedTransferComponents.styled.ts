@@ -197,4 +197,3 @@ export const WarningAlert = styled(Alert)({
     alignItems: 'center'
   }
 })
-

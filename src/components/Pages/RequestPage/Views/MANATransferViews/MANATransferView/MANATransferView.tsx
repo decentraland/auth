@@ -48,4 +48,3 @@ export const MANATransferView = ({ manaData, isLoading, onDeny, onApprove }: MAN
     </NFTTransferContainer>
   )
 }
-

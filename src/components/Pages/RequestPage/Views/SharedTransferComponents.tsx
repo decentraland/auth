@@ -82,4 +82,3 @@ type TransferLayoutProps = {
 export const TransferLayout = ({ children }: TransferLayoutProps) => {
   return <>{children}</>
 }
-
