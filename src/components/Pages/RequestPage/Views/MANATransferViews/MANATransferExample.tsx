@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { MANATransferView, MANATransferCompleteView, MANATransferCanceledView } from './index'
 import { MANATransferData } from '../../types'
+import { MANATransferView, MANATransferCompleteView, MANATransferCanceledView } from './index'
 
 /**
  * Example component demonstrating the MANA transfer views
@@ -47,7 +47,7 @@ export const MANATransferExample = () => {
   const handleApprove = async () => {
     console.log('Approve clicked')
     // Simulate async operation
-    await new Promise((resolve) => setTimeout(resolve, 2000))
+    await new Promise(resolve => setTimeout(resolve, 2000))
     setCurrentView('complete')
   }
 
@@ -92,4 +92,3 @@ export const MANATransferExample = () => {
     </div>
   )
 }
-

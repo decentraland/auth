@@ -6,4 +6,3 @@ export type MANATransferViewProps = {
   onDeny: () => void
   onApprove: () => void
 }
-

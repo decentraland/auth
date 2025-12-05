@@ -33,4 +33,3 @@ export const SuccessAnimation = styled(Lottie)({
   pointerEvents: 'none',
   zIndex: 10
 })
-

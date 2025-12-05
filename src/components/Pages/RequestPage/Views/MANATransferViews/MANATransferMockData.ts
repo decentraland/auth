@@ -83,4 +83,3 @@ export const mockMANATransferData3: MANATransferData = {
   sceneImageUrl: MOCK_SCENE_IMAGE
   // No profile - testing without recipient profile
 }
-

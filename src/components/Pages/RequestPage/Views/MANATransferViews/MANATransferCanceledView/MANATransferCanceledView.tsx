@@ -1,6 +1,14 @@
 import { NFTTransferContainer } from '../../../Container'
 import { ProfileAvatar } from '../../../types'
-import { CenteredContent, Title, RecipientProfileText, CreatorLabel, SceneImageWrapper, SceneName, InfoAlert } from '../MANATransferComponents.styled'
+import {
+  CenteredContent,
+  Title,
+  RecipientProfileText,
+  CreatorLabel,
+  SceneImageWrapper,
+  SceneName,
+  InfoAlert
+} from '../MANATransferComponents.styled'
 import { SecondaryText } from './MANATransferCanceledView.styled'
 import { MANATransferCanceledViewProps } from './MANATransferCanceledView.types'
 
@@ -30,4 +38,3 @@ export const MANATransferCanceledView = ({ manaData }: MANATransferCanceledViewP
     </NFTTransferContainer>
   )
 }
-

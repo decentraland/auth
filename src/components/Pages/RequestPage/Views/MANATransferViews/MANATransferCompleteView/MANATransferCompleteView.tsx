@@ -1,7 +1,15 @@
 import successAnimation from '../../../../../../assets/animations/successAnimation_Lottie.json'
 import { NFTTransferContainer } from '../../../Container'
 import { ProfileAvatar } from '../../../types'
-import { CenteredContent, Title, RecipientProfile, RecipientProfileText, CreatorLabel, SceneName, InfoAlert } from '../MANATransferComponents.styled'
+import {
+  CenteredContent,
+  Title,
+  RecipientProfile,
+  RecipientProfileText,
+  CreatorLabel,
+  SceneName,
+  InfoAlert
+} from '../MANATransferComponents.styled'
 import { SceneImageWrapper, SceneImageContainer, SuccessAnimation } from './MANATransferCompleteView.styled'
 import { MANATransferCompleteViewProps } from './MANATransferCompleteView.types'
 
@@ -33,4 +41,3 @@ export const MANATransferCompleteView = ({ manaData }: MANATransferCompleteViewP
     </NFTTransferContainer>
   )
 }
-
