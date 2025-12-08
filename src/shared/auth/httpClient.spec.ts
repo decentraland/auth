@@ -7,6 +7,7 @@ import { RecoverResponse } from './types'
 jest.mock('@sentry/react')
 jest.mock('../../modules/analytics/segment')
 jest.mock('../../modules/config')
+jest.mock('decentraland-crypto-fetch', () => jest.fn())
 
 // Mock console.error to prevent errors from being logged
 jest.spyOn(console, 'error').mockImplementation(() => undefined)

@@ -71,8 +71,8 @@ enum View {
   VERIFY_SIGN_IN_DENIED,
   VERIFY_SIGN_IN_ERROR,
   VERIFY_SIGN_IN_COMPLETE,
-  // Token Flow
-  TOKEN_CONTINUE_IN_APP,
+  // Deep Link Flow
+  DEEP_LINK_CONTINUE_IN_APP,
   // Wallet Interaction
   WALLET_INTERACTION,
   WALLET_NFT_INTERACTION,
@@ -103,13 +103,14 @@ export const RequestPage = () => {
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false)
   const requestRef = useRef<RecoverResponse>()
   const [error, setError] = useState<string>()
-  const [tokenData, setTokenData] = useState<{ token: string; deepLink: string }>()
+  const [identityId, setIdentityId] = useState<string>()
   const timeoutRef = useRef<NodeJS.Timeout>()
   const signTimeoutRef = useRef<NodeJS.Timeout>()
   const requestId = params.requestId ?? ''
   const [targetConfig, targetConfigId] = useTargetConfig()
   const isUserUsingWeb2Wallet = !!provider?.isMagic
   const authServerClient = useRef(createAuthServerWsClient())
+  const isDeepLinkFlow = searchParams.get('flow') === 'deeplink'
 
   // Goes to the login page where the user will have to connect a wallet.
   const toLoginPage = useCallback(() => {
@@ -201,7 +202,6 @@ export const RequestPage = () => {
         // Show different views depending on the request method.
         switch (request.method) {
           case 'dcl_personal_sign':
-          case 'dcl_personal_sign_with_token':
             setView(View.VERIFY_SIGN_IN)
             break
           case 'eth_sendTransaction': {
@@ -341,17 +341,22 @@ export const RequestPage = () => {
         throw new TimedOutError()
       }
 
-      console.log('Approve sign in verification - Signed the message. Sending the outcome to the server...')
-      const response = await authServerClient.current.sendSuccessfulOutcome(requestId, await signer.getAddress(), signature)
-      console.log('Approve sign in verification - Outcome sent')
+      console.log('Approve sign in verification - Signed the message.')
 
-      // Check if this is token flow
-      if (requestRef.current?.method === 'dcl_personal_sign_with_token' && response.token && response.deepLink) {
-        // Token flow - show "Continue in app" screen
-        setTokenData({ token: response.token, deepLink: response.deepLink })
-        setView(View.TOKEN_CONTINUE_IN_APP)
+      // Check if this is deep link flow
+      if (isDeepLinkFlow && identity) {
+        // Deep link flow - store identity and redirect via deep link
+        console.log('Deep link flow - Creating identity...')
+        const httpClient = createAuthServerHttpClient()
+        const identityResponse = await httpClient.postIdentity(identity)
+        console.log('Deep link flow - Identity created:', identityResponse.identityId)
+        setIdentityId(identityResponse.identityId)
+        setView(View.DEEP_LINK_CONTINUE_IN_APP)
       } else {
-        // Traditional flow - go directly to complete
+        // Traditional flow - send outcome and complete
+        console.log('Traditional flow - Sending outcome to server...')
+        await authServerClient.current.sendSuccessfulOutcome(requestId, await signer.getAddress(), signature)
+        console.log('Traditional flow - Outcome sent')
         setView(View.VERIFY_SIGN_IN_COMPLETE)
         if (targetConfig.deepLink) {
           window.location.href = targetConfig.deepLink
@@ -506,16 +511,16 @@ export const RequestPage = () => {
   }, [isUserUsingWeb2Wallet, onApproveWalletInteraction])
 
   const onContinueInApp = useCallback(() => {
-    if (!tokenData?.deepLink) return
+    if (!identityId) return
 
-    trackClick(ClickEvents.TOKEN_DEEP_LINK_OPENED)
+    trackClick(ClickEvents.IDENTITY_DEEP_LINK_OPENED)
 
-    // Open the deep link
-    window.location.href = tokenData.deepLink
+    // Open the deep link with identity ID
+    window.location.href = `decentraland://?signin=${identityId}`
 
     // Show completion view
     setView(View.VERIFY_SIGN_IN_COMPLETE)
-  }, [tokenData, trackClick])
+  }, [identityId, trackClick])
 
   switch (view) {
     case View.TIMEOUT:
@@ -531,7 +536,7 @@ export const RequestPage = () => {
       return <SigningError error={error} />
     case View.VERIFY_SIGN_IN_COMPLETE:
       return <SignInComplete />
-    case View.TOKEN_CONTINUE_IN_APP:
+    case View.DEEP_LINK_CONTINUE_IN_APP:
       return <ContinueInApp onContinue={onContinueInApp} requestId={requestId} />
     case View.VERIFY_SIGN_IN_DENIED:
       return <DeniedSignIn requestId={requestId} />
@@ -550,14 +555,12 @@ export const RequestPage = () => {
         </Container>
       )
     case View.VERIFY_SIGN_IN: {
-      const isTokenFlow = requestRef.current?.method === 'dcl_personal_sign_with_token'
-
       return (
         <Container canChangeAccount requestId={requestId}>
           <div className={viewStyles.logo}></div>
           <div className={viewStyles.title}>Verify Sign In</div>
 
-          {!isTokenFlow && (
+          {!isDeepLinkFlow && (
             <>
               <div className={viewStyles.description}>
                 Does the verification number below match the one in the {targetConfig.explorerText}?
@@ -566,16 +569,18 @@ export const RequestPage = () => {
             </>
           )}
 
-          {isTokenFlow && <div className={viewStyles.description}>Please confirm you want to sign in to {targetConfig.explorerText}</div>}
+          {isDeepLinkFlow && (
+            <div className={viewStyles.description}>Please confirm you want to sign in to {targetConfig.explorerText}</div>
+          )}
 
           <div className={styles.buttons}>
             <Button inverted disabled={isLoading} onClick={onDenyVerifySignIn} className={styles.noButton}>
               <Icon name="times circle" />
-              {isTokenFlow ? 'Cancel' : "No, it doesn't"}
+              {isDeepLinkFlow ? 'Cancel' : "No, it doesn't"}
             </Button>
             <Button inverted loading={isLoading} disabled={isLoading} onClick={onApproveSignInVerification} className={styles.yesButton}>
               <Icon name="check circle" />
-              {isTokenFlow ? 'Sign In' : 'Yes, they are the same'}
+              {isDeepLinkFlow ? 'Sign In' : 'Yes, they are the same'}
             </Button>
           </div>
           {hasTimedOut && (
