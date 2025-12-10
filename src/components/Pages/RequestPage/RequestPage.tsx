@@ -530,7 +530,7 @@ export const RequestPage = () => {
     case View.VERIFY_SIGN_IN_COMPLETE:
       return <SignInComplete />
     case View.DEEP_LINK_CONTINUE_IN_APP:
-      return <ContinueInApp onContinue={onContinueInApp} requestId={requestId} deepLinkUrl={`decentraland://?signin=${identityId}`} />
+      return <ContinueInApp onContinue={onContinueInApp} requestId={requestId} deepLinkUrl={`decentraland://open?signin=${identityId}`} />
     case View.VERIFY_SIGN_IN_DENIED:
       return <DeniedSignIn requestId={requestId} />
     case View.WALLET_INTERACTION_COMPLETE:
