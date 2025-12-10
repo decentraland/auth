@@ -76,9 +76,13 @@ const setupRedeployBase = (address: string = DEFAULT_MOCK_ADDRESS) => {
 describe('profile module', () => {
   beforeEach(() => {
     ;(config.get as jest.Mock).mockImplementation((key: string) => {
-      if (key === 'ENVIRONMENT') return 'development'
-      if (key === 'PEER_URL') return 'https://peer.decentraland.zone'
-      return null
+      const configMap = {
+        // eslint-disable-next-line @typescript-eslint/naming-convention
+        ENVIRONMENT: 'development',
+        // eslint-disable-next-line @typescript-eslint/naming-convention
+        PEER_URL: 'https://peer.decentraland.zone'
+      }
+      return configMap[key as keyof typeof configMap] ?? null
     })
   })
 
@@ -88,11 +92,10 @@ describe('profile module', () => {
 
   describe('when checking profile consistency with fetchProfileWithConsistencyCheck', () => {
     const mockAddress = DEFAULT_MOCK_ADDRESS
+    let result: Awaited<ReturnType<typeof fetchProfileWithConsistencyCheck>>
+    let mockProfile: Partial<Profile>
 
     describe('and all catalysts return the same profile with the same timestamp', () => {
-      let result: Awaited<ReturnType<typeof fetchProfileWithConsistencyCheck>>
-      let mockProfile: Partial<Profile>
-
       beforeEach(async () => {
         mockProfile = {
           timestamp: 1000,
@@ -127,7 +130,6 @@ describe('profile module', () => {
     })
 
     describe('and catalysts return profiles with different timestamps', () => {
-      let result: Awaited<ReturnType<typeof fetchProfileWithConsistencyCheck>>
       let newestProfile: Partial<Profile>
 
       beforeEach(async () => {
@@ -156,9 +158,6 @@ describe('profile module', () => {
     })
 
     describe('and some catalysts do not have the profile', () => {
-      let result: Awaited<ReturnType<typeof fetchProfileWithConsistencyCheck>>
-      let mockProfile: Partial<Profile>
-
       beforeEach(async () => {
         mockProfile = { timestamp: 1000, avatars: [] }
 
@@ -191,8 +190,6 @@ describe('profile module', () => {
     })
 
     describe('and no catalysts have the profile', () => {
-      let result: Awaited<ReturnType<typeof fetchProfileWithConsistencyCheck>>
-
       beforeEach(async () => {
         const mockCatalysts = [{ address: 'https://catalyst1.zone' }, { address: 'https://catalyst2.zone' }]
 
@@ -218,7 +215,6 @@ describe('profile module', () => {
     })
 
     describe('and an unexpected error occurs', () => {
-      let result: Awaited<ReturnType<typeof fetchProfileWithConsistencyCheck>>
       let errorMessage: string
 
       beforeEach(async () => {
