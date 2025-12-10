@@ -48,10 +48,10 @@ const NEW_USER_BACKGROUND_IMAGES = [ImageNew1, ImageNew2, ImageNew3, ImageNew4, 
 const NEW_USER_PARAM_VARIANTS = ['newUser', 'newuser', 'new-user', 'new_user']
 
 export const LoginPage = () => {
-  const isNewUser = useMemo(() => {
-    const search = new URLSearchParams(window.location.search)
-    return NEW_USER_PARAM_VARIANTS.some(variant => search.has(variant))
-  }, [])
+  const [isNewUser, setIsNewUser] = useState(
+    NEW_USER_PARAM_VARIANTS.some(variant => new URLSearchParams(window.location.search).has(variant))
+  )
+
   const [loadingState, setLoadingState] = useState(ConnectionLayoutState.CONNECTING_WALLET)
   const [showConnectionLayout, setShowConnectionLayout] = useState(false)
   const [showClockSyncModal, setShowClockSyncModal] = useState(false)
@@ -242,12 +242,19 @@ export const LoginPage = () => {
           />
           <div className={styles.left}>
             <div className={styles.leftInfo}>
-              <Connection
-                onConnect={handleOnConnect}
-                loadingOption={currentConnectionType}
-                connectionOptions={targetConfig.connectionOptions}
-                isNewUser={isNewUser}
-              />
+              <div className={styles.mainContainer}>
+                <Connection
+                  onConnect={handleOnConnect}
+                  loadingOption={currentConnectionType}
+                  connectionOptions={targetConfig.connectionOptions}
+                  isNewUser={isNewUser}
+                />
+                {isNewUser && (
+                  <div className={styles.newUserInfo}>
+                    Already have an account? <span onClick={() => setIsNewUser(false)}>Sign In</span>
+                  </div>
+                )}
+              </div>
               {showGuestOption && (
                 <div className={styles.guestInfo}>
                   Quick dive?{' '}
