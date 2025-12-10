@@ -5,6 +5,7 @@ import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
 import { connection, Provider } from 'decentraland-connect'
 import { ContractName, getContractName } from 'decentraland-transactions'
 import { config } from '../../../modules/config'
+import { isMobile } from '../LoginPage/utils'
 
 const DEEPLINK_DETECTION_TIMEOUT = 500
 
@@ -15,6 +16,12 @@ const DEEPLINK_DETECTION_TIMEOUT = 500
  */
 export const launchDeepLink = (url: string): Promise<boolean> => {
   return new Promise(resolve => {
+    if (isMobile()) {
+      window.location.href = url
+      resolve(true)
+      return
+    }
+
     let appDetected = false
 
     const handleBlur = () => {
