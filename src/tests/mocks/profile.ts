@@ -31,7 +31,6 @@ export function createMockProfile(address: string = DEFAULT_MOCK_ADDRESS): Profi
         avatar: {
           bodyShape: 'urn:decentraland:off-chain:base-avatars:BaseMale',
           wearables: [],
-          emotes: [],
           snapshots: {
             body: 'https://peer.decentraland.zone/content/body',
             face256: 'https://peer.decentraland.zone/content/face256'
@@ -42,7 +41,7 @@ export function createMockProfile(address: string = DEFAULT_MOCK_ADDRESS): Profi
         }
       }
     ]
-  } as Profile
+  }
 }
 
 export function createMockEntity(address: string = DEFAULT_MOCK_ADDRESS): Entity {
