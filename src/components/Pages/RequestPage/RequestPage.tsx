@@ -340,16 +340,12 @@ export const RequestPage = () => {
       if (hasTimeouted) {
         throw new TimedOutError()
       }
-
-      console.log('Approve sign in verification - Signed the message.')
-
+      console.log({ isDeepLinkFlow, identity })
       // Check if this is deep link flow
       if (isDeepLinkFlow && identity) {
-        // Deep link flow - store identity and redirect via deep link
-        console.log('Deep link flow - Creating identity...')
         const httpClient = createAuthServerHttpClient()
         const identityResponse = await httpClient.postIdentity(identity)
-        console.log('Deep link flow - Identity created:', identityResponse.identityId)
+
         setIdentityId(identityResponse.identityId)
         setView(View.DEEP_LINK_CONTINUE_IN_APP)
       } else {
@@ -385,7 +381,7 @@ export const RequestPage = () => {
         setIsLoading(false)
       }
     }
-  }, [setIsLoading, isUserUsingWeb2Wallet, isLoading])
+  }, [setIsLoading, isUserUsingWeb2Wallet, isLoading, identity])
 
   const onDenyWalletInteraction = useCallback(async () => {
     setIsLoading(true)
@@ -515,9 +511,6 @@ export const RequestPage = () => {
 
     trackClick(ClickEvents.IDENTITY_DEEP_LINK_OPENED)
 
-    // Open the deep link with identity ID
-    window.location.href = `decentraland://?signin=${identityId}`
-
     // Show completion view
     setView(View.VERIFY_SIGN_IN_COMPLETE)
   }, [identityId, trackClick])
@@ -537,7 +530,7 @@ export const RequestPage = () => {
     case View.VERIFY_SIGN_IN_COMPLETE:
       return <SignInComplete />
     case View.DEEP_LINK_CONTINUE_IN_APP:
-      return <ContinueInApp onContinue={onContinueInApp} requestId={requestId} />
+      return <ContinueInApp onContinue={onContinueInApp} requestId={requestId} deepLinkUrl={`decentraland://?signin=${identityId}`} />
     case View.VERIFY_SIGN_IN_DENIED:
       return <DeniedSignIn requestId={requestId} />
     case View.WALLET_INTERACTION_COMPLETE:

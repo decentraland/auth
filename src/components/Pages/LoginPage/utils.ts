@@ -121,6 +121,5 @@ export async function getIdentitySignature(address: string, provider: Provider):
 
 export function isMobile() {
   const userAgent = navigator.userAgent
-  return true
   return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent)
 }

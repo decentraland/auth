@@ -6,6 +6,38 @@ import { connection, Provider } from 'decentraland-connect'
 import { ContractName, getContractName } from 'decentraland-transactions'
 import { config } from '../../../modules/config'
 
+const DEEPLINK_DETECTION_TIMEOUT = 500
+
+/**
+ * Attempts to launch a deep link and detects if the app handled it.
+ * Uses blur detection technique - if window loses focus, app was launched.
+ * Returns true if app was detected, false otherwise.
+ */
+export const launchDeepLink = (url: string): Promise<boolean> => {
+  return new Promise(resolve => {
+    let appDetected = false
+
+    const handleBlur = () => {
+      appDetected = true
+    }
+
+    window.addEventListener('blur', handleBlur)
+
+    // Create a hidden iframe to trigger the deep link
+    // This avoids Safari redirecting to an invalid URL if app is not installed
+    const iframe = document.createElement('iframe')
+    iframe.setAttribute('style', 'display: none')
+    iframe.src = url
+    document.body.appendChild(iframe)
+
+    setTimeout(() => {
+      window.removeEventListener('blur', handleBlur)
+      document.body.removeChild(iframe)
+      resolve(appDetected)
+    }, DEEPLINK_DETECTION_TIMEOUT)
+  })
+}
+
 export async function getConnectedProvider(): Promise<Provider | null> {
   try {
     return await connection.getProvider()
