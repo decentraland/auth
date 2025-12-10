@@ -58,18 +58,19 @@ export async function fetchProfileWithConsistencyCheck(address: string): Promise
     }
 
     const allProfilesExist = profilesWithUrls.length === catalystUrls.length
+    const firstProfile = profilesWithUrls[0]!
     const allProfilesHaveSameTimestamp = profilesWithUrls.every(
-      ({ profile }) => profile.timestamp === profilesWithUrls[0]?.profile.timestamp
+      profileWithUrl => profileWithUrl?.profile?.timestamp === firstProfile.profile.timestamp
     )
 
     const newest = profilesWithUrls.reduce((acc, current) => {
-      return (acc.profile.timestamp ?? 0) > (current.profile.timestamp ?? 0) ? acc : current
-    }, profilesWithUrls[0])
+      return (acc?.profile?.timestamp ?? 0) > (current?.profile?.timestamp ?? 0) ? acc : current
+    }, firstProfile)
 
     return {
       isConsistent: allProfilesExist && allProfilesHaveSameTimestamp,
-      profile: newest.profile,
-      profileFetchedFrom: newest.url
+      profile: newest?.profile,
+      profileFetchedFrom: newest?.url
     }
   } catch (error) {
     console.error('Profile consistency check failed:', error)
