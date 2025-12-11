@@ -340,7 +340,6 @@ export const RequestPage = () => {
       if (hasTimeouted) {
         throw new TimedOutError()
       }
-      console.log({ isDeepLinkFlow, identity })
       // Check if this is deep link flow
       if (isDeepLinkFlow && identity) {
         const httpClient = createAuthServerHttpClient()
