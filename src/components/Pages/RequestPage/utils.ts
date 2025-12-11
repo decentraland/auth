@@ -3,7 +3,7 @@ import { Rarity } from '@dcl/schemas'
 import { ChainId } from '@dcl/schemas/dist/dapps/chain-id'
 import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
 import { connection, Provider } from 'decentraland-connect'
-import { ContractName, getContractName } from 'decentraland-transactions'
+import { ContractName, getContractName, getContract } from 'decentraland-transactions'
 import { config } from '../../../modules/config'
 
 export async function getConnectedProvider(): Promise<Provider | null> {
@@ -114,6 +114,46 @@ export function decodeNftTransferData(data: string, contractABI: object[]): { to
     return { tokenId, toAddress }
   } catch (error) {
     console.error('Error decoding NFT transfer data:', error)
+    return null
+  }
+}
+
+/**
+ * Decodes MANA (ERC20) transfer data to extract amount and destination address
+ * @param data The transaction data
+ * @returns Object containing manaAmount and toAddress, or null if decoding fails
+ */
+export function decodeManaTransferData(data: string): { manaAmount: string; toAddress: string } | null {
+  try {
+    if (!data || data.length < 10) return null
+
+    // ERC20 transfer function signature: transfer(address to, uint256 amount)
+    const transferFunctionSignature = '0xa9059cbb'
+
+    // Check if this is a transfer function call
+    if (!data.startsWith(transferFunctionSignature)) {
+      return null
+    }
+
+    const contract = getContract(ContractName.ERC20, getMetaTransactionChainId())
+
+    const contractInterface = new ethers.Interface(contract.abi)
+    const decodedData = contractInterface.parseTransaction({ data })
+
+    if (!decodedData) {
+      console.error('Failed to decode MANA transfer data')
+      return null
+    }
+
+    const toAddress = decodedData.args[0] as string
+    const amount = decodedData.args[1] as bigint
+
+    // Convert from wei to MANA (18 decimals)
+    const manaAmount = ethers.formatEther(amount)
+
+    return { manaAmount, toAddress }
+  } catch (error) {
+    console.error('Error decoding MANA transfer data:', error)
     return null
   }
 }

@@ -13,4 +13,12 @@ export type NFTTransferData = {
   recipientProfile?: Profile
 }
 
+export type MANATransferData = {
+  manaAmount: string
+  toAddress: string
+  recipientProfile?: Profile
+  sceneName: string
+  sceneImageUrl: string
+}
+
 export type ProfileAvatar = Parameters<typeof ProfileComponent>[0]['avatar']
