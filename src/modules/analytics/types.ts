@@ -26,6 +26,7 @@ export enum ClickEvents {
   DENY_WALLET_INTERACTION = 'Deny Wallet Interaction',
   APPROVE_SING_IN = 'Approve Sign In',
   APPROVE_WALLET_INTERACTION = 'Approve Wallet Interaction',
+  IDENTITY_DEEP_LINK_OPENED = 'Identity Deep Link Opened',
   RANDOMIZE = 'Randomize default profile',
   BACK_TO_AVATAR_RANDOMIZATION_VIEW = 'Back to avatar randomization view',
   SUBMIT_PROFILE = 'Submit profile'

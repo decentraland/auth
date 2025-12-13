@@ -4,7 +4,7 @@ import { config } from '../../modules/config'
 import { trackEvent } from '../utils/analytics'
 import { handleError } from '../utils/errorHandler'
 import { DifferentSenderError, ExpiredRequestError, RequestNotFoundError, IpValidationError } from './errors'
-import { OutcomeError, OutcomeResponse, RecoverResponse, ValidationResponse } from './types'
+import { OutcomeError, RecoverResponse, ValidationResponse } from './types'
 
 export const createAuthServerWsClient = (authServerUrl?: string) => {
   const url = authServerUrl ?? config.get('AUTH_SERVER_URL')
@@ -39,7 +39,7 @@ export const createAuthServerWsClient = (authServerUrl?: string) => {
 
   const sendSuccessfulOutcome = async (requestId: string, sender: string, result: any): Promise<void> => {
     try {
-      await request<OutcomeResponse>('outcome', {
+      await request<void>('outcome', {
         requestId,
         sender,
         result
@@ -52,7 +52,7 @@ export const createAuthServerWsClient = (authServerUrl?: string) => {
 
   const sendFailedOutcome = async (requestId: string, sender: string, error: OutcomeError): Promise<void> => {
     try {
-      await request<OutcomeResponse>('outcome', {
+      await request<void>('outcome', {
         requestId,
         sender,
         error
