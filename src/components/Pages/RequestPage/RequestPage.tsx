@@ -156,9 +156,9 @@ export const RequestPage = () => {
 
       const consistencyResult = await fetchProfileWithConsistencyCheck(account)
       console.log('Loading request - Consistency result', consistencyResult)
-      if (!consistencyResult.isConsistent && consistencyResult.entity && identity) {
+      if (!consistencyResult.isConsistent && consistencyResult.profile && identity) {
         try {
-          await redeployExistingProfile(consistencyResult.entity, account, identity)
+          await redeployExistingProfile(consistencyResult.profile, account, identity)
         } catch (error) {
           console.warn('Profile redeployment failed, falling back to login page:', error)
           toLoginPage()
