@@ -5,7 +5,7 @@ import { config } from '../../modules/config'
 import { trackEvent } from '../utils/analytics'
 import { handleError } from '../utils/errorHandler'
 import { DifferentSenderError, ExpiredRequestError, RequestNotFoundError, IpValidationError } from './errors'
-import { IdentityResponse, OutcomeError, RecoverResponse } from './types'
+import { IdentityResponse, OutcomeError, OutcomeResponse, RecoverResponse } from './types'
 export const createAuthServerHttpClient = (authServerUrl?: string) => {
   const baseUrl = authServerUrl ?? config.get('AUTH_SERVER_URL')
 
@@ -30,7 +30,7 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
     throw new Error('Unknown error')
   }
 
-  const sendSuccessfulOutcome = async (requestId: string, sender: string, result: unknown): Promise<void> => {
+  const sendSuccessfulOutcome = async (requestId: string, sender: string, result: unknown): Promise<OutcomeResponse> => {
     try {
       const response = await fetch(baseUrl + '/v2/requests/' + requestId + '/outcome', {
         method: 'POST',
@@ -52,6 +52,8 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
         type: 'success',
         method: 'outcome_send'
       })
+
+      return {}
     } catch (e) {
       handleError(e, 'Error sending outcome')
       throw e
@@ -77,9 +79,8 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
 
       const data = await response.json()
 
-      trackEvent(TrackingEvents.REQUEST_OUTCOME_SUCCESS, {
-        type: 'success',
-        method: 'identity_create'
+      trackEvent(TrackingEvents.DEEP_LINK_AUTH_SUCCESS, {
+        type: 'success'
       })
 
       return data
@@ -89,7 +90,7 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
     }
   }
 
-  const sendFailedOutcome = async (requestId: string, sender: string, error: OutcomeError): Promise<void> => {
+  const sendFailedOutcome = async (requestId: string, sender: string, error: OutcomeError): Promise<OutcomeResponse> => {
     try {
       const response = await fetch(baseUrl + '/v2/requests/' + requestId + '/outcome', {
         method: 'POST',
@@ -112,13 +113,15 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
         method: 'outcome_send',
         error: error.message
       })
+
+      return {}
     } catch (e) {
       handleError(e, 'Error sending outcome')
       throw e
     }
   }
 
-  const recover = async (requestId: string, signerAddress: string): Promise<RecoverResponse> => {
+  const recover = async (requestId: string, signerAddress: string, isDeepLinkFlow = false): Promise<RecoverResponse> => {
     let recoverResponse: RecoverResponse | undefined
 
     try {
@@ -144,7 +147,7 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
       switch (recoverResponse.method) {
         case 'dcl_personal_sign':
           trackEvent(TrackingEvents.REQUEST_INTERACTION, {
-            type: RequestInteractionType.VERIFY_SIGN_IN,
+            type: isDeepLinkFlow ? RequestInteractionType.DEEP_LINK_SIGN_IN : RequestInteractionType.VERIFY_SIGN_IN,
             browserTime: Date.now(),
             requestType: recoverResponse?.method
           })

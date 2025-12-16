@@ -17,7 +17,6 @@ import { config } from '../../../modules/config'
 import { fetchProfile, fetchProfileWithConsistencyCheck, redeployExistingProfile } from '../../../modules/profile'
 import {
   createAuthServerHttpClient,
-  createAuthServerWsClient,
   RecoverResponse,
   ExpiredRequestError,
   DifferentSenderError,
@@ -109,7 +108,7 @@ export const RequestPage = () => {
   const requestId = params.requestId ?? ''
   const [targetConfig, targetConfigId] = useTargetConfig()
   const isUserUsingWeb2Wallet = !!provider?.isMagic
-  const authServerClient = useRef(createAuthServerWsClient())
+  const authServerClient = useRef(createAuthServerHttpClient())
   const isDeepLinkFlow = searchParams.get('flow') === 'deeplink'
 
   // Goes to the login page where the user will have to connect a wallet.
@@ -145,11 +144,6 @@ export const RequestPage = () => {
     // Wait for the features to be initialized.
     if (!initializedFlags) return
 
-    // Initialize the auth server client.
-    if (flags[FeatureFlagsKeys.HTTP_AUTH]) {
-      authServerClient.current = createAuthServerHttpClient()
-    }
-
     const loadRequest = async () => {
       const timeTheSiteStartedLoading = Date.now()
       browserProvider.current = new ethers.BrowserProvider(provider)
@@ -180,7 +174,7 @@ export const RequestPage = () => {
         const signerAddress = await signer.getAddress()
         getAnalytics()?.identify({ ethAddress: signerAddress })
         // Recover the request from the auth server.
-        const request = await authServerClient.current.recover(requestId, signerAddress)
+        const request = await authServerClient.current.recover(requestId, signerAddress, isDeepLinkFlow)
         requestRef.current = request
 
         if (flags[FeatureFlagsKeys.LOGIN_ON_SETUP]) {
