@@ -1,4 +1,5 @@
 import { createFetchComponent } from '@well-known-components/fetch-component'
+import { IFetchComponent } from '@well-known-components/interfaces'
 import { createLambdasClient, createContentClient, DeploymentBuilder } from 'dcl-catalyst-client'
 import { Profile, ProfileAvatarsItem } from 'dcl-catalyst-client/dist/client/specs/catalyst.schemas'
 import { getCatalystServersFromCache } from 'dcl-catalyst-client/dist/contracts-snapshots'
@@ -14,9 +15,20 @@ export interface ConsistencyResult {
   error?: string
 }
 
-export async function fetchProfile(address: string): Promise<Profile | null> {
+interface ProfileResult {
+  profile: Profile
+  url: string
+}
+
+interface ProfileResultError {
+  error: string
+  url: string
+  isTimeout?: boolean
+}
+
+export async function fetchProfile(address: string, fetcher?: IFetchComponent): Promise<Profile | null> {
   const PEER_URL = config.get('PEER_URL')
-  const client = createLambdasClient({ url: PEER_URL + '/lambdas', fetcher: createFetchComponent() })
+  const client = createLambdasClient({ url: PEER_URL + '/lambdas', fetcher: fetcher ?? createFetchComponent() })
   try {
     const profile: Profile = await client.getAvatarDetails(address)
     return profile
@@ -25,7 +37,7 @@ export async function fetchProfile(address: string): Promise<Profile | null> {
   }
 }
 
-export async function fetchProfileWithConsistencyCheck(address: string): Promise<ConsistencyResult> {
+export async function fetchProfileWithConsistencyCheck(address: string, fetcher?: IFetchComponent): Promise<ConsistencyResult> {
   try {
     // Determine network based on environment
     const environment = config.get('ENVIRONMENT')
@@ -35,20 +47,25 @@ export async function fetchProfileWithConsistencyCheck(address: string): Promise
     const catalystServers = getCatalystServersFromCache(network)
     const catalystUrls = catalystServers.map(server => `${server.address}`)
 
-    const profileResults = await Promise.all(
+    const profileResults: (ProfileResult | ProfileResultError)[] = await Promise.all(
       catalystUrls.map(async url => {
         try {
-          const client = createLambdasClient({ url: url + '/lambdas', fetcher: createFetchComponent() })
+          const client = createLambdasClient({ url: url + '/lambdas', fetcher: fetcher ?? createFetchComponent() })
           const profile = await client.getAvatarDetails(address)
           return { profile, url }
-        } catch {
-          // Profile doesn't exist on this catalyst (404) or fetch failed
-          return null
+        } catch (error) {
+          return {
+            error: normalizeErrorMessage(error),
+            url,
+            isTimeout: isTimeoutError(error)
+          }
         }
       })
     )
 
-    const profilesWithUrls = profileResults.filter(result => result !== null)
+    const profilesWithUrls = profileResults.filter(isProfileResult)
+    const profileErrors = profileResults.filter(isProfileResultError)
+    const nonTimeoutErrors = profileErrors.filter(error => !error.isTimeout)
 
     if (profilesWithUrls.length === 0) {
       return {
@@ -57,20 +74,21 @@ export async function fetchProfileWithConsistencyCheck(address: string): Promise
       }
     }
 
-    const allProfilesExist = profilesWithUrls.length === catalystUrls.length
-    const firstProfile = profilesWithUrls[0]!
+    const firstProfile = profilesWithUrls[0]
     const allProfilesHaveSameTimestamp = profilesWithUrls.every(
-      profileWithUrl => profileWithUrl?.profile?.timestamp === firstProfile.profile.timestamp
+      profileWithUrl => profileWithUrl.profile.timestamp === firstProfile.profile.timestamp
     )
 
     const newest = profilesWithUrls.reduce((acc, current) => {
       return (acc?.profile?.timestamp ?? 0) > (current?.profile?.timestamp ?? 0) ? acc : current
     }, firstProfile)
 
+    const consistencyError = nonTimeoutErrors[0]
     return {
-      isConsistent: allProfilesExist && allProfilesHaveSameTimestamp,
-      profile: newest?.profile,
-      profileFetchedFrom: newest?.url
+      isConsistent: consistencyError === undefined && allProfilesHaveSameTimestamp,
+      profile: newest.profile,
+      profileFetchedFrom: newest.url,
+      error: consistencyError ? `${consistencyError.error} (${consistencyError.url})` : undefined
     }
   } catch (error) {
     console.error('Profile consistency check failed:', error)
@@ -85,7 +103,8 @@ export async function fetchProfileWithConsistencyCheck(address: string): Promise
 export async function redeployExistingProfile(
   profile: Profile,
   connectedAccount: string,
-  connectedAccountIdentity: AuthIdentity
+  connectedAccountIdentity: AuthIdentity,
+  fetcher?: IFetchComponent
 ): Promise<void> {
   const snapshotUrls = Object.entries(profile.avatars?.[0]?.avatar?.snapshots ?? {}).reduce(
     (acc, [file, url]) => ({ ...acc, [file]: url }),
@@ -100,15 +119,16 @@ export async function redeployExistingProfile(
   const files = createSnapshotFilesMap(bodyBuffer, faceBuffer)
   const metadata = await buildProfileMetadata(profile, files)
 
-  await redeployWithCatalystRotation(connectedAccount, connectedAccountIdentity, files, metadata)
+  await redeployWithCatalystRotation(connectedAccount, connectedAccountIdentity, files, metadata, fetcher)
 }
 
 export async function redeployExistingProfileWithContentServerData(
   catalystUrl: string,
   connectedAccount: string,
-  connectedAccountIdentity: AuthIdentity
+  connectedAccountIdentity: AuthIdentity,
+  fetcher?: IFetchComponent
 ): Promise<void> {
-  const client = createContentClient({ url: catalystUrl + '/content', fetcher: createFetchComponent() })
+  const client = createContentClient({ url: catalystUrl + '/content', fetcher: fetcher ?? createFetchComponent() })
   const entity = (await client.fetchEntitiesByPointers([connectedAccount]))?.[0]
   if (!entity) {
     throw new Error('Profile entity not found')
@@ -131,7 +151,8 @@ async function redeployWithCatalystRotation(
   connectedAccount: string,
   connectedAccountIdentity: AuthIdentity,
   files: Map<string, Uint8Array>,
-  metadata: Partial<Profile>
+  metadata: Partial<Profile>,
+  fetcher?: IFetchComponent
 ): Promise<void> {
   const catalystUrls = getCatalystUrlsForRotation()
   const MAX_ATTEMPTS = Math.min(catalystUrls.length, 3)
@@ -140,7 +161,7 @@ async function redeployWithCatalystRotation(
     const catalystUrl = catalystUrls[attempt]
 
     try {
-      await attemptRedeployment(catalystUrl, connectedAccount, connectedAccountIdentity, files, metadata)
+      await attemptRedeployment(catalystUrl, connectedAccount, connectedAccountIdentity, files, metadata, fetcher)
       console.log(`Profile redeployment successful using catalyst: ${catalystUrl}`)
       return
     } catch (error) {
@@ -167,9 +188,10 @@ async function attemptRedeployment(
   connectedAccount: string,
   connectedAccountIdentity: AuthIdentity,
   files: Map<string, Uint8Array>,
-  metadata: Partial<Profile>
+  metadata: Partial<Profile>,
+  fetcher?: IFetchComponent
 ): Promise<void> {
-  const client = createContentClient({ url: catalystUrl, fetcher: createFetchComponent() })
+  const client = createContentClient({ url: catalystUrl, fetcher: fetcher ?? createFetchComponent() })
 
   const deploymentEntity = await DeploymentBuilder.buildEntity({
     type: EntityType.PROFILE,
@@ -245,4 +267,47 @@ function isRetryableHttpError(error: unknown): boolean {
 
   // For all other errors (network, parsing, etc.), try next catalyst
   return true
+}
+
+const TIMEOUT_STATUS_CODE = 408
+
+function normalizeErrorMessage(error: unknown): string {
+  if (typeof error === 'string') {
+    return error
+  }
+
+  if (error instanceof Error) {
+    return error.message
+  }
+
+  try {
+    return JSON.stringify(error)
+  } catch {
+    return 'Unknown error'
+  }
+}
+
+function isTimeoutError(error: unknown): boolean {
+  if (typeof error === 'object' && error !== null) {
+    const maybeStatus = (error as { status?: number }).status
+    if (maybeStatus === TIMEOUT_STATUS_CODE) {
+      return true
+    }
+  }
+
+  const message = normalizeErrorMessage(error)
+  return (
+    message.toLowerCase().includes('timeout') ||
+    message.toLowerCase().includes('request timeout') ||
+    message.toLowerCase().includes('aborted') ||
+    message.includes('status 408')
+  )
+}
+
+function isProfileResult(result: ProfileResult | ProfileResultError): result is ProfileResult {
+  return 'profile' in result
+}
+
+function isProfileResultError(result: ProfileResult | ProfileResultError): result is ProfileResultError {
+  return 'error' in result
 }

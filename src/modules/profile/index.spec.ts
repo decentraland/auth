@@ -157,7 +157,7 @@ describe('profile module', () => {
       })
     })
 
-    describe('and some catalysts do not have the profile', () => {
+    describe('and some catalysts timeout while others return the profile', () => {
       beforeEach(async () => {
         mockProfile = { timestamp: 1000, avatars: [] }
 
@@ -170,18 +170,54 @@ describe('profile module', () => {
         ;(getCatalystServersFromCache as jest.Mock).mockReturnValue(mockCatalysts)
 
         const mockClientWithProfile = { getAvatarDetails: jest.fn().mockResolvedValue(mockProfile) }
-        const mockClientWithoutProfile = { getAvatarDetails: jest.fn().mockRejectedValue(new Error('404')) }
+        const mockClientTimeout = {
+          getAvatarDetails: jest.fn().mockRejectedValue('Aborted')
+        }
 
         ;(createLambdasClient as jest.Mock)
           .mockReturnValueOnce(mockClientWithProfile)
-          .mockReturnValueOnce(mockClientWithoutProfile)
+          .mockReturnValueOnce(mockClientTimeout)
           .mockReturnValueOnce(mockClientWithProfile)
+
+        result = await fetchProfileWithConsistencyCheck(mockAddress)
+      })
+
+      it('should return isConsistent as true', () => {
+        expect(result.isConsistent).toBe(true)
+      })
+
+      it('should not surface an error because timeouts are ignored', () => {
+        expect(result.error).toBeUndefined()
+      })
+    })
+
+    describe('and a non-timeout error occurs', () => {
+      const errorMessage = 'Internal failure'
+
+      beforeEach(async () => {
+        mockProfile = { timestamp: 1000, avatars: [] }
+
+        const mockCatalysts = [{ address: 'https://catalyst1.zone' }, { address: 'https://catalyst2.zone' }]
+
+        ;(getCatalystServersFromCache as jest.Mock).mockReturnValue(mockCatalysts)
+
+        const mockClientWithProfile = { getAvatarDetails: jest.fn().mockResolvedValue(mockProfile) }
+        const mockClientWithError = {
+          getAvatarDetails: jest.fn().mockRejectedValue(errorMessage)
+        }
+
+        ;(createLambdasClient as jest.Mock).mockReturnValueOnce(mockClientWithProfile).mockReturnValueOnce(mockClientWithError)
 
         result = await fetchProfileWithConsistencyCheck(mockAddress)
       })
 
       it('should return isConsistent as false', () => {
         expect(result.isConsistent).toBe(false)
+      })
+
+      it('should surface the error message and URL', () => {
+        expect(result.error).toContain(errorMessage)
+        expect(result.error).toContain('https://catalyst2.zone')
       })
 
       it('should still return the available profile', () => {
