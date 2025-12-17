@@ -5,6 +5,7 @@ import { AuthIdentity } from '@dcl/crypto'
 import { ProviderType } from '@dcl/schemas'
 import { connection } from 'decentraland-connect'
 import { FeatureFlagsContext, FeatureFlagsKeys, OnboardingFlowVariant } from '../components/FeatureFlagsProvider'
+import { config } from '../modules/config'
 import { fetchProfileWithConsistencyCheck, redeployExistingProfile, redeployExistingProfileWithContentServerData } from '../modules/profile'
 import { useCurrentConnectionData } from '../shared/connection/hook'
 import { locations } from '../shared/locations'
@@ -68,7 +69,9 @@ export const useAuthFlow = () => {
 
       if (targetConfig && !targetConfig.skipSetup && account) {
         // Check profile consistency across all catalysts
-        const fetcherWithTimeout = createFetchComponent({ defaultFetcherOptions: { timeout: 10000 } })
+        const fetcherWithTimeout = createFetchComponent({
+          defaultFetcherOptions: { timeout: Number(config.get('PROFILE_CONSISTENCY_CHECK_TIMEOUT')) ?? 10000 }
+        })
         const consistencyResult = await fetchProfileWithConsistencyCheck(account, fetcherWithTimeout)
 
         // Check A/B testing new onboarding flow
