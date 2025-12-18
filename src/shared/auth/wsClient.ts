@@ -37,9 +37,9 @@ export const createAuthServerWsClient = (authServerUrl?: string) => {
     return response
   }
 
-  const sendSuccessfulOutcome = async (requestId: string, sender: string, result: any): Promise<void> => {
+  const sendSuccessfulOutcome = async (requestId: string, sender: string, result: any): Promise<OutcomeResponse> => {
     try {
-      await request<OutcomeResponse>('outcome', {
+      return await request<OutcomeResponse>('outcome', {
         requestId,
         sender,
         result
@@ -50,9 +50,9 @@ export const createAuthServerWsClient = (authServerUrl?: string) => {
     }
   }
 
-  const sendFailedOutcome = async (requestId: string, sender: string, error: OutcomeError): Promise<void> => {
+  const sendFailedOutcome = async (requestId: string, sender: string, error: OutcomeError): Promise<OutcomeResponse> => {
     try {
-      await request<OutcomeResponse>('outcome', {
+      return await request<OutcomeResponse>('outcome', {
         requestId,
         sender,
         error
@@ -63,7 +63,7 @@ export const createAuthServerWsClient = (authServerUrl?: string) => {
     }
   }
 
-  const recover = async (requestId: string, signerAddress: string): Promise<RecoverResponse> => {
+  const recover = async (requestId: string, signerAddress: string, isDeepLinkFlow = false): Promise<RecoverResponse> => {
     let response: RecoverResponse | undefined
 
     try {
@@ -85,7 +85,7 @@ export const createAuthServerWsClient = (authServerUrl?: string) => {
       switch (response.method) {
         case 'dcl_personal_sign':
           trackEvent(TrackingEvents.REQUEST_INTERACTION, {
-            type: RequestInteractionType.VERIFY_SIGN_IN,
+            type: isDeepLinkFlow ? RequestInteractionType.DEEP_LINK_SIGN_IN : RequestInteractionType.VERIFY_SIGN_IN,
             browserTime: Date.now(),
             requestTime: new Date(response.expiration).getTime(),
             requestType: response?.method

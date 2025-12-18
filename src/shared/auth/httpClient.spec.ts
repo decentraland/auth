@@ -1,3 +1,4 @@
+import { AuthIdentity } from '@dcl/crypto'
 import { getAnalytics } from '../../modules/analytics/segment'
 import { config } from '../../modules/config'
 import { DifferentSenderError, ExpiredRequestError, RequestNotFoundError } from './errors'
@@ -7,6 +8,7 @@ import { RecoverResponse } from './types'
 jest.mock('@sentry/react')
 jest.mock('../../modules/analytics/segment')
 jest.mock('../../modules/config')
+jest.mock('decentraland-crypto-fetch', () => jest.fn())
 
 // Mock console.error to prevent errors from being logged
 jest.spyOn(console, 'error').mockImplementation(() => undefined)
@@ -148,7 +150,8 @@ describe('createAuthServerClient', () => {
     describe('when the request is successful', () => {
       beforeEach(() => {
         mockFetch.mockResolvedValueOnce({
-          ok: true
+          ok: true,
+          json: () => Promise.resolve({})
         })
       })
 
@@ -354,6 +357,91 @@ describe('createAuthServerClient', () => {
 
       it('should handle and rethrow the error', async () => {
         await expect(client.notifyRequestNeedsValidation(mockRequestId)).rejects.toThrow('an error')
+      })
+    })
+  })
+
+  describe('when posting an identity', () => {
+    let client: ReturnType<typeof createAuthServerHttpClient>
+    let mockIdentity: AuthIdentity
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const signedFetch = require('decentraland-crypto-fetch') as jest.Mock
+
+    beforeEach(() => {
+      client = createAuthServerHttpClient()
+      mockIdentity = {
+        ephemeralIdentity: {
+          address: '0x123',
+          publicKey: '0xpubkey',
+          privateKey: '0xprivkey'
+        },
+        expiration: new Date(),
+        authChain: []
+      } as AuthIdentity
+    })
+
+    describe('when the request is successful', () => {
+      const mockResponse = {
+        identityId: 'mock-identity-id',
+        expiration: new Date().toISOString()
+      }
+
+      beforeEach(() => {
+        signedFetch.mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockResponse)
+        })
+      })
+
+      it('should post the identity and return the response', async () => {
+        const result = await client.postIdentity(mockIdentity)
+
+        expect(signedFetch).toHaveBeenCalledWith(mockUrl + '/identities', {
+          method: 'POST',
+          headers: {
+            // eslint-disable-next-line @typescript-eslint/naming-convention
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ identity: mockIdentity }),
+          identity: mockIdentity
+        })
+        expect(result).toEqual(mockResponse)
+      })
+    })
+
+    describe('when the response is not ok', () => {
+      beforeEach(() => {
+        signedFetch.mockResolvedValueOnce({
+          ok: false,
+          json: () => Promise.resolve({ error: 'Failed to create identity' })
+        })
+      })
+
+      it('should throw an error with the error message', async () => {
+        await expect(client.postIdentity(mockIdentity)).rejects.toThrow('Failed to create identity')
+      })
+    })
+
+    describe('when the response is not ok and has no error message', () => {
+      beforeEach(() => {
+        signedFetch.mockResolvedValueOnce({
+          ok: false,
+          json: () => Promise.resolve({})
+        })
+      })
+
+      it('should throw a default error message', async () => {
+        await expect(client.postIdentity(mockIdentity)).rejects.toThrow('Failed to create identity')
+      })
+    })
+
+    describe('when the request fails due to network error', () => {
+      beforeEach(() => {
+        signedFetch.mockRejectedValueOnce(new Error('Network error'))
+      })
+
+      it('should handle and rethrow the error', async () => {
+        await expect(client.postIdentity(mockIdentity)).rejects.toThrow('Network error')
       })
     })
   })
