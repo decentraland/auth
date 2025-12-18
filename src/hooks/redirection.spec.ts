@@ -50,6 +50,45 @@ describe('when using the redirection hook', () => {
     })
   })
 
+  describe('and the current URL contains a flow parameter', () => {
+    beforeEach(() => {
+      mockedUseLocation.mockReturnValue({
+        search: 'redirectTo=http://localhost/test&flow=deeplink'
+      } as Location)
+    })
+
+    it('should return the redirectTo URL with the flow parameter', () => {
+      const { result } = renderHook(() => useAfterLoginRedirection())
+      expect(result.current.url).toBe('http://localhost/test?flow=deeplink')
+    })
+  })
+
+  describe('and the current URL contains both targetConfigId and flow parameters', () => {
+    beforeEach(() => {
+      mockedUseLocation.mockReturnValue({
+        search: 'redirectTo=http://localhost/test&targetConfigId=android&flow=deeplink'
+      } as Location)
+    })
+
+    it('should return the redirectTo URL with both parameters', () => {
+      const { result } = renderHook(() => useAfterLoginRedirection())
+      expect(result.current.url).toBe('http://localhost/test?targetConfigId=android&flow=deeplink')
+    })
+  })
+
+  describe('and the redirectTo URL already has a flow parameter', () => {
+    beforeEach(() => {
+      mockedUseLocation.mockReturnValue({
+        search: 'redirectTo=http://localhost/test?flow=existing&flow=deeplink'
+      } as Location)
+    })
+
+    it('should not duplicate the flow parameter', () => {
+      const { result } = renderHook(() => useAfterLoginRedirection())
+      expect(result.current.url).toBe('http://localhost/test?flow=existing')
+    })
+  })
+
   describe('and the redirectTo parameter points to another domain', () => {
     beforeEach(() => {
       mockedUseLocation.mockReturnValue({ search: 'redirectTo=https://test.com' } as Location)
