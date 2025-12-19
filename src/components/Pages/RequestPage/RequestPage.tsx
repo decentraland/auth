@@ -110,26 +110,26 @@ export const RequestPage = () => {
   const isUserUsingWeb2Wallet = !!provider?.isMagic
   const authServerClient = useRef(createAuthServerHttpClient())
   const isDeepLinkFlow = searchParams.get('flow') === 'deeplink'
+  const flowParam = isDeepLinkFlow ? '&flow=deeplink' : ''
 
   // Goes to the login page where the user will have to connect a wallet.
   const toLoginPage = useCallback(() => {
-    navigate(locations.login(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}`))
-  }, [requestId])
+    navigate(locations.login(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}${flowParam}`))
+  }, [requestId, targetConfigId, isDeepLinkFlow])
 
   const toSetupPage = useCallback(async () => {
     const referrer = extractReferrerFromSearchParameters(searchParams)
-
     // Check A/B testing new onboarding flow
     const isFlowV2OnboardingFlowEnabled = variants[FeatureFlagsKeys.ONBOARDING_FLOW]?.name === OnboardingFlowVariant.V2
 
     const hasWebGPU = await checkWebGpuSupport()
     const isAvatarSetupFlowAllowed = isFlowV2OnboardingFlowEnabled && hasWebGPU
     if (isAvatarSetupFlowAllowed) {
-      navigate(locations.avatarSetup(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}`, referrer))
+      navigate(locations.avatarSetup(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}${flowParam}`, referrer))
     } else {
-      navigate(locations.setup(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}`, referrer))
+      navigate(locations.setup(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}${flowParam}`, referrer))
     }
-  }, [requestId, variants[FeatureFlagsKeys.ONBOARDING_FLOW], searchParams])
+  }, [requestId, targetConfigId, isDeepLinkFlow, variants[FeatureFlagsKeys.ONBOARDING_FLOW], searchParams])
 
   useEffect(() => {
     // Wait for the user to be connected.
