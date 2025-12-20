@@ -11,5 +11,6 @@
   "REFERRAL_SERVER_URL": "https://social-api.decentraland.org/v1",
   "WEARABLE_PREVIEW_URL": "https://wearable-preview.decentraland.org",
   "DOWNLOAD_URL": "https://decentraland.org/download",
-  "META_TRANSACTION_SERVER_URL": "https://transactions-api.decentraland.org"
+  "META_TRANSACTION_SERVER_URL": "https://transactions-api.decentraland.org",
+  "PROFILE_CONSISTENCY_CHECK_TIMEOUT": "10000"
 }
