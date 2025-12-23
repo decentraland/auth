@@ -10,6 +10,7 @@ export enum TrackingEvents {
   REQUEST_INTERACTION = 'Request interaction',
   REQUEST_OUTCOME_SUCCESS = 'Request outcome sent successfully',
   REQUEST_OUTCOME_FAILED = 'Request outcome sent with error',
+  DEEP_LINK_AUTH_SUCCESS = 'Deep link auth success',
   START_ADDING_NAME = 'Start adding name',
   START_ADDING_EMAIL = 'Start adding email',
   CHECK_TERMS_OF_SERVICE = 'Check terms of service'
@@ -17,6 +18,7 @@ export enum TrackingEvents {
 
 export enum RequestInteractionType {
   VERIFY_SIGN_IN = 'Verify sign in',
+  DEEP_LINK_SIGN_IN = 'Deep link sign in',
   WALLET_INTERACTION = 'Wallet interaction'
 }
 
@@ -26,6 +28,7 @@ export enum ClickEvents {
   DENY_WALLET_INTERACTION = 'Deny Wallet Interaction',
   APPROVE_SING_IN = 'Approve Sign In',
   APPROVE_WALLET_INTERACTION = 'Approve Wallet Interaction',
+  IDENTITY_DEEP_LINK_OPENED = 'Identity Deep Link Opened',
   RANDOMIZE = 'Randomize default profile',
   BACK_TO_AVATAR_RANDOMIZATION_VIEW = 'Back to avatar randomization view',
   SUBMIT_PROFILE = 'Submit profile'

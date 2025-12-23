@@ -61,6 +61,12 @@
   z-index: 1;
 }
 
+.mainContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 48px;
+}
+
 .footer {
   display: flex;
   flex-direction: column;
@@ -78,6 +84,19 @@
 .footer a {
   color: white;
   text-decoration: underline;
+}
+
+.newUserInfo {
+  font-size: 16px;
+  line-height: 150%;
+  letter-spacing: 0px;
+}
+
+.newUserInfo span{ 
+  color: var(--Primary-Base-Primary, #FF2D55);
+  text-decoration: underline;
+  text-transform: uppercase;
+  cursor: pointer;
 }
 
 .guestInfo,
