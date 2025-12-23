@@ -4,11 +4,8 @@ import { getCatalystServersFromCache } from 'dcl-catalyst-client/dist/contracts-
 import { AuthIdentity, Authenticator } from '@dcl/crypto'
 import { hashV1 } from '@dcl/hashing'
 import { EntityType, Entity } from '@dcl/schemas'
+import { fetcher } from '../../shared/fetcher'
 import { config } from '../config'
-
-// Workaround for fetch types mismatch between browser and node-fetch (React 18 migration)
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const fetcher = { fetch: (url: string, init?: RequestInit) => fetch(url, init) } as any
 
 export interface ConsistencyResult {
   isConsistent: boolean
@@ -19,7 +16,7 @@ export interface ConsistencyResult {
 
 export async function fetchProfile(address: string): Promise<Profile | null> {
   const PEER_URL = config.get('PEER_URL')
-  const client = createLambdasClient({ url: PEER_URL + '/lambdas', fetcher: fetcher })
+  const client = createLambdasClient({ url: PEER_URL + '/lambdas', fetcher })
   try {
     const profile: Profile = await client.getAvatarDetails(address)
     return profile
