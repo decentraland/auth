@@ -2,11 +2,8 @@ import { DeploymentBuilder, createContentClient } from 'dcl-catalyst-client'
 import { Authenticator } from '@dcl/crypto'
 import { Avatar, EntityType } from '@dcl/schemas'
 import { config } from '../../../modules/config'
+import { fetcher } from '../../../shared/fetcher'
 import { ContentClient, DeploymentParams, ContentHashes, CreateAvatarMetadataParams } from './AvatarSetupPage.types'
-
-// Workaround for fetch types mismatch between browser and node-fetch (React 18 migration)
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const fetcher = { fetch: (url: string, init?: RequestInit) => fetch(url, init) } as any
 
 /**
  * Creates a content client for interacting with the Decentraland catalyst
