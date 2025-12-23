@@ -40,7 +40,8 @@ import {
   getMetaTransactionChainId,
   decodeNftTransferData,
   decodeManaTransferData,
-  fetchNftMetadata
+  fetchNftMetadata,
+  fetchPlaceByCreatorAddress
 } from './utils'
 import {
   DeniedSignIn,
@@ -224,14 +225,19 @@ export const RequestPage = () => {
               if (transactionData && contractAddress) {
                 const manaData = decodeManaTransferData(transactionData)
                 if (manaData) {
-                  const recipientProfile = await fetchProfile(manaData.toAddress)
+                  const [recipientProfile, placeInfo] = await Promise.all([
+                    fetchProfile(manaData.toAddress),
+                    fetchPlaceByCreatorAddress(manaData.toAddress)
+                  ])
+
                   setManaTransferData({
                     manaAmount: `${parseFloat(manaData.manaAmount).toFixed(2)} MANA`,
                     toAddress: manaData.toAddress,
                     recipientProfile: recipientProfile || undefined,
-                    sceneName: 'Genesis Plaza', // TODO: Get actual scene name
+                    sceneName: placeInfo?.sceneName || 'Unknown Place',
                     sceneImageUrl:
-                      'https://peer.decentraland.org/content/contents/bafkreidj26s7aenyxfthfdibnqonzqm5ptc4iamml744gmcyuokewkr76y' // TODO: Get actual scene image
+                      placeInfo?.sceneImageUrl ||
+                      'https://peer.decentraland.org/content/contents/bafkreidj26s7aenyxfthfdibnqonzqm5ptc4iamml744gmcyuokewkr76y'
                   })
                   setView(View.WALLET_MANA_INTERACTION)
                   break

@@ -25,13 +25,15 @@ export const MANATransferView = ({ manaData, isLoading, onDeny, onApprove }: MAN
   return (
     <NFTTransferContainer>
       <CenteredContent>
-        <Title>Confirm {manaData.manaAmount} tip for</Title>
+        <Title>
+          {isProcessing ? 'Sending' : 'Confirm'} {manaData.manaAmount} Tip for
+        </Title>
 
         <RecipientProfile>
           <RecipientProfileText address={manaData.toAddress} avatar={recipientAvatar as ProfileAvatar} size="huge" inline />
         </RecipientProfile>
 
-        <CreatorLabel>creator of</CreatorLabel>
+        <CreatorLabel>CREATOR OF</CreatorLabel>
 
         <SceneImageWrapper>
           <img src={manaData.sceneImageUrl} alt={manaData.sceneName} />

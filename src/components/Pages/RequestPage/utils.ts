@@ -240,3 +240,43 @@ export async function fetchNftMetadata(
     rarity
   }
 }
+
+/**
+ * Fetches place information by creator address from the Places API
+ * @param creatorAddress The creator's Ethereum address
+ * @returns Object containing place name and image URL if exactly one place is found, null otherwise
+ */
+export async function fetchPlaceByCreatorAddress(creatorAddress: string): Promise<{ sceneName: string; sceneImageUrl: string } | null> {
+  try {
+    const placesApiUrl = config.get('PLACES_API_URL')
+    const response = await fetch(`${placesApiUrl}/api/places?creator_address=${creatorAddress.toLowerCase()}`)
+
+    if (!response.ok) {
+      console.error(`Failed to fetch place info from Places API: ${response.status} ${response.statusText}`)
+      return null
+    }
+
+    const data = await response.json()
+
+    if (!data.ok || !data.data || data.data.length === 0) {
+      console.log(`No places found for creator address: ${creatorAddress}`)
+      return null
+    }
+
+    // Only return place data if exactly one place is found
+    if (data.data.length !== 1) {
+      console.log(`Multiple places found for creator address: ${creatorAddress}, showing default view`)
+      return null
+    }
+
+    const place = data.data[0]
+
+    return {
+      sceneName: place.title || 'Unknown Place',
+      sceneImageUrl: place.image || ''
+    }
+  } catch (error) {
+    console.error('Error fetching place by creator address:', error)
+    return null
+  }
+}
