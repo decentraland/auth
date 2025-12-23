@@ -1,8 +1,9 @@
 /* eslint-disable import/order */
 /* eslint-disable @typescript-eslint/naming-convention */
 import 'semantic-ui-css/semantic.min.css'
-import React, { useEffect } from 'react'
-import ReactDOM from 'react-dom'
+import * as React from 'react'
+import { useEffect } from 'react'
+import * as ReactDOM from 'react-dom'
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { darkTheme, DclThemeProvider } from 'decentraland-ui2'
 import { RequestPage } from './components/Pages/RequestPage'

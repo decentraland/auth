@@ -1,5 +1,5 @@
 import { Location, useLocation } from 'react-router-dom'
-import { renderHook } from '@testing-library/react-hooks'
+import { renderHook } from '@testing-library/react'
 import { useAfterLoginRedirection } from './redirection'
 
 jest.mock('react-router-dom')
