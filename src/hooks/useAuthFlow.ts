@@ -4,7 +4,7 @@ import { AuthIdentity } from '@dcl/crypto'
 import { ProviderType } from '@dcl/schemas'
 import { connection } from 'decentraland-connect'
 import { FeatureFlagsContext, FeatureFlagsKeys, OnboardingFlowVariant } from '../components/FeatureFlagsProvider'
-import { fetchProfileWithConsistencyCheck, redeployExistingProfile } from '../modules/profile'
+import { fetchProfileWithConsistencyCheck, redeployExistingProfile, redeployExistingProfileWithContentServerData } from '../modules/profile'
 import { useCurrentConnectionData } from '../shared/connection/hook'
 import { locations } from '../shared/locations'
 import { isProfileComplete } from '../shared/profile'
@@ -74,19 +74,26 @@ export const useAuthFlow = () => {
 
         // If profile is not consistent across catalysts, try to redeploy if we have a valid entity
         if (!consistencyResult.isConsistent) {
-          console.log('Profile is not consistent across catalysts, trying to redeploy')
           // Use provided identity first, then fall back to hook identity
           const userIdentity = providedIdentity ?? identity
 
           // If we have a valid entity and user identity, attempt redeployment
-          if (consistencyResult.entity && userIdentity) {
+          if (consistencyResult.profile && consistencyResult.profileFetchedFrom && userIdentity) {
             try {
-              await redeployExistingProfile(consistencyResult.entity, account, userIdentity)
+              await redeployExistingProfile(consistencyResult.profile, account, userIdentity)
               // If redeployment succeeds, continue with the login flow
               return redirect()
             } catch (error) {
-              console.warn('Profile redeployment failed, falling back to onboarding:', error)
-              // Fall through to onboarding flow
+              console.warn('Profile redeployment failed, attempting to redeploy with content server data:', error)
+              // If redeployment with lamb2 profile fails, try to redeploy with content server data
+              try {
+                await redeployExistingProfileWithContentServerData(consistencyResult.profileFetchedFrom, account, userIdentity)
+                // If redeployment succeeds, continue with the login flow
+                return redirect()
+              } catch (error) {
+                console.warn('Profile redeployment failed, falling back to onboarding:', error)
+                // Fall through to onboarding flow
+              }
             }
           }
 
@@ -102,7 +109,7 @@ export const useAuthFlow = () => {
         }
 
         // If consistent, check if profile exists and is complete
-        const profile: Profile | undefined = consistencyResult.entity?.metadata as Profile
+        const profile: Profile | undefined = consistencyResult.profile
         const hasWebGPU = await checkWebGpuSupport()
         const isAvatarSetupFlowAllowed = isFlowV2OnboardingFlowEnabled && hasWebGPU
         const isProfileIncomplete = !profile || !isProfileComplete(profile)

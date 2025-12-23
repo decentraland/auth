@@ -11,6 +11,11 @@ export type OutcomeResponse = {
   error?: string
 }
 
+export type IdentityResponse = {
+  identityId: string
+  expiration: Date
+}
+
 export type OutcomeError = { code: number; message: string }
 
 export type ValidationResponse = {

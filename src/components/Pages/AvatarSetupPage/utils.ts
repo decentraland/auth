@@ -1,9 +1,12 @@
-import { createFetchComponent } from '@well-known-components/fetch-component'
 import { DeploymentBuilder, createContentClient } from 'dcl-catalyst-client'
 import { Authenticator } from '@dcl/crypto'
 import { Avatar, EntityType } from '@dcl/schemas'
 import { config } from '../../../modules/config'
 import { ContentClient, DeploymentParams, ContentHashes, CreateAvatarMetadataParams } from './AvatarSetupPage.types'
+
+// Workaround for fetch types mismatch between browser and node-fetch (React 18 migration)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const fetcher = { fetch: (url: string, init?: RequestInit) => fetch(url, init) } as any
 
 /**
  * Creates a content client for interacting with the Decentraland catalyst
@@ -11,7 +14,7 @@ import { ContentClient, DeploymentParams, ContentHashes, CreateAvatarMetadataPar
  */
 const createCatalystClient = (): ContentClient => {
   const peerUrl = config.get('PEER_URL', '')
-  return createContentClient({ url: peerUrl + '/content', fetcher: createFetchComponent() })
+  return createContentClient({ url: peerUrl + '/content', fetcher })
 }
 
 /**

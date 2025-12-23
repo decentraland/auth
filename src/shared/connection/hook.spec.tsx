@@ -1,5 +1,4 @@
-import { act } from '@testing-library/react'
-import { renderHook } from '@testing-library/react-hooks'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import { ProviderType } from '@dcl/schemas'
 import { getCurrentConnectionData, ConnectionData } from './connection'
 import { useCurrentConnectionData } from './hooks'
@@ -66,13 +65,13 @@ describe('useCurrentConnectionData', () => {
     })
 
     it('should return the connection data and set isLoading to false', async () => {
-      const { result, waitForNextUpdate } = renderHook(() => useCurrentConnectionData())
+      const { result } = renderHook(() => useCurrentConnectionData())
 
-      await waitForNextUpdate()
-
-      expect(result.current).toEqual({
-        isLoading: false,
-        ...mockConnectionData
+      await waitFor(() => {
+        expect(result.current).toEqual({
+          isLoading: false,
+          ...mockConnectionData
+        })
       })
     })
   })
@@ -83,17 +82,17 @@ describe('useCurrentConnectionData', () => {
     })
 
     it('should return the initial state where isLoading is false and the other fields are undefined', async () => {
-      const { result, waitForNextUpdate } = renderHook(() => useCurrentConnectionData())
+      const { result } = renderHook(() => useCurrentConnectionData())
 
-      await waitForNextUpdate()
-
-      expect(result.current).toEqual({
-        isLoading: false,
-        account: undefined,
-        identity: undefined,
-        provider: undefined,
-        providerType: undefined,
-        chainId: undefined
+      await waitFor(() => {
+        expect(result.current).toEqual({
+          isLoading: false,
+          account: undefined,
+          identity: undefined,
+          provider: undefined,
+          providerType: undefined,
+          chainId: undefined
+        })
       })
     })
   })

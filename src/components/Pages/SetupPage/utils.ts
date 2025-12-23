@@ -1,8 +1,11 @@
-import { createFetchComponent } from '@well-known-components/fetch-component'
 import { DeploymentBuilder, createContentClient } from 'dcl-catalyst-client'
 import { AuthIdentity, Authenticator } from '@dcl/crypto'
 import { EntityType } from '@dcl/schemas'
 import { config } from '../../../modules/config'
+
+// Workaround for fetch types mismatch between browser and node-fetch (React 18 migration)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const fetcher = { fetch: (url: string, init?: RequestInit) => fetch(url, init) } as any
 
 export async function subscribeToNewsletter(email: string) {
   const url = config.get('BUILDER_SERVER_URL')
@@ -36,7 +39,7 @@ export async function deployProfileFromDefault({
 }) {
   // Create the content client to fetch and deploy profiles.
   const peerUrl = config.get('PEER_URL', '')
-  const client = createContentClient({ url: peerUrl + '/content', fetcher: createFetchComponent() })
+  const client = createContentClient({ url: peerUrl + '/content', fetcher })
 
   // Fetch the entity of the currently selected default profile.
   const defaultEntities = await client.fetchEntitiesByPointers([defaultProfile])
