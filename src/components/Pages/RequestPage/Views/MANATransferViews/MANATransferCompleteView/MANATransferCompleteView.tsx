@@ -19,13 +19,13 @@ export const MANATransferCompleteView = ({ manaData }: MANATransferCompleteViewP
   return (
     <NFTTransferContainer>
       <CenteredContent>
-        <Title>{manaData.manaAmount} tip sent to</Title>
+        <Title>Success! {manaData.manaAmount} MANA tip Sent to</Title>
 
         <RecipientProfile>
           <RecipientProfileText address={manaData.toAddress} avatar={recipientAvatar as ProfileAvatar} size="huge" inline />
         </RecipientProfile>
 
-        <CreatorLabel>creator of</CreatorLabel>
+        <CreatorLabel>CREATOR OF</CreatorLabel>
 
         <SceneImageWrapper>
           <SceneImageContainer>

@@ -18,14 +18,14 @@ export const MANATransferCanceledView = ({ manaData }: MANATransferCanceledViewP
   return (
     <NFTTransferContainer>
       <CenteredContent>
-        <Title>{manaData.manaAmount} tip cancelled</Title>
+        <Title>{manaData.manaAmount} MANA Tip cancelled</Title>
 
         <SecondaryText>
           Your tip wasn&apos;t delivered to
           <RecipientProfileText address={manaData.toAddress} avatar={recipientAvatar as ProfileAvatar} size="huge" inline />
         </SecondaryText>
 
-        <CreatorLabel>creator of</CreatorLabel>
+        <CreatorLabel>CREATOR OF</CreatorLabel>
 
         <SceneImageWrapper>
           <img src={manaData.sceneImageUrl} alt={manaData.sceneName} />
