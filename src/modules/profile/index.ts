@@ -1,4 +1,3 @@
-import { createFetchComponent } from '@well-known-components/fetch-component'
 import { createLambdasClient, createContentClient, DeploymentBuilder } from 'dcl-catalyst-client'
 import { Profile, ProfileAvatarsItem } from 'dcl-catalyst-client/dist/client/specs/catalyst.schemas'
 import { getCatalystServersFromCache } from 'dcl-catalyst-client/dist/contracts-snapshots'
@@ -6,6 +5,10 @@ import { AuthIdentity, Authenticator } from '@dcl/crypto'
 import { hashV1 } from '@dcl/hashing'
 import { EntityType, Entity } from '@dcl/schemas'
 import { config } from '../config'
+
+// Workaround for fetch types mismatch between browser and node-fetch (React 18 migration)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const fetcher = { fetch: (url: string, init?: RequestInit) => fetch(url, init) } as any
 
 export interface ConsistencyResult {
   isConsistent: boolean
@@ -16,7 +19,7 @@ export interface ConsistencyResult {
 
 export async function fetchProfile(address: string): Promise<Profile | null> {
   const PEER_URL = config.get('PEER_URL')
-  const client = createLambdasClient({ url: PEER_URL + '/lambdas', fetcher: createFetchComponent() })
+  const client = createLambdasClient({ url: PEER_URL + '/lambdas', fetcher: fetcher })
   try {
     const profile: Profile = await client.getAvatarDetails(address)
     return profile
@@ -38,7 +41,7 @@ export async function fetchProfileWithConsistencyCheck(address: string): Promise
     const profileResults = await Promise.all(
       catalystUrls.map(async url => {
         try {
-          const client = createLambdasClient({ url: url + '/lambdas', fetcher: createFetchComponent() })
+          const client = createLambdasClient({ url: url + '/lambdas', fetcher: fetcher })
           const profile = await client.getAvatarDetails(address)
           return { profile, url }
         } catch {
@@ -108,7 +111,7 @@ export async function redeployExistingProfileWithContentServerData(
   connectedAccount: string,
   connectedAccountIdentity: AuthIdentity
 ): Promise<void> {
-  const client = createContentClient({ url: catalystUrl + '/content', fetcher: createFetchComponent() })
+  const client = createContentClient({ url: catalystUrl + '/content', fetcher: fetcher })
   const entity = (await client.fetchEntitiesByPointers([connectedAccount]))?.[0]
   if (!entity) {
     throw new Error('Profile entity not found')
@@ -169,7 +172,7 @@ async function attemptRedeployment(
   files: Map<string, Uint8Array>,
   metadata: Partial<Profile>
 ): Promise<void> {
-  const client = createContentClient({ url: catalystUrl, fetcher: createFetchComponent() })
+  const client = createContentClient({ url: catalystUrl, fetcher: fetcher })
 
   const deploymentEntity = await DeploymentBuilder.buildEntity({
     type: EntityType.PROFILE,

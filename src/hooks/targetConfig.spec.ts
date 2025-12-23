@@ -1,5 +1,5 @@
 import { useLocation } from 'react-router-dom'
-import { renderHook } from '@testing-library/react-hooks'
+import { renderHook } from '@testing-library/react'
 import { ConnectionOptionType } from '../components/Connection'
 import { isMobile } from '../components/Pages/LoginPage/utils'
 import { _targetConfigs, useTargetConfig } from './targetConfig'

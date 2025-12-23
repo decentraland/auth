@@ -20,7 +20,7 @@ export const Container = (props: { children: ReactNode; requestId?: string; canC
   const isDeepLinkFlow = searchParams.get('flow') === 'deeplink'
 
   const onChangeAccount = useCallback(
-    async evt => {
+    async (evt: React.MouseEvent<HTMLAnchorElement>) => {
       evt.preventDefault()
       await connection.disconnect()
       const flowParam = isDeepLinkFlow ? '&flow=deeplink' : ''
