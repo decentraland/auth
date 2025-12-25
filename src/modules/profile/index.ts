@@ -1,9 +1,9 @@
-import { createFetchComponent } from '@well-known-components/fetch-component'
 import { createLambdasClient, createContentClient, DeploymentBuilder } from 'dcl-catalyst-client'
 import { Profile, ProfileAvatarsItem } from 'dcl-catalyst-client/dist/client/specs/catalyst.schemas'
 import { getCatalystServersFromCache } from 'dcl-catalyst-client/dist/contracts-snapshots'
 import { AuthIdentity, Authenticator } from '@dcl/crypto'
 import { EntityType, Entity } from '@dcl/schemas'
+import { fetcher } from '../../shared/fetcher'
 import { config } from '../config'
 
 export interface ConsistencyResult {
@@ -15,7 +15,7 @@ export interface ConsistencyResult {
 
 export async function fetchProfile(address: string): Promise<Profile | null> {
   const PEER_URL = config.get('PEER_URL')
-  const client = createLambdasClient({ url: PEER_URL + '/lambdas', fetcher: createFetchComponent() })
+  const client = createLambdasClient({ url: PEER_URL + '/lambdas', fetcher })
   try {
     const profile: Profile = await client.getAvatarDetails(address)
     return profile
@@ -37,7 +37,7 @@ export async function fetchProfileWithConsistencyCheck(address: string): Promise
     const profileResults = await Promise.all(
       catalystUrls.map(async url => {
         try {
-          const client = createLambdasClient({ url: url + '/lambdas', fetcher: createFetchComponent() })
+          const client = createLambdasClient({ url: url + '/lambdas', fetcher: fetcher })
           const profile = await client.getAvatarDetails(address)
           return { profile, url }
         } catch {
@@ -97,7 +97,7 @@ export async function redeployExistingProfileWithContentServerData(
   connectedAccount: string,
   connectedAccountIdentity: AuthIdentity
 ): Promise<void> {
-  const client = createContentClient({ url: catalystUrl + '/content', fetcher: createFetchComponent() })
+  const client = createContentClient({ url: catalystUrl + '/content', fetcher: fetcher })
   const entity = (await client.fetchEntitiesByPointers([connectedAccount]))?.[0]
   if (!entity) {
     throw new Error('Profile entity not found')
@@ -149,7 +149,7 @@ async function attemptRedeployment(
   connectedAccountIdentity: AuthIdentity,
   metadata: Partial<Profile>
 ): Promise<void> {
-  const client = createContentClient({ url: catalystUrl, fetcher: createFetchComponent() })
+  const client = createContentClient({ url: catalystUrl, fetcher: fetcher })
 
   const deploymentEntity = await DeploymentBuilder.buildEntity({
     type: EntityType.PROFILE,

@@ -41,7 +41,7 @@ const defaultMobileConfig: TargetConfig = {
   ...defaultConfig,
   skipSetup: true,
   showWearablePreview: false,
-  explorerText: 'Mobile App',
+  explorerText: 'Decentraland Mobile App',
   deepLink: 'decentraland://'
 }
 

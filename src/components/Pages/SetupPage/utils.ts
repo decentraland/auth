@@ -1,8 +1,8 @@
-import { createFetchComponent } from '@well-known-components/fetch-component'
 import { DeploymentBuilder, createContentClient } from 'dcl-catalyst-client'
 import { AuthIdentity, Authenticator } from '@dcl/crypto'
 import { EntityType } from '@dcl/schemas'
 import { config } from '../../../modules/config'
+import { fetcher } from '../../../shared/fetcher'
 
 export async function subscribeToNewsletter(email: string) {
   const url = config.get('BUILDER_SERVER_URL')
@@ -36,7 +36,7 @@ export async function deployProfileFromDefault({
 }) {
   // Create the content client to fetch and deploy profiles.
   const peerUrl = config.get('PEER_URL', '')
-  const client = createContentClient({ url: peerUrl + '/content', fetcher: createFetchComponent() })
+  const client = createContentClient({ url: peerUrl + '/content', fetcher })
 
   // Fetch the entity of the currently selected default profile.
   const defaultEntities = await client.fetchEntitiesByPointers([defaultProfile])

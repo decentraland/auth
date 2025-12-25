@@ -1,5 +1,5 @@
 import { Location, useLocation } from 'react-router-dom'
-import { renderHook } from '@testing-library/react-hooks'
+import { renderHook } from '@testing-library/react'
 import { useAfterLoginRedirection } from './redirection'
 
 jest.mock('react-router-dom')
@@ -47,6 +47,45 @@ describe('when using the redirection hook', () => {
     it('should return the redirectTo URL with the targetConfigId parameter', () => {
       const { result } = renderHook(() => useAfterLoginRedirection())
       expect(result.current.url).toBe('http://localhost/test?targetConfigId=android')
+    })
+  })
+
+  describe('and the current URL contains a flow parameter', () => {
+    beforeEach(() => {
+      mockedUseLocation.mockReturnValue({
+        search: 'redirectTo=http://localhost/test&flow=deeplink'
+      } as Location)
+    })
+
+    it('should return the redirectTo URL with the flow parameter', () => {
+      const { result } = renderHook(() => useAfterLoginRedirection())
+      expect(result.current.url).toBe('http://localhost/test?flow=deeplink')
+    })
+  })
+
+  describe('and the current URL contains both targetConfigId and flow parameters', () => {
+    beforeEach(() => {
+      mockedUseLocation.mockReturnValue({
+        search: 'redirectTo=http://localhost/test&targetConfigId=android&flow=deeplink'
+      } as Location)
+    })
+
+    it('should return the redirectTo URL with both parameters', () => {
+      const { result } = renderHook(() => useAfterLoginRedirection())
+      expect(result.current.url).toBe('http://localhost/test?targetConfigId=android&flow=deeplink')
+    })
+  })
+
+  describe('and the redirectTo URL already has a flow parameter', () => {
+    beforeEach(() => {
+      mockedUseLocation.mockReturnValue({
+        search: 'redirectTo=http://localhost/test?flow=existing&flow=deeplink'
+      } as Location)
+    })
+
+    it('should not duplicate the flow parameter', () => {
+      const { result } = renderHook(() => useAfterLoginRedirection())
+      expect(result.current.url).toBe('http://localhost/test?flow=existing')
     })
   })
 

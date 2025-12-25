@@ -1,8 +1,8 @@
-import { createFetchComponent } from '@well-known-components/fetch-component'
 import { DeploymentBuilder, createContentClient } from 'dcl-catalyst-client'
 import { Authenticator } from '@dcl/crypto'
 import { Avatar, EntityType } from '@dcl/schemas'
 import { config } from '../../../modules/config'
+import { fetcher } from '../../../shared/fetcher'
 import { ContentClient, DeploymentParams, ContentHashes, CreateAvatarMetadataParams } from './AvatarSetupPage.types'
 
 /**
@@ -11,7 +11,7 @@ import { ContentClient, DeploymentParams, ContentHashes, CreateAvatarMetadataPar
  */
 const createCatalystClient = (): ContentClient => {
   const peerUrl = config.get('PEER_URL', '')
-  return createContentClient({ url: peerUrl + '/content', fetcher: createFetchComponent() })
+  return createContentClient({ url: peerUrl + '/content', fetcher })
 }
 
 /**
