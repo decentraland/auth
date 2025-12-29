@@ -1,5 +1,4 @@
 import { useCallback, useContext } from 'react'
-import { createFetchComponent } from '@well-known-components/fetch-component'
 import type { Profile } from 'dcl-catalyst-client/dist/client/specs/catalyst.schemas'
 import { AuthIdentity } from '@dcl/crypto'
 import { ProviderType } from '@dcl/schemas'
@@ -8,6 +7,7 @@ import { FeatureFlagsContext, FeatureFlagsKeys, OnboardingFlowVariant } from '..
 import { config } from '../modules/config'
 import { fetchProfileWithConsistencyCheck, redeployExistingProfile, redeployExistingProfileWithContentServerData } from '../modules/profile'
 import { useCurrentConnectionData } from '../shared/connection/hook'
+import { createFetcher } from '../shared/fetcher'
 import { locations } from '../shared/locations'
 import { isProfileComplete } from '../shared/profile'
 import { checkWebGpuSupport } from '../shared/utils/webgpu'
@@ -69,8 +69,8 @@ export const useAuthFlow = () => {
 
       if (targetConfig && !targetConfig.skipSetup && account) {
         // Check profile consistency across all catalysts
-        const fetcherWithTimeout = createFetchComponent({
-          defaultFetcherOptions: { timeout: Number(config.get('PROFILE_CONSISTENCY_CHECK_TIMEOUT')) ?? 10000 }
+        const fetcherWithTimeout = createFetcher({
+          signal: AbortSignal.timeout(Number(config.get('PROFILE_CONSISTENCY_CHECK_TIMEOUT')) ?? 10000)
         })
         const consistencyResult = await fetchProfileWithConsistencyCheck(account, fetcherWithTimeout)
 

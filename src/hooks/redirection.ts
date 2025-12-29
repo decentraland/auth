@@ -29,6 +29,12 @@ export const useAfterLoginRedirection = () => {
       redirectToURL.searchParams.append('targetConfigId', targetConfigId)
     }
 
+    // Add the flow to the redirect URL if it exists (for deep link flow)
+    const flow = search.get('flow')
+    if (flow && !redirectToURL.searchParams.has('flow')) {
+      redirectToURL.searchParams.append('flow', flow)
+    }
+
     // Set the sanitized redirect URL
     sanitizedRedirectTo = redirectToURL.href
   } catch (error) {

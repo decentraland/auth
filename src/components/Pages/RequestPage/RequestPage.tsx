@@ -17,7 +17,6 @@ import { config } from '../../../modules/config'
 import { fetchProfile, fetchProfileWithConsistencyCheck, redeployExistingProfile } from '../../../modules/profile'
 import {
   createAuthServerHttpClient,
-  createAuthServerWsClient,
   RecoverResponse,
   ExpiredRequestError,
   DifferentSenderError,
@@ -42,6 +41,7 @@ import {
   fetchNftMetadata
 } from './utils'
 import {
+  ContinueInApp,
   DeniedSignIn,
   DeniedWalletInteraction,
   DifferentAccountError,
@@ -70,6 +70,8 @@ enum View {
   VERIFY_SIGN_IN_DENIED,
   VERIFY_SIGN_IN_ERROR,
   VERIFY_SIGN_IN_COMPLETE,
+  // Deep Link Flow
+  DEEP_LINK_CONTINUE_IN_APP,
   // Wallet Interaction
   WALLET_INTERACTION,
   WALLET_NFT_INTERACTION,
@@ -100,32 +102,34 @@ export const RequestPage = () => {
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false)
   const requestRef = useRef<RecoverResponse>()
   const [error, setError] = useState<string>()
+  const [identityId, setIdentityId] = useState<string>()
   const timeoutRef = useRef<NodeJS.Timeout>()
   const signTimeoutRef = useRef<NodeJS.Timeout>()
   const requestId = params.requestId ?? ''
   const [targetConfig, targetConfigId] = useTargetConfig()
   const isUserUsingWeb2Wallet = !!provider?.isMagic
-  const authServerClient = useRef(createAuthServerWsClient())
+  const authServerClient = useRef(createAuthServerHttpClient())
+  const isDeepLinkFlow = searchParams.get('flow') === 'deeplink'
+  const flowParam = isDeepLinkFlow ? '&flow=deeplink' : ''
 
   // Goes to the login page where the user will have to connect a wallet.
   const toLoginPage = useCallback(() => {
-    navigate(locations.login(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}`))
-  }, [requestId])
+    navigate(locations.login(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}${flowParam}`))
+  }, [requestId, targetConfigId, isDeepLinkFlow])
 
   const toSetupPage = useCallback(async () => {
     const referrer = extractReferrerFromSearchParameters(searchParams)
-
     // Check A/B testing new onboarding flow
     const isFlowV2OnboardingFlowEnabled = variants[FeatureFlagsKeys.ONBOARDING_FLOW]?.name === OnboardingFlowVariant.V2
 
     const hasWebGPU = await checkWebGpuSupport()
     const isAvatarSetupFlowAllowed = isFlowV2OnboardingFlowEnabled && hasWebGPU
     if (isAvatarSetupFlowAllowed) {
-      navigate(locations.avatarSetup(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}`, referrer))
+      navigate(locations.avatarSetup(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}${flowParam}`, referrer))
     } else {
-      navigate(locations.setup(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}`, referrer))
+      navigate(locations.setup(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}${flowParam}`, referrer))
     }
-  }, [requestId, variants[FeatureFlagsKeys.ONBOARDING_FLOW], searchParams])
+  }, [requestId, targetConfigId, isDeepLinkFlow, variants[FeatureFlagsKeys.ONBOARDING_FLOW], searchParams])
 
   useEffect(() => {
     // Wait for the user to be connected.
@@ -139,11 +143,6 @@ export const RequestPage = () => {
 
     // Wait for the features to be initialized.
     if (!initializedFlags) return
-
-    // Initialize the auth server client.
-    if (flags[FeatureFlagsKeys.HTTP_AUTH]) {
-      authServerClient.current = createAuthServerHttpClient()
-    }
 
     const loadRequest = async () => {
       const timeTheSiteStartedLoading = Date.now()
@@ -175,7 +174,7 @@ export const RequestPage = () => {
         const signerAddress = await signer.getAddress()
         getAnalytics()?.identify({ ethAddress: signerAddress })
         // Recover the request from the auth server.
-        const request = await authServerClient.current.recover(requestId, signerAddress)
+        const request = await authServerClient.current.recover(requestId, signerAddress, isDeepLinkFlow)
         requestRef.current = request
 
         if (flags[FeatureFlagsKeys.LOGIN_ON_SETUP]) {
@@ -335,15 +334,22 @@ export const RequestPage = () => {
       if (hasTimeouted) {
         throw new TimedOutError()
       }
+      // Check if this is deep link flow
+      if (isDeepLinkFlow && identity) {
+        const httpClient = createAuthServerHttpClient()
+        const identityResponse = await httpClient.postIdentity(identity)
 
-      console.log('Approve sign in verification - Signed the message. Sending the outcome to the server...')
-      await authServerClient.current.sendSuccessfulOutcome(requestId, await signer.getAddress(), signature)
-      console.log('Approve sign in verification - Outcome sent')
-
-      setView(View.VERIFY_SIGN_IN_COMPLETE)
-
-      if (targetConfig.deepLink) {
-        window.location.href = targetConfig.deepLink
+        setIdentityId(identityResponse.identityId)
+        setView(View.DEEP_LINK_CONTINUE_IN_APP)
+      } else {
+        // Traditional flow - send outcome and complete
+        console.log('Traditional flow - Sending outcome to server...')
+        await authServerClient.current.sendSuccessfulOutcome(requestId, await signer.getAddress(), signature)
+        console.log('Traditional flow - Outcome sent')
+        setView(View.VERIFY_SIGN_IN_COMPLETE)
+        if (targetConfig.deepLink) {
+          window.location.href = targetConfig.deepLink
+        }
       }
     } catch (e) {
       if (e instanceof TimedOutError) {
@@ -368,7 +374,7 @@ export const RequestPage = () => {
         setIsLoading(false)
       }
     }
-  }, [setIsLoading, isUserUsingWeb2Wallet, isLoading])
+  }, [setIsLoading, isUserUsingWeb2Wallet, isLoading, identity])
 
   const onDenyWalletInteraction = useCallback(async () => {
     setIsLoading(true)
@@ -493,6 +499,15 @@ export const RequestPage = () => {
     }
   }, [isUserUsingWeb2Wallet, onApproveWalletInteraction])
 
+  const onContinueInApp = useCallback(() => {
+    if (!identityId) return
+
+    trackClick(ClickEvents.IDENTITY_DEEP_LINK_OPENED)
+
+    // Show completion view
+    setView(View.VERIFY_SIGN_IN_COMPLETE)
+  }, [identityId, trackClick])
+
   switch (view) {
     case View.TIMEOUT:
       return <TimeoutError requestId={requestId} />
@@ -507,6 +522,8 @@ export const RequestPage = () => {
       return <SigningError error={error} />
     case View.VERIFY_SIGN_IN_COMPLETE:
       return <SignInComplete />
+    case View.DEEP_LINK_CONTINUE_IN_APP:
+      return <ContinueInApp onContinue={onContinueInApp} requestId={requestId} deepLinkUrl={`decentraland://open?signin=${identityId}`} />
     case View.VERIFY_SIGN_IN_DENIED:
       return <DeniedSignIn requestId={requestId} />
     case View.WALLET_INTERACTION_COMPLETE:
@@ -523,21 +540,33 @@ export const RequestPage = () => {
           <Loader active size="huge" />
         </Container>
       )
-    case View.VERIFY_SIGN_IN:
+    case View.VERIFY_SIGN_IN: {
       return (
         <Container canChangeAccount requestId={requestId}>
           <div className={viewStyles.logo}></div>
           <div className={viewStyles.title}>Verify Sign In</div>
-          <div className={viewStyles.description}>Does the verification number below match the one in the {targetConfig.explorerText}?</div>
-          <div className={styles.code}>{requestRef.current?.code}</div>
+
+          {!isDeepLinkFlow && (
+            <>
+              <div className={viewStyles.description}>
+                Does the verification number below match the one in the {targetConfig.explorerText}?
+              </div>
+              <div className={styles.code}>{requestRef.current?.code}</div>
+            </>
+          )}
+
+          {isDeepLinkFlow && (
+            <div className={viewStyles.description}>Please confirm you want to sign in to {targetConfig.explorerText}</div>
+          )}
+
           <div className={styles.buttons}>
             <Button inverted disabled={isLoading} onClick={onDenyVerifySignIn} className={styles.noButton}>
               <Icon name="times circle" />
-              No, it doesn't
+              {isDeepLinkFlow ? 'Cancel' : "No, it doesn't"}
             </Button>
             <Button inverted loading={isLoading} disabled={isLoading} onClick={onApproveSignInVerification} className={styles.yesButton}>
               <Icon name="check circle" />
-              Yes, they are the same
+              {isDeepLinkFlow ? 'Sign In' : 'Yes, they are the same'}
             </Button>
           </div>
           {hasTimedOut && (
@@ -552,6 +581,8 @@ export const RequestPage = () => {
           )}
         </Container>
       )
+    }
+
     case View.WALLET_NFT_INTERACTION:
       return nftTransferData ? (
         <>

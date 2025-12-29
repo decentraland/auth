@@ -20,10 +20,6 @@ import {
 } from './index'
 
 // Mock dependencies
-jest.mock('@well-known-components/fetch-component', () => ({
-  createFetchComponent: jest.fn(() => ({}))
-}))
-
 jest.mock('dcl-catalyst-client', () => ({
   createLambdasClient: jest.fn(),
   createContentClient: jest.fn(),

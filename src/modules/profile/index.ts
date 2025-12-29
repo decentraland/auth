@@ -1,4 +1,3 @@
-import { createFetchComponent } from '@well-known-components/fetch-component'
 import { IFetchComponent } from '@well-known-components/interfaces'
 import { createLambdasClient, createContentClient, DeploymentBuilder } from 'dcl-catalyst-client'
 import { Profile, ProfileAvatarsItem } from 'dcl-catalyst-client/dist/client/specs/catalyst.schemas'
@@ -6,6 +5,7 @@ import { getCatalystServersFromCache } from 'dcl-catalyst-client/dist/contracts-
 import { AuthIdentity, Authenticator } from '@dcl/crypto'
 import { hashV1 } from '@dcl/hashing'
 import { EntityType, Entity } from '@dcl/schemas'
+import { createFetcher } from '../../shared/fetcher'
 import { config } from '../config'
 
 export interface ConsistencyResult {
@@ -28,7 +28,7 @@ interface ProfileResultError {
 
 export async function fetchProfile(address: string, fetcher?: IFetchComponent): Promise<Profile | null> {
   const PEER_URL = config.get('PEER_URL')
-  const client = createLambdasClient({ url: PEER_URL + '/lambdas', fetcher: fetcher ?? createFetchComponent() })
+  const client = createLambdasClient({ url: PEER_URL + '/lambdas', fetcher: fetcher ?? createFetcher() })
   try {
     const profile: Profile = await client.getAvatarDetails(address)
     return profile
@@ -50,7 +50,7 @@ export async function fetchProfileWithConsistencyCheck(address: string, fetcher?
     const profileResults: (ProfileResult | ProfileResultError)[] = await Promise.all(
       catalystUrls.map(async url => {
         try {
-          const client = createLambdasClient({ url: url + '/lambdas', fetcher: fetcher ?? createFetchComponent() })
+          const client = createLambdasClient({ url: url + '/lambdas', fetcher: fetcher ?? createFetcher() })
           const profile = await client.getAvatarDetails(address)
           return { profile, url }
         } catch (error) {
@@ -128,7 +128,7 @@ export async function redeployExistingProfileWithContentServerData(
   connectedAccountIdentity: AuthIdentity,
   fetcher?: IFetchComponent
 ): Promise<void> {
-  const client = createContentClient({ url: catalystUrl + '/content', fetcher: fetcher ?? createFetchComponent() })
+  const client = createContentClient({ url: catalystUrl + '/content', fetcher: fetcher ?? createFetcher() })
   const entity = (await client.fetchEntitiesByPointers([connectedAccount]))?.[0]
   if (!entity) {
     throw new Error('Profile entity not found')
@@ -144,7 +144,17 @@ export async function redeployExistingProfileWithContentServerData(
   const files = createSnapshotFilesMap(bodyBuffer, faceBuffer)
   const metadata = buildMetadataWithEmptyWearables(entity)
 
-  await redeployWithCatalystRotation(connectedAccount, connectedAccountIdentity, files, metadata)
+  // First try to redeploy with the full content server metadata
+  // If it fails, try to redeploy with the empty wearables metadata
+  try {
+    await redeployWithCatalystRotation(connectedAccount, connectedAccountIdentity, files, metadata, fetcher)
+  } catch (error) {
+    console.warn(
+      'Profile redeployment failed with full content server metadata, attempting to redeploy with empty wearables metadata:',
+      error
+    )
+    await redeployWithCatalystRotation(connectedAccount, connectedAccountIdentity, files, buildMetadataWithEmptyWearables(entity), fetcher)
+  }
 }
 
 async function redeployWithCatalystRotation(
@@ -191,7 +201,7 @@ async function attemptRedeployment(
   metadata: Partial<Profile>,
   fetcher?: IFetchComponent
 ): Promise<void> {
-  const client = createContentClient({ url: catalystUrl, fetcher: fetcher ?? createFetchComponent() })
+  const client = createContentClient({ url: catalystUrl, fetcher: fetcher ?? createFetcher() })
 
   const deploymentEntity = await DeploymentBuilder.buildEntity({
     type: EntityType.PROFILE,
@@ -288,6 +298,10 @@ function normalizeErrorMessage(error: unknown): string {
 }
 
 function isTimeoutError(error: unknown): boolean {
+  if (error instanceof Error && error.name === 'AbortError') {
+    return true
+  }
+
   if (typeof error === 'object' && error !== null) {
     const maybeStatus = (error as { status?: number }).status
     if (maybeStatus === TIMEOUT_STATUS_CODE) {
@@ -300,7 +314,7 @@ function isTimeoutError(error: unknown): boolean {
     message.toLowerCase().includes('timeout') ||
     message.toLowerCase().includes('request timeout') ||
     message.toLowerCase().includes('aborted') ||
-    message.includes('status 408')
+    message.toLowerCase().includes('status 408')
   )
 }
 

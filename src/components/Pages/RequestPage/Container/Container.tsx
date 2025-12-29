@@ -1,4 +1,5 @@
 import { ReactNode, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useMobileMediaQuery } from 'decentraland-ui/dist/components/Media/Media'
 import { connection } from 'decentraland-connect'
 import { useNavigateWithSearchParams } from '../../../../hooks/navigation'
@@ -11,18 +12,21 @@ import styles from './Container.module.css'
 export const Container = (props: { children: ReactNode; requestId?: string; canChangeAccount?: boolean; hasProfile?: boolean }) => {
   const { children, requestId, canChangeAccount } = props
 
+  const [searchParams] = useSearchParams()
   const [targetConfig, targetConfigId] = useTargetConfig()
   const navigate = useNavigateWithSearchParams()
   const isMobile = useMobileMediaQuery()
   const { account } = useCurrentConnectionData()
+  const isDeepLinkFlow = searchParams.get('flow') === 'deeplink'
 
   const onChangeAccount = useCallback(
-    async evt => {
+    async (evt: React.MouseEvent<HTMLAnchorElement>) => {
       evt.preventDefault()
       await connection.disconnect()
-      navigate(locations.login(`/auth/requests/${requestId ?? ''}?targetConfigId=${targetConfigId}`))
+      const flowParam = isDeepLinkFlow ? '&flow=deeplink' : ''
+      navigate(locations.login(`/auth/requests/${requestId ?? ''}?targetConfigId=${targetConfigId}${flowParam}`))
     },
-    [requestId, targetConfigId]
+    [requestId, targetConfigId, isDeepLinkFlow]
   )
 
   return (
