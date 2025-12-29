@@ -11,26 +11,34 @@ import type { IFetchComponent } from '@well-known-components/interfaces'
  *
  * This wrapper solves the problem by maintaining the correct context.
  */
-export const fetcher = {
-  fetch: async (url: string, init?: RequestInit) => {
-    const response = await fetch(url, init)
-
-    // `dcl-catalyst-client` expects a `node-fetch` like Response that has `.buffer()`.
-    // In the browser, Response only implements `.arrayBuffer()`.
-    const responseWithBuffer = response as unknown as Response & { buffer?: () => Promise<Uint8Array> }
-
-    if (typeof responseWithBuffer.buffer !== 'function') {
-      let cached: Uint8Array | undefined
-
-      responseWithBuffer.buffer = async () => {
-        if (!cached) {
-          cached = new Uint8Array(await response.arrayBuffer())
-        }
-
-        return cached
+export const createFetcher = (defaultFetcherOptions?: RequestInit & { timeout?: number }) => {
+  return {
+    fetch: async (url: string, init?: RequestInit) => {
+      const defaultOptions = {
+        ...defaultFetcherOptions,
+        signal: defaultFetcherOptions?.timeout ? AbortSignal.timeout(defaultFetcherOptions.timeout) : undefined
       }
-    }
+      const response = await fetch(url, { ...defaultOptions, ...init })
 
-    return responseWithBuffer
-  }
-} as unknown as IFetchComponent
+      // `dcl-catalyst-client` expects a `node-fetch` like Response that has `.buffer()`.
+      // In the browser, Response only implements `.arrayBuffer()`.
+      const responseWithBuffer = response as unknown as Response & { buffer?: () => Promise<Uint8Array> }
+
+      if (typeof responseWithBuffer.buffer !== 'function') {
+        let cached: Uint8Array | undefined
+
+        responseWithBuffer.buffer = async () => {
+          if (!cached) {
+            cached = new Uint8Array(await response.arrayBuffer())
+          }
+
+          return cached
+        }
+      }
+
+      return responseWithBuffer
+    }
+  } as unknown as IFetchComponent
+}
+
+export const fetcher = createFetcher()
