@@ -50,6 +50,19 @@ export const useAuthFlow = () => {
   }, [flags[FeatureFlagsKeys.MAGIC_TEST], flagInitialized])
 
   /**
+   * Returns the disabled catalysts from the feature flags.
+   * @returns {string[]} The disabled catalysts.
+   */
+  const getDisabledCatalysts = useCallback((): string[] => {
+    if (!flagInitialized) {
+      return []
+    }
+    return variants[FeatureFlagsKeys.DISABLED_CATALYSTS]?.enabled
+      ? JSON.parse(variants[FeatureFlagsKeys.DISABLED_CATALYSTS]?.payload?.value ?? '[]')
+      : []
+  }, [variants[FeatureFlagsKeys.DISABLED_CATALYSTS], flagInitialized])
+
+  /**
    * Checks profile consistency across catalysts and redirects based on profile state.
    * Handles profile redeployment if inconsistent, and navigates to setup/avatar setup
    * flows based on feature flags and WebGPU support.
@@ -72,7 +85,10 @@ export const useAuthFlow = () => {
         const fetcherWithTimeout = createFetcher({
           timeout: Number(config.get('PROFILE_CONSISTENCY_CHECK_TIMEOUT')) ?? 10000
         })
-        const consistencyResult = await fetchProfileWithConsistencyCheck(account, fetcherWithTimeout)
+
+        const disabledCatalysts = getDisabledCatalysts()
+
+        const consistencyResult = await fetchProfileWithConsistencyCheck(account, disabledCatalysts, fetcherWithTimeout)
 
         // Check A/B testing new onboarding flow
         const isFlowV2OnboardingFlowEnabled = variants[FeatureFlagsKeys.ONBOARDING_FLOW]?.name === OnboardingFlowVariant.V2
@@ -85,7 +101,7 @@ export const useAuthFlow = () => {
           // If we have a valid entity and user identity, attempt redeployment
           if (consistencyResult.profile && consistencyResult.profileFetchedFrom && userIdentity) {
             try {
-              await redeployExistingProfile(consistencyResult.profile, account, userIdentity, fetcherWithTimeout)
+              await redeployExistingProfile(consistencyResult.profile, account, userIdentity, disabledCatalysts, fetcherWithTimeout)
               // If redeployment succeeds, continue with the login flow
               return redirect()
             } catch (error) {
@@ -96,6 +112,7 @@ export const useAuthFlow = () => {
                   consistencyResult.profileFetchedFrom,
                   account,
                   userIdentity,
+                  disabledCatalysts,
                   fetcherWithTimeout
                 )
                 // If redeployment succeeds, continue with the login flow

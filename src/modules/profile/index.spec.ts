@@ -123,7 +123,7 @@ describe('profile module', () => {
           getAvatarDetails: jest.fn().mockResolvedValue(mockProfile)
         })
 
-        result = await fetchProfileWithConsistencyCheck(mockAddress)
+        result = await fetchProfileWithConsistencyCheck(mockAddress, [])
       })
 
       it('should return isConsistent as true', () => {
@@ -155,7 +155,7 @@ describe('profile module', () => {
 
         ;(createLambdasClient as jest.Mock).mockReturnValueOnce(mockClient1).mockReturnValueOnce(mockClient2)
 
-        result = await fetchProfileWithConsistencyCheck(mockAddress)
+        result = await fetchProfileWithConsistencyCheck(mockAddress, [])
       })
 
       it('should return isConsistent as false', () => {
@@ -189,7 +189,7 @@ describe('profile module', () => {
           .mockReturnValueOnce(mockClientTimeout)
           .mockReturnValueOnce(mockClientWithProfile)
 
-        result = await fetchProfileWithConsistencyCheck(mockAddress)
+        result = await fetchProfileWithConsistencyCheck(mockAddress, [])
       })
 
       it('should return isConsistent as true', () => {
@@ -218,7 +218,7 @@ describe('profile module', () => {
 
         ;(createLambdasClient as jest.Mock).mockReturnValueOnce(mockClientWithProfile).mockReturnValueOnce(mockClientWithError)
 
-        result = await fetchProfileWithConsistencyCheck(mockAddress)
+        result = await fetchProfileWithConsistencyCheck(mockAddress, [])
       })
 
       it('should return isConsistent as false', () => {
@@ -244,7 +244,7 @@ describe('profile module', () => {
         const mockClientWithoutProfile = { getAvatarDetails: jest.fn().mockRejectedValue(new Error('404')) }
         ;(createLambdasClient as jest.Mock).mockReturnValue(mockClientWithoutProfile)
 
-        result = await fetchProfileWithConsistencyCheck(mockAddress)
+        result = await fetchProfileWithConsistencyCheck(mockAddress, [])
       })
 
       it('should return isConsistent as false', () => {
@@ -269,7 +269,7 @@ describe('profile module', () => {
           throw new Error(errorMessage)
         })
 
-        result = await fetchProfileWithConsistencyCheck(mockAddress)
+        result = await fetchProfileWithConsistencyCheck(mockAddress, [])
       })
 
       it('should return isConsistent as false', () => {
@@ -338,7 +338,7 @@ describe('profile module', () => {
         const mockContentClient = { deploy: jest.fn().mockResolvedValue({}) }
         ;(createContentClient as jest.Mock).mockReturnValue(mockContentClient)
 
-        await redeployExistingProfile(mockProfile, mockAddress, mockIdentity, mockFetcher)
+        await redeployExistingProfile(mockProfile, mockAddress, mockIdentity, [], mockFetcher)
       })
 
       it('should fetch body and face snapshots', () => {
@@ -374,7 +374,7 @@ describe('profile module', () => {
         mockContentClient2 = { deploy: jest.fn().mockResolvedValue({}) }
         ;(createContentClient as jest.Mock).mockReturnValueOnce(mockContentClient1).mockReturnValueOnce(mockContentClient2)
 
-        await redeployExistingProfile(mockProfile, mockAddress, mockIdentity, mockFetcher)
+        await redeployExistingProfile(mockProfile, mockAddress, mockIdentity, [], mockFetcher)
       })
 
       it('should retry with the next catalyst', () => {
@@ -393,7 +393,7 @@ describe('profile module', () => {
       })
 
       it('should throw an error after all retries are exhausted', async () => {
-        await expect(redeployExistingProfile(mockProfile, mockAddress, mockIdentity, mockFetcher)).rejects.toEqual({ status: 500 })
+        await expect(redeployExistingProfile(mockProfile, mockAddress, mockIdentity, [], mockFetcher)).rejects.toEqual({ status: 500 })
       })
     })
 
@@ -404,7 +404,7 @@ describe('profile module', () => {
       })
 
       it('should not retry and throw immediately', async () => {
-        await expect(redeployExistingProfile(mockProfile, mockAddress, mockIdentity, mockFetcher)).rejects.toEqual({
+        await expect(redeployExistingProfile(mockProfile, mockAddress, mockIdentity, [], mockFetcher)).rejects.toEqual({
           status: 400
         })
 
@@ -440,7 +440,7 @@ describe('profile module', () => {
 
         ;(createContentClient as jest.Mock).mockReturnValueOnce(mockContentClientForFetch).mockReturnValueOnce(mockContentClientForDeploy)
 
-        await redeployExistingProfileWithContentServerData(mockCatalystUrl, mockAddress, mockIdentity)
+        await redeployExistingProfileWithContentServerData(mockCatalystUrl, mockAddress, mockIdentity, [])
       })
 
       it('should fetch the entity by pointer', () => {
@@ -515,7 +515,7 @@ describe('profile module', () => {
         const mockContentClient = { deploy: jest.fn().mockResolvedValue({}) }
         ;(createContentClient as jest.Mock).mockReturnValue(mockContentClient)
 
-        await redeployExistingProfile(mockProfile, mockAddress, mockIdentity, mockFetcher)
+        await redeployExistingProfile(mockProfile, mockAddress, mockIdentity, [], mockFetcher)
       })
 
       it('should create the first content client with the PEER_URL', () => {
@@ -547,7 +547,7 @@ describe('profile module', () => {
           }
         })
 
-        await redeployExistingProfile(mockProfile, mockAddress, mockIdentity, mockFetcher).catch(() => undefined)
+        await redeployExistingProfile(mockProfile, mockAddress, mockIdentity, [], mockFetcher).catch(() => undefined)
       })
 
       it('should attempt up to 3 catalysts maximum', () => {
