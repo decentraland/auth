@@ -1,4 +1,3 @@
-import { createFetchComponent } from '@well-known-components/fetch-component'
 import { DeploymentBuilder, createContentClient } from 'dcl-catalyst-client'
 import { Authenticator } from '@dcl/crypto'
 import { EntityType, Entity } from '@dcl/schemas'
@@ -9,13 +8,11 @@ import { DeploymentParams, AvatarShape, Color } from './AvatarSetupPage.types'
 jest.mock('../../../modules/config')
 jest.mock('dcl-catalyst-client')
 jest.mock('@dcl/crypto')
-jest.mock('@well-known-components/fetch-component')
 
 const mockConfig = config as jest.Mocked<typeof config>
 const mockCreateContentClient = createContentClient as jest.MockedFunction<typeof createContentClient>
 const mockDeploymentBuilder = DeploymentBuilder as jest.Mocked<typeof DeploymentBuilder>
 const mockAuthenticator = Authenticator as jest.Mocked<typeof Authenticator>
-const mockCreateFetchComponent = createFetchComponent as jest.MockedFunction<typeof createFetchComponent>
 
 describe('deployProfileFromAvatarShape', () => {
   let mockParams: DeploymentParams
@@ -130,7 +127,6 @@ describe('deployProfileFromAvatarShape', () => {
 
     mockConfig.get.mockReturnValue(mockPeerUrl)
     mockCreateContentClient.mockReturnValue(mockContentClient as any)
-    mockCreateFetchComponent.mockReturnValue({} as any)
     mockDeploymentBuilder.buildEntity.mockResolvedValue(mockBuiltEntity as any)
     mockAuthenticator.signPayload.mockReturnValue(mockAuthChain as any)
   })
