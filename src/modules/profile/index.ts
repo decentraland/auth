@@ -104,16 +104,18 @@ export async function redeployExistingProfile(
   profile: Profile,
   connectedAccount: string,
   connectedAccountIdentity: AuthIdentity,
-  fetcher?: IFetchComponent
+  _fetcher?: IFetchComponent
 ): Promise<void> {
   const snapshotUrls = Object.entries(profile.avatars?.[0]?.avatar?.snapshots ?? {}).reduce(
     (acc, [file, url]) => ({ ...acc, [file]: url }),
     {} as Record<string, string>
   )
 
+  const fetcher = _fetcher ?? createFetcher()
+
   const [bodyBuffer, faceBuffer] = await Promise.all([
-    fetch(snapshotUrls['body']).then(response => response.arrayBuffer()),
-    fetch(snapshotUrls['face256']).then(response => response.arrayBuffer())
+    fetcher.fetch(snapshotUrls['body']).then(response => response.arrayBuffer()),
+    fetcher.fetch(snapshotUrls['face256']).then(response => response.arrayBuffer())
   ])
 
   const files = createSnapshotFilesMap(bodyBuffer, faceBuffer)
