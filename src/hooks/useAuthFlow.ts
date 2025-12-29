@@ -14,6 +14,7 @@ import { checkWebGpuSupport } from '../shared/utils/webgpu'
 import { useNavigateWithSearchParams } from './navigation'
 import { useAfterLoginRedirection } from './redirection'
 import { useTargetConfig } from './targetConfig'
+import { useDisabledCatalysts } from './useDisabledCatalysts'
 
 /**
  * Custom hook that manages authentication flow logic including Magic connection
@@ -32,6 +33,7 @@ export const useAuthFlow = () => {
 
   const [targetConfig] = useTargetConfig()
   const { identity } = useCurrentConnectionData()
+  const disabledCatalysts = useDisabledCatalysts()
 
   /**
    * Connects to the Magic wallet provider based on the current feature flag configuration.
@@ -48,19 +50,6 @@ export const useAuthFlow = () => {
     const providerType = flags[FeatureFlagsKeys.MAGIC_TEST] ? ProviderType.MAGIC_TEST : ProviderType.MAGIC
     return await connection.connect(providerType)
   }, [flags[FeatureFlagsKeys.MAGIC_TEST], flagInitialized])
-
-  /**
-   * Returns the disabled catalysts from the feature flags.
-   * @returns {string[]} The disabled catalysts.
-   */
-  const getDisabledCatalysts = useCallback((): string[] => {
-    if (!flagInitialized) {
-      return []
-    }
-    return variants[FeatureFlagsKeys.DISABLED_CATALYSTS]?.enabled
-      ? JSON.parse(variants[FeatureFlagsKeys.DISABLED_CATALYSTS]?.payload?.value ?? '[]')
-      : []
-  }, [variants[FeatureFlagsKeys.DISABLED_CATALYSTS], flagInitialized])
 
   /**
    * Checks profile consistency across catalysts and redirects based on profile state.
@@ -85,8 +74,6 @@ export const useAuthFlow = () => {
         const fetcherWithTimeout = createFetcher({
           timeout: Number(config.get('PROFILE_CONSISTENCY_CHECK_TIMEOUT')) ?? 10000
         })
-
-        const disabledCatalysts = getDisabledCatalysts()
 
         const consistencyResult = await fetchProfileWithConsistencyCheck(account, disabledCatalysts, fetcherWithTimeout)
 
@@ -150,7 +137,15 @@ export const useAuthFlow = () => {
 
       redirect()
     },
-    [targetConfig?.skipSetup, variants[FeatureFlagsKeys.ONBOARDING_FLOW], navigate, redirectTo, flagInitialized, identity]
+    [
+      targetConfig?.skipSetup,
+      variants[FeatureFlagsKeys.ONBOARDING_FLOW],
+      navigate,
+      redirectTo,
+      flagInitialized,
+      identity,
+      disabledCatalysts
+    ]
   )
 
   return {
