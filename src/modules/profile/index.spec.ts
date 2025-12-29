@@ -66,11 +66,12 @@ type MockFetcher = IFetchComponent & {
   fetch: jest.Mock<Promise<MockFetcherResponse>, Parameters<IFetchComponent['fetch']>>
 }
 
-const createMockFetcher = (): MockFetcher => ({
-  fetch: jest.fn().mockResolvedValue({
-    arrayBuffer: jest.fn().mockResolvedValue(new ArrayBuffer(8))
-  })
-}) as unknown as MockFetcher
+const createMockFetcher = (): MockFetcher =>
+  ({
+    fetch: jest.fn().mockResolvedValue({
+      arrayBuffer: jest.fn().mockResolvedValue(new ArrayBuffer(8))
+    })
+  } as unknown as MockFetcher)
 
 const setupRedeployBase = (address: string = DEFAULT_MOCK_ADDRESS) => {
   const profile = createMockProfile(address)
@@ -392,9 +393,7 @@ describe('profile module', () => {
       })
 
       it('should throw an error after all retries are exhausted', async () => {
-        await expect(
-          redeployExistingProfile(mockProfile, mockAddress, mockIdentity, mockFetcher)
-        ).rejects.toEqual({ status: 500 })
+        await expect(redeployExistingProfile(mockProfile, mockAddress, mockIdentity, mockFetcher)).rejects.toEqual({ status: 500 })
       })
     })
 
@@ -405,9 +404,7 @@ describe('profile module', () => {
       })
 
       it('should not retry and throw immediately', async () => {
-        await expect(
-          redeployExistingProfile(mockProfile, mockAddress, mockIdentity, mockFetcher)
-        ).rejects.toEqual({
+        await expect(redeployExistingProfile(mockProfile, mockAddress, mockIdentity, mockFetcher)).rejects.toEqual({
           status: 400
         })
 

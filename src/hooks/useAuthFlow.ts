@@ -70,7 +70,7 @@ export const useAuthFlow = () => {
       if (targetConfig && !targetConfig.skipSetup && account) {
         // Check profile consistency across all catalysts
         const fetcherWithTimeout = createFetcher({
-          signal: AbortSignal.timeout(Number(config.get('PROFILE_CONSISTENCY_CHECK_TIMEOUT')) ?? 10000)
+          timeout: Number(config.get('PROFILE_CONSISTENCY_CHECK_TIMEOUT')) ?? 10000
         })
         const consistencyResult = await fetchProfileWithConsistencyCheck(account, fetcherWithTimeout)
 

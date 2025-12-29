@@ -11,10 +11,14 @@ import type { IFetchComponent } from '@well-known-components/interfaces'
  *
  * This wrapper solves the problem by maintaining the correct context.
  */
-export const createFetcher = (defaultFetcherOptions?: RequestInit) => {
+export const createFetcher = (defaultFetcherOptions?: RequestInit & { timeout?: number }) => {
   return {
     fetch: async (url: string, init?: RequestInit) => {
-      const response = await fetch(url, { ...defaultFetcherOptions, ...init })
+      const defaultOptions = {
+        ...defaultFetcherOptions,
+        signal: defaultFetcherOptions?.timeout ? AbortSignal.timeout(defaultFetcherOptions.timeout) : undefined
+      }
+      const response = await fetch(url, { ...defaultOptions, ...init })
 
       // `dcl-catalyst-client` expects a `node-fetch` like Response that has `.buffer()`.
       // In the browser, Response only implements `.arrayBuffer()`.
