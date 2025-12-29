@@ -1,3 +1,4 @@
+import type { IFetchComponent } from '@well-known-components/interfaces'
 import { createContentClient, createLambdasClient, DeploymentBuilder } from 'dcl-catalyst-client'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/catalyst.schemas'
 import { getCatalystServersFromCache } from 'dcl-catalyst-client/dist/contracts-snapshots'
@@ -57,16 +58,28 @@ jest.spyOn(console, 'error').mockImplementation(() => undefined)
 
 const createCatalystList = (...addresses: string[]) => addresses.map(address => ({ address }))
 
+type MockFetcherResponse = {
+  arrayBuffer: jest.Mock<Promise<ArrayBuffer>, []>
+}
+
+type MockFetcher = IFetchComponent & {
+  fetch: jest.Mock<Promise<MockFetcherResponse>, Parameters<IFetchComponent['fetch']>>
+}
+
+const createMockFetcher = (): MockFetcher => ({
+  fetch: jest.fn().mockResolvedValue({
+    arrayBuffer: jest.fn().mockResolvedValue(new ArrayBuffer(8))
+  })
+}) as unknown as MockFetcher
+
 const setupRedeployBase = (address: string = DEFAULT_MOCK_ADDRESS) => {
   const profile = createMockProfile(address)
   const identity = createMockIdentity(address)
+  const fetcher = createMockFetcher()
 
-  global.fetch = jest.fn().mockResolvedValue({
-    arrayBuffer: () => Promise.resolve(new ArrayBuffer(8))
-  })
   ;(hashV1 as jest.Mock).mockResolvedValue('mock-hash')
 
-  return { profile, identity }
+  return { profile, identity, fetcher }
 }
 
 describe('profile module', () => {
@@ -310,9 +323,10 @@ describe('profile module', () => {
     const mockAddress = DEFAULT_MOCK_ADDRESS
     let mockProfile: Profile
     let mockIdentity: AuthIdentity
+    let mockFetcher: MockFetcher
 
     beforeEach(() => {
-      ;({ profile: mockProfile, identity: mockIdentity } = setupRedeployBase(mockAddress))
+      ;({ profile: mockProfile, identity: mockIdentity, fetcher: mockFetcher } = setupRedeployBase(mockAddress))
       ;(DeploymentBuilder.buildEntity as jest.Mock).mockResolvedValue(createMockDeploymentResult())
       ;(Authenticator.signPayload as jest.Mock).mockReturnValue([])
       ;(getCatalystServersFromCache as jest.Mock).mockReturnValue(createCatalystList('https://catalyst1.zone', 'https://catalyst2.zone'))
@@ -323,12 +337,12 @@ describe('profile module', () => {
         const mockContentClient = { deploy: jest.fn().mockResolvedValue({}) }
         ;(createContentClient as jest.Mock).mockReturnValue(mockContentClient)
 
-        await redeployExistingProfile(mockProfile, mockAddress, mockIdentity)
+        await redeployExistingProfile(mockProfile, mockAddress, mockIdentity, mockFetcher)
       })
 
       it('should fetch body and face snapshots', () => {
-        expect(global.fetch).toHaveBeenCalledWith('https://peer.decentraland.zone/content/body')
-        expect(global.fetch).toHaveBeenCalledWith('https://peer.decentraland.zone/content/face256')
+        expect(mockFetcher.fetch).toHaveBeenCalledWith('https://peer.decentraland.zone/content/body')
+        expect(mockFetcher.fetch).toHaveBeenCalledWith('https://peer.decentraland.zone/content/face256')
       })
 
       it('should build the deployment entity with correct type', () => {
@@ -359,7 +373,7 @@ describe('profile module', () => {
         mockContentClient2 = { deploy: jest.fn().mockResolvedValue({}) }
         ;(createContentClient as jest.Mock).mockReturnValueOnce(mockContentClient1).mockReturnValueOnce(mockContentClient2)
 
-        await redeployExistingProfile(mockProfile, mockAddress, mockIdentity)
+        await redeployExistingProfile(mockProfile, mockAddress, mockIdentity, mockFetcher)
       })
 
       it('should retry with the next catalyst', () => {
@@ -378,7 +392,9 @@ describe('profile module', () => {
       })
 
       it('should throw an error after all retries are exhausted', async () => {
-        await expect(redeployExistingProfile(mockProfile, mockAddress, mockIdentity)).rejects.toEqual({ status: 500 })
+        await expect(
+          redeployExistingProfile(mockProfile, mockAddress, mockIdentity, mockFetcher)
+        ).rejects.toEqual({ status: 500 })
       })
     })
 
@@ -389,7 +405,9 @@ describe('profile module', () => {
       })
 
       it('should not retry and throw immediately', async () => {
-        await expect(redeployExistingProfile(mockProfile, mockAddress, mockIdentity)).rejects.toEqual({
+        await expect(
+          redeployExistingProfile(mockProfile, mockAddress, mockIdentity, mockFetcher)
+        ).rejects.toEqual({
           status: 400
         })
 
@@ -480,9 +498,10 @@ describe('profile module', () => {
     const mockAddress = DEFAULT_MOCK_ADDRESS
     let mockIdentity: AuthIdentity
     let mockProfile: Profile
+    let mockFetcher: MockFetcher
 
     beforeEach(() => {
-      ;({ profile: mockProfile, identity: mockIdentity } = setupRedeployBase(mockAddress))
+      ;({ profile: mockProfile, identity: mockIdentity, fetcher: mockFetcher } = setupRedeployBase(mockAddress))
       ;(DeploymentBuilder.buildEntity as jest.Mock).mockResolvedValue(createMockDeploymentResult())
       ;(Authenticator.signPayload as jest.Mock).mockReturnValue([])
     })
@@ -499,7 +518,7 @@ describe('profile module', () => {
         const mockContentClient = { deploy: jest.fn().mockResolvedValue({}) }
         ;(createContentClient as jest.Mock).mockReturnValue(mockContentClient)
 
-        await redeployExistingProfile(mockProfile, mockAddress, mockIdentity)
+        await redeployExistingProfile(mockProfile, mockAddress, mockIdentity, mockFetcher)
       })
 
       it('should create the first content client with the PEER_URL', () => {
@@ -531,7 +550,7 @@ describe('profile module', () => {
           }
         })
 
-        await redeployExistingProfile(mockProfile, mockAddress, mockIdentity).catch(() => undefined)
+        await redeployExistingProfile(mockProfile, mockAddress, mockIdentity, mockFetcher).catch(() => undefined)
       })
 
       it('should attempt up to 3 catalysts maximum', () => {
