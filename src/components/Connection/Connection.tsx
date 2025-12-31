@@ -1,4 +1,5 @@
-import React, { useCallback, useState } from 'react'
+import { useCallback, useState } from 'react'
+import type { ReactNode } from 'react'
 import { Logo } from 'decentraland-ui2'
 import {
   ChevronIcon,
@@ -23,8 +24,8 @@ const defaultProps = {
     accessWith: (option: ConnectionOptionType) => `Continue with ${connectionOptionTitles[option]}`,
     connectWith: (option: ConnectionOptionType) => `Continue with ${connectionOptionTitles[option]}`,
     moreOptions: 'More Options',
-    socialMessage: (element: React.ReactNode) => <>Access secured by {element}</>,
-    web3Message: (learnMore: (value: React.ReactNode) => React.ReactNode) => <>Have a digital wallet? {learnMore('Learn More')}</>
+    socialMessage: (element: ReactNode) => <>Access secured by {element}</>,
+    web3Message: (learnMore: (value: ReactNode) => ReactNode) => <>Have a digital wallet? {learnMore('Learn More')}</>
   }
 }
 
@@ -45,6 +46,7 @@ export const Connection = (props: ConnectionProps): JSX.Element => {
         {isNewUser && <DecentralandText>Decentraland</DecentralandText>}
       </DclLogoContainer>
       <MainContentContainer>
+        {/* Rationale: `isNewUser` is used only for styling; the styled component filters it out so it doesn't reach the DOM. */}
         <Title isNewUser={isNewUser}>{isNewUser ? i18n.titleNewUser : i18n.title}</Title>
         {connectionOptions && (
           <ConnectionPrimaryButton

@@ -1,4 +1,4 @@
-import React from 'react'
+import * as React from 'react'
 import { handleError } from '../../shared/utils/errorHandler'
 import { IntercomWidget } from './IntercomWidget'
 import { DefaultProps, Props } from './Intercom.types'
@@ -16,19 +16,27 @@ export default class Intercom extends React.PureComponent<Props> {
   }
 
   private readonly widget: IntercomWidget
+  private readonly enabled: boolean
 
   constructor(props: Props) {
     super(props)
     this.widget = IntercomWidget.getInstance()
+    const appId = String(props.appId ?? '').trim()
+    // Rationale: in local/dev environments this can be empty or the literal string "undefined"/"null".
+    // Intercom will spam console warnings and failed network requests if we attempt to boot without a valid App ID.
+    this.enabled = Boolean(appId) && appId !== 'undefined' && appId !== 'null'
+
+    if (!this.enabled) {
+      return
+    }
 
     if (!this.widget.appId) {
       this.widget.init(props.appId, props.settings)
-    } else {
-      if (this.widget.appId !== props.appId) {
-        throw new Error(`Intercom widget already initialized with app id "${props.appId}". Only one intercom widget is allowed.`)
-      }
+      return
+    }
 
-      // Else, all settings will be ignored but no notice will be given
+    if (this.widget.appId !== props.appId) {
+      throw new Error(`Intercom widget already initialized with app id "${props.appId}". Only one intercom widget is allowed.`)
     }
   }
 
@@ -49,6 +57,10 @@ export default class Intercom extends React.PureComponent<Props> {
 
   async renderWidget() {
     const { data } = this.props
+
+    if (!this.enabled) {
+      return
+    }
 
     try {
       await this.widget.inject()

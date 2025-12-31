@@ -2,11 +2,11 @@ import { useCallback, useContext } from 'react'
 import type { Profile } from 'dcl-catalyst-client/dist/client/specs/catalyst.schemas'
 import { AuthIdentity } from '@dcl/crypto'
 import { ProviderType } from '@dcl/schemas'
+import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
 import { connection } from 'decentraland-connect'
 import { FeatureFlagsContext, FeatureFlagsKeys, OnboardingFlowVariant } from '../components/FeatureFlagsProvider'
 import { config } from '../modules/config'
 import { fetchProfileWithConsistencyCheck, redeployExistingProfile, redeployExistingProfileWithContentServerData } from '../modules/profile'
-import { useCurrentConnectionData } from '../shared/connection/hook'
 import { createFetcher } from '../shared/fetcher'
 import { locations } from '../shared/locations'
 import { isProfileComplete } from '../shared/profile'
@@ -32,7 +32,6 @@ export const useAuthFlow = () => {
   const { flags, variants, initialized: flagInitialized } = useContext(FeatureFlagsContext)
 
   const [targetConfig] = useTargetConfig()
-  const { identity } = useCurrentConnectionData()
   const disabledCatalysts = useDisabledCatalysts()
 
   /**
@@ -82,8 +81,9 @@ export const useAuthFlow = () => {
 
         // If profile is not consistent across catalysts, try to redeploy if we have a valid entity
         if (!consistencyResult.isConsistent) {
-          // Use provided identity first, then fall back to hook identity
-          const userIdentity = providedIdentity ?? identity
+          // Use provided identity first, then fall back to localStorage identity (no provider init side-effects)
+          // Rationale: reading identity from localStorage avoids triggering provider initialization (e.g. WalletConnect) during page load.
+          const userIdentity = providedIdentity ?? localStorageGetIdentity(account.toLowerCase())
 
           // If we have a valid entity and user identity, attempt redeployment
           if (consistencyResult.profile && consistencyResult.profileFetchedFrom && userIdentity) {
@@ -137,15 +137,7 @@ export const useAuthFlow = () => {
 
       redirect()
     },
-    [
-      targetConfig?.skipSetup,
-      variants[FeatureFlagsKeys.ONBOARDING_FLOW],
-      navigate,
-      redirectTo,
-      flagInitialized,
-      identity,
-      disabledCatalysts
-    ]
+    [targetConfig?.skipSetup, variants[FeatureFlagsKeys.ONBOARDING_FLOW], navigate, redirectTo, flagInitialized, disabledCatalysts]
   )
 
   return {

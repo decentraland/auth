@@ -362,7 +362,11 @@ export const RequestPage = () => {
         setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
         setView(View.IP_VALIDATION_ERROR)
       } else {
+        // Rationale: attach requestId so we can correlate this client-side error with auth-server logs/Sentry issues.
         const errorMessage = handleError(e, 'Error approving sign in verification', {
+          sentryExtra: {
+            requestId
+          },
           sentryTags: { isWeb2Wallet: isUserUsingWeb2Wallet }
         })
         setError(errorMessage)
@@ -465,7 +469,12 @@ export const RequestPage = () => {
         setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
         setView(View.IP_VALIDATION_ERROR)
       } else {
+        // Rationale: include requestId + method to improve debugging/correlation for wallet interaction failures.
         handleError(e, 'Wallet interaction error', {
+          sentryExtra: {
+            method: requestRef.current?.method,
+            requestId
+          },
           sentryTags: { isWeb2Wallet: isUserUsingWeb2Wallet }
         })
 

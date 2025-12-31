@@ -9,6 +9,17 @@ import { IdentityResponse, OutcomeError, OutcomeResponse, RecoverResponse } from
 export const createAuthServerHttpClient = (authServerUrl?: string) => {
   const baseUrl = authServerUrl ?? config.get('AUTH_SERVER_URL')
 
+  const getResponseCorrelationIds = (response: Response) => {
+    // Rationale: backend logs often include request/trace identifiers in headers.
+    // Adding them to Sentry makes it much easier to correlate a frontend error with server-side logs.
+    const headers = (response as unknown as { headers?: { get?: (key: string) => string | null } }).headers
+    return {
+      traceparent: headers?.get?.('traceparent') ?? undefined,
+      // eslint-disable-next-line @typescript-eslint/naming-convention
+      x_request_id: headers?.get?.('x-request-id') ?? undefined
+    }
+  }
+
   const extractError = async (response: Response, requestId: string) => {
     let data: { error?: string }
     try {
@@ -31,6 +42,7 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
   }
 
   const sendSuccessfulOutcome = async (requestId: string, sender: string, result: unknown): Promise<OutcomeResponse> => {
+    let responseCorrelationIds: ReturnType<typeof getResponseCorrelationIds> | undefined
     try {
       const response = await fetch(baseUrl + '/v2/requests/' + requestId + '/outcome', {
         method: 'POST',
@@ -44,6 +56,8 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
         })
       })
 
+      responseCorrelationIds = getResponseCorrelationIds(response)
+
       if (!response.ok) {
         await extractError(response, requestId)
       }
@@ -55,7 +69,12 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
 
       return {}
     } catch (e) {
-      handleError(e, 'Error sending outcome')
+      handleError(e, 'Error sending outcome', {
+        sentryExtra: {
+          requestId,
+          ...responseCorrelationIds
+        }
+      })
       throw e
     }
   }
@@ -91,6 +110,7 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
   }
 
   const sendFailedOutcome = async (requestId: string, sender: string, error: OutcomeError): Promise<OutcomeResponse> => {
+    let responseCorrelationIds: ReturnType<typeof getResponseCorrelationIds> | undefined
     try {
       const response = await fetch(baseUrl + '/v2/requests/' + requestId + '/outcome', {
         method: 'POST',
@@ -104,6 +124,8 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
         })
       })
 
+      responseCorrelationIds = getResponseCorrelationIds(response)
+
       if (!response.ok) {
         await extractError(response, requestId)
       }
@@ -116,24 +138,37 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
 
       return {}
     } catch (e) {
-      handleError(e, 'Error sending outcome')
+      handleError(e, 'Error sending outcome', {
+        sentryExtra: {
+          requestId,
+          ...responseCorrelationIds
+        }
+      })
       throw e
     }
   }
 
   const recover = async (requestId: string, signerAddress: string, isDeepLinkFlow = false): Promise<RecoverResponse> => {
     let recoverResponse: RecoverResponse | undefined
+    let responseCorrelationIds: ReturnType<typeof getResponseCorrelationIds> | undefined
 
     try {
       const response = await fetch(baseUrl + '/v2/requests/' + requestId, {
         method: 'GET'
       })
 
+      responseCorrelationIds = getResponseCorrelationIds(response)
+
       if (!response.ok) {
         await extractError(response, requestId)
       }
 
-      const recoverResponse = await response.json()
+      recoverResponse = await response.json()
+
+      if (!recoverResponse) {
+        // Defensive guard + type narrowing. If the server returns an empty body we prefer failing explicitly.
+        throw new Error('Recover response is empty')
+      }
 
       // If the sender defined in the request is different than the one that is connected, show an error.
       if (recoverResponse.sender && recoverResponse.sender !== signerAddress.toLowerCase()) {
@@ -168,6 +203,10 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
       return recoverResponse
     } catch (e) {
       handleError(e, 'Error recovering request', {
+        sentryExtra: {
+          requestId,
+          ...responseCorrelationIds
+        },
         trackingData: {
           browserTime: Date.now(),
           requestType: recoverResponse?.method ?? 'Unknown'
@@ -179,16 +218,24 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
   }
 
   const notifyRequestNeedsValidation = async (requestId: string) => {
+    let responseCorrelationIds: ReturnType<typeof getResponseCorrelationIds> | undefined
     try {
       const response = await fetch(baseUrl + '/v2/requests/' + requestId + '/validation', {
         method: 'POST'
       })
 
+      responseCorrelationIds = getResponseCorrelationIds(response)
+
       if (!response.ok) {
         await extractError(response, requestId)
       }
     } catch (e) {
-      handleError(e, 'Error notifying request needs validation')
+      handleError(e, 'Error notifying request needs validation', {
+        sentryExtra: {
+          requestId,
+          ...responseCorrelationIds
+        }
+      })
       throw e
     }
   }

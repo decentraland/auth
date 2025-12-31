@@ -45,7 +45,12 @@ export const createAuthServerWsClient = (authServerUrl?: string) => {
         result
       })
     } catch (e) {
-      handleError(e, 'Error sending outcome')
+      // Rationale: include requestId to correlate this client-side error with backend logs/Sentry issues.
+      handleError(e, 'Error sending outcome', {
+        sentryExtra: {
+          requestId
+        }
+      })
       throw e
     }
   }
@@ -58,7 +63,12 @@ export const createAuthServerWsClient = (authServerUrl?: string) => {
         error
       })
     } catch (e) {
-      handleError(e, 'Error sending outcome')
+      // Rationale: include requestId to correlate this client-side error with backend logs/Sentry issues.
+      handleError(e, 'Error sending outcome', {
+        sentryExtra: {
+          requestId
+        }
+      })
       throw e
     }
   }
@@ -107,6 +117,10 @@ export const createAuthServerWsClient = (authServerUrl?: string) => {
       return response
     } catch (e) {
       handleError(e, 'Error recovering request', {
+        sentryExtra: {
+          requestId
+        },
+        // Rationale: tracking data is useful for product insights; requestId is useful for debugging/correlation.
         trackingData: {
           browserTime: Date.now(),
           requestType: response?.method ?? 'Unknown'
@@ -121,7 +135,12 @@ export const createAuthServerWsClient = (authServerUrl?: string) => {
     try {
       await request<ValidationResponse>('request-validation-status', { requestId })
     } catch (e) {
-      handleError(e, 'Error notifying request needs validation')
+      // Rationale: include requestId to correlate this client-side error with backend logs/Sentry issues.
+      handleError(e, 'Error notifying request needs validation', {
+        sentryExtra: {
+          requestId
+        }
+      })
       throw e
     }
   }

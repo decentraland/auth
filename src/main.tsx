@@ -2,9 +2,10 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import './polyfills.ts'
 import 'semantic-ui-css/semantic.min.css'
-import * as React from 'react'
+// Side-effect import: installs a global handler to cleanup stale WalletConnect v2 state that can surface as unhandled rejections.
+import './shared/connection/walletConnectUnhandledRejection'
 import { useEffect } from 'react'
-import * as ReactDOM from 'react-dom'
+import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { darkTheme, DclThemeProvider } from 'decentraland-ui2'
 import { RequestPage } from './components/Pages/RequestPage'
@@ -46,16 +47,28 @@ const SiteRoutes = () => {
   )
 }
 
-ReactDOM.render(
-  <React.StrictMode>
-    <FeatureFlagsProvider>
-      <DclThemeProvider theme={darkTheme}>
-        <BrowserRouter basename="/auth">
-          <SiteRoutes />
-        </BrowserRouter>
-      </DclThemeProvider>
-      <Intercom appId={config.get('INTERCOM_APP_ID')} settings={{ alignment: 'right' }} />
-    </FeatureFlagsProvider>
-  </React.StrictMode>,
-  document.getElementById('root')
+const rootElement = document.getElementById('root')
+
+if (!rootElement) {
+  throw new Error('Root element not found')
+}
+
+declare global {
+  interface Window {
+    // Vite HMR can re-evaluate this module; keeping a single root avoids "createRoot called twice" warnings in dev.
+    __dclAuthRoot__?: ReturnType<typeof createRoot>
+  }
+}
+
+const root = window.__dclAuthRoot__ ?? (window.__dclAuthRoot__ = createRoot(rootElement))
+
+root.render(
+  <FeatureFlagsProvider>
+    <DclThemeProvider theme={darkTheme}>
+      <BrowserRouter basename="/auth">
+        <SiteRoutes />
+      </BrowserRouter>
+    </DclThemeProvider>
+    <Intercom appId={config.get('INTERCOM_APP_ID')} settings={{ alignment: 'right' }} />
+  </FeatureFlagsProvider>
 )
