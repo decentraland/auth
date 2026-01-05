@@ -11,6 +11,7 @@ import { getContract, sendMetaTransaction, ContractName } from 'decentraland-tra
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import { useAnalytics } from '../../../hooks/useAnalytics'
+import { useDisabledCatalysts } from '../../../hooks/useDisabledCatalysts'
 import { getAnalytics } from '../../../modules/analytics/segment'
 import { ClickEvents, TrackingEvents } from '../../../modules/analytics/types'
 import { config } from '../../../modules/config'
@@ -120,6 +121,7 @@ export const RequestPage = () => {
   const authServerClient = useRef(createAuthServerHttpClient())
   const isDeepLinkFlow = searchParams.get('flow') === 'deeplink'
   const flowParam = isDeepLinkFlow ? '&flow=deeplink' : ''
+  const disabledCatalysts = useDisabledCatalysts()
 
   // Goes to the login page where the user will have to connect a wallet.
   const toLoginPage = useCallback(() => {
@@ -157,11 +159,11 @@ export const RequestPage = () => {
       const timeTheSiteStartedLoading = Date.now()
       browserProvider.current = new ethers.BrowserProvider(provider)
 
-      const consistencyResult = await fetchProfileWithConsistencyCheck(account)
+      const consistencyResult = await fetchProfileWithConsistencyCheck(account, disabledCatalysts)
       console.log('Loading request - Consistency result', consistencyResult)
       if (!consistencyResult.isConsistent && consistencyResult.profile && identity) {
         try {
-          await redeployExistingProfile(consistencyResult.profile, account, identity)
+          await redeployExistingProfile(consistencyResult.profile, account, identity, disabledCatalysts)
         } catch (error) {
           console.warn('Profile redeployment failed, falling back to login page:', error)
           toLoginPage()

@@ -4,6 +4,12 @@ import { Connection as ConnectionNew } from './Connection'
 import { EXTRA_TEST_ID, PRIMARY_TEST_ID, SECONDARY_TEST_ID, SHOW_MORE_BUTTON_TEST_ID } from './constants'
 import { ConnectionOptionType, ConnectionProps, MetamaskEthereumWindow } from './Connection.types'
 
+declare global {
+  interface Window {
+    ethereum?: { isMetaMask?: boolean }
+  }
+}
+
 function renderConnectionNew(props: Partial<ConnectionProps>) {
   return render(
     <DclThemeProvider theme={darkTheme}>
@@ -146,7 +152,7 @@ describe('when rendering ConnectionNew', () => {
   describe('and the user has metamask installed', () => {
     let connectionOptions: ConnectionProps['connectionOptions']
     let onConnect: jest.Mock
-    let oldEthereum: typeof window.ethereum
+    let oldEthereum: Window['ethereum']
 
     beforeEach(() => {
       oldEthereum = window.ethereum

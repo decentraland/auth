@@ -17,11 +17,26 @@ export const FeatureFlagsProvider = (props: PropsWithChildren<unknown>) => {
           const baseUrl = config.get('FEATURE_FLAGS_URL')
           const controller = new AbortController()
           timeoutId = setTimeout(() => controller.abort(), THIRTY_SECONDS)
-          const response = await fetch(`${baseUrl}/dapps.json`, { signal: controller.signal })
-          const json = await response.json()
-          setValue({ ...value, flags: json.flags, variants: json.variants, initialized: true })
+
+          const fetchJson = async (path: string) => {
+            const response = await fetch(`${baseUrl}/${path}`, { signal: controller.signal })
+            return response.json()
+          }
+
+          const [dappsJson, explorerJson] = await Promise.all([fetchJson('dapps.json'), fetchJson('explorer.json')])
+
+          const mergedFlags = {
+            ...(dappsJson?.flags ?? {}),
+            ...(explorerJson?.flags ?? {})
+          }
+          const mergedVariants = {
+            ...(dappsJson?.variants ?? {}),
+            ...(explorerJson?.variants ?? {})
+          }
+
+          setValue(prev => ({ ...prev, flags: mergedFlags, variants: mergedVariants, initialized: true }))
         } catch (error) {
-          setValue({ ...value, flags: {}, variants: {}, initialized: true })
+          setValue(prev => ({ ...prev, flags: {}, variants: {}, initialized: true }))
           console.error('Error fetching feature flags', error)
         } finally {
           if (timeoutId) {

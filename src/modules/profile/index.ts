@@ -1,10 +1,12 @@
+import { IFetchComponent } from '@well-known-components/interfaces'
 import { createLambdasClient, createContentClient, DeploymentBuilder } from 'dcl-catalyst-client'
 import { Profile, ProfileAvatarsItem } from 'dcl-catalyst-client/dist/client/specs/catalyst.schemas'
 import { getCatalystServersFromCache } from 'dcl-catalyst-client/dist/contracts-snapshots'
+import { L1Network } from '@dcl/catalyst-contracts'
 import { AuthIdentity, Authenticator } from '@dcl/crypto'
 import { hashV1 } from '@dcl/hashing'
 import { EntityType, Entity } from '@dcl/schemas'
-import { fetcher } from '../../shared/fetcher'
+import { createFetcher } from '../../shared/fetcher'
 import { config } from '../config'
 
 export interface ConsistencyResult {
@@ -14,9 +16,25 @@ export interface ConsistencyResult {
   error?: string
 }
 
-export async function fetchProfile(address: string): Promise<Profile | null> {
+interface ProfileResult {
+  profile: Profile
+  url: string
+}
+
+interface ProfileResultError {
+  error: string
+  url: string
+  isTimeout?: boolean
+}
+
+const getCatalystServers = (network: L1Network, disabledCatalysts: string[] = []) => {
+  const catalystServersFromCache = getCatalystServersFromCache(network)
+  return catalystServersFromCache.filter(server => !disabledCatalysts.includes(server.address))
+}
+
+export async function fetchProfile(address: string, fetcher?: IFetchComponent): Promise<Profile | null> {
   const PEER_URL = config.get('PEER_URL')
-  const client = createLambdasClient({ url: PEER_URL + '/lambdas', fetcher })
+  const client = createLambdasClient({ url: PEER_URL + '/lambdas', fetcher: fetcher ?? createFetcher() })
   try {
     const profile: Profile = await client.getAvatarDetails(address)
     return profile
@@ -25,30 +43,39 @@ export async function fetchProfile(address: string): Promise<Profile | null> {
   }
 }
 
-export async function fetchProfileWithConsistencyCheck(address: string): Promise<ConsistencyResult> {
+export async function fetchProfileWithConsistencyCheck(
+  address: string,
+  disabledCatalysts: string[],
+  fetcher?: IFetchComponent
+): Promise<ConsistencyResult> {
   try {
     // Determine network based on environment
     const environment = config.get('ENVIRONMENT')
     const network = environment === 'development' ? 'sepolia' : 'mainnet'
 
     // Get all catalyst servers for the network and remove the current peer to avoid duplicated fetches
-    const catalystServers = getCatalystServersFromCache(network)
+    const catalystServers = getCatalystServers(network, disabledCatalysts)
     const catalystUrls = catalystServers.map(server => `${server.address}`)
 
-    const profileResults = await Promise.all(
+    const profileResults: (ProfileResult | ProfileResultError)[] = await Promise.all(
       catalystUrls.map(async url => {
         try {
-          const client = createLambdasClient({ url: url + '/lambdas', fetcher: fetcher })
+          const client = createLambdasClient({ url: url + '/lambdas', fetcher: fetcher ?? createFetcher() })
           const profile = await client.getAvatarDetails(address)
           return { profile, url }
-        } catch {
-          // Profile doesn't exist on this catalyst (404) or fetch failed
-          return null
+        } catch (error) {
+          return {
+            error: normalizeErrorMessage(error),
+            url,
+            isTimeout: isTimeoutError(error)
+          }
         }
       })
     )
 
-    const profilesWithUrls = profileResults.filter(result => result !== null)
+    const profilesWithUrls = profileResults.filter(isProfileResult)
+    const profileErrors = profileResults.filter(isProfileResultError)
+    const nonTimeoutErrors = profileErrors.filter(error => !error.isTimeout)
 
     if (profilesWithUrls.length === 0) {
       return {
@@ -57,20 +84,21 @@ export async function fetchProfileWithConsistencyCheck(address: string): Promise
       }
     }
 
-    const allProfilesExist = profilesWithUrls.length === catalystUrls.length
-    const firstProfile = profilesWithUrls[0]!
+    const firstProfile = profilesWithUrls[0]
     const allProfilesHaveSameTimestamp = profilesWithUrls.every(
-      profileWithUrl => profileWithUrl?.profile?.timestamp === firstProfile.profile.timestamp
+      profileWithUrl => profileWithUrl.profile.timestamp === firstProfile.profile.timestamp
     )
 
     const newest = profilesWithUrls.reduce((acc, current) => {
       return (acc?.profile?.timestamp ?? 0) > (current?.profile?.timestamp ?? 0) ? acc : current
     }, firstProfile)
 
+    const consistencyError = nonTimeoutErrors[0]
     return {
-      isConsistent: allProfilesExist && allProfilesHaveSameTimestamp,
-      profile: newest?.profile,
-      profileFetchedFrom: newest?.url
+      isConsistent: consistencyError === undefined && allProfilesHaveSameTimestamp,
+      profile: newest.profile,
+      profileFetchedFrom: newest.url,
+      error: consistencyError ? `${consistencyError.error} (${consistencyError.url})` : undefined
     }
   } catch (error) {
     console.error('Profile consistency check failed:', error)
@@ -85,30 +113,36 @@ export async function fetchProfileWithConsistencyCheck(address: string): Promise
 export async function redeployExistingProfile(
   profile: Profile,
   connectedAccount: string,
-  connectedAccountIdentity: AuthIdentity
+  connectedAccountIdentity: AuthIdentity,
+  disabledCatalysts: string[] = [],
+  _fetcher?: IFetchComponent
 ): Promise<void> {
   const snapshotUrls = Object.entries(profile.avatars?.[0]?.avatar?.snapshots ?? {}).reduce(
     (acc, [file, url]) => ({ ...acc, [file]: url }),
     {} as Record<string, string>
   )
 
+  const fetcher = _fetcher ?? createFetcher()
+
   const [bodyBuffer, faceBuffer] = await Promise.all([
-    fetch(snapshotUrls['body']).then(response => response.arrayBuffer()),
-    fetch(snapshotUrls['face256']).then(response => response.arrayBuffer())
+    fetcher.fetch(snapshotUrls['body']).then(response => response.arrayBuffer()),
+    fetcher.fetch(snapshotUrls['face256']).then(response => response.arrayBuffer())
   ])
 
   const files = createSnapshotFilesMap(bodyBuffer, faceBuffer)
   const metadata = await buildProfileMetadata(profile, files)
 
-  await redeployWithCatalystRotation(connectedAccount, connectedAccountIdentity, files, metadata)
+  await redeployWithCatalystRotation(connectedAccount, connectedAccountIdentity, files, metadata, disabledCatalysts, fetcher)
 }
 
 export async function redeployExistingProfileWithContentServerData(
   catalystUrl: string,
   connectedAccount: string,
-  connectedAccountIdentity: AuthIdentity
+  connectedAccountIdentity: AuthIdentity,
+  disabledCatalysts: string[] = [],
+  fetcher?: IFetchComponent
 ): Promise<void> {
-  const client = createContentClient({ url: catalystUrl + '/content', fetcher: fetcher })
+  const client = createContentClient({ url: catalystUrl + '/content', fetcher: fetcher ?? createFetcher() })
   const entity = (await client.fetchEntitiesByPointers([connectedAccount]))?.[0]
   if (!entity) {
     throw new Error('Profile entity not found')
@@ -124,23 +158,42 @@ export async function redeployExistingProfileWithContentServerData(
   const files = createSnapshotFilesMap(bodyBuffer, faceBuffer)
   const metadata = buildMetadataWithEmptyWearables(entity)
 
-  await redeployWithCatalystRotation(connectedAccount, connectedAccountIdentity, files, metadata)
+  // First try to redeploy with the full content server metadata
+  // If it fails, try to redeploy with the empty wearables metadata
+  try {
+    await redeployWithCatalystRotation(connectedAccount, connectedAccountIdentity, files, metadata, disabledCatalysts, fetcher)
+  } catch (error) {
+    console.warn(
+      'Profile redeployment failed with full content server metadata, attempting to redeploy with empty wearables metadata:',
+      error
+    )
+    await redeployWithCatalystRotation(
+      connectedAccount,
+      connectedAccountIdentity,
+      files,
+      buildMetadataWithEmptyWearables(entity),
+      disabledCatalysts,
+      fetcher
+    )
+  }
 }
 
 async function redeployWithCatalystRotation(
   connectedAccount: string,
   connectedAccountIdentity: AuthIdentity,
   files: Map<string, Uint8Array>,
-  metadata: Partial<Profile>
+  metadata: Partial<Profile>,
+  disabledCatalysts: string[] = [],
+  fetcher?: IFetchComponent
 ): Promise<void> {
-  const catalystUrls = getCatalystUrlsForRotation()
+  const catalystUrls = getCatalystUrlsForRotation(disabledCatalysts)
   const MAX_ATTEMPTS = Math.min(catalystUrls.length, 3)
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const catalystUrl = catalystUrls[attempt]
 
     try {
-      await attemptRedeployment(catalystUrl, connectedAccount, connectedAccountIdentity, files, metadata)
+      await attemptRedeployment(catalystUrl, connectedAccount, connectedAccountIdentity, files, metadata, fetcher)
       console.log(`Profile redeployment successful using catalyst: ${catalystUrl}`)
       return
     } catch (error) {
@@ -167,9 +220,10 @@ async function attemptRedeployment(
   connectedAccount: string,
   connectedAccountIdentity: AuthIdentity,
   files: Map<string, Uint8Array>,
-  metadata: Partial<Profile>
+  metadata: Partial<Profile>,
+  fetcher?: IFetchComponent
 ): Promise<void> {
-  const client = createContentClient({ url: catalystUrl, fetcher: fetcher })
+  const client = createContentClient({ url: catalystUrl, fetcher: fetcher ?? createFetcher() })
 
   const deploymentEntity = await DeploymentBuilder.buildEntity({
     type: EntityType.PROFILE,
@@ -186,13 +240,13 @@ async function attemptRedeployment(
   })
 }
 
-function getCatalystUrlsForRotation(): string[] {
+function getCatalystUrlsForRotation(disabledCatalysts: string[] = []): string[] {
+  const PEER_URL = config.get('PEER_URL')
   const environment = config.get('ENVIRONMENT')
   const network = environment === 'development' ? 'sepolia' : 'mainnet'
-  const catalystServers = getCatalystServersFromCache(network)
-  const PEER_URL = config.get('PEER_URL')
+  const catalystServers = getCatalystServers(network, [PEER_URL, ...disabledCatalysts])
 
-  return [PEER_URL + '/content', ...catalystServers.map(server => server.address + '/content').filter(url => url !== PEER_URL + '/content')]
+  return [PEER_URL + '/content', ...catalystServers.map(server => server.address + '/content')]
 }
 
 function createSnapshotFilesMap(bodyBuffer: ArrayBuffer | Buffer, faceBuffer: ArrayBuffer | Buffer): Map<string, Uint8Array> {
@@ -245,4 +299,51 @@ function isRetryableHttpError(error: unknown): boolean {
 
   // For all other errors (network, parsing, etc.), try next catalyst
   return true
+}
+
+const TIMEOUT_STATUS_CODE = 408
+
+function normalizeErrorMessage(error: unknown): string {
+  if (typeof error === 'string') {
+    return error
+  }
+
+  if (error instanceof Error) {
+    return error.message
+  }
+
+  try {
+    return JSON.stringify(error)
+  } catch {
+    return 'Unknown error'
+  }
+}
+
+function isTimeoutError(error: unknown): boolean {
+  if (error instanceof Error && error.name === 'AbortError') {
+    return true
+  }
+
+  if (typeof error === 'object' && error !== null) {
+    const maybeStatus = (error as { status?: number }).status
+    if (maybeStatus === TIMEOUT_STATUS_CODE) {
+      return true
+    }
+  }
+
+  const message = normalizeErrorMessage(error)
+  return (
+    message.toLowerCase().includes('timeout') ||
+    message.toLowerCase().includes('request timeout') ||
+    message.toLowerCase().includes('aborted') ||
+    message.toLowerCase().includes('status 408')
+  )
+}
+
+function isProfileResult(result: ProfileResult | ProfileResultError): result is ProfileResult {
+  return 'profile' in result
+}
+
+function isProfileResultError(result: ProfileResult | ProfileResultError): result is ProfileResultError {
+  return 'error' in result
 }

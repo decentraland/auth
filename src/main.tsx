@@ -1,5 +1,6 @@
 /* eslint-disable import/order */
 /* eslint-disable @typescript-eslint/naming-convention */
+import './polyfills.ts'
 import 'semantic-ui-css/semantic.min.css'
 import * as React from 'react'
 import { useEffect } from 'react'

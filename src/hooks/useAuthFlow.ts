@@ -4,14 +4,17 @@ import { AuthIdentity } from '@dcl/crypto'
 import { ProviderType } from '@dcl/schemas'
 import { connection } from 'decentraland-connect'
 import { FeatureFlagsContext, FeatureFlagsKeys, OnboardingFlowVariant } from '../components/FeatureFlagsProvider'
+import { config } from '../modules/config'
 import { fetchProfileWithConsistencyCheck, redeployExistingProfile, redeployExistingProfileWithContentServerData } from '../modules/profile'
 import { useCurrentConnectionData } from '../shared/connection/hook'
+import { createFetcher } from '../shared/fetcher'
 import { locations } from '../shared/locations'
 import { isProfileComplete } from '../shared/profile'
 import { checkWebGpuSupport } from '../shared/utils/webgpu'
 import { useNavigateWithSearchParams } from './navigation'
 import { useAfterLoginRedirection } from './redirection'
 import { useTargetConfig } from './targetConfig'
+import { useDisabledCatalysts } from './useDisabledCatalysts'
 
 /**
  * Custom hook that manages authentication flow logic including Magic connection
@@ -30,6 +33,7 @@ export const useAuthFlow = () => {
 
   const [targetConfig] = useTargetConfig()
   const { identity } = useCurrentConnectionData()
+  const disabledCatalysts = useDisabledCatalysts()
 
   /**
    * Connects to the Magic wallet provider based on the current feature flag configuration.
@@ -67,7 +71,11 @@ export const useAuthFlow = () => {
 
       if (targetConfig && !targetConfig.skipSetup && account) {
         // Check profile consistency across all catalysts
-        const consistencyResult = await fetchProfileWithConsistencyCheck(account)
+        const fetcherWithTimeout = createFetcher({
+          timeout: Number(config.get('PROFILE_CONSISTENCY_CHECK_TIMEOUT')) ?? 10000
+        })
+
+        const consistencyResult = await fetchProfileWithConsistencyCheck(account, disabledCatalysts, fetcherWithTimeout)
 
         // Check A/B testing new onboarding flow
         const isFlowV2OnboardingFlowEnabled = variants[FeatureFlagsKeys.ONBOARDING_FLOW]?.name === OnboardingFlowVariant.V2
@@ -80,14 +88,20 @@ export const useAuthFlow = () => {
           // If we have a valid entity and user identity, attempt redeployment
           if (consistencyResult.profile && consistencyResult.profileFetchedFrom && userIdentity) {
             try {
-              await redeployExistingProfile(consistencyResult.profile, account, userIdentity)
+              await redeployExistingProfile(consistencyResult.profile, account, userIdentity, disabledCatalysts, fetcherWithTimeout)
               // If redeployment succeeds, continue with the login flow
               return redirect()
             } catch (error) {
               console.warn('Profile redeployment failed, attempting to redeploy with content server data:', error)
               // If redeployment with lamb2 profile fails, try to redeploy with content server data
               try {
-                await redeployExistingProfileWithContentServerData(consistencyResult.profileFetchedFrom, account, userIdentity)
+                await redeployExistingProfileWithContentServerData(
+                  consistencyResult.profileFetchedFrom,
+                  account,
+                  userIdentity,
+                  disabledCatalysts,
+                  fetcherWithTimeout
+                )
                 // If redeployment succeeds, continue with the login flow
                 return redirect()
               } catch (error) {
@@ -123,7 +137,15 @@ export const useAuthFlow = () => {
 
       redirect()
     },
-    [targetConfig?.skipSetup, variants[FeatureFlagsKeys.ONBOARDING_FLOW], navigate, redirectTo, flagInitialized, identity]
+    [
+      targetConfig?.skipSetup,
+      variants[FeatureFlagsKeys.ONBOARDING_FLOW],
+      navigate,
+      redirectTo,
+      flagInitialized,
+      identity,
+      disabledCatalysts
+    ]
   )
 
   return {
