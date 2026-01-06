@@ -31,6 +31,7 @@ export const ConnectionPrimaryButton = ({
     <PrimaryContainer data-testid={testId}>
       <PrimaryOptionWrapper>
         <PrimaryOption>
+          {/* Rationale: `isNewUser` is used only for styling; the styled component filters it out so it doesn't reach the DOM. */}
           <PrimaryButton
             data-testid={testId ? `${testId}-${option}-button` : undefined}
             startIcon={<ConnectionIcon type={option} />}

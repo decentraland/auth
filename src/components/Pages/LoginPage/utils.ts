@@ -4,6 +4,7 @@ import { AuthIdentity, Authenticator } from '@dcl/crypto'
 import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
 import { localStorageGetIdentity, localStorageStoreIdentity } from '@dcl/single-sign-on-client'
 import { connection, getConfiguration, ConnectionResponse, Provider } from 'decentraland-connect'
+import { isWalletConnectStaleSessionError, resetWalletConnectConnection } from '../../../shared/connection/walletConnect'
 import { extractReferrerFromSearchParameters } from '../../../shared/locations'
 import { ConnectionOptionType } from '../../Connection'
 
@@ -83,20 +84,46 @@ export async function connectToSocialProvider(
 
 export async function connectToProvider(connectionOption: ConnectionOptionType): Promise<ConnectionResponse> {
   const providerType = fromConnectionOptionToProviderType(connectionOption)
+  const isWalletConnect = providerType === ProviderType.WALLET_CONNECT_V2
+  let didResetWalletConnect = false
 
-  let connectionData: ConnectionResponse
   try {
-    connectionData = await connection.connect(providerType)
+    // If WalletConnect is already connected in-memory (e.g. user rejected the signature step and tries again),
+    // reuse the existing connector instead of re-initializing WalletConnect Core.
+    if (isWalletConnect && connection.isConnected()) {
+      return await connection.tryPreviousConnection()
+    }
+
+    // For cold-start WalletConnect we prefer a clean slate to avoid stale sessions and "core init 2x" warnings.
+    if (isWalletConnect) {
+      // Rationale: WalletConnect persists state in localStorage; clearing it before connecting prevents
+      // "No matching key..." errors and reduces the chance of double-init warnings during retries.
+      await resetWalletConnectConnection()
+      didResetWalletConnect = true
+    }
+
+    const connectionData = await connection.connect(providerType)
+
+    if (!connectionData.account || !connectionData.provider) {
+      if (isWalletConnect) {
+        await resetWalletConnectConnection()
+      }
+
+      throw new Error(
+        `Could not get provider (connectionOption=${connectionOption}, providerType=${providerType}, hasAccount=${!!connectionData.account}, hasProvider=${!!connectionData.provider})`
+      )
+    }
+
+    return connectionData
   } catch (error) {
+    if (isWalletConnect && isWalletConnectStaleSessionError(error) && !didResetWalletConnect) {
+      // If we didn't reset yet (e.g. error thrown before the initial reset runs), do it now as a best-effort recovery.
+      await resetWalletConnectConnection()
+    }
+
     console.error('Error connecting to provider', error)
     throw error
   }
-
-  if (!connectionData.account || !connectionData.provider) {
-    throw new Error('Could not get provider')
-  }
-
-  return connectionData
 }
 
 export function isSocialLogin(connectionType: ConnectionOptionType): boolean {
