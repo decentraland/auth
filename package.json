@@ -26,7 +26,7 @@
   },
   "dependencies": {
     "@dcl/crypto": "^3.4.5",
-    "@dcl/schemas": "^19.8.0",
+    "@dcl/schemas": "22.0.0",
     "@dcl/single-sign-on-client": "^0.1.0",
     "@dcl/ui-env": "^1.4.0",
     "@magic-ext/oauth2": "^9.21.0",
@@ -38,7 +38,7 @@
     "decentraland-crypto-fetch": "^2.0.1",
     "decentraland-transactions": "^2.24.1",
     "decentraland-ui": "^7.1.0",
-    "decentraland-ui2": "^1.1.1",
+    "decentraland-ui2": "1.1.7",
     "ethers": "^6.8.0",
     "isbot": "^5.1.22",
     "lottie-react": "^2.4.1",

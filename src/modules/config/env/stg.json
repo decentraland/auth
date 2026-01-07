@@ -13,5 +13,7 @@
   "DOWNLOAD_URL": "https://decentraland.zone/download",
   "META_TRANSACTION_SERVER_URL": "https://transactions-api.decentraland.today",
   "PLACES_API_URL": "https://places.decentraland.today",
-  "PROFILE_CONSISTENCY_CHECK_TIMEOUT": "10000"
+  "PROFILE_CONSISTENCY_CHECK_TIMEOUT": "10000",
+  "NOTIFICATIONS_SERVICE_URL": "https://notifications.decentraland.today",
+  "NOTIFICATIONS_SERVICE_TOKEN": ""
 }
