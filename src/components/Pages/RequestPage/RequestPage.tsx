@@ -27,19 +27,22 @@ import {
 import { useCurrentConnectionData } from '../../../shared/connection'
 import { isErrorWithMessage, isRpcError } from '../../../shared/errors'
 import { extractReferrerFromSearchParameters, locations } from '../../../shared/locations'
+import { sendTipNotification } from '../../../shared/notifications'
 import { isProfileComplete } from '../../../shared/profile'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { checkWebGpuSupport } from '../../../shared/utils/webgpu'
 import { FeatureFlagsContext, FeatureFlagsKeys, OnboardingFlowVariant } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
 import { Container } from './Container'
-import { NFTTransferData } from './types'
+import { NFTTransferData, MANATransferData } from './types'
 import {
   getNetworkProvider,
   getConnectedProvider,
   checkMetaTransactionSupport,
   getMetaTransactionChainId,
   decodeNftTransferData,
-  fetchNftMetadata
+  decodeManaTransferData,
+  fetchNftMetadata,
+  fetchPlaceByCreatorAddress
 } from './utils'
 import {
   ContinueInApp,
@@ -50,6 +53,9 @@ import {
   NFTTransferView,
   NFTTransferCompleteView,
   NFTTransferCanceledView,
+  MANATransferView,
+  MANATransferCompleteView,
+  MANATransferCanceledView,
   RecoverError,
   SignInComplete,
   SigningError,
@@ -76,11 +82,14 @@ enum View {
   // Wallet Interaction
   WALLET_INTERACTION,
   WALLET_NFT_INTERACTION,
+  WALLET_MANA_INTERACTION,
   WALLET_INTERACTION_DENIED,
   WALLET_NFT_INTERACTION_DENIED,
+  WALLET_MANA_INTERACTION_DENIED,
   WALLET_INTERACTION_ERROR,
   WALLET_INTERACTION_COMPLETE,
-  WALLET_NFT_INTERACTION_COMPLETE
+  WALLET_NFT_INTERACTION_COMPLETE,
+  WALLET_MANA_INTERACTION_COMPLETE
 }
 
 export const RequestPage = () => {
@@ -100,6 +109,7 @@ export const RequestPage = () => {
   }>()
   const [transactionGasCost, setTransactionGasCost] = useState<bigint>()
   const [nftTransferData, setNftTransferData] = useState<NFTTransferData | null>(null)
+  const [manaTransferData, setManaTransferData] = useState<MANATransferData | null>(null)
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false)
   const requestRef = useRef<RecoverResponse>()
   const [error, setError] = useState<string>()
@@ -211,11 +221,30 @@ export const RequestPage = () => {
                 chainId: currentChainId
               })
 
-              // Check if this is an NFT transfer by trying to decode the transaction data
+              // Check if this is an NFT transfer or MANA transfer by analyzing the transaction data
               const transactionData = request.params?.[0]?.data as string | undefined
               const contractAddress = request.params?.[0]?.to as string | undefined
-
               if (transactionData && contractAddress) {
+                const manaData = decodeManaTransferData(transactionData)
+                if (manaData) {
+                  const [recipientProfile, placeInfo] = await Promise.all([
+                    fetchProfile(manaData.toAddress),
+                    fetchPlaceByCreatorAddress(manaData.toAddress)
+                  ])
+
+                  setManaTransferData({
+                    manaAmount: `${parseFloat(manaData.manaAmount).toFixed(2)} MANA`,
+                    toAddress: manaData.toAddress,
+                    recipientProfile: recipientProfile || undefined,
+                    sceneName: placeInfo?.sceneName || 'Unknown Place',
+                    sceneImageUrl:
+                      placeInfo?.sceneImageUrl ||
+                      'https://peer.decentraland.org/content/contents/bafkreidj26s7aenyxfthfdibnqonzqm5ptc4iamml744gmcyuokewkr76y'
+                  })
+                  setView(View.WALLET_MANA_INTERACTION)
+                  break
+                }
+
                 // Try to decode as NFT transfer using CollectionV2 contract
                 // If it decodes successfully, it's an NFT transfer
                 const chainId = getMetaTransactionChainId()
@@ -286,7 +315,12 @@ export const RequestPage = () => {
   useEffect(() => {
     // The timeout is only necessary on the verify sign in and wallet interaction views.
     // We can clear it out when the user is shown another view to prevent the timeout from triggering somewhere not intended.
-    if (view !== View.VERIFY_SIGN_IN && view !== View.WALLET_INTERACTION && view !== View.WALLET_NFT_INTERACTION) {
+    if (
+      view !== View.VERIFY_SIGN_IN &&
+      view !== View.WALLET_INTERACTION &&
+      view !== View.WALLET_NFT_INTERACTION &&
+      view !== View.WALLET_MANA_INTERACTION
+    ) {
       clearTimeout(timeoutRef.current)
     }
   }, [view])
@@ -396,13 +430,15 @@ export const RequestPage = () => {
     }
 
     setIsLoading(false)
-    // Set appropriate view based on whether it's an NFT transfer
+    // Set appropriate view based on whether it's an NFT transfer or MANA transfer
     if (nftTransferData) {
       setView(View.WALLET_NFT_INTERACTION_DENIED)
+    } else if (manaTransferData) {
+      setView(View.WALLET_MANA_INTERACTION_DENIED)
     } else {
       setView(View.WALLET_INTERACTION_DENIED)
     }
-  }, [nftTransferData, requestId])
+  }, [nftTransferData, manaTransferData, requestId])
 
   const onApproveWalletInteraction = useCallback(async () => {
     setIsLoading(true)
@@ -430,7 +466,6 @@ export const RequestPage = () => {
 
       // Check if this contract will use meta transactions
       const { willUseMetaTransaction, contractName } = await checkMetaTransactionSupport(toAddress)
-
       if (willUseMetaTransaction && contractName) {
         const connectedProvider = await getConnectedProvider()
         if (!connectedProvider) {
@@ -456,6 +491,12 @@ export const RequestPage = () => {
       if (nftTransferData) {
         console.log('Setting view to WALLET_NFT_INTERACTION_COMPLETE')
         setView(View.WALLET_NFT_INTERACTION_COMPLETE)
+      } else if (manaTransferData) {
+        console.log('Setting view to WALLET_MANA_INTERACTION_COMPLETE')
+        if (result) {
+          await sendTipNotification(signerAddress, manaTransferData.toAddress, manaTransferData.manaAmount, result)
+        }
+        setView(View.WALLET_MANA_INTERACTION_COMPLETE)
       } else {
         console.log('Setting view to WALLET_INTERACTION_COMPLETE')
         setView(View.WALLET_INTERACTION_COMPLETE)
@@ -491,7 +532,7 @@ export const RequestPage = () => {
     } finally {
       setIsLoading(false)
     }
-  }, [isUserUsingWeb2Wallet, nftTransferData, requestId])
+  }, [isUserUsingWeb2Wallet, nftTransferData, manaTransferData, requestId])
 
   const handleApproveWalletInteraction = useCallback(async () => {
     if (isUserUsingWeb2Wallet) {
@@ -532,10 +573,14 @@ export const RequestPage = () => {
       return <WalletInteractionComplete />
     case View.WALLET_NFT_INTERACTION_COMPLETE:
       return nftTransferData ? <NFTTransferCompleteView nftData={nftTransferData} /> : null
+    case View.WALLET_MANA_INTERACTION_COMPLETE:
+      return manaTransferData ? <MANATransferCompleteView manaData={manaTransferData} /> : null
     case View.WALLET_INTERACTION_DENIED:
       return <DeniedWalletInteraction />
     case View.WALLET_NFT_INTERACTION_DENIED:
       return nftTransferData ? <NFTTransferCanceledView nftData={nftTransferData} /> : null
+    case View.WALLET_MANA_INTERACTION_DENIED:
+      return manaTransferData ? <MANATransferCanceledView manaData={manaTransferData} /> : null
     case View.LOADING_REQUEST:
       return (
         <Container>
@@ -599,6 +644,26 @@ export const RequestPage = () => {
           />
           <NFTTransferView
             nftData={nftTransferData}
+            isLoading={isLoading}
+            onDeny={onDenyWalletInteraction}
+            onApprove={handleApproveWalletInteraction}
+          />
+        </>
+      ) : null
+    case View.WALLET_MANA_INTERACTION:
+      return manaTransferData ? (
+        <>
+          <Web2TransactionModal
+            isOpen={isTransactionModalOpen}
+            transactionCostAmount={formatEther((transactionGasCost ?? 0).toString())}
+            userBalanceAmount={formatEther((walletInfo?.balance ?? 0).toString())}
+            chainId={walletInfo?.chainId ?? ChainId.ETHEREUM_MAINNET}
+            onAccept={onApproveWalletInteraction}
+            onClose={onDenyWalletInteraction}
+            onReject={onDenyWalletInteraction}
+          />
+          <MANATransferView
+            manaData={manaTransferData}
             isLoading={isLoading}
             onDeny={onDenyWalletInteraction}
             onApprove={handleApproveWalletInteraction}
