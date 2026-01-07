@@ -22,7 +22,14 @@ export const MANATransferCompleteView = ({ manaData }: MANATransferCompleteViewP
         <Title>Success! {manaData.manaAmount} MANA tip Sent to</Title>
 
         <RecipientProfile>
-          <RecipientProfileText address={manaData.toAddress} avatar={recipientAvatar as ProfileAvatar} size="huge" inline />
+          <RecipientProfileText
+            address={manaData.toAddress}
+            avatar={recipientAvatar as ProfileAvatar}
+            size="huge"
+            inline
+            showBothNameAndAddress
+            shortenAddress
+          />
         </RecipientProfile>
 
         <CreatorLabel>CREATOR OF</CreatorLabel>

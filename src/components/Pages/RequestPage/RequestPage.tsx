@@ -27,6 +27,7 @@ import {
 import { useCurrentConnectionData } from '../../../shared/connection'
 import { isErrorWithMessage, isRpcError } from '../../../shared/errors'
 import { extractReferrerFromSearchParameters, locations } from '../../../shared/locations'
+import { sendTipNotification } from '../../../shared/notifications'
 import { isProfileComplete } from '../../../shared/profile'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { checkWebGpuSupport } from '../../../shared/utils/webgpu'
@@ -492,6 +493,9 @@ export const RequestPage = () => {
         setView(View.WALLET_NFT_INTERACTION_COMPLETE)
       } else if (manaTransferData) {
         console.log('Setting view to WALLET_MANA_INTERACTION_COMPLETE')
+        if (result) {
+          await sendTipNotification(signerAddress, manaTransferData.toAddress, manaTransferData.manaAmount, result)
+        }
         setView(View.WALLET_MANA_INTERACTION_COMPLETE)
       } else {
         console.log('Setting view to WALLET_INTERACTION_COMPLETE')

@@ -22,7 +22,14 @@ export const MANATransferCanceledView = ({ manaData }: MANATransferCanceledViewP
 
         <SecondaryText>
           Your tip wasn&apos;t delivered to
-          <RecipientProfileText address={manaData.toAddress} avatar={recipientAvatar as ProfileAvatar} size="huge" inline />
+          <RecipientProfileText
+            address={manaData.toAddress}
+            avatar={recipientAvatar as ProfileAvatar}
+            size="huge"
+            inline
+            showBothNameAndAddress
+            shortenAddress
+          />
         </SecondaryText>
 
         <CreatorLabel>CREATOR OF</CreatorLabel>

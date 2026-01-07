@@ -30,7 +30,14 @@ export const MANATransferView = ({ manaData, isLoading, onDeny, onApprove }: MAN
         </Title>
 
         <RecipientProfile>
-          <RecipientProfileText address={manaData.toAddress} avatar={recipientAvatar as ProfileAvatar} size="huge" inline />
+          <RecipientProfileText
+            address={manaData.toAddress}
+            avatar={recipientAvatar as ProfileAvatar}
+            size="huge"
+            inline
+            showBothNameAndAddress
+            shortenAddress
+          />
         </RecipientProfile>
 
         <CreatorLabel>CREATOR OF</CreatorLabel>
