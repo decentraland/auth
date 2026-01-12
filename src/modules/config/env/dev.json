@@ -12,5 +12,8 @@
   "WEARABLE_PREVIEW_URL": "https://wearable-preview.decentraland.zone",
   "DOWNLOAD_URL": "https://decentraland.zone/download",
   "META_TRANSACTION_SERVER_URL": "https://transactions-api.decentraland.zone",
-  "PROFILE_CONSISTENCY_CHECK_TIMEOUT": "10000"
+  "PLACES_API_URL": "https://places.decentraland.zone",
+  "PROFILE_CONSISTENCY_CHECK_TIMEOUT": "10000",
+  "NOTIFICATIONS_PROCESSOR_URL": "https://notifications-processor.decentraland.zone",
+  "NOTIFICATIONS_PROCESSOR_TOKEN": ""
 }

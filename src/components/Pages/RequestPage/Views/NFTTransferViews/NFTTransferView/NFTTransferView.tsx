@@ -3,6 +3,7 @@ import { Rarity } from '@dcl/schemas'
 import { AssetImage } from 'decentraland-ui2/dist/components/AssetImage'
 import { NFTTransferContainer } from '../../../Container'
 import { ProfileAvatar } from '../../../types'
+import { LoadingState, ActionButtons } from '../../SharedTransferComponents'
 import {
   CenteredContent,
   Title,
@@ -12,26 +13,7 @@ import {
   NFTName,
   WarningAlert
 } from '../NFTTransferComponents.styled'
-import {
-  ButtonsContainer,
-  CancelButton,
-  ConfirmButton,
-  LoadingContainer,
-  LoadingText,
-  ProgressContainer,
-  ProgressTrack,
-  ProgressSpinner
-} from './NFTTransferView.styled'
 import { NFTTransferViewProps } from './NFTTransferView.types'
-
-const CircularProgressWithTrack = () => {
-  return (
-    <ProgressContainer>
-      <ProgressTrack variant="determinate" value={100} size={30} thickness={4} />
-      <ProgressSpinner variant="indeterminate" disableShrink size={30} thickness={4} />
-    </ProgressContainer>
-  )
-}
 
 export const NFTTransferView = ({ nftData, isLoading, onDeny, onApprove }: NFTTransferViewProps) => {
   const [isProcessing, setIsProcessing] = useState(false)
@@ -60,19 +42,9 @@ export const NFTTransferView = ({ nftData, isLoading, onDeny, onApprove }: NFTTr
         {!isProcessing && <WarningAlert severity="info">Gifting an item cannot be undone</WarningAlert>}
 
         {isProcessing ? (
-          <LoadingContainer>
-            <CircularProgressWithTrack />
-            <LoadingText>Processing Authorization</LoadingText>
-          </LoadingContainer>
+          <LoadingState text="Processing Authorization" />
         ) : (
-          <ButtonsContainer>
-            <CancelButton variant="contained" size="large" disabled={isLoading} onClick={onDeny} fullWidth>
-              CANCEL
-            </CancelButton>
-            <ConfirmButton variant="contained" size="large" disabled={isLoading} onClick={handleApprove} fullWidth>
-              CONFIRM & SEND
-            </ConfirmButton>
-          </ButtonsContainer>
+          <ActionButtons isLoading={isLoading} onCancel={onDeny} onConfirm={handleApprove} />
         )}
       </CenteredContent>
     </NFTTransferContainer>
