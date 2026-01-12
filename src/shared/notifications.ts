@@ -30,16 +30,16 @@ export async function sendTipNotification(
   transactionHash: string
 ): Promise<void> {
   try {
-    const notificationsServiceUrl = config.get('NOTIFICATIONS_SERVICE_URL')
-    const notificationsServiceToken = config.get('NOTIFICATIONS_SERVICE_TOKEN')
+    const notificationsProcessorUrl = config.get('NOTIFICATIONS_PROCESSOR_URL')
+    const notificationsProcessorToken = config.get('NOTIFICATIONS_PROCESSOR_TOKEN')
 
-    if (!notificationsServiceUrl) {
-      console.warn('NOTIFICATIONS_SERVICE_URL not configured, skipping notification')
+    if (!notificationsProcessorUrl) {
+      console.warn('NOTIFICATIONS_PROCESSOR_URL not configured, skipping notification')
       return
     }
 
-    if (!notificationsServiceToken) {
-      console.warn('NOTIFICATIONS_SERVICE_TOKEN not configured, skipping notification')
+    if (!notificationsProcessorToken) {
+      console.warn('NOTIFICATIONS_PROCESSOR_TOKEN not configured, skipping notification')
       return
     }
 
@@ -55,12 +55,21 @@ export async function sendTipNotification(
       timestamp: Date.now()
     }
 
-    const response = await fetch(`${notificationsServiceUrl}/notifications`, {
+    const processorUrl = `${notificationsProcessorUrl}/notifications`
+
+    console.log('Sending tip notification to:', processorUrl, {
+      type: notification.type,
+      address: notification.address,
+      eventKey: notification.eventKey
+    })
+
+    const response = await fetch(processorUrl, {
       method: 'POST',
       headers: {
         // eslint-disable-next-line @typescript-eslint/naming-convention
-        'content-type': 'application/json',
-        authorization: `Bearer ${notificationsServiceToken}`
+        'Content-Type': 'application/json',
+        // eslint-disable-next-line @typescript-eslint/naming-convention
+        Authorization: `Bearer ${notificationsProcessorToken}`
       },
       body: JSON.stringify([notification])
     })
@@ -68,6 +77,12 @@ export async function sendTipNotification(
     if (!response.ok) {
       const errorText = await response.text()
       console.error(`Failed to send tip notification: ${response.status} ${response.statusText}`, errorText)
+      console.error('Request details:', {
+        url: processorUrl,
+        method: 'POST',
+        hasToken: !!notificationsProcessorToken,
+        payload: notification
+      })
       throw new Error(`Failed to send tip notification: ${response.status}`)
     }
 
