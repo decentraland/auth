@@ -71,6 +71,10 @@ export const useAnalytics = () => {
     trackEvent(TrackingEvents.CHECK_TERMS_OF_SERVICE)
   }, [])
 
+  const trackWebGPUSupportCheck = useCallback((data: { supported: boolean }) => {
+    trackEvent(TrackingEvents.WEBGPU_SUPPORT_CHECK, data)
+  }, [])
+
   const trackGuestLogin = useCallback(async () => {
     trackLoginClick({ type: 'guest' })
     await wait(TRACKING_DELAY)
@@ -85,6 +89,7 @@ export const useAnalytics = () => {
     trackLoginSuccess,
     trackStartAddingEmail,
     trackStartAddingName,
-    trackTermsOfServiceSuccess
+    trackTermsOfServiceSuccess,
+    trackWebGPUSupportCheck
   }
 }

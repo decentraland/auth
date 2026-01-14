@@ -14,6 +14,7 @@ import { checkWebGpuSupport } from '../shared/utils/webgpu'
 import { useNavigateWithSearchParams } from './navigation'
 import { useAfterLoginRedirection } from './redirection'
 import { useTargetConfig } from './targetConfig'
+import { useAnalytics } from './useAnalytics'
 import { useDisabledCatalysts } from './useDisabledCatalysts'
 
 /**
@@ -34,6 +35,7 @@ export const useAuthFlow = () => {
   const [targetConfig] = useTargetConfig()
   const { identity } = useCurrentConnectionData()
   const disabledCatalysts = useDisabledCatalysts()
+  const { trackWebGPUSupportCheck } = useAnalytics()
 
   /**
    * Connects to the Magic wallet provider based on the current feature flag configuration.
@@ -113,6 +115,7 @@ export const useAuthFlow = () => {
 
           // Fallback to onboarding flow (original behavior)
           const hasWebGPU = await checkWebGpuSupport()
+          trackWebGPUSupportCheck({ supported: hasWebGPU })
           const isAvatarSetupFlowAllowed = isFlowV2OnboardingFlowEnabled && hasWebGPU
 
           if (isAvatarSetupFlowAllowed) {
@@ -125,6 +128,7 @@ export const useAuthFlow = () => {
         // If consistent, check if profile exists and is complete
         const profile: Profile | undefined = consistencyResult.profile
         const hasWebGPU = await checkWebGpuSupport()
+        trackWebGPUSupportCheck({ supported: hasWebGPU })
         const isAvatarSetupFlowAllowed = isFlowV2OnboardingFlowEnabled && hasWebGPU
         const isProfileIncomplete = !profile || !isProfileComplete(profile)
 
