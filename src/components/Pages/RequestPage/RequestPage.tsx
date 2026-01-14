@@ -89,7 +89,7 @@ export const RequestPage = () => {
   const navigate = useNavigateWithSearchParams()
   const { isLoading: isConnecting, account, provider, providerType, identity } = useCurrentConnectionData()
   const { flags, variants, initialized: initializedFlags } = useContext(FeatureFlagsContext)
-  const { trackClick } = useAnalytics()
+  const { trackClick, trackWebGPUSupportCheck } = useAnalytics()
   const browserProvider = useRef<BrowserProvider>()
   const [view, setView] = useState(View.LOADING_REQUEST)
   const [isLoading, setIsLoading] = useState(false)
@@ -113,7 +113,6 @@ export const RequestPage = () => {
   const isDeepLinkFlow = searchParams.get('flow') === 'deeplink'
   const flowParam = isDeepLinkFlow ? '&flow=deeplink' : ''
   const disabledCatalysts = useDisabledCatalysts()
-
   // Goes to the login page where the user will have to connect a wallet.
   const toLoginPage = useCallback(() => {
     navigate(locations.login(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}${flowParam}`))
@@ -125,6 +124,7 @@ export const RequestPage = () => {
     const isFlowV2OnboardingFlowEnabled = variants[FeatureFlagsKeys.ONBOARDING_FLOW]?.name === OnboardingFlowVariant.V2
 
     const hasWebGPU = await checkWebGpuSupport()
+    trackWebGPUSupportCheck({ supported: hasWebGPU })
     const isAvatarSetupFlowAllowed = isFlowV2OnboardingFlowEnabled && hasWebGPU
     if (isAvatarSetupFlowAllowed) {
       navigate(locations.avatarSetup(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}${flowParam}`, referrer))
