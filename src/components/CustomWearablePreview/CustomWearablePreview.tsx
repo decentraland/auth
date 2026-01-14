@@ -4,6 +4,7 @@ import { PreviewUnityMode } from '@dcl/schemas/dist/dapps/preview'
 import { Env } from '@dcl/ui-env'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
 import { WearablePreview } from 'decentraland-ui2'
+import { useAnalytics } from '../../hooks/useAnalytics'
 import { config } from '../../modules/config'
 import { checkWebGpuSupport } from '../../shared/utils/webgpu'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../FeatureFlagsProvider/FeatureFlagsProvider.types'
@@ -16,13 +17,14 @@ export const CustomWearablePreview = (props: Props) => {
   const [isLoading, setIsLoading] = useState(true)
   const [hasWebGPU, setHasWebGPU] = useState(false)
   const [isCheckingWebGPU, setIsCheckingWebGPU] = useState(true)
-
+  const { trackWebGPUSupportCheck } = useAnalytics()
   useEffect(() => setIsLoading(true), [props.profile])
 
   useEffect(() => {
     async function initializeWebGpu() {
       setIsCheckingWebGPU(true)
       const webGPUSupported = await checkWebGpuSupport()
+      trackWebGPUSupportCheck({ supported: webGPUSupported })
       setHasWebGPU(webGPUSupported)
       setIsCheckingWebGPU(false)
     }

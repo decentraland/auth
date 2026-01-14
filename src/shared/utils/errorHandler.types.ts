@@ -24,6 +24,7 @@ export interface TrackingData {
   profile?: string
   isGuest?: boolean
   avatar_shape?: AvatarShape
+  supported?: boolean
 }
 
 export interface SentryTags {
