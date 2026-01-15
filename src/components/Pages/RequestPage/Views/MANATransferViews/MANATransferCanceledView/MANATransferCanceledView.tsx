@@ -39,7 +39,7 @@ export const MANATransferCanceledView = ({ manaData }: MANATransferCanceledViewP
 
         <SceneName>{manaData.sceneName}</SceneName>
 
-        <InfoAlert severity="info">You can close this tab and return to the Decentraland app</InfoAlert>
+        <InfoAlert severity="info">You can close this tab and return to the Decentraland app.</InfoAlert>
       </CenteredContent>
     </NFTTransferContainer>
   )
