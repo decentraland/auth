@@ -88,20 +88,20 @@ describe('when rendering ConnectionNew', () => {
       })
     })
 
-    it('should render all the extra options by default', () => {
-      const { getByTestId } = screen
+    it('should not render extra options by default', () => {
+      const { queryByTestId } = screen
 
       connectionOptions?.extraOptions?.forEach(option => {
-        expect(getByTestId(`${EXTRA_TEST_ID}-${option}-button`)).toBeInTheDocument()
+        expect(queryByTestId(`${EXTRA_TEST_ID}-${option}-button`)).not.toBeInTheDocument()
       })
     })
 
     describe('and the user clicks the show more button', () => {
-      it('should hide the extra options', () => {
+      it('should show the extra options', () => {
         const { getByTestId, queryByTestId } = screen
 
         connectionOptions?.extraOptions?.forEach(option => {
-          expect(getByTestId(`${EXTRA_TEST_ID}-${option}-button`)).toBeInTheDocument()
+          expect(queryByTestId(`${EXTRA_TEST_ID}-${option}-button`)).not.toBeInTheDocument()
         })
 
         act(() => {
@@ -109,13 +109,13 @@ describe('when rendering ConnectionNew', () => {
         })
 
         connectionOptions?.extraOptions?.forEach(option => {
-          expect(queryByTestId(`${EXTRA_TEST_ID}-${option}-button`)).not.toBeInTheDocument()
+          expect(getByTestId(`${EXTRA_TEST_ID}-${option}-button`)).toBeInTheDocument()
         })
       })
 
       describe('and the user clicks it again', () => {
-        it('should show the extra options again', () => {
-          const { getByTestId } = screen
+        it('should hide the extra options again', () => {
+          const { getByTestId, queryByTestId } = screen
 
           act(() => {
             fireEvent.click(getByTestId(SHOW_MORE_BUTTON_TEST_ID))
@@ -126,7 +126,7 @@ describe('when rendering ConnectionNew', () => {
           })
 
           connectionOptions?.extraOptions?.forEach(option => {
-            expect(getByTestId(`${EXTRA_TEST_ID}-${option}-button`)).toBeInTheDocument()
+            expect(queryByTestId(`${EXTRA_TEST_ID}-${option}-button`)).not.toBeInTheDocument()
           })
         })
       })
@@ -135,6 +135,11 @@ describe('when rendering ConnectionNew', () => {
     describe('and the user clicks one of the extra options buttons', () => {
       it('should call onConnect with the correct option', () => {
         const { getByTestId } = screen
+
+        act(() => {
+          fireEvent.click(getByTestId(SHOW_MORE_BUTTON_TEST_ID))
+        })
+
         connectionOptions?.extraOptions?.forEach(option => {
           fireEvent.click(getByTestId(`${EXTRA_TEST_ID}-${option}-button`))
           expect(onConnect).toHaveBeenCalledWith(option)
@@ -244,16 +249,21 @@ describe('when rendering ConnectionNew', () => {
       expect(queryByTestId(SECONDARY_TEST_ID)).not.toBeInTheDocument()
     })
 
-    it('should render all the extra options by default', () => {
-      const { getByTestId } = screen
+    it('should not render extra options by default', () => {
+      const { queryByTestId } = screen
       connectionOptions?.extraOptions?.forEach(option => {
-        expect(getByTestId(`${EXTRA_TEST_ID}-${option}-button`)).toBeInTheDocument()
+        expect(queryByTestId(`${EXTRA_TEST_ID}-${option}-button`)).not.toBeInTheDocument()
       })
     })
 
     describe('and the user clicks one of the extra options buttons', () => {
       it('should call onConnect with the correct option', () => {
         const { getByTestId } = screen
+
+        act(() => {
+          fireEvent.click(getByTestId(SHOW_MORE_BUTTON_TEST_ID))
+        })
+
         connectionOptions?.extraOptions?.forEach(option => {
           fireEvent.click(getByTestId(`${EXTRA_TEST_ID}-${option}-button`))
           expect(onConnect).toHaveBeenCalledWith(option)
@@ -421,6 +431,11 @@ describe('when rendering ConnectionNew', () => {
 
     it('should disable the extra options buttons', () => {
       const { getByTestId } = screen
+
+      act(() => {
+        fireEvent.click(getByTestId(SHOW_MORE_BUTTON_TEST_ID))
+      })
+
       const extraButton = getByTestId(`${EXTRA_TEST_ID}-${ConnectionOptionType.X}-button`)
       expect(extraButton).toBeDisabled()
     })

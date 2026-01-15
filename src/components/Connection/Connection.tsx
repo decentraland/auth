@@ -1,10 +1,11 @@
-import React, { useCallback, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Logo } from 'decentraland-ui2'
 import {
   ChevronIcon,
   ChevronUpIcon,
   ConnectionContainer,
   DclLogoContainer,
+  Divider,
   ShowMoreButton,
   ShowMoreContainer,
   Title,
@@ -14,11 +15,12 @@ import {
 import { ConnectionPrimaryButton } from './ConnectionPrimaryButton'
 import { ConnectionSecondaryButton } from './ConnectionSecondaryButton'
 import { EXTRA_TEST_ID, PRIMARY_TEST_ID, SECONDARY_TEST_ID, SHOW_MORE_BUTTON_TEST_ID } from './constants'
+import { EmailInput } from './EmailInput'
 import { ConnectionOptionType, ConnectionProps, connectionOptionTitles } from './Connection.types'
 
 const defaultProps = {
   i18n: {
-    title: 'Sign In to Decentraland',
+    title: 'Log in or Sign up to Jump In',
     titleNewUser: 'Create an Account to Jump In',
     accessWith: (option: ConnectionOptionType) => `Continue with ${connectionOptionTitles[option]}`,
     connectWith: (option: ConnectionOptionType) => `Continue with ${connectionOptionTitles[option]}`,
@@ -29,14 +31,35 @@ const defaultProps = {
 }
 
 export const Connection = (props: ConnectionProps): JSX.Element => {
-  const { i18n = defaultProps.i18n, onConnect, connectionOptions, className, loadingOption, isNewUser } = props
+  const {
+    i18n = defaultProps.i18n,
+    onConnect,
+    onEmailSubmit,
+    connectionOptions,
+    className,
+    loadingOption,
+    isNewUser,
+    isEmailLoading,
+    emailError
+  } = props
 
   const hasExtraOptions = connectionOptions?.extraOptions && connectionOptions.extraOptions.length > 0
 
-  const [showMore, setShowMore] = useState(hasExtraOptions && !isNewUser)
+  const [showMore, setShowMore] = useState(false)
   const handleShowMore = useCallback(() => {
     setShowMore(!showMore)
   }, [showMore])
+
+  // Filter out EMAIL from connection options (it's handled by EmailInput now)
+  const filteredPrimary =
+    connectionOptions?.primary === ConnectionOptionType.EMAIL ? connectionOptions?.secondary : connectionOptions?.primary
+  const filteredSecondary =
+    connectionOptions?.primary === ConnectionOptionType.EMAIL
+      ? connectionOptions?.extraOptions?.[0]
+      : connectionOptions?.secondary === ConnectionOptionType.EMAIL
+      ? connectionOptions?.extraOptions?.[0]
+      : connectionOptions?.secondary
+  const filteredExtraOptions = connectionOptions?.extraOptions?.filter(opt => opt !== ConnectionOptionType.EMAIL)
 
   return (
     <ConnectionContainer className={className}>
@@ -46,9 +69,17 @@ export const Connection = (props: ConnectionProps): JSX.Element => {
       </DclLogoContainer>
       <MainContentContainer>
         <Title isNewUser={isNewUser}>{isNewUser ? i18n.titleNewUser : i18n.title}</Title>
-        {connectionOptions && (
+
+        {/* Email Input (primary method) */}
+        {onEmailSubmit && <EmailInput onSubmit={onEmailSubmit} isLoading={isEmailLoading} error={emailError} />}
+
+        {/* Divider */}
+        {onEmailSubmit && (filteredPrimary || filteredSecondary) && <Divider>or continue with</Divider>}
+
+        {/* MetaMask button */}
+        {filteredPrimary && (
           <ConnectionPrimaryButton
-            option={connectionOptions.primary}
+            option={filteredPrimary}
             testId={PRIMARY_TEST_ID}
             loadingOption={loadingOption}
             i18n={{
@@ -61,9 +92,11 @@ export const Connection = (props: ConnectionProps): JSX.Element => {
             isNewUser={isNewUser}
           />
         )}
-        {connectionOptions?.secondary && (
+
+        {/* Google button */}
+        {filteredSecondary && (
           <ConnectionPrimaryButton
-            option={connectionOptions.secondary}
+            option={filteredSecondary}
             testId={SECONDARY_TEST_ID}
             loadingOption={loadingOption}
             i18n={{
@@ -79,16 +112,16 @@ export const Connection = (props: ConnectionProps): JSX.Element => {
       </MainContentContainer>
 
       <ShowMoreContainer>
-        {hasExtraOptions && (
+        {hasExtraOptions && filteredExtraOptions && filteredExtraOptions.length > 0 && (
           <ShowMoreButton data-testid={SHOW_MORE_BUTTON_TEST_ID} variant="text" fullWidth onClick={handleShowMore}>
             {i18n.moreOptions}
             {showMore ? <ChevronUpIcon /> : <ChevronIcon />}
           </ShowMoreButton>
         )}
-        {showMore && hasExtraOptions && connectionOptions.extraOptions && (
+        {showMore && filteredExtraOptions && filteredExtraOptions.length > 0 && (
           <ConnectionSecondaryButton
             testId={EXTRA_TEST_ID}
-            options={connectionOptions.extraOptions}
+            options={filteredExtraOptions}
             onConnect={onConnect}
             tooltipDirection="top center"
             loadingOption={loadingOption}

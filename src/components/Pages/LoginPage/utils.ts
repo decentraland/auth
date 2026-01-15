@@ -9,7 +9,7 @@ import { ConnectionOptionType } from '../../Connection'
 
 const ONE_MONTH_IN_MINUTES = 60 * 24 * 30
 
-export function fromConnectionOptionToProviderType(connectionType: ConnectionOptionType, isTesting?: boolean) {
+export function fromConnectionOptionToProviderType(connectionType: ConnectionOptionType, isTesting?: boolean): ProviderType {
   switch (connectionType) {
     case ConnectionOptionType.DISCORD:
     case ConnectionOptionType.X:
@@ -28,24 +28,32 @@ export function fromConnectionOptionToProviderType(connectionType: ConnectionOpt
     case ConnectionOptionType.DAPPER:
     case ConnectionOptionType.SAMSUNG:
       return ProviderType.INJECTED
+    case ConnectionOptionType.EMAIL:
+      return ProviderType.THIRDWEB
     default:
       throw new Error('Invalid provider')
   }
 }
 
-async function generateIdentity(address: string, provider: Provider): Promise<AuthIdentity> {
-  const browserProvider = new ethers.BrowserProvider(provider)
-  const account = ethers.Wallet.createRandom()
+type SignMessageFn = (message: string) => Promise<string>
+
+async function generateIdentityWithSigner(address: string, signMessage: SignMessageFn): Promise<AuthIdentity> {
+  const ephemeralAccount = ethers.Wallet.createRandom()
 
   const payload = {
-    address: account.address.toString(),
-    publicKey: ethers.hexlify(account.publicKey),
-    privateKey: ethers.hexlify(account.privateKey)
+    address: ephemeralAccount.address.toString(),
+    publicKey: ethers.hexlify(ephemeralAccount.publicKey),
+    privateKey: ethers.hexlify(ephemeralAccount.privateKey)
   }
 
+  return Authenticator.initializeAuthChain(address, payload, ONE_MONTH_IN_MINUTES, signMessage)
+}
+
+async function generateIdentity(address: string, provider: Provider): Promise<AuthIdentity> {
+  const browserProvider = new ethers.BrowserProvider(provider)
   const signer = await browserProvider.getSigner()
 
-  return Authenticator.initializeAuthChain(address, payload, ONE_MONTH_IN_MINUTES, message => signer.signMessage(message))
+  return generateIdentityWithSigner(address, message => signer.signMessage(message))
 }
 
 export async function connectToSocialProvider(
@@ -84,6 +92,10 @@ export async function connectToSocialProvider(
 export async function connectToProvider(connectionOption: ConnectionOptionType): Promise<ConnectionResponse> {
   const providerType = fromConnectionOptionToProviderType(connectionOption)
 
+  if (providerType === ProviderType.THIRDWEB) {
+    throw new Error('Email connection should use thirdweb flow, not connectToProvider')
+  }
+
   let connectionData: ConnectionResponse
   try {
     connectionData = await connection.connect(providerType)
@@ -104,6 +116,10 @@ export function isSocialLogin(connectionType: ConnectionOptionType): boolean {
   return SOCIAL_LOGIN_TYPES.includes(connectionType)
 }
 
+export function isEmailLogin(connectionType: ConnectionOptionType): boolean {
+  return connectionType === ConnectionOptionType.EMAIL
+}
+
 export async function getIdentitySignature(address: string, provider: Provider): Promise<AuthIdentity> {
   let identity: AuthIdentity
 
@@ -116,6 +132,22 @@ export async function getIdentitySignature(address: string, provider: Provider):
     identity = ssoIdentity
   }
 
+  return identity
+}
+
+/**
+ * Get or generate identity using a custom sign function (for thirdweb, etc.)
+ * This allows identity generation without a traditional provider.
+ */
+export async function getIdentityWithSigner(address: string, signMessage: SignMessageFn): Promise<AuthIdentity> {
+  const ssoIdentity = localStorageGetIdentity(address)
+
+  if (ssoIdentity) {
+    return ssoIdentity
+  }
+
+  const identity = await generateIdentityWithSigner(address, signMessage)
+  localStorageStoreIdentity(address, identity)
   return identity
 }
 
