@@ -25,7 +25,6 @@ import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import { useAnalytics } from '../../../hooks/useAnalytics'
 import { useAuthFlow } from '../../../hooks/useAuthFlow'
-import { useAutoLogin } from '../../../hooks/useAutoLogin'
 import { ConnectionType } from '../../../modules/analytics/types'
 import { config } from '../../../modules/config'
 import { createAuthServerHttpClient } from '../../../shared/auth'
@@ -290,12 +289,6 @@ export const LoginPage = () => {
     // Go back to the email login modal with the current email
     setShowEmailLoginModal(true)
   }, [])
-
-  // Use the auto-login hook to handle loginMethod URL parameter
-  useAutoLogin({
-    isReady: flagInitialized,
-    onConnect: handleOnConnect
-  })
 
   const handleTryAgain = useCallback(() => {
     if (currentConnectionType) {
