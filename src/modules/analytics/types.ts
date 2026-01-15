@@ -13,7 +13,8 @@ export enum TrackingEvents {
   DEEP_LINK_AUTH_SUCCESS = 'Deep link auth success',
   START_ADDING_NAME = 'Start adding name',
   START_ADDING_EMAIL = 'Start adding email',
-  CHECK_TERMS_OF_SERVICE = 'Check terms of service'
+  CHECK_TERMS_OF_SERVICE = 'Check terms of service',
+  WEBGPU_SUPPORT_CHECK = 'WebGPU support check'
 }
 
 export enum RequestInteractionType {
