@@ -3,14 +3,13 @@ import { NFTTransferContainer } from '../../../Container'
 import { ProfileAvatar } from '../../../types'
 import {
   CenteredContent,
-  Title,
   RecipientProfile,
   RecipientProfileText,
   CreatorLabel,
   SceneName,
   InfoAlert
 } from '../MANATransferComponents.styled'
-import { SceneImageWrapper, SceneImageContainer, SuccessAnimation } from './MANATransferCompleteView.styled'
+import { Title, SceneImageWrapper, SceneImageContainer, SuccessAnimation } from './MANATransferCompleteView.styled'
 import { MANATransferCompleteViewProps } from './MANATransferCompleteView.types'
 
 export const MANATransferCompleteView = ({ manaData }: MANATransferCompleteViewProps) => {

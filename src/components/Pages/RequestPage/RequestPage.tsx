@@ -233,7 +233,7 @@ export const RequestPage = () => {
                   ])
 
                   setManaTransferData({
-                    manaAmount: `${parseFloat(manaData.manaAmount).toFixed(2)} MANA`,
+                    manaAmount: `${parseInt(manaData.manaAmount, 10)} MANA`,
                     toAddress: manaData.toAddress,
                     recipientProfile: recipientProfile || undefined,
                     sceneName: placeInfo?.sceneName || 'Unknown Place',

@@ -18,19 +18,18 @@ export const MANATransferCanceledView = ({ manaData }: MANATransferCanceledViewP
   return (
     <NFTTransferContainer>
       <CenteredContent>
-        <Title>{manaData.manaAmount} MANA Tip cancelled</Title>
+        <Title>{manaData.manaAmount} MANA Tip Cancelled</Title>
 
-        <SecondaryText>
-          Your tip wasn&apos;t delivered to
-          <RecipientProfileText
-            address={manaData.toAddress}
-            avatar={recipientAvatar as ProfileAvatar}
-            size="huge"
-            inline
-            showBothNameAndAddress
-            shortenAddress
-          />
-        </SecondaryText>
+        <SecondaryText>Your tip wasn&apos;t delivered to</SecondaryText>
+
+        <RecipientProfileText
+          address={manaData.toAddress}
+          avatar={recipientAvatar as ProfileAvatar}
+          size="huge"
+          inline
+          showBothNameAndAddress
+          shortenAddress
+        />
 
         <CreatorLabel>CREATOR OF</CreatorLabel>
 

@@ -1,9 +1,20 @@
 import Lottie from 'lottie-react'
-import { styled } from 'decentraland-ui2'
+import { styled, Typography } from 'decentraland-ui2'
+
+export const Title = styled(Typography)({
+  fontSize: '36px',
+  fontWeight: '600',
+  fontStyle: 'normal',
+  lineHeight: '100%',
+  letterSpacing: '0px',
+  textAlign: 'center',
+  marginBottom: '10px',
+  whiteSpace: 'nowrap'
+})
 
 export const SceneImageWrapper = styled('div')({
-  width: '260px',
-  height: '260px',
+  width: '470px',
+  height: '328px',
   marginBottom: '16px',
   overflow: 'visible',
   position: 'relative'

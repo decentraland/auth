@@ -40,7 +40,7 @@ export const SecondaryText = styled(Box)({
   justifyContent: 'center',
   gap: '8px',
   marginBottom: '32px',
-  fontSize: '18px',
+  fontSize: '24px',
   flexWrap: 'wrap'
 })
 
@@ -60,16 +60,32 @@ export const RecipientProfile = styled(Box)({
 })
 
 export const RecipientProfileText = styled(Profile)({
-  fontWeight: '700',
-  fontSize: '24px',
-  // eslint-disable-next-line @typescript-eslint/naming-convention
-  '& span': {
-    fontWeight: '700 !important'
-  },
   // eslint-disable-next-line @typescript-eslint/naming-convention
   '& .MuiAvatar-root': {
     width: '40px',
     height: '40px'
+  },
+  // Container for name and address - align items to the left
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  '& .MuiBox-root': {
+    alignItems: 'flex-start !important'
+  },
+  // Name styling (first span directly inside the content box)
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  '& .MuiBox-root > span:first-child': {
+    fontWeight: '600 !important',
+    fontSize: '26px',
+    lineHeight: '100%',
+    letterSpacing: '0px'
+  },
+  // Address styling (span inside the nested MuiBox-root)
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  '& .MuiBox-root .MuiBox-root span': {
+    fontWeight: '400 !important',
+    fontSize: '20px',
+    lineHeight: '100%',
+    letterSpacing: '0%',
+    textAlign: 'center'
   }
 })
 
