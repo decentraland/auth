@@ -30,6 +30,7 @@ export async function sendTipNotification(
   transactionHash: string
 ): Promise<void> {
   try {
+    // TODO: we should change this logic to use the AUTH_SERVER_URL
     const notificationsProcessorUrl = config.get('NOTIFICATIONS_PROCESSOR_URL')
     const notificationsProcessorToken = config.get('NOTIFICATIONS_PROCESSOR_TOKEN')
 

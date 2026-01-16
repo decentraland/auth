@@ -102,9 +102,10 @@ const avatar: Avatar = {
 const nftData: NFTTransferData = {
   contractAddress: '0x0000000000000000000000000000000000000000',
   description: 'Test description',
-  imageUrl: 'https://placehold.co/512x512/png',
+  imageUrl:
+    'https://peer.decentraland.org/lambdas/collections/contents/urn:decentraland:matic:collections-v2:0xfef5c99885c3036e591b6e6db52482891834a5f4:0/thumbnail',
   name: 'Test NFT',
-  rarity: Rarity.COMMON,
+  rarity: Rarity.UNIQUE,
   toAddress: '0x0000000000000000000000000000000000000000',
   tokenId: '1',
   recipientProfile: {
@@ -114,7 +115,7 @@ const nftData: NFTTransferData = {
 
 const manaData: MANATransferData = {
   manaAmount: '10',
-  sceneImageUrl: 'https://placehold.co/940x656/png',
+  sceneImageUrl: 'https://peer.decentraland.org/content/contents/bafybeietrfx6arffgapt65jkawued7mcsu75uuloodf3drxbvq2pfpggei',
   sceneName: 'Test Scene',
   toAddress: '0x0000000000000000000000000000000000000000',
   recipientProfile: {
