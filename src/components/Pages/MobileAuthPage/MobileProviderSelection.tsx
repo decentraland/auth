@@ -1,5 +1,5 @@
 import { ConnectionOptionType, Connection, ConnectionProps } from '../../Connection'
-import styles from './MobileAuthPage.module.css'
+import { Background, Content, Main, MobileConnectionWrapper } from './MobileAuthPage.styled'
 
 type Props = {
   onConnect: (type: ConnectionOptionType) => void
@@ -9,16 +9,13 @@ type Props = {
 
 export const MobileProviderSelection = ({ onConnect, loadingOption, connectionOptions }: Props) => {
   return (
-    <main className={styles.main}>
-      <div className={styles.background} />
-      <div className={styles.content}>
-        <Connection
-          onConnect={onConnect}
-          loadingOption={loadingOption}
-          connectionOptions={connectionOptions}
-          className={styles.mobileConnection}
-        />
-      </div>
-    </main>
+    <Main component="main">
+      <Background />
+      <Content>
+        <MobileConnectionWrapper>
+          <Connection onConnect={onConnect} loadingOption={loadingOption} connectionOptions={connectionOptions} />
+        </MobileConnectionWrapper>
+      </Content>
+    </Main>
   )
 }

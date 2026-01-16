@@ -8,7 +8,7 @@ import { isErrorWithName } from '../../../shared/errors'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { createMagicInstance } from '../../../shared/utils/magicSdk'
 import { ConnectionOptionType } from '../../Connection'
-import { ConnectionModal } from '../../ConnectionModal'
+import { ConnectionLayout } from '../../ConnectionModal/ConnectionLayout'
 import { ConnectionLayoutState } from '../../ConnectionModal/ConnectionLayout.type'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import {
@@ -18,10 +18,10 @@ import {
   fromConnectionOptionToProviderType,
   connectToSocialProvider
 } from '../LoginPage/utils'
+import { Main } from './MobileAuthPage.styled'
 import { MobileAuthSuccess } from './MobileAuthSuccess'
 import { MobileProviderSelection } from './MobileProviderSelection'
 import { parseConnectionOptionType } from './utils'
-import styles from './MobileAuthPage.module.css'
 
 type MobileAuthView = 'selection' | 'connecting' | 'success' | 'error'
 
@@ -154,13 +154,6 @@ export const MobileAuthPage = () => {
     }
   }, [connectionType, initiateAuth])
 
-  const handleCloseConnectionModal = useCallback(() => {
-    setView('selection')
-    setConnectionType(undefined)
-    setLoadingState(ConnectionLayoutState.CONNECTING_WALLET)
-    hasInitiated.current = false
-  }, [])
-
   // Provider selection view
   if (view === 'selection') {
     return (
@@ -173,17 +166,14 @@ export const MobileAuthPage = () => {
     return <MobileAuthSuccess identityId={identityId} explorerText={targetConfig.explorerText} onTryAgain={handleTryAgain} />
   }
 
-  // Loading/error modal for connecting states
+  // Loading/error view - use ConnectionLayout directly for centering
   return (
-    <main className={styles.main}>
-      <div className={styles.background} />
-      <ConnectionModal
-        open={true}
+    <Main component="main">
+      <ConnectionLayout
         state={loadingState}
-        onClose={handleCloseConnectionModal}
         onTryAgain={handleTryAgain}
         providerType={connectionType ? fromConnectionOptionToProviderType(connectionType) : null}
       />
-    </main>
+    </Main>
   )
 }

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Icon from 'semantic-ui-react/dist/commonjs/elements/Icon/Icon'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import { launchDeepLink } from '../RequestPage/utils'
-import styles from './MobileAuthPage.module.css'
+import { Background, Description, Logo, Main, SuccessContainer, Title } from './MobileAuthPage.styled'
 
 const COUNTDOWN_SECONDS = 5
 
@@ -45,36 +45,34 @@ export const MobileAuthSuccess = ({ identityId, explorerText, onTryAgain }: Prop
 
   if (deepLinkFailed) {
     return (
-      <main className={styles.main}>
-        <div className={styles.background} />
-        <div className={styles.successContainer}>
-          <div className={styles.title}>Could not open {explorerText}</div>
-          <div className={styles.description}>
-            The application could not be launched. Please make sure {explorerText} is installed and try again.
-          </div>
+      <Main component="main">
+        <Background />
+        <SuccessContainer>
+          <Title>Could not open {explorerText}</Title>
+          <Description>The application could not be launched. Please make sure {explorerText} is installed and try again.</Description>
           <Button primary onClick={onTryAgain} style={{ marginTop: '24px', paddingLeft: '16px' }}>
             <Icon name="arrow left" />
             Try again
           </Button>
-        </div>
-      </main>
+        </SuccessContainer>
+      </Main>
     )
   }
 
   return (
-    <main className={styles.main}>
-      <div className={styles.background} />
-      <div className={styles.successContainer}>
-        <div className={styles.logo}></div>
-        <div className={styles.title}>Sign In Successful</div>
-        <div className={styles.description}>
+    <Main component="main">
+      <Background />
+      <SuccessContainer>
+        <Logo />
+        <Title>Sign In Successful</Title>
+        <Description>
           {countdown > 0 ? `You will be redirected to ${explorerText} in ${countdown}...` : `Redirecting to ${explorerText}...`}
-        </div>
+        </Description>
         <Button primary onClick={attemptDeepLink} style={{ marginTop: '24px', paddingLeft: '16px' }}>
           <Icon name="sign in" />
           Return to {explorerText}
         </Button>
-      </div>
-    </main>
+      </SuccessContainer>
+    </Main>
   )
 }

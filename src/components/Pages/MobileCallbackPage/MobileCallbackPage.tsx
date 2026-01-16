@@ -13,7 +13,17 @@ import { createMagicInstance } from '../../../shared/utils/magicSdk'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import { getIdentitySignature } from '../LoginPage/utils'
 import { launchDeepLink } from '../RequestPage/utils'
-import styles from './MobileCallbackPage.module.css'
+import {
+  Container,
+  Description,
+  ErrorLogo,
+  LoadingContainer,
+  LoadingLogo,
+  LoadingText,
+  Logo,
+  Main,
+  Title
+} from './MobileCallbackPage.styled'
 
 const COUNTDOWN_SECONDS = 5
 
@@ -114,17 +124,17 @@ export const MobileCallbackPage = () => {
   // Show error state
   if (error) {
     return (
-      <main className={styles.main}>
-        <div className={styles.container}>
-          <div className={styles.errorLogo}></div>
-          <div className={styles.title}>Authentication Failed</div>
-          <div className={styles.description}>{error}</div>
+      <Main component="main">
+        <Container>
+          <ErrorLogo />
+          <Title>Authentication Failed</Title>
+          <Description>{error}</Description>
           <Button primary onClick={handleRetry} style={{ marginTop: '24px' }}>
             <Icon name="arrow left" />
             Try again
           </Button>
-        </div>
-      </main>
+        </Container>
+      </Main>
     )
   }
 
@@ -132,49 +142,49 @@ export const MobileCallbackPage = () => {
   if (identityId) {
     if (deepLinkFailed) {
       return (
-        <main className={styles.main}>
-          <div className={styles.container}>
-            <div className={styles.errorLogo}></div>
-            <div className={styles.title}>Could not open {targetConfig.explorerText}</div>
-            <div className={styles.description}>
+        <Main component="main">
+          <Container>
+            <ErrorLogo />
+            <Title>Could not open {targetConfig.explorerText}</Title>
+            <Description>
               The application could not be launched. Please make sure {targetConfig.explorerText} is installed and try again.
-            </div>
+            </Description>
             <Button primary onClick={handleRetry} style={{ marginTop: '24px' }}>
               <Icon name="arrow left" />
               Try again
             </Button>
-          </div>
-        </main>
+          </Container>
+        </Main>
       )
     }
 
     return (
-      <main className={styles.main}>
-        <div className={styles.container}>
-          <div className={styles.logo}></div>
-          <div className={styles.title}>Sign In Successful</div>
-          <div className={styles.description}>
+      <Main component="main">
+        <Container>
+          <Logo />
+          <Title>Sign In Successful</Title>
+          <Description>
             {countdown > 0
               ? `You will be redirected to ${targetConfig.explorerText} in ${countdown}...`
               : `Redirecting to ${targetConfig.explorerText}...`}
-          </div>
+          </Description>
           <Button primary onClick={attemptDeepLink} style={{ marginTop: '24px', paddingLeft: '16px' }}>
             <Icon name="sign in" />
             Return to {targetConfig.explorerText}
           </Button>
-        </div>
-      </main>
+        </Container>
+      </Main>
     )
   }
 
   // Show loading state
   return (
-    <main className={styles.main}>
-      <div className={styles.loadingContainer}>
-        <div className={styles.loadingLogo} />
-        <div className={styles.loadingText}>Just a moment, we're verifying your login credentials...</div>
+    <Main component="main">
+      <LoadingContainer>
+        <LoadingLogo />
+        <LoadingText>Just a moment, we're verifying your login credentials...</LoadingText>
         <Loader active size="small" />
-      </div>
-    </main>
+      </LoadingContainer>
+    </Main>
   )
 }
