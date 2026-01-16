@@ -12,5 +12,6 @@
   "WEARABLE_PREVIEW_URL": "https://wearable-preview.decentraland.zone",
   "DOWNLOAD_URL": "https://decentraland.zone/download",
   "META_TRANSACTION_SERVER_URL": "https://transactions-api.decentraland.zone",
-  "PROFILE_CONSISTENCY_CHECK_TIMEOUT": "10000"
+  "PROFILE_CONSISTENCY_CHECK_TIMEOUT": "10000",
+  "THIRDWEB_CLIENT_ID": "8d056704cd974d011e0c4c51dadb841e"
 }

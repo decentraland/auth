@@ -368,17 +368,14 @@ export const SetupPage = () => {
 
       authServerClient.current = flags[FeatureFlagsKeys.HTTP_AUTH] ? createAuthServerHttpClient() : createAuthServerWsClient()
 
-      if (provider?.isMagic) {
-        try {
-          const storedEmail = localStorage.getItem('dcl_magic_user_email')
-          if (storedEmail) {
-            setEmail(storedEmail)
-            // Clear the stored email after using it
-            localStorage.removeItem('dcl_magic_user_email')
-          }
-        } catch (error) {
-          console.warn('Failed to get user email from localStorage:', error)
+      // Try to get stored email from web2 auth (Magic or Thirdweb)
+      try {
+        const storedEmail = localStorage.getItem('dcl_thirdweb_user_email') || localStorage.getItem('dcl_magic_user_email')
+        if (storedEmail) {
+          setEmail(storedEmail)
         }
+      } catch (error) {
+        console.warn('Failed to get user email from localStorage:', error)
       }
 
       if (referrer && EthAddress.validate(referrer) && !hasTrackedReferral.current) {

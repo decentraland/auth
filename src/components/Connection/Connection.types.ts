@@ -10,7 +10,8 @@ export enum ConnectionOptionType {
   GOOGLE = 'google',
   APPLE = 'apple',
   DISCORD = 'discord',
-  X = 'x'
+  X = 'x',
+  EMAIL = 'email'
 }
 
 export const connectionOptionTitles: { [key in ConnectionOptionType]: string } = {
@@ -25,7 +26,8 @@ export const connectionOptionTitles: { [key in ConnectionOptionType]: string } =
   [ConnectionOptionType.GOOGLE]: 'Google',
   [ConnectionOptionType.APPLE]: 'Apple',
   [ConnectionOptionType.DISCORD]: 'Discord',
-  [ConnectionOptionType.X]: 'X'
+  [ConnectionOptionType.X]: 'X',
+  [ConnectionOptionType.EMAIL]: 'Email'
 }
 
 export type MetamaskEthereumWindow = typeof window.ethereum & { isMetaMask?: boolean }
@@ -51,5 +53,8 @@ export type ConnectionProps = {
   className?: string
   loadingOption?: ConnectionOptionType
   isNewUser?: boolean
+  isEmailLoading?: boolean
+  emailError?: string | null
   onConnect: (wallet: ConnectionOptionType) => unknown
+  onEmailSubmit?: (email: string) => void
 }

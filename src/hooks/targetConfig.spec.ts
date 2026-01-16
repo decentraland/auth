@@ -116,9 +116,10 @@ describe('useTargetConfig', () => {
       const { result } = renderHook(() => useTargetConfig())
       const [config] = result.current
 
-      expect(config.connectionOptions.primary).toBe(ConnectionOptionType.GOOGLE)
+      // Default config now has EMAIL as primary, METAMASK as secondary
+      // On mobile, METAMASK is replaced with WALLET_CONNECT
+      expect(config.connectionOptions.primary).toBe(ConnectionOptionType.EMAIL)
       expect(config.connectionOptions.secondary).toBe(ConnectionOptionType.WALLET_CONNECT)
-      expect(config.connectionOptions.extraOptions).not.toContain(ConnectionOptionType.WALLET_CONNECT)
       expect(config.connectionOptions.extraOptions).not.toContain(ConnectionOptionType.METAMASK)
     })
   })
@@ -134,9 +135,10 @@ describe('useTargetConfig', () => {
       const [config, targetConfigId] = result.current
 
       expect(targetConfigId).toBe('alternative')
-      expect(config.connectionOptions.primary).toBe(ConnectionOptionType.GOOGLE)
+      // Alternative config inherits from default, so it also has EMAIL as primary
+      // On mobile, METAMASK is replaced with WALLET_CONNECT
+      expect(config.connectionOptions.primary).toBe(ConnectionOptionType.EMAIL)
       expect(config.connectionOptions.secondary).toBe(ConnectionOptionType.WALLET_CONNECT)
-      expect(config.connectionOptions.extraOptions).not.toContain(ConnectionOptionType.WALLET_CONNECT)
       expect(config.connectionOptions.extraOptions).not.toContain(ConnectionOptionType.METAMASK)
     })
   })

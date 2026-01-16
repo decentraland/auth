@@ -26,7 +26,7 @@
   },
   "dependencies": {
     "@dcl/crypto": "^3.4.5",
-    "@dcl/schemas": "^19.8.0",
+    "@dcl/schemas": "^22.1.0",
     "@dcl/single-sign-on-client": "^0.1.0",
     "@dcl/ui-env": "^1.4.0",
     "@magic-ext/oauth2": "^9.21.0",
@@ -34,7 +34,7 @@
     "ajv": "^8.12.0",
     "classnames": "^2.3.2",
     "dcl-catalyst-client": "^21.10.1",
-    "decentraland-connect": "^11.0.0",
+    "decentraland-connect": "^11.1.0",
     "decentraland-crypto-fetch": "^2.0.1",
     "decentraland-transactions": "^2.24.1",
     "decentraland-ui": "^7.1.0",
@@ -46,7 +46,8 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.17.0",
-    "socket.io-client": "^4.7.2"
+    "socket.io-client": "^4.7.2",
+    "thirdweb": "^5.116.1"
   },
   "devDependencies": {
     "@dcl/eslint-config": "^1.1.12",

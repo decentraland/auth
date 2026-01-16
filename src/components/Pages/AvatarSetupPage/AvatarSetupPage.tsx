@@ -227,8 +227,8 @@ const AvatarSetupPage: React.FC = () => {
         if (hasLauncher) {
           navigate('/')
         } else {
+          // If the site has a request, sign it first
           if (requestId && provider && flags[FeatureFlagsKeys.LOGIN_ON_SETUP]) {
-            // If the site to be redirect to is a request site, we need to recover the request and sign in
             await signRequest(provider, requestId, account)
           } else {
             redirect({ user: account }, config.get('DOWNLOAD_URL'))
@@ -294,15 +294,14 @@ const AvatarSetupPage: React.FC = () => {
 
     authServerClient.current = flags[FeatureFlagsKeys.HTTP_AUTH] ? createAuthServerHttpClient() : createAuthServerWsClient()
 
-    if (provider?.isMagic) {
-      try {
-        const storedEmail = localStorage.getItem('dcl_magic_user_email')
-        if (storedEmail) {
-          setState(prev => ({ ...prev, email: storedEmail, isEmailInherited: true }))
-        }
-      } catch (error) {
-        console.warn('Failed to get user email from localStorage:', error)
+    // Try to get stored email from web2 auth (Magic or Thirdweb)
+    try {
+      const storedEmail = localStorage.getItem('dcl_thirdweb_user_email') || localStorage.getItem('dcl_magic_user_email')
+      if (storedEmail) {
+        setState(prev => ({ ...prev, email: storedEmail, isEmailInherited: true }))
       }
+    } catch (error) {
+      console.warn('Failed to get user email from localStorage:', error)
     }
 
     if (referrer && EthAddress.validate(referrer) && !hasTrackedReferral.current) {

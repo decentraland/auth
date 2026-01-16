@@ -87,12 +87,33 @@ const ShowMoreButton = styled(Button)(({ theme }) => ({
 const ChevronIcon = styled(ExpandMoreIcon)({})
 const ChevronUpIcon = styled(ExpandLessIcon)({})
 
+const dividerLineStyle = {
+  content: '""',
+  flex: 1,
+  height: '1px',
+  background: 'rgba(255, 255, 255, 0.2)'
+}
+
+const Divider = styled(Box)(({ theme }) => ({
+  display: 'flex',
+  alignItems: 'center',
+  gap: theme.spacing(2),
+  margin: `${theme.spacing(3)} 0`,
+  color: 'rgba(255, 255, 255, 0.5)',
+  fontSize: '13px',
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  '&::before': dividerLineStyle,
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  '&::after': dividerLineStyle
+}))
+
 export {
   ChevronIcon,
   ChevronUpIcon,
   ConnectionContainer,
   DclLogoContainer,
   DecentralandText,
+  Divider,
   MainContentContainer,
   ShowMoreButton,
   ShowMoreContainer,

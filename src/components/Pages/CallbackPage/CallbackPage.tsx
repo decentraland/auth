@@ -35,7 +35,9 @@ export const CallbackPage = () => {
       return undefined
     }
 
-    await getIdentitySignature(connectionData.account?.toLowerCase() ?? '', connectionData.provider)
+    if (connectionData.provider) {
+      await getIdentitySignature(connectionData.account?.toLowerCase() ?? '', connectionData.provider)
+    }
     return connectionData
   }, [connectToMagic, initialized])
 

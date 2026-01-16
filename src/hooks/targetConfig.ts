@@ -24,9 +24,10 @@ const defaultConfig: TargetConfig = {
   showWearablePreview: true,
   explorerText: 'Decentraland app',
   connectionOptions: {
-    primary: ConnectionOptionType.GOOGLE,
+    primary: ConnectionOptionType.EMAIL,
     secondary: ConnectionOptionType.METAMASK,
     extraOptions: [
+      ConnectionOptionType.GOOGLE,
       ConnectionOptionType.DISCORD,
       ConnectionOptionType.APPLE,
       ConnectionOptionType.X,
@@ -72,9 +73,10 @@ const targetConfigs: Record<TargetConfigId, TargetConfig> = {
   android: {
     ...defaultMobileConfig,
     connectionOptions: {
-      primary: ConnectionOptionType.GOOGLE,
+      primary: ConnectionOptionType.EMAIL,
       secondary: ConnectionOptionType.WALLET_CONNECT,
       extraOptions: [
+        ConnectionOptionType.GOOGLE,
         ConnectionOptionType.DISCORD,
         ConnectionOptionType.APPLE,
         ConnectionOptionType.X,
@@ -86,9 +88,9 @@ const targetConfigs: Record<TargetConfigId, TargetConfig> = {
   androidSocial: {
     ...defaultMobileConfig,
     connectionOptions: {
-      primary: ConnectionOptionType.GOOGLE,
-      secondary: ConnectionOptionType.X,
-      extraOptions: [ConnectionOptionType.APPLE, ConnectionOptionType.DISCORD]
+      primary: ConnectionOptionType.EMAIL,
+      secondary: ConnectionOptionType.GOOGLE,
+      extraOptions: [ConnectionOptionType.APPLE, ConnectionOptionType.DISCORD, ConnectionOptionType.X]
     }
   },
   androidWeb3: {

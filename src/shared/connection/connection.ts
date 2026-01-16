@@ -6,19 +6,29 @@ export type DefinedConnectionResponse = Omit<ConnectionResponse, 'account'> & { 
 export type ConnectionData = DefinedConnectionResponse & { identity: AuthIdentity }
 
 /**
- * Gets the current connection data.
- * @returns {Promise<ConnectionData | null>} The connection data or null if the user isn't connected or has no identity.
+ * Gets the current connection data including the identity.
+ * Works transparently with all provider types (MetaMask, Magic, Thirdweb, etc.)
+ *
+ * @returns The connection data or null if not connected.
  */
 export const getCurrentConnectionData = async (): Promise<ConnectionData | null> => {
   try {
     const previousConnection = await connection.tryPreviousConnection()
-    if (previousConnection.account && previousConnection.provider) {
-      const identity = localStorageGetIdentity(previousConnection.account)
-      if (identity) {
-        return { ...(previousConnection as DefinedConnectionResponse), identity }
-      }
+
+    if (!previousConnection.account) {
+      return null
     }
-    return null
+
+    const identity = localStorageGetIdentity(previousConnection.account)
+    if (!identity) {
+      return null
+    }
+
+    return {
+      ...previousConnection,
+      account: previousConnection.account,
+      identity
+    }
   } catch (error) {
     return null
   }
