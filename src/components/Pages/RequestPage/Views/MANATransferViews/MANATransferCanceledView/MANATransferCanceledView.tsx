@@ -1,15 +1,8 @@
+import { TransferAlert, TransferAssetImage, TransferProfile, TransferSecondaryText } from '../../../../../Transfer'
+import { CenteredContent, Label, Title } from '../../../../../Transfer/Transfer.styled'
 import { NFTTransferContainer } from '../../../Container'
 import { ProfileAvatar } from '../../../types'
-import {
-  CenteredContent,
-  Title,
-  RecipientProfileText,
-  CreatorLabel,
-  SceneImageWrapper,
-  SceneName,
-  InfoAlert
-} from '../MANATransferComponents.styled'
-import { SecondaryText } from './MANATransferCanceledView.styled'
+import { SceneName } from '../MANATransferComponents.styled'
 import { MANATransferCanceledViewProps } from './MANATransferCanceledView.types'
 
 export const MANATransferCanceledView = ({ manaData }: MANATransferCanceledViewProps) => {
@@ -20,9 +13,10 @@ export const MANATransferCanceledView = ({ manaData }: MANATransferCanceledViewP
       <CenteredContent>
         <Title>{manaData.manaAmount} MANA Tip Cancelled</Title>
 
-        <SecondaryText>Your tip wasn&apos;t delivered to</SecondaryText>
+        <TransferSecondaryText>Your tip wasn&apos;t delivered to</TransferSecondaryText>
 
-        <RecipientProfileText
+        <TransferProfile
+          withContainer={false}
           address={manaData.toAddress}
           avatar={recipientAvatar as ProfileAvatar}
           size="huge"
@@ -31,15 +25,13 @@ export const MANATransferCanceledView = ({ manaData }: MANATransferCanceledViewP
           shortenAddress
         />
 
-        <CreatorLabel>CREATOR OF</CreatorLabel>
+        <Label>CREATOR OF</Label>
 
-        <SceneImageWrapper>
-          <img src={manaData.sceneImageUrl} alt={manaData.sceneName} />
-        </SceneImageWrapper>
+        <TransferAssetImage src={manaData.sceneImageUrl} alt={manaData.sceneName} />
 
         <SceneName>{manaData.sceneName}</SceneName>
 
-        <InfoAlert severity="info">You can close this tab and return to the Decentraland app.</InfoAlert>
+        <TransferAlert />
       </CenteredContent>
     </NFTTransferContainer>
   )

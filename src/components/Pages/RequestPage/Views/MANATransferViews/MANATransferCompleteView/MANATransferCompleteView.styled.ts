@@ -20,20 +20,6 @@ export const SceneImageWrapper = styled('div')({
   position: 'relative'
 })
 
-export const SceneImageContainer = styled('div')({
-  width: '100%',
-  height: '100%',
-  borderRadius: '16px',
-  overflow: 'hidden',
-  // eslint-disable-next-line @typescript-eslint/naming-convention
-  '& img': {
-    width: '100%',
-    height: '100%',
-    objectFit: 'cover'
-  }
-})
-
-// eslint-disable-next-line @typescript-eslint/naming-convention
 export const SuccessAnimation = styled(Lottie)({
   position: 'absolute',
   top: '50%',

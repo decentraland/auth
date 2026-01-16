@@ -1,23 +1,7 @@
 import Lottie from 'lottie-react'
 import { styled } from 'decentraland-ui2'
 
-export const NFTImageWrapper = styled('div')({
-  width: '260px',
-  height: '260px',
-  marginBottom: '16px',
-  overflow: 'visible',
-  position: 'relative'
-})
-
-export const NFTImageContainer = styled('div')({
-  width: '100%',
-  height: '100%',
-  borderRadius: '16px',
-  overflow: 'hidden'
-})
-
-// eslint-disable-next-line @typescript-eslint/naming-convention
-export const SuccessAnimation = styled(Lottie)({
+const SuccessAnimation = styled(Lottie)({
   position: 'absolute',
   top: '50%',
   left: '50%',
@@ -27,3 +11,5 @@ export const SuccessAnimation = styled(Lottie)({
   pointerEvents: 'none',
   zIndex: 10
 })
+
+export { SuccessAnimation }

@@ -1,16 +1,9 @@
 import { useState } from 'react'
+import { TransferActionButtons, TransferAssetImage, TransferLoadingState, TransferProfile } from '../../../../../Transfer'
+import { CenteredContent, Label, Title } from '../../../../../Transfer/Transfer.styled'
 import { NFTTransferContainer } from '../../../Container'
 import { ProfileAvatar } from '../../../types'
-import { LoadingState, ActionButtons } from '../../SharedTransferComponents'
-import {
-  CenteredContent,
-  Title,
-  RecipientProfile,
-  RecipientProfileText,
-  CreatorLabel,
-  SceneImageWrapper,
-  SceneName
-} from '../MANATransferComponents.styled'
+import { SceneName } from '../MANATransferComponents.styled'
 import { MANATransferViewProps } from './MANATransferView.types'
 
 export const MANATransferView = ({ manaData, isLoading, onDeny, onApprove }: MANATransferViewProps) => {
@@ -29,29 +22,25 @@ export const MANATransferView = ({ manaData, isLoading, onDeny, onApprove }: MAN
           {isProcessing ? 'Sending' : 'Confirm'} {manaData.manaAmount} Tip for
         </Title>
 
-        <RecipientProfile>
-          <RecipientProfileText
-            address={manaData.toAddress}
-            avatar={recipientAvatar as ProfileAvatar}
-            size="huge"
-            inline
-            showBothNameAndAddress
-            shortenAddress
-          />
-        </RecipientProfile>
+        <TransferProfile
+          address={manaData.toAddress}
+          avatar={recipientAvatar as ProfileAvatar}
+          size="large"
+          inline
+          showBothNameAndAddress
+          shortenAddress
+        />
 
-        <CreatorLabel>CREATOR OF</CreatorLabel>
+        <Label>CREATOR OF</Label>
 
-        <SceneImageWrapper>
-          <img src={manaData.sceneImageUrl} alt={manaData.sceneName} />
-        </SceneImageWrapper>
+        <TransferAssetImage src={manaData.sceneImageUrl} alt={manaData.sceneName} />
 
         <SceneName>{manaData.sceneName}</SceneName>
 
         {isProcessing ? (
-          <LoadingState text="Processing Authorization" />
+          <TransferLoadingState text="Processing Authorization" />
         ) : (
-          <ActionButtons isLoading={isLoading} onCancel={onDeny} onConfirm={handleApprove} />
+          <TransferActionButtons isLoading={isLoading} onCancel={onDeny} onConfirm={handleApprove} />
         )}
       </CenteredContent>
     </NFTTransferContainer>

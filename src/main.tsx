@@ -25,6 +25,13 @@ import './index.css'
 
 getAnalytics()?.load(config.get('SEGMENT_API_KEY'))
 
+const DevTestViewPage = import.meta.env.DEV
+  ? React.lazy(async () => {
+      const mod = await import('./components/Pages/RequestPage/TestViewPage')
+      return { default: mod.TestViewPage }
+    })
+  : undefined
+
 const SiteRoutes = () => {
   const location = useLocation()
   const analytics = getAnalytics()
@@ -39,6 +46,16 @@ const SiteRoutes = () => {
       <Route path="/invalidRedirection" Component={InvalidRedirectionPage} />
       <Route path="/callback" Component={CallbackPage} />
       <Route path="/requests/:requestId" Component={RequestPage} />
+      {DevTestViewPage ? (
+        <Route
+          path="/testView/:viewId"
+          element={
+            <React.Suspense fallback={null}>
+              <DevTestViewPage />
+            </React.Suspense>
+          }
+        />
+      ) : null}
       <Route path="/setup" Component={SetupPage} />
       <Route path="/avatar-setup" Component={AvatarSetupPage} />
       <Route path="*" Component={DefaultPage} />

@@ -1,9 +1,8 @@
 import { Rarity } from '@dcl/schemas'
-import { AssetImage } from 'decentraland-ui2/dist/components/AssetImage'
+import { TransferAlert, TransferAssetImage, TransferProfile, TransferSecondaryText } from '../../../../../Transfer'
+import { CenteredContent, ItemName as NFTName, Title } from '../../../../../Transfer/Transfer.styled'
 import { NFTTransferContainer } from '../../../Container'
 import { ProfileAvatar } from '../../../types'
-import { CenteredContent, Title, RecipientProfileText, NFTImageWrapper, NFTName, InfoAlert } from '../NFTTransferComponents.styled'
-import { SecondaryText } from './NFTTransferCanceledView.styled'
 import { NFTTransferCanceledViewProps } from './NFTTransferCanceledView.types'
 
 export const NFTTransferCanceledView = ({ nftData }: NFTTransferCanceledViewProps) => {
@@ -14,18 +13,20 @@ export const NFTTransferCanceledView = ({ nftData }: NFTTransferCanceledViewProp
       <CenteredContent>
         <Title>Gift Canceled</Title>
 
-        <SecondaryText>
+        <TransferSecondaryText>
           Your gift wasn&apos;t delivered to
-          <RecipientProfileText address={nftData.toAddress} avatar={recipientAvatar as ProfileAvatar} size="huge" inline />
-        </SecondaryText>
+          <TransferProfile withContainer={false} address={nftData.toAddress} avatar={recipientAvatar as ProfileAvatar} size="huge" inline />
+        </TransferSecondaryText>
 
-        <NFTImageWrapper>
-          <AssetImage src={nftData.imageUrl} name={nftData.name || `NFT #${nftData.tokenId}`} rarity={nftData.rarity || Rarity.COMMON} />
-        </NFTImageWrapper>
+        <TransferAssetImage
+          src={nftData.imageUrl}
+          name={nftData.name || `NFT #${nftData.tokenId}`}
+          rarity={nftData.rarity || Rarity.COMMON}
+        />
 
         {nftData.name && <NFTName>{nftData.name}</NFTName>}
 
-        <InfoAlert severity="info">You can close this tab and return to the Decentraland app</InfoAlert>
+        <TransferAlert text="You can close this tab and return to the Decentraland app" />
       </CenteredContent>
     </NFTTransferContainer>
   )
