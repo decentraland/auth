@@ -37,6 +37,7 @@ export const EmailInput = ({ onSubmit, isLoading, error }: EmailInputProps) => {
       <label className={styles.label}>Recommended</label>
       <div className={styles.inputWrapper}>
         <input
+          id="dcl-email-input"
           ref={inputRef}
           type="email"
           placeholder="Enter Your Email"

@@ -3,7 +3,7 @@ import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
 import { Modal } from 'decentraland-ui/dist/components/Modal/Modal'
 import { handleError } from '../../shared/utils/errorHandler'
 import { sendEmailOTP, verifyOTPAndConnect } from './utils'
-import { EmailLoginModalProps, EmailLoginStep } from './EmailLoginModal.types'
+import { EmailLoginModalProps } from './EmailLoginModal.types'
 import styles from './EmailLoginModal.module.css'
 
 const OTP_LENGTH = 6
@@ -11,7 +11,6 @@ const OTP_LENGTH = 6
 export const EmailLoginModal = (props: EmailLoginModalProps) => {
   const { open, email, onClose, onBack, onSuccess } = props
 
-  const [step, setStep] = useState<EmailLoginStep>(EmailLoginStep.ENTER_OTP)
   const [otp, setOtp] = useState<string[]>(Array(OTP_LENGTH).fill(''))
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -25,7 +24,6 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
   // Reset state when modal opens
   useEffect(() => {
     if (open) {
-      setStep(EmailLoginStep.ENTER_OTP)
       setOtp(Array(OTP_LENGTH).fill(''))
       setError(null)
       setIsLoading(false)
@@ -123,8 +121,6 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
         const errorMessage = handleError(e, 'Error verifying OTP')
         setError(errorMessage || 'The Code Is Invalid Or Expired. Please Resend Code')
         setHasError(true)
-        // Stay in ENTER_OTP step, don't close modal
-        setStep(EmailLoginStep.ENTER_OTP)
       } finally {
         setIsLoading(false)
       }
@@ -153,14 +149,6 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
     }
   }, [])
 
-  const handleTryAgain = useCallback(() => {
-    setStep(EmailLoginStep.ENTER_OTP)
-    setOtp(Array(OTP_LENGTH).fill(''))
-    setError(null)
-    setHasError(false)
-    setTimeout(() => otpInputRefs.current[0]?.focus(), 100)
-  }, [])
-
   const handleClose = useCallback(() => {
     if (!isLoading) {
       onClose()
@@ -174,40 +162,6 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
   }, [isLoading, onBack])
 
   const renderContent = () => {
-    if (step === EmailLoginStep.VERIFYING) {
-      return (
-        <div className={styles.content}>
-          <div className={styles.emailIconContainer}>
-            <div className={styles.emailIcon} />
-          </div>
-          <p className={styles.title}>Verifying...</p>
-          <p className={styles.subtitle}>Please wait while we verify your code</p>
-          <Loader className={styles.loader} size="medium" inline active />
-        </div>
-      )
-    }
-
-    if (step === EmailLoginStep.ERROR) {
-      return (
-        <div className={styles.content}>
-          <div className={styles.emailIconContainer}>
-            <div className={styles.emailIcon} />
-          </div>
-          <p className={styles.title}>Verification Failed</p>
-          {error && <p className={styles.errorMessage}>{error}</p>}
-          <div className={styles.buttonContainer}>
-            <button className={styles.primaryButton} onClick={handleTryAgain}>
-              Try Again
-            </button>
-            <button className={styles.secondaryButton} onClick={handleBack}>
-              Use Different Email
-            </button>
-          </div>
-        </div>
-      )
-    }
-
-    // ENTER_OTP step
     return (
       <div className={styles.content}>
         <div className={styles.emailIconContainer}>
