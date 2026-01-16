@@ -4,6 +4,8 @@ import LoginRoundedIcon from '@mui/icons-material/LoginRounded'
 import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
+import logoImg from '../../../assets/images/logo.svg'
+import wrongImg from '../../../assets/images/wrong.svg'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import { useAuthFlow } from '../../../hooks/useAuthFlow'
@@ -15,6 +17,7 @@ import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvide
 import { getIdentitySignature } from '../LoginPage/utils'
 import { launchDeepLink } from '../RequestPage/utils'
 import {
+  ActionButton,
   Container,
   Description,
   Icon,
@@ -23,10 +26,8 @@ import {
   LoadingText,
   Logo,
   LogoLarge,
-  logoImg,
   Main,
-  Title,
-  wrongImg
+  Title
 } from './MobileCallbackPage.styled'
 
 const COUNTDOWN_SECONDS = 5
@@ -133,10 +134,12 @@ export const MobileCallbackPage = () => {
           <Icon src={wrongImg} alt="Error" />
           <Title>Authentication Failed</Title>
           <Description>{error}</Description>
-          <Button primary onClick={handleRetry} style={{ marginTop: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <ArrowBackIosNewTwoToneIcon style={{ fontSize: '20px' }} />
-            Try again
-          </Button>
+          <ActionButton>
+            <Button primary onClick={handleRetry}>
+              <ArrowBackIosNewTwoToneIcon fontSize="small" />
+              Try again
+            </Button>
+          </ActionButton>
         </Container>
       </Main>
     )
@@ -153,10 +156,12 @@ export const MobileCallbackPage = () => {
             <Description>
               The application could not be launched. Please make sure {targetConfig.explorerText} is installed and try again.
             </Description>
-            <Button primary onClick={handleRetry} style={{ marginTop: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <ArrowBackIosNewTwoToneIcon style={{ fontSize: '20px' }} />
-              Try again
-            </Button>
+            <ActionButton>
+              <Button primary onClick={handleRetry}>
+                <ArrowBackIosNewTwoToneIcon fontSize="small" />
+                Try again
+              </Button>
+            </ActionButton>
           </Container>
         </Main>
       )
@@ -172,10 +177,12 @@ export const MobileCallbackPage = () => {
               ? `You will be redirected to ${targetConfig.explorerText} in ${countdown}...`
               : `Redirecting to ${targetConfig.explorerText}...`}
           </Description>
-          <Button primary onClick={attemptDeepLink} style={{ marginTop: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <LoginRoundedIcon style={{ fontSize: '20px' }} />
-            Return to {targetConfig.explorerText}
-          </Button>
+          <ActionButton>
+            <Button primary onClick={attemptDeepLink}>
+              <LoginRoundedIcon fontSize="small" />
+              Return to {targetConfig.explorerText}
+            </Button>
+          </ActionButton>
         </Container>
       </Main>
     )

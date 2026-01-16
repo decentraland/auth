@@ -1,9 +1,5 @@
 import { Box, styled } from 'decentraland-ui2'
 
-// Export SVG imports for use as img src
-export { default as logoImg } from '../../../assets/images/logo.svg'
-export { default as wrongImg } from '../../../assets/images/wrong.svg'
-
 const Main = styled(Box)({
   display: 'flex',
   flexDirection: 'column',
@@ -95,6 +91,11 @@ const Logo = styled('img')({
   height: '40px'
 })
 
+const LogoLarge = styled('img')({
+  width: '64px',
+  height: '64px'
+})
+
 const Icon = styled('img')({
   width: '40px',
   height: '40px'
@@ -113,4 +114,58 @@ const LoaderWrapper = styled(Box)({
   }
 })
 
-export { Background, Content, Description, Icon, LoaderWrapper, Logo, Main, MobileConnectionWrapper, SuccessContainer, Title }
+const LoadingContainer = styled(Box)({
+  zIndex: 1,
+  padding: '40px 20px',
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  textAlign: 'center',
+  maxWidth: '500px'
+})
+
+const LoadingTitle = styled(Box)({
+  fontSize: '36px',
+  fontWeight: 600,
+  lineHeight: '44px',
+  marginTop: '48px',
+  color: 'white'
+})
+
+const ActionButton = styled(Box)({
+  marginTop: '24px',
+  ['& .ui.button']: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px'
+  }
+})
+
+const TestButtonGroup = styled(Box)({
+  width: '100%',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '8px',
+  marginTop: '16px',
+  ['& .ui.button']: {
+    width: '100%'
+  }
+})
+
+export {
+  ActionButton,
+  Background,
+  Content,
+  Description,
+  Icon,
+  LoaderWrapper,
+  LoadingContainer,
+  LoadingTitle,
+  Logo,
+  LogoLarge,
+  Main,
+  MobileConnectionWrapper,
+  SuccessContainer,
+  TestButtonGroup,
+  Title
+}

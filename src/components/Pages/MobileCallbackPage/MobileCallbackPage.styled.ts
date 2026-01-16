@@ -1,9 +1,5 @@
 import { Box, styled } from 'decentraland-ui2'
 
-// Export SVG imports for use as img src
-export { default as logoImg } from '../../../assets/images/logo.svg'
-export { default as wrongImg } from '../../../assets/images/wrong.svg'
-
 const Main = styled(Box)({
   display: 'flex',
   flexDirection: 'column',
@@ -109,4 +105,13 @@ const LoaderWrapper = styled(Box)({
   }
 })
 
-export { Container, Description, Icon, LoaderWrapper, LoadingContainer, LoadingText, Logo, LogoLarge, Main, Title }
+const ActionButton = styled(Box)({
+  marginTop: '24px',
+  ['& .ui.button']: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px'
+  }
+})
+
+export { ActionButton, Container, Description, Icon, LoaderWrapper, LoadingContainer, LoadingText, Logo, LogoLarge, Main, Title }

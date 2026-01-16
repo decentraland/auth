@@ -2,8 +2,10 @@ import { useCallback, useEffect, useState } from 'react'
 import ArrowBackIosNewTwoToneIcon from '@mui/icons-material/ArrowBackIosNewTwoTone'
 import LoginRoundedIcon from '@mui/icons-material/LoginRounded'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
+import logoImg from '../../../assets/images/logo.svg'
+import wrongImg from '../../../assets/images/wrong.svg'
 import { launchDeepLink } from '../RequestPage/utils'
-import { Background, Description, Icon, Logo, logoImg, Main, SuccessContainer, Title, wrongImg } from './MobileAuthPage.styled'
+import { ActionButton, Background, Description, Icon, Logo, Main, SuccessContainer, Title } from './MobileAuthPage.styled'
 
 const COUNTDOWN_SECONDS = 5
 
@@ -52,10 +54,12 @@ export const MobileAuthSuccess = ({ identityId, explorerText, onTryAgain }: Prop
           <Icon src={wrongImg} alt="Error" />
           <Title>Could not open {explorerText}</Title>
           <Description>The application could not be launched. Please make sure {explorerText} is installed and try again.</Description>
-          <Button primary onClick={onTryAgain} style={{ marginTop: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <ArrowBackIosNewTwoToneIcon style={{ fontSize: '20px' }} />
-            Try again
-          </Button>
+          <ActionButton>
+            <Button primary onClick={onTryAgain}>
+              <ArrowBackIosNewTwoToneIcon fontSize="small" />
+              Try again
+            </Button>
+          </ActionButton>
         </SuccessContainer>
       </Main>
     )
@@ -70,10 +74,12 @@ export const MobileAuthSuccess = ({ identityId, explorerText, onTryAgain }: Prop
         <Description>
           {countdown > 0 ? `You will be redirected to ${explorerText} in ${countdown}...` : `Redirecting to ${explorerText}...`}
         </Description>
-        <Button primary onClick={attemptDeepLink} style={{ marginTop: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <LoginRoundedIcon style={{ fontSize: '20px' }} />
-          Return to {explorerText}
-        </Button>
+        <ActionButton>
+          <Button primary onClick={attemptDeepLink}>
+            <LoginRoundedIcon fontSize="small" />
+            Return to {explorerText}
+          </Button>
+        </ActionButton>
       </SuccessContainer>
     </Main>
   )
