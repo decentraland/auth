@@ -1,15 +1,21 @@
 import { Box, styled } from 'decentraland-ui2'
-import logoImg from '../../../assets/images/logo.svg'
-import wrongImg from '../../../assets/images/wrong.svg'
+
+// Export SVG imports for use as img src
+export { default as logoImg } from '../../../assets/images/logo.svg'
+export { default as wrongImg } from '../../../assets/images/wrong.svg'
 
 const Main = styled(Box)({
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
   justifyContent: 'center',
-  minHeight: '100vh',
+  height: '100dvh',
+  maxHeight: '100dvh',
   width: '100%',
   position: 'relative',
+  overflow: 'hidden',
+  padding: '0 20px',
+  boxSizing: 'border-box',
   ['&::before']: {
     content: '""',
     position: 'fixed',
@@ -68,24 +74,6 @@ const SuccessContainer = styled(Box)({
   maxWidth: '500px'
 })
 
-const ErrorLogo = styled(Box)({
-  width: '40px',
-  height: '40px',
-  backgroundRepeat: 'no-repeat',
-  backgroundSize: 'cover',
-  backgroundPosition: 'right',
-  backgroundImage: `url(${wrongImg})`
-})
-
-const Logo = styled(Box)({
-  width: '40px',
-  height: '40px',
-  backgroundImage: `url(${logoImg})`,
-  backgroundSize: 'contain',
-  backgroundRepeat: 'no-repeat',
-  backgroundPosition: 'center'
-})
-
 const Title = styled(Box)({
   fontSize: '36px',
   fontWeight: 600,
@@ -102,4 +90,27 @@ const Description = styled(Box)({
   color: 'white'
 })
 
-export { Background, Content, Description, ErrorLogo, Logo, Main, MobileConnectionWrapper, SuccessContainer, Title }
+const Logo = styled('img')({
+  width: '40px',
+  height: '40px'
+})
+
+const Icon = styled('img')({
+  width: '40px',
+  height: '40px'
+})
+
+const LoaderWrapper = styled(Box)({
+  marginTop: '24px',
+  position: 'relative',
+  display: 'flex',
+  justifyContent: 'center',
+  width: '100%',
+  ['& .ui.loader']: {
+    position: 'relative',
+    left: 'auto',
+    transform: 'none'
+  }
+})
+
+export { Background, Content, Description, Icon, LoaderWrapper, Logo, Main, MobileConnectionWrapper, SuccessContainer, Title }

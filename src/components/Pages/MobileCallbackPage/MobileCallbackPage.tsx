@@ -17,13 +17,16 @@ import { launchDeepLink } from '../RequestPage/utils'
 import {
   Container,
   Description,
-  ErrorLogo,
+  Icon,
+  LoaderWrapper,
   LoadingContainer,
-  LoadingLogo,
   LoadingText,
   Logo,
+  LogoLarge,
+  logoImg,
   Main,
-  Title
+  Title,
+  wrongImg
 } from './MobileCallbackPage.styled'
 
 const COUNTDOWN_SECONDS = 5
@@ -127,11 +130,11 @@ export const MobileCallbackPage = () => {
     return (
       <Main component="main">
         <Container>
-          <ErrorLogo />
+          <Icon src={wrongImg} alt="Error" />
           <Title>Authentication Failed</Title>
           <Description>{error}</Description>
-          <Button primary onClick={handleRetry} style={{ marginTop: '24px' }}>
-            <ArrowBackIosNewTwoToneIcon />
+          <Button primary onClick={handleRetry} style={{ marginTop: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <ArrowBackIosNewTwoToneIcon style={{ fontSize: '20px' }} />
             Try again
           </Button>
         </Container>
@@ -145,13 +148,13 @@ export const MobileCallbackPage = () => {
       return (
         <Main component="main">
           <Container>
-            <ErrorLogo />
+            <Icon src={wrongImg} alt="Error" />
             <Title>Could not open {targetConfig.explorerText}</Title>
             <Description>
               The application could not be launched. Please make sure {targetConfig.explorerText} is installed and try again.
             </Description>
-            <Button primary onClick={handleRetry} style={{ marginTop: '24px' }}>
-              <ArrowBackIosNewTwoToneIcon />
+            <Button primary onClick={handleRetry} style={{ marginTop: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <ArrowBackIosNewTwoToneIcon style={{ fontSize: '20px' }} />
               Try again
             </Button>
           </Container>
@@ -162,15 +165,15 @@ export const MobileCallbackPage = () => {
     return (
       <Main component="main">
         <Container>
-          <Logo />
+          <Logo src={logoImg} alt="Decentraland logo" />
           <Title>Sign In Successful</Title>
           <Description>
             {countdown > 0
               ? `You will be redirected to ${targetConfig.explorerText} in ${countdown}...`
               : `Redirecting to ${targetConfig.explorerText}...`}
           </Description>
-          <Button primary onClick={attemptDeepLink} style={{ marginTop: '24px', paddingLeft: '16px' }}>
-            <LoginRoundedIcon />
+          <Button primary onClick={attemptDeepLink} style={{ marginTop: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <LoginRoundedIcon style={{ fontSize: '20px' }} />
             Return to {targetConfig.explorerText}
           </Button>
         </Container>
@@ -182,9 +185,11 @@ export const MobileCallbackPage = () => {
   return (
     <Main component="main">
       <LoadingContainer>
-        <LoadingLogo />
+        <LogoLarge src={logoImg} alt="Decentraland logo" />
         <LoadingText>Just a moment, we're verifying your login credentials...</LoadingText>
-        <Loader active size="small" />
+        <LoaderWrapper>
+          <Loader active size="small" />
+        </LoaderWrapper>
       </LoadingContainer>
     </Main>
   )

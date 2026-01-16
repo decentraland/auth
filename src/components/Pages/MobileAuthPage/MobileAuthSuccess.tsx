@@ -3,7 +3,7 @@ import ArrowBackIosNewTwoToneIcon from '@mui/icons-material/ArrowBackIosNewTwoTo
 import LoginRoundedIcon from '@mui/icons-material/LoginRounded'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import { launchDeepLink } from '../RequestPage/utils'
-import { Background, Description, Logo, Main, SuccessContainer, Title } from './MobileAuthPage.styled'
+import { Background, Description, Icon, Logo, logoImg, Main, SuccessContainer, Title, wrongImg } from './MobileAuthPage.styled'
 
 const COUNTDOWN_SECONDS = 5
 
@@ -49,10 +49,11 @@ export const MobileAuthSuccess = ({ identityId, explorerText, onTryAgain }: Prop
       <Main component="main">
         <Background />
         <SuccessContainer>
+          <Icon src={wrongImg} alt="Error" />
           <Title>Could not open {explorerText}</Title>
           <Description>The application could not be launched. Please make sure {explorerText} is installed and try again.</Description>
-          <Button primary onClick={onTryAgain} style={{ marginTop: '24px', paddingLeft: '16px' }}>
-            <ArrowBackIosNewTwoToneIcon />
+          <Button primary onClick={onTryAgain} style={{ marginTop: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <ArrowBackIosNewTwoToneIcon style={{ fontSize: '20px' }} />
             Try again
           </Button>
         </SuccessContainer>
@@ -64,13 +65,13 @@ export const MobileAuthSuccess = ({ identityId, explorerText, onTryAgain }: Prop
     <Main component="main">
       <Background />
       <SuccessContainer>
-        <Logo />
+        <Logo src={logoImg} alt="Decentraland logo" />
         <Title>Sign In Successful</Title>
         <Description>
           {countdown > 0 ? `You will be redirected to ${explorerText} in ${countdown}...` : `Redirecting to ${explorerText}...`}
         </Description>
-        <Button primary onClick={attemptDeepLink} style={{ marginTop: '24px', paddingLeft: '16px' }}>
-          <LoginRoundedIcon />
+        <Button primary onClick={attemptDeepLink} style={{ marginTop: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <LoginRoundedIcon style={{ fontSize: '20px' }} />
           Return to {explorerText}
         </Button>
       </SuccessContainer>
