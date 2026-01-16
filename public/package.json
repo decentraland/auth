@@ -1,7 +1,7 @@
 {
-  "name": "@dcl/auth-site-public",
+  "name": "@dcl/auth-site",
   "version": "0.0.0",
-  "description": "Auth website public assets",
+  "description": "Auth website",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
