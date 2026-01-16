@@ -1,11 +1,10 @@
 import { Box, styled } from 'decentraland-ui2'
-import logoImg from '../../../assets/images/logo.svg'
-import wrongImg from '../../../assets/images/wrong.svg'
 
 const Main = styled(Box)({
   display: 'flex',
   flexDirection: 'column',
-  minHeight: '100vh',
+  height: '100dvh',
+  maxHeight: '100dvh',
   width: '100%',
   backgroundSize: 'cover',
   backgroundPosition: 'center',
@@ -13,6 +12,9 @@ const Main = styled(Box)({
   position: 'relative',
   justifyContent: 'center',
   alignItems: 'center',
+  overflow: 'hidden',
+  padding: '0 20px',
+  boxSizing: 'border-box',
   ['&::before']: {
     content: '""',
     position: 'fixed',
@@ -41,15 +43,6 @@ const LoadingContainer = styled(Box)({
   padding: '20px'
 })
 
-const LoadingLogo = styled(Box)({
-  width: '64px',
-  height: '64px',
-  backgroundImage: `url(${logoImg})`,
-  backgroundSize: 'contain',
-  backgroundRepeat: 'no-repeat',
-  backgroundPosition: 'center'
-})
-
 const LoadingText = styled(Box)({
   fontSize: '24px',
   fontWeight: 500,
@@ -69,21 +62,6 @@ const Container = styled(Box)({
   maxWidth: '500px'
 })
 
-const ErrorLogo = styled(Box)({
-  width: '40px',
-  height: '40px',
-  backgroundRepeat: 'no-repeat',
-  backgroundSize: 'cover',
-  backgroundPosition: 'right',
-  backgroundImage: `url(${wrongImg})`
-})
-
-const Logo = styled(Box)({
-  width: '40px',
-  height: '40px',
-  backgroundImage: `url(${logoImg})`
-})
-
 const Title = styled(Box)({
   fontSize: '36px',
   fontWeight: 600,
@@ -100,4 +78,40 @@ const Description = styled(Box)({
   color: 'white'
 })
 
-export { Container, Description, ErrorLogo, LoadingContainer, LoadingLogo, LoadingText, Logo, Main, Title }
+const Logo = styled('img')({
+  width: '40px',
+  height: '40px'
+})
+
+const LogoLarge = styled('img')({
+  width: '64px',
+  height: '64px'
+})
+
+const Icon = styled('img')({
+  width: '40px',
+  height: '40px'
+})
+
+const LoaderWrapper = styled(Box)({
+  position: 'relative',
+  display: 'flex',
+  justifyContent: 'center',
+  width: '100%',
+  ['& .ui.loader']: {
+    position: 'relative',
+    left: 'auto',
+    transform: 'none'
+  }
+})
+
+const ActionButton = styled(Box)({
+  marginTop: '24px',
+  ['& .ui.button']: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px'
+  }
+})
+
+export { ActionButton, Container, Description, Icon, LoaderWrapper, LoadingContainer, LoadingText, Logo, LogoLarge, Main, Title }

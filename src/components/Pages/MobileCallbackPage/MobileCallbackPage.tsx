@@ -4,6 +4,8 @@ import LoginRoundedIcon from '@mui/icons-material/LoginRounded'
 import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
+import logoImg from '../../../assets/images/logo.svg'
+import wrongImg from '../../../assets/images/wrong.svg'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import { useAuthFlow } from '../../../hooks/useAuthFlow'
@@ -15,13 +17,15 @@ import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvide
 import { getIdentitySignature } from '../LoginPage/utils'
 import { launchDeepLink } from '../RequestPage/utils'
 import {
+  ActionButton,
   Container,
   Description,
-  ErrorLogo,
+  Icon,
+  LoaderWrapper,
   LoadingContainer,
-  LoadingLogo,
   LoadingText,
   Logo,
+  LogoLarge,
   Main,
   Title
 } from './MobileCallbackPage.styled'
@@ -127,13 +131,15 @@ export const MobileCallbackPage = () => {
     return (
       <Main component="main">
         <Container>
-          <ErrorLogo />
+          <Icon src={wrongImg} alt="Error" />
           <Title>Authentication Failed</Title>
           <Description>{error}</Description>
-          <Button primary onClick={handleRetry} style={{ marginTop: '24px' }}>
-            <ArrowBackIosNewTwoToneIcon />
-            Try again
-          </Button>
+          <ActionButton>
+            <Button primary onClick={handleRetry}>
+              <ArrowBackIosNewTwoToneIcon fontSize="small" />
+              Try again
+            </Button>
+          </ActionButton>
         </Container>
       </Main>
     )
@@ -145,15 +151,17 @@ export const MobileCallbackPage = () => {
       return (
         <Main component="main">
           <Container>
-            <ErrorLogo />
+            <Icon src={wrongImg} alt="Error" />
             <Title>Could not open {targetConfig.explorerText}</Title>
             <Description>
               The application could not be launched. Please make sure {targetConfig.explorerText} is installed and try again.
             </Description>
-            <Button primary onClick={handleRetry} style={{ marginTop: '24px' }}>
-              <ArrowBackIosNewTwoToneIcon />
-              Try again
-            </Button>
+            <ActionButton>
+              <Button primary onClick={handleRetry}>
+                <ArrowBackIosNewTwoToneIcon fontSize="small" />
+                Try again
+              </Button>
+            </ActionButton>
           </Container>
         </Main>
       )
@@ -162,17 +170,19 @@ export const MobileCallbackPage = () => {
     return (
       <Main component="main">
         <Container>
-          <Logo />
+          <Logo src={logoImg} alt="Decentraland logo" />
           <Title>Sign In Successful</Title>
           <Description>
             {countdown > 0
               ? `You will be redirected to ${targetConfig.explorerText} in ${countdown}...`
               : `Redirecting to ${targetConfig.explorerText}...`}
           </Description>
-          <Button primary onClick={attemptDeepLink} style={{ marginTop: '24px', paddingLeft: '16px' }}>
-            <LoginRoundedIcon />
-            Return to {targetConfig.explorerText}
-          </Button>
+          <ActionButton>
+            <Button primary onClick={attemptDeepLink}>
+              <LoginRoundedIcon fontSize="small" />
+              Return to {targetConfig.explorerText}
+            </Button>
+          </ActionButton>
         </Container>
       </Main>
     )
@@ -182,9 +192,11 @@ export const MobileCallbackPage = () => {
   return (
     <Main component="main">
       <LoadingContainer>
-        <LoadingLogo />
+        <LogoLarge src={logoImg} alt="Decentraland logo" />
         <LoadingText>Just a moment, we're verifying your login credentials...</LoadingText>
-        <Loader active size="small" />
+        <LoaderWrapper>
+          <Loader active size="small" />
+        </LoaderWrapper>
       </LoadingContainer>
     </Main>
   )

@@ -1,15 +1,17 @@
 import { Box, styled } from 'decentraland-ui2'
-import logoImg from '../../../assets/images/logo.svg'
-import wrongImg from '../../../assets/images/wrong.svg'
 
 const Main = styled(Box)({
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
   justifyContent: 'center',
-  minHeight: '100vh',
+  height: '100dvh',
+  maxHeight: '100dvh',
   width: '100%',
   position: 'relative',
+  overflow: 'hidden',
+  padding: '0 20px',
+  boxSizing: 'border-box',
   ['&::before']: {
     content: '""',
     position: 'fixed',
@@ -68,24 +70,6 @@ const SuccessContainer = styled(Box)({
   maxWidth: '500px'
 })
 
-const ErrorLogo = styled(Box)({
-  width: '40px',
-  height: '40px',
-  backgroundRepeat: 'no-repeat',
-  backgroundSize: 'cover',
-  backgroundPosition: 'right',
-  backgroundImage: `url(${wrongImg})`
-})
-
-const Logo = styled(Box)({
-  width: '40px',
-  height: '40px',
-  backgroundImage: `url(${logoImg})`,
-  backgroundSize: 'contain',
-  backgroundRepeat: 'no-repeat',
-  backgroundPosition: 'center'
-})
-
 const Title = styled(Box)({
   fontSize: '36px',
   fontWeight: 600,
@@ -102,4 +86,86 @@ const Description = styled(Box)({
   color: 'white'
 })
 
-export { Background, Content, Description, ErrorLogo, Logo, Main, MobileConnectionWrapper, SuccessContainer, Title }
+const Logo = styled('img')({
+  width: '40px',
+  height: '40px'
+})
+
+const LogoLarge = styled('img')({
+  width: '64px',
+  height: '64px'
+})
+
+const Icon = styled('img')({
+  width: '40px',
+  height: '40px'
+})
+
+const LoaderWrapper = styled(Box)({
+  marginTop: '24px',
+  position: 'relative',
+  display: 'flex',
+  justifyContent: 'center',
+  width: '100%',
+  ['& .ui.loader']: {
+    position: 'relative',
+    left: 'auto',
+    transform: 'none'
+  }
+})
+
+const LoadingContainer = styled(Box)({
+  zIndex: 1,
+  padding: '40px 20px',
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  textAlign: 'center',
+  maxWidth: '500px'
+})
+
+const LoadingTitle = styled(Box)({
+  fontSize: '36px',
+  fontWeight: 600,
+  lineHeight: '44px',
+  marginTop: '48px',
+  color: 'white'
+})
+
+const ActionButton = styled(Box)({
+  marginTop: '24px',
+  ['& .ui.button']: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px'
+  }
+})
+
+const TestButtonGroup = styled(Box)({
+  width: '100%',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '8px',
+  marginTop: '16px',
+  ['& .ui.button']: {
+    width: '100%'
+  }
+})
+
+export {
+  ActionButton,
+  Background,
+  Content,
+  Description,
+  Icon,
+  LoaderWrapper,
+  LoadingContainer,
+  LoadingTitle,
+  Logo,
+  LogoLarge,
+  Main,
+  MobileConnectionWrapper,
+  SuccessContainer,
+  TestButtonGroup,
+  Title
+}
