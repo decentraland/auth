@@ -48,12 +48,11 @@ export const MobileAuthSuccess = ({ identityId, explorerText, onTryAgain }: Prop
       <main className={styles.main}>
         <div className={styles.background} />
         <div className={styles.successContainer}>
-          <div className={styles.errorLogo}></div>
           <div className={styles.title}>Could not open {explorerText}</div>
           <div className={styles.description}>
             The application could not be launched. Please make sure {explorerText} is installed and try again.
           </div>
-          <Button primary onClick={onTryAgain} style={{ marginTop: '24px' }}>
+          <Button primary onClick={onTryAgain} style={{ marginTop: '24px', paddingLeft: '16px' }}>
             <Icon name="arrow left" />
             Try again
           </Button>
@@ -69,9 +68,9 @@ export const MobileAuthSuccess = ({ identityId, explorerText, onTryAgain }: Prop
         <div className={styles.logo}></div>
         <div className={styles.title}>Sign In Successful</div>
         <div className={styles.description}>
-          You will be redirected to {explorerText} in {countdown}...
+          {countdown > 0 ? `You will be redirected to ${explorerText} in ${countdown}...` : `Redirecting to ${explorerText}...`}
         </div>
-        <Button primary onClick={attemptDeepLink} style={{ marginTop: '24px' }}>
+        <Button primary onClick={attemptDeepLink} style={{ marginTop: '24px', paddingLeft: '16px' }}>
           <Icon name="sign in" />
           Return to {explorerText}
         </Button>

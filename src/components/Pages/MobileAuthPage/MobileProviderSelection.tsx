@@ -12,7 +12,12 @@ export const MobileProviderSelection = ({ onConnect, loadingOption, connectionOp
     <main className={styles.main}>
       <div className={styles.background} />
       <div className={styles.content}>
-        <Connection onConnect={onConnect} loadingOption={loadingOption} connectionOptions={connectionOptions} />
+        <Connection
+          onConnect={onConnect}
+          loadingOption={loadingOption}
+          connectionOptions={connectionOptions}
+          className={styles.mobileConnection}
+        />
       </div>
     </main>
   )

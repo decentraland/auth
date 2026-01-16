@@ -35,6 +35,22 @@
   padding: 20px;
 }
 
+/* Override Connection component margins for mobile */
+.mobileConnection > div:nth-child(2) {
+  /* MainContentContainer - reduce top margin */
+  margin-top: 24px !important;
+}
+
+.mobileConnection > div:nth-child(2) > p:first-child {
+  /* Title - reduce bottom margin */
+  margin-bottom: 32px !important;
+}
+
+.mobileConnection > div:nth-child(3) {
+  /* ShowMoreContainer - reduce top margin */
+  margin-top: 20px !important;
+}
+
 .successContainer {
   z-index: 1;
   padding: 40px 20px;

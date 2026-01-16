@@ -1,10 +1,12 @@
 import { useCallback, useContext, useEffect, useState, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
+import { connection } from 'decentraland-connect'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import { createAuthServerHttpClient } from '../../../shared/auth'
 import { isErrorWithName } from '../../../shared/errors'
 import { handleError } from '../../../shared/utils/errorHandler'
+import { createMagicInstance } from '../../../shared/utils/magicSdk'
 import { ConnectionOptionType, parseConnectionOptionType } from '../../Connection'
 import { ConnectionModal } from '../../ConnectionModal'
 import { ConnectionLayoutState } from '../../ConnectionModal/ConnectionLayout.type'
@@ -33,8 +35,46 @@ export const MobileAuthPage = () => {
   const [connectionType, setConnectionType] = useState<ConnectionOptionType>()
 
   const hasInitiated = useRef(false)
+  const hasClearedSessions = useRef(false)
   const providerParam = searchParams.get('provider')
   const provider = parseConnectionOptionType(providerParam)
+
+  // Clear any cached sessions on mount to ensure fresh login
+  useEffect(() => {
+    if (!flagInitialized || hasClearedSessions.current) return
+
+    const clearCachedSessions = async () => {
+      try {
+        // Clear Magic session if exists
+        const magic = await createMagicInstance(!!flags[FeatureFlagsKeys.MAGIC_TEST])
+        if (await magic?.user.isLoggedIn()) {
+          await magic?.user.logout()
+        }
+
+        // Clear WalletConnect/AppKit session
+        await connection.disconnect()
+
+        // Clear cached email
+        localStorage.removeItem('dcl_magic_user_email')
+
+        // Clear all single-sign-on cached identities
+        const keysToRemove: string[] = []
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i)
+          if (key?.startsWith('single-sign-on-')) {
+            keysToRemove.push(key)
+          }
+        }
+        keysToRemove.forEach(key => localStorage.removeItem(key))
+      } catch (err) {
+        // Ignore errors - just ensuring clean state
+        console.warn('Failed to clear cached sessions:', err)
+      }
+    }
+
+    hasClearedSessions.current = true
+    clearCachedSessions()
+  }, [flagInitialized, flags])
 
   const initiateAuth = useCallback(
     async (selectedConnectionType: ConnectionOptionType) => {
