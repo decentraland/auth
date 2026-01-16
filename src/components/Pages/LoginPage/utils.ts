@@ -59,7 +59,8 @@ async function generateIdentity(address: string, provider: Provider): Promise<Au
 export async function connectToSocialProvider(
   connectionOption: ConnectionOptionType,
   isTesting?: boolean,
-  redirectTo?: string
+  redirectTo?: string,
+  isMobileFlow?: boolean
 ): Promise<void> {
   const MAGIC_KEY = isTesting ? getConfiguration().magic_test.apiKey : getConfiguration().magic.apiKey
   const providerType = fromConnectionOptionToProviderType(connectionOption, isTesting)
@@ -84,7 +85,7 @@ export async function connectToSocialProvider(
     await magic?.oauth2.loginWithRedirect({
       provider: connectionOption === ConnectionOptionType.X ? 'twitter' : (connectionOption as OAuthProvider),
       redirectURI: url.href,
-      customData: JSON.stringify({ redirectTo, referrer })
+      customData: JSON.stringify({ redirectTo, referrer, isMobileFlow })
     })
   }
 }
@@ -154,4 +155,9 @@ export async function getIdentityWithSigner(address: string, signMessage: SignMe
 export function isMobile() {
   const userAgent = navigator.userAgent
   return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent)
+}
+
+export function isIos() {
+  const userAgent = navigator.userAgent
+  return /iPhone|iPad|iPod/i.test(userAgent)
 }

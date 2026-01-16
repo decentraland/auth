@@ -1,6 +1,6 @@
 import { useLocation, Location } from 'react-router-dom'
 import { ConnectionOptionType } from '../components/Connection'
-import { isMobile } from '../components/Pages/LoginPage/utils'
+import { isMobile, isIos } from '../components/Pages/LoginPage/utils'
 import { extractRedirectToFromSearchParameters } from '../shared/locations'
 
 type TargetConfigId = 'default' | 'alternative' | 'ios' | 'android' | 'androidSocial' | 'androidWeb3'
@@ -73,10 +73,9 @@ const targetConfigs: Record<TargetConfigId, TargetConfig> = {
   android: {
     ...defaultMobileConfig,
     connectionOptions: {
-      primary: ConnectionOptionType.EMAIL,
+      primary: ConnectionOptionType.GOOGLE,
       secondary: ConnectionOptionType.WALLET_CONNECT,
       extraOptions: [
-        ConnectionOptionType.GOOGLE,
         ConnectionOptionType.DISCORD,
         ConnectionOptionType.APPLE,
         ConnectionOptionType.X,
@@ -130,10 +129,19 @@ const getTargetConfigId = (location: Location): TargetConfigId => {
   const search = new URLSearchParams(location.search)
   const targetConfigIdParam = search.get('targetConfigId') as TargetConfigId
   const redirectTo = extractRedirectToFromSearchParameters(search)
-  // Get the targetConfigId from the search parameters or the redirectTo URL
+
+  // If explicit targetConfigId is provided, use it
   if (targetConfigIdParam in targetConfigs) {
     return targetConfigIdParam
-  } else if (redirectTo) {
+  }
+
+  // Auto-detect iOS/Android on mobile
+  if (isMobile()) {
+    return isIos() ? 'ios' : 'android'
+  }
+
+  // Check redirectTo URL for targetConfigId (desktop flow)
+  if (redirectTo) {
     try {
       let searchParams: URLSearchParams
       // If the redirectTo is a relative URL, we need to parse it as a search params
@@ -143,13 +151,14 @@ const getTargetConfigId = (location: Location): TargetConfigId => {
         searchParams = new URL(redirectTo).searchParams
       }
       const targetConfigIdFromRedirectTo = searchParams.get('targetConfigId') as TargetConfigId
-      if (targetConfigIdFromRedirectTo) {
+      if (targetConfigIdFromRedirectTo in targetConfigs) {
         return targetConfigIdFromRedirectTo
       }
     } catch (error) {
       console.error("Can't parse redirectTo URL")
     }
   }
+
   return 'default'
 }
 
