@@ -23,7 +23,6 @@ const TransferCanceledView = memo((props: TransferCanceledViewProps) => {
               <ColumnContainer>
                 <Box>Your tip wasn&apos;t delivered to</Box>
                 <Profile
-                  withContainer={false}
                   address={transferData.toAddress}
                   avatar={recipientAvatar as ProfileAvatar}
                   size="huge"
@@ -43,16 +42,14 @@ const TransferCanceledView = memo((props: TransferCanceledViewProps) => {
           <>
             <TransferSecondaryText>
               Your gift wasn&apos;t delivered to
-              <Profile
-                withContainer={false}
-                address={transferData.toAddress}
-                avatar={recipientAvatar as ProfileAvatar}
-                size="huge"
-                inline
-                shortenAddress
-              />
+              <Profile address={transferData.toAddress} avatar={recipientAvatar as ProfileAvatar} size="huge" inline shortenAddress />
             </TransferSecondaryText>
-            <TransferAssetImage src={transferData.imageUrl} alt={transferData.name} rarity={transferData.rarity || Rarity.COMMON} />
+            <TransferAssetImage
+              src={transferData.imageUrl}
+              alt={transferData.name}
+              name={transferData.name}
+              rarity={transferData.rarity || Rarity.COMMON}
+            />
             <ItemName>{transferData.name}</ItemName>
             <TransferAlert />
           </>
