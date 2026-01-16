@@ -1,0 +1,291 @@
+.modal {
+  background: linear-gradient(135deg, #952dc6 0%, #32134c 100%) !important;
+  border-radius: 16px !important;
+  max-width: 480px !important;
+  margin: auto !important;
+}
+
+.modal :global(.ui.modal > .content) {
+  background: transparent !important;
+  padding: 0 !important;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+}
+
+.backButton {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
+  transition: opacity 0.2s;
+}
+
+.backButton:hover:not(:disabled) {
+  opacity: 0.8;
+}
+
+.backButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.backIcon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.closeButton {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 28px;
+  cursor: pointer;
+  padding: 4px 12px;
+  line-height: 1;
+  transition: opacity 0.2s;
+}
+
+.closeButton:hover:not(:disabled) {
+  opacity: 0.8;
+}
+
+.closeButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.main {
+  padding: 0 40px 40px;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.emailIconContainer {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.emailIcon {
+  width: 48px;
+  height: 48px;
+  background-image: url('../../assets/images/email.svg');
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  filter: brightness(0) invert(1);
+}
+
+.title {
+  color: white;
+  font-size: 28px;
+  font-weight: 600;
+  margin: 0 0 12px;
+}
+
+.subtitle {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0 0 32px;
+  max-width: 340px;
+}
+
+.subtitle strong {
+  color: white;
+  font-weight: 600;
+}
+
+.otpContainer {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.otpInput {
+  width: 52px;
+  height: 60px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 12px;
+  background: transparent;
+  color: white;
+  font-size: 24px;
+  font-weight: 600;
+  text-align: center;
+  outline: none;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.otpInput:focus {
+  border-color: white;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.otpInput:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.otpInput::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.otpInputError {
+  border-color: #ff4444 !important;
+  background: rgba(255, 68, 68, 0.1);
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  10%,
+  30%,
+  50%,
+  70%,
+  90% {
+    transform: translateX(-6px);
+  }
+  20%,
+  40%,
+  60%,
+  80% {
+    transform: translateX(6px);
+  }
+}
+
+.shake {
+  animation: shake 0.5s ease-in-out;
+}
+
+.verifyingContainer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.verifyingLoader {
+  width: 16px !important;
+  height: 16px !important;
+}
+
+.verifyingLoader::before,
+.verifyingLoader::after {
+  width: 16px !important;
+  height: 16px !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
+}
+
+.verifyingLoader::after {
+  border-top-color: white !important;
+}
+
+.verifyingText {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 14px;
+}
+
+.errorMessage {
+  color: #ff6b6b;
+  font-size: 14px;
+  margin: 0 0 16px;
+  background: rgba(255, 107, 107, 0.15);
+  padding: 8px 16px;
+  border-radius: 8px;
+}
+
+.resendText {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 14px;
+  margin: 8px 0 0;
+}
+
+.resendLink {
+  color: var(--primary);
+  cursor: pointer;
+  text-decoration: underline;
+  transition: color 0.2s;
+}
+
+.resendLink:hover {
+  color: #ffb3b3;
+}
+
+.buttonContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 280px;
+  margin-top: 16px;
+}
+
+.primaryButton {
+  background: #ff8a8a;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 14px 24px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.primaryButton:hover {
+  background: #ff9d9d;
+}
+
+.secondaryButton {
+  background: transparent;
+  color: white;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.secondaryButton:hover {
+  border-color: white;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.loader {
+  margin-top: 16px !important;
+}
+
+.loader::before,
+.loader::after {
+  border-color: rgba(255, 255, 255, 0.3) !important;
+}
+
+.loader::after {
+  border-top-color: white !important;
+}

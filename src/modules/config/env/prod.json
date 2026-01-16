@@ -15,5 +15,6 @@
   "PLACES_API_URL": "https://places.decentraland.org",
   "PROFILE_CONSISTENCY_CHECK_TIMEOUT": "10000",
   "NOTIFICATIONS_PROCESSOR_URL": "https://notifications-processor.decentraland.org",
-  "NOTIFICATIONS_PROCESSOR_TOKEN": ""
+  "NOTIFICATIONS_PROCESSOR_TOKEN": "",
+  "THIRDWEB_CLIENT_ID": "8d056704cd974d011e0c4c51dadb841e"
 }

@@ -4,5 +4,11 @@ module.exports = {
   ignorePatterns: ['.eslintrc.cjs', 'jest.config.ts', 'scripts/prebuild.cjs', 'src/**/*.d.ts'],
   parserOptions: {
     project: ['tsconfig.json']
+  },
+  settings: {
+    'import/ignore': ['thirdweb']
+  },
+  rules: {
+    'import/no-unresolved': ['error', { ignore: ['^thirdweb'] }]
   }
 }

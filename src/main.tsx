@@ -16,6 +16,8 @@ import Intercom from './components/Intercom'
 import { CallbackPage } from './components/Pages/CallbackPage'
 import { InvalidRedirectionPage } from './components/Pages/InvalidRedirectionPage'
 import { LoginPage } from './components/Pages/LoginPage'
+import { MobileAuthPage } from './components/Pages/MobileAuthPage'
+import { MobileCallbackPage } from './components/Pages/MobileCallbackPage'
 import { FeatureFlagsProvider } from './components/FeatureFlagsProvider'
 import { config } from './modules/config'
 import { getAnalytics } from './modules/analytics/segment'
@@ -59,6 +61,8 @@ const SiteRoutes = () => {
       ) : null}
       <Route path="/setup" Component={SetupPage} />
       <Route path="/avatar-setup" Component={AvatarSetupPage} />
+      <Route path="/mobile" Component={MobileAuthPage} />
+      <Route path="/mobile/callback" Component={MobileCallbackPage} />
       <Route path="*" Component={DefaultPage} />
     </Routes>
   )

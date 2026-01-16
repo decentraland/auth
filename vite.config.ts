@@ -5,6 +5,7 @@ import { nodePolyfills } from 'vite-plugin-node-polyfills'
 // https://vitejs.dev/config/
 export default defineConfig(({ command, mode }) => {
   const envVariables = loadEnv(mode, process.cwd())
+
   return {
     plugins: [
       react(),
@@ -25,7 +26,20 @@ export default defineConfig(({ command, mode }) => {
             commonjsOptions: {
               transformMixedEsModules: true
             },
-            sourcemap: true
+            // Disable sourcemaps in production to reduce memory usage during build
+            sourcemap: false,
+            // Increase chunk size warning limit (thirdweb is large)
+            chunkSizeWarningLimit: 2000,
+            rollupOptions: {
+              output: {
+                // Split large dependencies into separate chunks to reduce memory pressure
+                manualChunks: {
+                  thirdweb: ['thirdweb'],
+                  vendor: ['react', 'react-dom', 'react-router-dom'],
+                  ui: ['decentraland-ui', 'decentraland-ui2']
+                }
+              }
+            }
           }
         }
       : undefined)

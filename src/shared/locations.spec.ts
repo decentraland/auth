@@ -1,6 +1,61 @@
-import { extractRedirectToFromSearchParameters, extractReferrerFromSearchParameters } from './locations'
+import { extractRedirectToFromSearchParameters, extractReferrerFromSearchParameters, locations } from './locations'
 
 describe('locations', () => {
+  describe('login', () => {
+    describe('when using legacy signature', () => {
+      it('returns /login when no params', () => {
+        expect(locations.login()).toBe('/login')
+      })
+
+      it('returns /login with redirectTo', () => {
+        expect(locations.login('/dashboard')).toBe('/login?redirectTo=%2Fdashboard')
+      })
+
+      it('returns /login with redirectTo and referrer', () => {
+        const result = locations.login('/dashboard', '0x123')
+        expect(result).toBe('/login?redirectTo=%2Fdashboard&referrer=0x123')
+      })
+    })
+
+    describe('when using new options signature', () => {
+      it('returns /login with loginMethod email', () => {
+        expect(locations.login({ loginMethod: 'email' })).toBe('/login?loginMethod=email')
+      })
+
+      it('returns /login with loginMethod and redirectTo', () => {
+        const result = locations.login({
+          redirectTo: '/play',
+          loginMethod: 'email'
+        })
+        expect(result).toBe('/login?redirectTo=%2Fplay&loginMethod=email')
+      })
+
+      it('returns /login with all options', () => {
+        const result = locations.login({
+          redirectTo: '/play',
+          referrer: '0x123',
+          loginMethod: 'email'
+        })
+        expect(result).toBe('/login?redirectTo=%2Fplay&referrer=0x123&loginMethod=email')
+      })
+    })
+  })
+
+  describe('loginWithEmail', () => {
+    it('returns email login URL without params', () => {
+      expect(locations.loginWithEmail()).toBe('/login?loginMethod=email')
+    })
+
+    it('returns email login URL with redirectTo', () => {
+      expect(locations.loginWithEmail('/play')).toBe('/login?redirectTo=%2Fplay&loginMethod=email')
+    })
+
+    it('returns email login URL with all params', () => {
+      const result = locations.loginWithEmail('/play', '0x123')
+      expect(result).toBe('/login?redirectTo=%2Fplay&referrer=0x123&loginMethod=email')
+    })
+  })
+
   describe('when extracting redirectTo from search parameters', () => {
     let searchParams: URLSearchParams
     let redirectTo: string

@@ -1,11 +1,71 @@
 import { EthAddress } from '@dcl/schemas'
 
+/**
+ * Login method types for direct login
+ * Currently only supports 'email' for thirdweb email OTP
+ */
+export type LoginMethod = 'email'
+
+/**
+ * Options for the login location
+ */
+interface LoginOptions {
+  redirectTo?: string
+  referrer?: string | null
+  /**
+   * Login method: 'email' for thirdweb email OTP
+   */
+  loginMethod?: LoginMethod
+}
+
+const buildQueryString = (params: Record<string, string | undefined | null>): string => {
+  const entries = Object.entries(params).filter(([, value]) => value != null && value !== '')
+  if (entries.length === 0) return ''
+
+  const queryString = entries.map(([key, value]) => `${key}=${encodeURIComponent(value as string)}`).join('&')
+
+  return `?${queryString}`
+}
+
 export const locations = {
   home: () => '/',
-  login: (redirectTo?: string, referrer?: string | null) =>
-    `/login${redirectTo ? `?redirectTo=${encodeURIComponent(redirectTo)}` : ''}${
-      referrer ? `${redirectTo ? '&' : '?'}referrer=${encodeURIComponent(referrer)}` : ''
-    }`,
+
+  /**
+   * Generate login URL with optional auto-login parameters
+   *
+   * Examples:
+   * - locations.login() → /login
+   * - locations.login({ loginMethod: 'email' }) → /login?loginMethod=email (auto-triggers email OTP)
+   * - locations.login({ redirectTo: '/play', loginMethod: 'email' }) → /login?redirectTo=%2Fplay&loginMethod=email
+   */
+  login: (options?: LoginOptions | string, legacyReferrer?: string | null) => {
+    // Support legacy signature: login(redirectTo?: string, referrer?: string | null)
+    if (typeof options === 'string' || options === undefined) {
+      const redirectTo = options
+      const referrer = legacyReferrer
+      return `/login${buildQueryString({ redirectTo, referrer: referrer ?? undefined })}`
+    }
+
+    // New signature: login(options: LoginOptions)
+    const { redirectTo, referrer, loginMethod } = options
+    return `/login${buildQueryString({
+      redirectTo,
+      referrer: referrer ?? undefined,
+      loginMethod
+    })}`
+  },
+
+  /**
+   * Generate direct email OTP login URL
+   * Shorthand for login({ loginMethod: 'email', ...options })
+   */
+  loginWithEmail: (redirectTo?: string, referrer?: string | null) =>
+    `/login${buildQueryString({
+      redirectTo,
+      referrer: referrer ?? undefined,
+      loginMethod: 'email'
+    })}`,
+
   setup: (redirectTo?: string, referrer?: string | null) =>
     `/setup${redirectTo ? `?redirectTo=${encodeURIComponent(redirectTo)}` : ''}${
       referrer ? `${redirectTo ? '&' : '?'}referrer=${encodeURIComponent(referrer)}` : ''
@@ -13,7 +73,9 @@ export const locations = {
   avatarSetup: (redirectTo?: string, referrer?: string | null) =>
     `/avatar-setup${redirectTo ? `?redirectTo=${encodeURIComponent(redirectTo)}` : ''}${
       referrer ? `${redirectTo ? '&' : '?'}referrer=${encodeURIComponent(referrer)}` : ''
-    }`
+    }`,
+  mobile: (provider?: string) => `/mobile${provider ? `?provider=${encodeURIComponent(provider)}` : ''}`,
+  mobileCallback: () => '/mobile/callback'
 }
 
 export const extractRedirectToFromSearchParameters = (searchParams: URLSearchParams): string => {

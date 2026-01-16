@@ -1,7 +1,10 @@
 import { useState, useCallback, useMemo, useEffect, useContext } from 'react'
 import classNames from 'classnames'
+import { ChainId } from '@dcl/schemas/dist/dapps/chain-id'
+import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
 import { Env } from '@dcl/ui-env'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
+import { connection } from 'decentraland-connect'
 import ImageNew1 from '../../../assets/images/background/image-new1.webp'
 import ImageNew2 from '../../../assets/images/background/image-new2.webp'
 import ImageNew3 from '../../../assets/images/background/image-new3.webp'
@@ -22,20 +25,26 @@ import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import { useAnalytics } from '../../../hooks/useAnalytics'
 import { useAuthFlow } from '../../../hooks/useAuthFlow'
+import { useAutoLogin } from '../../../hooks/useAutoLogin'
 import { ConnectionType } from '../../../modules/analytics/types'
 import { config } from '../../../modules/config'
 import { createAuthServerHttpClient } from '../../../shared/auth'
 import { isErrorWithName } from '../../../shared/errors'
 import { extractReferrerFromSearchParameters } from '../../../shared/locations'
+import { sendEmailOTP } from '../../../shared/thirdweb'
 import { isClockSynchronized } from '../../../shared/utils/clockSync'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { ClockSyncModal } from '../../ClockSyncModal'
 import { ConnectionOptionType, Connection } from '../../Connection'
 import { ConnectionModal } from '../../ConnectionModal'
 import { ConnectionLayoutState } from '../../ConnectionModal/ConnectionLayout.type'
+import { EmailLoginModal } from '../../EmailLoginModal'
+import { EmailLoginResult } from '../../EmailLoginModal/EmailLoginModal.types'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
+import { ConfirmingLogin } from './ConfirmingLogin'
 import {
   getIdentitySignature,
+  getIdentityWithSigner,
   connectToProvider,
   isSocialLogin,
   fromConnectionOptionToProviderType,
@@ -55,9 +64,19 @@ export const LoginPage = () => {
   const [loadingState, setLoadingState] = useState(ConnectionLayoutState.CONNECTING_WALLET)
   const [showConnectionLayout, setShowConnectionLayout] = useState(false)
   const [showClockSyncModal, setShowClockSyncModal] = useState(false)
+  const [showEmailLoginModal, setShowEmailLoginModal] = useState(false)
   const [currentConnectionType, setCurrentConnectionType] = useState<ConnectionOptionType>()
   const { url: redirectTo, redirect } = useAfterLoginRedirection()
   const { initialized: flagInitialized, flags } = useContext(FeatureFlagsContext)
+
+  // Email login state
+  const [currentEmail, setCurrentEmail] = useState('')
+  const [isEmailLoading, setIsEmailLoading] = useState(false)
+  const [emailError, setEmailError] = useState<string | null>(null)
+  const [showConfirmingLogin, setShowConfirmingLogin] = useState(false)
+  const [confirmingLoginError, setConfirmingLoginError] = useState<string | null>(null)
+  // Store address from email login for clock sync continuation
+  const [emailLoginAddress, setEmailLoginAddress] = useState<string | null>(null)
 
   // TODO: remove /play from redirectTo
   const showGuestOption = redirectTo && new URL(redirectTo).pathname.includes('/play')
@@ -99,11 +118,50 @@ export const LoginPage = () => {
     }
   }, [])
 
+  // Handle email submit from the main page
+  const handleEmailSubmit = useCallback(
+    async (email: string) => {
+      setCurrentEmail(email)
+      setIsEmailLoading(true)
+      setEmailError(null)
+      setCurrentConnectionType(ConnectionOptionType.EMAIL)
+
+      trackLoginClick({
+        method: ConnectionOptionType.EMAIL,
+        type: ConnectionType.WEB2
+      })
+
+      try {
+        // Send OTP to email
+        await sendEmailOTP(email)
+        // Open OTP modal
+        setShowEmailLoginModal(true)
+      } catch (error) {
+        const errorMessage = handleError(error, 'Error sending verification code')
+        setEmailError(errorMessage || 'Failed to send verification code. Please try again.')
+      } finally {
+        setIsEmailLoading(false)
+      }
+    },
+    [trackLoginClick]
+  )
+
   const handleOnConnect = useCallback(
     async (connectionType: ConnectionOptionType) => {
       if (!flagInitialized) {
         return
       }
+
+      // EMAIL is handled differently - focus the email input instead of connecting
+      if (connectionType === ConnectionOptionType.EMAIL) {
+        const emailInput = document.getElementById('dcl-email-input')
+        if (emailInput) {
+          emailInput.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          emailInput.focus()
+        }
+        return
+      }
+
       const isLoggingInThroughSocial = isSocialLogin(connectionType)
       const providerType = isLoggingInThroughSocial ? ConnectionType.WEB2 : ConnectionType.WEB3
       setCurrentConnectionType(connectionType)
@@ -123,6 +181,9 @@ export const LoginPage = () => {
           const connectionData = await connectToProvider(connectionType)
 
           setLoadingState(ConnectionLayoutState.WAITING_FOR_SIGNATURE)
+          if (!connectionData.provider) {
+            throw new Error('Provider is required for wallet connections')
+          }
           await getIdentitySignature(connectionData.account?.toLowerCase() ?? '', connectionData.provider)
 
           await trackLoginSuccess({
@@ -178,6 +239,83 @@ export const LoginPage = () => {
     setLoadingState(ConnectionLayoutState.CONNECTING_WALLET)
   }, [setShowConnectionLayout])
 
+  const handleEmailLoginClose = useCallback(() => {
+    setShowEmailLoginModal(false)
+  }, [])
+
+  const handleEmailLoginBack = useCallback(() => {
+    setShowEmailLoginModal(false)
+    setCurrentEmail('')
+    setCurrentConnectionType(undefined)
+  }, [])
+
+  const handleEmailLoginSuccess = useCallback(
+    async (result: EmailLoginResult) => {
+      setShowEmailLoginModal(false)
+      setShowConfirmingLogin(true)
+      setConfirmingLoginError(null)
+
+      try {
+        const { account } = result
+        const address = account.address.toLowerCase()
+
+        // Store address for clock sync continuation
+        setEmailLoginAddress(address)
+
+        // Generate identity using the thirdweb account's signMessage
+        await getIdentityWithSigner(address, async (message: string) => account.signMessage({ message }))
+
+        // Store connection data for marketplace to reconnect later
+        connection.storeConnectionData(ProviderType.THIRDWEB, ChainId.ETHEREUM_MAINNET)
+
+        await trackLoginSuccess({
+          ethAddress: address,
+          type: ConnectionType.WEB2
+        })
+
+        const search = new URLSearchParams(window.location.search)
+        const referrer = extractReferrerFromSearchParameters(search)
+
+        const isClockSync = await checkClockSynchronization()
+
+        if (isClockSync) {
+          await checkProfileAndRedirect(address, referrer, () => {
+            redirect()
+            setShowConfirmingLogin(false)
+          })
+        } else {
+          // Clock sync failed - hide confirming overlay so modal is visible
+          setShowConfirmingLogin(false)
+        }
+      } catch (error) {
+        const errorMessage = handleError(error, 'Error completing email login', {
+          sentryTags: {
+            connectionType: ConnectionOptionType.EMAIL
+          }
+        })
+        setConfirmingLoginError(errorMessage || 'Something went wrong. Please try again.')
+      }
+    },
+    [trackLoginSuccess, checkClockSynchronization, checkProfileAndRedirect, redirect]
+  )
+
+  const handleEmailLoginError = useCallback((error: string) => {
+    handleError(new Error(error), 'Email login error')
+  }, [])
+
+  const handleConfirmingLoginRetry = useCallback(() => {
+    setShowConfirmingLogin(false)
+    setConfirmingLoginError(null)
+    // Go back to the email login modal with the current email
+    setShowEmailLoginModal(true)
+  }, [])
+
+  // Use the auto-login hook to handle loginMethod URL parameter
+  useAutoLogin({
+    isReady: flagInitialized,
+    onConnect: handleOnConnect
+  })
+
   const handleTryAgain = useCallback(() => {
     if (currentConnectionType) {
       handleOnConnect(currentConnectionType)
@@ -187,12 +325,25 @@ export const LoginPage = () => {
   const handleClockSyncContinue = useCallback(async () => {
     setShowClockSyncModal(false)
 
-    // Get the current connection data and proceed with profile check
+    const search = new URLSearchParams(window.location.search)
+    const referrer = extractReferrerFromSearchParameters(search)
+
+    // Handle EMAIL login separately - use stored address instead of connectToProvider
+    if (currentConnectionType === ConnectionOptionType.EMAIL && emailLoginAddress) {
+      try {
+        await checkProfileAndRedirect(emailLoginAddress, referrer, () => {
+          redirect()
+        })
+      } catch (error) {
+        handleError(error, 'Error during email clock sync continue flow')
+      }
+      return
+    }
+
+    // Handle other connection types via connectToProvider
     if (currentConnectionType) {
       try {
         const connectionData = await connectToProvider(currentConnectionType)
-        const search = new URLSearchParams(window.location.search)
-        const referrer = extractReferrerFromSearchParameters(search)
 
         await checkProfileAndRedirect(connectionData.account ?? '', referrer, () => {
           redirect()
@@ -202,7 +353,7 @@ export const LoginPage = () => {
         handleError(error, 'Error during clock sync continue flow')
       }
     }
-  }, [currentConnectionType, checkProfileAndRedirect, redirect])
+  }, [currentConnectionType, emailLoginAddress, checkProfileAndRedirect, redirect])
 
   useEffect(() => {
     const backgroundInterval = setInterval(() => {
@@ -228,6 +379,9 @@ export const LoginPage = () => {
           })`
         }}
       />
+      {showConfirmingLogin && !showClockSyncModal && (
+        <ConfirmingLogin error={confirmingLoginError} onError={confirmingLoginError ? handleConfirmingLoginRetry : undefined} />
+      )}
       {config.is(Env.DEVELOPMENT) && !flagInitialized ? (
         <Loader active size="massive" />
       ) : (
@@ -240,14 +394,25 @@ export const LoginPage = () => {
             onTryAgain={handleTryAgain}
             providerType={currentConnectionType ? fromConnectionOptionToProviderType(currentConnectionType) : null}
           />
+          <EmailLoginModal
+            open={showEmailLoginModal}
+            email={currentEmail}
+            onClose={handleEmailLoginClose}
+            onBack={handleEmailLoginBack}
+            onSuccess={handleEmailLoginSuccess}
+            onError={handleEmailLoginError}
+          />
           <div className={styles.left}>
             <div className={styles.leftInfo}>
               <div className={styles.mainContainer}>
                 <Connection
                   onConnect={handleOnConnect}
+                  onEmailSubmit={handleEmailSubmit}
                   loadingOption={currentConnectionType}
                   connectionOptions={targetConfig.connectionOptions}
                   isNewUser={isNewUser}
+                  isEmailLoading={isEmailLoading}
+                  emailError={emailError}
                 />
                 {isNewUser && (
                   <div className={styles.newUserInfo}>
