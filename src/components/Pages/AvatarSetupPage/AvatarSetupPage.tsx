@@ -1,4 +1,5 @@
-import React, { useCallback, useState, useMemo, useEffect, useContext, useRef } from 'react'
+import * as React from 'react'
+import { useCallback, useState, useMemo, useEffect, useContext, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import CircularProgress from '@mui/material/CircularProgress'
 import { EthAddress, Email } from '@dcl/schemas'

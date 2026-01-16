@@ -1,4 +1,4 @@
-import React from 'react'
+import * as React from 'react'
 import { Modal } from 'decentraland-ui/dist/components/Modal/Modal'
 import { ModalNavigation } from 'decentraland-ui/dist/components/ModalNavigation/ModalNavigation'
 import warningIcon from '../../assets/images/warning.svg'

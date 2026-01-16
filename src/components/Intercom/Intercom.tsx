@@ -1,4 +1,4 @@
-import React from 'react'
+import * as React from 'react'
 import { handleError } from '../../shared/utils/errorHandler'
 import { IntercomWidget } from './IntercomWidget'
 import { DefaultProps, Props } from './Intercom.types'
