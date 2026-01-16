@@ -1,5 +1,6 @@
 import { useCallback, useContext, useEffect, useState } from 'react'
-import Icon from 'semantic-ui-react/dist/commonjs/elements/Icon/Icon'
+import ArrowBackIosNewTwoToneIcon from '@mui/icons-material/ArrowBackIosNewTwoTone'
+import LoginRoundedIcon from '@mui/icons-material/LoginRounded'
 import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
@@ -130,7 +131,7 @@ export const MobileCallbackPage = () => {
           <Title>Authentication Failed</Title>
           <Description>{error}</Description>
           <Button primary onClick={handleRetry} style={{ marginTop: '24px' }}>
-            <Icon name="arrow left" />
+            <ArrowBackIosNewTwoToneIcon />
             Try again
           </Button>
         </Container>
@@ -150,7 +151,7 @@ export const MobileCallbackPage = () => {
               The application could not be launched. Please make sure {targetConfig.explorerText} is installed and try again.
             </Description>
             <Button primary onClick={handleRetry} style={{ marginTop: '24px' }}>
-              <Icon name="arrow left" />
+              <ArrowBackIosNewTwoToneIcon />
               Try again
             </Button>
           </Container>
@@ -169,7 +170,7 @@ export const MobileCallbackPage = () => {
               : `Redirecting to ${targetConfig.explorerText}...`}
           </Description>
           <Button primary onClick={attemptDeepLink} style={{ marginTop: '24px', paddingLeft: '16px' }}>
-            <Icon name="sign in" />
+            <LoginRoundedIcon />
             Return to {targetConfig.explorerText}
           </Button>
         </Container>

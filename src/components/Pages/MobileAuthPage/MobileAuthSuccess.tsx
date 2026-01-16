@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import Icon from 'semantic-ui-react/dist/commonjs/elements/Icon/Icon'
+import ArrowBackIosNewTwoToneIcon from '@mui/icons-material/ArrowBackIosNewTwoTone'
+import LoginRoundedIcon from '@mui/icons-material/LoginRounded'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import { launchDeepLink } from '../RequestPage/utils'
 import { Background, Description, Logo, Main, SuccessContainer, Title } from './MobileAuthPage.styled'
@@ -51,7 +52,7 @@ export const MobileAuthSuccess = ({ identityId, explorerText, onTryAgain }: Prop
           <Title>Could not open {explorerText}</Title>
           <Description>The application could not be launched. Please make sure {explorerText} is installed and try again.</Description>
           <Button primary onClick={onTryAgain} style={{ marginTop: '24px', paddingLeft: '16px' }}>
-            <Icon name="arrow left" />
+            <ArrowBackIosNewTwoToneIcon />
             Try again
           </Button>
         </SuccessContainer>
@@ -69,7 +70,7 @@ export const MobileAuthSuccess = ({ identityId, explorerText, onTryAgain }: Prop
           {countdown > 0 ? `You will be redirected to ${explorerText} in ${countdown}...` : `Redirecting to ${explorerText}...`}
         </Description>
         <Button primary onClick={attemptDeepLink} style={{ marginTop: '24px', paddingLeft: '16px' }}>
-          <Icon name="sign in" />
+          <LoginRoundedIcon />
           Return to {explorerText}
         </Button>
       </SuccessContainer>
