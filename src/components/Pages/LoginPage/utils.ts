@@ -79,7 +79,7 @@ export async function connectToSocialProvider(
     const url = new URL(window.location.href)
     const search = new URLSearchParams(window.location.search)
     const referrer = extractReferrerFromSearchParameters(search)
-    url.pathname = isMobileFlow ? '/auth/mobile/callback' : '/auth/callback'
+    url.pathname = '/auth/callback'
     url.search = ''
 
     await magic?.oauth2.loginWithRedirect({
