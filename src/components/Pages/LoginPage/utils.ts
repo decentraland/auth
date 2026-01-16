@@ -59,10 +59,12 @@ async function generateIdentity(address: string, provider: Provider): Promise<Au
 export async function connectToSocialProvider(
   connectionOption: ConnectionOptionType,
   isTesting?: boolean,
-  redirectTo?: string
+  redirectTo?: string,
+  isMobileFlow?: boolean
 ): Promise<void> {
   const MAGIC_KEY = isTesting ? getConfiguration().magic_test.apiKey : getConfiguration().magic.apiKey
   const providerType = fromConnectionOptionToProviderType(connectionOption, isTesting)
+  console.log({ config: getConfiguration() })
 
   if (ProviderType.MAGIC === providerType || ProviderType.MAGIC_TEST === providerType) {
     // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -78,13 +80,13 @@ export async function connectToSocialProvider(
     const url = new URL(window.location.href)
     const search = new URLSearchParams(window.location.search)
     const referrer = extractReferrerFromSearchParameters(search)
-    url.pathname = '/auth/callback'
+    url.pathname = isMobileFlow ? '/auth/mobile/callback' : '/auth/callback'
     url.search = ''
 
     await magic?.oauth2.loginWithRedirect({
       provider: connectionOption === ConnectionOptionType.X ? 'twitter' : (connectionOption as OAuthProvider),
       redirectURI: url.href,
-      customData: JSON.stringify({ redirectTo, referrer })
+      customData: JSON.stringify({ redirectTo, referrer, isMobileFlow })
     })
   }
 }
@@ -154,4 +156,9 @@ export async function getIdentityWithSigner(address: string, signMessage: SignMe
 export function isMobile() {
   const userAgent = navigator.userAgent
   return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent)
+}
+
+export function isIos() {
+  const userAgent = navigator.userAgent
+  return /iPhone|iPad|iPod/i.test(userAgent)
 }

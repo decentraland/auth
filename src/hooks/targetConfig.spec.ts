@@ -1,7 +1,7 @@
 import { useLocation } from 'react-router-dom'
 import { renderHook } from '@testing-library/react'
 import { ConnectionOptionType } from '../components/Connection'
-import { isMobile } from '../components/Pages/LoginPage/utils'
+import { isMobile, isIos } from '../components/Pages/LoginPage/utils'
 import { _targetConfigs, useTargetConfig } from './targetConfig'
 
 jest.mock('react-router-dom')
@@ -155,6 +155,40 @@ describe('useTargetConfig', () => {
 
       expect(targetConfigId).toBe('default')
       expect(config).toEqual(_targetConfigs.default)
+    })
+  })
+
+  describe('when on iOS mobile with no targetConfigId', () => {
+    beforeEach(() => {
+      ;(useLocation as jest.Mock).mockReturnValue({ search: '' })
+      ;(isMobile as jest.Mock).mockReturnValue(true)
+      ;(isIos as jest.Mock).mockReturnValue(true)
+    })
+
+    it('should return the ios config', () => {
+      const { result } = renderHook(() => useTargetConfig())
+      const [config, targetConfigId] = result.current
+
+      expect(targetConfigId).toBe('ios')
+      expect(config.connectionOptions.primary).toBe(ConnectionOptionType.APPLE)
+      expect(config.connectionOptions.secondary).toBe(ConnectionOptionType.WALLET_CONNECT)
+    })
+  })
+
+  describe('when on Android mobile with no targetConfigId', () => {
+    beforeEach(() => {
+      ;(useLocation as jest.Mock).mockReturnValue({ search: '' })
+      ;(isMobile as jest.Mock).mockReturnValue(true)
+      ;(isIos as jest.Mock).mockReturnValue(false)
+    })
+
+    it('should return the android config', () => {
+      const { result } = renderHook(() => useTargetConfig())
+      const [config, targetConfigId] = result.current
+
+      expect(targetConfigId).toBe('android')
+      expect(config.connectionOptions.primary).toBe(ConnectionOptionType.GOOGLE)
+      expect(config.connectionOptions.secondary).toBe(ConnectionOptionType.WALLET_CONNECT)
     })
   })
 })
