@@ -11,11 +11,12 @@ type Props = {
   onContinue: () => void
   requestId: string
   deepLinkUrl: string
+  autoStart?: boolean
 }
 
 const COUNTDOWN_SECONDS = 5
 
-export const ContinueInApp = ({ onContinue, requestId, deepLinkUrl }: Props) => {
+export const ContinueInApp = ({ onContinue, requestId, deepLinkUrl, autoStart = true }: Props) => {
   const [targetConfig] = useTargetConfig()
   const [searchParams] = useSearchParams()
   const [countdown, setCountdown] = useState(COUNTDOWN_SECONDS)
@@ -40,6 +41,7 @@ export const ContinueInApp = ({ onContinue, requestId, deepLinkUrl }: Props) => 
   }, [requestId, searchParams])
 
   useEffect(() => {
+    if (!autoStart) return
     if (deepLinkFailed) return
 
     // Start countdown
@@ -56,7 +58,7 @@ export const ContinueInApp = ({ onContinue, requestId, deepLinkUrl }: Props) => 
     }, 1000)
 
     return () => clearInterval(interval)
-  }, [attemptDeepLink, deepLinkFailed])
+  }, [attemptDeepLink, autoStart, deepLinkFailed])
 
   if (deepLinkFailed) {
     return (

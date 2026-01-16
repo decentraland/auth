@@ -33,7 +33,7 @@ import { handleError } from '../../../shared/utils/errorHandler'
 import { checkWebGpuSupport } from '../../../shared/utils/webgpu'
 import { FeatureFlagsContext, FeatureFlagsKeys, OnboardingFlowVariant } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
 import { Container } from './Container'
-import { NFTTransferData, MANATransferData } from './types'
+import { MANATransferData, NFTTransferData, TransferType } from './types'
 import {
   getNetworkProvider,
   getConnectedProvider,
@@ -50,12 +50,9 @@ import {
   DeniedWalletInteraction,
   DifferentAccountError,
   IpValidationError as IpValidationErrorView,
-  NFTTransferView,
-  NFTTransferCompleteView,
-  NFTTransferCanceledView,
-  MANATransferView,
-  MANATransferCompleteView,
-  MANATransferCanceledView,
+  TransferCanceledView,
+  TransferCompletedView,
+  TransferConfirmView,
   RecoverError,
   SignInComplete,
   SigningError,
@@ -572,15 +569,15 @@ export const RequestPage = () => {
     case View.WALLET_INTERACTION_COMPLETE:
       return <WalletInteractionComplete />
     case View.WALLET_NFT_INTERACTION_COMPLETE:
-      return nftTransferData ? <NFTTransferCompleteView nftData={nftTransferData} /> : null
+      return nftTransferData ? <TransferCompletedView type={TransferType.GIFT} transferData={nftTransferData} /> : null
     case View.WALLET_MANA_INTERACTION_COMPLETE:
-      return manaTransferData ? <MANATransferCompleteView manaData={manaTransferData} /> : null
+      return manaTransferData ? <TransferCompletedView type={TransferType.TIP} transferData={manaTransferData} /> : null
     case View.WALLET_INTERACTION_DENIED:
       return <DeniedWalletInteraction />
     case View.WALLET_NFT_INTERACTION_DENIED:
-      return nftTransferData ? <NFTTransferCanceledView nftData={nftTransferData} /> : null
+      return nftTransferData ? <TransferCanceledView type={TransferType.GIFT} transferData={nftTransferData} /> : null
     case View.WALLET_MANA_INTERACTION_DENIED:
-      return manaTransferData ? <MANATransferCanceledView manaData={manaTransferData} /> : null
+      return manaTransferData ? <TransferCanceledView type={TransferType.TIP} transferData={manaTransferData} /> : null
     case View.LOADING_REQUEST:
       return (
         <Container>
@@ -642,8 +639,9 @@ export const RequestPage = () => {
             onClose={onDenyWalletInteraction}
             onReject={onDenyWalletInteraction}
           />
-          <NFTTransferView
-            nftData={nftTransferData}
+          <TransferConfirmView
+            type={TransferType.GIFT}
+            transferData={nftTransferData}
             isLoading={isLoading}
             onDeny={onDenyWalletInteraction}
             onApprove={handleApproveWalletInteraction}
@@ -662,8 +660,9 @@ export const RequestPage = () => {
             onClose={onDenyWalletInteraction}
             onReject={onDenyWalletInteraction}
           />
-          <MANATransferView
-            manaData={manaTransferData}
+          <TransferConfirmView
+            type={TransferType.TIP}
+            transferData={manaTransferData}
             isLoading={isLoading}
             onDeny={onDenyWalletInteraction}
             onApprove={handleApproveWalletInteraction}
