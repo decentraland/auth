@@ -73,10 +73,9 @@ const targetConfigs: Record<TargetConfigId, TargetConfig> = {
   android: {
     ...defaultMobileConfig,
     connectionOptions: {
-      primary: ConnectionOptionType.EMAIL,
+      primary: ConnectionOptionType.GOOGLE,
       secondary: ConnectionOptionType.WALLET_CONNECT,
       extraOptions: [
-        ConnectionOptionType.GOOGLE,
         ConnectionOptionType.DISCORD,
         ConnectionOptionType.APPLE,
         ConnectionOptionType.X,
