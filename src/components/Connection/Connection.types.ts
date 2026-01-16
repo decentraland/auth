@@ -58,34 +58,3 @@ export type ConnectionProps = {
   onConnect: (wallet: ConnectionOptionType) => unknown
   onEmailSubmit?: (email: string) => void
 }
-
-/**
- * Parses a provider string into a ConnectionOptionType enum value.
- * Handles various formats: 'google', 'wallet-connect', 'walletconnect', 'wallet_connect', etc.
- * @returns The corresponding ConnectionOptionType or null if not found.
- */
-export const parseConnectionOptionType = (provider: string | null): ConnectionOptionType | null => {
-  if (!provider) return null
-
-  const normalized = provider.toLowerCase().trim()
-
-  // Direct match with enum values
-  const enumValues = Object.values(ConnectionOptionType) as string[]
-  if (enumValues.includes(normalized)) {
-    return normalized as ConnectionOptionType
-  }
-
-  // Handle aliases and variations (using Map to avoid naming convention issues)
-  const aliases = new Map<string, ConnectionOptionType>([
-    ['walletconnect', ConnectionOptionType.WALLET_CONNECT],
-    ['wallet_connect', ConnectionOptionType.WALLET_CONNECT],
-    ['metamaskmobile', ConnectionOptionType.METAMASK_MOBILE],
-    ['metamask_mobile', ConnectionOptionType.METAMASK_MOBILE],
-    ['walletlink', ConnectionOptionType.WALLET_LINK],
-    ['wallet_link', ConnectionOptionType.WALLET_LINK],
-    ['twitter', ConnectionOptionType.X],
-    ['samsung', ConnectionOptionType.SAMSUNG]
-  ])
-
-  return aliases.get(normalized) ?? null
-}

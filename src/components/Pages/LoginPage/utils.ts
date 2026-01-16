@@ -64,7 +64,6 @@ export async function connectToSocialProvider(
 ): Promise<void> {
   const MAGIC_KEY = isTesting ? getConfiguration().magic_test.apiKey : getConfiguration().magic.apiKey
   const providerType = fromConnectionOptionToProviderType(connectionOption, isTesting)
-  console.log({ config: getConfiguration() })
 
   if (ProviderType.MAGIC === providerType || ProviderType.MAGIC_TEST === providerType) {
     // eslint-disable-next-line @typescript-eslint/naming-convention

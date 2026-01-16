@@ -7,7 +7,6 @@ const createMagicInstance = async (isTest: boolean) => {
   const { OAuthExtension } = await import('@magic-ext/oauth2')
 
   const config = isTest ? getConfiguration().magic_test : getConfiguration().magic
-  console.log({ config: getConfiguration() })
   const MAGIC_KEY = config.apiKey
 
   return new Magic(MAGIC_KEY, {

@@ -111,8 +111,6 @@ export const MobileCallbackPage = () => {
     navigate(locations.mobile())
   }, [navigate])
 
-  console.log({ identityId })
-
   // Show error state
   if (error) {
     return (
