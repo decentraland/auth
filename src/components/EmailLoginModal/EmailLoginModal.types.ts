@@ -1,7 +1,6 @@
+// This enum is kept for potential future use (e.g., multi-step flows)
 export enum EmailLoginStep {
-  ENTER_OTP = 'enter_otp',
-  VERIFYING = 'verifying',
-  ERROR = 'error'
+  ENTER_OTP = 'enter_otp'
 }
 
 /**

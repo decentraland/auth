@@ -25,6 +25,7 @@ import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import { useAnalytics } from '../../../hooks/useAnalytics'
 import { useAuthFlow } from '../../../hooks/useAuthFlow'
+import { useAutoLogin } from '../../../hooks/useAutoLogin'
 import { ConnectionType } from '../../../modules/analytics/types'
 import { config } from '../../../modules/config'
 import { createAuthServerHttpClient } from '../../../shared/auth'
@@ -74,6 +75,8 @@ export const LoginPage = () => {
   const [emailError, setEmailError] = useState<string | null>(null)
   const [showConfirmingLogin, setShowConfirmingLogin] = useState(false)
   const [confirmingLoginError, setConfirmingLoginError] = useState<string | null>(null)
+  // Store address from email login for clock sync continuation
+  const [emailLoginAddress, setEmailLoginAddress] = useState<string | null>(null)
 
   // TODO: remove /play from redirectTo
   const showGuestOption = redirectTo && new URL(redirectTo).pathname.includes('/play')
@@ -148,6 +151,17 @@ export const LoginPage = () => {
       if (!flagInitialized) {
         return
       }
+
+      // EMAIL is handled differently - focus the email input instead of connecting
+      if (connectionType === ConnectionOptionType.EMAIL) {
+        const emailInput = document.getElementById('dcl-email-input')
+        if (emailInput) {
+          emailInput.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          emailInput.focus()
+        }
+        return
+      }
+
       const isLoggingInThroughSocial = isSocialLogin(connectionType)
       const providerType = isLoggingInThroughSocial ? ConnectionType.WEB2 : ConnectionType.WEB3
       setCurrentConnectionType(connectionType)
@@ -245,6 +259,9 @@ export const LoginPage = () => {
         const { account } = result
         const address = account.address.toLowerCase()
 
+        // Store address for clock sync continuation
+        setEmailLoginAddress(address)
+
         // Generate identity using the thirdweb account's signMessage
         await getIdentityWithSigner(address, async (message: string) => account.signMessage({ message }))
 
@@ -266,6 +283,9 @@ export const LoginPage = () => {
             redirect()
             setShowConfirmingLogin(false)
           })
+        } else {
+          // Clock sync failed - hide confirming overlay so modal is visible
+          setShowConfirmingLogin(false)
         }
       } catch (error) {
         const errorMessage = handleError(error, 'Error completing email login', {
@@ -290,6 +310,12 @@ export const LoginPage = () => {
     setShowEmailLoginModal(true)
   }, [])
 
+  // Use the auto-login hook to handle loginMethod URL parameter
+  useAutoLogin({
+    isReady: flagInitialized,
+    onConnect: handleOnConnect
+  })
+
   const handleTryAgain = useCallback(() => {
     if (currentConnectionType) {
       handleOnConnect(currentConnectionType)
@@ -299,12 +325,25 @@ export const LoginPage = () => {
   const handleClockSyncContinue = useCallback(async () => {
     setShowClockSyncModal(false)
 
-    // Get the current connection data and proceed with profile check
+    const search = new URLSearchParams(window.location.search)
+    const referrer = extractReferrerFromSearchParameters(search)
+
+    // Handle EMAIL login separately - use stored address instead of connectToProvider
+    if (currentConnectionType === ConnectionOptionType.EMAIL && emailLoginAddress) {
+      try {
+        await checkProfileAndRedirect(emailLoginAddress, referrer, () => {
+          redirect()
+        })
+      } catch (error) {
+        handleError(error, 'Error during email clock sync continue flow')
+      }
+      return
+    }
+
+    // Handle other connection types via connectToProvider
     if (currentConnectionType) {
       try {
         const connectionData = await connectToProvider(currentConnectionType)
-        const search = new URLSearchParams(window.location.search)
-        const referrer = extractReferrerFromSearchParameters(search)
 
         await checkProfileAndRedirect(connectionData.account ?? '', referrer, () => {
           redirect()
@@ -314,7 +353,7 @@ export const LoginPage = () => {
         handleError(error, 'Error during clock sync continue flow')
       }
     }
-  }, [currentConnectionType, checkProfileAndRedirect, redirect])
+  }, [currentConnectionType, emailLoginAddress, checkProfileAndRedirect, redirect])
 
   useEffect(() => {
     const backgroundInterval = setInterval(() => {
@@ -340,7 +379,7 @@ export const LoginPage = () => {
           })`
         }}
       />
-      {showConfirmingLogin && (
+      {showConfirmingLogin && !showClockSyncModal && (
         <ConfirmingLogin error={confirmingLoginError} onError={confirmingLoginError ? handleConfirmingLoginRetry : undefined} />
       )}
       {config.is(Env.DEVELOPMENT) && !flagInitialized ? (
