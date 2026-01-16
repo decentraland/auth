@@ -1,4 +1,4 @@
-import React from 'react'
+import * as React from 'react'
 import { ConnectionOptionType } from './Connection.types'
 
 export type ConnectionPrimaryButtonI18N = {

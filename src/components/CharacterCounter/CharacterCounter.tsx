@@ -1,4 +1,4 @@
-import React from 'react'
+import * as React from 'react'
 import { CharacterCounter, CharacterCounterText, WarningIcon, ErrorText } from './CharacterCounter.styled'
 import { CharacterCounterProps } from './CharacterCounter.types'
 

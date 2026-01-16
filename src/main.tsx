@@ -7,6 +7,7 @@ import { useEffect } from 'react'
 import * as ReactDOM from 'react-dom'
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { darkTheme, DclThemeProvider } from 'decentraland-ui2'
+import { Env } from '@dcl/ui-env'
 import { RequestPage } from './components/Pages/RequestPage'
 import { SetupPage } from './components/Pages/SetupPage'
 import { DefaultPage } from './components/Pages/DefaultPage'
@@ -27,6 +28,13 @@ import './index.css'
 
 getAnalytics()?.load(config.get('SEGMENT_API_KEY'))
 
+const DevTestViewPage = !config.is(Env.PRODUCTION)
+  ? React.lazy(async () => {
+      const mod = await import('./components/Pages/RequestPage/TestViewPage')
+      return { default: mod.TestViewPage }
+    })
+  : undefined
+
 const SiteRoutes = () => {
   const location = useLocation()
   const analytics = getAnalytics()
@@ -41,6 +49,16 @@ const SiteRoutes = () => {
       <Route path="/invalidRedirection" Component={InvalidRedirectionPage} />
       <Route path="/callback" Component={CallbackPage} />
       <Route path="/requests/:requestId" Component={RequestPage} />
+      {DevTestViewPage ? (
+        <Route
+          path="/testView/:viewId"
+          element={
+            <React.Suspense fallback={null}>
+              <DevTestViewPage />
+            </React.Suspense>
+          }
+        />
+      ) : null}
       <Route path="/setup" Component={SetupPage} />
       <Route path="/avatar-setup" Component={AvatarSetupPage} />
       <Route path="/mobile" Component={MobileAuthPage} />
