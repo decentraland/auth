@@ -42,6 +42,8 @@ const TransferConfirmView = (props: TransferConfirmViewProps) => {
               inline
               showBothNameAndAddress
               shortenAddress
+              showCopyButton
+              highlightName
             />
 
             <Label>CREATOR OF</Label>

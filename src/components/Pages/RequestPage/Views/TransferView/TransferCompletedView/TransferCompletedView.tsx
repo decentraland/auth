@@ -28,6 +28,8 @@ const TransferCompletedView = (props: TransferCompletedViewProps) => {
               showBothNameAndAddress
               shortenAddress
               size="huge"
+              showCopyButton
+              highlightName
             />
 
             <Label>CREATOR OF</Label>

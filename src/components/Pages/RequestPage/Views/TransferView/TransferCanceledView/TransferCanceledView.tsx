@@ -29,6 +29,8 @@ const TransferCanceledView = memo((props: TransferCanceledViewProps) => {
                   inline
                   showBothNameAndAddress
                   shortenAddress
+                  showCopyButton
+                  highlightName
                 />
               </ColumnContainer>
             </TransferSecondaryText>
