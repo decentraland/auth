@@ -1,7 +1,6 @@
 import { useCallback, useContext, useEffect, useState, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
-import { connection } from 'decentraland-connect'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import { createAuthServerHttpClient } from '../../../shared/auth'
 import { isErrorWithName } from '../../../shared/errors'
@@ -51,9 +50,6 @@ export const MobileAuthPage = () => {
         if (await magic?.user.isLoggedIn()) {
           await magic?.user.logout()
         }
-
-        // Clear WalletConnect/AppKit session
-        await connection.disconnect()
 
         // Clear cached email
         localStorage.removeItem('dcl_magic_user_email')
