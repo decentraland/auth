@@ -105,7 +105,7 @@ export const MobileAuthPage = () => {
           const storedIdentity = localStorageGetIdentity(connectionData.account?.toLowerCase() ?? '') ?? identity
 
           const httpClient = createAuthServerHttpClient()
-          const response = await httpClient.postIdentity(storedIdentity)
+          const response = await httpClient.postIdentity(storedIdentity, { isMobile: true })
 
           setIdentityId(response.identityId)
           setView('success')
