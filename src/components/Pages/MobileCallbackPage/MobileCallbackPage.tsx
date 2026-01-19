@@ -74,7 +74,7 @@ export const MobileCallbackPage = () => {
 
       // Post identity to server
       const httpClient = createAuthServerHttpClient()
-      const response = await httpClient.postIdentity(identity, true)
+      const response = await httpClient.postIdentity(identity, { isMobile: true })
 
       setIdentityId(response.identityId)
     } catch (err) {

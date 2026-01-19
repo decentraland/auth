@@ -60,7 +60,7 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
     }
   }
 
-  const postIdentity = async (identity: AuthIdentity, isMobile?: boolean): Promise<IdentityResponse> => {
+  const postIdentity = async (identity: AuthIdentity, opts: { isMobile?: boolean } = { isMobile: false }): Promise<IdentityResponse> => {
     try {
       const response = await signedFetch(baseUrl + '/identities', {
         method: 'POST',
@@ -68,7 +68,7 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
           // eslint-disable-next-line @typescript-eslint/naming-convention
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ identity, isMobile }),
+        body: JSON.stringify({ identity, isMobile: opts.isMobile }),
         identity
       })
 
