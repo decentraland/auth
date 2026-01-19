@@ -402,7 +402,7 @@ describe('createAuthServerClient', () => {
             // eslint-disable-next-line @typescript-eslint/naming-convention
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({ identity: mockIdentity }),
+          body: JSON.stringify({ identity: mockIdentity, isMobile: false }),
           identity: mockIdentity
         })
         expect(result).toEqual(mockResponse)
