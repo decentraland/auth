@@ -17,7 +17,7 @@ const TransferCompletedView = (props: TransferCompletedViewProps) => {
   return (
     <TransferLayout>
       <CenteredContent>
-        <Title>{isTip ? `Success! ${transferData.manaAmount} MANA tip Sent to` : 'Gift Sent to'}</Title>
+        <Title>{isTip ? `Success! ${transferData.manaAmount} tip Sent to` : 'Gift Sent to'}</Title>
 
         {isTip ? (
           <>

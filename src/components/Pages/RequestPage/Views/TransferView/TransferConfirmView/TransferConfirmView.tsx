@@ -26,7 +26,7 @@ const TransferConfirmView = (props: TransferConfirmViewProps) => {
         <Title>
           {isTip ? (
             <>
-              {isProcessing ? 'Sending' : 'Confirm'} {transferData.manaAmount} MANA Tip for
+              {isProcessing ? 'Sending' : 'Confirm'} {transferData.manaAmount} Tip for
             </>
           ) : (
             <>{isProcessing ? 'Sending Gift to' : 'Confirm Gift for'}</>

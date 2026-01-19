@@ -114,7 +114,7 @@ const nftData: NFTTransferData = {
 }
 
 const manaData: MANATransferData = {
-  manaAmount: '10',
+  manaAmount: '10 MANA',
   sceneImageUrl: 'https://peer.decentraland.org/content/contents/bafybeietrfx6arffgapt65jkawued7mcsu75uuloodf3drxbvq2pfpggei',
   sceneName: 'Test Scene',
   toAddress: '0x0000000000000000000000000000000000000000',
