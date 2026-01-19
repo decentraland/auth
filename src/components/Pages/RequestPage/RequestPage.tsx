@@ -497,8 +497,8 @@ export const RequestPage = () => {
         setView(View.WALLET_NFT_INTERACTION_COMPLETE)
       } else if (manaTransferData) {
         console.log('Setting view to WALLET_MANA_INTERACTION_COMPLETE')
-        if (result) {
-          await sendTipNotification(signerAddress, manaTransferData.toAddress, manaTransferData.manaAmount, result)
+        if (result && identity) {
+          await sendTipNotification(identity, result)
         }
         setView(View.WALLET_MANA_INTERACTION_COMPLETE)
       } else {
