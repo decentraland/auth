@@ -1,10 +1,9 @@
 import { EthAddress } from '@dcl/schemas'
 
 /**
- * Login method types for direct login
- * Currently only supports 'email' for thirdweb email OTP
+ * Login method types for direct login via URL parameters
  */
-export type LoginMethod = 'email'
+export type LoginMethod = 'email' | 'metamask' | 'google' | 'discord' | 'apple' | 'x' | 'fortmatic' | 'coinbase' | 'walletconnect'
 
 /**
  * Options for the login location

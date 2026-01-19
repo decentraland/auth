@@ -5,7 +5,6 @@ import { connection } from 'decentraland-connect'
 import { useNavigateWithSearchParams } from '../../../../hooks/navigation'
 import { useTargetConfig } from '../../../../hooks/targetConfig'
 import { useCurrentConnectionData } from '../../../../shared/connection/hooks'
-import { locations } from '../../../../shared/locations'
 import { CustomWearablePreview } from '../../../CustomWearablePreview'
 import styles from './Container.module.css'
 
@@ -19,14 +18,19 @@ export const Container = (props: { children: ReactNode; requestId?: string; canC
   const { account } = useCurrentConnectionData()
   const isDeepLinkFlow = searchParams.get('flow') === 'deeplink'
 
+  // Preserve loginMethod from current URL for auto-login functionality
+  const loginMethodParam = searchParams.get('loginMethod')
+
   const onChangeAccount = useCallback(
     async (evt: React.MouseEvent<HTMLAnchorElement>) => {
       evt.preventDefault()
       await connection.disconnect()
       const flowParam = isDeepLinkFlow ? '&flow=deeplink' : ''
-      navigate(locations.login(`/auth/requests/${requestId ?? ''}?targetConfigId=${targetConfigId}${flowParam}`))
+      const redirectToUrl = `/auth/requests/${requestId ?? ''}?targetConfigId=${targetConfigId}${flowParam}`
+      const loginMethodQuery = loginMethodParam ? `&loginMethod=${encodeURIComponent(loginMethodParam)}` : ''
+      navigate(`/login?redirectTo=${encodeURIComponent(redirectToUrl)}${loginMethodQuery}`)
     },
-    [requestId, targetConfigId, isDeepLinkFlow]
+    [requestId, targetConfigId, isDeepLinkFlow, loginMethodParam]
   )
 
   return (

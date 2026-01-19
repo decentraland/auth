@@ -114,9 +114,16 @@ export const RequestPage = () => {
   const flowParam = isDeepLinkFlow ? '&flow=deeplink' : ''
   const disabledCatalysts = useDisabledCatalysts()
   // Goes to the login page where the user will have to connect a wallet.
+  // Preserve loginMethod from current URL if present for auto-login functionality
+  const loginMethodParam = searchParams.get('loginMethod')
+
   const toLoginPage = useCallback(() => {
-    navigate(locations.login(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}${flowParam}`))
-  }, [requestId, targetConfigId, isDeepLinkFlow])
+    const redirectToUrl = `/auth/requests/${requestId}?targetConfigId=${targetConfigId}${flowParam}`
+    // Pass loginMethod as a separate query param for /login, not inside redirectTo
+    const loginMethodQuery = loginMethodParam ? `&loginMethod=${encodeURIComponent(loginMethodParam)}` : ''
+    const finalUrl = `/login?redirectTo=${encodeURIComponent(redirectToUrl)}${loginMethodQuery}`
+    navigate(finalUrl)
+  }, [requestId, targetConfigId, isDeepLinkFlow, loginMethodParam])
 
   const toSetupPage = useCallback(async () => {
     const referrer = extractReferrerFromSearchParameters(searchParams)
