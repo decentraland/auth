@@ -38,7 +38,7 @@
     "decentraland-crypto-fetch": "^2.0.1",
     "decentraland-transactions": "^2.24.1",
     "decentraland-ui": "^7.1.0",
-    "decentraland-ui2": "^1.1.12",
+    "decentraland-ui2": "^1.1.13",
     "ethers": "^6.8.0",
     "isbot": "^5.1.22",
     "lottie-react": "^2.4.1",
