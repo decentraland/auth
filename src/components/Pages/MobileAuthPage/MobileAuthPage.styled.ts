@@ -4,13 +4,13 @@ const Main = styled(Box)({
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
-  justifyContent: 'center',
+  justifyContent: 'flex-start',
   height: '100dvh',
   maxHeight: '100dvh',
   width: '100%',
   position: 'relative',
   overflow: 'hidden',
-  padding: '0 20px',
+  padding: '20vh 20px 0',
   boxSizing: 'border-box',
   ['&::before']: {
     content: '""',
@@ -63,25 +63,26 @@ const MobileConnectionWrapper = styled(Box)({
 
 const SuccessContainer = styled(Box)({
   zIndex: 1,
-  padding: '40px 20px',
+  padding: '40px 0',
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'flex-start',
+  width: '100%',
   maxWidth: '500px'
 })
 
 const Title = styled(Box)({
-  fontSize: '36px',
+  fontSize: '28px',
   fontWeight: 600,
-  lineHeight: '44px',
+  lineHeight: '36px',
   marginTop: '32px',
   color: 'white'
 })
 
 const Description = styled(Box)({
-  fontSize: '24px',
+  fontSize: '18px',
   fontWeight: 400,
-  lineHeight: '29.05px',
+  lineHeight: '24px',
   marginTop: '16px',
   color: 'white'
 })

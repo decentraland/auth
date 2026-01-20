@@ -72,7 +72,15 @@ export const MobileAuthSuccess = ({ identityId, explorerText, onTryAgain }: Prop
         <Logo src={logoImg} alt="Decentraland logo" />
         <Title>Sign In Successful</Title>
         <Description>
-          {countdown > 0 ? `You will be redirected to ${explorerText} in ${countdown}...` : `Redirecting to ${explorerText}...`}
+          {countdown > 0 ? (
+            <>
+              You will be redirected to
+              <br />
+              {explorerText} in {countdown}...
+            </>
+          ) : (
+            `Redirecting to ${explorerText}...`
+          )}
         </Description>
         <ActionButton>
           <Button primary onClick={attemptDeepLink}>
