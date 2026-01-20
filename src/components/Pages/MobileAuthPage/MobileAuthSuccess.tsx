@@ -7,7 +7,7 @@ import wrongImg from '../../../assets/images/wrong.svg'
 import { launchDeepLink } from '../RequestPage/utils'
 import { ActionButton, Background, Description, Icon, Logo, Main, SuccessContainer, Title } from './MobileAuthPage.styled'
 
-const COUNTDOWN_SECONDS = 5
+const COUNTDOWN_SECONDS = 3
 
 type Props = {
   identityId: string
@@ -72,7 +72,15 @@ export const MobileAuthSuccess = ({ identityId, explorerText, onTryAgain }: Prop
         <Logo src={logoImg} alt="Decentraland logo" />
         <Title>Sign In Successful</Title>
         <Description>
-          {countdown > 0 ? `You will be redirected to ${explorerText} in ${countdown}...` : `Redirecting to ${explorerText}...`}
+          {countdown > 0 ? (
+            <>
+              You will be redirected to
+              <br />
+              {explorerText} in {countdown}...
+            </>
+          ) : (
+            `Redirecting to ${explorerText}...`
+          )}
         </Description>
         <ActionButton>
           <Button primary onClick={attemptDeepLink}>
