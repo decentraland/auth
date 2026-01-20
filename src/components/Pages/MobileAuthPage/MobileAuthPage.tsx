@@ -1,7 +1,6 @@
 import { useCallback, useContext, useEffect, useState, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
-import { connection } from 'decentraland-connect'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import { createAuthServerHttpClient } from '../../../shared/auth'
 import { isErrorWithName } from '../../../shared/errors'
@@ -30,15 +29,17 @@ export const MobileAuthPage = () => {
   const { flags, initialized: flagInitialized } = useContext(FeatureFlagsContext)
   const [targetConfig] = useTargetConfig()
 
-  const [view, setView] = useState<MobileAuthView>('selection')
-  const [loadingState, setLoadingState] = useState(ConnectionLayoutState.CONNECTING_WALLET)
+  const providerParam = searchParams.get('provider')
+  const provider = parseConnectionOptionType(providerParam)
+
+  // If provider param is present, start with connecting view and loading state to avoid button flash
+  const [view, setView] = useState<MobileAuthView>(provider ? 'connecting' : 'selection')
+  const [loadingState, setLoadingState] = useState(provider ? ConnectionLayoutState.LOADING_MAGIC : ConnectionLayoutState.CONNECTING_WALLET)
   const [identityId, setIdentityId] = useState<string | null>(null)
-  const [connectionType, setConnectionType] = useState<ConnectionOptionType>()
+  const [connectionType, setConnectionType] = useState<ConnectionOptionType | undefined>(provider ?? undefined)
 
   const hasInitiated = useRef(false)
   const hasClearedSessions = useRef(false)
-  const providerParam = searchParams.get('provider')
-  const provider = parseConnectionOptionType(providerParam)
 
   // Clear any cached sessions on mount to ensure fresh login
   useEffect(() => {
@@ -51,9 +52,6 @@ export const MobileAuthPage = () => {
         if (await magic?.user.isLoggedIn()) {
           await magic?.user.logout()
         }
-
-        // Clear WalletConnect/AppKit session
-        await connection.disconnect()
 
         // Clear cached email
         localStorage.removeItem('dcl_magic_user_email')
