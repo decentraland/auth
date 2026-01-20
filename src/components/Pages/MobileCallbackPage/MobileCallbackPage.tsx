@@ -1,6 +1,5 @@
 import { useCallback, useContext, useEffect, useState } from 'react'
 import ArrowBackIosNewTwoToneIcon from '@mui/icons-material/ArrowBackIosNewTwoTone'
-import LoginRoundedIcon from '@mui/icons-material/LoginRounded'
 import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
@@ -15,22 +14,20 @@ import { handleError } from '../../../shared/utils/errorHandler'
 import { createMagicInstance } from '../../../shared/utils/magicSdk'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import { getIdentitySignature } from '../LoginPage/utils'
-import { launchDeepLink } from '../RequestPage/utils'
+import { MobileAuthSuccess } from '../MobileAuthPage/MobileAuthSuccess'
 import {
   ActionButton,
-  Container,
-  Description,
+  Background,
   Icon,
+  Description,
   LoaderWrapper,
   LoadingContainer,
-  LoadingText,
-  Logo,
+  LoadingTitle,
   LogoLarge,
   Main,
+  SuccessContainer,
   Title
-} from './MobileCallbackPage.styled'
-
-const COUNTDOWN_SECONDS = 5
+} from '../MobileAuthPage/MobileAuthPage.styled'
 
 export const MobileCallbackPage = () => {
   const navigate = useNavigateWithSearchParams()
@@ -41,10 +38,6 @@ export const MobileCallbackPage = () => {
   const [isProcessing, setIsProcessing] = useState(false)
   const [identityId, setIdentityId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [countdown, setCountdown] = useState(COUNTDOWN_SECONDS)
-  const [deepLinkFailed, setDeepLinkFailed] = useState(false)
-
-  const deepLinkUrl = identityId ? `decentraland://open?signin=${identityId}` : ''
 
   const processOAuthCallback = useCallback(async () => {
     try {
@@ -94,35 +87,7 @@ export const MobileCallbackPage = () => {
     processOAuthCallback()
   }, [initialized, isProcessing, processOAuthCallback])
 
-  // Countdown and auto-launch deep link on success
-  useEffect(() => {
-    if (!identityId || deepLinkFailed) return
-
-    const interval = setInterval(() => {
-      setCountdown(prev => {
-        if (prev <= 1) {
-          clearInterval(interval)
-          attemptDeepLink()
-          return 0
-        }
-        return prev - 1
-      })
-    }, 1000)
-
-    return () => clearInterval(interval)
-  }, [identityId, deepLinkFailed])
-
-  const attemptDeepLink = useCallback(async () => {
-    if (!deepLinkUrl) return
-
-    const wasLaunched = await launchDeepLink(deepLinkUrl)
-    if (!wasLaunched) {
-      setDeepLinkFailed(true)
-    }
-  }, [deepLinkUrl])
-
   const handleRetry = useCallback(() => {
-    // Redirect back to mobile auth page on error
     navigate(locations.mobile())
   }, [navigate])
 
@@ -130,7 +95,8 @@ export const MobileCallbackPage = () => {
   if (error) {
     return (
       <Main component="main">
-        <Container>
+        <Background />
+        <SuccessContainer>
           <Icon src={wrongImg} alt="Error" />
           <Title>Authentication Failed</Title>
           <Description>{error}</Description>
@@ -140,60 +106,23 @@ export const MobileCallbackPage = () => {
               Try again
             </Button>
           </ActionButton>
-        </Container>
+        </SuccessContainer>
       </Main>
     )
   }
 
-  // Show success screen with deep link
+  // Show success screen - use shared MobileAuthSuccess component
   if (identityId) {
-    if (deepLinkFailed) {
-      return (
-        <Main component="main">
-          <Container>
-            <Icon src={wrongImg} alt="Error" />
-            <Title>Could not open {targetConfig.explorerText}</Title>
-            <Description>
-              The application could not be launched. Please make sure {targetConfig.explorerText} is installed and try again.
-            </Description>
-            <ActionButton>
-              <Button primary onClick={handleRetry}>
-                <ArrowBackIosNewTwoToneIcon fontSize="small" />
-                Try again
-              </Button>
-            </ActionButton>
-          </Container>
-        </Main>
-      )
-    }
-
-    return (
-      <Main component="main">
-        <Container>
-          <Logo src={logoImg} alt="Decentraland logo" />
-          <Title>Sign In Successful</Title>
-          <Description>
-            {countdown > 0
-              ? `You will be redirected to ${targetConfig.explorerText} in ${countdown}...`
-              : `Redirecting to ${targetConfig.explorerText}...`}
-          </Description>
-          <ActionButton>
-            <Button primary onClick={attemptDeepLink}>
-              <LoginRoundedIcon fontSize="small" />
-              Return to {targetConfig.explorerText}
-            </Button>
-          </ActionButton>
-        </Container>
-      </Main>
-    )
+    return <MobileAuthSuccess identityId={identityId} explorerText={targetConfig.explorerText} onTryAgain={handleRetry} />
   }
 
   // Show loading state
   return (
     <Main component="main">
+      <Background />
       <LoadingContainer>
         <LogoLarge src={logoImg} alt="Decentraland logo" />
-        <LoadingText>Just a moment, we're verifying your login credentials...</LoadingText>
+        <LoadingTitle>Just a moment, we're verifying your login credentials...</LoadingTitle>
         <LoaderWrapper>
           <Loader active size="small" />
         </LoaderWrapper>
