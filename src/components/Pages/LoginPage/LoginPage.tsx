@@ -69,6 +69,9 @@ export const LoginPage = () => {
   const { url: redirectTo, redirect } = useAfterLoginRedirection()
   const { initialized: flagInitialized, flags } = useContext(FeatureFlagsContext)
 
+  // Check if email OTP login is enabled via feature flag
+  const isEmailOtpEnabled = flags[FeatureFlagsKeys.EMAIL_OTP_LOGIN] === true
+
   // Email login state
   const [currentEmail, setCurrentEmail] = useState('')
   const [isEmailLoading, setIsEmailLoading] = useState(false)
@@ -153,7 +156,12 @@ export const LoginPage = () => {
       }
 
       // EMAIL is handled differently - focus the email input instead of connecting
+      // But only if email OTP is enabled
       if (connectionType === ConnectionOptionType.EMAIL) {
+        if (!isEmailOtpEnabled) {
+          // Email OTP is disabled via feature flag, ignore this auto-login attempt
+          return
+        }
         const emailInput = document.getElementById('dcl-email-input')
         if (emailInput) {
           emailInput.scrollIntoView({ behavior: 'smooth', block: 'center' })
@@ -229,7 +237,8 @@ export const LoginPage = () => {
       checkProfileAndRedirect,
       redirect,
       flagInitialized,
-      checkClockSynchronization
+      checkClockSynchronization,
+      isEmailOtpEnabled
     ]
   )
 
@@ -394,20 +403,22 @@ export const LoginPage = () => {
             onTryAgain={handleTryAgain}
             providerType={currentConnectionType ? fromConnectionOptionToProviderType(currentConnectionType) : null}
           />
-          <EmailLoginModal
-            open={showEmailLoginModal}
-            email={currentEmail}
-            onClose={handleEmailLoginClose}
-            onBack={handleEmailLoginBack}
-            onSuccess={handleEmailLoginSuccess}
-            onError={handleEmailLoginError}
-          />
+          {isEmailOtpEnabled && (
+            <EmailLoginModal
+              open={showEmailLoginModal}
+              email={currentEmail}
+              onClose={handleEmailLoginClose}
+              onBack={handleEmailLoginBack}
+              onSuccess={handleEmailLoginSuccess}
+              onError={handleEmailLoginError}
+            />
+          )}
           <div className={styles.left}>
             <div className={styles.leftInfo}>
               <div className={styles.mainContainer}>
                 <Connection
                   onConnect={handleOnConnect}
-                  onEmailSubmit={handleEmailSubmit}
+                  onEmailSubmit={isEmailOtpEnabled ? handleEmailSubmit : undefined}
                   loadingOption={currentConnectionType}
                   connectionOptions={targetConfig.connectionOptions}
                   isNewUser={isNewUser}

@@ -7,7 +7,8 @@ export enum FeatureFlagsKeys {
   HTTP_AUTH = 'dapps-http-auth',
   UNITY_WEARABLE_PREVIEW = 'dapps-unity-wearable-preview',
   ONBOARDING_FLOW = 'dapps-onboarding-flow',
-  DISABLED_CATALYSTS = 'explorer-disabled-catalyst'
+  DISABLED_CATALYSTS = 'explorer-disabled-catalyst',
+  EMAIL_OTP_LOGIN = 'dapps-email-otp-login'
 }
 
 export enum OnboardingFlowVariant {
