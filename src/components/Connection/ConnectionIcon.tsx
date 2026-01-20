@@ -1,4 +1,4 @@
-import React from 'react'
+import * as React from 'react'
 import { SvgIcon } from 'decentraland-ui2'
 import appleSvg from '../../assets/images/apple.svg'
 import coinbaseSvg from '../../assets/images/coinbase.svg'

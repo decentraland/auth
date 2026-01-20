@@ -3,7 +3,7 @@ import { Rarity } from '@dcl/schemas'
 import { ChainId } from '@dcl/schemas/dist/dapps/chain-id'
 import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
 import { connection, Provider } from 'decentraland-connect'
-import { ContractName, getContractName } from 'decentraland-transactions'
+import { ContractName, getContractName, getContract } from 'decentraland-transactions'
 import { config } from '../../../modules/config'
 import { isMobile } from '../LoginPage/utils'
 
@@ -158,6 +158,46 @@ export function decodeNftTransferData(data: string, contractABI: object[]): { to
 }
 
 /**
+ * Decodes MANA (ERC20) transfer data to extract amount and destination address
+ * @param data The transaction data
+ * @returns Object containing manaAmount and toAddress, or null if decoding fails
+ */
+export function decodeManaTransferData(data: string): { manaAmount: string; toAddress: string } | null {
+  try {
+    if (!data || data.length < 10) return null
+
+    // ERC20 transfer function signature: transfer(address to, uint256 amount)
+    const transferFunctionSignature = '0xa9059cbb'
+
+    // Check if this is a transfer function call
+    if (!data.startsWith(transferFunctionSignature)) {
+      return null
+    }
+
+    const contract = getContract(ContractName.ERC20, getMetaTransactionChainId())
+
+    const contractInterface = new ethers.Interface(contract.abi)
+    const decodedData = contractInterface.parseTransaction({ data })
+
+    if (!decodedData) {
+      console.error('Failed to decode MANA transfer data')
+      return null
+    }
+
+    const toAddress = decodedData.args[0] as string
+    const amount = decodedData.args[1] as bigint
+
+    // Convert from wei to MANA (18 decimals)
+    const manaAmount = ethers.formatEther(amount)
+
+    return { manaAmount, toAddress }
+  } catch (error) {
+    console.error('Error decoding MANA transfer data:', error)
+    return null
+  }
+}
+
+/**
  * Fetches NFT metadata from tokenURI
  * @param contractAddress The NFT contract address
  * @param contractABI The contract ABI to use for interacting with the contract
@@ -237,5 +277,45 @@ export async function fetchNftMetadata(
     name: metadata.name,
     description: metadata.description,
     rarity
+  }
+}
+
+/**
+ * Fetches place information by creator address from the Places API
+ * @param creatorAddress The creator's Ethereum address
+ * @returns Object containing place name and image URL if exactly one place is found, null otherwise
+ */
+export async function fetchPlaceByCreatorAddress(creatorAddress: string): Promise<{ sceneName: string; sceneImageUrl: string } | null> {
+  try {
+    const placesApiUrl = config.get('PLACES_API_URL')
+    const response = await fetch(`${placesApiUrl}/api/places?creator_address=${creatorAddress.toLowerCase()}`)
+
+    if (!response.ok) {
+      console.error(`Failed to fetch place info from Places API: ${response.status} ${response.statusText}`)
+      return null
+    }
+
+    const data = await response.json()
+
+    if (!data.ok || !data.data || data.data.length === 0) {
+      console.log(`No places found for creator address: ${creatorAddress}`)
+      return null
+    }
+
+    // Only return place data if exactly one place is found
+    if (data.data.length !== 1) {
+      console.log(`Multiple places found for creator address: ${creatorAddress}, showing default view`)
+      return null
+    }
+
+    const place = data.data[0]
+
+    return {
+      sceneName: place.title || 'Unknown Place',
+      sceneImageUrl: place.image || ''
+    }
+  } catch (error) {
+    console.error('Error fetching place by creator address:', error)
+    return null
   }
 }

@@ -8,6 +8,6 @@ jobs:
     steps:
       - uses: actions/checkout@main
       - name: Install
-        run: npm install --legacy-peer-deps
+        run: npm install
       - name: Audit signatures
         run: npm audit signatures
