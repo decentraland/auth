@@ -7,7 +7,7 @@ import wrongImg from '../../../assets/images/wrong.svg'
 import { launchDeepLink } from '../RequestPage/utils'
 import { ActionButton, Background, Description, Icon, Logo, Main, SuccessContainer, Title } from './MobileAuthPage.styled'
 
-const COUNTDOWN_SECONDS = 5
+const COUNTDOWN_SECONDS = 3
 
 type Props = {
   identityId: string
