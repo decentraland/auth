@@ -89,6 +89,25 @@ enum View {
   WALLET_MANA_INTERACTION_COMPLETE
 }
 
+// Terminal views that should not trigger a re-fetch of the request
+const TERMINAL_VIEWS = new Set([
+  View.VERIFY_SIGN_IN_COMPLETE,
+  View.VERIFY_SIGN_IN_DENIED,
+  View.VERIFY_SIGN_IN_ERROR,
+  View.DEEP_LINK_CONTINUE_IN_APP,
+  View.WALLET_INTERACTION_COMPLETE,
+  View.WALLET_NFT_INTERACTION_COMPLETE,
+  View.WALLET_MANA_INTERACTION_COMPLETE,
+  View.WALLET_INTERACTION_DENIED,
+  View.WALLET_NFT_INTERACTION_DENIED,
+  View.WALLET_MANA_INTERACTION_DENIED,
+  View.WALLET_INTERACTION_ERROR,
+  View.TIMEOUT,
+  View.LOADING_ERROR,
+  View.DIFFERENT_ACCOUNT,
+  View.IP_VALIDATION_ERROR
+])
+
 export const RequestPage = () => {
   const params = useParams()
   const [searchParams] = useSearchParams()
@@ -109,6 +128,8 @@ export const RequestPage = () => {
   const [manaTransferData, setManaTransferData] = useState<MANATransferData | null>(null)
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false)
   const requestRef = useRef<RecoverResponse>()
+  const viewRef = useRef(view)
+  viewRef.current = view
   const [error, setError] = useState<string>()
   const [identityId, setIdentityId] = useState<string>()
   const timeoutRef = useRef<NodeJS.Timeout>()
@@ -159,6 +180,13 @@ export const RequestPage = () => {
 
     // Wait for the features to be initialized.
     if (!initializedFlags) return
+
+    // Don't re-fetch if we're already in a terminal view (completed, denied, error, etc.)
+    // This prevents the bug where after approving, dependency changes cause a re-fetch
+    // of an already-consumed request
+    if (TERMINAL_VIEWS.has(viewRef.current)) {
+      return
+    }
 
     const loadRequest = async () => {
       const timeTheSiteStartedLoading = Date.now()
@@ -257,7 +285,7 @@ export const RequestPage = () => {
 
                 if (transferData) {
                   const [metadata, recipientProfile] = await Promise.all([
-                    fetchNftMetadata(contractAddress, contract.abi, transferData.tokenId, browserProvider.current),
+                    fetchNftMetadata(contractAddress, contract.abi, transferData.tokenId),
                     fetchProfile(transferData.toAddress)
                   ])
                   setNftTransferData({
