@@ -202,16 +202,20 @@ export function decodeManaTransferData(data: string): { manaAmount: string; toAd
  * @param contractAddress The NFT contract address
  * @param contractABI The contract ABI to use for interacting with the contract
  * @param tokenId The token ID
- * @param provider The ethers provider
  * @returns Object containing image URL and other metadata
  * @throws Error if tokenURI is not found or metadata cannot be fetched
  */
 export async function fetchNftMetadata(
   contractAddress: string,
   contractABI: object[],
-  tokenId: string,
-  provider: ethers.BrowserProvider
+  tokenId: string
 ): Promise<{ imageUrl: string; name: string; description: string; rarity: Rarity }> {
+  // Get the correct network provider for NFT collections (Polygon/Amoy)
+  // This is necessary because the user's browser provider may be connected to a different network
+  const chainId = getMetaTransactionChainId()
+  const networkProvider = await getNetworkProvider(chainId)
+  const provider = new ethers.BrowserProvider(networkProvider)
+
   // Use the provided contract ABI to interact with the NFT contract
   const contract = new ethers.Contract(contractAddress, contractABI, provider)
   const tokenUri = await contract.tokenURI(tokenId)
