@@ -527,14 +527,26 @@ describe('when testing fetchNftMetadata', () => {
   let contractAddress: string
   let contractABI: object[]
   let tokenId: string
-  let mockProvider: any
   let mockContract: any
+  let mockNetworkProvider: any
+  let mockBrowserProvider: any
 
   beforeEach(() => {
     contractAddress = '0xcontract'
     contractABI = [{ type: 'function', name: 'tokenURI' }]
     tokenId = '123'
     global.fetch = jest.fn()
+
+    // Mock config.get for getMetaTransactionChainId
+    jest.mocked(config.get).mockReturnValue('production')
+
+    // Mock getNetworkProvider dependencies
+    mockNetworkProvider = { isNetworkProvider: true }
+    mockBrowserProvider = {}
+    jest.mocked(connection.getProvider).mockRejectedValue(new Error('Not connected'))
+    jest.mocked(connection.tryPreviousConnection).mockRejectedValue(new Error('No previous'))
+    jest.mocked(connection.createProvider).mockReturnValue(mockNetworkProvider)
+    jest.mocked(ethers.BrowserProvider).mockImplementation(() => mockBrowserProvider)
   })
 
   afterEach(() => {
@@ -563,7 +575,7 @@ describe('when testing fetchNftMetadata', () => {
     })
 
     it('should return the metadata with image URL, name, and description', async () => {
-      const result = await fetchNftMetadata(contractAddress, contractABI, tokenId, mockProvider)
+      const result = await fetchNftMetadata(contractAddress, contractABI, tokenId)
       expect(result).toEqual({
         imageUrl: 'https://example.com/image.png',
         name: 'Test NFT',
@@ -599,7 +611,7 @@ describe('when testing fetchNftMetadata', () => {
     })
 
     it('should return the metadata with the rarity', async () => {
-      const result = await fetchNftMetadata(contractAddress, contractABI, tokenId, mockProvider)
+      const result = await fetchNftMetadata(contractAddress, contractABI, tokenId)
       expect(result).toEqual({
         imageUrl: 'https://example.com/image.png',
         name: 'Rare NFT',
@@ -630,7 +642,7 @@ describe('when testing fetchNftMetadata', () => {
     })
 
     it('should return the metadata with image_url', async () => {
-      const result = await fetchNftMetadata(contractAddress, contractABI, tokenId, mockProvider)
+      const result = await fetchNftMetadata(contractAddress, contractABI, tokenId)
       expect(result.imageUrl).toBe('https://example.com/image.png')
     })
   })
@@ -665,7 +677,7 @@ describe('when testing fetchNftMetadata', () => {
     })
 
     it('should correctly map the rarity', async () => {
-      const result = await fetchNftMetadata(contractAddress, contractABI, tokenId, mockProvider)
+      const result = await fetchNftMetadata(contractAddress, contractABI, tokenId)
       expect(result.rarity).toBe(expectedRarity)
     })
   })
@@ -679,7 +691,7 @@ describe('when testing fetchNftMetadata', () => {
     })
 
     it('should throw an error indicating no tokenURI', async () => {
-      await expect(fetchNftMetadata(contractAddress, contractABI, tokenId, mockProvider)).rejects.toThrow(
+      await expect(fetchNftMetadata(contractAddress, contractABI, tokenId)).rejects.toThrow(
         `No tokenURI returned for token ${tokenId} at contract ${contractAddress}`
       )
     })
@@ -702,7 +714,7 @@ describe('when testing fetchNftMetadata', () => {
     })
 
     it('should throw an error with the status', async () => {
-      await expect(fetchNftMetadata(contractAddress, contractABI, tokenId, mockProvider)).rejects.toThrow(
+      await expect(fetchNftMetadata(contractAddress, contractABI, tokenId)).rejects.toThrow(
         `Failed to fetch metadata from ${tokenUri}: 404 Not Found`
       )
     })
