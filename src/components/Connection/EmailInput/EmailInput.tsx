@@ -1,5 +1,9 @@
-import { useState, useCallback, useRef, KeyboardEvent, ChangeEvent } from 'react'
+import { useState, useCallback, useRef, useMemo, KeyboardEvent, ChangeEvent } from 'react'
 import styles from './EmailInput.module.css'
+
+// RFC 5322 compliant email regex
+const EMAIL_REGEX =
+  /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/
 
 export type EmailInputProps = {
   onSubmit: (email: string) => void
@@ -11,15 +15,20 @@ export const EmailInput = ({ onSubmit, isLoading, error }: EmailInputProps) => {
   const [email, setEmail] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
+  const isValidEmail = useMemo(() => {
+    if (!email) return false
+    return EMAIL_REGEX.test(email)
+  }, [email])
+
   const handleEmailChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     setEmail(e.target.value)
   }, [])
 
   const handleSubmit = useCallback(() => {
-    if (email && email.includes('@')) {
+    if (isValidEmail) {
       onSubmit(email)
     }
-  }, [email, onSubmit])
+  }, [email, isValidEmail, onSubmit])
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLInputElement>) => {
@@ -30,7 +39,10 @@ export const EmailInput = ({ onSubmit, isLoading, error }: EmailInputProps) => {
     [handleSubmit]
   )
 
-  const isValid = email && email.includes('@')
+  const isValid = isValidEmail
+  // Show validation error when user has typed something but it's not a valid email
+  const showValidationError = email.length > 0 && !isValidEmail
+  const hasError = showValidationError || !!error
 
   return (
     <div className={styles.container}>
@@ -44,7 +56,7 @@ export const EmailInput = ({ onSubmit, isLoading, error }: EmailInputProps) => {
           value={email}
           onChange={handleEmailChange}
           onKeyDown={handleKeyDown}
-          className={styles.input}
+          className={`${styles.input} ${hasError ? styles.inputError : ''}`}
           disabled={isLoading}
           autoComplete="email"
         />
@@ -52,7 +64,8 @@ export const EmailInput = ({ onSubmit, isLoading, error }: EmailInputProps) => {
           {isLoading ? <span className={styles.spinner} /> : 'NEXT'}
         </button>
       </div>
-      {error && <p className={styles.error}>{error}</p>}
+      {showValidationError && <p className={styles.error}>Enter A Valid Email Address</p>}
+      {error && !showValidationError && <p className={styles.error}>{error}</p>}
     </div>
   )
 }

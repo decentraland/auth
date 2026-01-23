@@ -87,8 +87,21 @@
   }
 }
 
+.inputError {
+  border-color: #ff6b6b;
+}
+
+.inputError:focus {
+  border-color: #ff6b6b;
+}
+
 .error {
   color: #ff6b6b;
   font-size: 13px;
   margin: 8px 0 0;
+}
+
+.error::before {
+  content: '\26A0';
+  margin-right: 6px;
 }
