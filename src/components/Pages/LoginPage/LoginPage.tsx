@@ -141,7 +141,12 @@ export const LoginPage = () => {
         setShowEmailLoginModal(true)
       } catch (error) {
         const errorMessage = handleError(error, 'Error sending verification code')
-        setEmailError(errorMessage || 'Failed to send verification code. Please try again.')
+        // Handle network errors with a user-friendly message
+        if (errorMessage === 'Failed to fetch' || errorMessage?.toLowerCase().includes('network')) {
+          setEmailError('Unable to connect. Please check your internet connection and try again.')
+        } else {
+          setEmailError(errorMessage || 'Failed to send verification code. Please try again.')
+        }
       } finally {
         setIsEmailLoading(false)
       }

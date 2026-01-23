@@ -8,6 +8,13 @@ import styles from './EmailLoginModal.module.css'
 
 const OTP_LENGTH = 6
 
+const getNetworkFriendlyError = (errorMessage: string | undefined, fallback: string): string => {
+  if (errorMessage === 'Failed to fetch' || errorMessage?.toLowerCase().includes('network')) {
+    return 'Unable to connect. Please check your internet connection and try again.'
+  }
+  return errorMessage || fallback
+}
+
 export const EmailLoginModal = (props: EmailLoginModalProps) => {
   const { open, email, onClose, onBack, onSuccess } = props
 
@@ -119,7 +126,7 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
         onSuccess({ email: currentEmail, account })
       } catch (e) {
         const errorMessage = handleError(e, 'Error verifying OTP')
-        setError(errorMessage || 'The Code Is Invalid Or Expired. Please Resend Code')
+        setError(getNetworkFriendlyError(errorMessage, 'The code is invalid or expired. Please resend code'))
         setHasError(true)
       } finally {
         setIsLoading(false)
@@ -143,7 +150,8 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
       setTimeout(() => otpInputRefs.current[0]?.focus(), 100)
     } catch (e) {
       const errorMessage = handleError(e, 'Error resending OTP')
-      setError(errorMessage || 'Failed to resend verification code')
+      setError(getNetworkFriendlyError(errorMessage, 'Failed to resend verification code'))
+      setHasError(true)
     } finally {
       setIsLoading(false)
     }
@@ -200,14 +208,23 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
           </div>
         )}
 
-        {error && <p className={styles.errorMessage}>⚠ {error}</p>}
+        {error && (
+          <>
+            <p className={styles.errorMessage}>{error}</p>
+            <span className={styles.resendLinkError} onClick={!isLoading ? handleResendOtp : undefined}>
+              Resend Code
+            </span>
+          </>
+        )}
 
-        <p className={styles.resendText}>
-          Didn't get an email?{' '}
-          <span className={styles.resendLink} onClick={!isLoading ? handleResendOtp : undefined}>
-            Resend Code
-          </span>
-        </p>
+        {!error && (
+          <p className={styles.resendText}>
+            Didn't get an email?{' '}
+            <span className={styles.resendLink} onClick={!isLoading ? handleResendOtp : undefined}>
+              Resend Code
+            </span>
+          </p>
+        )}
       </div>
     )
   }
