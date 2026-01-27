@@ -2,8 +2,7 @@ import { useCallback, useContext, useEffect, useState } from 'react'
 import ArrowBackIosNewTwoToneIcon from '@mui/icons-material/ArrowBackIosNewTwoTone'
 import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
-import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
-import logoImg from '../../../assets/images/logo.svg'
+import { CircularProgress } from 'decentraland-ui2'
 import wrongImg from '../../../assets/images/wrong.svg'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useTargetConfig } from '../../../hooks/targetConfig'
@@ -12,22 +11,11 @@ import { createAuthServerHttpClient } from '../../../shared/auth'
 import { locations } from '../../../shared/locations'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { createMagicInstance } from '../../../shared/utils/magicSdk'
+import { ConnectionContainer, ConnectionTitle, DecentralandLogo, ProgressContainer } from '../../ConnectionModal/ConnectionLayout.styled'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import { getIdentitySignature } from '../LoginPage/utils'
+import { ActionButton, Background, Description, Icon, Main, SuccessContainer, Title } from '../MobileAuthPage/MobileAuthPage.styled'
 import { MobileAuthSuccess } from '../MobileAuthPage/MobileAuthSuccess'
-import {
-  ActionButton,
-  Background,
-  Icon,
-  Description,
-  LoaderWrapper,
-  LoadingContainer,
-  LoadingTitle,
-  LogoLarge,
-  Main,
-  SuccessContainer,
-  Title
-} from '../MobileAuthPage/MobileAuthPage.styled'
 
 export const MobileCallbackPage = () => {
   const navigate = useNavigateWithSearchParams()
@@ -43,13 +31,7 @@ export const MobileCallbackPage = () => {
     try {
       // Get OAuth result from Magic
       const magic = await createMagicInstance(!!flags[FeatureFlagsKeys.MAGIC_TEST])
-      const result = await magic?.oauth2.getRedirectResult()
-
-      // Store email if available
-      if (result?.oauth?.userInfo?.email) {
-        localStorage.setItem('dcl_magic_user_email', result.oauth.userInfo.email)
-      }
-
+      await magic?.oauth2.getRedirectResult()
       // Connect to Magic provider
       const connectionData = await connectToMagic()
       if (!connectionData?.account || !connectionData?.provider) {
@@ -119,14 +101,13 @@ export const MobileCallbackPage = () => {
   // Show loading state
   return (
     <Main component="main">
-      <Background />
-      <LoadingContainer>
-        <LogoLarge src={logoImg} alt="Decentraland logo" />
-        <LoadingTitle>Just a moment, we're verifying your login credentials...</LoadingTitle>
-        <LoaderWrapper>
-          <Loader active size="small" />
-        </LoaderWrapper>
-      </LoadingContainer>
+      <ConnectionContainer>
+        <DecentralandLogo size="huge" />
+        <ConnectionTitle>Just a moment, we're verifying your login credentials...</ConnectionTitle>
+        <ProgressContainer>
+          <CircularProgress color="inherit" />
+        </ProgressContainer>
+      </ConnectionContainer>
     </Main>
   )
 }
