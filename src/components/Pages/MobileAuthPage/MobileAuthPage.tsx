@@ -38,42 +38,7 @@ export const MobileAuthPage = () => {
   const [identityId, setIdentityId] = useState<string | null>(null)
   const [connectionType, setConnectionType] = useState<ConnectionOptionType | undefined>(provider ?? undefined)
 
-  const hasInitiated = useRef(false)
-  const hasClearedSessions = useRef(false)
-
-  // Clear any cached sessions on mount to ensure fresh login
-  useEffect(() => {
-    if (!flagInitialized || hasClearedSessions.current) return
-
-    const clearCachedSessions = async () => {
-      try {
-        // Clear Magic session if exists
-        const magic = await createMagicInstance(!!flags[FeatureFlagsKeys.MAGIC_TEST])
-        if (await magic?.user.isLoggedIn()) {
-          await magic?.user.logout()
-        }
-
-        // Clear cached email
-        localStorage.removeItem('dcl_magic_user_email')
-
-        // Clear all single-sign-on cached identities
-        const keysToRemove: string[] = []
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i)
-          if (key?.startsWith('single-sign-on-')) {
-            keysToRemove.push(key)
-          }
-        }
-        keysToRemove.forEach(key => localStorage.removeItem(key))
-      } catch (err) {
-        // Ignore errors - just ensuring clean state
-        console.warn('Failed to clear cached sessions:', err)
-      }
-    }
-
-    hasClearedSessions.current = true
-    clearCachedSessions()
-  }, [flagInitialized, flags])
+  const hasStartedInit = useRef(false)
 
   const initiateAuth = useCallback(
     async (selectedConnectionType: ConnectionOptionType) => {
@@ -130,22 +95,49 @@ export const MobileAuthPage = () => {
     },
     [flagInitialized]
   )
-
-  // Auto-initiate auth if valid provider param is present
+  // Clear cached sessions and optionally auto-initiate auth in a single sequential flow.
+  // This prevents a race condition where clearCachedSessions (magic.user.logout) and
+  // initiateAuth (magic.oauth2.loginWithRedirect) could run concurrently, corrupting
+  // the Magic iframe state and causing "Magic: user isn't logged in" errors.
   useEffect(() => {
-    if (!flagInitialized || hasInitiated.current) return
+    if (!flagInitialized || hasStartedInit.current) return
+    hasStartedInit.current = true
 
-    if (provider) {
-      hasInitiated.current = true
-      initiateAuth(provider)
+    const initialize = async () => {
+      // Step 1: Clear cached sessions
+      try {
+        const magic = await createMagicInstance(!!flags[FeatureFlagsKeys.MAGIC_TEST])
+        if (await magic?.user.isLoggedIn()) {
+          await magic?.user.logout()
+        }
+
+        localStorage.removeItem('dcl_magic_user_email')
+
+        const keysToRemove: string[] = []
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i)
+          if (key?.startsWith('single-sign-on-')) {
+            keysToRemove.push(key)
+          }
+        }
+        keysToRemove.forEach(key => localStorage.removeItem(key))
+      } catch (err) {
+        console.warn('Failed to clear cached sessions:', err)
+      }
+
+      // Step 2: Auto-initiate auth if provider param is present
+      if (provider) {
+        initiateAuth(provider)
+      }
     }
-  }, [provider, flagInitialized, initiateAuth])
+
+    initialize()
+  }, [flagInitialized, flags, provider, initiateAuth])
 
   const handleTryAgain = useCallback(() => {
     if (connectionType) {
       setView('selection')
       setLoadingState(ConnectionLayoutState.CONNECTING_WALLET)
-      hasInitiated.current = false
       initiateAuth(connectionType)
     } else {
       setView('selection')
