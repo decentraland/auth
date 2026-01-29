@@ -87,7 +87,7 @@ const WALLET_SESSION_PATTERNS = [/no matching key/i, /session topic doesn't exis
 const BROWSER_ENVIRONMENT_PATTERNS = [
   // DOM manipulation race conditions
   /removeChild.*not a child/i,
-  /node.*not found/i,
+  /The node to be removed is not a child/i,
   // Clipboard permission errors
   /write.*permission denied/i,
   /clipboard.*denied/i,
@@ -99,7 +99,7 @@ const BROWSER_ENVIRONMENT_PATTERNS = [
   /gas price.*exceeds/i,
   /exceeds max gas/i,
   // External library initialization race conditions (AppKit/WalletConnect)
-  /setDefaultChain/i,
+  /evaluating.*setDefaultChain/i,
   /appkit.*not initialized/i
 ]
 

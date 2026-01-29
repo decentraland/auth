@@ -81,9 +81,11 @@ const handleError = (error: unknown, context: string, options?: HandleErrorOptio
     // If checking fails, proceed with normal error handling
   }
 
-  if (ignorableResult.isIgnorable && !options?.skipSentry) {
-    // Track ignorable error via analytics for monitoring
-    trackIgnorableError(errorMessage, context, ignorableResult.category, ignorableResult.reason)
+  if (ignorableResult.isIgnorable) {
+    // Track ignorable error via analytics for monitoring (unless tracking is disabled)
+    if (!options?.skipTracking) {
+      trackIgnorableError(errorMessage, context, ignorableResult.category, ignorableResult.reason)
+    }
     return errorMessage // Skip Sentry
   }
 

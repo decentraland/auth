@@ -101,6 +101,7 @@ describe('ignorableErrors', () => {
     describe('browser environment patterns', () => {
       const browserEnvironmentMessages = [
         "Failed to execute 'removeChild' on 'Node': The node to be removed is not a child of this node.",
+        'The node to be removed is not a child of this node',
         "Failed to execute 'writeText' on 'Clipboard': Write permission denied.",
         'Clipboard access denied',
         'The object can not be found here.',
@@ -149,7 +150,9 @@ describe('ignorableErrors', () => {
         'Request failed: user data corrupted', // contains "request" but isn't expired
         'Network configuration invalid', // contains "network" but isn't transient
         'User authentication failed', // contains "user" but isn't a rejection
-        'Session data corrupted' // contains "session" but isn't expected state
+        'Session data corrupted', // contains "session" but isn't expected state
+        'GraphQL node user not found', // contains "node" but isn't DOM error
+        'setDefaultChain requires valid chainId' // contains "setDefaultChain" but isn't Safari evaluation error
       ]
 
       it.each(falsePositiveCandidates)('should NOT filter "%s"', message => {
