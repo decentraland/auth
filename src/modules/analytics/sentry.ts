@@ -24,13 +24,25 @@ init({
       return null
     }
 
-    // Filter out ignorable errors (user-initiated actions, expected states, transient network issues)
+    // Filter out ignorable errors - check multiple locations
     if (
       event.exception?.values?.some(exception => {
-        const message = exception.value || ''
-        return isIgnorableErrorMessage(message)
+        // Check exception.value (most common)
+        if (exception.value && isIgnorableErrorMessage(exception.value)) {
+          return true
+        }
+        // Check exception.type (some errors use type as message)
+        if (exception.type && isIgnorableErrorMessage(exception.type)) {
+          return true
+        }
+        return false
       })
     ) {
+      return null
+    }
+
+    // Also check event.message for non-exception captures
+    if (event.message && isIgnorableErrorMessage(event.message)) {
       return null
     }
 
