@@ -72,4 +72,10 @@ export interface HandleErrorOptions {
   skipLogging?: boolean
   skipTracking?: boolean
   trackingEvent?: string
+  /**
+   * If true, skips sending the error to Sentry.
+   * Use this for expected errors that are handled gracefully.
+   * Note: Most ignorable errors are already filtered in Sentry's beforeSend hook.
+   */
+  skipSentry?: boolean
 }

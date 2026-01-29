@@ -1,5 +1,6 @@
 import { init, browserTracingIntegration, replayIntegration } from '@sentry/react'
 import { Env } from '@dcl/ui-env/dist/env'
+import { isIgnorableErrorMessage } from '../../shared/utils/ignorableErrors'
 import { config } from '../config'
 
 init({
@@ -22,6 +23,17 @@ init({
     ) {
       return null
     }
+
+    // Filter out ignorable errors (user-initiated actions, expected states, transient network issues)
+    if (
+      event.exception?.values?.some(exception => {
+        const message = exception.value || ''
+        return isIgnorableErrorMessage(message)
+      })
+    ) {
+      return null
+    }
+
     return event
   }
 })

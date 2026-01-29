@@ -39,7 +39,10 @@ export const launchDeepLink = (url: string): Promise<boolean> => {
 
     setTimeout(() => {
       window.removeEventListener('blur', handleBlur)
-      document.body.removeChild(iframe)
+      // Only remove iframe if it's still a child of document.body
+      if (iframe.parentNode === document.body) {
+        document.body.removeChild(iframe)
+      }
       resolve(appDetected)
     }, DEEPLINK_DETECTION_TIMEOUT)
   })
