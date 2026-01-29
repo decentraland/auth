@@ -118,6 +118,46 @@ describe('ignorableErrors', () => {
       })
     })
 
+    describe('noise patterns', () => {
+      const noiseMessages = ['<unknown>', 'handleError', 'Pl', 'error: test', 'Error: test']
+
+      it.each(noiseMessages)('should identify "%s" as noise', message => {
+        const result = isIgnorableError(new Error(message))
+        expect(result.isIgnorable).toBe(true)
+        expect(result.category).toBe('noise')
+      })
+    })
+
+    describe('when validating Category 1 errors from Sentry export', () => {
+      const sentryCategory1Errors = [
+        'The request UUID was not found',
+        "Magic: user isn't logged in",
+        'user rejected action',
+        "No matching key. session topic doesn't exist",
+        'User closed the modal without connecting',
+        'Skipped remaining OAuth verification steps'
+      ]
+
+      it.each(sentryCategory1Errors)('should filter Sentry error: "%s"', message => {
+        const result = isIgnorableError({ message })
+        expect(result.isIgnorable).toBe(true)
+      })
+    })
+
+    describe('when error message is similar but NOT ignorable', () => {
+      const falsePositiveCandidates = [
+        'Request failed: user data corrupted', // contains "request" but isn't expired
+        'Network configuration invalid', // contains "network" but isn't transient
+        'User authentication failed', // contains "user" but isn't a rejection
+        'Session data corrupted' // contains "session" but isn't expected state
+      ]
+
+      it.each(falsePositiveCandidates)('should NOT filter "%s"', message => {
+        const result = isIgnorableError(new Error(message))
+        expect(result.isIgnorable).toBe(false)
+      })
+    })
+
     describe('non-ignorable errors', () => {
       const realErrors = [
         'Error invoking post: Method not found',
