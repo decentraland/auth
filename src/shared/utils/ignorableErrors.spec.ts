@@ -48,7 +48,10 @@ describe('ignorableErrors', () => {
         'contract accounts are not supported',
         'record was recently deleted',
         'the request is not recent enough',
-        'the request is too far in the future'
+        'the request is too far in the future',
+        // Auth chain validation failures
+        'The sender is different from the sender in the request',
+        'The signature is invalid for authority ECDSA_EIP_1654_EPHEMERAL'
       ]
 
       it.each(expectedStateMessages)('should identify "%s" as expected_state', message => {
@@ -109,7 +112,10 @@ describe('ignorableErrors', () => {
         'Current network gas price 2284715824096 exceeds max gas price allowed 800000000000',
         'exceeds max gas allowed',
         "undefined is not an object (evaluating 'this.getProvider(r).setDefaultChain')",
-        'AppKit is not initialized'
+        'AppKit is not initialized',
+        // AppKit race condition errors - getProvider returns undefined
+        "undefined is not an object (evaluating 'this.getProvider(s).request')",
+        "Cannot read properties of undefined (reading 'request')"
       ]
 
       it.each(browserEnvironmentMessages)('should identify "%s" as browser_environment', message => {

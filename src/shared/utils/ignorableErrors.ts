@@ -60,7 +60,10 @@ const EXPECTED_STATE_PATTERNS = [
   /contract accounts.*not supported/i, // Smart wallets
   /record was recently deleted/i,
   /the request is not recent enough/i, // Clock sync
-  /the request is too far in the future/i // Clock sync
+  /the request is too far in the future/i, // Clock sync
+  // Auth chain validation failures (user switched wallets or stale identity)
+  /sender is different from the sender/i,
+  /signature is invalid.*ECDSA/i
 ]
 
 // Network transient issues
@@ -99,8 +102,11 @@ const BROWSER_ENVIRONMENT_PATTERNS = [
   /gas price.*exceeds/i,
   /exceeds max gas/i,
   // External library initialization race conditions (AppKit/WalletConnect)
+  // These occur when wallet connection is attempted before AppKit is fully initialized
   /evaluating.*setDefaultChain/i,
-  /appkit.*not initialized/i
+  /appkit.*not initialized/i,
+  /getProvider\([^)]*\)\.request/i, // Safari: undefined is not an object (evaluating 'this.getProvider(s).request')
+  /Cannot read properties of undefined \(reading 'request'\)/i // Chrome: getProvider() returns undefined
 ]
 
 // Noise patterns that provide no actionable info
