@@ -11,11 +11,10 @@ import { getContract, sendMetaTransaction, ContractName } from 'decentraland-tra
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import { useAnalytics } from '../../../hooks/useAnalytics'
-import { useDisabledCatalysts } from '../../../hooks/useDisabledCatalysts'
 import { getAnalytics } from '../../../modules/analytics/segment'
 import { ClickEvents, TrackingEvents } from '../../../modules/analytics/types'
 import { config } from '../../../modules/config'
-import { fetchProfile, fetchProfileWithConsistencyCheck, redeployExistingProfile } from '../../../modules/profile'
+import { fetchProfile } from '../../../modules/profile'
 import {
   createAuthServerHttpClient,
   RecoverResponse,
@@ -140,7 +139,6 @@ export const RequestPage = () => {
   const authServerClient = useRef(createAuthServerHttpClient())
   const isDeepLinkFlow = searchParams.get('flow') === 'deeplink'
   const flowParam = isDeepLinkFlow ? '&flow=deeplink' : ''
-  const disabledCatalysts = useDisabledCatalysts()
   // Goes to the login page where the user will have to connect a wallet.
   // Preserve loginMethod from current URL if present for auto-login functionality
   const loginMethodParam = searchParams.get('loginMethod')
@@ -191,17 +189,6 @@ export const RequestPage = () => {
     const loadRequest = async () => {
       const timeTheSiteStartedLoading = Date.now()
       browserProvider.current = new ethers.BrowserProvider(provider)
-
-      const consistencyResult = await fetchProfileWithConsistencyCheck(account, disabledCatalysts)
-      console.log('Loading request - Consistency result', consistencyResult)
-      if (!consistencyResult.isConsistent && consistencyResult.profile && identity) {
-        try {
-          await redeployExistingProfile(consistencyResult.profile, account, identity, disabledCatalysts)
-        } catch (error) {
-          console.warn('Profile redeployment failed, falling back to login page:', error)
-          toLoginPage()
-        }
-      }
 
       const profile = await fetchProfile(account)
 
@@ -342,7 +329,7 @@ export const RequestPage = () => {
       clearTimeout(timeoutRef.current)
       clearTimeout(signTimeoutRef.current)
     }
-  }, [toLoginPage, toSetupPage, account, provider, providerType, isConnecting, initializedFlags, identity])
+  }, [toLoginPage, toSetupPage, account, provider, providerType, isConnecting, initializedFlags])
 
   useEffect(() => {
     // The timeout is only necessary on the verify sign in and wallet interaction views.
