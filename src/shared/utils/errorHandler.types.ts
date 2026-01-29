@@ -25,6 +25,10 @@ export interface TrackingData {
   isGuest?: boolean
   avatar_shape?: AvatarShape
   supported?: boolean
+  /** Category of ignorable error (for filtered error tracking) */
+  category?: string
+  /** Pattern that matched the error (for filtered error tracking) */
+  reason?: string
 }
 
 export interface SentryTags {
