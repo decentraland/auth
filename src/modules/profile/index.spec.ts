@@ -3,7 +3,6 @@ import { createContentClient, createLambdasClient, DeploymentBuilder } from 'dcl
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/catalyst.schemas'
 import { getCatalystServersFromCache } from 'dcl-catalyst-client/dist/contracts-snapshots'
 import { AuthIdentity, Authenticator } from '@dcl/crypto'
-import { hashV1 } from '@dcl/hashing'
 import { Entity, EntityType } from '@dcl/schemas'
 import {
   createMockIdentity,
@@ -13,12 +12,7 @@ import {
   createMockDeploymentResult
 } from '../../tests/mocks/profile'
 import { config } from '../config'
-import {
-  fetchProfileWithConsistencyCheck,
-  redeployExistingProfile,
-  redeployExistingProfileWithContentServerData,
-  buildProfileMetadata
-} from './index'
+import { fetchProfileWithConsistencyCheck, redeployExistingProfile, redeployExistingProfileWithContentServerData } from './index'
 
 // Mock dependencies
 jest.mock('dcl-catalyst-client', () => ({
@@ -39,10 +33,6 @@ jest.mock('@dcl/crypto', () => ({
   Authenticator: {
     signPayload: jest.fn()
   }
-}))
-
-jest.mock('@dcl/hashing', () => ({
-  hashV1: jest.fn()
 }))
 
 jest.mock('../config', () => ({
@@ -77,8 +67,6 @@ const setupRedeployBase = (address: string = DEFAULT_MOCK_ADDRESS) => {
   const profile = createMockProfile(address)
   const identity = createMockIdentity(address)
   const fetcher = createMockFetcher()
-
-  ;(hashV1 as jest.Mock).mockResolvedValue('mock-hash')
 
   return { profile, identity, fetcher }
 }
@@ -282,44 +270,6 @@ describe('profile module', () => {
     })
   })
 
-  describe('when building profile metadata with buildProfileMetadata', () => {
-    describe('and valid profile and files are provided', () => {
-      let result: Partial<Profile>
-      let mockProfile: Profile
-      let files: Map<string, Uint8Array>
-
-      beforeEach(async () => {
-        mockProfile = createMockProfile()
-
-        files = new Map<string, Uint8Array>()
-        files.set('body.png', new Uint8Array([1, 2, 3]))
-        files.set('face256.png', new Uint8Array([4, 5, 6]))
-        ;(hashV1 as jest.Mock).mockResolvedValueOnce('hash-body').mockResolvedValueOnce('hash-face256')
-
-        result = await buildProfileMetadata(mockProfile, files)
-      })
-
-      it('should hash the body file', () => {
-        expect(hashV1).toHaveBeenCalledWith(new Uint8Array([1, 2, 3]))
-      })
-
-      it('should hash the face file', () => {
-        expect(hashV1).toHaveBeenCalledWith(new Uint8Array([4, 5, 6]))
-      })
-
-      it('should return metadata with updated snapshots', () => {
-        expect(result.avatars?.[0]?.avatar?.snapshots).toEqual({
-          body: 'hash-body',
-          face256: 'hash-face256'
-        })
-      })
-
-      it('should preserve other avatar properties', () => {
-        expect(result.avatars?.[0]?.name).toBe('TestAvatar')
-      })
-    })
-  })
-
   describe('when redeploying existing profile with redeployExistingProfile', () => {
     const mockAddress = DEFAULT_MOCK_ADDRESS
     let mockProfile: Profile
@@ -341,16 +291,20 @@ describe('profile module', () => {
         await redeployExistingProfile(mockProfile, mockAddress, mockIdentity, [], mockFetcher)
       })
 
-      it('should fetch body and face snapshots', () => {
-        expect(mockFetcher.fetch).toHaveBeenCalledWith('https://peer.decentraland.zone/content/body')
-        expect(mockFetcher.fetch).toHaveBeenCalledWith('https://peer.decentraland.zone/content/face256')
-      })
-
-      it('should build the deployment entity with correct type', () => {
+      it('should build the deployment entity with the correct type and without snapshots in metadata', () => {
         expect(DeploymentBuilder.buildEntity).toHaveBeenCalledWith(
           expect.objectContaining({
             type: EntityType.PROFILE,
-            pointers: [mockAddress]
+            pointers: [mockAddress],
+            metadata: expect.objectContaining({
+              avatars: expect.arrayContaining([
+                expect.objectContaining({
+                  avatar: expect.not.objectContaining({
+                    snapshots: expect.anything()
+                  })
+                })
+              ])
+            })
           })
         )
       })
@@ -430,8 +384,7 @@ describe('profile module', () => {
     describe('and the entity is found', () => {
       beforeEach(async () => {
         const mockContentClientForFetch = {
-          fetchEntitiesByPointers: jest.fn().mockResolvedValue([mockEntity]),
-          downloadContent: jest.fn().mockResolvedValue(new Uint8Array([1, 2, 3]))
+          fetchEntitiesByPointers: jest.fn().mockResolvedValue([mockEntity])
         }
 
         const mockContentClientForDeploy = {
@@ -448,23 +401,14 @@ describe('profile module', () => {
         expect(mockClient.fetchEntitiesByPointers).toHaveBeenCalledWith([mockAddress])
       })
 
-      it('should download body content', () => {
-        const mockClient = (createContentClient as jest.Mock).mock.results[0].value
-        expect(mockClient.downloadContent).toHaveBeenCalledWith('body-hash')
-      })
-
-      it('should download face content', () => {
-        const mockClient = (createContentClient as jest.Mock).mock.results[0].value
-        expect(mockClient.downloadContent).toHaveBeenCalledWith('face-hash')
-      })
-
-      it('should build the deployment entity with empty wearables', () => {
+      it('should build the deployment entity without snapshots and empty wearables in metadata', () => {
         expect(DeploymentBuilder.buildEntity).toHaveBeenCalledWith(
           expect.objectContaining({
             metadata: expect.objectContaining({
               avatars: expect.arrayContaining([
                 expect.objectContaining({
-                  avatar: expect.objectContaining({
+                  avatar: expect.not.objectContaining({
+                    snapshots: expect.anything(),
                     wearables: []
                   })
                 })

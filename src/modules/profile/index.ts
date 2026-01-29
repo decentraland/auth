@@ -4,7 +4,6 @@ import { Profile, ProfileAvatarsItem } from 'dcl-catalyst-client/dist/client/spe
 import { getCatalystServersFromCache } from 'dcl-catalyst-client/dist/contracts-snapshots'
 import { L1Network } from '@dcl/catalyst-contracts'
 import { AuthIdentity, Authenticator } from '@dcl/crypto'
-import { hashV1 } from '@dcl/hashing'
 import { EntityType, Entity } from '@dcl/schemas'
 import { createFetcher } from '../../shared/fetcher'
 import { config } from '../config'
@@ -117,22 +116,10 @@ export async function redeployExistingProfile(
   disabledCatalysts: string[] = [],
   _fetcher?: IFetchComponent
 ): Promise<void> {
-  const snapshotUrls = Object.entries(profile.avatars?.[0]?.avatar?.snapshots ?? {}).reduce(
-    (acc, [file, url]) => ({ ...acc, [file]: url }),
-    {} as Record<string, string>
-  )
-
   const fetcher = _fetcher ?? createFetcher()
-
-  const [bodyBuffer, faceBuffer] = await Promise.all([
-    fetcher.fetch(snapshotUrls['body']).then(response => response.arrayBuffer()),
-    fetcher.fetch(snapshotUrls['face256']).then(response => response.arrayBuffer())
-  ])
-
-  const files = createSnapshotFilesMap(bodyBuffer, faceBuffer)
-  const metadata = await buildProfileMetadata(profile, files)
-
-  await redeployWithCatalystRotation(connectedAccount, connectedAccountIdentity, files, metadata, disabledCatalysts, fetcher)
+  // Don't redeploy snapshot files, remove snapshot references from avatar
+  const metadata = buildProfileMetadataWithoutSnapshots(profile)
+  await redeployWithCatalystRotation(connectedAccount, connectedAccountIdentity, metadata, disabledCatalysts, fetcher)
 }
 
 export async function redeployExistingProfileWithContentServerData(
@@ -148,20 +135,13 @@ export async function redeployExistingProfileWithContentServerData(
     throw new Error('Profile entity not found')
   }
 
-  const contentHashesByFile = entity.content.reduce((acc, next) => ({ ...acc, [next.file]: next.hash }), {} as Record<string, string>)
-
-  const [bodyBuffer, faceBuffer] = await Promise.all([
-    client.downloadContent(contentHashesByFile['body.png']),
-    client.downloadContent(contentHashesByFile['face256.png'])
-  ])
-
-  const files = createSnapshotFilesMap(bodyBuffer, faceBuffer)
+  // Don't redeploy snapshot files, remove snapshot references from avatar
   const metadata = buildMetadataWithEmptyWearables(entity)
 
   // First try to redeploy with the full content server metadata
   // If it fails, try to redeploy with the empty wearables metadata
   try {
-    await redeployWithCatalystRotation(connectedAccount, connectedAccountIdentity, files, metadata, disabledCatalysts, fetcher)
+    await redeployWithCatalystRotation(connectedAccount, connectedAccountIdentity, metadata, disabledCatalysts, fetcher)
   } catch (error) {
     console.warn(
       'Profile redeployment failed with full content server metadata, attempting to redeploy with empty wearables metadata:',
@@ -170,7 +150,6 @@ export async function redeployExistingProfileWithContentServerData(
     await redeployWithCatalystRotation(
       connectedAccount,
       connectedAccountIdentity,
-      files,
       buildMetadataWithEmptyWearables(entity),
       disabledCatalysts,
       fetcher
@@ -181,7 +160,6 @@ export async function redeployExistingProfileWithContentServerData(
 async function redeployWithCatalystRotation(
   connectedAccount: string,
   connectedAccountIdentity: AuthIdentity,
-  files: Map<string, Uint8Array>,
   metadata: Partial<Profile>,
   disabledCatalysts: string[] = [],
   fetcher?: IFetchComponent
@@ -193,7 +171,7 @@ async function redeployWithCatalystRotation(
     const catalystUrl = catalystUrls[attempt]
 
     try {
-      await attemptRedeployment(catalystUrl, connectedAccount, connectedAccountIdentity, files, metadata, fetcher)
+      await attemptRedeployment(catalystUrl, connectedAccount, connectedAccountIdentity, metadata, fetcher)
       console.log(`Profile redeployment successful using catalyst: ${catalystUrl}`)
       return
     } catch (error) {
@@ -219,7 +197,6 @@ async function attemptRedeployment(
   catalystUrl: string,
   connectedAccount: string,
   connectedAccountIdentity: AuthIdentity,
-  files: Map<string, Uint8Array>,
   metadata: Partial<Profile>,
   fetcher?: IFetchComponent
 ): Promise<void> {
@@ -229,8 +206,7 @@ async function attemptRedeployment(
     type: EntityType.PROFILE,
     pointers: [connectedAccount],
     metadata,
-    timestamp: Date.now(),
-    files
+    timestamp: Date.now()
   })
 
   await client.deploy({
@@ -249,37 +225,31 @@ function getCatalystUrlsForRotation(disabledCatalysts: string[] = []): string[] 
   return [PEER_URL + '/content', ...catalystServers.map(server => server.address + '/content')]
 }
 
-function createSnapshotFilesMap(bodyBuffer: ArrayBuffer | Buffer, faceBuffer: ArrayBuffer | Buffer): Map<string, Uint8Array> {
-  const files = new Map<string, Uint8Array>()
-  files.set('body.png', new Uint8Array(bodyBuffer))
-  files.set('face256.png', new Uint8Array(faceBuffer))
-  return files
-}
-
-export async function buildProfileMetadata(profile: Profile, files: Map<string, Uint8Array>): Promise<Partial<Profile>> {
-  const adaptSnapshot = async ([file, content]: [string, Uint8Array]) => [file.replace('.png', ''), await hashV1(content)]
-  const snapshots = Object.fromEntries(await Promise.all(Array.from(files.entries()).map(adaptSnapshot)))
-
+function buildProfileMetadataWithoutSnapshots(profile: Profile): Partial<Profile> {
+  // Remove snapshots property entirely from the avatar
   return {
-    avatars: profile.avatars?.map(avatar => ({
-      ...avatar,
-      avatar: {
-        ...avatar.avatar,
-        snapshots
+    avatars: profile.avatars?.map(avatar => {
+      const { snapshots, ...avatarWithoutSnapshots } = avatar.avatar ?? {}
+      return {
+        ...avatar,
+        avatar: avatarWithoutSnapshots
       }
-    }))
+    })
   }
 }
 
 function buildMetadataWithEmptyWearables(entity: Entity): Partial<Profile> {
   return {
-    avatars: entity.metadata?.avatars?.map((avatar: ProfileAvatarsItem) => ({
-      ...avatar,
-      avatar: {
-        ...avatar.avatar,
-        wearables: []
+    avatars: entity.metadata?.avatars?.map((avatar: ProfileAvatarsItem) => {
+      const { snapshots, ...avatarWithoutSnapshots } = avatar.avatar ?? {}
+      return {
+        ...avatar,
+        avatar: {
+          ...avatarWithoutSnapshots,
+          wearables: []
+        }
       }
-    }))
+    })
   }
 }
 
