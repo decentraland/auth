@@ -74,7 +74,8 @@ export const createAuthServerWsClient = (authServerUrl?: string) => {
       }
 
       // If the sender defined in the request is different than the one that is connected, show an error.
-      if (response.sender && response.sender !== signerAddress.toLowerCase()) {
+      // Normalize both addresses to lowercase for comparison
+      if (response.sender && response.sender.toLowerCase() !== signerAddress.toLowerCase()) {
         throw new DifferentSenderError(signerAddress, response.sender)
       }
 
