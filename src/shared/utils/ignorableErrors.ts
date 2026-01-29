@@ -7,6 +7,8 @@
  * - EXPECTED_STATE: Expected application states that aren't actual errors
  * - NETWORK_TRANSIENT: Transient network issues that are expected in production
  * - WALLET_SESSION: WalletConnect session issues that are common and expected
+ * - BROWSER_ENVIRONMENT: Browser/DOM errors that are transient or environment-specific
+ * - NOISE: Errors with no actionable context (minified, empty, or test errors)
  */
 
 // Error message patterns that indicate user-initiated cancellation
@@ -101,7 +103,22 @@ const BROWSER_ENVIRONMENT_PATTERNS = [
   /appkit.*not initialized/i
 ]
 
-export type IgnorableErrorCategory = 'user_initiated' | 'expected_state' | 'network_transient' | 'wallet_session' | 'browser_environment'
+// Noise patterns that provide no actionable info
+// NOTE: These patterns were observed in Sentry with no actionable context.
+const NOISE_PATTERNS = [
+  /^<unknown>$/, // Empty/undefined errors serialized as "<unknown>" - seen 50+ times in Sentry
+  /^handleError$/, // Error message IS "handleError" - indicates bug in error handling code, but no stack trace to act on
+  /^Pl$/, // Minified Safari error - seen 30+ times, no actionable context
+  /^error: test$/i // Test errors that leaked to production
+]
+
+export type IgnorableErrorCategory =
+  | 'user_initiated'
+  | 'expected_state'
+  | 'network_transient'
+  | 'wallet_session'
+  | 'browser_environment'
+  | 'noise'
 
 export interface IgnorableErrorResult {
   isIgnorable: boolean
@@ -187,6 +204,16 @@ export const isIgnorableError = (error: unknown): IgnorableErrorResult => {
       isIgnorable: true,
       category: 'browser_environment',
       reason: browserEnvironmentMatch
+    }
+  }
+
+  // Check noise patterns
+  const noiseMatch = matchesPatterns(message, NOISE_PATTERNS)
+  if (noiseMatch) {
+    return {
+      isIgnorable: true,
+      category: 'noise',
+      reason: noiseMatch
     }
   }
 
