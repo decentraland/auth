@@ -1,3 +1,4 @@
+export { ClockSyncError } from './ClockSyncError'
 export { CloseWindow } from './CloseWindow'
 export { DeniedSignIn } from './DeniedSignIn'
 export { DeniedWalletInteraction } from './DeniedWalletInteraction'

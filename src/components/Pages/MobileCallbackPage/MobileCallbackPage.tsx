@@ -9,6 +9,7 @@ import { useTargetConfig } from '../../../hooks/targetConfig'
 import { useAuthFlow } from '../../../hooks/useAuthFlow'
 import { createAuthServerHttpClient } from '../../../shared/auth'
 import { locations } from '../../../shared/locations'
+import { isClockSyncError } from '../../../shared/utils/clockSync'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { createMagicInstance } from '../../../shared/utils/magicSdk'
 import { ConnectionContainer, ConnectionTitle, DecentralandLogo, ProgressContainer } from '../../ConnectionModal/ConnectionLayout.styled'
@@ -53,6 +54,12 @@ export const MobileCallbackPage = () => {
 
       setIdentityId(response.identityId)
     } catch (err) {
+      // Check for clock sync errors and show user-friendly message
+      if (isClockSyncError(err)) {
+        setError("Your device's clock appears to be out of sync. Please check your date and time settings and try again.")
+        return
+      }
+
       handleError(err, 'Mobile OAuth callback error', {
         sentryTags: {
           isMobileFlow: true

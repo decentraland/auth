@@ -4,6 +4,7 @@ import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import { createAuthServerHttpClient } from '../../../shared/auth'
 import { isErrorWithName } from '../../../shared/errors'
+import { isClockSyncError } from '../../../shared/utils/clockSync'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { createMagicInstance } from '../../../shared/utils/magicSdk'
 import { ConnectionOptionType } from '../../Connection'
@@ -78,6 +79,13 @@ export const MobileAuthPage = () => {
           setView('success')
         }
       } catch (err) {
+        // Check for clock sync errors first and show user-friendly message
+        if (isClockSyncError(err)) {
+          setLoadingState(ConnectionLayoutState.ERROR_CLOCK_SYNC)
+          setView('error')
+          return
+        }
+
         handleError(err, 'Error during mobile auth', {
           sentryTags: {
             connectionType: selectedConnectionType,

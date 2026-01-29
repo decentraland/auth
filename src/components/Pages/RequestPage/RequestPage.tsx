@@ -29,6 +29,7 @@ import { isErrorWithMessage, isRpcError } from '../../../shared/errors'
 import { extractReferrerFromSearchParameters, locations } from '../../../shared/locations'
 import { sendTipNotification } from '../../../shared/notifications'
 import { isProfileComplete } from '../../../shared/profile'
+import { isClockSyncError } from '../../../shared/utils/clockSync'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { checkWebGpuSupport } from '../../../shared/utils/webgpu'
 import { FeatureFlagsContext, FeatureFlagsKeys, OnboardingFlowVariant } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
@@ -45,6 +46,7 @@ import {
   fetchPlaceByCreatorAddress
 } from './utils'
 import {
+  ClockSyncError,
   ContinueInApp,
   DeniedSignIn,
   DeniedWalletInteraction,
@@ -66,6 +68,7 @@ enum View {
   TIMEOUT,
   DIFFERENT_ACCOUNT,
   IP_VALIDATION_ERROR,
+  CLOCK_SYNC_ERROR,
   // Loading
   LOADING_REQUEST,
   LOADING_ERROR,
@@ -424,6 +427,12 @@ export const RequestPage = () => {
         return
       }
 
+      // Check for clock sync errors first and show user-friendly view
+      if (isClockSyncError(e)) {
+        setView(View.CLOCK_SYNC_ERROR)
+        return
+      }
+
       if (e instanceof IpValidationError) {
         setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
         setView(View.IP_VALIDATION_ERROR)
@@ -590,6 +599,8 @@ export const RequestPage = () => {
       return <DifferentAccountError requestId={requestId} />
     case View.IP_VALIDATION_ERROR:
       return <IpValidationErrorView requestId={requestId} reason={error || 'Unknown error'} />
+    case View.CLOCK_SYNC_ERROR:
+      return <ClockSyncError />
     case View.LOADING_ERROR:
       return <RecoverError error={error} />
     case View.VERIFY_SIGN_IN_ERROR:

@@ -13,6 +13,9 @@ const getConnectionLayoutMessage = (loadingState: ConnectionLayoutState, provide
     case ConnectionLayoutState.ERROR_LOCKED_WALLET: {
       return 'Your wallet is currently locked. To continue, please unlock your wallet and try again.'
     }
+    case ConnectionLayoutState.ERROR_CLOCK_SYNC: {
+      return "Your device's clock appears to be out of sync. Please check your date and time settings and try again."
+    }
     case ConnectionLayoutState.CONNECTING_WALLET:
     case ConnectionLayoutState.WAITING_FOR_SIGNATURE: {
       return providerType === ProviderType.MAGIC || providerType === ProviderType.MAGIC_TEST
@@ -37,7 +40,10 @@ const ConnectionLayout = React.memo((props: ConnectionLayoutProps) => {
     state === ConnectionLayoutState.LOADING_MAGIC ||
     state === ConnectionLayoutState.VALIDATING_SIGN_IN
 
-  const isError = state === ConnectionLayoutState.ERROR || state === ConnectionLayoutState.ERROR_LOCKED_WALLET
+  const isError =
+    state === ConnectionLayoutState.ERROR ||
+    state === ConnectionLayoutState.ERROR_LOCKED_WALLET ||
+    state === ConnectionLayoutState.ERROR_CLOCK_SYNC
 
   const handleTryAgain = useCallback(() => {
     onTryAgain()
