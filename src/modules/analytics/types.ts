@@ -21,8 +21,7 @@ export enum TrackingEvents {
   ERROR_SESSION_STATE = 'Error Session State',
   ERROR_NETWORK_TRANSIENT = 'Error Network Transient',
   ERROR_WALLET_SESSION = 'Error Wallet Session',
-  ERROR_BROWSER_ENVIRONMENT = 'Error Browser Environment',
-  ERROR_NOISE = 'Error Noise'
+  ERROR_BROWSER_ENVIRONMENT = 'Error Browser Environment'
 }
 
 export enum RequestInteractionType {

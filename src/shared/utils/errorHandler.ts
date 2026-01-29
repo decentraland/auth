@@ -42,21 +42,22 @@ const normalizeError = (error: unknown): Error => {
 /**
  * Track ignorable errors via analytics for monitoring.
  * Private helper - maps error categories to tracking events.
+ * Note: 'noise' category is not tracked as these errors have no actionable context.
  */
 const trackIgnorableError = (message: string, context: string, category?: IgnorableErrorCategory, reason?: string) => {
   /* eslint-disable @typescript-eslint/naming-convention */
-  const eventMap: Record<IgnorableErrorCategory, TrackingEvents> = {
+  const eventMap: Partial<Record<IgnorableErrorCategory, TrackingEvents>> = {
     user_initiated: TrackingEvents.ERROR_USER_REJECTED,
     expected_state: TrackingEvents.ERROR_SESSION_STATE,
     network_transient: TrackingEvents.ERROR_NETWORK_TRANSIENT,
     wallet_session: TrackingEvents.ERROR_WALLET_SESSION,
-    browser_environment: TrackingEvents.ERROR_BROWSER_ENVIRONMENT,
-    noise: TrackingEvents.ERROR_NOISE
+    browser_environment: TrackingEvents.ERROR_BROWSER_ENVIRONMENT
   }
   /* eslint-enable @typescript-eslint/naming-convention */
 
-  if (category) {
-    trackEvent(eventMap[category], {
+  const trackingEvent = category ? eventMap[category] : undefined
+  if (trackingEvent) {
+    trackEvent(trackingEvent, {
       error: message,
       context,
       category,
