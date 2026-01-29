@@ -2,6 +2,7 @@ import { captureException } from '@sentry/react'
 import { TrackingEvents } from '../../modules/analytics/types'
 import { isErrorWithMessage } from '../errors'
 import { trackEvent } from './analytics'
+import { isIgnorableError, IgnorableErrorCategory, IgnorableErrorResult } from './ignorableErrors'
 import { ErrorContext, HandleErrorOptions } from './errorHandler.types'
 
 /**
@@ -38,6 +39,32 @@ const normalizeError = (error: unknown): Error => {
   return new Error(`Unknown error: ${JSON.stringify(error)}`)
 }
 
+/**
+ * Track ignorable errors via analytics for monitoring.
+ * Private helper - maps error categories to tracking events.
+ */
+const trackIgnorableError = (message: string, context: string, category?: IgnorableErrorCategory, reason?: string) => {
+  /* eslint-disable @typescript-eslint/naming-convention */
+  const eventMap: Record<IgnorableErrorCategory, TrackingEvents> = {
+    user_initiated: TrackingEvents.ERROR_USER_REJECTED,
+    expected_state: TrackingEvents.ERROR_SESSION_STATE,
+    network_transient: TrackingEvents.ERROR_NETWORK_TRANSIENT,
+    wallet_session: TrackingEvents.ERROR_WALLET_SESSION,
+    browser_environment: TrackingEvents.ERROR_BROWSER_ENVIRONMENT,
+    noise: TrackingEvents.ERROR_NOISE
+  }
+  /* eslint-enable @typescript-eslint/naming-convention */
+
+  if (category) {
+    trackEvent(eventMap[category], {
+      error: message,
+      context,
+      category,
+      reason
+    })
+  }
+}
+
 const handleError = (error: unknown, context: string, options?: HandleErrorOptions) => {
   const errorMessage = isErrorWithMessage(error) ? error.message : 'Unknown error'
 
@@ -45,7 +72,22 @@ const handleError = (error: unknown, context: string, options?: HandleErrorOptio
     console.error(`${context}:`, errorMessage)
   }
 
-  // Skip Sentry if explicitly requested (ignorable errors are also filtered in Sentry's beforeSend)
+  // Check if error is ignorable - skip Sentry but track via analytics
+  // Defensive: wrap in try-catch so malformed input doesn't break error handling
+  let ignorableResult: IgnorableErrorResult = { isIgnorable: false }
+  try {
+    ignorableResult = isIgnorableError(error)
+  } catch {
+    // If checking fails, proceed with normal error handling
+  }
+
+  if (ignorableResult.isIgnorable && !options?.skipSentry) {
+    // Track ignorable error via analytics for monitoring
+    trackIgnorableError(errorMessage, context, ignorableResult.category, ignorableResult.reason)
+    return errorMessage // Skip Sentry
+  }
+
+  // Non-ignorable: send to Sentry
   if (!options?.skipSentry) {
     // Normalize the error to ensure it's a proper Error instance
     // This prevents "Object captured as exception" issues in Sentry
