@@ -14,7 +14,15 @@ export enum TrackingEvents {
   START_ADDING_NAME = 'Start adding name',
   START_ADDING_EMAIL = 'Start adding email',
   CHECK_TERMS_OF_SERVICE = 'Check terms of service',
-  WEBGPU_SUPPORT_CHECK = 'WebGPU support check'
+  WEBGPU_SUPPORT_CHECK = 'WebGPU support check',
+
+  // Filtered error tracking (for monitoring ignorable errors)
+  ERROR_USER_REJECTED = 'Error User Rejected',
+  ERROR_SESSION_STATE = 'Error Session State',
+  ERROR_NETWORK_TRANSIENT = 'Error Network Transient',
+  ERROR_WALLET_SESSION = 'Error Wallet Session',
+  ERROR_BROWSER_ENVIRONMENT = 'Error Browser Environment',
+  ERROR_NOISE = 'Error Noise'
 }
 
 export enum RequestInteractionType {
