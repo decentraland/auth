@@ -4,7 +4,7 @@ import { config } from '../config'
 
 init({
   environment: config.get('ENVIRONMENT'),
-  release: `${config.get('SENTRY_RELEASE_PREFIX', 'auth')}@${process.env.VITE_REACT_APP_WEBSITE_VERSION}`,
+  release: `${config.get('SENTRY_RELEASE_PREFIX', 'auth')}@${import.meta.env.VITE_REACT_APP_WEBSITE_VERSION}`,
   dsn: config.get('SENTRY_DSN'),
   integrations: [browserTracingIntegration(), replayIntegration()],
   // Performance Monitoring
