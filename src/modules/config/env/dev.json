@@ -14,6 +14,5 @@
   "META_TRANSACTION_SERVER_URL": "https://transactions-api.decentraland.zone",
   "PLACES_API_URL": "https://places.decentraland.zone",
   "PROFILE_CONSISTENCY_CHECK_TIMEOUT": "10000",
-  "EVENTS_NOTIFIER_URL": "https://events-notifier.decentraland.zone",
-  "THIRDWEB_CLIENT_ID": "8d056704cd974d011e0c4c51dadb841e"
+  "EVENTS_NOTIFIER_URL": "https://events-notifier.decentraland.zone"
 }

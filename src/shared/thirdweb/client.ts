@@ -1,5 +1,5 @@
 import { createThirdwebClient, ThirdwebClient } from 'thirdweb'
-import { config } from '../../modules/config'
+import { getConfiguration } from 'decentraland-connect'
 
 let thirdwebClient: ThirdwebClient | null = null
 
@@ -15,7 +15,8 @@ let thirdwebClient: ThirdwebClient | null = null
  */
 export const getThirdwebClient = (): ThirdwebClient => {
   if (!thirdwebClient) {
-    const clientId = config.get('THIRDWEB_CLIENT_ID')
+    // const clientId = config.get('THIRDWEB_CLIENT_ID')
+    const clientId = getConfiguration().thirdweb?.clientId
 
     if (!clientId) {
       throw new Error('THIRDWEB_CLIENT_ID is not configured')
