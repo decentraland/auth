@@ -1,6 +1,8 @@
 import { useState, useCallback, useRef, useEffect, KeyboardEvent, ChangeEvent, ClipboardEvent } from 'react'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
 import { Modal } from 'decentraland-ui/dist/components/Modal/Modal'
+import { TrackingEvents } from '../../modules/analytics/types'
+import { trackEvent } from '../../shared/utils/analytics'
 import { handleError } from '../../shared/utils/errorHandler'
 import { sendEmailOTP, verifyOTPAndConnect } from './utils'
 import { EmailLoginModalProps } from './EmailLoginModal.types'
@@ -123,11 +125,17 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
         // Store email for future reference
         localStorage.setItem('dcl_thirdweb_user_email', currentEmail)
 
+        // Track OTP verification success
+        trackEvent(TrackingEvents.OTP_VERIFICATION_SUCCESS, { email: currentEmail })
+
         onSuccess({ email: currentEmail, account })
       } catch (e) {
         const errorMessage = handleError(e, 'Error verifying OTP')
         setError(getNetworkFriendlyError(errorMessage, 'The code is invalid or expired. Please resend code'))
         setHasError(true)
+
+        // Track OTP verification failure
+        trackEvent(TrackingEvents.OTP_VERIFICATION_FAILURE, { email: currentEmail, error: errorMessage })
       } finally {
         setIsLoading(false)
       }
@@ -146,6 +154,10 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
       console.log('[Thirdweb] Resending OTP to:', currentEmail)
       // Re-send OTP using thirdweb
       await sendEmailOTP(currentEmail)
+
+      // Track OTP resend
+      trackEvent(TrackingEvents.OTP_RESEND, { email: currentEmail })
+
       // Focus first OTP input
       setTimeout(() => otpInputRefs.current[0]?.focus(), 100)
     } catch (e) {
