@@ -80,6 +80,19 @@ export const useAnalytics = () => {
     await wait(TRACKING_DELAY)
   }, [trackLoginClick])
 
+  // OTP-related tracking events
+  const trackOtpVerificationSuccess = useCallback((data: { email: string }) => {
+    trackEvent(TrackingEvents.OTP_VERIFICATION_SUCCESS, { email: data.email })
+  }, [])
+
+  const trackOtpVerificationFailure = useCallback((data: { email: string; error?: string }) => {
+    trackEvent(TrackingEvents.OTP_VERIFICATION_FAILURE, { email: data.email, error: data.error })
+  }, [])
+
+  const trackOtpResend = useCallback((data: { email: string }) => {
+    trackEvent(TrackingEvents.OTP_RESEND, { email: data.email })
+  }, [])
+
   return {
     trackAvatarEditSuccess,
     trackCheckTermsOfService,
@@ -87,6 +100,9 @@ export const useAnalytics = () => {
     trackGuestLogin,
     trackLoginClick,
     trackLoginSuccess,
+    trackOtpResend,
+    trackOtpVerificationFailure,
+    trackOtpVerificationSuccess,
     trackStartAddingEmail,
     trackStartAddingName,
     trackTermsOfServiceSuccess,

@@ -14,7 +14,11 @@ export enum TrackingEvents {
   START_ADDING_NAME = 'Start adding name',
   START_ADDING_EMAIL = 'Start adding email',
   CHECK_TERMS_OF_SERVICE = 'Check terms of service',
-  WEBGPU_SUPPORT_CHECK = 'WebGPU support check'
+  WEBGPU_SUPPORT_CHECK = 'WebGPU support check',
+  // Email OTP Events
+  OTP_VERIFICATION_SUCCESS = 'OTP Verification Success',
+  OTP_VERIFICATION_FAILURE = 'OTP Verification Failure',
+  OTP_RESEND = 'OTP Resend'
 }
 
 export enum RequestInteractionType {
