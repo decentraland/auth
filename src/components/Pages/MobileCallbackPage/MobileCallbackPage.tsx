@@ -1,12 +1,12 @@
 import { useCallback, useContext, useEffect, useState } from 'react'
 import ArrowBackIosNewTwoToneIcon from '@mui/icons-material/ArrowBackIosNewTwoTone'
-import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
+import { ProviderType } from '@dcl/schemas'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
+import { connection } from 'decentraland-connect'
 import { CircularProgress } from 'decentraland-ui2'
 import wrongImg from '../../../assets/images/wrong.svg'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useTargetConfig } from '../../../hooks/targetConfig'
-import { useAuthFlow } from '../../../hooks/useAuthFlow'
 import { createAuthServerHttpClient } from '../../../shared/auth'
 import { locations } from '../../../shared/locations'
 import { handleError } from '../../../shared/utils/errorHandler'
@@ -20,7 +20,6 @@ import { MobileAuthSuccess } from '../MobileAuthPage/MobileAuthSuccess'
 export const MobileCallbackPage = () => {
   const navigate = useNavigateWithSearchParams()
   const { initialized, flags } = useContext(FeatureFlagsContext)
-  const { connectToMagic } = useAuthFlow()
   const [targetConfig] = useTargetConfig()
 
   const [isProcessing, setIsProcessing] = useState(false)
@@ -32,20 +31,17 @@ export const MobileCallbackPage = () => {
       // Get OAuth result from Magic
       const magic = await createMagicInstance(!!flags[FeatureFlagsKeys.MAGIC_TEST])
       await magic?.oauth2.getRedirectResult()
+
       // Connect to Magic provider
-      const connectionData = await connectToMagic()
+      const providerType = flags[FeatureFlagsKeys.MAGIC_TEST] ? ProviderType.MAGIC_TEST : ProviderType.MAGIC
+      const connectionData = await connection.connect(providerType)
+
       if (!connectionData?.account || !connectionData?.provider) {
         throw new Error('Failed to connect to Magic')
       }
 
       // Generate identity
-      await getIdentitySignature(connectionData.account.toLowerCase(), connectionData.provider)
-
-      // Get the identity from localStorage
-      const identity = localStorageGetIdentity(connectionData.account.toLowerCase())
-      if (!identity) {
-        throw new Error('Failed to get identity')
-      }
+      const identity = await getIdentitySignature(connectionData.account.toLowerCase(), connectionData.provider)
 
       // Post identity to server
       const httpClient = createAuthServerHttpClient()
@@ -60,7 +56,7 @@ export const MobileCallbackPage = () => {
       })
       setError(err instanceof Error ? err.message : 'Authentication failed')
     }
-  }, [flags, connectToMagic])
+  }, [flags])
 
   useEffect(() => {
     if (!initialized || isProcessing) return
