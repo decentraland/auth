@@ -1,11 +1,15 @@
-import { init, browserTracingIntegration, replayIntegration } from '@sentry/react'
+import { init, setTag, setUser, browserTracingIntegration, replayIntegration } from '@sentry/react'
 import { Env } from '@dcl/ui-env/dist/env'
 import { config } from '../config'
+import { isMobileSession, getMobileSession } from '../../shared/mobile'
+
+const mobile = isMobileSession()
+const dsn = mobile ? config.get('SENTRY_DSN_MOBILE') : config.get('SENTRY_DSN')
 
 init({
   environment: config.get('ENVIRONMENT'),
   release: `${config.get('SENTRY_RELEASE_PREFIX', 'auth')}@${import.meta.env.VITE_REACT_APP_WEBSITE_VERSION}`,
-  dsn: config.get('SENTRY_DSN'),
+  dsn,
   integrations: [browserTracingIntegration(), replayIntegration()],
   // Performance Monitoring
   tracesSampleRate: 0.001,
@@ -25,3 +29,10 @@ init({
     return event
   }
 })
+
+// Set mobile-specific tags after init
+if (mobile) {
+  const session = getMobileSession()
+  if (session?.u) setUser({ id: session.u })
+  if (session?.s) setTag('dcl_session_id', session.s)
+}

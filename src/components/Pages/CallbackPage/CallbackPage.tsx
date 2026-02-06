@@ -13,13 +13,14 @@ import { createMagicInstance } from '../../../shared/utils/magicSdk'
 import { ConnectionLayout } from '../../ConnectionModal/ConnectionLayout'
 import { ConnectionLayoutState } from '../../ConnectionModal/ConnectionLayout.type'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
-import { isMobile, getIdentitySignature } from '../LoginPage/utils'
+import { getIdentitySignature } from '../LoginPage/utils'
+import { isMobileSession } from '../../../shared/mobile'
 import { MobileCallbackPage } from '../MobileCallbackPage/MobileCallbackPage'
 import { Container, Wrapper } from './CallbackPage.styled'
 
 export const CallbackPage = () => {
   // Render mobile callback UI directly if on mobile device
-  if (isMobile()) {
+  if (isMobileSession()) {
     return <MobileCallbackPage />
   }
 
