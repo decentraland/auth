@@ -23,10 +23,17 @@ import { config } from './modules/config'
 import { getAnalytics } from './modules/analytics/segment'
 import './modules/analytics/snippet'
 import './modules/analytics/sentry'
+import { getMobileSession } from './shared/mobile'
 import 'decentraland-ui/dist/themes/alternative/dark-theme.css'
 import './index.css'
 
-getAnalytics()?.load(config.get('SEGMENT_API_KEY'))
+const analytics = getAnalytics()
+analytics?.load(config.get('SEGMENT_API_KEY'))
+
+const mobileSession = getMobileSession()
+if (mobileSession?.u) {
+  analytics?.identify(mobileSession.u)
+}
 
 const DevTestViewPage = !config.is(Env.PRODUCTION)
   ? React.lazy(async () => {
