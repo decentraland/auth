@@ -49,7 +49,7 @@ async function generateIdentityWithSigner(address: string, signMessage: SignMess
   return Authenticator.initializeAuthChain(address, payload, ONE_MONTH_IN_MINUTES, signMessage)
 }
 
-async function generateIdentity(address: string, provider: Provider): Promise<AuthIdentity> {
+export async function generateIdentity(address: string, provider: Provider): Promise<AuthIdentity> {
   const browserProvider = new ethers.BrowserProvider(provider)
   const signer = await browserProvider.getSigner()
 
