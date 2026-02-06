@@ -1,7 +1,7 @@
 import { init, setTag, setUser, browserTracingIntegration, replayIntegration } from '@sentry/react'
 import { Env } from '@dcl/ui-env/dist/env'
-import { config } from '../config'
 import { isMobileSession, getMobileSession } from '../../shared/mobile'
+import { config } from '../config'
 
 const mobile = isMobileSession()
 const dsn = mobile ? config.get('SENTRY_DSN_MOBILE') : config.get('SENTRY_DSN')
