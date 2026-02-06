@@ -16,6 +16,7 @@ import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvide
 import { getIdentitySignature } from '../LoginPage/utils'
 import { ActionButton, Background, Description, Icon, Main, SuccessContainer, Title } from '../MobileAuthPage/MobileAuthPage.styled'
 import { MobileAuthSuccess } from '../MobileAuthPage/MobileAuthSuccess'
+import { clearMobileAuthFlow } from '../MobileAuthPage/utils'
 
 export const MobileCallbackPage = () => {
   const navigate = useNavigateWithSearchParams()
@@ -48,6 +49,8 @@ export const MobileCallbackPage = () => {
       const response = await httpClient.postIdentity(identity, { isMobile: true })
 
       setIdentityId(response.identityId)
+      // Clean up the mobile flow flag
+      clearMobileAuthFlow()
     } catch (err) {
       handleError(err, 'Mobile OAuth callback error', {
         sentryTags: {
@@ -55,6 +58,8 @@ export const MobileCallbackPage = () => {
         }
       })
       setError(err instanceof Error ? err.message : 'Authentication failed')
+      // Clean up the mobile flow flag
+      clearMobileAuthFlow()
     }
   }, [flags])
 

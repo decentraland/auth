@@ -20,7 +20,7 @@ import {
 import { Main } from './MobileAuthPage.styled'
 import { MobileAuthSuccess } from './MobileAuthSuccess'
 import { MobileProviderSelection } from './MobileProviderSelection'
-import { parseConnectionOptionType } from './utils'
+import { parseConnectionOptionType, setMobileAuthFlow } from './utils'
 
 type MobileAuthView = 'selection' | 'connecting' | 'success' | 'error'
 
@@ -39,6 +39,11 @@ export const MobileAuthPage = () => {
   const [connectionType, setConnectionType] = useState<ConnectionOptionType | undefined>(provider ?? undefined)
 
   const hasStartedInit = useRef(false)
+
+  // Set mobile auth flow flag once on mount (used by CallbackPage after OAuth redirect)
+  useEffect(() => {
+    setMobileAuthFlow()
+  }, [])
 
   const initiateAuth = useCallback(
     async (selectedConnectionType: ConnectionOptionType) => {
