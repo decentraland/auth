@@ -82,10 +82,20 @@ export async function connectToSocialProvider(
     url.pathname = '/auth/callback'
     url.search = ''
 
+    const currentSearch = new URLSearchParams(window.location.search)
+
     await magic?.oauth2.loginWithRedirect({
       provider: connectionOption === ConnectionOptionType.X ? 'twitter' : (connectionOption as OAuthProvider),
       redirectURI: url.href,
-      customData: JSON.stringify({ redirectTo, referrer, isMobileFlow }),
+      customData: JSON.stringify({
+        redirectTo,
+        referrer,
+        isMobileFlow,
+        ...(isMobileFlow && {
+          mobileUserId: currentSearch.get('u') ?? undefined,
+          mobileSessionId: currentSearch.get('s') ?? undefined
+        })
+      }),
       ...(isMobileFlow && { loginHint: '' }) // Force account picker on mobile
     })
   }

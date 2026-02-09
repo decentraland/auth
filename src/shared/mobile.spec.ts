@@ -1,6 +1,4 @@
-import { isMobileSession, getMobileSession, MobileSession } from './mobile'
-
-const MOBILE_SESSION_KEY = 'auth-mobile-session'
+import { isMobileSession, getMobileSession } from './mobile'
 
 function setLocation(pathname: string, search = '') {
   Object.defineProperty(window, 'location', {
@@ -9,117 +7,128 @@ function setLocation(pathname: string, search = '') {
   })
 }
 
+function makeState(customData: Record<string, unknown>): string {
+  return btoa(JSON.stringify({ customData: JSON.stringify(customData) }))
+}
+
 describe('mobile session', () => {
   beforeEach(() => {
-    localStorage.clear()
     setLocation('/auth/login')
   })
 
   describe('isMobileSession', () => {
-    describe('on /auth/mobile with params', () => {
-      it('should return true and persist session', () => {
+    describe('on /auth/mobile', () => {
+      it('should return true with params', () => {
         setLocation('/auth/mobile', '?u=user123&s=session456')
         expect(isMobileSession()).toBe(true)
-
-        const stored: MobileSession = JSON.parse(localStorage.getItem(MOBILE_SESSION_KEY)!)
-        expect(stored.u).toBe('user123')
-        expect(stored.s).toBe('session456')
-        expect(stored.t).toBeGreaterThan(0)
       })
 
-      it('should work with subpaths like /auth/mobile/callback', () => {
+      it('should return true without params', () => {
+        setLocation('/auth/mobile')
+        expect(isMobileSession()).toBe(true)
+      })
+
+      it('should return true for subpaths like /auth/mobile/callback', () => {
         setLocation('/auth/mobile/callback', '?u=user1&s=sess1')
         expect(isMobileSession()).toBe(true)
-        expect(localStorage.getItem(MOBILE_SESSION_KEY)).not.toBeNull()
       })
     })
 
-    describe('on /auth/mobile without params', () => {
-      it('should return true and keep existing recent session', () => {
-        const session: MobileSession = { t: Date.now(), u: 'prev-user', s: 'prev-sess' }
-        localStorage.setItem(MOBILE_SESSION_KEY, JSON.stringify(session))
-
-        setLocation('/auth/mobile')
-        expect(isMobileSession()).toBe(true)
-
-        const stored: MobileSession = JSON.parse(localStorage.getItem(MOBILE_SESSION_KEY)!)
-        expect(stored.u).toBe('prev-user')
-      })
-
-      it('should return true and remove expired session', () => {
-        const session: MobileSession = { t: Date.now() - 11 * 60 * 1000, u: 'old-user', s: 'old-sess' }
-        localStorage.setItem(MOBILE_SESSION_KEY, JSON.stringify(session))
-
-        setLocation('/auth/mobile')
-        expect(isMobileSession()).toBe(true)
-        expect(localStorage.getItem(MOBILE_SESSION_KEY)).toBeNull()
-      })
-
-      it('should return true even with no previous session', () => {
-        setLocation('/auth/mobile')
-        expect(isMobileSession()).toBe(true)
-      })
-    })
-
-    describe('on other routes', () => {
-      it('should return true if a recent session exists', () => {
-        const session: MobileSession = { t: Date.now(), u: 'user1', s: 'sess1' }
-        localStorage.setItem(MOBILE_SESSION_KEY, JSON.stringify(session))
-
-        setLocation('/auth/callback')
+    describe('on /auth/callback with state param', () => {
+      it('should return true when isMobileFlow is true in state', () => {
+        const state = makeState({ isMobileFlow: true, mobileUserId: 'u1', mobileSessionId: 's1' })
+        setLocation('/auth/callback', `?state=${state}`)
         expect(isMobileSession()).toBe(true)
       })
 
-      it('should return false and clean up if session is expired', () => {
-        const session: MobileSession = { t: Date.now() - 11 * 60 * 1000, u: 'user1', s: 'sess1' }
-        localStorage.setItem(MOBILE_SESSION_KEY, JSON.stringify(session))
-
-        setLocation('/auth/callback')
+      it('should return false when isMobileFlow is false in state', () => {
+        const state = makeState({ isMobileFlow: false })
+        setLocation('/auth/callback', `?state=${state}`)
         expect(isMobileSession()).toBe(false)
-        expect(localStorage.getItem(MOBILE_SESSION_KEY)).toBeNull()
       })
 
-      it('should return false if no session exists', () => {
+      it('should return false when isMobileFlow is missing from state', () => {
+        const state = makeState({ redirectTo: '/somewhere' })
+        setLocation('/auth/callback', `?state=${state}`)
+        expect(isMobileSession()).toBe(false)
+      })
+    })
+
+    describe('on other routes without state', () => {
+      it('should return false', () => {
         setLocation('/auth/login')
         expect(isMobileSession()).toBe(false)
       })
     })
 
-    describe('corrupted localStorage', () => {
-      it('should return false and clean up on other routes', () => {
-        localStorage.setItem(MOBILE_SESSION_KEY, 'not-json')
-
-        setLocation('/auth/callback')
+    describe('malformed state', () => {
+      it('should return false for invalid base64', () => {
+        setLocation('/auth/callback', '?state=not-base64!!!')
         expect(isMobileSession()).toBe(false)
-        expect(localStorage.getItem(MOBILE_SESSION_KEY)).toBeNull()
       })
 
-      it('should return true and clean up on /auth/mobile without params', () => {
-        localStorage.setItem(MOBILE_SESSION_KEY, 'not-json')
+      it('should return false for non-JSON state', () => {
+        setLocation('/auth/callback', `?state=${btoa('not-json')}`)
+        expect(isMobileSession()).toBe(false)
+      })
 
-        setLocation('/auth/mobile')
-        expect(isMobileSession()).toBe(true)
-        expect(localStorage.getItem(MOBILE_SESSION_KEY)).toBeNull()
+      it('should return false for state without customData', () => {
+        setLocation('/auth/callback', `?state=${btoa(JSON.stringify({ other: 'data' }))}`)
+        expect(isMobileSession()).toBe(false)
       })
     })
   })
 
   describe('getMobileSession', () => {
-    it('should return the session if it exists', () => {
-      const session: MobileSession = { t: Date.now(), u: 'user1', s: 'sess1' }
-      localStorage.setItem(MOBILE_SESSION_KEY, JSON.stringify(session))
+    describe('on /auth/mobile', () => {
+      it('should return session from URL params', () => {
+        setLocation('/auth/mobile', '?u=user123&s=session456')
+        expect(getMobileSession()).toEqual({ u: 'user123', s: 'session456' })
+      })
 
-      const result = getMobileSession()
-      expect(result).toEqual(session)
+      it('should return session with only u param', () => {
+        setLocation('/auth/mobile', '?u=user123')
+        expect(getMobileSession()).toEqual({ u: 'user123', s: undefined })
+      })
+
+      it('should return session with undefined fields when no params', () => {
+        setLocation('/auth/mobile')
+        expect(getMobileSession()).toEqual({ u: undefined, s: undefined })
+      })
     })
 
-    it('should return null if no session exists', () => {
-      expect(getMobileSession()).toBeNull()
+    describe('on /auth/callback with state param', () => {
+      it('should return session from state when isMobileFlow is true', () => {
+        const state = makeState({ isMobileFlow: true, mobileUserId: 'u1', mobileSessionId: 's1' })
+        setLocation('/auth/callback', `?state=${state}`)
+        expect(getMobileSession()).toEqual({ u: 'u1', s: 's1' })
+      })
+
+      it('should return session with undefined fields when missing from state', () => {
+        const state = makeState({ isMobileFlow: true })
+        setLocation('/auth/callback', `?state=${state}`)
+        expect(getMobileSession()).toEqual({ u: undefined, s: undefined })
+      })
+
+      it('should return null when isMobileFlow is false', () => {
+        const state = makeState({ isMobileFlow: false, mobileUserId: 'u1' })
+        setLocation('/auth/callback', `?state=${state}`)
+        expect(getMobileSession()).toBeNull()
+      })
     })
 
-    it('should return null on corrupted data', () => {
-      localStorage.setItem(MOBILE_SESSION_KEY, 'not-json')
-      expect(getMobileSession()).toBeNull()
+    describe('on other routes', () => {
+      it('should return null when no state param', () => {
+        setLocation('/auth/login')
+        expect(getMobileSession()).toBeNull()
+      })
+    })
+
+    describe('malformed state', () => {
+      it('should return null for invalid state', () => {
+        setLocation('/auth/callback', '?state=garbage')
+        expect(getMobileSession()).toBeNull()
+      })
     })
   })
 })
