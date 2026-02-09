@@ -3,6 +3,9 @@ export interface MobileSession {
   s?: string
 }
 
+// In-memory cache: survives SPA navigations without localStorage
+let cachedSession: MobileSession | null | undefined
+
 // Helper that parses the state param from the OAuth callback (same pattern as extractRedirectToFromSearchParameters)
 function extractMobileDataFromState(): { isMobileFlow?: boolean; mobileUserId?: string; mobileSessionId?: string } | null {
   try {
@@ -24,20 +27,26 @@ function extractMobileDataFromState(): { isMobileFlow?: boolean; mobileUserId?: 
 }
 
 export function getMobileSession(): MobileSession | null {
+  if (cachedSession !== undefined) {
+    return cachedSession
+  }
+
   const params = new URLSearchParams(window.location.search)
 
   // On /auth/mobile, read from URL params
   if (window.location.pathname.startsWith('/auth/mobile')) {
-    return { u: params.get('u') ?? undefined, s: params.get('s') ?? undefined }
+    cachedSession = { u: params.get('u') ?? undefined, s: params.get('s') ?? undefined }
+    return cachedSession
   }
 
   // On callback, extract from OAuth state param
   const stateData = extractMobileDataFromState()
   if (stateData?.isMobileFlow) {
-    return {
+    cachedSession = {
       u: stateData.mobileUserId ?? undefined,
       s: stateData.mobileSessionId ?? undefined
     }
+    return cachedSession
   }
 
   return null
