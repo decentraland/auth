@@ -19,116 +19,202 @@ describe('mobile session', () => {
 
   describe('isMobileSession', () => {
     describe('on /auth/mobile', () => {
-      it('should return true with params', () => {
-        setLocation('/auth/mobile', '?u=user123&s=session456')
-        expect(isMobileSession()).toBe(true)
+      describe('when there are query parameters', () => {
+        beforeEach(() => {
+          setLocation('/auth/mobile', '?u=user123&s=session456')
+        })
+
+        it('should return true', () => {
+          expect(isMobileSession()).toBe(true)
+        })
       })
 
-      it('should return true without params', () => {
-        setLocation('/auth/mobile')
-        expect(isMobileSession()).toBe(true)
+      describe('when there are no query parameters', () => {
+        beforeEach(() => {
+          setLocation('/auth/mobile')
+        })
+
+        it('should return true', () => {
+          expect(isMobileSession()).toBe(true)
+        })
       })
 
-      it('should return true for subpaths like /auth/mobile/callback', () => {
-        setLocation('/auth/mobile/callback', '?u=user1&s=sess1')
-        expect(isMobileSession()).toBe(true)
+      describe('when having an extra path', () => {
+        beforeEach(() => {
+          setLocation('/auth/mobile/callback', '?u=user1&s=sess1')
+        })
+
+        it('should return true', () => {
+          expect(isMobileSession()).toBe(true)
+        })
       })
     })
 
     describe('on /auth/callback with state param', () => {
-      it('should return true when isMobileFlow is true in state', () => {
-        const state = makeState({ isMobileFlow: true, mobileUserId: 'u1', mobileSessionId: 's1' })
-        setLocation('/auth/callback', `?state=${state}`)
-        expect(isMobileSession()).toBe(true)
+      describe('when isMobileFlow is true in state', () => {
+        beforeEach(() => {
+          const state = makeState({ isMobileFlow: true, mobileUserId: 'u1', mobileSessionId: 's1' })
+          setLocation('/auth/callback', `?state=${state}`)
+        })
+
+        it('should return true', () => {
+          expect(isMobileSession()).toBe(true)
+        })
       })
 
-      it('should return false when isMobileFlow is false in state', () => {
-        const state = makeState({ isMobileFlow: false })
-        setLocation('/auth/callback', `?state=${state}`)
-        expect(isMobileSession()).toBe(false)
+      describe('when isMobileFlow is false in state', () => {
+        beforeEach(() => {
+          const state = makeState({ isMobileFlow: false })
+          setLocation('/auth/callback', `?state=${state}`)
+        })
+
+        it('should return false', () => {
+          expect(isMobileSession()).toBe(false)
+        })
       })
 
-      it('should return false when isMobileFlow is missing from state', () => {
-        const state = makeState({ redirectTo: '/somewhere' })
-        setLocation('/auth/callback', `?state=${state}`)
-        expect(isMobileSession()).toBe(false)
+      describe('when isMobileFlow is missing from state', () => {
+        beforeEach(() => {
+          const state = makeState({ redirectTo: '/somewhere' })
+          setLocation('/auth/callback', `?state=${state}`)
+        })
+
+        it('should return false', () => {
+          expect(isMobileSession()).toBe(false)
+        })
       })
     })
 
     describe('on other routes without state', () => {
-      it('should return false', () => {
+      beforeEach(() => {
         setLocation('/auth/login')
+      })
+
+      it('should return false', () => {
         expect(isMobileSession()).toBe(false)
       })
     })
 
     describe('malformed state', () => {
-      it('should return false for invalid base64', () => {
-        setLocation('/auth/callback', '?state=not-base64!!!')
-        expect(isMobileSession()).toBe(false)
+      describe('when state is invalid base64', () => {
+        beforeEach(() => {
+          setLocation('/auth/callback', '?state=not-base64!!!')
+        })
+
+        it('should return false', () => {
+          expect(isMobileSession()).toBe(false)
+        })
       })
 
-      it('should return false for non-JSON state', () => {
-        setLocation('/auth/callback', `?state=${btoa('not-json')}`)
-        expect(isMobileSession()).toBe(false)
+      describe('when state is non-JSON', () => {
+        beforeEach(() => {
+          setLocation('/auth/callback', `?state=${btoa('not-json')}`)
+        })
+
+        it('should return false', () => {
+          expect(isMobileSession()).toBe(false)
+        })
       })
 
-      it('should return false for state without customData', () => {
-        setLocation('/auth/callback', `?state=${btoa(JSON.stringify({ other: 'data' }))}`)
-        expect(isMobileSession()).toBe(false)
+      describe('when state has no customData', () => {
+        beforeEach(() => {
+          setLocation('/auth/callback', `?state=${btoa(JSON.stringify({ other: 'data' }))}`)
+        })
+
+        it('should return false', () => {
+          expect(isMobileSession()).toBe(false)
+        })
       })
     })
   })
 
   describe('getMobileSession', () => {
     describe('on /auth/mobile', () => {
-      it('should return session from URL params', () => {
-        setLocation('/auth/mobile', '?u=user123&s=session456')
-        expect(getMobileSession()).toEqual({ u: 'user123', s: 'session456' })
+      describe('when both u and s params are present', () => {
+        beforeEach(() => {
+          setLocation('/auth/mobile', '?u=user123&s=session456')
+        })
+
+        it('should return session from URL params', () => {
+          expect(getMobileSession()).toEqual({ u: 'user123', s: 'session456' })
+        })
       })
 
-      it('should return session with only u param', () => {
-        setLocation('/auth/mobile', '?u=user123')
-        expect(getMobileSession()).toEqual({ u: 'user123', s: undefined })
+      describe('when only u param is present', () => {
+        beforeEach(() => {
+          setLocation('/auth/mobile', '?u=user123')
+        })
+
+        it('should return session with undefined s', () => {
+          expect(getMobileSession()).toEqual({ u: 'user123', s: undefined })
+        })
       })
 
-      it('should return session with undefined fields when no params', () => {
-        setLocation('/auth/mobile')
-        expect(getMobileSession()).toEqual({ u: undefined, s: undefined })
+      describe('when no params are present', () => {
+        beforeEach(() => {
+          setLocation('/auth/mobile')
+        })
+
+        it('should return session with undefined fields', () => {
+          expect(getMobileSession()).toEqual({ u: undefined, s: undefined })
+        })
       })
     })
 
     describe('on /auth/callback with state param', () => {
-      it('should return session from state when isMobileFlow is true', () => {
-        const state = makeState({ isMobileFlow: true, mobileUserId: 'u1', mobileSessionId: 's1' })
-        setLocation('/auth/callback', `?state=${state}`)
-        expect(getMobileSession()).toEqual({ u: 'u1', s: 's1' })
+      describe('when isMobileFlow is true with mobile data', () => {
+        beforeEach(() => {
+          const state = makeState({ isMobileFlow: true, mobileUserId: 'u1', mobileSessionId: 's1' })
+          setLocation('/auth/callback', `?state=${state}`)
+        })
+
+        it('should return session from state', () => {
+          expect(getMobileSession()).toEqual({ u: 'u1', s: 's1' })
+        })
       })
 
-      it('should return session with undefined fields when missing from state', () => {
-        const state = makeState({ isMobileFlow: true })
-        setLocation('/auth/callback', `?state=${state}`)
-        expect(getMobileSession()).toEqual({ u: undefined, s: undefined })
+      describe('when isMobileFlow is true without mobile data', () => {
+        beforeEach(() => {
+          const state = makeState({ isMobileFlow: true })
+          setLocation('/auth/callback', `?state=${state}`)
+        })
+
+        it('should return session with undefined fields', () => {
+          expect(getMobileSession()).toEqual({ u: undefined, s: undefined })
+        })
       })
 
-      it('should return null when isMobileFlow is false', () => {
-        const state = makeState({ isMobileFlow: false, mobileUserId: 'u1' })
-        setLocation('/auth/callback', `?state=${state}`)
-        expect(getMobileSession()).toBeNull()
+      describe('when isMobileFlow is false', () => {
+        beforeEach(() => {
+          const state = makeState({ isMobileFlow: false, mobileUserId: 'u1' })
+          setLocation('/auth/callback', `?state=${state}`)
+        })
+
+        it('should return null', () => {
+          expect(getMobileSession()).toBeNull()
+        })
       })
     })
 
     describe('on other routes', () => {
-      it('should return null when no state param', () => {
+      beforeEach(() => {
         setLocation('/auth/login')
+      })
+
+      it('should return null', () => {
         expect(getMobileSession()).toBeNull()
       })
     })
 
     describe('malformed state', () => {
-      it('should return null for invalid state', () => {
-        setLocation('/auth/callback', '?state=garbage')
-        expect(getMobileSession()).toBeNull()
+      describe('when state is invalid', () => {
+        beforeEach(() => {
+          setLocation('/auth/callback', '?state=garbage')
+        })
+
+        it('should return null', () => {
+          expect(getMobileSession()).toBeNull()
+        })
       })
     })
   })
