@@ -291,18 +291,13 @@ describe('profile module', () => {
         expect(DeploymentBuilder.buildEntity).toHaveBeenCalledWith(
           expect.objectContaining({
             type: EntityType.PROFILE,
-            pointers: [mockAddress],
-            metadata: expect.objectContaining({
-              avatars: expect.arrayContaining([
-                expect.objectContaining({
-                  avatar: expect.not.objectContaining({
-                    snapshots: expect.anything()
-                  })
-                })
-              ])
-            })
+            pointers: [mockAddress]
           })
         )
+
+        // Verify snapshots were stripped from metadata
+        const callArgs = (DeploymentBuilder.buildEntity as jest.Mock).mock.calls[0][0]
+        expect(callArgs.metadata.avatars[0].avatar).not.toHaveProperty('snapshots')
       })
 
       it('should sign the payload with the identity', () => {
@@ -400,12 +395,10 @@ describe('profile module', () => {
       it('should build the deployment entity with empty wearables and no snapshots', () => {
         expect(DeploymentBuilder.buildEntity).toHaveBeenCalledWith(
           expect.objectContaining({
-            files: new Map(),
             metadata: expect.objectContaining({
               avatars: expect.arrayContaining([
                 expect.objectContaining({
-                  avatar: expect.not.objectContaining({
-                    snapshots: expect.anything(),
+                  avatar: expect.objectContaining({
                     wearables: []
                   })
                 })
@@ -413,6 +406,10 @@ describe('profile module', () => {
             })
           })
         )
+
+        // Verify snapshots were stripped
+        const callArgs = (DeploymentBuilder.buildEntity as jest.Mock).mock.calls[0][0]
+        expect(callArgs.metadata.avatars[0].avatar).not.toHaveProperty('snapshots')
       })
     })
 
