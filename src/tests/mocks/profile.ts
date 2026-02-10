@@ -31,10 +31,6 @@ export function createMockProfile(address: string = DEFAULT_MOCK_ADDRESS): Profi
         avatar: {
           bodyShape: 'urn:decentraland:off-chain:base-avatars:BaseMale',
           wearables: [],
-          snapshots: {
-            body: 'https://peer.decentraland.zone/content/body',
-            face256: 'https://peer.decentraland.zone/content/face256'
-          },
           eyes: { color: { r: 0, g: 0, b: 0 } },
           hair: { color: { r: 0, g: 0, b: 0 } },
           skin: { color: { r: 0, g: 0, b: 0 } }
@@ -51,10 +47,7 @@ export function createMockEntity(address: string = DEFAULT_MOCK_ADDRESS): Entity
     type: EntityType.PROFILE,
     pointers: [address],
     timestamp: Date.now(),
-    content: [
-      { file: 'body.png', hash: 'body-hash' },
-      { file: 'face256.png', hash: 'face-hash' }
-    ],
+    content: [],
     metadata: {
       avatars: [
         {
@@ -70,7 +63,6 @@ export function createMockEntity(address: string = DEFAULT_MOCK_ADDRESS): Entity
             bodyShape: 'urn:decentraland:off-chain:base-avatars:BaseMale',
             wearables: ['urn:decentraland:off-chain:base-avatars:eyes_00'],
             emotes: [],
-            snapshots: {},
             eyes: { color: { r: 0, g: 0, b: 0 } },
             hair: { color: { r: 0, g: 0, b: 0 } },
             skin: { color: { r: 0, g: 0, b: 0 } }

@@ -42,25 +42,6 @@ export async function deployProfileFromDefault({
   const defaultEntities = await client.fetchEntitiesByPointers([defaultProfile])
   const defaultEntity = defaultEntities[0]
 
-  // Download the content of the default profile and create the files map to be used for deploying the new profile.
-  const bodyFile = 'body.png'
-  const face256File = 'face256.png'
-
-  const contentHashesByFile = defaultEntity.content.reduce(
-    (acc, next) => ({ ...acc, [next.file]: next.hash }),
-    {} as Record<string, string>
-  )
-
-  const [bodyBuffer, faceBuffer] = await Promise.all([
-    client.downloadContent(contentHashesByFile[bodyFile]),
-    client.downloadContent(contentHashesByFile[face256File])
-  ])
-
-  const files = new Map<string, Uint8Array>()
-
-  files.set(bodyFile, bodyBuffer)
-  files.set(face256File, faceBuffer)
-
   // Both org and zone content server profiles have legacy ids for wearables and body shapes.
   // We need to map them to urns to be able to deploy the profile.
   const mapLegacyIdToUrn = (urn: string) => urn.replace('dcl://base-avatars/', 'urn:decentraland:off-chain:base-avatars:')
@@ -78,6 +59,7 @@ export async function deployProfileFromDefault({
   avatar.avatar.bodyShape = mapLegacyIdToUrn(defaultEntity.metadata.avatars[0].avatar.bodyShape)
   avatar.avatar.wearables = defaultEntity.metadata.avatars[0].avatar.wearables.map(mapLegacyIdToUrn)
   avatar.avatar.emotes = []
+  delete avatar.avatar.snapshots
 
   // Build the entity for the profile to be deployed.
   const deploymentEntity = await DeploymentBuilder.buildEntity({
@@ -85,7 +67,7 @@ export async function deployProfileFromDefault({
     pointers: [connectedAccount],
     metadata: { avatars: [avatar] },
     timestamp: Date.now(),
-    files
+    files: new Map()
   })
 
   // Deploy the profile for the currently connected account.

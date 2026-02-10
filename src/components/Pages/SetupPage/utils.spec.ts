@@ -82,12 +82,9 @@ describe('when deploying a profile based on a default profile', () => {
   let mockParams: Parameters<typeof deployProfileFromDefault>[0]
   let mockEntity: Entity
   let mockPeerUrl: string
-  let mockDownloadedBodyContent: Uint8Array
-  let mockDownloadedFace256Content: Uint8Array
   let mockBuiltEntity: DeploymentPreparationData
   let mockAuthChain: AuthLink[]
   let mockFetchEntitiesByPointers: jest.Mock
-  let mockDownloadContent: jest.Mock
   let mockDeploy: jest.Mock
 
   beforeEach(() => {
@@ -104,16 +101,7 @@ describe('when deploying a profile based on a default profile', () => {
       type: EntityType.PROFILE,
       pointers: ['default52'],
       timestamp: 1689277989804,
-      content: [
-        {
-          file: 'body.png',
-          hash: 'bafkreiabtvbkmfnxhxal5wyqewfimdn4jb4kyvs7rkcjscab2y22e7keym'
-        },
-        {
-          file: 'face256.png',
-          hash: 'bafkreig24bloh3ljvlu4w2nxl5mns2bvjfxuu7ny5nvfjg2zy4r67dqcqm'
-        }
-      ],
+      content: [],
       metadata: {
         avatars: [
           {
@@ -154,10 +142,6 @@ describe('when deploying a profile based on a default profile', () => {
                 'dcl://base-avatars/f_mouth_08'
               ],
               version: 0,
-              snapshots: {
-                body: 'bafkreiabtvbkmfnxhxal5wyqewfimdn4jb4kyvs7rkcjscab2y22e7keym',
-                face256: 'bafkreig24bloh3ljvlu4w2nxl5mns2bvjfxuu7ny5nvfjg2zy4r67dqcqm'
-              },
               emotes: []
             },
             ethAddress: '0x0000000000000000000000000000000000000000',
@@ -171,23 +155,16 @@ describe('when deploying a profile based on a default profile', () => {
 
     mockPeerUrl = 'https://peer.com'
 
-    mockDownloadedBodyContent = new Uint8Array([1, 2, 3])
-    mockDownloadedFace256Content = new Uint8Array([2, 3, 4])
     mockBuiltEntity = { entityId: 'entityId', files: new Map<string, Uint8Array>() }
     mockAuthChain = []
 
     mockConfig.get.mockReturnValueOnce(mockPeerUrl)
 
     mockFetchEntitiesByPointers = jest.fn().mockResolvedValue([mockEntity])
-    mockDownloadContent = jest.fn()
     mockDeploy = jest.fn()
-
-    mockDownloadContent.mockResolvedValueOnce(mockDownloadedBodyContent)
-    mockDownloadContent.mockResolvedValueOnce(mockDownloadedFace256Content)
 
     mockCreateContentClient.mockReturnValueOnce({
       fetchEntitiesByPointers: mockFetchEntitiesByPointers,
-      downloadContent: mockDownloadContent,
       deploy: mockDeploy
     } as unknown as ReturnType<typeof createContentClient>)
 
@@ -203,17 +180,11 @@ describe('when deploying a profile based on a default profile', () => {
 
     expect(mockFetchEntitiesByPointers).toHaveBeenCalledWith([mockParams.defaultProfile])
 
-    expect(mockDownloadContent).toHaveBeenCalledWith(mockEntity.content[0].hash)
-    expect(mockDownloadContent).toHaveBeenCalledWith(mockEntity.content[1].hash)
-
     expect(mockDeploymentBuilder.buildEntity).toHaveBeenCalledWith({
       type: EntityType.PROFILE,
       pointers: [mockParams.connectedAccount],
       timestamp: expect.any(Number),
-      files: new Map([
-        ['body.png', mockDownloadedBodyContent],
-        ['face256.png', mockDownloadedFace256Content]
-      ]),
+      files: new Map(),
       metadata: {
         avatars: [
           {
@@ -260,10 +231,6 @@ describe('when deploying a profile based on a default profile', () => {
                 'urn:decentraland:off-chain:base-avatars:f_mouth_08'
               ],
               version: 0,
-              snapshots: {
-                body: 'bafkreiabtvbkmfnxhxal5wyqewfimdn4jb4kyvs7rkcjscab2y22e7keym',
-                face256: 'bafkreig24bloh3ljvlu4w2nxl5mns2bvjfxuu7ny5nvfjg2zy4r67dqcqm'
-              },
               emotes: []
             }
           }

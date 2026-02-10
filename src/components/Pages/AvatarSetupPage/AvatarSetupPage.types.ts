@@ -1,4 +1,3 @@
-import { createContentClient } from 'dcl-catalyst-client'
 import { AuthIdentity } from '@dcl/crypto'
 
 export interface AvatarSetupState {
@@ -26,8 +25,6 @@ export interface AvatarShape {
   wearables: string[]
 }
 
-export type ContentClient = ReturnType<typeof createContentClient>
-
 export interface DeploymentParams {
   avatarShape: AvatarShape
   connectedAccount: string
@@ -35,15 +32,8 @@ export interface DeploymentParams {
   connectedAccountIdentity: AuthIdentity
 }
 
-export interface ContentHashes {
-  [filename: string]: string
-}
-
 export interface CreateAvatarMetadataParams {
   avatarShape: AvatarShape
   connectedAccount: string
   deploymentProfileName: string
-  contentHashes: ContentHashes
-  bodyFileName: string
-  face256FileName: string
 }
