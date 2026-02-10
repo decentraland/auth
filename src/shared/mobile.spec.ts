@@ -1,4 +1,4 @@
-import { isMobileSession, getMobileSession } from './mobile'
+import { isMobileSession, getMobileSession, resetMobileSession } from './mobile'
 
 function setLocation(pathname: string, search = '') {
   Object.defineProperty(window, 'location', {
@@ -13,6 +13,7 @@ function makeState(customData: Record<string, unknown>): string {
 
 describe('mobile session', () => {
   beforeEach(() => {
+    resetMobileSession()
     setLocation('/auth/login')
   })
 

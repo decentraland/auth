@@ -55,3 +55,8 @@ export function getMobileSession(): MobileSession | null {
 export function isMobileSession(): boolean {
   return getMobileSession() !== null
 }
+
+// Exported for testing only
+export function resetMobileSession(): void {
+  cachedSession = undefined
+}
