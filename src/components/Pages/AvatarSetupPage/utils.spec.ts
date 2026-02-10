@@ -1,6 +1,6 @@
 import { DeploymentBuilder, createContentClient } from 'dcl-catalyst-client'
 import { Authenticator } from '@dcl/crypto'
-import { EntityType, Entity } from '@dcl/schemas'
+import { EntityType } from '@dcl/schemas'
 import { config } from '../../../modules/config'
 import { deployProfileFromAvatarShape } from './utils'
 import { DeploymentParams, AvatarShape, Color } from './AvatarSetupPage.types'
@@ -17,14 +17,9 @@ const mockAuthenticator = Authenticator as jest.Mocked<typeof Authenticator>
 describe('deployProfileFromAvatarShape', () => {
   let mockParams: DeploymentParams
   let mockPeerUrl: string
-  let mockDefaultEntity: Entity
-  let mockBodyBuffer: Uint8Array
-  let mockFaceBuffer: Uint8Array
   let mockBuiltEntity: { entityId: string; files: Map<string, Uint8Array> }
   let mockAuthChain: Array<{ type: string; payload: string; signature: string }>
   let mockContentClient: {
-    fetchEntitiesByPointers: jest.Mock
-    downloadContent: jest.Mock
     deploy: jest.Mock
   }
   let mockAvatarShape: AvatarShape
@@ -63,67 +58,15 @@ describe('deployProfileFromAvatarShape', () => {
     }
 
     mockPeerUrl = 'https://peer.decentraland.org'
-    mockBodyBuffer = new Uint8Array([1, 2, 3, 4])
-    mockFaceBuffer = new Uint8Array([5, 6, 7, 8])
     mockBuiltEntity = {
       entityId: 'mock-entity-id',
-      files: new Map([
-        ['body.png', mockBodyBuffer],
-        ['face256.png', mockFaceBuffer]
-      ])
+      files: new Map()
     }
     mockAuthChain = [{ type: 'SIGNER', payload: 'mock-payload', signature: 'mock-signature' }]
 
-    mockDefaultEntity = {
-      version: 'v3',
-      id: 'bafkreidm7vujpipkjcrntulaqso72c74polpl6v73w4baf7dpyq6ula3lu',
-      type: EntityType.PROFILE,
-      pointers: ['default1'],
-      timestamp: 1689277989804,
-      content: [
-        {
-          file: 'body.png',
-          hash: 'bafkreibcd4qcbtizhykjnnimypg7pzbgeeyovdcf7hbgejzwhlatgknuji'
-        },
-        {
-          file: 'face256.png',
-          hash: 'bafkreicewdls4xaaudfazngdag2a3snopl4sqs32bzany7uj6hcupb6lxy'
-        }
-      ],
-      metadata: {
-        avatars: [
-          {
-            name: 'default',
-            description: '',
-            avatar: {
-              bodyShape: 'dcl://base-avatars/BaseFemale',
-              skin: { color: mockSkinColor },
-              hair: { color: mockHairColor },
-              eyes: { color: mockEyeColor },
-              wearables: ['dcl://base-avatars/colored_sweater'],
-              version: 0,
-              snapshots: {
-                body: 'bafkreibcd4qcbtizhykjnnimypg7pzbgeeyovdcf7hbgejzwhlatgknuji',
-                face256: 'bafkreicewdls4xaaudfazngdag2a3snopl4sqs32bzany7uj6hcupb6lxy'
-              },
-              emotes: []
-            },
-            ethAddress: '0x0000000000000000000000000000000000000000',
-            version: 0,
-            tutorialStep: 0,
-            hasClaimedName: false
-          }
-        ]
-      }
-    }
-
     mockContentClient = {
-      fetchEntitiesByPointers: jest.fn().mockResolvedValue([mockDefaultEntity]),
-      downloadContent: jest.fn(),
       deploy: jest.fn().mockResolvedValue(undefined)
     }
-
-    mockContentClient.downloadContent.mockResolvedValueOnce(mockBodyBuffer).mockResolvedValueOnce(mockFaceBuffer)
 
     mockConfig.get.mockReturnValue(mockPeerUrl)
     mockCreateContentClient.mockReturnValue(mockContentClient as any)
@@ -132,7 +75,7 @@ describe('deployProfileFromAvatarShape', () => {
   })
 
   describe('when all parameters are valid', () => {
-    it('should download profile and content from catalyst', async () => {
+    it('should create content client with correct URL', async () => {
       await expect(deployProfileFromAvatarShape(mockParams)).resolves.not.toThrow()
 
       expect(mockConfig.get).toHaveBeenCalledWith('PEER_URL', '')
@@ -140,19 +83,16 @@ describe('deployProfileFromAvatarShape', () => {
         url: mockPeerUrl + '/content',
         fetcher: expect.anything()
       })
-      expect(mockContentClient.fetchEntitiesByPointers).toHaveBeenCalledWith(['default1'])
-      expect(mockContentClient.downloadContent).toHaveBeenCalledWith('bafkreibcd4qcbtizhykjnnimypg7pzbgeeyovdcf7hbgejzwhlatgknuji')
-      expect(mockContentClient.downloadContent).toHaveBeenCalledWith('bafkreicewdls4xaaudfazngdag2a3snopl4sqs32bzany7uj6hcupb6lxy')
     })
 
-    it('should build entity with correct avatar metadata', async () => {
+    it('should build entity with correct avatar metadata without snapshots', async () => {
       await deployProfileFromAvatarShape(mockParams)
 
       expect(mockDeploymentBuilder.buildEntity).toHaveBeenCalledWith({
         type: EntityType.PROFILE,
         pointers: [mockParams.connectedAccount],
         timestamp: expect.any(Number),
-        files: expect.any(Map),
+        files: new Map(),
         metadata: {
           avatars: [
             {
@@ -170,11 +110,7 @@ describe('deployProfileFromAvatarShape', () => {
                 emotes: [],
                 eyes: { color: mockEyeColor },
                 skin: { color: mockSkinColor },
-                hair: { color: mockHairColor },
-                snapshots: {
-                  body: 'bafkreibcd4qcbtizhykjnnimypg7pzbgeeyovdcf7hbgejzwhlatgknuji',
-                  face256: 'bafkreicewdls4xaaudfazngdag2a3snopl4sqs32bzany7uj6hcupb6lxy'
-                }
+                hair: { color: mockHairColor }
               }
             }
           ]
@@ -196,39 +132,6 @@ describe('deployProfileFromAvatarShape', () => {
         files: mockBuiltEntity.files,
         authChain: mockAuthChain
       })
-    })
-  })
-
-  describe('when fetchEntitiesByPointers fails', () => {
-    beforeEach(() => {
-      mockContentClient.fetchEntitiesByPointers.mockRejectedValue(new Error('Failed to fetch entities'))
-    })
-
-    it('should throw an error and log the failure', async () => {
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation()
-
-      await expect(deployProfileFromAvatarShape(mockParams)).rejects.toThrow('Failed to fetch entities')
-
-      expect(consoleSpy).toHaveBeenCalledWith('Failed to deploy profile from avatar shape:', expect.any(Error))
-
-      consoleSpy.mockRestore()
-    })
-  })
-
-  describe('when downloadContent fails', () => {
-    beforeEach(() => {
-      mockContentClient.downloadContent.mockReset()
-      mockContentClient.downloadContent.mockRejectedValue(new Error('Failed to download content'))
-    })
-
-    it('should throw an error and log the failure', async () => {
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation()
-
-      await expect(deployProfileFromAvatarShape(mockParams)).rejects.toThrow('Failed to download content')
-
-      expect(consoleSpy).toHaveBeenCalledWith('Failed to deploy profile from avatar shape:', expect.any(Error))
-
-      consoleSpy.mockRestore()
     })
   })
 
