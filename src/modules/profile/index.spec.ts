@@ -48,12 +48,8 @@ jest.spyOn(console, 'error').mockImplementation(() => undefined)
 
 const createCatalystList = (...addresses: string[]) => addresses.map(address => ({ address }))
 
-type MockFetcherResponse = {
-  arrayBuffer: jest.Mock<Promise<ArrayBuffer>, []>
-}
-
 type MockFetcher = IFetchComponent & {
-  fetch: jest.Mock<Promise<MockFetcherResponse>, Parameters<IFetchComponent['fetch']>>
+  fetch: jest.Mock
 }
 
 const createMockFetcher = (): MockFetcher =>
@@ -291,22 +287,17 @@ describe('profile module', () => {
         await redeployExistingProfile(mockProfile, mockAddress, mockIdentity, [], mockFetcher)
       })
 
-      it('should build the deployment entity with the correct type and without snapshots in metadata', () => {
+      it('should build the deployment entity with correct type and no snapshots', () => {
         expect(DeploymentBuilder.buildEntity).toHaveBeenCalledWith(
           expect.objectContaining({
             type: EntityType.PROFILE,
-            pointers: [mockAddress],
-            metadata: expect.objectContaining({
-              avatars: expect.arrayContaining([
-                expect.objectContaining({
-                  avatar: expect.not.objectContaining({
-                    snapshots: expect.anything()
-                  })
-                })
-              ])
-            })
+            pointers: [mockAddress]
           })
         )
+
+        // Verify snapshots were stripped from metadata
+        const callArgs = (DeploymentBuilder.buildEntity as jest.Mock).mock.calls[0][0]
+        expect(callArgs.metadata.avatars[0].avatar).not.toHaveProperty('snapshots')
       })
 
       it('should sign the payload with the identity', () => {
@@ -401,14 +392,13 @@ describe('profile module', () => {
         expect(mockClient.fetchEntitiesByPointers).toHaveBeenCalledWith([mockAddress])
       })
 
-      it('should build the deployment entity without snapshots and empty wearables in metadata', () => {
+      it('should build the deployment entity with empty wearables and no snapshots', () => {
         expect(DeploymentBuilder.buildEntity).toHaveBeenCalledWith(
           expect.objectContaining({
             metadata: expect.objectContaining({
               avatars: expect.arrayContaining([
                 expect.objectContaining({
-                  avatar: expect.not.objectContaining({
-                    snapshots: expect.anything(),
+                  avatar: expect.objectContaining({
                     wearables: []
                   })
                 })
@@ -416,6 +406,10 @@ describe('profile module', () => {
             })
           })
         )
+
+        // Verify snapshots were stripped
+        const callArgs = (DeploymentBuilder.buildEntity as jest.Mock).mock.calls[0][0]
+        expect(callArgs.metadata.avatars[0].avatar).not.toHaveProperty('snapshots')
       })
     })
 
