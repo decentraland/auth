@@ -81,8 +81,21 @@ export const LoginPage = () => {
   // Store address from email login for clock sync continuation
   const [emailLoginAddress, setEmailLoginAddress] = useState<string | null>(null)
 
-  // TODO: remove /play from redirectTo
-  const showGuestOption = redirectTo && new URL(redirectTo).pathname.includes('/play')
+  // TODO: remove /play from redirectTo. Build guest URL only when redirect path includes /play; use its presence to show the option.
+  const guestRedirectToURL = useMemo(() => {
+    if (!redirectTo) return ''
+    try {
+      const url = redirectTo.startsWith('/') ? new URL(redirectTo, window.location.origin) : new URL(redirectTo)
+      if (!url.pathname.includes('/play')) return ''
+      url.searchParams.append('guest', 'true')
+      return url.toString()
+    } catch {
+      return ''
+    }
+  }, [redirectTo])
+
+  const showGuestOption = !!guestRedirectToURL
+
   const [currentBackgroundIndex, setCurrentBackgroundIndex] = useState(0)
   const [targetConfig] = useTargetConfig()
   const { checkProfileAndRedirect } = useAuthFlow()
@@ -91,15 +104,6 @@ export const LoginPage = () => {
   const handleGuestLogin = useCallback(async () => {
     await trackGuestLogin()
   }, [trackGuestLogin])
-
-  const guestRedirectToURL = useMemo(() => {
-    if (redirectTo) {
-      const playUrl = new URL(redirectTo)
-      playUrl.searchParams.append('guest', 'true')
-      return playUrl.toString()
-    }
-    return ''
-  }, [redirectTo])
 
   const checkClockSynchronization = useCallback(async (): Promise<boolean> => {
     try {
