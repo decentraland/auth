@@ -16,6 +16,12 @@ export class RequestNotFoundError extends Error {
   }
 }
 
+export class RequestFulfilledError extends Error {
+  constructor(public readonly requestId: string) {
+    super(`The request ${requestId} has already been fulfilled`)
+  }
+}
+
 export class IpValidationError extends Error {
   constructor(public readonly requestId: string, public readonly reason: string) {
     super(`IP validation failed: ${reason}`)

@@ -3,7 +3,7 @@ import { RequestInteractionType, TrackingEvents } from '../../modules/analytics/
 import { config } from '../../modules/config'
 import { trackEvent } from '../utils/analytics'
 import { handleError } from '../utils/errorHandler'
-import { DifferentSenderError, ExpiredRequestError, RequestNotFoundError, IpValidationError } from './errors'
+import { DifferentSenderError, ExpiredRequestError, RequestNotFoundError, RequestFulfilledError, IpValidationError } from './errors'
 import { OutcomeError, OutcomeResponse, RecoverResponse, ValidationResponse } from './types'
 
 export const createAuthServerWsClient = (authServerUrl?: string) => {
@@ -24,7 +24,9 @@ export const createAuthServerWsClient = (authServerUrl?: string) => {
     // Close client, we don't need it anymore
     socket.close()
 
-    if (response.error?.includes('not found')) {
+    if (response.error?.includes('already been fulfilled')) {
+      throw new RequestFulfilledError(message.requestId)
+    } else if (response.error?.includes('not found')) {
       throw new RequestNotFoundError(message.requestId)
     } else if (response.error?.includes('has expired')) {
       throw new ExpiredRequestError(message.requestId)
@@ -106,13 +108,16 @@ export const createAuthServerWsClient = (authServerUrl?: string) => {
 
       return response
     } catch (e) {
-      handleError(e, 'Error recovering request', {
-        trackingData: {
-          browserTime: Date.now(),
-          requestType: response?.method ?? 'Unknown'
-        },
-        trackingEvent: TrackingEvents.REQUEST_LOADING_ERROR
-      })
+      // Don't report fulfilled requests to Sentry — they are an expected state after successful login
+      if (!(e instanceof RequestFulfilledError)) {
+        handleError(e, 'Error recovering request', {
+          trackingData: {
+            browserTime: Date.now(),
+            requestType: response?.method ?? 'Unknown'
+          },
+          trackingEvent: TrackingEvents.REQUEST_LOADING_ERROR
+        })
+      }
       throw e
     }
   }

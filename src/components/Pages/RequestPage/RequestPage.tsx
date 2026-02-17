@@ -22,6 +22,7 @@ import {
   ExpiredRequestError,
   DifferentSenderError,
   IpValidationError,
+  RequestFulfilledError,
   TimedOutError
 } from '../../../shared/auth'
 import { useCurrentConnectionData } from '../../../shared/connection'
@@ -130,6 +131,7 @@ export const RequestPage = () => {
   const requestRef = useRef<RecoverResponse>()
   const viewRef = useRef(view)
   viewRef.current = view
+  const hasCompletedRef = useRef(false)
   const [error, setError] = useState<string>()
   const [identityId, setIdentityId] = useState<string>()
   const timeoutRef = useRef<NodeJS.Timeout>()
@@ -184,7 +186,7 @@ export const RequestPage = () => {
     // Don't re-fetch if we're already in a terminal view (completed, denied, error, etc.)
     // This prevents the bug where after approving, dependency changes cause a re-fetch
     // of an already-consumed request
-    if (TERMINAL_VIEWS.has(viewRef.current)) {
+    if (TERMINAL_VIEWS.has(viewRef.current) || hasCompletedRef.current) {
       return
     }
 
@@ -319,7 +321,11 @@ export const RequestPage = () => {
             setView(View.WALLET_INTERACTION)
         }
       } catch (e) {
-        if (e instanceof DifferentSenderError) {
+        if (e instanceof RequestFulfilledError) {
+          // Request was already consumed successfully — not an error, stop re-fetching
+          hasCompletedRef.current = true
+          return
+        } else if (e instanceof DifferentSenderError) {
           setView(View.DIFFERENT_ACCOUNT)
           return
         } else if (e instanceof ExpiredRequestError) {
@@ -369,6 +375,7 @@ export const RequestPage = () => {
         })
       }
     } finally {
+      hasCompletedRef.current = true
       setIsLoading(false)
       setView(View.VERIFY_SIGN_IN_DENIED)
     }
@@ -414,6 +421,7 @@ export const RequestPage = () => {
         console.log('Traditional flow - Sending outcome to server...')
         await authServerClient.current.sendSuccessfulOutcome(requestId, await signer.getAddress(), signature)
         console.log('Traditional flow - Outcome sent')
+        hasCompletedRef.current = true
         setView(View.VERIFY_SIGN_IN_COMPLETE)
         if (targetConfig.deepLink) {
           window.location.href = targetConfig.deepLink
@@ -461,6 +469,7 @@ export const RequestPage = () => {
       console.error('Failed to send denied notification:', error)
     }
 
+    hasCompletedRef.current = true
     setIsLoading(false)
     // Set appropriate view based on whether it's an NFT transfer or MANA transfer
     if (nftTransferData) {
@@ -519,6 +528,7 @@ export const RequestPage = () => {
         method: requestRef.current?.method
       })
       await authServerClient.current.sendSuccessfulOutcome(requestId, signerAddress, result)
+      hasCompletedRef.current = true
 
       if (nftTransferData) {
         console.log('Setting view to WALLET_NFT_INTERACTION_COMPLETE')
