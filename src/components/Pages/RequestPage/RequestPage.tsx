@@ -321,11 +321,7 @@ export const RequestPage = () => {
             setView(View.WALLET_INTERACTION)
         }
       } catch (e) {
-        if (e instanceof RequestFulfilledError) {
-          // Request was already consumed successfully — not an error, stop re-fetching
-          hasCompletedRef.current = true
-          return
-        } else if (e instanceof DifferentSenderError) {
+        if (e instanceof DifferentSenderError) {
           setView(View.DIFFERENT_ACCOUNT)
           return
         } else if (e instanceof ExpiredRequestError) {
@@ -334,6 +330,10 @@ export const RequestPage = () => {
         } else if (e instanceof IpValidationError) {
           setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
           setView(View.IP_VALIDATION_ERROR)
+          return
+        } else if (e instanceof RequestFulfilledError) {
+          // Request was already consumed successfully — not an error, stop re-fetching
+          hasCompletedRef.current = true
           return
         }
 
