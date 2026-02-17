@@ -1,5 +1,6 @@
 import { useCallback, useContext, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { RPCError } from 'magic-sdk'
 import { ProviderType } from '@dcl/schemas'
 import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
@@ -10,7 +11,7 @@ import { ConnectionType } from '../../../modules/analytics/types'
 import { extractReferrerFromSearchParameters, locations } from '../../../shared/locations'
 import { isMobileSession } from '../../../shared/mobile'
 import { handleError } from '../../../shared/utils/errorHandler'
-import { createMagicInstance } from '../../../shared/utils/magicSdk'
+import { createMagicInstance, OAUTH_ACCESS_DENIED_ERROR } from '../../../shared/utils/magicSdk'
 import { ConnectionLayout } from '../../ConnectionModal/ConnectionLayout'
 import { ConnectionLayoutState } from '../../ConnectionModal/ConnectionLayout.type'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
@@ -84,6 +85,15 @@ const DesktopCallbackPage = () => {
   )
 
   const logInAndRedirect = useCallback(async () => {
+    // Check for OAuth error in URL params before getRedirectResult() strips them
+    const oauthError = new URLSearchParams(window.location.search).get('error')
+
+    if (oauthError === OAUTH_ACCESS_DENIED_ERROR) {
+      // User cancelled at the OAuth provider — not an error, go back to login
+      navigate(locations.login())
+      return
+    }
+
     try {
       const magic = await createMagicInstance(!!flags[FeatureFlagsKeys.MAGIC_TEST])
       const referrer = extractReferrerFromSearchParameters(searchParams)
@@ -97,7 +107,13 @@ const DesktopCallbackPage = () => {
       handleContinue(referrer)
     } catch (error) {
       handleError(error, 'Error logging in with Magic SDK', {
-        skipTracking: false
+        skipTracking: false,
+        sentryExtra: {
+          oauthError: oauthError ?? undefined,
+          magicRpcCode: error instanceof RPCError ? String(error.code) : undefined,
+          magicRpcRawMessage: error instanceof RPCError ? error.rawMessage : undefined,
+          magicRpcData: error instanceof RPCError ? JSON.stringify(error.data) : undefined
+        }
       })
       navigate(locations.login())
     }
