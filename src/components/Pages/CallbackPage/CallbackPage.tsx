@@ -8,7 +8,7 @@ import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { useAnalytics } from '../../../hooks/useAnalytics'
 import { useAuthFlow } from '../../../hooks/useAuthFlow'
 import { ConnectionType } from '../../../modules/analytics/types'
-import { extractReferrerFromSearchParameters, locations } from '../../../shared/locations'
+import { extractRedirectToFromSearchParameters, extractReferrerFromSearchParameters, locations } from '../../../shared/locations'
 import { isMobileSession } from '../../../shared/mobile'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { createMagicInstance, OAUTH_ACCESS_DENIED_ERROR } from '../../../shared/utils/magicSdk'
@@ -90,7 +90,12 @@ const DesktopCallbackPage = () => {
 
     if (oauthError === OAUTH_ACCESS_DENIED_ERROR) {
       // User cancelled at the OAuth provider — not an error, go back to login
-      navigate(locations.login())
+      // Preserve the original redirectTo and referrer from the OAuth state so the next login attempt
+      // still redirects to the correct destination (e.g., Marketplace)
+      const callbackParams = new URLSearchParams(window.location.search)
+      const redirectTo = extractRedirectToFromSearchParameters(callbackParams)
+      const referrer = extractReferrerFromSearchParameters(callbackParams)
+      navigate(locations.login({ redirectTo, referrer }))
       return
     }
 
