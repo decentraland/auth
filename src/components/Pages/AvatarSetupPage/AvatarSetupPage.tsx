@@ -19,6 +19,7 @@ import { useCurrentConnectionData } from '../../../shared/connection/hooks'
 import { locations } from '../../../shared/locations'
 import { isProfileComplete } from '../../../shared/profile'
 import { handleError } from '../../../shared/utils/errorHandler'
+import { AnimatedBackground } from '../../AnimatedBackground'
 import { CharacterCounterComponent } from '../../CharacterCounter'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import { subscribeToNewsletter } from '../SetupPage/utils'
@@ -340,6 +341,7 @@ const AvatarSetupPage: React.FC = () => {
   if (!initialized) {
     return (
       <MainContainer>
+        <AnimatedBackground style={{ position: 'absolute', width: '100%', height: '100%' }} />
         <LoadingContainer>
           <DecentralandLogo />
           <LoadingTitle variant="h3">Confirming login...</LoadingTitle>
@@ -353,6 +355,7 @@ const AvatarSetupPage: React.FC = () => {
 
   return (
     <MainContainer>
+      <AnimatedBackground style={{ position: 'absolute', width: '100%', height: '100%' }} />
       <BackgroundShadow />
       <LeftFormSection>
         <DecentralandLogo />

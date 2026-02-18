@@ -1,4 +1,5 @@
 import { Logo, CircularProgress } from 'decentraland-ui2'
+import { AnimatedBackground } from '../../AnimatedBackground'
 import styles from './ConfirmingLogin.module.css'
 
 export type ConfirmingLoginProps = {
@@ -10,7 +11,7 @@ export const ConfirmingLogin = ({ error, onError }: ConfirmingLoginProps) => {
   if (error) {
     return (
       <div className={styles.container}>
-        <div className={styles.background} />
+        <AnimatedBackground style={{ position: 'absolute', width: '100%', height: '100%', zIndex: -1 }} />
         <div className={styles.content}>
           <Logo size="huge" />
           <p className={styles.title}>Something went wrong</p>
@@ -27,7 +28,7 @@ export const ConfirmingLogin = ({ error, onError }: ConfirmingLoginProps) => {
 
   return (
     <div className={styles.container}>
-      <div className={styles.background} />
+      <AnimatedBackground style={{ position: 'absolute', width: '100%', height: '100%', zIndex: -1 }} />
       <div className={styles.content}>
         <Logo size="huge" />
         <p className={styles.title}>Confirming login...</p>

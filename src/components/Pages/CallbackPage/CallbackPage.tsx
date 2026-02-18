@@ -16,6 +16,7 @@ import { ConnectionLayoutState } from '../../ConnectionModal/ConnectionLayout.ty
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import { getIdentitySignature } from '../LoginPage/utils'
 import { MobileCallbackPage } from '../MobileCallbackPage/MobileCallbackPage'
+import { AnimatedBackground } from '../../AnimatedBackground'
 import { Container, Wrapper } from './CallbackPage.styled'
 
 export const CallbackPage = () => {
@@ -112,6 +113,7 @@ const DesktopCallbackPage = () => {
 
   return (
     <Container>
+      <AnimatedBackground style={{ position: 'absolute', width: '100%', height: '100%' }} />
       <Wrapper>
         <ConnectionLayout
           state={ConnectionLayoutState.VALIDATING_SIGN_IN}
