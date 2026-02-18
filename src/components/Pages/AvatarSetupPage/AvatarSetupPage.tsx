@@ -341,7 +341,7 @@ const AvatarSetupPage: React.FC = () => {
   if (!initialized) {
     return (
       <MainContainer>
-        <AnimatedBackground style={{ position: 'absolute', width: '100%', height: '100%' }} />
+        <AnimatedBackground variant="absolute" />
         <LoadingContainer>
           <DecentralandLogo />
           <LoadingTitle variant="h3">Confirming login...</LoadingTitle>
@@ -355,7 +355,7 @@ const AvatarSetupPage: React.FC = () => {
 
   return (
     <MainContainer>
-      <AnimatedBackground style={{ position: 'absolute', width: '100%', height: '100%' }} />
+      <AnimatedBackground variant="absolute" />
       <BackgroundShadow />
       <LeftFormSection>
         <DecentralandLogo />

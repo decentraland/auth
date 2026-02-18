@@ -11,7 +11,7 @@ export const ConfirmingLogin = ({ error, onError }: ConfirmingLoginProps) => {
   if (error) {
     return (
       <div className={styles.container}>
-        <AnimatedBackground style={{ position: 'absolute', width: '100%', height: '100%', zIndex: -1 }} />
+        <AnimatedBackground variant="absolute" />
         <div className={styles.content}>
           <Logo size="huge" />
           <p className={styles.title}>Something went wrong</p>
@@ -28,7 +28,7 @@ export const ConfirmingLogin = ({ error, onError }: ConfirmingLoginProps) => {
 
   return (
     <div className={styles.container}>
-      <AnimatedBackground style={{ position: 'absolute', width: '100%', height: '100%', zIndex: -1 }} />
+      <AnimatedBackground variant="absolute" />
       <div className={styles.content}>
         <Logo size="huge" />
         <p className={styles.title}>Confirming login...</p>
