@@ -19,4 +19,7 @@ const getMagicApiKey = (isTest: boolean): string => {
   return config.apiKey
 }
 
-export { createMagicInstance, getMagicApiKey }
+// OAuth error code returned in the redirect URL when the user cancels at the provider
+const OAUTH_ACCESS_DENIED_ERROR = 'access_denied'
+
+export { createMagicInstance, getMagicApiKey, OAUTH_ACCESS_DENIED_ERROR }

@@ -1,7 +1,8 @@
 import { useCallback, useRef } from 'react'
 import { BrowserProvider } from 'ethers'
 import type { Provider } from 'decentraland-connect'
-import { createAuthServerWsClient, ExpiredRequestError, IpValidationError, RecoverResponse } from '../shared/auth'
+import { createAuthServerWsClient, ExpiredRequestError, IpValidationError, RequestFulfilledError, RecoverResponse } from '../shared/auth'
+import { isErrorWithMessage } from '../shared/errors'
 import { handleError } from '../shared/utils/errorHandler'
 
 interface SignRequestErrorHandlers {
@@ -29,7 +30,10 @@ export const useSignRequest = (redirect: () => void, errorHandlers?: SignRequest
           return
         }
       } catch (e) {
-        if (e instanceof ExpiredRequestError) {
+        if (e instanceof RequestFulfilledError) {
+          // Request was already consumed successfully — not an error, silently ignore
+          return
+        } else if (e instanceof ExpiredRequestError) {
           if (errorHandlers?.onExpiredRequest) {
             errorHandlers.onExpiredRequest()
           } else {
@@ -43,7 +47,8 @@ export const useSignRequest = (redirect: () => void, errorHandlers?: SignRequest
             errorHandlers.onRecoverError(errorMessage)
           }
         } else {
-          const errorMessage = handleError(e, 'Error recovering request')
+          // Don't call handleError here — wsClient.recover() already reported to Sentry
+          const errorMessage = isErrorWithMessage(e) ? e.message : 'Unknown error'
           if (errorHandlers?.onRecoverError) {
             errorHandlers.onRecoverError(errorMessage)
           }
