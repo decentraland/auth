@@ -14,7 +14,7 @@
     "check:code": "eslint -c .eslintrc.cjs src",
     "fix:code": "npm run check:code -- --fix",
     "pre-commit:fix:code": "eslint -c .eslintrc.cjs --fix",
-    "prepare": "husky install"
+    "prepare": "husky"
   },
   "engines": {
     "node": ">=20.0.0",
@@ -66,7 +66,7 @@
     "dotenv": "^16.3.1",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.3",
-    "husky": "^8.0.3",
+    "husky": "9.1.7",
     "identity-obj-proxy": "^3.0.0",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",

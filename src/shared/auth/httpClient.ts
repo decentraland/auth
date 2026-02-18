@@ -4,7 +4,7 @@ import { RequestInteractionType, TrackingEvents } from '../../modules/analytics/
 import { config } from '../../modules/config'
 import { trackEvent } from '../utils/analytics'
 import { handleError } from '../utils/errorHandler'
-import { DifferentSenderError, ExpiredRequestError, RequestNotFoundError, IpValidationError } from './errors'
+import { DifferentSenderError, ExpiredRequestError, RequestNotFoundError, RequestFulfilledError, IpValidationError } from './errors'
 import { IdentityResponse, OutcomeError, OutcomeResponse, RecoverResponse } from './types'
 export const createAuthServerHttpClient = (authServerUrl?: string) => {
   const baseUrl = authServerUrl ?? config.get('AUTH_SERVER_URL')
@@ -17,7 +17,9 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
       throw new Error('Unknown error')
     }
 
-    if (data.error?.includes('not found')) {
+    if (data.error?.includes('already been fulfilled')) {
+      throw new RequestFulfilledError(requestId)
+    } else if (data.error?.includes('not found')) {
       throw new RequestNotFoundError(requestId)
     } else if (data.error?.includes('has expired')) {
       throw new ExpiredRequestError(requestId)
@@ -167,13 +169,16 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
 
       return recoverResponse
     } catch (e) {
-      handleError(e, 'Error recovering request', {
-        trackingData: {
-          browserTime: Date.now(),
-          requestType: recoverResponse?.method ?? 'Unknown'
-        },
-        trackingEvent: TrackingEvents.REQUEST_LOADING_ERROR
-      })
+      // Don't report fulfilled requests to Sentry — they are an expected state after successful login
+      if (!(e instanceof RequestFulfilledError)) {
+        handleError(e, 'Error recovering request', {
+          trackingData: {
+            browserTime: Date.now(),
+            requestType: recoverResponse?.method ?? 'Unknown'
+          },
+          trackingEvent: TrackingEvents.REQUEST_LOADING_ERROR
+        })
+      }
       throw e
     }
   }
