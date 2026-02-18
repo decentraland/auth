@@ -1,5 +1,6 @@
 import { useCallback, useContext, useEffect, useState } from 'react'
 import ArrowBackIosNewTwoToneIcon from '@mui/icons-material/ArrowBackIosNewTwoTone'
+import { RPCError } from 'magic-sdk'
 import { ProviderType } from '@dcl/schemas'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import { connection } from 'decentraland-connect'
@@ -10,7 +11,7 @@ import { useTargetConfig } from '../../../hooks/targetConfig'
 import { createAuthServerHttpClient } from '../../../shared/auth'
 import { locations } from '../../../shared/locations'
 import { handleError } from '../../../shared/utils/errorHandler'
-import { createMagicInstance } from '../../../shared/utils/magicSdk'
+import { createMagicInstance, OAUTH_ACCESS_DENIED_ERROR } from '../../../shared/utils/magicSdk'
 import { ConnectionContainer, ConnectionTitle, DecentralandLogo, ProgressContainer } from '../../ConnectionModal/ConnectionLayout.styled'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import { getIdentitySignature } from '../LoginPage/utils'
@@ -27,6 +28,14 @@ export const MobileCallbackPage = () => {
   const [error, setError] = useState<string | null>(null)
 
   const processOAuthCallback = useCallback(async () => {
+    // Check for OAuth error in URL params before getRedirectResult() strips them
+    const oauthError = new URLSearchParams(window.location.search).get('error')
+    if (oauthError === OAUTH_ACCESS_DENIED_ERROR) {
+      // User cancelled at the OAuth provider — not an error, go back to mobile login
+      navigate(locations.mobile())
+      return
+    }
+
     try {
       // Get OAuth result from Magic
       const magic = await createMagicInstance(!!flags[FeatureFlagsKeys.MAGIC_TEST])
@@ -52,6 +61,12 @@ export const MobileCallbackPage = () => {
       handleError(err, 'Mobile OAuth callback error', {
         sentryTags: {
           isMobileFlow: true
+        },
+        sentryExtra: {
+          oauthError: oauthError ?? undefined,
+          magicRpcCode: err instanceof RPCError ? String(err.code) : undefined,
+          magicRpcRawMessage: err instanceof RPCError ? err.rawMessage : undefined,
+          magicRpcData: err instanceof RPCError ? JSON.stringify(err.data) : undefined
         }
       })
       setError(err instanceof Error ? err.message : 'Authentication failed')
