@@ -8,10 +8,11 @@ import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { useAnalytics } from '../../../hooks/useAnalytics'
 import { useAuthFlow } from '../../../hooks/useAuthFlow'
 import { ConnectionType } from '../../../modules/analytics/types'
-import { extractRedirectToFromSearchParameters, extractReferrerFromSearchParameters, locations } from '../../../shared/locations'
+import { extractReferrerFromSearchParameters, locations } from '../../../shared/locations'
 import { isMobileSession } from '../../../shared/mobile'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { createMagicInstance, OAUTH_ACCESS_DENIED_ERROR } from '../../../shared/utils/magicSdk'
+import { AnimatedBackground } from '../../AnimatedBackground'
 import { ConnectionLayout } from '../../ConnectionModal/ConnectionLayout'
 import { ConnectionLayoutState } from '../../ConnectionModal/ConnectionLayout.type'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
@@ -29,7 +30,7 @@ export const CallbackPage = () => {
 }
 
 const DesktopCallbackPage = () => {
-  const { redirect } = useAfterLoginRedirection()
+  const { redirect, url: redirectTo } = useAfterLoginRedirection()
   const navigate = useNavigateWithSearchParams()
   const [searchParams] = useSearchParams()
   const [logInStarted, setLogInStarted] = useState(false)
@@ -90,12 +91,9 @@ const DesktopCallbackPage = () => {
 
     if (oauthError === OAUTH_ACCESS_DENIED_ERROR) {
       // User cancelled at the OAuth provider — not an error, go back to login
-      // Preserve the original redirectTo and referrer from the OAuth state so the next login attempt
+      // Preserve the original redirectTo from the OAuth state so the next login attempt
       // still redirects to the correct destination (e.g., Marketplace)
-      const callbackParams = new URLSearchParams(window.location.search)
-      const redirectTo = extractRedirectToFromSearchParameters(callbackParams)
-      const referrer = extractReferrerFromSearchParameters(callbackParams)
-      navigate(locations.login({ redirectTo, referrer }))
+      navigate(locations.login({ redirectTo }))
       return
     }
 
@@ -122,7 +120,7 @@ const DesktopCallbackPage = () => {
       })
       navigate(locations.login())
     }
-  }, [navigate, handleContinue, flags[FeatureFlagsKeys.MAGIC_TEST], searchParams])
+  }, [navigate, handleContinue, flags[FeatureFlagsKeys.MAGIC_TEST], searchParams, redirectTo])
 
   useEffect(() => {
     if (!logInStarted && initialized) {
@@ -133,6 +131,7 @@ const DesktopCallbackPage = () => {
 
   return (
     <Container>
+      <AnimatedBackground variant="absolute" />
       <Wrapper>
         <ConnectionLayout
           state={ConnectionLayoutState.VALIDATING_SIGN_IN}
