@@ -76,6 +76,12 @@ export async function connectToSocialProvider(
       extensions: [new OAuthExtension()]
     })
 
+    // Clear existing session before starting new OAuth flow (mirrors MobileAuthPage fix)
+    if (await magic.user.isLoggedIn()) {
+      console.log('Existing session found, logging out before redirect')
+      await magic.user.logout()
+    }
+
     const url = new URL(window.location.href)
     const search = new URLSearchParams(window.location.search)
     const referrer = extractReferrerFromSearchParameters(search)
