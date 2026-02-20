@@ -2,17 +2,12 @@ import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined'
 import Lottie from 'lottie-react'
 import { brand, neutral } from 'decentraland-ui2/dist/theme/colors'
 import { Logo, Box, styled, Typography, TextField, Checkbox, FormControlLabel, Button, Link } from 'decentraland-ui2'
-import CustomWelcomeBackground from '../../../assets/images/background/custom-welcome-background.webp'
 import SetupRightBackground from '../../../assets/images/setup-right-background.webp'
 
 const MainContainer = styled(Box)({
   display: 'flex',
   height: '100vh',
   minHeight: '700px',
-  backgroundImage: `url(${CustomWelcomeBackground})`,
-  backgroundSize: 'cover',
-  backgroundPosition: 'center',
-  backgroundRepeat: 'no-repeat',
   fontFamily: 'Arial, sans-serif',
   position: 'relative',
   overflow: 'hidden'

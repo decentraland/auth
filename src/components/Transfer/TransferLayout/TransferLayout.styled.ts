@@ -1,15 +1,4 @@
 import { Box, styled } from 'decentraland-ui2'
-import customWelcomeBackground from '../../../assets/images/background/custom-welcome-background.webp'
-
-const Background = styled(Box)({
-  backgroundImage: `url(${customWelcomeBackground})`,
-  backgroundPosition: 'right',
-  backgroundRepeat: 'no-repeat',
-  backgroundSize: 'cover',
-  height: '100vh',
-  position: 'fixed',
-  width: '100vw'
-})
 
 const LayoutRoot = styled(Box)({
   position: 'relative',
@@ -29,4 +18,4 @@ const Main = styled(Box)(({ theme }) => ({
   width: '100%'
 }))
 
-export { Background, LayoutRoot, Main }
+export { LayoutRoot, Main }

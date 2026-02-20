@@ -5,6 +5,7 @@ import { connection } from 'decentraland-connect'
 import { useNavigateWithSearchParams } from '../../../../hooks/navigation'
 import { useTargetConfig } from '../../../../hooks/targetConfig'
 import { useCurrentConnectionData } from '../../../../shared/connection/hooks'
+import { AnimatedBackground } from '../../../AnimatedBackground'
 import { CustomWearablePreview } from '../../../CustomWearablePreview'
 import styles from './Container.module.css'
 
@@ -35,7 +36,7 @@ export const Container = (props: { children: ReactNode; requestId?: string; canC
 
   return (
     <div>
-      <div className={styles.background} />
+      <AnimatedBackground />
       <div className={styles.main}>
         <div className={styles.left}>
           {children}

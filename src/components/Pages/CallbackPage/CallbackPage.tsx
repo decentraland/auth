@@ -12,6 +12,7 @@ import { extractReferrerFromSearchParameters, locations } from '../../../shared/
 import { isMobileSession } from '../../../shared/mobile'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { createMagicInstance, OAUTH_ACCESS_DENIED_ERROR } from '../../../shared/utils/magicSdk'
+import { AnimatedBackground } from '../../AnimatedBackground'
 import { ConnectionLayout } from '../../ConnectionModal/ConnectionLayout'
 import { ConnectionLayoutState } from '../../ConnectionModal/ConnectionLayout.type'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
@@ -130,6 +131,7 @@ const DesktopCallbackPage = () => {
 
   return (
     <Container>
+      <AnimatedBackground variant="absolute" />
       <Wrapper>
         <ConnectionLayout
           state={ConnectionLayoutState.VALIDATING_SIGN_IN}
