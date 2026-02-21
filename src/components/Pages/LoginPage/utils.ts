@@ -76,6 +76,13 @@ export async function connectToSocialProvider(
       extensions: [new OAuthExtension()]
     })
 
+    // Clear existing session before starting new OAuth flow (mirrors MobileAuthPage fix)
+    if (await magic.user.isLoggedIn()) {
+      await magic.user.logout()
+      localStorage.removeItem('dcl_magic_user_email')
+      await connection.disconnect()
+    }
+
     const url = new URL(window.location.href)
     const search = new URLSearchParams(window.location.search)
     const referrer = extractReferrerFromSearchParameters(search)
