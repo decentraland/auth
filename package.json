@@ -30,14 +30,14 @@
     "@dcl/schemas": "^22.1.0",
     "@dcl/single-sign-on-client": "^0.1.0",
     "@dcl/ui-env": "^1.4.0",
-    "@magic-ext/oauth2": "15.3.2-canary.1040.22248562051.0",
+    "@magic-ext/oauth2": "^9.21.0",
     "@sentry/react": "^9.1.0",
     "ajv": "^8.12.0",
     "classnames": "^2.3.2",
     "dcl-catalyst-client": "^21.10.1",
     "decentraland-connect": "^11.2.0",
     "decentraland-crypto-fetch": "^2.0.1",
-    "decentraland-transactions": "^2.24.1",
+    "decentraland-transactions": "^3.0.2",
     "decentraland-ui": "^7.1.0",
     "decentraland-ui2": "^1.2.1",
     "ethers": "^6.8.0",
@@ -75,9 +75,6 @@
     "typescript": "^5.0.2",
     "vite": "^6.1.1",
     "vite-plugin-node-polyfills": "^0.23.0"
-  },
-  "overrides": {
-    "@magic-ext/oauth2": "15.3.2-canary.1040.22248562051.0"
   },
   "homepage": ""
 }
