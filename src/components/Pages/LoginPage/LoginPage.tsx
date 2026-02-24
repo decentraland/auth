@@ -283,8 +283,12 @@ export const LoginPage = () => {
         // Generate identity using the thirdweb account's signMessage
         await getIdentityWithSigner(address, async (message: string) => account.signMessage({ message }))
 
-        // Store connection data for marketplace to reconnect later
-        connection.storeConnectionData(ProviderType.THIRDWEB, ChainId.ETHEREUM_MAINNET)
+        // Establish the full thirdweb connection so that connection.connector is set in memory.
+        // This ensures SetupPage's tryPreviousConnection() finds the active connector
+        // and returns immediately without needing autoConnect() to restore the session.
+        // (storeConnectionData only writes metadata to localStorage but doesn't set the connector,
+        // causing autoConnect to fail when SetupPage tries to re-establish the connection.)
+        await connection.connect(ProviderType.THIRDWEB, ChainId.ETHEREUM_MAINNET)
 
         await trackLoginSuccess({
           ethAddress: address,
