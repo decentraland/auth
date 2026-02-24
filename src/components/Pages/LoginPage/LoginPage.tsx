@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo, useEffect, useContext } from 'react'
 import classNames from 'classnames'
 import { ChainId } from '@dcl/schemas/dist/dapps/chain-id'
 import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
+import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
 import { Env } from '@dcl/ui-env'
 import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
 import { connection } from 'decentraland-connect'
@@ -31,7 +32,7 @@ import { config } from '../../../modules/config'
 import { createAuthServerHttpClient } from '../../../shared/auth'
 import { isErrorWithName } from '../../../shared/errors'
 import { extractReferrerFromSearchParameters } from '../../../shared/locations'
-import { sendEmailOTP } from '../../../shared/thirdweb'
+import { disconnectWallet, sendEmailOTP } from '../../../shared/thirdweb'
 import { isClockSynchronized } from '../../../shared/utils/clockSync'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { ClockSyncModal } from '../../ClockSyncModal'
@@ -137,6 +138,14 @@ export const LoginPage = () => {
         method: ConnectionOptionType.EMAIL,
         type: ConnectionType.WEB2
       })
+
+      // Avoid stale connection/account from a previous wallet session.
+      try {
+        await connection.disconnect()
+        await disconnectWallet()
+      } catch {
+        // Keep the flow going even if cleanup fails.
+      }
 
       try {
         // Send OTP to email
@@ -281,10 +290,17 @@ export const LoginPage = () => {
         setEmailLoginAddress(address)
 
         // Generate identity using the thirdweb account's signMessage
-        await getIdentityWithSigner(address, async (message: string) => account.signMessage({ message }))
+        const freshIdentity = await getIdentityWithSigner(address, async (message: string) => account.signMessage({ message }))
 
-        // Store connection data for marketplace to reconnect later
-        connection.storeConnectionData(ProviderType.THIRDWEB, ChainId.ETHEREUM_MAINNET)
+        // Ensure connector session matches the OTP-authenticated account.
+        const thirdwebConnection = await connection.connect(ProviderType.THIRDWEB, ChainId.ETHEREUM_MAINNET)
+        const connectedAddress = thirdwebConnection.account?.toLowerCase() ?? ''
+        if (!connectedAddress) {
+          throw new Error('Thirdweb connection did not return a connected account')
+        }
+        if (connectedAddress !== address) {
+          throw new Error('Detected a different account session than the verified email. Please try logging in again.')
+        }
 
         await trackLoginSuccess({
           ethAddress: address,
@@ -297,10 +313,15 @@ export const LoginPage = () => {
         const isClockSync = await checkClockSynchronization()
 
         if (isClockSync) {
-          await checkProfileAndRedirect(address, referrer, () => {
-            redirect()
-            setShowConfirmingLogin(false)
-          })
+          await checkProfileAndRedirect(
+            address,
+            referrer,
+            () => {
+              redirect()
+              setShowConfirmingLogin(false)
+            },
+            freshIdentity
+          )
         } else {
           // Clock sync failed - hide confirming overlay so modal is visible
           setShowConfirmingLogin(false)
@@ -349,9 +370,15 @@ export const LoginPage = () => {
     // Handle EMAIL login separately - use stored address instead of connectToProvider
     if (currentConnectionType === ConnectionOptionType.EMAIL && emailLoginAddress) {
       try {
-        await checkProfileAndRedirect(emailLoginAddress, referrer, () => {
-          redirect()
-        })
+        const freshIdentity = localStorageGetIdentity(emailLoginAddress)
+        await checkProfileAndRedirect(
+          emailLoginAddress,
+          referrer,
+          () => {
+            redirect()
+          },
+          freshIdentity
+        )
       } catch (error) {
         handleError(error, 'Error during email clock sync continue flow')
       }

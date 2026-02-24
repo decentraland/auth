@@ -121,6 +121,7 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
       try {
         // Verify OTP and connect wallet using thirdweb
         const account = await verifyOTPAndConnect(currentEmail, code)
+        console.log('[Thirdweb] OTP verified successfully!')
 
         // Store email for future reference
         localStorage.setItem('dcl_thirdweb_user_email', currentEmail)
