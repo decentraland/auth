@@ -1,4 +1,6 @@
 import { inAppWallet, preAuthenticate } from 'thirdweb/wallets'
+import { authDebug } from '../utils/authDebug'
+import { AuthDebugDecision, AuthDebugEvent, AuthDebugStep } from '../utils/authDebug.type'
 import { getThirdwebClient } from './client'
 
 // Store the wallet instance for reuse
@@ -78,8 +80,26 @@ export const verifyEmailOTPAndConnect = async (email: string, verificationCode: 
       address: account.address,
       hasSignMessage: typeof account.signMessage === 'function'
     })
+    authDebug({
+      event: AuthDebugEvent.THIRDWEB_VERIFY_OTP,
+      account: account.address,
+      providerType: 'thirdweb',
+      step: AuthDebugStep.THIRDWEB_EMAIL_AUTH,
+      decision: AuthDebugDecision.SUCCESS,
+      email
+    })
     return account
   } catch (error) {
+    authDebug({
+      event: AuthDebugEvent.THIRDWEB_VERIFY_OTP,
+      providerType: 'thirdweb',
+      step: AuthDebugStep.THIRDWEB_EMAIL_AUTH,
+      decision: AuthDebugDecision.ERROR,
+      email,
+      details: {
+        message: error instanceof Error ? error.message : String(error)
+      }
+    })
     console.error('[Thirdweb] Error verifying OTP:', error)
     throw error
   }

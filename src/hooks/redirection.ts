@@ -2,6 +2,8 @@ import { useCallback } from 'react'
 import { useLocation } from 'react-router-dom'
 import { validateUrlInstance } from '@dcl/schemas'
 import { extractRedirectToFromSearchParameters, locations } from '../shared/locations'
+import { authDebug } from '../shared/utils/authDebug'
+import { AuthDebugDecision, AuthDebugEvent, AuthDebugStep } from '../shared/utils/authDebug.type'
 
 export const useAfterLoginRedirection = () => {
   const location = useLocation()
@@ -86,6 +88,16 @@ export const useAfterLoginRedirection = () => {
         const isHostnameValid = hasOverrideUrl || finalUrlObj.hostname === window.location.hostname
 
         if (!isUrlValid || !isHostnameValid) {
+          authDebug({
+            event: AuthDebugEvent.REDIRECT_FINAL_URL_INVALID,
+            step: AuthDebugStep.AFTER_LOGIN_REDIRECTION,
+            decision: AuthDebugDecision.HOME_FALLBACK,
+            details: {
+              finalUrlHostname: finalUrlObj.hostname,
+              isUrlValid,
+              isHostnameValid
+            }
+          })
           console.error('Invalid final URL, redirecting to home')
           window.location.href = locations.home()
           return
@@ -93,6 +105,14 @@ export const useAfterLoginRedirection = () => {
 
         window.location.href = finalUrl
       } catch (error) {
+        authDebug({
+          event: AuthDebugEvent.REDIRECT_FINAL_URL_INVALID,
+          step: AuthDebugStep.AFTER_LOGIN_REDIRECTION,
+          decision: AuthDebugDecision.HOME_FALLBACK,
+          details: {
+            message: error instanceof Error ? error.message : String(error)
+          }
+        })
         console.error('Final URL validation failed:', error)
         window.location.href = locations.home()
       }
