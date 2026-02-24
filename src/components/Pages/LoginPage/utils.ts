@@ -9,6 +9,74 @@ import { ConnectionOptionType } from '../../Connection'
 
 const ONE_MONTH_IN_MINUTES = 60 * 24 * 30
 
+/** Enable wallet/provider debug logs (dev or localStorage dcl_auth_debug_ethereum=1) */
+const DEBUG_ETHEREUM =
+  (typeof import.meta !== 'undefined' && import.meta.env?.DEV === true) ||
+  (typeof localStorage !== 'undefined' && localStorage.getItem('dcl_auth_debug_ethereum') === '1')
+
+function debugLog(label: string, data: Record<string, unknown>): void {
+  if (!DEBUG_ETHEREUM) return
+  console.log(`[auth/ethereum] ${label}`, data)
+}
+
+const METAMASK_RDNS = 'io.metamask'
+const EIP6963_REQUEST_TIMEOUT_MS = 1000
+
+function getMetaMaskProviderEip6963(): Promise<unknown> {
+  return new Promise(resolve => {
+    const timeout = setTimeout(() => resolve(null), EIP6963_REQUEST_TIMEOUT_MS)
+    const handler = (event: CustomEvent<{ info: { rdns: string }; provider: unknown }>) => {
+      if (event.detail?.info?.rdns === METAMASK_RDNS) {
+        clearTimeout(timeout)
+        window.removeEventListener('eip6963:announceProvider', handler as EventListener)
+        resolve(event.detail.provider)
+      }
+    }
+    window.addEventListener('eip6963:announceProvider', handler as EventListener)
+    window.dispatchEvent(new Event('eip6963:requestProvider'))
+  })
+}
+
+/**
+ * Prefer real MetaMask when something else (e.g. thirdweb) has overwritten window.ethereum.
+ * Uses EIP-6963 (rdns io.metamask) then .providers fallback.
+ */
+async function ensureMetaMaskProvider(): Promise<void> {
+  if (typeof window === 'undefined' || !window.ethereum) return
+
+  // MetaMask and some wrappers expose _state.accounts (internal API)
+  const eth = window.ethereum as {
+    // eslint-disable-next-line @typescript-eslint/naming-convention -- provider internal API
+    _state?: { accounts?: string[] }
+    providers?: Array<{ isMetaMask?: boolean }>
+    isMetaMask?: boolean
+  }
+  const stateAccounts = eth._state?.accounts
+  debugLog('before ensureMetaMaskProvider', {
+    isMetaMask: eth.isMetaMask,
+    hasProviders: !!eth.providers,
+    providersLength: eth.providers?.length ?? 0,
+    stateAccount0: stateAccounts?.[0] ?? null
+  })
+
+  const realMetaMask = await getMetaMaskProviderEip6963()
+  if (realMetaMask) {
+    ;(window as unknown as { ethereum: unknown }).ethereum = realMetaMask
+    debugLog('ensureMetaMaskProvider', { source: 'eip6963', rdns: METAMASK_RDNS })
+    return
+  }
+
+  if (eth.providers?.length) {
+    const metamask = eth.providers.find((p: { isMetaMask?: boolean }) => p.isMetaMask)
+    if (metamask) {
+      ;(window as unknown as { ethereum: unknown }).ethereum = metamask
+      debugLog('ensureMetaMaskProvider', { source: 'providers' })
+    }
+  } else {
+    debugLog('ensureMetaMaskProvider', { source: 'none', note: 'eip6963 timed out and providers undefined' })
+  }
+}
+
 export function fromConnectionOptionToProviderType(connectionType: ConnectionOptionType, isTesting?: boolean): ProviderType {
   switch (connectionType) {
     case ConnectionOptionType.DISCORD:
@@ -113,6 +181,10 @@ export async function connectToProvider(connectionOption: ConnectionOptionType):
     throw new Error('Email connection should use thirdweb flow, not connectToProvider')
   }
 
+  if (connectionOption === ConnectionOptionType.METAMASK) {
+    await ensureMetaMaskProvider()
+  }
+
   let connectionData: ConnectionResponse
   try {
     connectionData = await connection.connect(providerType)
@@ -120,6 +192,12 @@ export async function connectToProvider(connectionOption: ConnectionOptionType):
     console.error('Error connecting to provider', error)
     throw error
   }
+
+  debugLog('after connection.connect', {
+    providerType,
+    account: connectionData.account ?? null,
+    accountShort: connectionData.account ? `${connectionData.account.slice(0, 6)}...${connectionData.account.slice(-4)}` : null
+  })
 
   if (!connectionData.account || !connectionData.provider) {
     throw new Error('Could not get provider')
