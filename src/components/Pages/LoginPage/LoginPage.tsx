@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo, useEffect, useContext } from 'react'
 import classNames from 'classnames'
+import type { AuthIdentity } from '@dcl/crypto'
 import { ChainId } from '@dcl/schemas/dist/dapps/chain-id'
 import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
 import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
@@ -105,6 +106,26 @@ export const LoginPage = () => {
   const handleGuestLogin = useCallback(async () => {
     await trackGuestLogin()
   }, [trackGuestLogin])
+
+  const getReferrerFromCurrentSearch = useCallback(() => {
+    const search = new URLSearchParams(window.location.search)
+    return extractReferrerFromSearchParameters(search)
+  }, [])
+
+  const runProfileRedirect = useCallback(
+    async (account: string, referrer: string | null, identity: AuthIdentity | null = null, onRedirect?: () => void) => {
+      await checkProfileAndRedirect(
+        account,
+        referrer,
+        () => {
+          redirect()
+          onRedirect?.()
+        },
+        identity
+      )
+    },
+    [checkProfileAndRedirect, redirect]
+  )
 
   const checkClockSynchronization = useCallback(async (): Promise<boolean> => {
     try {
@@ -217,16 +238,12 @@ export const LoginPage = () => {
             type: providerType
           })
 
-          const search = new URLSearchParams(window.location.search)
-          const referrer = extractReferrerFromSearchParameters(search)
+          const referrer = getReferrerFromCurrentSearch()
 
           const isClockSync = await checkClockSynchronization()
 
           if (isClockSync) {
-            await checkProfileAndRedirect(connectionData.account ?? '', referrer, () => {
-              redirect()
-              setShowConnectionLayout(false)
-            })
+            await runProfileRedirect(connectionData.account ?? '', referrer, null, () => setShowConnectionLayout(false))
           }
         }
       } catch (error) {
@@ -252,10 +269,10 @@ export const LoginPage = () => {
       flags[FeatureFlagsKeys.MAGIC_TEST],
       trackLoginClick,
       trackLoginSuccess,
-      checkProfileAndRedirect,
-      redirect,
+      runProfileRedirect,
       flagInitialized,
       checkClockSynchronization,
+      getReferrerFromCurrentSearch,
       isEmailOtpEnabled
     ]
   )
@@ -307,21 +324,12 @@ export const LoginPage = () => {
           type: ConnectionType.WEB2
         })
 
-        const search = new URLSearchParams(window.location.search)
-        const referrer = extractReferrerFromSearchParameters(search)
+        const referrer = getReferrerFromCurrentSearch()
 
         const isClockSync = await checkClockSynchronization()
 
         if (isClockSync) {
-          await checkProfileAndRedirect(
-            address,
-            referrer,
-            () => {
-              redirect()
-              setShowConfirmingLogin(false)
-            },
-            freshIdentity
-          )
+          await runProfileRedirect(address, referrer, freshIdentity, () => setShowConfirmingLogin(false))
         } else {
           // Clock sync failed - hide confirming overlay so modal is visible
           setShowConfirmingLogin(false)
@@ -335,7 +343,7 @@ export const LoginPage = () => {
         setConfirmingLoginError(errorMessage || 'Something went wrong. Please try again.')
       }
     },
-    [trackLoginSuccess, checkClockSynchronization, checkProfileAndRedirect, redirect]
+    [trackLoginSuccess, checkClockSynchronization, runProfileRedirect, getReferrerFromCurrentSearch]
   )
 
   const handleEmailLoginError = useCallback((error: string) => {
@@ -364,21 +372,13 @@ export const LoginPage = () => {
   const handleClockSyncContinue = useCallback(async () => {
     setShowClockSyncModal(false)
 
-    const search = new URLSearchParams(window.location.search)
-    const referrer = extractReferrerFromSearchParameters(search)
+    const referrer = getReferrerFromCurrentSearch()
 
     // Handle EMAIL login separately - use stored address instead of connectToProvider
     if (currentConnectionType === ConnectionOptionType.EMAIL && emailLoginAddress) {
       try {
         const freshIdentity = localStorageGetIdentity(emailLoginAddress)
-        await checkProfileAndRedirect(
-          emailLoginAddress,
-          referrer,
-          () => {
-            redirect()
-          },
-          freshIdentity
-        )
+        await runProfileRedirect(emailLoginAddress, referrer, freshIdentity)
       } catch (error) {
         handleError(error, 'Error during email clock sync continue flow')
       }
@@ -390,15 +390,12 @@ export const LoginPage = () => {
       try {
         const connectionData = await connectToProvider(currentConnectionType)
 
-        await checkProfileAndRedirect(connectionData.account ?? '', referrer, () => {
-          redirect()
-          setShowConnectionLayout(false)
-        })
+        await runProfileRedirect(connectionData.account ?? '', referrer, null, () => setShowConnectionLayout(false))
       } catch (error) {
         handleError(error, 'Error during clock sync continue flow')
       }
     }
-  }, [currentConnectionType, emailLoginAddress, checkProfileAndRedirect, redirect])
+  }, [currentConnectionType, emailLoginAddress, runProfileRedirect, getReferrerFromCurrentSearch])
 
   useEffect(() => {
     const backgroundInterval = setInterval(() => {
