@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect, useContext } from 'react'
+import { useState, useCallback, useMemo, useEffect, useContext, useRef } from 'react'
 import classNames from 'classnames'
 import type { AuthIdentity } from '@dcl/crypto'
 import { ChainId } from '@dcl/schemas/dist/dapps/chain-id'
@@ -34,6 +34,8 @@ import { createAuthServerHttpClient } from '../../../shared/auth'
 import { isErrorWithName } from '../../../shared/errors'
 import { extractReferrerFromSearchParameters } from '../../../shared/locations'
 import { disconnectWallet, sendEmailOTP } from '../../../shared/thirdweb'
+import { authDebug, createAuthAttemptId } from '../../../shared/utils/authDebug'
+import { AuthDebugDecision, AuthDebugEvent, AuthDebugStep } from '../../../shared/utils/authDebug.type'
 import { isClockSynchronized } from '../../../shared/utils/clockSync'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { ClockSyncModal } from '../../ClockSyncModal'
@@ -57,6 +59,11 @@ import styles from './LoginPage.module.css'
 const BACKGROUND_IMAGES = [Image1, Image2, Image3, Image4, Image5, Image6, Image7, Image8, Image9, Image10]
 const NEW_USER_BACKGROUND_IMAGES = [ImageNew1, ImageNew2, ImageNew3, ImageNew4, ImageNew5, ImageNew6]
 const NEW_USER_PARAM_VARIANTS = ['newUser', 'newuser', 'new-user', 'new_user']
+
+type RunProfileRedirectOptions = {
+  onRedirect?: () => void
+  attemptId?: string | null
+}
 
 export const LoginPage = () => {
   const [isNewUser, setIsNewUser] = useState(
@@ -82,6 +89,7 @@ export const LoginPage = () => {
   const [confirmingLoginError, setConfirmingLoginError] = useState<string | null>(null)
   // Store address from email login for clock sync continuation
   const [emailLoginAddress, setEmailLoginAddress] = useState<string | null>(null)
+  const currentAuthAttemptIdRef = useRef<string | null>(null)
 
   // TODO: remove /play from redirectTo. Build guest URL only when redirect path includes /play; use its presence to show the option.
   const guestRedirectToURL = useMemo(() => {
@@ -113,7 +121,8 @@ export const LoginPage = () => {
   }, [])
 
   const runProfileRedirect = useCallback(
-    async (account: string, referrer: string | null, identity: AuthIdentity | null = null, onRedirect?: () => void) => {
+    async (account: string, referrer: string | null, identity: AuthIdentity | null = null, options: RunProfileRedirectOptions = {}) => {
+      const { onRedirect, attemptId = null } = options
       await checkProfileAndRedirect(
         account,
         referrer,
@@ -121,7 +130,8 @@ export const LoginPage = () => {
           redirect()
           onRedirect?.()
         },
-        identity
+        identity,
+        attemptId
       )
     },
     [checkProfileAndRedirect, redirect]
@@ -150,10 +160,28 @@ export const LoginPage = () => {
   // Handle email submit from the main page
   const handleEmailSubmit = useCallback(
     async (email: string) => {
+      const attemptId = createAuthAttemptId('email')
+      currentAuthAttemptIdRef.current = attemptId
+
       setCurrentEmail(email)
       setIsEmailLoading(true)
       setEmailError(null)
       setCurrentConnectionType(ConnectionOptionType.EMAIL)
+
+      authDebug({
+        event: AuthDebugEvent.LOGIN_ATTEMPT_STARTED,
+        attemptId,
+        providerType: ProviderType.THIRDWEB,
+        step: AuthDebugStep.LOGIN_PAGE,
+        decision: AuthDebugDecision.EMAIL
+      })
+      authDebug({
+        event: AuthDebugEvent.EMAIL_LOGIN_SUBMIT,
+        attemptId,
+        providerType: ProviderType.THIRDWEB,
+        step: AuthDebugStep.LOGIN_PAGE,
+        email
+      })
 
       trackLoginClick({
         method: ConnectionOptionType.EMAIL,
@@ -161,20 +189,47 @@ export const LoginPage = () => {
       })
 
       // Avoid stale connection/account from a previous wallet session.
+      let cleanupDecision = AuthDebugDecision.SUCCESS
       try {
         await connection.disconnect()
         await disconnectWallet()
       } catch {
         // Keep the flow going even if cleanup fails.
+        cleanupDecision = AuthDebugDecision.FAILED
       }
+      authDebug({
+        event: AuthDebugEvent.EMAIL_LOGIN_SESSION_CLEANUP,
+        attemptId,
+        providerType: ProviderType.THIRDWEB,
+        step: AuthDebugStep.LOGIN_PAGE,
+        decision: cleanupDecision
+      })
 
       try {
         // Send OTP to email
         await sendEmailOTP(email)
+        authDebug({
+          event: AuthDebugEvent.EMAIL_LOGIN_OTP_REQUESTED,
+          attemptId,
+          providerType: ProviderType.THIRDWEB,
+          step: AuthDebugStep.LOGIN_PAGE,
+          decision: AuthDebugDecision.REQUESTED,
+          email
+        })
         // Open OTP modal
         setShowEmailLoginModal(true)
       } catch (error) {
         const errorMessage = handleError(error, 'Error sending verification code')
+        authDebug({
+          event: AuthDebugEvent.EMAIL_LOGIN_SUBMIT_FAILED,
+          attemptId,
+          providerType: ProviderType.THIRDWEB,
+          step: AuthDebugStep.LOGIN_PAGE,
+          decision: AuthDebugDecision.OTP_REQUEST_FAILED,
+          details: {
+            message: errorMessage
+          }
+        })
         // Handle network errors with a user-friendly message
         if (errorMessage === 'Failed to fetch' || errorMessage?.toLowerCase().includes('network')) {
           setEmailError('Unable to connect. Please check your internet connection and try again.')
@@ -211,7 +266,16 @@ export const LoginPage = () => {
 
       const isLoggingInThroughSocial = isSocialLogin(connectionType)
       const providerType = isLoggingInThroughSocial ? ConnectionType.WEB2 : ConnectionType.WEB3
+      const providerName = fromConnectionOptionToProviderType(connectionType)
+      const attemptId = createAuthAttemptId(isLoggingInThroughSocial ? 'social' : 'wallet')
       setCurrentConnectionType(connectionType)
+      authDebug({
+        event: AuthDebugEvent.LOGIN_ATTEMPT_STARTED,
+        attemptId,
+        providerType: providerName,
+        step: AuthDebugStep.LOGIN_PAGE,
+        decision: connectionType
+      })
 
       trackLoginClick({
         method: connectionType,
@@ -243,7 +307,17 @@ export const LoginPage = () => {
           const isClockSync = await checkClockSynchronization()
 
           if (isClockSync) {
-            await runProfileRedirect(connectionData.account ?? '', referrer, null, () => setShowConnectionLayout(false))
+            authDebug({
+              event: AuthDebugEvent.WALLET_LOGIN_PROFILE_CHECK,
+              attemptId,
+              account: connectionData.account ?? '',
+              providerType: providerName,
+              step: AuthDebugStep.LOGIN_PAGE
+            })
+            await runProfileRedirect(connectionData.account ?? '', referrer, null, {
+              onRedirect: () => setShowConnectionLayout(false),
+              attemptId
+            })
           }
         }
       } catch (error) {
@@ -251,6 +325,16 @@ export const LoginPage = () => {
           sentryTags: {
             isWeb2Wallet: isLoggingInThroughSocial,
             connectionType
+          }
+        })
+        authDebug({
+          event: AuthDebugEvent.LOGIN_ATTEMPT_FAILED,
+          attemptId,
+          providerType: providerName,
+          step: AuthDebugStep.LOGIN_PAGE,
+          decision: AuthDebugDecision.ERROR,
+          details: {
+            message: error instanceof Error ? error.message : String(error)
           }
         })
 
@@ -284,10 +368,12 @@ export const LoginPage = () => {
   }, [setShowConnectionLayout])
 
   const handleEmailLoginClose = useCallback(() => {
+    currentAuthAttemptIdRef.current = null
     setShowEmailLoginModal(false)
   }, [])
 
   const handleEmailLoginBack = useCallback(() => {
+    currentAuthAttemptIdRef.current = null
     setShowEmailLoginModal(false)
     setCurrentEmail('')
     setCurrentConnectionType(undefined)
@@ -299,15 +385,35 @@ export const LoginPage = () => {
       setShowConfirmingLogin(true)
       setConfirmingLoginError(null)
 
+      const attemptId = currentAuthAttemptIdRef.current ?? createAuthAttemptId('email')
+      currentAuthAttemptIdRef.current = attemptId
+
       try {
         const { account } = result
         const address = account.address.toLowerCase()
+        const providerType = ProviderType.THIRDWEB
+
+        authDebug({
+          event: AuthDebugEvent.EMAIL_LOGIN_OTP_VERIFIED,
+          attemptId,
+          account: address,
+          providerType,
+          step: AuthDebugStep.LOGIN_PAGE
+        })
 
         // Store address for clock sync continuation
         setEmailLoginAddress(address)
 
         // Generate identity using the thirdweb account's signMessage
         const freshIdentity = await getIdentityWithSigner(address, async (message: string) => account.signMessage({ message }))
+        authDebug({
+          event: AuthDebugEvent.EMAIL_LOGIN_IDENTITY_READY,
+          attemptId,
+          account: address,
+          providerType,
+          step: AuthDebugStep.LOGIN_PAGE,
+          decision: freshIdentity ? AuthDebugDecision.READY : AuthDebugDecision.MISSING
+        })
 
         // Ensure connector session matches the OTP-authenticated account.
         const thirdwebConnection = await connection.connect(ProviderType.THIRDWEB, ChainId.ETHEREUM_MAINNET)
@@ -318,6 +424,14 @@ export const LoginPage = () => {
         if (connectedAddress !== address) {
           throw new Error('Detected a different account session than the verified email. Please try logging in again.')
         }
+        authDebug({
+          event: AuthDebugEvent.EMAIL_LOGIN_CONNECTOR_CONNECTED,
+          attemptId,
+          account: connectedAddress,
+          providerType,
+          step: AuthDebugStep.LOGIN_PAGE,
+          decision: AuthDebugDecision.SESSION_ALIGNED
+        })
 
         await trackLoginSuccess({
           ethAddress: address,
@@ -329,7 +443,17 @@ export const LoginPage = () => {
         const isClockSync = await checkClockSynchronization()
 
         if (isClockSync) {
-          await runProfileRedirect(address, referrer, freshIdentity, () => setShowConfirmingLogin(false))
+          authDebug({
+            event: AuthDebugEvent.EMAIL_LOGIN_PROFILE_CHECK,
+            attemptId,
+            account: address,
+            providerType,
+            step: AuthDebugStep.LOGIN_PAGE
+          })
+          await runProfileRedirect(address, referrer, freshIdentity, {
+            onRedirect: () => setShowConfirmingLogin(false),
+            attemptId
+          })
         } else {
           // Clock sync failed - hide confirming overlay so modal is visible
           setShowConfirmingLogin(false)
@@ -338,6 +462,16 @@ export const LoginPage = () => {
         const errorMessage = handleError(error, 'Error completing email login', {
           sentryTags: {
             connectionType: ConnectionOptionType.EMAIL
+          }
+        })
+        authDebug({
+          event: AuthDebugEvent.EMAIL_LOGIN_FAILED,
+          attemptId,
+          providerType: ProviderType.THIRDWEB,
+          step: AuthDebugStep.LOGIN_PAGE,
+          decision: AuthDebugDecision.ERROR,
+          details: {
+            message: errorMessage
           }
         })
         setConfirmingLoginError(errorMessage || 'Something went wrong. Please try again.')
@@ -353,6 +487,7 @@ export const LoginPage = () => {
   const handleConfirmingLoginRetry = useCallback(() => {
     setShowConfirmingLogin(false)
     setConfirmingLoginError(null)
+    currentAuthAttemptIdRef.current = null
     // Go back to the email login modal with the current email
     setShowEmailLoginModal(true)
   }, [])
@@ -378,7 +513,17 @@ export const LoginPage = () => {
     if (currentConnectionType === ConnectionOptionType.EMAIL && emailLoginAddress) {
       try {
         const freshIdentity = localStorageGetIdentity(emailLoginAddress)
-        await runProfileRedirect(emailLoginAddress, referrer, freshIdentity)
+        authDebug({
+          event: AuthDebugEvent.EMAIL_LOGIN_PROFILE_CHECK,
+          attemptId: currentAuthAttemptIdRef.current,
+          account: emailLoginAddress,
+          providerType: ProviderType.THIRDWEB,
+          step: AuthDebugStep.LOGIN_PAGE_CLOCK_SYNC,
+          decision: AuthDebugDecision.CONTINUE
+        })
+        await runProfileRedirect(emailLoginAddress, referrer, freshIdentity, {
+          attemptId: currentAuthAttemptIdRef.current
+        })
       } catch (error) {
         handleError(error, 'Error during email clock sync continue flow')
       }
@@ -389,8 +534,17 @@ export const LoginPage = () => {
     if (currentConnectionType) {
       try {
         const connectionData = await connectToProvider(currentConnectionType)
+        authDebug({
+          event: AuthDebugEvent.WALLET_LOGIN_PROFILE_CHECK,
+          account: connectionData.account ?? '',
+          providerType: fromConnectionOptionToProviderType(currentConnectionType),
+          step: AuthDebugStep.LOGIN_PAGE_CLOCK_SYNC,
+          decision: AuthDebugDecision.CONTINUE
+        })
 
-        await runProfileRedirect(connectionData.account ?? '', referrer, null, () => setShowConnectionLayout(false))
+        await runProfileRedirect(connectionData.account ?? '', referrer, null, {
+          onRedirect: () => setShowConnectionLayout(false)
+        })
       } catch (error) {
         handleError(error, 'Error during clock sync continue flow')
       }

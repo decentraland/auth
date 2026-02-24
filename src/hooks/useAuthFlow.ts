@@ -10,6 +10,8 @@ import { useCurrentConnectionData } from '../shared/connection/hook'
 import { createFetcher } from '../shared/fetcher'
 import { locations } from '../shared/locations'
 import { isProfileComplete } from '../shared/profile'
+import { authDebug } from '../shared/utils/authDebug'
+import { AuthDebugDecision, AuthDebugEvent, AuthDebugStep } from '../shared/utils/authDebug.type'
 import { checkWebGpuSupport } from '../shared/utils/webgpu'
 import { useNavigateWithSearchParams } from './navigation'
 import { useAfterLoginRedirection } from './redirection'
@@ -22,7 +24,7 @@ import { useDisabledCatalysts } from './useDisabledCatalysts'
  * and profile validation with redirects based on profile state and feature flags.
  *
  * @returns {{
- *   checkProfileAndRedirect: (account: string, referrer: string | null, redirect: () => void, providedIdentity?: AuthIdentity | null) => Promise<void>,
+ *   checkProfileAndRedirect: (account: string, referrer: string | null, redirect: () => void, providedIdentity?: AuthIdentity | null, attemptId?: string | null) => Promise<void>,
  *   connectToMagic: () => Promise<import('decentraland-connect').ConnectionResponse | undefined>,
  *   isInitialized: boolean
  * }} Authentication flow utilities and initialization status
@@ -33,7 +35,7 @@ export const useAuthFlow = () => {
   const { flags, variants, initialized: flagInitialized } = useContext(FeatureFlagsContext)
 
   const [targetConfig] = useTargetConfig()
-  const { identity } = useCurrentConnectionData()
+  const { identity, providerType } = useCurrentConnectionData()
   const disabledCatalysts = useDisabledCatalysts()
   const { trackWebGPUSupportCheck } = useAnalytics()
 
@@ -63,11 +65,34 @@ export const useAuthFlow = () => {
    * @param {() => void} redirect - Callback function to execute for successful redirect
    * @param {AuthIdentity | null} [providedIdentity] - Optional authentication identity to use for redeployment.
    * Falls back to hook identity if not provided.
+   * @param {string | null} [attemptId] - Optional auth attempt identifier for debugging.
    * @returns {Promise<void>} A promise that resolves after the navigation or redirect completes
    */
   const checkProfileAndRedirect = useCallback(
-    async (account: string, referrer: string | null, redirect: () => void, providedIdentity: AuthIdentity | null = null) => {
+    async (
+      account: string,
+      referrer: string | null,
+      redirect: () => void,
+      providedIdentity: AuthIdentity | null = null,
+      attemptId: string | null = null
+    ) => {
+      authDebug({
+        event: AuthDebugEvent.PROFILE_CHECK_STARTED,
+        attemptId,
+        account,
+        providerType: providerType ? String(providerType) : 'n/a',
+        step: AuthDebugStep.AUTH_FLOW
+      })
+
       if (!flagInitialized) {
+        authDebug({
+          event: AuthDebugEvent.PROFILE_CHECK_DECISION,
+          attemptId,
+          account,
+          providerType: providerType ? String(providerType) : 'n/a',
+          step: AuthDebugStep.AUTH_FLOW,
+          decision: AuthDebugDecision.FLAGS_NOT_INITIALIZED
+        })
         return undefined
       }
 
@@ -78,6 +103,14 @@ export const useAuthFlow = () => {
         })
 
         const consistencyResult = await fetchProfileWithConsistencyCheck(account, disabledCatalysts, fetcherWithTimeout)
+        authDebug({
+          event: AuthDebugEvent.PROFILE_CONSISTENCY_CHECKED,
+          attemptId,
+          account,
+          providerType: providerType ? String(providerType) : 'n/a',
+          step: AuthDebugStep.AUTH_FLOW,
+          decision: consistencyResult.isConsistent ? AuthDebugDecision.CONSISTENT : AuthDebugDecision.INCONSISTENT
+        })
 
         // Check A/B testing new onboarding flow
         const isFlowV2OnboardingFlowEnabled = variants[FeatureFlagsKeys.ONBOARDING_FLOW]?.name === OnboardingFlowVariant.V2
@@ -92,6 +125,14 @@ export const useAuthFlow = () => {
             try {
               await redeployExistingProfile(consistencyResult.profile, account, userIdentity, disabledCatalysts, fetcherWithTimeout)
               // If redeployment succeeds, continue with the login flow
+              authDebug({
+                event: AuthDebugEvent.PROFILE_CHECK_DECISION,
+                attemptId,
+                account,
+                providerType: providerType ? String(providerType) : 'n/a',
+                step: AuthDebugStep.AUTH_FLOW,
+                decision: AuthDebugDecision.REDEPLOY_AND_REDIRECT
+              })
               return redirect()
             } catch (error) {
               console.warn('Profile redeployment failed, attempting to redeploy with content server data:', error)
@@ -105,6 +146,14 @@ export const useAuthFlow = () => {
                   fetcherWithTimeout
                 )
                 // If redeployment succeeds, continue with the login flow
+                authDebug({
+                  event: AuthDebugEvent.PROFILE_CHECK_DECISION,
+                  attemptId,
+                  account,
+                  providerType: providerType ? String(providerType) : 'n/a',
+                  step: AuthDebugStep.AUTH_FLOW,
+                  decision: AuthDebugDecision.REDEPLOY_CONTENT_SERVER_AND_REDIRECT
+                })
                 return redirect()
               } catch (error) {
                 console.warn('Profile redeployment failed, falling back to onboarding:', error)
@@ -119,8 +168,24 @@ export const useAuthFlow = () => {
           const isAvatarSetupFlowAllowed = isFlowV2OnboardingFlowEnabled && hasWebGPU
 
           if (isAvatarSetupFlowAllowed) {
+            authDebug({
+              event: AuthDebugEvent.PROFILE_CHECK_DECISION,
+              attemptId,
+              account,
+              providerType: providerType ? String(providerType) : 'n/a',
+              step: AuthDebugStep.AUTH_FLOW,
+              decision: AuthDebugDecision.AVATAR_SETUP
+            })
             return navigate(locations.avatarSetup(redirectTo, referrer))
           } else {
+            authDebug({
+              event: AuthDebugEvent.PROFILE_CHECK_DECISION,
+              attemptId,
+              account,
+              providerType: providerType ? String(providerType) : 'n/a',
+              step: AuthDebugStep.AUTH_FLOW,
+              decision: AuthDebugDecision.SETUP
+            })
             return navigate(locations.setup(redirectTo, referrer))
           }
         }
@@ -133,11 +198,36 @@ export const useAuthFlow = () => {
         const isProfileIncomplete = !profile || !isProfileComplete(profile)
 
         if (isProfileIncomplete && !isAvatarSetupFlowAllowed) {
+          authDebug({
+            event: AuthDebugEvent.PROFILE_CHECK_DECISION,
+            attemptId,
+            account,
+            providerType: providerType ? String(providerType) : 'n/a',
+            step: AuthDebugStep.AUTH_FLOW,
+            decision: AuthDebugDecision.SETUP
+          })
           return navigate(locations.setup(redirectTo, referrer))
         } else if (isProfileIncomplete && isAvatarSetupFlowAllowed) {
+          authDebug({
+            event: AuthDebugEvent.PROFILE_CHECK_DECISION,
+            attemptId,
+            account,
+            providerType: providerType ? String(providerType) : 'n/a',
+            step: AuthDebugStep.AUTH_FLOW,
+            decision: AuthDebugDecision.AVATAR_SETUP
+          })
           return navigate(locations.avatarSetup(redirectTo, referrer))
         }
       }
+
+      authDebug({
+        event: AuthDebugEvent.PROFILE_CHECK_DECISION,
+        attemptId,
+        account,
+        providerType: providerType ? String(providerType) : 'n/a',
+        step: AuthDebugStep.AUTH_FLOW,
+        decision: AuthDebugDecision.REDIRECT
+      })
 
       redirect()
     },
@@ -148,6 +238,7 @@ export const useAuthFlow = () => {
       redirectTo,
       flagInitialized,
       identity,
+      providerType,
       disabledCatalysts
     ]
   )
