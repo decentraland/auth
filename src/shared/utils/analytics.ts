@@ -19,7 +19,11 @@ const trackWithDelay = async (event: TrackingEvents, data?: TrackingData) => {
 }
 
 const identifyUser = (ethAddress: string) => {
-  getAnalytics()?.identify({ ethAddress })
+  getAnalytics()?.identify(ethAddress, { ethAddress })
 }
 
-export { identifyUser, trackEvent, trackWithDelay }
+const resetUser = () => {
+  getAnalytics()?.reset()
+}
+
+export { identifyUser, resetUser, trackEvent, trackWithDelay }

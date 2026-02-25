@@ -218,7 +218,7 @@ export const RequestPage = () => {
       try {
         const signer = await browserProvider.current.getSigner()
         const signerAddress = await signer.getAddress()
-        getAnalytics()?.identify({ ethAddress: signerAddress })
+        getAnalytics()?.identify(signerAddress, { ethAddress: signerAddress })
         // Recover the request from the auth server.
         const request = await authServerClient.current.recover(requestId, signerAddress, isDeepLinkFlow)
         requestRef.current = request
