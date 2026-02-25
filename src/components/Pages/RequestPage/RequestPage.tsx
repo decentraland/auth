@@ -30,6 +30,7 @@ import { isErrorWithMessage, isRpcError } from '../../../shared/errors'
 import { extractReferrerFromSearchParameters, locations } from '../../../shared/locations'
 import { sendTipNotification } from '../../../shared/notifications'
 import { isProfileComplete } from '../../../shared/profile'
+import { identifyUser } from '../../../shared/utils/analytics'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { checkWebGpuSupport } from '../../../shared/utils/webgpu'
 import { FeatureFlagsContext, FeatureFlagsKeys, OnboardingFlowVariant } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
@@ -218,7 +219,7 @@ export const RequestPage = () => {
       try {
         const signer = await browserProvider.current.getSigner()
         const signerAddress = await signer.getAddress()
-        getAnalytics()?.identify(signerAddress, { ethAddress: signerAddress })
+        identifyUser(signerAddress)
         // Recover the request from the auth server.
         const request = await authServerClient.current.recover(requestId, signerAddress, isDeepLinkFlow)
         requestRef.current = request

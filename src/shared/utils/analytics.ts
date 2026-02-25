@@ -22,8 +22,4 @@ const identifyUser = (ethAddress: string) => {
   getAnalytics()?.identify(ethAddress, { ethAddress })
 }
 
-const resetUser = () => {
-  getAnalytics()?.reset()
-}
-
-export { identifyUser, resetUser, trackEvent, trackWithDelay }
+export { identifyUser, trackEvent, trackWithDelay }
