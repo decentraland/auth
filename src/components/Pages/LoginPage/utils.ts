@@ -3,7 +3,7 @@ import { ethers } from 'ethers'
 import { AuthIdentity, Authenticator } from '@dcl/crypto'
 import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
 import { localStorageGetIdentity, localStorageStoreIdentity } from '@dcl/single-sign-on-client'
-import { connection, getConfiguration, ConnectionResponse, Provider } from 'decentraland-connect'
+import { connection, getConfiguration, ConnectionResponse, Provider, WalletConnectV2Connector } from 'decentraland-connect'
 import { extractReferrerFromSearchParameters } from '../../../shared/locations'
 import { ConnectionOptionType } from '../../Connection'
 
@@ -111,6 +111,12 @@ export async function connectToProvider(connectionOption: ConnectionOptionType):
 
   if (providerType === ProviderType.THIRDWEB) {
     throw new Error('Email connection should use thirdweb flow, not connectToProvider')
+  }
+
+  // Clear stale WalletConnect/AppKit data to prevent session conflicts
+  if (providerType === ProviderType.WALLET_CONNECT || providerType === ProviderType.WALLET_CONNECT_V2) {
+    WalletConnectV2Connector.clearStorage()
+    localStorage.removeItem('WALLETCONNECT_DEEPLINK_CHOICE')
   }
 
   let connectionData: ConnectionResponse

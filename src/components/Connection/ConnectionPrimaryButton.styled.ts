@@ -32,7 +32,9 @@ const PrimaryOption = styled(Box)({
   width: '100%'
 })
 
-const PrimaryButton = styled(Button)<{ isNewUser?: boolean }>(({ theme, isNewUser }) => ({
+const PrimaryButton = styled(Button, {
+  shouldForwardProp: prop => prop !== 'isNewUser'
+})<{ isNewUser?: boolean }>(({ theme, isNewUser }) => ({
   width: '100%',
   display: 'flex',
   flexDirection: 'row',
@@ -81,10 +83,22 @@ const PrimaryButton = styled(Button)<{ isNewUser?: boolean }>(({ theme, isNewUse
   ['&.MuiButton-text:active']: {
     backgroundColor: theme.palette.common.white,
     transform: 'translateY(0)'
+  },
+  ['&.Mui-disabled']: {
+    backgroundColor: theme.palette.common.white,
+    color: theme.palette.common.black,
+    opacity: 0.6,
+    pointerEvents: 'none'
   }
 }))
 
-const PrimaryButtonWrapper = styled(Box)<{ isNewUser?: boolean }>(({ isNewUser, theme }) => ({
+const primaryTooltipSlotProps = {
+  tooltip: { sx: { fontSize: '14px' } }
+}
+
+const PrimaryButtonWrapper = styled(Box, {
+  shouldForwardProp: prop => prop !== 'isNewUser'
+})<{ isNewUser?: boolean }>(({ isNewUser, theme }) => ({
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
@@ -93,4 +107,12 @@ const PrimaryButtonWrapper = styled(Box)<{ isNewUser?: boolean }>(({ isNewUser, 
   fontSize: '14px'
 }))
 
-export { PrimaryContainer, PrimaryMessage, PrimaryOption, PrimaryOptionWrapper, PrimaryButton, PrimaryButtonWrapper }
+export {
+  PrimaryContainer,
+  PrimaryMessage,
+  PrimaryOption,
+  PrimaryOptionWrapper,
+  PrimaryButton,
+  primaryTooltipSlotProps,
+  PrimaryButtonWrapper
+}

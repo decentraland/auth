@@ -27,7 +27,9 @@ const MainContentContainer = styled(Box)(({ theme }) => ({
   marginTop: theme.spacing(17.5)
 }))
 
-const Title = styled(Typography)<{ isNewUser?: boolean }>(({ theme, isNewUser }) => ({
+const Title = styled(Typography, {
+  shouldForwardProp: prop => prop !== 'isNewUser'
+})<{ isNewUser?: boolean }>(({ theme, isNewUser }) => ({
   marginBottom: isNewUser ? theme.spacing(4) : theme.spacing(7),
   fontSize: '24px',
   color: theme.palette.common.white,
