@@ -4,7 +4,7 @@ import './polyfills.ts'
 import 'semantic-ui-css/semantic.min.css'
 import * as React from 'react'
 import { useEffect } from 'react'
-import * as ReactDOM from 'react-dom'
+import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { darkTheme, DclThemeProvider } from 'decentraland-ui2'
 import { Env } from '@dcl/ui-env'
@@ -75,7 +75,7 @@ const SiteRoutes = () => {
   )
 }
 
-ReactDOM.render(
+createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <FeatureFlagsProvider>
       <DclThemeProvider theme={darkTheme}>
@@ -85,6 +85,5 @@ ReactDOM.render(
       </DclThemeProvider>
       <Intercom appId={config.get('INTERCOM_APP_ID')} settings={{ alignment: 'right' }} />
     </FeatureFlagsProvider>
-  </React.StrictMode>,
-  document.getElementById('root')
+  </React.StrictMode>
 )
