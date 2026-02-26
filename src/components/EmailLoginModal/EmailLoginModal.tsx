@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect, KeyboardEvent, ChangeEvent, ClipboardEvent } from 'react'
-import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
-import { Modal } from 'decentraland-ui/dist/components/Modal/Modal'
+import Dialog from '@mui/material/Dialog'
+import { CircularProgress } from 'decentraland-ui2'
 import { TrackingEvents } from '../../modules/analytics/types'
 import { trackEvent } from '../../shared/utils/analytics'
 import { handleError } from '../../shared/utils/errorHandler'
@@ -216,7 +216,7 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
 
         {isLoading && !error && (
           <div className={styles.verifyingContainer}>
-            <Loader className={styles.verifyingLoader} size="small" inline active />
+            <CircularProgress className={styles.verifyingLoader} size={16} />
             <span className={styles.verifyingText}>Verifying...</span>
           </div>
         )}
@@ -243,7 +243,7 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
   }
 
   return (
-    <Modal size="small" open={open} className={styles.modal}>
+    <Dialog open={open} maxWidth="sm" fullWidth className={styles.modal} PaperProps={{ className: styles.modal }}>
       <div className={styles.header}>
         <button className={styles.backButton} onClick={handleBack} disabled={isLoading}>
           <span className={styles.backIcon}>‹</span> BACK
@@ -253,6 +253,6 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
         </button>
       </div>
       <div className={styles.main}>{renderContent()}</div>
-    </Modal>
+    </Dialog>
   )
 }

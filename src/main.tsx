@@ -1,7 +1,6 @@
 /* eslint-disable import/order */
 /* eslint-disable @typescript-eslint/naming-convention */
 import './polyfills.ts'
-import 'semantic-ui-css/semantic.min.css'
 import * as React from 'react'
 import { useEffect } from 'react'
 import * as ReactDOM from 'react-dom'
@@ -24,7 +23,6 @@ import { getAnalytics } from './modules/analytics/segment'
 import './modules/analytics/snippet'
 import './modules/analytics/sentry'
 import { getMobileSession } from './shared/mobile'
-import 'decentraland-ui/dist/themes/alternative/dark-theme.css'
 import './index.css'
 
 const analytics = getAnalytics()

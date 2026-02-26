@@ -1,4 +1,4 @@
-import type { PopupProps } from 'semantic-ui-react/dist/commonjs/modules/Popup'
+import type { TooltipProps } from '@mui/material/Tooltip'
 import { ConnectionOptionType } from '../Connection.types'
 
 export type ConnectionIconProps = {
@@ -7,7 +7,7 @@ export type ConnectionIconProps = {
   info?: string
   showTooltip?: boolean
   testId?: string
-  tooltipPosition?: PopupProps['position']
+  tooltipPosition?: TooltipProps['placement']
   children?: React.ReactNode
   disabled?: boolean
   loading?: boolean

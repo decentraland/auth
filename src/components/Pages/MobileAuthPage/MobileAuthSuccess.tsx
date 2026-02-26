@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import ArrowBackIosNewTwoToneIcon from '@mui/icons-material/ArrowBackIosNewTwoTone'
 import LoginRoundedIcon from '@mui/icons-material/LoginRounded'
-import { Button } from 'decentraland-ui/dist/components/Button/Button'
+import { Button } from 'decentraland-ui2'
 import logoImg from '../../../assets/images/logo.svg'
 import wrongImg from '../../../assets/images/wrong.svg'
 import { launchDeepLink } from '../RequestPage/utils'
@@ -55,8 +55,7 @@ export const MobileAuthSuccess = ({ identityId, explorerText, onTryAgain }: Prop
           <Title>Could not open {explorerText}</Title>
           <Description>The application could not be launched. Please make sure {explorerText} is installed and try again.</Description>
           <ActionButton>
-            <Button primary onClick={onTryAgain}>
-              <ArrowBackIosNewTwoToneIcon fontSize="small" />
+            <Button variant="contained" onClick={onTryAgain} startIcon={<ArrowBackIosNewTwoToneIcon fontSize="small" />}>
               Try again
             </Button>
           </ActionButton>
@@ -83,8 +82,7 @@ export const MobileAuthSuccess = ({ identityId, explorerText, onTryAgain }: Prop
           )}
         </Description>
         <ActionButton>
-          <Button primary onClick={attemptDeepLink}>
-            <LoginRoundedIcon fontSize="small" />
+          <Button variant="contained" onClick={attemptDeepLink} startIcon={<LoginRoundedIcon fontSize="small" />}>
             Return to {explorerText}
           </Button>
         </ActionButton>

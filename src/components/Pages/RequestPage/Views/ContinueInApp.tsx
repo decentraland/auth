@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import Icon from 'semantic-ui-react/dist/commonjs/elements/Icon/Icon'
-import { Button } from 'decentraland-ui/dist/components/Button/Button'
+import ArrowBackIcon from '@mui/icons-material/ArrowBack'
+import LoginIcon from '@mui/icons-material/Login'
+import { Button } from 'decentraland-ui2'
 import { useTargetConfig } from '../../../../hooks/targetConfig'
 import { Container } from '../Container'
 import { launchDeepLink } from '../utils'
@@ -69,8 +70,7 @@ export const ContinueInApp = ({ onContinue, requestId, deepLinkUrl, autoStart = 
           The application could not be launched. Please make sure {targetConfig.explorerText} is installed and try again.
         </div>
 
-        <Button primary onClick={handleGoToLogin} style={{ marginTop: '24px' }}>
-          <Icon name="arrow left" />
+        <Button variant="contained" onClick={handleGoToLogin} startIcon={<ArrowBackIcon />} sx={{ marginTop: '24px' }}>
           Go back to login
         </Button>
       </Container>
@@ -85,8 +85,7 @@ export const ContinueInApp = ({ onContinue, requestId, deepLinkUrl, autoStart = 
         You will be redirected to {targetConfig.explorerText} in {countdown}...
       </div>
 
-      <Button primary onClick={attemptDeepLink} style={{ marginTop: '24px' }}>
-        <Icon name="sign in" />
+      <Button variant="contained" onClick={attemptDeepLink} startIcon={<LoginIcon />} sx={{ marginTop: '24px' }}>
         Return to {targetConfig.explorerText}
       </Button>
     </Container>

@@ -17,7 +17,7 @@ const PrimaryMessage = styled(Box)(({ theme }) => ({
 
 const PrimaryOptionWrapper = styled(Box)(({ theme }) => ({
   width: '100%',
-  ['& .ui.button.primary']: {
+  ['& .MuiButton-contained']: {
     backgroundColor: theme.palette.common.white,
     color: theme.palette.common.black,
     display: 'flex',

@@ -1,6 +1,6 @@
 import { ReactNode, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { useMobileMediaQuery } from 'decentraland-ui/dist/components/Media/Media'
+import { useMobileMediaQuery } from 'decentraland-ui2'
 import { connection } from 'decentraland-connect'
 import { useNavigateWithSearchParams } from '../../../../hooks/navigation'
 import { useTargetConfig } from '../../../../hooks/targetConfig'

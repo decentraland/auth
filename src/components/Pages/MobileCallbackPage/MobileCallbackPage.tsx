@@ -2,7 +2,7 @@ import { useCallback, useContext, useEffect, useState } from 'react'
 import ArrowBackIosNewTwoToneIcon from '@mui/icons-material/ArrowBackIosNewTwoTone'
 import { RPCError } from 'magic-sdk'
 import { ProviderType } from '@dcl/schemas'
-import { Button } from 'decentraland-ui/dist/components/Button/Button'
+import { Button } from 'decentraland-ui2'
 import { connection } from 'decentraland-connect'
 import { CircularProgress } from 'decentraland-ui2'
 import wrongImg from '../../../assets/images/wrong.svg'
@@ -94,8 +94,7 @@ export const MobileCallbackPage = () => {
           <Title>Authentication Failed</Title>
           <Description>{error}</Description>
           <ActionButton>
-            <Button primary onClick={handleRetry}>
-              <ArrowBackIosNewTwoToneIcon fontSize="small" />
+            <Button variant="contained" onClick={handleRetry} startIcon={<ArrowBackIosNewTwoToneIcon fontSize="small" />}>
               Try again
             </Button>
           </ActionButton>

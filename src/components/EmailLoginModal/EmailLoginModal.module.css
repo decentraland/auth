@@ -5,11 +5,6 @@
   margin: auto !important;
 }
 
-.modal :global(.ui.modal > .content) {
-  background: transparent !important;
-  padding: 0 !important;
-}
-
 .header {
   display: flex;
   justify-content: space-between;
@@ -191,17 +186,7 @@
 .verifyingLoader {
   width: 16px !important;
   height: 16px !important;
-}
-
-.verifyingLoader::before,
-.verifyingLoader::after {
-  width: 16px !important;
-  height: 16px !important;
-  border-color: rgba(255, 255, 255, 0.3) !important;
-}
-
-.verifyingLoader::after {
-  border-top-color: white !important;
+  color: white !important;
 }
 
 .verifyingText {

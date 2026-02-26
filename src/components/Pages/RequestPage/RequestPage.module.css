@@ -15,23 +15,21 @@
   z-index: 1;
 }
 
-.noButton:global(.ui.button),
-.noButton:global(.ui.button):hover,
-.yesButton:global(.ui.button),
-.yesButton:global(.ui.button):hover {
-  background: white;
-  color: black;
+.noButton,
+.noButton:hover,
+.yesButton,
+.yesButton:hover {
+  background: white !important;
+  color: black !important;
   display: flex;
 }
 
-.noButton:global(.ui.button) i {
+.noButton .MuiButton-startIcon {
   color: red;
-  font-size: 20px;
 }
 
-.yesButton:global(.ui.button) i {
+.yesButton .MuiButton-startIcon {
   color: green;
-  font-size: 20px;
 }
 
 .communityBubble {

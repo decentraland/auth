@@ -1,12 +1,14 @@
 import { useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
+import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined'
+import CheckCircleOutlinedIcon from '@mui/icons-material/CheckCircleOutlined'
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline'
+import Dialog from '@mui/material/Dialog'
+import DialogActions from '@mui/material/DialogActions'
+import DialogContent from '@mui/material/DialogContent'
+import DialogTitle from '@mui/material/DialogTitle'
 import { ethers, BrowserProvider, formatEther } from 'ethers'
-import Icon from 'semantic-ui-react/dist/commonjs/elements/Icon/Icon'
-import { ChainId } from '@dcl/schemas'
-import { Button } from 'decentraland-ui/dist/components/Button/Button'
-import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
-import { Web2TransactionModal } from 'decentraland-ui/dist/components/Web2TransactionModal'
+import { Button, CircularProgress } from 'decentraland-ui2'
 import { getContract, sendMetaTransaction, ContractName } from 'decentraland-transactions'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useTargetConfig } from '../../../hooks/targetConfig'
@@ -627,7 +629,7 @@ export const RequestPage = () => {
     case View.LOADING_REQUEST:
       return (
         <Container>
-          <Loader active size="huge" />
+          <CircularProgress size={60} />
         </Container>
       )
     case View.VERIFY_SIGN_IN: {
@@ -650,12 +652,10 @@ export const RequestPage = () => {
           )}
 
           <div className={styles.buttons}>
-            <Button inverted disabled={isLoading} onClick={onDenyVerifySignIn} className={styles.noButton}>
-              <Icon name="times circle" />
+            <Button variant="outlined" disabled={isLoading} onClick={onDenyVerifySignIn} className={styles.noButton} startIcon={<CancelOutlinedIcon />}>
               {isDeepLinkFlow ? 'Cancel' : "No, it doesn't"}
             </Button>
-            <Button inverted loading={isLoading} disabled={isLoading} onClick={onApproveSignInVerification} className={styles.yesButton}>
-              <Icon name="check circle" />
+            <Button variant="outlined" disabled={isLoading} onClick={onApproveSignInVerification} className={styles.yesButton} startIcon={isLoading ? <CircularProgress size={20} color="inherit" /> : <CheckCircleOutlinedIcon />}>
               {isDeepLinkFlow ? 'Sign In' : 'Yes, they are the same'}
             </Button>
           </div>
@@ -676,15 +676,17 @@ export const RequestPage = () => {
     case View.WALLET_NFT_INTERACTION:
       return nftTransferData ? (
         <>
-          <Web2TransactionModal
-            isOpen={isTransactionModalOpen}
-            transactionCostAmount={formatEther((transactionGasCost ?? 0).toString())}
-            userBalanceAmount={formatEther((walletInfo?.balance ?? 0).toString())}
-            chainId={walletInfo?.chainId ?? ChainId.ETHEREUM_MAINNET}
-            onAccept={onApproveWalletInteraction}
-            onClose={onDenyWalletInteraction}
-            onReject={onDenyWalletInteraction}
-          />
+          <Dialog open={isTransactionModalOpen} maxWidth="xs" fullWidth>
+            <DialogTitle>Confirm Transaction</DialogTitle>
+            <DialogContent>
+              <p>Transaction cost: {formatEther((transactionGasCost ?? 0).toString())} ETH</p>
+              <p>Your balance: {formatEther((walletInfo?.balance ?? 0).toString())} ETH</p>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={onDenyWalletInteraction}>Cancel</Button>
+              <Button variant="contained" onClick={onApproveWalletInteraction}>Confirm</Button>
+            </DialogActions>
+          </Dialog>
           <TransferConfirmView
             type={TransferType.GIFT}
             transferData={nftTransferData}
@@ -697,15 +699,17 @@ export const RequestPage = () => {
     case View.WALLET_MANA_INTERACTION:
       return manaTransferData ? (
         <>
-          <Web2TransactionModal
-            isOpen={isTransactionModalOpen}
-            transactionCostAmount={formatEther((transactionGasCost ?? 0).toString())}
-            userBalanceAmount={formatEther((walletInfo?.balance ?? 0).toString())}
-            chainId={walletInfo?.chainId ?? ChainId.ETHEREUM_MAINNET}
-            onAccept={onApproveWalletInteraction}
-            onClose={onDenyWalletInteraction}
-            onReject={onDenyWalletInteraction}
-          />
+          <Dialog open={isTransactionModalOpen} maxWidth="xs" fullWidth>
+            <DialogTitle>Confirm Transaction</DialogTitle>
+            <DialogContent>
+              <p>Transaction cost: {formatEther((transactionGasCost ?? 0).toString())} ETH</p>
+              <p>Your balance: {formatEther((walletInfo?.balance ?? 0).toString())} ETH</p>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={onDenyWalletInteraction}>Cancel</Button>
+              <Button variant="contained" onClick={onApproveWalletInteraction}>Confirm</Button>
+            </DialogActions>
+          </Dialog>
           <TransferConfirmView
             type={TransferType.TIP}
             transferData={manaTransferData}
@@ -718,15 +722,17 @@ export const RequestPage = () => {
     case View.WALLET_INTERACTION:
       return (
         <Container canChangeAccount requestId={requestId}>
-          <Web2TransactionModal
-            isOpen={isTransactionModalOpen}
-            transactionCostAmount={formatEther((transactionGasCost ?? 0).toString())}
-            userBalanceAmount={formatEther((walletInfo?.balance ?? 0).toString())}
-            chainId={walletInfo?.chainId ?? ChainId.ETHEREUM_MAINNET}
-            onAccept={onApproveWalletInteraction}
-            onClose={onDenyWalletInteraction}
-            onReject={onDenyWalletInteraction}
-          />
+          <Dialog open={isTransactionModalOpen} maxWidth="xs" fullWidth>
+            <DialogTitle>Confirm Transaction</DialogTitle>
+            <DialogContent>
+              <p>Transaction cost: {formatEther((transactionGasCost ?? 0).toString())} ETH</p>
+              <p>Your balance: {formatEther((walletInfo?.balance ?? 0).toString())} ETH</p>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={onDenyWalletInteraction}>Cancel</Button>
+              <Button variant="contained" onClick={onApproveWalletInteraction}>Confirm</Button>
+            </DialogActions>
+          </Dialog>
           <div className={viewStyles.logo}></div>
           <div className={viewStyles.title}>
             {isUserUsingWeb2Wallet
@@ -735,11 +741,11 @@ export const RequestPage = () => {
           </div>
           <div className={viewStyles.description}>Only proceed if you are aware of all transaction details and trust this scene.</div>
           <div className={styles.buttons}>
-            <Button inverted disabled={isLoading} onClick={onDenyWalletInteraction}>
+            <Button variant="outlined" disabled={isLoading} onClick={onDenyWalletInteraction}>
               Deny
             </Button>
-            <Button primary disabled={isLoading} loading={isLoading} onClick={handleApproveWalletInteraction}>
-              Allow
+            <Button variant="contained" disabled={isLoading} onClick={handleApproveWalletInteraction}>
+              {isLoading ? <CircularProgress size={20} color="inherit" /> : 'Allow'}
             </Button>
           </div>
         </Container>

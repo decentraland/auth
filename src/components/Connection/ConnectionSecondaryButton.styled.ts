@@ -13,7 +13,7 @@ const ShowMoreSecondaryOptions = styled(Box)(({ theme }) => ({
 const SecondaryOptionButton = styled(Box)(({ theme }) => ({
   width: '100%',
   minWidth: '46px',
-  ['& .ui.button.primary']: {
+  ['& .MuiButton-contained']: {
     width: '100%',
     minWidth: '46px',
     backgroundColor: theme.palette.common.white,

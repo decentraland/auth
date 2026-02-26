@@ -19,9 +19,9 @@
 
 /* Primary button styles */
 
-.primaryButton:global(.ui.button.primary) {
-  background-color: #ffffff;
-  color: black;
+.primaryButton {
+  background-color: #ffffff !important;
+  color: black !important;
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -68,7 +68,7 @@
   margin-top: 32px;
 }
 
-.showMoreButton:global(.ui.button.basic) {
+.showMoreButton {
   color: #ffffff !important;
   font-weight: bold;
   display: flex;
@@ -94,7 +94,7 @@
   width: 100%;
 }
 
-.secondaryOptionButton:global(.ui.button.primary) {
+.secondaryOptionButton {
   min-width: 46px;
 }
 
@@ -102,7 +102,4 @@
   .showMoreSecondaryOptions {
       grid-template-columns: repeat(1, 1fr);
     }
-  .secondaryOptionButton span :global(.ui.button.primary) {
-    margin: auto
-  }
 }

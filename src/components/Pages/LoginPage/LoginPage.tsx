@@ -5,7 +5,7 @@ import { ChainId } from '@dcl/schemas/dist/dapps/chain-id'
 import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
 import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
 import { Env } from '@dcl/ui-env'
-import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
+import { CircularProgress } from 'decentraland-ui2'
 import { connection } from 'decentraland-connect'
 import ImageNew1 from '../../../assets/images/background/image-new1.webp'
 import ImageNew2 from '../../../assets/images/background/image-new2.webp'
@@ -99,6 +99,8 @@ export const LoginPage = () => {
   const showGuestOption = !!guestRedirectToURL
 
   const [currentBackgroundIndex, setCurrentBackgroundIndex] = useState(0)
+  const [previousBackgroundIndex, setPreviousBackgroundIndex] = useState(0)
+  const [backgroundTransitioning, setBackgroundTransitioning] = useState(false)
   const [targetConfig] = useTargetConfig()
   const { checkProfileAndRedirect } = useAuthFlow()
   const { trackLoginClick, trackLoginSuccess, trackGuestLogin } = useAnalytics()
@@ -398,34 +400,51 @@ export const LoginPage = () => {
   }, [currentConnectionType, emailLoginAddress, runProfileRedirect, getReferrerFromCurrentSearch])
 
   useEffect(() => {
+    const images = isNewUser ? NEW_USER_BACKGROUND_IMAGES : BACKGROUND_IMAGES
+    const maxIndex = images.length - 1
     const backgroundInterval = setInterval(() => {
-      setCurrentBackgroundIndex(index => {
-        if (index === (isNewUser ? NEW_USER_BACKGROUND_IMAGES.length - 1 : BACKGROUND_IMAGES.length - 1)) {
-          return 0
-        }
-        return index + 1
+      setCurrentBackgroundIndex(prev => {
+        setPreviousBackgroundIndex(prev)
+        setBackgroundTransitioning(true)
+        return prev >= maxIndex ? 0 : prev + 1
       })
     }, 5000)
-    return () => {
-      clearInterval(backgroundInterval)
-    }
-  }, [])
+    return () => clearInterval(backgroundInterval)
+  }, [isNewUser])
 
+  useEffect(() => {
+    if (!backgroundTransitioning) return
+    const t = setTimeout(() => {
+      setPreviousBackgroundIndex(currentBackgroundIndex)
+      setBackgroundTransitioning(false)
+    }, 1000)
+    return () => clearTimeout(t)
+  }, [backgroundTransitioning, currentBackgroundIndex])
+
+  const backgroundImages = isNewUser ? NEW_USER_BACKGROUND_IMAGES : BACKGROUND_IMAGES
   return (
     <main className={classNames(styles.main, isNewUser && styles.newUserMain)}>
-      <div
-        className={styles.background}
-        style={{
-          backgroundImage: `url(${
-            isNewUser ? NEW_USER_BACKGROUND_IMAGES[currentBackgroundIndex] : BACKGROUND_IMAGES[currentBackgroundIndex]
-          })`
-        }}
-      />
+      <div className={styles.backgroundWrapper}>
+        <div
+          className={styles.background}
+          style={{
+            backgroundImage: `url(${backgroundImages[previousBackgroundIndex]})`
+          }}
+          aria-hidden
+        />
+        <div
+          className={classNames(styles.background, backgroundTransitioning ? styles.backgroundEnterActive : styles.backgroundEnter)}
+          style={{
+            backgroundImage: `url(${backgroundImages[currentBackgroundIndex]})`
+          }}
+          aria-hidden
+        />
+      </div>
       {showConfirmingLogin && !showClockSyncModal && (
         <ConfirmingLogin error={confirmingLoginError} onError={confirmingLoginError ? handleConfirmingLoginRetry : undefined} />
       )}
       {config.is(Env.DEVELOPMENT) && !flagInitialized ? (
-        <Loader active size="massive" />
+        <CircularProgress size={80} />
       ) : (
         <>
           <ClockSyncModal open={showClockSyncModal} onContinue={handleClockSyncContinue} onClose={handleClockSyncContinue} />
