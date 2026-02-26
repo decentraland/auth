@@ -1,4 +1,4 @@
-import type { TooltipProps } from '@mui/material/Tooltip'
+import type { TooltipProps } from 'decentraland-ui2'
 import { ConnectionOptionType } from '../Connection.types'
 
 export type ConnectionIconProps = {

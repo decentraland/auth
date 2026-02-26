@@ -3,13 +3,9 @@ import { useParams, useSearchParams } from 'react-router-dom'
 import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined'
 import CheckCircleOutlinedIcon from '@mui/icons-material/CheckCircleOutlined'
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline'
-import Dialog from '@mui/material/Dialog'
-import DialogActions from '@mui/material/DialogActions'
-import DialogContent from '@mui/material/DialogContent'
-import DialogTitle from '@mui/material/DialogTitle'
 import { ethers, BrowserProvider, formatEther } from 'ethers'
-import { Button, CircularProgress } from 'decentraland-ui2'
 import { getContract, sendMetaTransaction, ContractName } from 'decentraland-transactions'
+import { Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle } from 'decentraland-ui2'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import { useAnalytics } from '../../../hooks/useAnalytics'
@@ -652,10 +648,22 @@ export const RequestPage = () => {
           )}
 
           <div className={styles.buttons}>
-            <Button variant="outlined" disabled={isLoading} onClick={onDenyVerifySignIn} className={styles.noButton} startIcon={<CancelOutlinedIcon />}>
+            <Button
+              variant="outlined"
+              disabled={isLoading}
+              onClick={onDenyVerifySignIn}
+              className={styles.noButton}
+              startIcon={<CancelOutlinedIcon />}
+            >
               {isDeepLinkFlow ? 'Cancel' : "No, it doesn't"}
             </Button>
-            <Button variant="outlined" disabled={isLoading} onClick={onApproveSignInVerification} className={styles.yesButton} startIcon={isLoading ? <CircularProgress size={20} color="inherit" /> : <CheckCircleOutlinedIcon />}>
+            <Button
+              variant="outlined"
+              disabled={isLoading}
+              onClick={onApproveSignInVerification}
+              className={styles.yesButton}
+              startIcon={isLoading ? <CircularProgress size={20} color="inherit" /> : <CheckCircleOutlinedIcon />}
+            >
               {isDeepLinkFlow ? 'Sign In' : 'Yes, they are the same'}
             </Button>
           </div>
@@ -684,7 +692,9 @@ export const RequestPage = () => {
             </DialogContent>
             <DialogActions>
               <Button onClick={onDenyWalletInteraction}>Cancel</Button>
-              <Button variant="contained" onClick={onApproveWalletInteraction}>Confirm</Button>
+              <Button variant="contained" onClick={onApproveWalletInteraction}>
+                Confirm
+              </Button>
             </DialogActions>
           </Dialog>
           <TransferConfirmView
@@ -707,7 +717,9 @@ export const RequestPage = () => {
             </DialogContent>
             <DialogActions>
               <Button onClick={onDenyWalletInteraction}>Cancel</Button>
-              <Button variant="contained" onClick={onApproveWalletInteraction}>Confirm</Button>
+              <Button variant="contained" onClick={onApproveWalletInteraction}>
+                Confirm
+              </Button>
             </DialogActions>
           </Dialog>
           <TransferConfirmView
@@ -730,7 +742,9 @@ export const RequestPage = () => {
             </DialogContent>
             <DialogActions>
               <Button onClick={onDenyWalletInteraction}>Cancel</Button>
-              <Button variant="contained" onClick={onApproveWalletInteraction}>Confirm</Button>
+              <Button variant="contained" onClick={onApproveWalletInteraction}>
+                Confirm
+              </Button>
             </DialogActions>
           </Dialog>
           <div className={viewStyles.logo}></div>

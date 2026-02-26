@@ -1,7 +1,6 @@
 import * as React from 'react'
-import Dialog from '@mui/material/Dialog'
-import IconButton from '@mui/material/IconButton'
 import CloseIcon from '@mui/icons-material/Close'
+import { Dialog, IconButton } from 'decentraland-ui2'
 import warningIcon from '../../assets/images/warning.svg'
 import { Actions, Content, ContinueButton, Message, WarningIcon, Title } from './ClockSyncModal.styled'
 import { ClockSyncModalProps } from './ClockSyncModal.types'

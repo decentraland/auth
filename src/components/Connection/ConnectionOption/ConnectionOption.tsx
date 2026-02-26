@@ -1,6 +1,5 @@
-import Tooltip from '@mui/material/Tooltip'
 import classNames from 'classnames'
-import { Button, CircularProgress } from 'decentraland-ui2'
+import { Button, CircularProgress, Tooltip } from 'decentraland-ui2'
 import { capitalize } from '../../../shared/text'
 import { ConnectionIconProps } from './ConnectionOption.types'
 import styles from './ConnectionOption.module.css'

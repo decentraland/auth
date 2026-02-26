@@ -488,26 +488,18 @@ export const SetupPage = () => {
                 <div className={styles.name}>
                   <div className={styles.field}>
                     <label className={styles.fieldLabel}>Username</label>
-                    <input
-                      className={styles.fieldInput}
-                      placeholder="Enter your username"
-                      onChange={handleNameChange}
-                      value={name}
-                    />
+                    <input className={styles.fieldInput} placeholder="Enter your username" onChange={handleNameChange} value={name} />
                     {showErrors && nameError ? (
-                      <div className={styles.fieldMessage}><InputErrorMessage message={nameError} /></div>
+                      <div className={styles.fieldMessage}>
+                        <InputErrorMessage message={nameError} />
+                      </div>
                     ) : null}
                   </div>
                 </div>
                 <div>
                   <div className={styles.field}>
                     <label className={styles.fieldLabel}>Email (optional)</label>
-                    <input
-                      className={styles.fieldInput}
-                      placeholder="Enter your email"
-                      value={email}
-                      onChange={handleEmailChange}
-                    />
+                    <input className={styles.fieldInput} placeholder="Enter your email" value={email} onChange={handleEmailChange} />
                     <div className={styles.fieldMessage}>
                       {showErrors && emailError ? <InputErrorMessage className={styles.emailError} message={emailError} /> : null}
                       <span>

@@ -1,6 +1,5 @@
 import { useState, useCallback, useRef, useEffect, KeyboardEvent, ChangeEvent, ClipboardEvent } from 'react'
-import Dialog from '@mui/material/Dialog'
-import { CircularProgress } from 'decentraland-ui2'
+import { CircularProgress, Dialog } from 'decentraland-ui2'
 import { TrackingEvents } from '../../modules/analytics/types'
 import { trackEvent } from '../../shared/utils/analytics'
 import { handleError } from '../../shared/utils/errorHandler'
