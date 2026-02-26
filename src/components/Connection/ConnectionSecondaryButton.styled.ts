@@ -13,13 +13,26 @@ const ShowMoreSecondaryOptions = styled(Box)(({ theme }) => ({
 const SecondaryOptionButton = styled(Box)(({ theme }) => ({
   width: '100%',
   minWidth: '46px',
-  ['& .MuiButton-contained']: {
+  ['& .MuiButton-contained, & .MuiButton-containedPrimary, & .MuiButton-containedSecondary']: {
     width: '100%',
     minWidth: '46px',
-    backgroundColor: theme.palette.common.white,
-    color: theme.palette.common.black,
+    backgroundColor: `${theme.palette.common.white} !important`,
+    color: `${theme.palette.common.black} !important`,
+    transition: 'transform 0.2s ease-in-out',
     [theme.breakpoints.down('xs')]: {
       margin: 'auto'
+    },
+    // eslint-disable-next-line @typescript-eslint/naming-convention -- CSS pseudo-selector
+    '&:hover': {
+      backgroundColor: `${theme.palette.common.white} !important`,
+      color: `${theme.palette.common.black} !important`,
+      transform: 'translateY(-2px)'
+    },
+    // eslint-disable-next-line @typescript-eslint/naming-convention -- CSS pseudo-selector
+    '&:active': {
+      backgroundColor: `${theme.palette.common.white} !important`,
+      color: `${theme.palette.common.black} !important`,
+      transform: 'translateY(0)'
     }
   }
 }))

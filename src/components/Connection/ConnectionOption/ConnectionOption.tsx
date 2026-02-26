@@ -10,6 +10,7 @@ export const ConnectionOption = (props: ConnectionIconProps): JSX.Element => {
   const button = (
     <Button
       variant="contained"
+      color="secondary"
       key={type}
       size="small"
       data-testid={`${testId}-${type}-button`}

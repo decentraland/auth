@@ -287,6 +287,8 @@ export const LoginPage = () => {
 
   const handleEmailLoginClose = useCallback(() => {
     setShowEmailLoginModal(false)
+    setCurrentEmail('')
+    setCurrentConnectionType(undefined)
   }, [])
 
   const handleEmailLoginBack = useCallback(() => {
