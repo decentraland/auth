@@ -262,8 +262,8 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
 
   return (
     <>
-      {/* Dark overlay for the dialog container (see OTP_MODAL_ROOT_CLASS + otpModalContainerGlobalStyles in .styled.ts) */}
-      <GlobalStyles styles={otpModalContainerGlobalStyles} />
+      {/* Only inject when open so we don't affect other modals (e.g. Connection/Metamask modal) */}
+      {open && <GlobalStyles styles={otpModalContainerGlobalStyles} />}
       <Dialog
         open={open}
         maxWidth="sm"
