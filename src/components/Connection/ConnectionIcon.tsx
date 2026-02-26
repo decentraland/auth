@@ -25,7 +25,8 @@ const createIconComponent = (src: string) => {
 }
 
 export const ConnectionIcon = ({ type }: ConnectionIconProps): JSX.Element | null => {
-  const iconProps = { role: 'img' as const, ariaLabel: type }
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  const iconProps = { role: 'img' as const, 'aria-label': type }
 
   switch (type) {
     case ConnectionOptionType.APPLE:
