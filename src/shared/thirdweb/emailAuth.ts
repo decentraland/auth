@@ -1,4 +1,5 @@
 import { inAppWallet, preAuthenticate } from 'thirdweb/wallets'
+import { UserFacingError, isErrorWithMessage } from '../errors'
 import { getThirdwebClient } from './client'
 
 // Store the wallet instance for reuse
@@ -81,6 +82,9 @@ export const verifyEmailOTPAndConnect = async (email: string, verificationCode: 
     return account
   } catch (error) {
     console.error('[Thirdweb] Error verifying OTP:', error)
+    if (isErrorWithMessage(error) && /verify|invalid|expired/i.test(error.message)) {
+      throw new UserFacingError(error.message)
+    }
     throw error
   }
 }

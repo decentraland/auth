@@ -1,3 +1,14 @@
+/**
+ * Thrown when an error is caused by user input rather than a system failure.
+ * These are intentionally excluded from Sentry to avoid noise.
+ */
+export class UserFacingError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'UserFacingError'
+  }
+}
+
 export function isErrorWithMessage(error: unknown): error is Error {
   return error !== undefined && error !== null && typeof error === 'object' && 'message' in error
 }
