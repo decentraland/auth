@@ -107,12 +107,7 @@ const LoaderWrapper = styled(Box)({
   position: 'relative',
   display: 'flex',
   justifyContent: 'center',
-  width: '100%',
-  ['& .ui.loader']: {
-    position: 'relative',
-    left: 'auto',
-    transform: 'none'
-  }
+  width: '100%'
 })
 
 const LoadingContainer = styled(Box)({
@@ -134,12 +129,7 @@ const LoadingTitle = styled(Box)({
 })
 
 const ActionButton = styled(Box)({
-  marginTop: '24px',
-  ['& .ui.button']: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px'
-  }
+  marginTop: '24px'
 })
 
 const TestButtonGroup = styled(Box)({
@@ -147,10 +137,7 @@ const TestButtonGroup = styled(Box)({
   display: 'flex',
   flexDirection: 'column',
   gap: '8px',
-  marginTop: '16px',
-  ['& .ui.button']: {
-    width: '100%'
-  }
+  marginTop: '16px'
 })
 
 export {

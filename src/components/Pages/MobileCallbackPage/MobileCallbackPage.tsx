@@ -1,9 +1,7 @@
 import { useCallback, useContext, useEffect, useState } from 'react'
-import ArrowBackIosNewTwoToneIcon from '@mui/icons-material/ArrowBackIosNewTwoTone'
 import { RPCError } from 'magic-sdk'
-import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import { Provider } from 'decentraland-connect'
-import { CircularProgress } from 'decentraland-ui2'
+import { Button, CircularProgress, muiIcons } from 'decentraland-ui2'
 import wrongImg from '../../../assets/images/wrong.svg'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useTargetConfig } from '../../../hooks/targetConfig'
@@ -17,6 +15,8 @@ import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvide
 import { getIdentitySignature } from '../LoginPage/utils'
 import { ActionButton, Background, Description, Icon, Main, SuccessContainer, Title } from '../MobileAuthPage/MobileAuthPage.styled'
 import { MobileAuthSuccess } from '../MobileAuthPage/MobileAuthSuccess'
+
+const ArrowBackIosNewTwoToneIcon = muiIcons.ArrowBackIosNewTwoTone
 
 export const MobileCallbackPage = () => {
   const navigate = useNavigateWithSearchParams()
@@ -110,8 +110,7 @@ export const MobileCallbackPage = () => {
           <Title>Authentication Failed</Title>
           <Description>{error}</Description>
           <ActionButton>
-            <Button primary onClick={handleRetry}>
-              <ArrowBackIosNewTwoToneIcon fontSize="small" />
+            <Button variant="contained" onClick={handleRetry} startIcon={<ArrowBackIosNewTwoToneIcon fontSize="small" />}>
               Try again
             </Button>
           </ActionButton>

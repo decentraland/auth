@@ -123,7 +123,7 @@ export const Connection = (props: ConnectionProps): JSX.Element => {
             testId={EXTRA_TEST_ID}
             options={filteredExtraOptions}
             onConnect={onConnect}
-            tooltipDirection="top center"
+            tooltipDirection="top"
             loadingOption={loadingOption}
           />
         )}

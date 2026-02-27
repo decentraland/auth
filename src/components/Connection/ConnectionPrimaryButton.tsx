@@ -1,5 +1,5 @@
-import NavigateNextRoundedIcon from '@mui/icons-material/NavigateNextRounded'
 import Tooltip from '@mui/material/Tooltip'
+import { muiIcons } from 'decentraland-ui2'
 import { isSocialLogin } from '../Pages/LoginPage/utils'
 import { ConnectionIcon } from './ConnectionIcon'
 import {
@@ -8,10 +8,13 @@ import {
   PrimaryOptionWrapper,
   PrimaryButton,
   primaryTooltipSlotProps,
-  PrimaryButtonWrapper
+  PrimaryButtonWrapper,
+  TooltipWrapper
 } from './ConnectionPrimaryButton.styled'
 import { ConnectionOptionType, MetamaskEthereumWindow } from './Connection.types'
 import { ConnectionPrimaryButtonProps } from './ConnectionPrimaryButton.types'
+
+const NavigateNextRoundedIcon = muiIcons.NavigateNextRounded
 
 export const ConnectionPrimaryButton = ({
   option,
@@ -51,7 +54,7 @@ export const ConnectionPrimaryButton = ({
         <PrimaryOption>
           {error ? (
             <Tooltip title={error} arrow placement="top" slotProps={primaryTooltipSlotProps}>
-              <span style={{ display: 'block', width: '100%' }}>{button}</span>
+              <TooltipWrapper>{button}</TooltipWrapper>
             </Tooltip>
           ) : (
             button

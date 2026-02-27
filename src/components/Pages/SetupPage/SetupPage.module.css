@@ -35,14 +35,49 @@
   color: white;
 }
 
-.container :global(.message) {
+.fieldLabel {
   color: white !important;
   opacity: 70%;
+  display: block;
+  margin-bottom: 4px;
+  font-size: 14px;
+  font-weight: 500;
 }
 
-.container :global(.ui.sub.header) > label {
+.fieldInput {
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: white;
+  font-size: 16px;
+  padding: 8px 0;
+  outline: none;
+}
+
+.fieldMessage {
   color: white !important;
   opacity: 70%;
+  margin-top: 4px;
+  font-size: 13px;
+}
+
+.field {
+  margin-bottom: 16px;
+}
+
+.checkbox {
+  width: 18px;
+  height: 18px;
+  margin-right: 10px;
+  cursor: pointer;
+  accent-color: white;
+}
+
+.randomizeButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
 .container input {
@@ -96,12 +131,6 @@
   margin-top: 16px;
 }
 
-.randomize > :global(.button) {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
 
 .continue {
   width: 75%;
@@ -137,13 +166,6 @@
   align-items: center;
 }
 
-.agree :global(.checkbox) {
-  margin-right: 10px;
-}
-
-.agree :global(.ui.checkbox input[type='checkbox'].hidden ~ label:before) {
-  border: 2px solid rgba(255, 255, 255, 0.7);
-}
 
 .agree a {
   color: white;
@@ -232,27 +254,14 @@
     margin-top: 0px;
   }
 
-  .randomize > :global(.button) {
-    width: 100%;
-  }
-
   .continue {
     flex: 1;
     margin-top: 0px;
     width: unset;
   }
 
-  .continue > :global(.button) {
-    width: 100%;
-    transform: scale(1.05);
-  }
-
   .mobileCompleteYourProfile {
     margin-top: 47px;
-  }
-
-  .mobileContainer :global(.dcl.field) {
-    min-width: unset;
   }
 
   .agree {

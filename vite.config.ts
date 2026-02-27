@@ -36,7 +36,7 @@ export default defineConfig(({ command, mode }) => {
                 manualChunks: {
                   thirdweb: ['thirdweb'],
                   vendor: ['react', 'react-dom', 'react-router-dom'],
-                  ui: ['decentraland-ui', 'decentraland-ui2']
+                  ui: ['decentraland-ui2']
                 }
               }
             }

@@ -2,20 +2,43 @@
   display: grid;
   grid-template-columns: 40% 60%;
   height: 100%;
+  width: 100%;
+  max-width: 100vw;
   position: relative;
+  overflow: hidden;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.backgroundWrapper {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  overflow: hidden;
 }
 
 .background {
   width: 100%;
   height: 100%;
+  position: absolute;
   top: 0;
   left: 0;
-  position: absolute;
   background-repeat: no-repeat;
   background-size: cover;
   background-position: right;
   animation: move-background 10s linear infinite alternate;
-  z-index: -1;
+  transition: opacity 1s ease-in-out;
+}
+
+.backgroundEnter {
+  opacity: 0;
+}
+
+.backgroundEnterActive {
+  opacity: 1;
 }
 
 .main::before {

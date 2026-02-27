@@ -2,8 +2,7 @@ import { useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { PreviewEmote } from '@dcl/schemas'
 import { PreviewUnityMode } from '@dcl/schemas/dist/dapps/preview'
 import { Env } from '@dcl/ui-env'
-import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
-import { WearablePreview } from 'decentraland-ui2'
+import { CircularProgress, WearablePreview } from 'decentraland-ui2'
 import { useAnalytics } from '../../hooks/useAnalytics'
 import { config } from '../../modules/config'
 import { checkWebGpuSupport } from '../../shared/utils/webgpu'
@@ -89,7 +88,7 @@ export const CustomWearablePreview = (props: Props) => {
         onLoad={handleOnLoad}
       />
 
-      {isLoading ? <Loader active={true} size="huge" /> : null}
+      {isLoading ? <CircularProgress size={60} /> : null}
     </div>
   )
 }

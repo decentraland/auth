@@ -4,7 +4,7 @@ import { ConnectionSecondaryButtonProps } from './ConnectionSecondaryButton.type
 
 export const ConnectionSecondaryButton = ({
   options,
-  tooltipDirection = 'top center',
+  tooltipDirection = 'top',
   testId,
   loadingOption,
   onConnect
