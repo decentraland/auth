@@ -1,6 +1,6 @@
 import { captureException } from '@sentry/react'
 import { TrackingEvents } from '../../modules/analytics/types'
-import { isErrorWithMessage } from '../errors'
+import { UserFacingError, isErrorWithMessage } from '../errors'
 import { trackEvent } from './analytics'
 import { ErrorContext, HandleErrorOptions } from './errorHandler.types'
 
@@ -11,10 +11,12 @@ const handleError = (error: unknown, context: string, options?: HandleErrorOptio
     console.error(`${context}:`, errorMessage)
   }
 
-  captureException(error, {
-    tags: options?.sentryTags,
-    extra: options?.sentryExtra
-  })
+  if (!options?.skipSentry && !(error instanceof UserFacingError)) {
+    captureException(error, {
+      tags: options?.sentryTags,
+      extra: options?.sentryExtra
+    })
+  }
 
   if (!options?.skipTracking) {
     const trackingEvent = (options?.trackingEvent as TrackingEvents) || TrackingEvents.LOGIN_ERROR

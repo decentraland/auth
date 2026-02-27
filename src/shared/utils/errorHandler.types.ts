@@ -71,5 +71,6 @@ export interface HandleErrorOptions {
   sentryExtra?: SentryExtra
   skipLogging?: boolean
   skipTracking?: boolean
+  skipSentry?: boolean
   trackingEvent?: string
 }
