@@ -24,6 +24,7 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [hasError, setHasError] = useState(false)
+  const [resendCooldown, setResendCooldown] = useState(0)
 
   const otpInputRefs = useRef<(HTMLInputElement | null)[]>([])
   // Use ref to always have access to current email in callbacks
@@ -37,10 +38,18 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
       setError(null)
       setIsLoading(false)
       setHasError(false)
+      setResendCooldown(60)
       // Focus first OTP input after a short delay
       setTimeout(() => otpInputRefs.current[0]?.focus(), 100)
     }
   }, [open])
+
+  // Decrement resend cooldown every second
+  useEffect(() => {
+    if (resendCooldown <= 0) return
+    const timer = setTimeout(() => setResendCooldown(prev => prev - 1), 1000)
+    return () => clearTimeout(timer)
+  }, [resendCooldown])
 
   const handleOtpChange = useCallback(
     (index: number, value: string) => {
@@ -159,6 +168,7 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
       // Track OTP resend
       trackEvent(TrackingEvents.OTP_RESEND, { email: currentEmail })
 
+      setResendCooldown(60)
       // Focus first OTP input
       setTimeout(() => otpInputRefs.current[0]?.focus(), 100)
     } catch (e) {
@@ -181,6 +191,8 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
       onBack()
     }
   }, [isLoading, onBack])
+
+  const canResend = !isLoading && resendCooldown === 0
 
   const renderContent = () => {
     return (
@@ -224,8 +236,8 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
         {error && (
           <>
             <p className={styles.errorMessage}>{error}</p>
-            <span className={styles.resendLinkError} onClick={!isLoading ? handleResendOtp : undefined}>
-              Resend Code
+            <span className={styles.resendLinkError} onClick={canResend ? handleResendOtp : undefined}>
+              {resendCooldown > 0 ? `Resend Code (${resendCooldown}s)` : 'Resend Code'}
             </span>
           </>
         )}
@@ -233,8 +245,8 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
         {!error && (
           <p className={styles.resendText}>
             Didn't get an email?{' '}
-            <span className={styles.resendLink} onClick={!isLoading ? handleResendOtp : undefined}>
-              Resend Code
+            <span className={styles.resendLink} onClick={canResend ? handleResendOtp : undefined}>
+              {resendCooldown > 0 ? `Resend Code (${resendCooldown}s)` : 'Resend Code'}
             </span>
           </p>
         )}
