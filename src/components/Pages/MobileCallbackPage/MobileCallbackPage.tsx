@@ -9,7 +9,7 @@ import { createAuthServerHttpClient } from '../../../shared/auth'
 import { locations } from '../../../shared/locations'
 import { restoreSessionStorageMirror } from '../../../shared/mobile'
 import { handleError } from '../../../shared/utils/errorHandler'
-import { createMagicInstance, OAUTH_ACCESS_DENIED_ERROR } from '../../../shared/utils/magicSdk'
+import { OAUTH_ACCESS_DENIED_ERROR, createMagicInstance } from '../../../shared/utils/magicSdk'
 import { ConnectionContainer, ConnectionTitle, DecentralandLogo, ProgressContainer } from '../../ConnectionModal/ConnectionLayout.styled'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import { getIdentitySignature } from '../LoginPage/utils'
@@ -129,7 +129,7 @@ export const MobileCallbackPage = () => {
     <Main component="main">
       <ConnectionContainer>
         <DecentralandLogo size="huge" />
-        <ConnectionTitle>Just a moment, we're verifying your login credentials...</ConnectionTitle>
+        <ConnectionTitle>Just a moment, we&apos;re verifying your login credentials...</ConnectionTitle>
         <ProgressContainer>
           <CircularProgress color="inherit" />
         </ProgressContainer>

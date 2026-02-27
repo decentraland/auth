@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/naming-convention */
-import { Box, Button, muiIcons, styled, Typography } from 'decentraland-ui2'
+import { Box, Button, Typography, muiIcons, styled } from 'decentraland-ui2'
 
 const ExpandLessIcon = muiIcons.ExpandLess
 const ExpandMoreIcon = muiIcons.ExpandMore
@@ -96,9 +96,9 @@ const Divider = styled(Box)(({ theme }) => ({
   margin: `${theme.spacing(3)} 0`,
   color: 'rgba(255, 255, 255, 0.5)',
   fontSize: '13px',
-  // eslint-disable-next-line @typescript-eslint/naming-convention
+
   '&::before': dividerLineStyle,
-  // eslint-disable-next-line @typescript-eslint/naming-convention
+
   '&::after': dividerLineStyle
 }))
 

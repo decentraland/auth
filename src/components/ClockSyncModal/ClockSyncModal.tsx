@@ -1,8 +1,9 @@
+// eslint-disable-next-line @typescript-eslint/naming-convention
 import * as React from 'react'
 import { Dialog, muiIcons } from 'decentraland-ui2'
 import warningIcon from '../../assets/images/warning.svg'
-import { Actions, CloseIconButton, Content, ContinueButton, Message, WarningIcon, Title } from './ClockSyncModal.styled'
 import { ClockSyncModalProps } from './ClockSyncModal.types'
+import { Actions, CloseIconButton, Content, ContinueButton, Message, Title, WarningIcon } from './ClockSyncModal.styled'
 
 const CloseIcon = muiIcons.Close
 
@@ -15,7 +16,7 @@ export const ClockSyncModal: React.FC<ClockSyncModalProps> = ({ open, onContinue
       <Content>
         <WarningIcon src={warningIcon} alt="warning" />
         <Title>Device Clock Out of Sync</Title>
-        <Message>Please update your computer's time settings to the correct local time to avoid server timeout issues.</Message>
+        <Message>Please update your computer&apos;s time settings to the correct local time to avoid server timeout issues.</Message>
         <Actions>
           <ContinueButton variant="contained" onClick={onContinue}>
             Continue to site

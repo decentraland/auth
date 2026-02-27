@@ -1,4 +1,4 @@
-import { Alert, styled, dclColors } from 'decentraland-ui2'
+import { Alert, dclColors, styled } from 'decentraland-ui2'
 
 const AlertContainer = styled(Alert)(({ theme }) => ({
   alignItems: 'center',

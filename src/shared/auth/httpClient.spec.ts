@@ -1,4 +1,5 @@
 import { AuthIdentity } from '@dcl/crypto'
+import signedFetchMock from 'decentraland-crypto-fetch'
 import { getAnalytics } from '../../modules/analytics/segment'
 import { config } from '../../modules/config'
 import { DifferentSenderError, ExpiredRequestError, RequestNotFoundError } from './errors'
@@ -364,8 +365,8 @@ describe('createAuthServerClient', () => {
   describe('when posting an identity', () => {
     let client: ReturnType<typeof createAuthServerHttpClient>
     let mockIdentity: AuthIdentity
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const signedFetch = require('decentraland-crypto-fetch') as jest.Mock
+
+    const signedFetch = signedFetchMock as unknown as jest.Mock
 
     beforeEach(() => {
       client = createAuthServerHttpClient()

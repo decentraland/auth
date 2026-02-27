@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { ProviderType } from '@dcl/schemas'
-import { getCurrentConnectionData, ConnectionData } from './connection'
+import { ConnectionData, getCurrentConnectionData } from './connection'
 import { useCurrentConnectionData } from './hooks'
 
 // Mock the connection module

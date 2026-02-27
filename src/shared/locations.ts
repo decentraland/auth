@@ -3,7 +3,7 @@ import { EthAddress } from '@dcl/schemas'
 /**
  * Login method types for direct login via URL parameters
  */
-export type LoginMethod = 'email' | 'metamask' | 'google' | 'discord' | 'apple' | 'x' | 'fortmatic' | 'coinbase' | 'walletconnect'
+type LoginMethod = 'email' | 'metamask' | 'google' | 'discord' | 'apple' | 'x' | 'fortmatic' | 'coinbase' | 'walletconnect'
 
 /**
  * Options for the login location
@@ -26,7 +26,7 @@ const buildQueryString = (params: Record<string, string | undefined | null>): st
   return `?${queryString}`
 }
 
-export const locations = {
+const locations = {
   home: () => '/',
 
   /**
@@ -77,7 +77,7 @@ export const locations = {
   mobileCallback: () => '/mobile/callback'
 }
 
-export const extractRedirectToFromSearchParameters = (searchParams: URLSearchParams): string => {
+const extractRedirectToFromSearchParameters = (searchParams: URLSearchParams): string => {
   // Extract 'redirectTo' from current search parameters
   let redirectToSearchParam = searchParams.get('redirectTo')
   try {
@@ -90,7 +90,7 @@ export const extractRedirectToFromSearchParameters = (searchParams: URLSearchPar
         redirectToSearchParam = parsedRedirectTo ?? null
       }
     }
-  } catch (_) {
+  } catch {
     console.error("Can't decode state parameter")
   }
 
@@ -101,7 +101,7 @@ export const extractRedirectToFromSearchParameters = (searchParams: URLSearchPar
   if (redirectToSearchParam) {
     try {
       redirectTo = decodeURIComponent(redirectToSearchParam)
-    } catch (error) {
+    } catch {
       console.error("Can't decode redirectTo parameter")
     }
   }
@@ -109,7 +109,7 @@ export const extractRedirectToFromSearchParameters = (searchParams: URLSearchPar
   return redirectTo
 }
 
-export const extractReferrerFromSearchParameters = (searchParams: URLSearchParams): string | null => {
+const extractReferrerFromSearchParameters = (searchParams: URLSearchParams): string | null => {
   let referrerSearchParam = searchParams.get('referrer')
   try {
     const state = searchParams.get('state')
@@ -120,7 +120,7 @@ export const extractReferrerFromSearchParameters = (searchParams: URLSearchParam
         referrerSearchParam = parsedReferrer ?? null
       }
     }
-  } catch (_) {
+  } catch {
     console.error("Can't decode state parameter")
   }
 
@@ -130,3 +130,6 @@ export const extractReferrerFromSearchParameters = (searchParams: URLSearchParam
 
   return referrerSearchParam
 }
+
+export type { LoginMethod }
+export { locations, extractRedirectToFromSearchParameters, extractReferrerFromSearchParameters }

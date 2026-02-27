@@ -1,12 +1,12 @@
-export function isErrorWithMessage(error: unknown): error is Error {
+function isErrorWithMessage(error: unknown): error is Error {
   return error !== undefined && error !== null && typeof error === 'object' && 'message' in error
 }
 
-export function isErrorWithName(error: unknown): error is Error {
+function isErrorWithName(error: unknown): error is Error {
   return error !== undefined && error !== null && typeof error === 'object' && 'name' in error
 }
 
-export type RPCError = {
+type RPCError = {
   error: {
     code: number
     message: string
@@ -14,7 +14,7 @@ export type RPCError = {
   }
 }
 
-export function isRpcError(error: unknown): error is RPCError {
+function isRpcError(error: unknown): error is RPCError {
   return (
     error !== undefined &&
     error !== null &&
@@ -27,3 +27,6 @@ export function isRpcError(error: unknown): error is RPCError {
     'code' in error.error
   )
 }
+
+export type { RPCError }
+export { isErrorWithMessage, isErrorWithName, isRpcError }

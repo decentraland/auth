@@ -1,7 +1,8 @@
+// eslint-disable-next-line @typescript-eslint/naming-convention
 import * as React from 'react'
-import { useCallback, useState, useMemo, useEffect, useContext, useRef } from 'react'
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { EthAddress, Email } from '@dcl/schemas'
+import { Email, EthAddress } from '@dcl/schemas'
 import { PreviewUnityMode } from '@dcl/schemas/dist/dapps/preview'
 import { CircularProgress, WearablePreview, launchDesktopApp } from 'decentraland-ui2'
 import avatarFloat from '../../../assets/animations/AvatarFloat_Lottie.json'
@@ -13,7 +14,7 @@ import { useSignRequest } from '../../../hooks/useSignRequest'
 import { useTrackReferral } from '../../../hooks/useTrackReferral'
 import { config } from '../../../modules/config'
 import { fetchProfile } from '../../../modules/profile'
-import { createAuthServerHttpClient, createAuthServerWsClient, IpValidationError } from '../../../shared/auth'
+import { IpValidationError, createAuthServerHttpClient, createAuthServerWsClient } from '../../../shared/auth'
 import { useCurrentConnectionData } from '../../../shared/connection/hooks'
 import { locations } from '../../../shared/locations'
 import { isProfileComplete } from '../../../shared/profile'
@@ -22,37 +23,37 @@ import { AnimatedBackground } from '../../AnimatedBackground'
 import { CharacterCounterComponent } from '../../CharacterCounter'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import { subscribeToNewsletter } from '../SetupPage/utils'
-import {
-  MainContainer,
-  LeftFormSection,
-  DecentralandLogo,
-  WelcomeContainer,
-  WelcomeTitle,
-  InputContainer,
-  InputLabel,
-  TextInput,
-  ErrorLabel,
-  ErrorText,
-  ErrorContainer,
-  WarningIcon,
-  CheckboxContainer,
-  CheckboxRow,
-  CheckboxInput,
-  ContinueButton,
-  RightAvatarSection,
-  RightSectionBackground,
-  PreloadedWearableContainer,
-  DecentralandText,
-  AvatarParticles,
-  EmailDescription,
-  LoadingContainer,
-  ProgressContainer,
-  LoadingTitle,
-  LinkCheckbox,
-  BackgroundShadow
-} from './AvatarSetupPage.styled'
 import { deployProfileFromAvatarShape } from './utils'
 import { AvatarSetupState, AvatarShape } from './AvatarSetupPage.types'
+import {
+  AvatarParticles,
+  BackgroundShadow,
+  CheckboxContainer,
+  CheckboxInput,
+  CheckboxRow,
+  ContinueButton,
+  DecentralandLogo,
+  DecentralandText,
+  EmailDescription,
+  ErrorContainer,
+  ErrorLabel,
+  ErrorText,
+  InputContainer,
+  InputLabel,
+  LeftFormSection,
+  LinkCheckbox,
+  LoadingContainer,
+  LoadingTitle,
+  MainContainer,
+  PreloadedWearableContainer,
+  ProgressContainer,
+  RightAvatarSection,
+  RightSectionBackground,
+  TextInput,
+  WarningIcon,
+  WelcomeContainer,
+  WelcomeTitle
+} from './AvatarSetupPage.styled'
 
 const MAX_CHARACTERS = 15
 
@@ -94,7 +95,7 @@ const AvatarSetupPage: React.FC = () => {
       const url = new URL(redirectTo ?? '', window.location.origin)
       const regex = /^\/?auth\/requests\/([a-zA-Z0-9-]+)$/
       requestId = url.pathname.match(regex)?.[1] ?? null
-    } catch (_e) {
+    } catch {
       // Do nothing
     }
     return requestId
@@ -201,7 +202,7 @@ const AvatarSetupPage: React.FC = () => {
         if (referrer && EthAddress.validate(referrer)) {
           try {
             await trackReferral(referrer, 'PATCH')
-          } catch (error) {
+          } catch {
             // Error is already handled in trackReferral
           }
         }
@@ -414,7 +415,7 @@ const AvatarSetupPage: React.FC = () => {
             id="terms"
             label={
               <>
-                I agree with Decentraland's{' '}
+                I agree with Decentraland&apos;s{' '}
                 <LinkCheckbox href="https://decentraland.org/terms/" target="_blank">
                   Terms of Use
                 </LinkCheckbox>{' '}

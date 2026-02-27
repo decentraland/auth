@@ -1,5 +1,5 @@
-import { AlertContainer } from './TransferAlert.styled'
 import { TransferAlertProps } from './TransferAlert.types'
+import { AlertContainer } from './TransferAlert.styled'
 
 const DEFAULT_TEXT = 'You can close this tab and return to the Decentraland app.'
 

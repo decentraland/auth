@@ -1,7 +1,9 @@
+// eslint-disable-next-line @typescript-eslint/naming-convention
 import * as React from 'react'
-import { CharacterCounter, CharacterCounterText, WarningIcon, ErrorText } from './CharacterCounter.styled'
 import { CharacterCounterProps } from './CharacterCounter.types'
+import { CharacterCounter, CharacterCounterText, ErrorText, WarningIcon } from './CharacterCounter.styled'
 
+/* eslint-disable react/prop-types */
 const CharacterCounterComponent = React.memo<CharacterCounterProps>(props => {
   const { characterCount, maxCharacters, hasError } = props
 

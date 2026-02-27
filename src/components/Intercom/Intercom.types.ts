@@ -1,10 +1,10 @@
-export type IntercomWindow = Window & {
+type IntercomWindow = Window & {
   // eslint-disable-next-line @typescript-eslint/naming-convention
-  Intercom?: (command: string, ...args: any[]) => void
+  Intercom?: (command: string, ...args: unknown[]) => void
   intercomSettings: IntercomSettings
 }
 
-export type IntercomSettings = Partial<{
+type IntercomSettings = Partial<{
   alignment: 'left' | 'right'
   // eslint-disable-next-line @typescript-eslint/naming-convention
   horizontal_padding: number
@@ -12,11 +12,13 @@ export type IntercomSettings = Partial<{
   vertical_padding: number
 }>
 
-export type DefaultProps = {
-  data: Record<string, any>
+type DefaultProps = {
+  data: Record<string, unknown>
   settings: IntercomSettings
 }
 
-export type Props = Partial<DefaultProps> & {
+type Props = Partial<DefaultProps> & {
   appId: string
 }
+
+export type { IntercomWindow, IntercomSettings, DefaultProps, Props }

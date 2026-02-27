@@ -1,4 +1,4 @@
-import { Box, muiIcons, styled, Typography } from 'decentraland-ui2'
+import { Box, Typography, muiIcons, styled } from 'decentraland-ui2'
 
 const WarningAmberOutlinedIcon = muiIcons.WarningAmberOutlined
 

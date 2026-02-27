@@ -1,5 +1,5 @@
 import { act, fireEvent, render } from '@testing-library/react'
-import { darkTheme, DclThemeProvider } from 'decentraland-ui2'
+import { DclThemeProvider, darkTheme } from 'decentraland-ui2'
 import { Connection as ConnectionNew } from './Connection'
 import { EXTRA_TEST_ID, PRIMARY_TEST_ID, SECONDARY_TEST_ID, SHOW_MORE_BUTTON_TEST_ID } from './constants'
 import { ConnectionOptionType, ConnectionProps, MetamaskEthereumWindow } from './Connection.types'

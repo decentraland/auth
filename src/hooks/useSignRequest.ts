@@ -1,7 +1,7 @@
 import { useCallback, useRef } from 'react'
 import { BrowserProvider } from 'ethers'
 import type { Provider } from 'decentraland-connect'
-import { createAuthServerWsClient, ExpiredRequestError, IpValidationError, RequestFulfilledError, RecoverResponse } from '../shared/auth'
+import { ExpiredRequestError, IpValidationError, RecoverResponse, RequestFulfilledError, createAuthServerWsClient } from '../shared/auth'
 import { isErrorWithMessage } from '../shared/errors'
 import { handleError } from '../shared/utils/errorHandler'
 

@@ -1,7 +1,7 @@
 import { useLocation } from 'react-router-dom'
 import { renderHook } from '@testing-library/react'
 import { ConnectionOptionType } from '../components/Connection'
-import { isMobile, isIos } from '../components/Pages/LoginPage/utils'
+import { isIos, isMobile } from '../components/Pages/LoginPage/utils'
 import { _targetConfigs, useTargetConfig } from './targetConfig'
 
 jest.mock('react-router-dom')

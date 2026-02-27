@@ -1,4 +1,4 @@
-import { createThirdwebClient, ThirdwebClient } from 'thirdweb'
+import { ThirdwebClient, createThirdwebClient } from 'thirdweb'
 import { getConfiguration } from 'decentraland-connect'
 
 let thirdwebClient: ThirdwebClient | null = null
@@ -13,7 +13,7 @@ let thirdwebClient: ThirdwebClient | null = null
  *
  * @see https://portal.thirdweb.com/wallets/users
  */
-export const getThirdwebClient = (): ThirdwebClient => {
+const getThirdwebClient = (): ThirdwebClient => {
   if (!thirdwebClient) {
     // const clientId = config.get('THIRDWEB_CLIENT_ID')
     const clientId = getConfiguration().thirdweb?.clientId
@@ -33,6 +33,8 @@ export const getThirdwebClient = (): ThirdwebClient => {
 /**
  * Resets the thirdweb client (useful for testing)
  */
-export const resetThirdwebClient = (): void => {
+const resetThirdwebClient = (): void => {
   thirdwebClient = null
 }
+
+export { getThirdwebClient, resetThirdwebClient }

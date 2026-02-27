@@ -1,5 +1,5 @@
-import { ButtonsContainer, CancelButton, ConfirmButton } from './TransferActionButtons.styled'
 import { TransferActionButtonsProps } from './TransferActionButtons.types'
+import { ButtonsContainer, CancelButton, ConfirmButton } from './TransferActionButtons.styled'
 
 const TransferActionButtons = ({
   cancelText = 'CANCEL',

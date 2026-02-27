@@ -1,35 +1,35 @@
-import { useState, useCallback, useRef, useEffect, KeyboardEvent, ChangeEvent, ClipboardEvent } from 'react'
+import { ChangeEvent, ClipboardEvent, KeyboardEvent, useCallback, useEffect, useRef, useState } from 'react'
 import { GlobalStyles } from 'decentraland-ui2'
 import emailIconUrl from '../../assets/images/email.svg'
 import { TrackingEvents } from '../../modules/analytics/types'
 import { trackEvent } from '../../shared/utils/analytics'
 import { handleError } from '../../shared/utils/errorHandler'
+import { sendEmailOTP, verifyOTPAndConnect } from './utils'
+import { EmailLoginModalProps } from './EmailLoginModal.types'
 import {
-  OTP_MODAL_ROOT_CLASS,
-  otpModalContainerGlobalStyles,
-  StyledDialog,
-  Header,
   BackButton,
   BackIcon,
   CloseButton,
-  Main,
   Content,
-  EmailIconContainer,
   EmailIcon,
-  Title,
-  Subtitle,
+  EmailIconContainer,
+  ErrorMessage,
+  Header,
+  Main,
+  OTP_MODAL_ROOT_CLASS,
   OtpContainer,
   OtpInput,
+  ResendLink,
+  ResendLinkError,
+  ResendText,
+  StyledDialog,
+  Subtitle,
+  Title,
   VerifyingContainer,
   VerifyingLoader,
   VerifyingText,
-  ErrorMessage,
-  ResendText,
-  ResendLink,
-  ResendLinkError
+  otpModalContainerGlobalStyles
 } from './EmailLoginModal.styled'
-import { sendEmailOTP, verifyOTPAndConnect } from './utils'
-import { EmailLoginModalProps } from './EmailLoginModal.types'
 
 const OTP_LENGTH = 6
 
@@ -253,7 +253,7 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
 
         {!error && (
           <ResendText>
-            Didn't get an email? <ResendLink onClick={!isLoading ? handleResendOtp : undefined}>Resend Code</ResendLink>
+            Didn&apos;t get an email? <ResendLink onClick={!isLoading ? handleResendOtp : undefined}>Resend Code</ResendLink>
           </ResendText>
         )}
       </Content>

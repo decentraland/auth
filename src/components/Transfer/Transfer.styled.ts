@@ -1,4 +1,4 @@
-import { Alert, Box, Button, CircularProgress, circularProgressClasses, styled, Typography } from 'decentraland-ui2'
+import { Alert, Box, Button, CircularProgress, Typography, circularProgressClasses, styled } from 'decentraland-ui2'
 
 const ButtonsContainer = styled(Box)(({ theme }) => ({
   display: 'flex',

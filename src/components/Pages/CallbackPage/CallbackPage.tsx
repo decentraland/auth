@@ -11,7 +11,7 @@ import { ConnectionType } from '../../../modules/analytics/types'
 import { extractReferrerFromSearchParameters, locations } from '../../../shared/locations'
 import { isMobileSession } from '../../../shared/mobile'
 import { handleError } from '../../../shared/utils/errorHandler'
-import { createMagicInstance, OAUTH_ACCESS_DENIED_ERROR } from '../../../shared/utils/magicSdk'
+import { OAUTH_ACCESS_DENIED_ERROR, createMagicInstance } from '../../../shared/utils/magicSdk'
 import { AnimatedBackground } from '../../AnimatedBackground'
 import { ConnectionLayout } from '../../ConnectionModal/ConnectionLayout'
 import { ConnectionLayoutState } from '../../ConnectionModal/ConnectionLayout.type'
@@ -20,7 +20,7 @@ import { getIdentitySignature } from '../LoginPage/utils'
 import { MobileCallbackPage } from '../MobileCallbackPage/MobileCallbackPage'
 import { Container, Wrapper } from './CallbackPage.styled'
 
-export const CallbackPage = () => {
+const CallbackPage = () => {
   // Render mobile callback UI directly if on mobile device
   if (isMobileSession()) {
     return <MobileCallbackPage />
@@ -142,3 +142,5 @@ const DesktopCallbackPage = () => {
     </Container>
   )
 }
+
+export { CallbackPage }

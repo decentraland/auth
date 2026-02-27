@@ -1,15 +1,15 @@
 import type { IFetchComponent } from '@well-known-components/interfaces'
-import { createContentClient, createLambdasClient, DeploymentBuilder } from 'dcl-catalyst-client'
+import { DeploymentBuilder, createContentClient, createLambdasClient } from 'dcl-catalyst-client'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/catalyst.schemas'
 import { getCatalystServersFromCache } from 'dcl-catalyst-client/dist/contracts-snapshots'
 import { AuthIdentity, Authenticator } from '@dcl/crypto'
 import { Entity, EntityType } from '@dcl/schemas'
 import {
-  createMockIdentity,
-  createMockProfile,
-  createMockEntity,
   DEFAULT_MOCK_ADDRESS,
-  createMockDeploymentResult
+  createMockDeploymentResult,
+  createMockEntity,
+  createMockIdentity,
+  createMockProfile
 } from '../../tests/mocks/profile'
 import { config } from '../config'
 import { fetchProfileWithConsistencyCheck, redeployExistingProfile, redeployExistingProfileWithContentServerData } from './index'
@@ -57,7 +57,7 @@ const createMockFetcher = (): MockFetcher =>
     fetch: jest.fn().mockResolvedValue({
       arrayBuffer: jest.fn().mockResolvedValue(new ArrayBuffer(8))
     })
-  } as unknown as MockFetcher)
+  }) as unknown as MockFetcher
 
 const setupRedeployBase = (address: string = DEFAULT_MOCK_ADDRESS) => {
   const profile = createMockProfile(address)

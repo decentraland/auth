@@ -1,3 +1,4 @@
+// eslint-disable-next-line @typescript-eslint/naming-convention
 import * as React from 'react'
 import { SvgIcon } from 'decentraland-ui2'
 import appleSvg from '../../assets/images/apple.svg'
@@ -10,9 +11,9 @@ import metamaskSvg from '../../assets/images/metamask.svg'
 import samsungSvg from '../../assets/images/samsung-blockchain-wallet.svg'
 import walletConnectPng from '../../assets/images/wallet-connect.png'
 import xSvg from '../../assets/images/x.svg'
-import { IconWrapper } from './ConnectionIcon.styled'
 import { ConnectionOptionType } from './Connection.types'
 import { ConnectionIconProps } from './ConnectionIcon.types'
+import { IconWrapper } from './ConnectionIcon.styled'
 
 const createIconComponent = (src: string) => {
   const IconComponent = React.forwardRef<SVGSVGElement>((props, ref) => (

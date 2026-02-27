@@ -1,8 +1,8 @@
 import { useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { ethers, BrowserProvider, formatEther } from 'ethers'
-import { getContract, sendMetaTransaction, ContractName } from 'decentraland-transactions'
-import { muiIcons, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle } from 'decentraland-ui2'
+import { BrowserProvider, ethers, formatEther } from 'ethers'
+import { ContractName, getContract, sendMetaTransaction } from 'decentraland-transactions'
+import { Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, muiIcons } from 'decentraland-ui2'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import { useAnalytics } from '../../../hooks/useAnalytics'
@@ -12,13 +12,13 @@ import { ClickEvents, TrackingEvents } from '../../../modules/analytics/types'
 import { config } from '../../../modules/config'
 import { fetchProfile, fetchProfileWithConsistencyCheck, redeployExistingProfile } from '../../../modules/profile'
 import {
-  createAuthServerHttpClient,
-  RecoverResponse,
-  ExpiredRequestError,
   DifferentSenderError,
+  ExpiredRequestError,
   IpValidationError,
+  RecoverResponse,
   RequestFulfilledError,
-  TimedOutError
+  TimedOutError,
+  createAuthServerHttpClient
 } from '../../../shared/auth'
 import { useCurrentConnectionData } from '../../../shared/connection'
 import { isErrorWithMessage, isRpcError } from '../../../shared/errors'
@@ -32,14 +32,14 @@ import { FeatureFlagsContext, FeatureFlagsKeys, OnboardingFlowVariant } from '..
 import { Container } from './Container'
 import { MANATransferData, NFTTransferData, TransferType } from './types'
 import {
-  getNetworkProvider,
-  getConnectedProvider,
   checkMetaTransactionSupport,
-  getMetaTransactionChainId,
-  decodeNftTransferData,
   decodeManaTransferData,
+  decodeNftTransferData,
   fetchNftMetadata,
-  fetchPlaceByCreatorAddress
+  fetchPlaceByCreatorAddress,
+  getConnectedProvider,
+  getMetaTransactionChainId,
+  getNetworkProvider
 } from './utils'
 import {
   ContinueInApp,
@@ -47,13 +47,13 @@ import {
   DeniedWalletInteraction,
   DifferentAccountError,
   IpValidationError as IpValidationErrorView,
-  TransferCanceledView,
-  TransferCompletedView,
-  TransferConfirmView,
   RecoverError,
   SignInComplete,
   SigningError,
   TimeoutError,
+  TransferCanceledView,
+  TransferCompletedView,
+  TransferConfirmView,
   WalletInteractionComplete
 } from './Views'
 import { ErrorMessageIcon } from './Views/RecoverError.styled'
@@ -230,14 +230,17 @@ export const RequestPage = () => {
         }
 
         // Initialize the timeout to display the timeout view when the request expires.
-        timeoutRef.current = setTimeout(() => {
-          getAnalytics()?.track(TrackingEvents.REQUEST_EXPIRED, {
-            browserTime: Date.now(),
-            requestTime: new Date(request.expiration).getTime(),
-            timeTheSiteStartedLoading
-          })
-          setView(View.TIMEOUT)
-        }, new Date(request.expiration).getTime() - Date.now())
+        timeoutRef.current = setTimeout(
+          () => {
+            getAnalytics()?.track(TrackingEvents.REQUEST_EXPIRED, {
+              browserTime: Date.now(),
+              requestTime: new Date(request.expiration).getTime(),
+              timeTheSiteStartedLoading
+            })
+            setView(View.TIMEOUT)
+          },
+          new Date(request.expiration).getTime() - Date.now()
+        )
 
         // Show different views depending on the request method.
         switch (request.method) {
@@ -674,7 +677,7 @@ export const RequestPage = () => {
               <div>
                 You might be logged out of your wallet extension.
                 <br />
-                Please check that you're logged in and try again.
+                Please check that you&apos;re logged in and try again.
               </div>
             </div>
           )}

@@ -1,6 +1,8 @@
+// eslint-disable-next-line @typescript-eslint/naming-convention
 import Lottie from 'lottie-react'
 import { brand, neutral } from 'decentraland-ui2/dist/theme/colors'
-import { Logo, Box, muiIcons, styled, Typography, TextField, Checkbox, FormControlLabel, Button, Link } from 'decentraland-ui2'
+import { Box, Button, Checkbox, FormControlLabel, Link, Logo, TextField, Typography, muiIcons, styled } from 'decentraland-ui2'
+// eslint-disable-next-line @typescript-eslint/naming-convention
 import SetupRightBackground from '../../../assets/images/setup-right-background.webp'
 
 const WarningAmberOutlinedIcon = muiIcons.WarningAmberOutlined

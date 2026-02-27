@@ -1,4 +1,4 @@
-import { Box, Button, IconButton, styled, Typography } from 'decentraland-ui2'
+import { Box, Button, IconButton, Typography, styled } from 'decentraland-ui2'
 
 const Content = styled(Box)(({ theme }) => ({
   display: 'flex',

@@ -1,4 +1,4 @@
-import { ConnectionOptionType, Connection, ConnectionProps } from '../../Connection'
+import { Connection, ConnectionOptionType, ConnectionProps } from '../../Connection'
 import { Background, Content, Main, MobileConnectionWrapper } from './MobileAuthPage.styled'
 
 type Props = {

@@ -1,4 +1,4 @@
-import { Box, styled, Typography } from 'decentraland-ui2'
+import { Box, Typography, styled } from 'decentraland-ui2'
 
 const LoadingContainer = styled(Box)(({ theme }) => ({
   alignItems: 'center',
