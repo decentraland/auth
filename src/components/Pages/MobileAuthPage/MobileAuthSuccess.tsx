@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
-import ArrowBackIosNewTwoToneIcon from '@mui/icons-material/ArrowBackIosNewTwoTone'
-import LoginRoundedIcon from '@mui/icons-material/LoginRounded'
-import { Button } from 'decentraland-ui2'
+import { Button, muiIcons } from 'decentraland-ui2'
 import logoImg from '../../../assets/images/logo.svg'
 import wrongImg from '../../../assets/images/wrong.svg'
 import { launchDeepLink } from '../RequestPage/utils'
 import { ActionButton, Background, Description, Icon, Logo, Main, SuccessContainer, Title } from './MobileAuthPage.styled'
 
+const ArrowBackIosNewTwoToneIcon = muiIcons.ArrowBackIosNewTwoTone
+const LoginRoundedIcon = muiIcons.LoginRounded
 const COUNTDOWN_SECONDS = 3
 
 type Props = {

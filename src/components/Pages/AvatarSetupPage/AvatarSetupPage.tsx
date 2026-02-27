@@ -31,6 +31,7 @@ import {
   InputContainer,
   InputLabel,
   TextInput,
+  ErrorLabel,
   ErrorText,
   ErrorContainer,
   WarningIcon,
@@ -445,11 +446,7 @@ const AvatarSetupPage: React.FC = () => {
           {deploying ? 'DEPLOYING...' : 'CUSTOMIZE MY AVATAR'}
         </ContinueButton>
 
-        {deployError && (
-          <InputLabel color="error" sx={{ mt: 2, fontSize: '14px' }}>
-            An error occurred while creating your profile: {deployError}
-          </InputLabel>
-        )}
+        {deployError && <ErrorLabel color="error">An error occurred while creating your profile: {deployError}</ErrorLabel>}
       </LeftFormSection>
 
       <RightAvatarSection>

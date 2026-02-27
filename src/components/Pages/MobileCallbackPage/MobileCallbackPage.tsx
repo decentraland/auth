@@ -1,9 +1,8 @@
 import { useCallback, useContext, useEffect, useState } from 'react'
-import ArrowBackIosNewTwoToneIcon from '@mui/icons-material/ArrowBackIosNewTwoTone'
 import { RPCError } from 'magic-sdk'
 import { ProviderType } from '@dcl/schemas'
 import { connection } from 'decentraland-connect'
-import { Button, CircularProgress } from 'decentraland-ui2'
+import { Button, CircularProgress, muiIcons } from 'decentraland-ui2'
 import wrongImg from '../../../assets/images/wrong.svg'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useTargetConfig } from '../../../hooks/targetConfig'
@@ -16,6 +15,8 @@ import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvide
 import { getIdentitySignature } from '../LoginPage/utils'
 import { ActionButton, Background, Description, Icon, Main, SuccessContainer, Title } from '../MobileAuthPage/MobileAuthPage.styled'
 import { MobileAuthSuccess } from '../MobileAuthPage/MobileAuthSuccess'
+
+const ArrowBackIosNewTwoToneIcon = muiIcons.ArrowBackIosNewTwoTone
 
 export const MobileCallbackPage = () => {
   const navigate = useNavigateWithSearchParams()

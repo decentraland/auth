@@ -1,6 +1,8 @@
-import ExpandLessIcon from '@mui/icons-material/ExpandLess'
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
-import { Box, Button, styled, Typography } from 'decentraland-ui2'
+/* eslint-disable @typescript-eslint/naming-convention */
+import { Box, Button, muiIcons, styled, Typography } from 'decentraland-ui2'
+
+const ExpandLessIcon = muiIcons.ExpandLess
+const ExpandMoreIcon = muiIcons.ExpandMore
 
 const ConnectionContainer = styled(Box)(({ theme }) => ({
   color: theme.palette.common.white,
@@ -44,45 +46,36 @@ const ShowMoreContainer = styled(Box)(({ theme }) => ({
 }))
 
 const ShowMoreButton = styled(Button)(({ theme }) => ({
-  color: `${theme.palette.common.white} !important`,
-  fontWeight: theme.typography.fontWeightBold,
-  display: 'flex',
-  gap: theme.spacing(1),
-  justifyContent: 'center',
-  marginBottom: theme.spacing(2),
-  backgroundColor: 'transparent !important',
-  ['&:hover']: {
-    backgroundColor: 'transparent !important',
-    color: `${theme.palette.common.white} !important`,
-    opacity: '1 !important'
+  '&.MuiButton-root': {
+    color: theme.palette.common.white,
+    fontWeight: theme.typography.fontWeightBold,
+    display: 'flex',
+    gap: theme.spacing(1),
+    justifyContent: 'center',
+    marginBottom: theme.spacing(2),
+    backgroundColor: 'transparent'
   },
-  ['&:active']: {
-    backgroundColor: 'transparent !important',
-    color: `${theme.palette.common.white} !important`,
-    opacity: '1 !important',
+  '&.MuiButton-root:hover': {
+    backgroundColor: 'transparent',
+    color: theme.palette.common.white,
+    opacity: 1
+  },
+  '&.MuiButton-root:active': {
+    backgroundColor: 'transparent',
+    color: theme.palette.common.white,
+    opacity: 1,
     transform: 'none'
   },
-  ['&:focus']: {
-    backgroundColor: 'transparent !important',
-    color: `${theme.palette.common.white} !important`,
-    opacity: '1 !important'
+  '&.MuiButton-root:focus': {
+    backgroundColor: 'transparent',
+    color: theme.palette.common.white,
+    opacity: 1
   },
-  ['&:focus-visible']: {
-    backgroundColor: 'transparent !important',
-    color: `${theme.palette.common.white} !important`,
-    opacity: '1 !important',
+  '&.MuiButton-root:focus-visible': {
+    backgroundColor: 'transparent',
+    color: theme.palette.common.white,
+    opacity: 1,
     outline: 'none'
-  },
-  ['&.MuiButton-text']: {
-    color: `${theme.palette.common.white} !important`
-  },
-  ['&.MuiButton-text:hover']: {
-    backgroundColor: 'transparent !important',
-    color: `${theme.palette.common.white} !important`
-  },
-  ['&.MuiButton-text:active']: {
-    backgroundColor: 'transparent !important',
-    color: `${theme.palette.common.white} !important`
   }
 }))
 

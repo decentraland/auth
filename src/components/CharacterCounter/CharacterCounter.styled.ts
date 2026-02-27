@@ -1,5 +1,6 @@
-import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined'
-import { Box, styled, Typography } from 'decentraland-ui2'
+import { Box, muiIcons, styled, Typography } from 'decentraland-ui2'
+
+const WarningAmberOutlinedIcon = muiIcons.WarningAmberOutlined
 
 const CharacterCounter = styled(Box)({
   display: 'flex',

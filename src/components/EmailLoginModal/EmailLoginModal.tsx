@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect, KeyboardEvent, ChangeEvent, ClipboardEvent } from 'react'
-import { Dialog, GlobalStyles } from 'decentraland-ui2'
+import { GlobalStyles } from 'decentraland-ui2'
 import emailIconUrl from '../../assets/images/email.svg'
 import { TrackingEvents } from '../../modules/analytics/types'
 import { trackEvent } from '../../shared/utils/analytics'
@@ -7,7 +7,7 @@ import { handleError } from '../../shared/utils/errorHandler'
 import {
   OTP_MODAL_ROOT_CLASS,
   otpModalContainerGlobalStyles,
-  ModalPaper,
+  StyledDialog,
   Header,
   BackButton,
   BackIcon,
@@ -264,22 +264,7 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
     <>
       {/* Only inject when open so we don't affect other modals (e.g. Connection/Metamask modal) */}
       {open && <GlobalStyles styles={otpModalContainerGlobalStyles} />}
-      <Dialog
-        open={open}
-        maxWidth="sm"
-        fullWidth
-        className={OTP_MODAL_ROOT_CLASS}
-        slotProps={{
-          backdrop: {
-            sx: {
-              backgroundColor: 'rgba(0, 0, 0, 0.6)',
-              position: 'fixed',
-              inset: 0
-            }
-          }
-        }}
-        PaperProps={{ component: ModalPaper }}
-      >
+      <StyledDialog open={open} maxWidth="sm" fullWidth className={OTP_MODAL_ROOT_CLASS}>
         <Header>
           <BackButton onClick={handleBack} disabled={isLoading}>
             <BackIcon>‹</BackIcon> BACK
@@ -289,7 +274,7 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
           </CloseButton>
         </Header>
         <Main>{renderContent()}</Main>
-      </Dialog>
+      </StyledDialog>
     </>
   )
 }

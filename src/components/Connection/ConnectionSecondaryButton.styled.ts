@@ -16,22 +16,22 @@ const SecondaryOptionButton = styled(Box)(({ theme }) => ({
   ['& .MuiButton-contained, & .MuiButton-containedPrimary, & .MuiButton-containedSecondary']: {
     width: '100%',
     minWidth: '46px',
-    backgroundColor: `${theme.palette.common.white} !important`,
-    color: `${theme.palette.common.black} !important`,
+    backgroundColor: theme.palette.common.white,
+    color: theme.palette.common.black,
     transition: 'transform 0.2s ease-in-out',
     [theme.breakpoints.down('xs')]: {
       margin: 'auto'
     },
     // eslint-disable-next-line @typescript-eslint/naming-convention -- CSS pseudo-selector
     '&:hover': {
-      backgroundColor: `${theme.palette.common.white} !important`,
-      color: `${theme.palette.common.black} !important`,
+      backgroundColor: theme.palette.common.white,
+      color: theme.palette.common.black,
       transform: 'translateY(-2px)'
     },
     // eslint-disable-next-line @typescript-eslint/naming-convention -- CSS pseudo-selector
     '&:active': {
-      backgroundColor: `${theme.palette.common.white} !important`,
-      color: `${theme.palette.common.black} !important`,
+      backgroundColor: theme.palette.common.white,
+      color: theme.palette.common.black,
       transform: 'translateY(0)'
     }
   }

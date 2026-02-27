@@ -1,11 +1,8 @@
 import { useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined'
-import CheckCircleOutlinedIcon from '@mui/icons-material/CheckCircleOutlined'
-import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline'
 import { ethers, BrowserProvider, formatEther } from 'ethers'
 import { getContract, sendMetaTransaction, ContractName } from 'decentraland-transactions'
-import { Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle } from 'decentraland-ui2'
+import { muiIcons, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle } from 'decentraland-ui2'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import { useAnalytics } from '../../../hooks/useAnalytics'
@@ -59,8 +56,12 @@ import {
   TimeoutError,
   WalletInteractionComplete
 } from './Views'
+import { ErrorMessageIcon } from './Views/RecoverError.styled'
 import viewStyles from './Views/Views.module.css'
 import styles from './RequestPage.module.css'
+
+const CancelOutlinedIcon = muiIcons.CancelOutlined
+const CheckCircleOutlinedIcon = muiIcons.CheckCircleOutlined
 
 enum View {
   TIMEOUT,
@@ -669,7 +670,7 @@ export const RequestPage = () => {
           </div>
           {hasTimedOut && (
             <div className={styles.timeoutMessage}>
-              <ErrorOutlineIcon fontSize="large" sx={{ color: '#fb3b3b' }} />
+              <ErrorMessageIcon fontSize="large" />
               <div>
                 You might be logged out of your wallet extension.
                 <br />

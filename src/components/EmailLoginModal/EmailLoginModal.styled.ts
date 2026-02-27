@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/naming-convention -- CSS selectors, keyframes, and pseudo-elements use non-camelCase */
-import { Box, CircularProgress, keyframes, styled } from 'decentraland-ui2'
+import { Box, CircularProgress, Dialog, keyframes, styled } from 'decentraland-ui2'
 
 /**
  * Class name applied to the OTP Dialog root.
@@ -29,25 +29,32 @@ const shake = keyframes({
   '20%, 40%, 60%, 80%': { transform: 'translateX(6px)' }
 })
 
-export const ModalPaper = styled(Box)(({ theme }) => ({
-  background: 'linear-gradient(135deg, #952dc6 0%, #32134c 100%) !important',
-  borderRadius: '16px !important',
-  maxWidth: '480px !important',
-  margin: 'auto !important',
-  [theme.breakpoints.down('md')]: {
-    width: '90% !important',
-    maxWidth: '400px !important',
-    minWidth: 'auto !important',
-    minHeight: 'auto !important',
-    height: 'auto !important',
-    margin: 'auto !important',
-    borderRadius: '16px !important',
-    top: 'auto !important',
-    padding: '0 !important'
+export const StyledDialog = styled(Dialog)(({ theme }) => ({
+  '& .MuiDialog-paper': {
+    background: 'linear-gradient(135deg, #952dc6 0%, #32134c 100%)',
+    borderRadius: '16px',
+    maxWidth: '480px',
+    margin: 'auto',
+    [theme.breakpoints.down('md')]: {
+      width: '90%',
+      maxWidth: '400px',
+      minWidth: 'auto',
+      minHeight: 'auto',
+      height: 'auto',
+      margin: 'auto',
+      borderRadius: '16px',
+      top: 'auto',
+      padding: 0
+    },
+    [theme.breakpoints.down('sm')]: {
+      width: '90%',
+      maxWidth: '360px'
+    }
   },
-  [theme.breakpoints.down('sm')]: {
-    width: '90% !important',
-    maxWidth: '360px !important'
+  '& .MuiBackdrop-root': {
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    position: 'fixed',
+    inset: 0
   }
 }))
 
@@ -58,7 +65,7 @@ export const Header = styled(Box)(({ theme }) => ({
   padding: theme.spacing(2, 2.5)
 }))
 
-export const BackButton = styled('button')({
+export const BackButton = styled('button')(({ theme }) => ({
   background: 'none',
   border: 'none',
   color: 'white',
@@ -68,29 +75,29 @@ export const BackButton = styled('button')({
   display: 'flex',
   alignItems: 'center',
   gap: 4,
-  padding: '8px 12px',
+  padding: theme.spacing(1, 1.5),
   transition: 'opacity 0.2s',
   '&:hover:not(:disabled)': { opacity: 0.8 },
   '&:disabled': { opacity: 0.5, cursor: 'not-allowed' }
-})
+}))
 
 export const BackIcon = styled('span')({
   fontSize: 20,
   lineHeight: 1
 })
 
-export const CloseButton = styled('button')({
+export const CloseButton = styled('button')(({ theme }) => ({
   background: 'none',
   border: 'none',
   color: 'white',
   fontSize: 28,
   cursor: 'pointer',
-  padding: '4px 12px',
+  padding: theme.spacing(0.5, 1.5),
   lineHeight: 1,
   transition: 'opacity 0.2s',
   '&:hover:not(:disabled)': { opacity: 0.8 },
   '&:disabled': { opacity: 0.5, cursor: 'not-allowed' }
-})
+}))
 
 export const Main = styled(Box)(({ theme }) => ({
   padding: theme.spacing(0, 5, 5),
@@ -216,9 +223,9 @@ export const VerifyingContainer = styled(Box)(({ theme }) => ({
 }))
 
 export const VerifyingLoader = styled(CircularProgress)({
-  width: '16px !important',
-  height: '16px !important',
-  color: 'white !important'
+  '&.MuiCircularProgress-root': {
+    color: 'white'
+  }
 })
 
 export const VerifyingText = styled('span')({
@@ -226,16 +233,16 @@ export const VerifyingText = styled('span')({
   fontSize: 14
 })
 
-export const ErrorMessage = styled('p')({
+export const ErrorMessage = styled('p')(({ theme }) => ({
   color: '#ff6b6b',
   fontSize: 14,
   margin: 0,
-  marginBottom: 16,
+  marginBottom: theme.spacing(2),
   '&::before': {
     content: '"\\26A0"',
-    marginRight: 6
+    marginRight: theme.spacing(0.75)
   }
-})
+}))
 
 export const ResendText = styled('p')(({ theme }) => ({
   color: 'rgba(255, 255, 255, 0.7)',

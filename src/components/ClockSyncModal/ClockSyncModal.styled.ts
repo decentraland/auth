@@ -1,4 +1,4 @@
-import { Box, Button, styled, Typography } from 'decentraland-ui2'
+import { Box, Button, IconButton, styled, Typography } from 'decentraland-ui2'
 
 const Content = styled(Box)(({ theme }) => ({
   display: 'flex',
@@ -42,4 +42,11 @@ const ContinueButton = styled(Button)({
   minWidth: '120px'
 })
 
-export { Actions, Content, ContinueButton, Message, Title, WarningIcon }
+const CloseIconButton = styled(IconButton)(({ theme }) => ({
+  position: 'absolute',
+  right: theme.spacing(1),
+  top: theme.spacing(1),
+  color: 'white'
+}))
+
+export { Actions, CloseIconButton, Content, ContinueButton, Message, Title, WarningIcon }

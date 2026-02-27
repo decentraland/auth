@@ -107,6 +107,11 @@ const PrimaryButtonWrapper = styled(Box, {
   fontSize: '14px'
 }))
 
+const TooltipWrapper = styled('span')({
+  display: 'block',
+  width: '100%'
+})
+
 export {
   PrimaryContainer,
   PrimaryMessage,
@@ -114,5 +119,6 @@ export {
   PrimaryOptionWrapper,
   PrimaryButton,
   primaryTooltipSlotProps,
-  PrimaryButtonWrapper
+  PrimaryButtonWrapper,
+  TooltipWrapper
 }
