@@ -259,8 +259,9 @@ export const RequestPage = () => {
               })
 
               // Check if this is an NFT transfer or MANA transfer by analyzing the transaction data
-              const transactionData = request.params?.[0]?.data as string | undefined
-              const contractAddress = request.params?.[0]?.to as string | undefined
+              const txParams = request.params?.[0] as Record<string, unknown> | undefined
+              const transactionData = txParams?.data as string | undefined
+              const contractAddress = txParams?.to as string | undefined
               if (transactionData && contractAddress) {
                 const manaData = decodeManaTransferData(transactionData)
                 if (manaData) {
@@ -309,7 +310,7 @@ export const RequestPage = () => {
               }
 
               const gasPrice = (await browserProvider.current.getFeeData()).gasPrice ?? BigInt(0)
-              const transactionGasCost = await signer.estimateGas(request.params?.[0])
+              const transactionGasCost = await signer.estimateGas(request.params?.[0] as Record<string, unknown>)
               const totalGasCost = gasPrice * transactionGasCost
               setTransactionGasCost(totalGasCost)
             } catch (e) {
@@ -407,7 +408,7 @@ export const RequestPage = () => {
 
     try {
       console.log("Approve sign in verification - Got the provider's signer. Signing the message")
-      const signature = await signer.signMessage(requestRef.current?.params?.[0])
+      const signature = await signer.signMessage(requestRef.current?.params?.[0] as string)
 
       if (hasTimeouted) {
         throw new TimedOutError()
@@ -500,7 +501,8 @@ export const RequestPage = () => {
       const signer = await provider.getSigner()
       const signerAddress = await signer.getAddress()
       const chainId = getMetaTransactionChainId()
-      const toAddress = requestRef.current?.params?.[0]?.to
+      const txParams = requestRef.current?.params?.[0] as Record<string, unknown> | undefined
+      const toAddress = txParams?.to as string | undefined
 
       if (!toAddress) {
         throw new Error('Contract address not found in transaction parameters')
@@ -520,7 +522,7 @@ export const RequestPage = () => {
         const contract = getContract(contractName, chainId)
         contract.address = toAddress
 
-        result = await sendMetaTransaction(connectedProvider, networkProvider, requestRef.current?.params?.[0].data as string, contract, {
+        result = await sendMetaTransaction(connectedProvider, networkProvider, (requestRef.current?.params?.[0] as Record<string, unknown>).data as string, contract, {
           serverURL: `${config.get('META_TRANSACTION_SERVER_URL')}/v1`
         })
       } else {

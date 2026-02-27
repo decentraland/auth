@@ -56,7 +56,8 @@ HTMLCanvasElement.prototype.getContext = jest.fn(() => {
     transform: jest.fn(),
     rect: jest.fn(),
     clip: jest.fn()
-  } as unknown
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any
 })
 
 // Mock HTMLCanvasElement.prototype.toDataURL

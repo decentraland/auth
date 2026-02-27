@@ -64,7 +64,7 @@ export const useSignRequest = (redirect: () => void, errorHandlers?: SignRequest
 
         const browserProvider = new BrowserProvider(provider)
         const signer = await browserProvider.getSigner()
-        signature = await signer.signMessage(request.params?.[0])
+        signature = await signer.signMessage(request.params?.[0] as string)
 
         if (errorHandlers?.onConnectionModalClose) {
           errorHandlers.onConnectionModalClose()
