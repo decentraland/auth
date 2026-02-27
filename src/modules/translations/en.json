@@ -35,6 +35,7 @@
     "back": "BACK",
     "enter_complete_code": "Please enter the complete verification code",
     "invalid_or_expired": "The code is invalid or expired. Please resend code",
+    "failed_verify": "Failed to verify the code. Please check and try again.",
     "failed_resend": "Failed to resend verification code",
     "network_error": "Unable to connect. Please check your internet connection and try again."
   },
@@ -49,7 +50,8 @@
       "network_error": "Unable to connect. Please check your internet connection and try again.",
       "failed_send_code": "Failed to send verification code. Please try again.",
       "different_account_session": "Detected a different account session than the verified email. Please try logging in again.",
-      "no_connected_account": "Thirdweb connection did not return a connected account"
+      "no_connected_account": "Thirdweb connection did not return a connected account",
+      "invalid_email": "The email address is invalid. Please check and try again."
     }
   },
   "connection_layout": {

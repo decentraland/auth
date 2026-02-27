@@ -34,9 +34,22 @@ import {
 
 const OTP_LENGTH = 6
 
-const getNetworkFriendlyError = (errorMessage: string | undefined, fallback: string, networkError: string): string => {
+const getTranslatedApiError = (
+  errorMessage: string | undefined,
+  fallback: string,
+  networkError: string,
+  knownErrors?: [string, string][]
+): string => {
   if (errorMessage === 'Failed to fetch' || errorMessage?.toLowerCase().includes('network')) {
     return networkError
+  }
+  if (errorMessage && knownErrors) {
+    const lowerMsg = errorMessage.toLowerCase()
+    for (const [pattern, translated] of knownErrors) {
+      if (lowerMsg.includes(pattern.toLowerCase())) {
+        return translated
+      }
+    }
   }
   return errorMessage || fallback
 }
@@ -157,7 +170,11 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
         onSuccess({ email: currentEmail, account })
       } catch (e) {
         const errorMessage = handleError(e, 'Error verifying OTP')
-        setError(getNetworkFriendlyError(errorMessage, t('email_login_modal.invalid_or_expired'), t('email_login_modal.network_error')))
+        setError(
+          getTranslatedApiError(errorMessage, t('email_login_modal.invalid_or_expired'), t('email_login_modal.network_error'), [
+            ['failed to verify', t('email_login_modal.failed_verify')]
+          ])
+        )
         setHasError(true)
 
         // Track OTP verification failure
@@ -188,7 +205,7 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
       setTimeout(() => otpInputRefs.current[0]?.focus(), 100)
     } catch (e) {
       const errorMessage = handleError(e, 'Error resending OTP')
-      setError(getNetworkFriendlyError(errorMessage, t('email_login_modal.failed_resend'), t('email_login_modal.network_error')))
+      setError(getTranslatedApiError(errorMessage, t('email_login_modal.failed_resend'), t('email_login_modal.network_error')))
       setHasError(true)
     } finally {
       setIsLoading(false)

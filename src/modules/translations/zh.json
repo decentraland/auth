@@ -35,6 +35,7 @@
     "back": "返回",
     "enter_complete_code": "请输入完整的验证码",
     "invalid_or_expired": "验证码无效或已过期。请重新发送验证码",
+    "failed_verify": "验证码验证失败。请检查后重试。",
     "failed_resend": "重新发送验证码失败",
     "network_error": "无法连接。请检查您的网络连接后重试。"
   },
@@ -49,7 +50,8 @@
       "network_error": "无法连接。请检查您的网络连接后重试。",
       "failed_send_code": "发送验证码失败。请重试。",
       "different_account_session": "检测到与已验证邮箱不同的账户会话。请重新登录。",
-      "no_connected_account": "Thirdweb 连接未返回已连接的账户"
+      "no_connected_account": "Thirdweb 连接未返回已连接的账户",
+      "invalid_email": "邮箱地址无效。请检查后重试。"
     }
   },
   "connection_layout": {

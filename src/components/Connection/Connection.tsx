@@ -20,7 +20,8 @@ import {
 } from './Connection.styled'
 
 export const Connection = (props: ConnectionProps): JSX.Element => {
-  const { onConnect, onEmailSubmit, connectionOptions, className, loadingOption, isNewUser, isEmailLoading, emailError } = props
+  const { onConnect, onEmailSubmit, onEmailChange, connectionOptions, className, loadingOption, isNewUser, isEmailLoading, emailError } =
+    props
   const { t } = useTranslation()
 
   const hasExtraOptions = connectionOptions?.extraOptions && connectionOptions.extraOptions.length > 0
@@ -51,7 +52,9 @@ export const Connection = (props: ConnectionProps): JSX.Element => {
         <Title isNewUser={isNewUser}>{isNewUser ? t('connection.title_new_user') : t('connection.title')}</Title>
 
         {/* Email Input (primary method) */}
-        {onEmailSubmit && <EmailInput onSubmit={onEmailSubmit} isLoading={isEmailLoading} error={emailError} />}
+        {onEmailSubmit && (
+          <EmailInput onSubmit={onEmailSubmit} onEmailChange={onEmailChange} isLoading={isEmailLoading} error={emailError} />
+        )}
 
         {/* Divider */}
         {onEmailSubmit && (filteredPrimary || filteredSecondary) && <Divider>{t('connection.or_continue_with')}</Divider>}

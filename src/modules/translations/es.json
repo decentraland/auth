@@ -35,6 +35,7 @@
     "back": "ATRÁS",
     "enter_complete_code": "Por favor, ingresa el código de verificación completo",
     "invalid_or_expired": "El código es inválido o ha expirado. Por favor, reenvía el código",
+    "failed_verify": "No se pudo verificar el código. Por favor, verifica e inténtalo de nuevo.",
     "failed_resend": "Error al reenviar el código de verificación",
     "network_error": "No se puede conectar. Por favor, verifica tu conexión a internet e inténtalo de nuevo."
   },
@@ -49,7 +50,8 @@
       "network_error": "No se puede conectar. Por favor, verifica tu conexión a internet e inténtalo de nuevo.",
       "failed_send_code": "Error al enviar el código de verificación. Por favor, inténtalo de nuevo.",
       "different_account_session": "Se detectó una sesión de cuenta diferente a la del correo verificado. Por favor, intenta iniciar sesión de nuevo.",
-      "no_connected_account": "La conexión de Thirdweb no devolvió una cuenta conectada"
+      "no_connected_account": "La conexión de Thirdweb no devolvió una cuenta conectada",
+      "invalid_email": "La dirección de correo electrónico es inválida. Por favor, verifica e inténtalo de nuevo."
     }
   },
   "connection_layout": {
@@ -84,15 +86,15 @@
     "timeout": {
       "title": "Parece que tardaste demasiado y la solicitud ha expirado.",
       "subtitle": "Si el tiempo de expiración aún está corriendo en la aplicación Explorer, verifica la hora de tu computadora para ver si está configurada correctamente.",
-      "description": "Por favor, regresa al {explorerText} de Decentraland para intentar de nuevo."
+      "description": "Por favor, regresa a la {explorerText} de Decentraland para intentar de nuevo."
     },
     "different_account": {
       "title": "Parece que estás conectado con una cuenta diferente.",
-      "description": "Por favor, cambia la cuenta de tu billetera a la que está conectada al {explorerText}."
+      "description": "Por favor, cambia la cuenta de tu billetera a la que está conectada a la {explorerText}."
     },
     "sign_in_complete": {
       "title": "¡Inicio de sesión exitoso!",
-      "description": "¡Regresa al {explorerText} para entrar!"
+      "description": "¡Regresa a la {explorerText} para entrar!"
     },
     "denied_sign_in": {
       "title": "¿El número no coincidió o esta acción no fue realizada por ti?",
@@ -108,7 +110,7 @@
     },
     "signing_error": {
       "title": "Hubo un error al intentar enviar la solicitud.",
-      "description": "Regresa al {explorerText} para intentar de nuevo, o contacta a soporte si el error persiste."
+      "description": "Regresa a la {explorerText} para intentar de nuevo, o contacta a soporte si el error persiste."
     },
     "recover_error": {
       "title": "Hubo un error al recuperar la solicitud...",

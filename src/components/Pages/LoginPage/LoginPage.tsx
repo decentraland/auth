@@ -195,9 +195,13 @@ export const LoginPage = () => {
         setShowEmailLoginModal(true)
       } catch (error) {
         const errorMessage = handleError(error, 'Error sending verification code')
-        // Handle network errors with a user-friendly message
+        // Clear connection type so other login options aren't disabled
+        setCurrentConnectionType(undefined)
+        // Handle known API errors with translated messages
         if (errorMessage === 'Failed to fetch' || errorMessage?.toLowerCase().includes('network')) {
           setEmailError(t('login.errors.network_error'))
+        } else if (errorMessage?.toLowerCase().includes('invalid email')) {
+          setEmailError(t('login.errors.invalid_email'))
         } else {
           setEmailError(errorMessage || t('login.errors.failed_send_code'))
         }
@@ -368,6 +372,10 @@ export const LoginPage = () => {
     [trackLoginSuccess, checkClockSynchronization, runProfileRedirect, getReferrerFromCurrentSearch]
   )
 
+  const handleEmailInputChange = useCallback(() => {
+    setEmailError(null)
+  }, [])
+
   const handleEmailLoginError = useCallback((error: string) => {
     handleError(new Error(error), 'Email login error')
   }, [])
@@ -491,6 +499,7 @@ export const LoginPage = () => {
                 <Connection
                   onConnect={handleOnConnect}
                   onEmailSubmit={isEmailOtpEnabled ? handleEmailSubmit : undefined}
+                  onEmailChange={handleEmailInputChange}
                   loadingOption={currentConnectionType}
                   connectionOptions={targetConfig.connectionOptions}
                   isNewUser={isNewUser}
