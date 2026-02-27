@@ -6,8 +6,8 @@ import { CenteredContent, ItemName, Label, Title } from '../../../../../Transfer
 import { TransferType } from '../../../types'
 import type { ProfileAvatar } from '../../../types'
 import { SceneName } from '../TransferTipComponents.styled'
-import { SceneImageWrapper, SuccessAnimation } from './TransferCompletedView.styled'
 import { TransferCompletedViewProps } from './TransferCompletedView.types'
+import { SceneImageWrapper, SuccessAnimation } from './TransferCompletedView.styled'
 
 const TransferCompletedView = (props: TransferCompletedViewProps) => {
   const { type, transferData } = props

@@ -37,7 +37,7 @@ export const useAfterLoginRedirection = () => {
 
     // Set the sanitized redirect URL
     sanitizedRedirectTo = redirectToURL.href
-  } catch (error) {
+  } catch {
     console.error("Can't parse redirectTo URL")
     // Optionally, redirect to an error page or the home page
     sanitizedRedirectTo = locations.home()

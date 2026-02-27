@@ -1,9 +1,10 @@
+// eslint-disable-next-line @typescript-eslint/naming-convention
 import * as React from 'react'
 import { useCallback } from 'react'
 import { ProviderType } from '@dcl/schemas'
 import { Button, CircularProgress } from 'decentraland-ui2'
-import { ConnectionContainer, DecentralandLogo, ConnectionTitle, ProgressContainer, ErrorButtonContainer } from './ConnectionLayout.styled'
-import { ConnectionLayoutState, type ConnectionLayoutProps } from './ConnectionLayout.type'
+import { type ConnectionLayoutProps, ConnectionLayoutState } from './ConnectionLayout.type'
+import { ConnectionContainer, ConnectionTitle, DecentralandLogo, ErrorButtonContainer, ProgressContainer } from './ConnectionLayout.styled'
 
 const getConnectionLayoutMessage = (loadingState: ConnectionLayoutState, providerType: ProviderType | null) => {
   switch (loadingState) {

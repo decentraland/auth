@@ -1,4 +1,5 @@
 import { dclModal } from 'decentraland-ui2'
+// eslint-disable-next-line @typescript-eslint/naming-convention
 import CustomWelcomeBackground from '../../assets/images/background/custom-welcome-background.webp'
 import { ConnectionLayout } from './ConnectionLayout'
 import { ConnectionModalProps } from './ConnectionModal.types'

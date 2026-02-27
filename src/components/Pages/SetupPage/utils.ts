@@ -4,7 +4,7 @@ import { EntityType } from '@dcl/schemas'
 import { config } from '../../../modules/config'
 import { fetcher } from '../../../shared/fetcher'
 
-export async function subscribeToNewsletter(email: string) {
+async function subscribeToNewsletter(email: string) {
   const url = config.get('BUILDER_SERVER_URL')
 
   if (!url) {
@@ -23,7 +23,7 @@ export async function subscribeToNewsletter(email: string) {
   }
 }
 
-export async function deployProfileFromDefault({
+async function deployProfileFromDefault({
   defaultProfile,
   connectedAccount,
   deploymentProfileName,
@@ -77,3 +77,5 @@ export async function deployProfileFromDefault({
     authChain: Authenticator.signPayload(connectedAccountIdentity, deploymentEntity.entityId)
   })
 }
+
+export { subscribeToNewsletter, deployProfileFromDefault }

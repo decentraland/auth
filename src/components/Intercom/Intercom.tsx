@@ -1,8 +1,10 @@
+// eslint-disable-next-line @typescript-eslint/naming-convention
 import * as React from 'react'
 import { handleError } from '../../shared/utils/errorHandler'
 import { IntercomWidget } from './IntercomWidget'
 import { DefaultProps, Props } from './Intercom.types'
 
+// eslint-disable-next-line import/no-default-export
 export default class Intercom extends React.PureComponent<Props> {
   static defaultProps: DefaultProps = {
     data: {},

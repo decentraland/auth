@@ -2,8 +2,8 @@ import { ethers } from 'ethers'
 import { Rarity } from '@dcl/schemas'
 import { ChainId } from '@dcl/schemas/dist/dapps/chain-id'
 import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
-import { connection, Provider } from 'decentraland-connect'
-import { ContractName, getContractName, getContract } from 'decentraland-transactions'
+import { Provider, connection } from 'decentraland-connect'
+import { ContractName, getContract, getContractName } from 'decentraland-transactions'
 import { config } from '../../../modules/config'
 import { isMobile } from '../LoginPage/utils'
 
@@ -14,7 +14,7 @@ const DEEPLINK_DETECTION_TIMEOUT = 500
  * Uses blur detection technique - if window loses focus, app was launched.
  * Returns true if app was detected, false otherwise.
  */
-export const launchDeepLink = (url: string): Promise<boolean> => {
+const launchDeepLink = (url: string): Promise<boolean> => {
   return new Promise(resolve => {
     if (isMobile()) {
       window.location.href = url
@@ -45,20 +45,20 @@ export const launchDeepLink = (url: string): Promise<boolean> => {
   })
 }
 
-export async function getConnectedProvider(): Promise<Provider | null> {
+async function getConnectedProvider(): Promise<Provider | null> {
   try {
     return await connection.getProvider()
-  } catch (_e) {
+  } catch {
     try {
       const { provider } = await connection.tryPreviousConnection()
       return provider
-    } catch (error) {
+    } catch {
       return null
     }
   }
 }
 
-export async function getNetworkProvider(chainId: ChainId): Promise<Provider> {
+async function getNetworkProvider(chainId: ChainId): Promise<Provider> {
   /*
           We check if the connected provider is from the same chainId, if so we return that one instead of creating one.
           This is to avoid using our own RPCs that much, and use the ones provided by the provider when possible.
@@ -78,7 +78,7 @@ export async function getNetworkProvider(chainId: ChainId): Promise<Provider> {
  * @param address The Ethereum address to validate
  * @returns true if the address is a valid Decentraland contract address, false otherwise
  */
-export async function isDecentralandContractAddress(address: string): Promise<boolean> {
+async function isDecentralandContractAddress(address: string): Promise<boolean> {
   try {
     const transactionApiUrl = `${config.get('META_TRANSACTION_SERVER_URL')}/v1`
     const response = await fetch(`${transactionApiUrl}/contracts/${address}`)
@@ -99,7 +99,7 @@ export async function isDecentralandContractAddress(address: string): Promise<bo
  * Gets the appropriate chain ID based on the environment.
  * @returns ChainId.MATIC_MAINNET for production/staging, ChainId.MATIC_AMOY otherwise
  */
-export function getMetaTransactionChainId(): ChainId {
+function getMetaTransactionChainId(): ChainId {
   return ['production', 'staging'].includes(config.get('ENVIRONMENT').toLowerCase()) ? ChainId.MATIC_MAINNET : ChainId.MATIC_AMOY
 }
 
@@ -108,13 +108,13 @@ export function getMetaTransactionChainId(): ChainId {
  * @param contractAddress The contract address to check
  * @returns Object with willUseMetaTransaction boolean and contractName (or null)
  */
-export async function checkMetaTransactionSupport(
+async function checkMetaTransactionSupport(
   contractAddress: string
 ): Promise<{ willUseMetaTransaction: boolean; contractName: ContractName | null }> {
   try {
     const contractName = getContractName(contractAddress)
     return { willUseMetaTransaction: true, contractName }
-  } catch (error) {
+  } catch {
     const isAcceptedAddress = await isDecentralandContractAddress(contractAddress.toLowerCase())
     if (isAcceptedAddress) {
       return { willUseMetaTransaction: true, contractName: ContractName.ERC721CollectionV2 }
@@ -129,7 +129,7 @@ export async function checkMetaTransactionSupport(
  * @param contractABI The contract ABI to use for decoding
  * @returns Object containing tokenId and toAddress, or null if decoding fails
  */
-export function decodeNftTransferData(data: string, contractABI: object[]): { tokenId: string; toAddress: string } | null {
+function decodeNftTransferData(data: string, contractABI: object[]): { tokenId: string; toAddress: string } | null {
   try {
     if (!data || data.length < 10) return null
 
@@ -162,7 +162,7 @@ export function decodeNftTransferData(data: string, contractABI: object[]): { to
  * @param data The transaction data
  * @returns Object containing manaAmount and toAddress, or null if decoding fails
  */
-export function decodeManaTransferData(data: string): { manaAmount: string; toAddress: string } | null {
+function decodeManaTransferData(data: string): { manaAmount: string; toAddress: string } | null {
   try {
     if (!data || data.length < 10) return null
 
@@ -205,7 +205,7 @@ export function decodeManaTransferData(data: string): { manaAmount: string; toAd
  * @returns Object containing image URL and other metadata
  * @throws Error if tokenURI is not found or metadata cannot be fetched
  */
-export async function fetchNftMetadata(
+async function fetchNftMetadata(
   contractAddress: string,
   contractABI: object[],
   tokenId: string
@@ -289,7 +289,7 @@ export async function fetchNftMetadata(
  * @param creatorAddress The creator's Ethereum address
  * @returns Object containing place name and image URL if exactly one place is found, null otherwise
  */
-export async function fetchPlaceByCreatorAddress(creatorAddress: string): Promise<{ sceneName: string; sceneImageUrl: string } | null> {
+async function fetchPlaceByCreatorAddress(creatorAddress: string): Promise<{ sceneName: string; sceneImageUrl: string } | null> {
   try {
     const placesApiUrl = config.get('PLACES_API_URL')
     const response = await fetch(`${placesApiUrl}/api/places?creator_address=${creatorAddress.toLowerCase()}`)
@@ -322,4 +322,17 @@ export async function fetchPlaceByCreatorAddress(creatorAddress: string): Promis
     console.error('Error fetching place by creator address:', error)
     return null
   }
+}
+
+export {
+  launchDeepLink,
+  getConnectedProvider,
+  getNetworkProvider,
+  isDecentralandContractAddress,
+  getMetaTransactionChainId,
+  checkMetaTransactionSupport,
+  decodeNftTransferData,
+  decodeManaTransferData,
+  fetchNftMetadata,
+  fetchPlaceByCreatorAddress
 }

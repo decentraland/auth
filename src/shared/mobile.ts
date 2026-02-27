@@ -1,4 +1,4 @@
-export interface MobileSession {
+interface MobileSession {
   u?: string
   s?: string
 }
@@ -26,7 +26,7 @@ function extractMobileDataFromState(): { isMobileFlow?: boolean; mobileUserId?: 
   return null
 }
 
-export function getMobileSession(): MobileSession | null {
+function getMobileSession(): MobileSession | null {
   if (cachedSession !== undefined) {
     return cachedSession
   }
@@ -52,12 +52,12 @@ export function getMobileSession(): MobileSession | null {
   return null
 }
 
-export function isMobileSession(): boolean {
+function isMobileSession(): boolean {
   return getMobileSession() !== null
 }
 
 // Exported for testing only
-export function resetMobileSession(): void {
+function resetMobileSession(): void {
   cachedSession = undefined
 }
 
@@ -80,7 +80,7 @@ const PKCE_MIRROR_KEY = '_ss_mirror:magic_oauth_pkce_verifier'
 
 let mirroring = false
 
-export function mirrorSessionStorageWrites(): void {
+function mirrorSessionStorageWrites(): void {
   if (mirroring) return
   mirroring = true
 
@@ -115,7 +115,7 @@ export function mirrorSessionStorageWrites(): void {
  * Only restores if the key is missing from sessionStorage (iOS eviction case).
  * Always cleans up the mirror key afterwards.
  */
-export function restoreSessionStorageMirror(): boolean {
+function restoreSessionStorageMirror(): boolean {
   const mirrorValue = localStorage.getItem(PKCE_MIRROR_KEY)
   if (mirrorValue === null) return false
 
@@ -128,3 +128,6 @@ export function restoreSessionStorageMirror(): boolean {
   localStorage.removeItem(PKCE_MIRROR_KEY)
   return needsRestore
 }
+
+export type { MobileSession }
+export { getMobileSession, isMobileSession, resetMobileSession, mirrorSessionStorageWrites, restoreSessionStorageMirror }

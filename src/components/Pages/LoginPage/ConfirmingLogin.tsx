@@ -1,4 +1,4 @@
-import { Logo, CircularProgress } from 'decentraland-ui2'
+import { CircularProgress, Logo } from 'decentraland-ui2'
 import { AnimatedBackground } from '../../AnimatedBackground'
 import styles from './ConfirmingLogin.module.css'
 

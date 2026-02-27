@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react'
 import overlayTextureUrl from '../../assets/images/background/DCL_LogoPattern.png'
 import { FRAGMENT_SHADER, VERTEX_SHADER } from './AnimatedBackground.shaders'
-import { Canvas, Fallback, Wrapper } from './AnimatedBackground.styled'
 import { createProgram, createShader, loadTexture } from './AnimatedBackground.utils'
 import { AnimatedBackgroundProps } from './AnimatedBackground.types'
+import { Canvas, Fallback, Wrapper } from './AnimatedBackground.styled'
 
 const AnimatedBackground = ({ variant = 'fixed' }: AnimatedBackgroundProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null)

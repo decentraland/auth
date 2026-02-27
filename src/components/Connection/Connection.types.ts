@@ -1,4 +1,4 @@
-export enum ConnectionOptionType {
+enum ConnectionOptionType {
   METAMASK = 'metamask',
   DAPPER = 'dapper',
   FORTMATIC = 'fortmatic',
@@ -14,7 +14,7 @@ export enum ConnectionOptionType {
   EMAIL = 'email'
 }
 
-export const connectionOptionTitles: { [key in ConnectionOptionType]: string } = {
+const connectionOptionTitles: { [key in ConnectionOptionType]: string } = {
   [ConnectionOptionType.METAMASK]: 'MetaMask',
   [ConnectionOptionType.DAPPER]: 'Dapper',
   [ConnectionOptionType.FORTMATIC]: 'Fortmatic',
@@ -30,9 +30,9 @@ export const connectionOptionTitles: { [key in ConnectionOptionType]: string } =
   [ConnectionOptionType.EMAIL]: 'Email'
 }
 
-export type MetamaskEthereumWindow = typeof window.ethereum & { isMetaMask?: boolean }
+type MetamaskEthereumWindow = typeof window.ethereum & { isMetaMask?: boolean }
 
-export type ConnectionI18N = {
+type ConnectionI18N = {
   title: React.ReactNode
   titleNewUser: React.ReactNode
   subtitle: React.ReactNode
@@ -43,7 +43,7 @@ export type ConnectionI18N = {
   web3Message: (learnMore: (element: React.ReactNode) => React.ReactNode) => React.ReactNode
 }
 
-export type ConnectionProps = {
+type ConnectionProps = {
   i18n?: ConnectionI18N
   connectionOptions?: {
     primary: ConnectionOptionType
@@ -58,3 +58,6 @@ export type ConnectionProps = {
   onConnect: (wallet: ConnectionOptionType) => unknown
   onEmailSubmit?: (email: string) => void
 }
+
+export { ConnectionOptionType, connectionOptionTitles }
+export type { MetamaskEthereumWindow, ConnectionI18N, ConnectionProps }

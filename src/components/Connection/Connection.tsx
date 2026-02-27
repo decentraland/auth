@@ -1,22 +1,22 @@
 import { useCallback, useState } from 'react'
 import { Logo } from 'decentraland-ui2'
-import {
-  ChevronIcon,
-  ChevronUpIcon,
-  ConnectionContainer,
-  DclLogoContainer,
-  Divider,
-  ShowMoreButton,
-  ShowMoreContainer,
-  Title,
-  MainContentContainer,
-  DecentralandText
-} from './Connection.styled'
 import { ConnectionPrimaryButton } from './ConnectionPrimaryButton'
 import { ConnectionSecondaryButton } from './ConnectionSecondaryButton'
 import { EXTRA_TEST_ID, PRIMARY_TEST_ID, SECONDARY_TEST_ID, SHOW_MORE_BUTTON_TEST_ID } from './constants'
 import { EmailInput } from './EmailInput'
 import { ConnectionOptionType, ConnectionProps, connectionOptionTitles } from './Connection.types'
+import {
+  ChevronIcon,
+  ChevronUpIcon,
+  ConnectionContainer,
+  DclLogoContainer,
+  DecentralandText,
+  Divider,
+  MainContentContainer,
+  ShowMoreButton,
+  ShowMoreContainer,
+  Title
+} from './Connection.styled'
 
 const defaultProps = {
   i18n: {
@@ -57,8 +57,8 @@ export const Connection = (props: ConnectionProps): JSX.Element => {
     connectionOptions?.primary === ConnectionOptionType.EMAIL
       ? connectionOptions?.extraOptions?.[0]
       : connectionOptions?.secondary === ConnectionOptionType.EMAIL
-      ? connectionOptions?.extraOptions?.[0]
-      : connectionOptions?.secondary
+        ? connectionOptions?.extraOptions?.[0]
+        : connectionOptions?.secondary
   const filteredExtraOptions = connectionOptions?.extraOptions?.filter(opt => opt !== ConnectionOptionType.EMAIL)
 
   return (

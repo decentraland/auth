@@ -7,7 +7,7 @@ let walletInstance: ReturnType<typeof inAppWallet> | null = null
 /**
  * Gets or creates the in-app wallet instance
  */
-export const getInAppWallet = () => {
+const getInAppWallet = () => {
   if (!walletInstance) {
     walletInstance = inAppWallet()
   }
@@ -31,7 +31,7 @@ export const getInAppWallet = () => {
  *
  * @see https://portal.thirdweb.com/wallets/users
  */
-export const sendEmailOTP = async (email: string): Promise<void> => {
+const sendEmailOTP = async (email: string): Promise<void> => {
   const client = getThirdwebClient()
 
   await preAuthenticate({
@@ -62,7 +62,7 @@ export const sendEmailOTP = async (email: string): Promise<void> => {
  *
  * @see https://portal.thirdweb.com/wallets/users
  */
-export const verifyEmailOTPAndConnect = async (email: string, verificationCode: string) => {
+const verifyEmailOTPAndConnect = async (email: string, verificationCode: string) => {
   console.log('[Thirdweb] Verifying OTP for email:', email, 'code:', verificationCode)
   const client = getThirdwebClient()
   const wallet = getInAppWallet()
@@ -88,14 +88,14 @@ export const verifyEmailOTPAndConnect = async (email: string, verificationCode: 
 /**
  * Gets the current wallet instance (if connected)
  */
-export const getConnectedWallet = () => {
+const getConnectedWallet = () => {
   return walletInstance
 }
 
 /**
  * Disconnects the current wallet and resets the instance
  */
-export const disconnectWallet = async () => {
+const disconnectWallet = async () => {
   if (walletInstance) {
     await walletInstance.disconnect()
     walletInstance = null
@@ -105,7 +105,7 @@ export const disconnectWallet = async () => {
 /**
  * Checks if a wallet is currently connected
  */
-export const isWalletConnected = (): boolean => {
+const isWalletConnected = (): boolean => {
   if (!walletInstance) return false
 
   try {
@@ -115,3 +115,5 @@ export const isWalletConnected = (): boolean => {
     return false
   }
 }
+
+export { getInAppWallet, sendEmailOTP, verifyEmailOTPAndConnect, getConnectedWallet, disconnectWallet, isWalletConnected }

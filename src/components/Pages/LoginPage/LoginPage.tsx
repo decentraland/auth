@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect, useContext } from 'react'
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import classNames from 'classnames'
 import type { AuthIdentity } from '@dcl/crypto'
 import { ChainId } from '@dcl/schemas/dist/dapps/chain-id'
@@ -7,21 +7,37 @@ import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
 import { Env } from '@dcl/ui-env'
 import { connection } from 'decentraland-connect'
 import { CircularProgress } from 'decentraland-ui2'
+// eslint-disable-next-line @typescript-eslint/naming-convention
 import ImageNew1 from '../../../assets/images/background/image-new1.webp'
+// eslint-disable-next-line @typescript-eslint/naming-convention
 import ImageNew2 from '../../../assets/images/background/image-new2.webp'
+// eslint-disable-next-line @typescript-eslint/naming-convention
 import ImageNew3 from '../../../assets/images/background/image-new3.webp'
+// eslint-disable-next-line @typescript-eslint/naming-convention
 import ImageNew4 from '../../../assets/images/background/image-new4.webp'
+// eslint-disable-next-line @typescript-eslint/naming-convention
 import ImageNew5 from '../../../assets/images/background/image-new5.webp'
+// eslint-disable-next-line @typescript-eslint/naming-convention
 import ImageNew6 from '../../../assets/images/background/image-new6.webp'
+// eslint-disable-next-line @typescript-eslint/naming-convention
 import Image1 from '../../../assets/images/background/image1.webp'
+// eslint-disable-next-line @typescript-eslint/naming-convention
 import Image10 from '../../../assets/images/background/image10.webp'
+// eslint-disable-next-line @typescript-eslint/naming-convention
 import Image2 from '../../../assets/images/background/image2.webp'
+// eslint-disable-next-line @typescript-eslint/naming-convention
 import Image3 from '../../../assets/images/background/image3.webp'
+// eslint-disable-next-line @typescript-eslint/naming-convention
 import Image4 from '../../../assets/images/background/image4.webp'
+// eslint-disable-next-line @typescript-eslint/naming-convention
 import Image5 from '../../../assets/images/background/image5.webp'
+// eslint-disable-next-line @typescript-eslint/naming-convention
 import Image6 from '../../../assets/images/background/image6.webp'
+// eslint-disable-next-line @typescript-eslint/naming-convention
 import Image7 from '../../../assets/images/background/image7.webp'
+// eslint-disable-next-line @typescript-eslint/naming-convention
 import Image8 from '../../../assets/images/background/image8.webp'
+// eslint-disable-next-line @typescript-eslint/naming-convention
 import Image9 from '../../../assets/images/background/image9.webp'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { useTargetConfig } from '../../../hooks/targetConfig'
@@ -37,7 +53,7 @@ import { disconnectWallet, sendEmailOTP } from '../../../shared/thirdweb'
 import { isClockSynchronized } from '../../../shared/utils/clockSync'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { ClockSyncModal } from '../../ClockSyncModal'
-import { ConnectionOptionType, Connection } from '../../Connection'
+import { Connection, ConnectionOptionType } from '../../Connection'
 import { ConnectionModal } from '../../ConnectionModal'
 import { ConnectionLayoutState } from '../../ConnectionModal/ConnectionLayout.type'
 import { EmailLoginModal } from '../../EmailLoginModal'
@@ -45,12 +61,12 @@ import { EmailLoginResult } from '../../EmailLoginModal/EmailLoginModal.types'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import { ConfirmingLogin } from './ConfirmingLogin'
 import {
+  connectToProvider,
+  connectToSocialProvider,
+  fromConnectionOptionToProviderType,
   getIdentitySignature,
   getIdentityWithSigner,
-  connectToProvider,
-  isSocialLogin,
-  fromConnectionOptionToProviderType,
-  connectToSocialProvider
+  isSocialLogin
 } from './utils'
 import styles from './LoginPage.module.css'
 

@@ -1,7 +1,7 @@
 import { useCallback, useRef } from 'react'
 import { BrowserProvider } from 'ethers'
 import type { Provider } from 'decentraland-connect'
-import { createAuthServerWsClient, ExpiredRequestError, IpValidationError, RequestFulfilledError, RecoverResponse } from '../shared/auth'
+import { ExpiredRequestError, IpValidationError, RecoverResponse, RequestFulfilledError, createAuthServerWsClient } from '../shared/auth'
 import { isErrorWithMessage } from '../shared/errors'
 import { handleError } from '../shared/utils/errorHandler'
 
@@ -64,7 +64,7 @@ export const useSignRequest = (redirect: () => void, errorHandlers?: SignRequest
 
         const browserProvider = new BrowserProvider(provider)
         const signer = await browserProvider.getSigner()
-        signature = await signer.signMessage(request.params?.[0])
+        signature = await signer.signMessage(request.params?.[0] as string)
 
         if (errorHandlers?.onConnectionModalClose) {
           errorHandlers.onConnectionModalClose()

@@ -8,7 +8,7 @@ export const DeniedSignIn = ({ requestId }: { requestId: string }) => {
       <div className={styles.errorLogo}></div>
       <div className={styles.title}>Did the number not match, or was this action not taken by you?</div>
       <div className={styles.description}>
-        If you're trying to sign in, retry the action. If this action was not initiated by you, dismiss this message.
+        If you&apos;re trying to sign in, retry the action. If this action was not initiated by you, dismiss this message.
       </div>
       <CloseWindow />
     </Container>

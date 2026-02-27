@@ -3,7 +3,7 @@ import { RequestInteractionType, TrackingEvents } from '../../modules/analytics/
 import { config } from '../../modules/config'
 import { trackEvent } from '../utils/analytics'
 import { handleError } from '../utils/errorHandler'
-import { DifferentSenderError, ExpiredRequestError, RequestNotFoundError, RequestFulfilledError, IpValidationError } from './errors'
+import { DifferentSenderError, ExpiredRequestError, IpValidationError, RequestFulfilledError, RequestNotFoundError } from './errors'
 import { OutcomeError, OutcomeResponse, RecoverResponse, ValidationResponse } from './types'
 
 export const createAuthServerWsClient = (authServerUrl?: string) => {
@@ -11,7 +11,7 @@ export const createAuthServerWsClient = (authServerUrl?: string) => {
 
   const request = async <T>(
     event: string,
-    message: { requestId: string; sender?: string; result?: any; error?: OutcomeError }
+    message: { requestId: string; sender?: string; result?: unknown; error?: OutcomeError }
   ): Promise<T> => {
     const socket = io(url)
 
@@ -39,7 +39,7 @@ export const createAuthServerWsClient = (authServerUrl?: string) => {
     return response
   }
 
-  const sendSuccessfulOutcome = async (requestId: string, sender: string, result: any): Promise<OutcomeResponse> => {
+  const sendSuccessfulOutcome = async (requestId: string, sender: string, result: unknown): Promise<OutcomeResponse> => {
     try {
       return await request<OutcomeResponse>('outcome', {
         requestId,

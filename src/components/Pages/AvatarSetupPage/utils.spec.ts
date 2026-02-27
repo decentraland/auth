@@ -3,7 +3,7 @@ import { Authenticator } from '@dcl/crypto'
 import { EntityType } from '@dcl/schemas'
 import { config } from '../../../modules/config'
 import { deployProfileFromAvatarShape } from './utils'
-import { DeploymentParams, AvatarShape, Color } from './AvatarSetupPage.types'
+import { AvatarShape, Color, DeploymentParams } from './AvatarSetupPage.types'
 
 jest.mock('../../../modules/config')
 jest.mock('dcl-catalyst-client')
@@ -54,7 +54,7 @@ describe('deployProfileFromAvatarShape', () => {
       avatarShape: mockAvatarShape,
       connectedAccount: '0x69d30b1875d39e13a01af73ccfed6d84839e84f2',
       deploymentProfileName: 'TestUser',
-      connectedAccountIdentity: { privateKey: 'mock-private-key' } as any
+      connectedAccountIdentity: { privateKey: 'mock-private-key' } as unknown as DeploymentParams['connectedAccountIdentity']
     }
 
     mockPeerUrl = 'https://peer.decentraland.org'
@@ -69,9 +69,11 @@ describe('deployProfileFromAvatarShape', () => {
     }
 
     mockConfig.get.mockReturnValue(mockPeerUrl)
-    mockCreateContentClient.mockReturnValue(mockContentClient as any)
-    mockDeploymentBuilder.buildEntity.mockResolvedValue(mockBuiltEntity as any)
-    mockAuthenticator.signPayload.mockReturnValue(mockAuthChain as any)
+    mockCreateContentClient.mockReturnValue(mockContentClient as unknown as ReturnType<typeof createContentClient>)
+    mockDeploymentBuilder.buildEntity.mockResolvedValue(
+      mockBuiltEntity as unknown as Awaited<ReturnType<typeof DeploymentBuilder.buildEntity>>
+    )
+    mockAuthenticator.signPayload.mockReturnValue(mockAuthChain as unknown as ReturnType<typeof Authenticator.signPayload>)
   })
 
   describe('when all parameters are valid', () => {
