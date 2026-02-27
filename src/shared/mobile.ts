@@ -62,22 +62,21 @@ export function resetMobileSession(): void {
 }
 
 /**
- * Mirror sessionStorage writes to localStorage in real time.
+ * Mirror Magic's PKCE code verifier from sessionStorage to localStorage.
  *
  * Mobile Safari may evict the tab's sessionStorage during an OAuth redirect.
- * Magic's loginWithRedirect() writes the PKCE code verifier to sessionStorage
- * DURING its async body (after an iframe RPC round-trip, right before the
- * redirect), so a pre-redirect snapshot would miss it.
+ * Magic's loginWithRedirect() writes `magic_oauth_pkce_verifier` to
+ * sessionStorage DURING its async body (after an iframe RPC round-trip, right
+ * before the redirect), so a pre-redirect snapshot would miss it.
  *
- * Instead, we monkey-patch sessionStorage.setItem so every write is also
- * persisted to localStorage under a prefix. On the callback page,
- * restoreSessionStorageMirror() replays the mirrored keys if sessionStorage
- * was evicted.
+ * We patch Storage.prototype.setItem (not the instance — the Storage spec's
+ * named property setter would intercept instance assignment and store the
+ * function as a literal string entry). Only the PKCE key is mirrored.
  *
- * Call this before loginWithRedirect(). The patch is naturally discarded when
- * the page navigates away.
+ * Call this before loginWithRedirect().
  */
-const SS_MIRROR_PREFIX = '_ss_mirror:'
+const PKCE_KEY = 'magic_oauth_pkce_verifier'
+const PKCE_MIRROR_KEY = '_ss_mirror:magic_oauth_pkce_verifier'
 
 let mirroring = false
 
@@ -85,59 +84,47 @@ export function mirrorSessionStorageWrites(): void {
   if (mirroring) return
   mirroring = true
 
+  // eslint-disable-next-line @typescript-eslint/unbound-method
   const originalSetItem = Storage.prototype.setItem
 
   Storage.prototype.setItem = function (key: string, value: string) {
     originalSetItem.call(this, key, value)
-    if (this === sessionStorage) {
+    if (this === sessionStorage && key === PKCE_KEY) {
       try {
-        originalSetItem.call(localStorage, SS_MIRROR_PREFIX + key, value)
+        originalSetItem.call(localStorage, PKCE_MIRROR_KEY, value)
       } catch {
         // localStorage full — best effort
       }
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/unbound-method
   const originalRemoveItem = Storage.prototype.removeItem
 
   Storage.prototype.removeItem = function (key: string) {
     originalRemoveItem.call(this, key)
-    if (this === sessionStorage) {
-      originalRemoveItem.call(localStorage, SS_MIRROR_PREFIX + key)
+    if (this === sessionStorage && key === PKCE_KEY) {
+      originalRemoveItem.call(localStorage, PKCE_MIRROR_KEY)
     }
   }
 }
 
 /**
- * Restore sessionStorage from mirrored localStorage keys.
+ * Restore the PKCE code verifier from its localStorage mirror.
  *
- * Only restores when sessionStorage is empty (iOS eviction case) so we never
- * overwrite a healthy session. Always cleans up the mirror keys afterwards.
+ * Only restores if the key is missing from sessionStorage (iOS eviction case).
+ * Always cleans up the mirror key afterwards.
  */
 export function restoreSessionStorageMirror(): boolean {
-  const mirrorKeys: string[] = []
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i)
-    if (key?.startsWith(SS_MIRROR_PREFIX)) {
-      mirrorKeys.push(key)
-    }
+  const mirrorValue = localStorage.getItem(PKCE_MIRROR_KEY)
+  if (mirrorValue === null) return false
+
+  const needsRestore = sessionStorage.getItem(PKCE_KEY) === null
+
+  if (needsRestore) {
+    sessionStorage.setItem(PKCE_KEY, mirrorValue)
   }
 
-  if (mirrorKeys.length === 0) return false
-
-  const shouldRestore = sessionStorage.length === 0
-
-  if (shouldRestore) {
-    for (const key of mirrorKeys) {
-      const value = localStorage.getItem(key)
-      if (value !== null) {
-        sessionStorage.setItem(key.slice(SS_MIRROR_PREFIX.length), value)
-      }
-    }
-  }
-
-  for (const key of mirrorKeys) {
-    localStorage.removeItem(key)
-  }
-  return shouldRestore
+  localStorage.removeItem(PKCE_MIRROR_KEY)
+  return needsRestore
 }
