@@ -4,7 +4,7 @@ import { useMobileMediaQuery } from 'decentraland-ui/dist/components/Media/Media
 import { connection } from 'decentraland-connect'
 import { useNavigateWithSearchParams } from '../../../../hooks/navigation'
 import { useTargetConfig } from '../../../../hooks/targetConfig'
-import { useCurrentConnectionData } from '../../../../shared/connection/hooks'
+import { useCurrentConnectionData } from '../../../../shared/connection/hook'
 import { AnimatedBackground } from '../../../AnimatedBackground'
 import { CustomWearablePreview } from '../../../CustomWearablePreview'
 import styles from './Container.module.css'
