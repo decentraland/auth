@@ -1,15 +1,15 @@
 import { useCallback, useContext, useEffect, useState } from 'react'
 import ArrowBackIosNewTwoToneIcon from '@mui/icons-material/ArrowBackIosNewTwoTone'
 import { RPCError } from 'magic-sdk'
-import { ProviderType } from '@dcl/schemas'
 import { Button } from 'decentraland-ui/dist/components/Button/Button'
-import { connection } from 'decentraland-connect'
+import { Provider } from 'decentraland-connect'
 import { CircularProgress } from 'decentraland-ui2'
 import wrongImg from '../../../assets/images/wrong.svg'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import { createAuthServerHttpClient } from '../../../shared/auth'
 import { locations } from '../../../shared/locations'
+import { restoreSessionStorageMirror } from '../../../shared/mobile'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { createMagicInstance, OAUTH_ACCESS_DENIED_ERROR } from '../../../shared/utils/magicSdk'
 import { ConnectionContainer, ConnectionTitle, DecentralandLogo, ProgressContainer } from '../../ConnectionModal/ConnectionLayout.styled'
@@ -37,20 +37,36 @@ export const MobileCallbackPage = () => {
     }
 
     try {
-      // Get OAuth result from Magic
+      // Restore sessionStorage if Mobile Safari evicted it during the OAuth redirect.
+      // This recovers the PKCE code verifier that Magic needs.
+      console.log(
+        '[MobileCallback] Before restore — sessionStorage.length:',
+        sessionStorage.length,
+        'has PKCE:',
+        sessionStorage.getItem('magic_oauth_pkce_verifier') !== null
+      )
+      const restored = restoreSessionStorageMirror()
+      console.log(
+        '[MobileCallback] After restore — restored:',
+        restored,
+        'has PKCE:',
+        sessionStorage.getItem('magic_oauth_pkce_verifier') !== null
+      )
+
+      // Use a single Magic instance for the entire flow to avoid the two-iframe
+      // split that caused "user isn't logged in" errors.
       const magic = await createMagicInstance(!!flags[FeatureFlagsKeys.MAGIC_TEST])
-      await magic?.oauth2.getRedirectResult()
+      await magic.oauth2.getRedirectResult()
+      console.log('[MobileCallback] getRedirectResult succeeded')
 
-      // Connect to Magic provider
-      const providerType = flags[FeatureFlagsKeys.MAGIC_TEST] ? ProviderType.MAGIC_TEST : ProviderType.MAGIC
-      const connectionData = await connection.connect(providerType)
-
-      if (!connectionData?.account || !connectionData?.provider) {
-        throw new Error('Failed to connect to Magic')
-      }
+      // Reuse the same Magic instance to avoid spawning a second iframe
+      const provider = await magic.wallet.getProvider()
+      const accounts: string[] = await provider.request({ method: 'eth_accounts' })
+      const account = accounts[0]
+      if (!account) throw new Error('Failed to get account from Magic')
 
       // Generate identity
-      const identity = await getIdentitySignature(connectionData.account.toLowerCase(), connectionData.provider)
+      const identity = await getIdentitySignature(account.toLowerCase(), provider as unknown as Provider)
 
       // Post identity to server
       const httpClient = createAuthServerHttpClient()
@@ -71,7 +87,7 @@ export const MobileCallbackPage = () => {
       })
       setError(err instanceof Error ? err.message : 'Authentication failed')
     }
-  }, [flags])
+  }, [flags, navigate])
 
   useEffect(() => {
     if (!initialized || isProcessing) return

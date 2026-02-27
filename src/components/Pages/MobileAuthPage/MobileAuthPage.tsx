@@ -4,6 +4,7 @@ import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import { createAuthServerHttpClient } from '../../../shared/auth'
 import { isErrorWithName } from '../../../shared/errors'
+import { mirrorSessionStorageWrites } from '../../../shared/mobile'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { createMagicInstance } from '../../../shared/utils/magicSdk'
 import { ConnectionOptionType } from '../../Connection'
@@ -51,6 +52,8 @@ export const MobileAuthPage = () => {
           // OAuth flow - will redirect to provider
           setView('connecting')
           setLoadingState(ConnectionLayoutState.LOADING_MAGIC)
+          // Guard against Mobile Safari evicting sessionStorage during the OAuth redirect
+          mirrorSessionStorageWrites()
           await connectToSocialProvider(
             selectedConnectionType,
             flags[FeatureFlagsKeys.MAGIC_TEST],
