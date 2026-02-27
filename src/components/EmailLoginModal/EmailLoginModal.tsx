@@ -9,6 +9,13 @@ import { EmailLoginModalProps } from './EmailLoginModal.types'
 import styles from './EmailLoginModal.module.css'
 
 const OTP_LENGTH = 6
+const RESEND_COOLDOWN_SECONDS = 60
+
+const formatCountdown = (seconds: number): string => {
+  const minutes = Math.floor(seconds / 60)
+  const remainingSeconds = seconds % 60
+  return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`
+}
 
 const getNetworkFriendlyError = (errorMessage: string | undefined, fallback: string): string => {
   if (errorMessage === 'Failed to fetch' || errorMessage?.toLowerCase().includes('network')) {
@@ -24,6 +31,7 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [hasError, setHasError] = useState(false)
+  const [resendCooldown, setResendCooldown] = useState(() => (open ? RESEND_COOLDOWN_SECONDS : 0))
 
   const otpInputRefs = useRef<(HTMLInputElement | null)[]>([])
   // Use ref to always have access to current email in callbacks
@@ -37,10 +45,23 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
       setError(null)
       setIsLoading(false)
       setHasError(false)
+      setResendCooldown(RESEND_COOLDOWN_SECONDS)
       // Focus first OTP input after a short delay
       setTimeout(() => otpInputRefs.current[0]?.focus(), 100)
     }
   }, [open])
+
+  useEffect(() => {
+    if (resendCooldown <= 0) {
+      return
+    }
+
+    const timeoutId = setTimeout(() => {
+      setResendCooldown(prev => Math.max(prev - 1, 0))
+    }, 1000)
+
+    return () => clearTimeout(timeoutId)
+  }, [resendCooldown])
 
   const handleOtpChange = useCallback(
     (index: number, value: string) => {
@@ -145,6 +166,10 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
   )
 
   const handleResendOtp = useCallback(async () => {
+    if (isLoading || resendCooldown > 0) {
+      return
+    }
+
     const currentEmail = emailRef.current
     setOtp(Array(OTP_LENGTH).fill(''))
     setError(null)
@@ -158,6 +183,7 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
 
       // Track OTP resend
       trackEvent(TrackingEvents.OTP_RESEND, { email: currentEmail })
+      setResendCooldown(RESEND_COOLDOWN_SECONDS)
 
       // Focus first OTP input
       setTimeout(() => otpInputRefs.current[0]?.focus(), 100)
@@ -168,7 +194,7 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [isLoading, resendCooldown])
 
   const handleClose = useCallback(() => {
     if (!isLoading) {
@@ -181,6 +207,10 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
       onBack()
     }
   }, [isLoading, onBack])
+
+  const isResendDisabled = isLoading || resendCooldown > 0
+  const resendCountdown = resendCooldown > 0 ? ` (${formatCountdown(resendCooldown)})` : ''
+  const resendText = `Resend Code${resendCountdown}`
 
   const renderContent = () => {
     return (
@@ -224,8 +254,11 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
         {error && (
           <>
             <p className={styles.errorMessage}>{error}</p>
-            <span className={styles.resendLinkError} onClick={!isLoading ? handleResendOtp : undefined}>
-              Resend Code
+            <span
+              className={`${styles.resendLinkError} ${isResendDisabled ? styles.resendLinkDisabled : ''}`}
+              onClick={!isResendDisabled ? handleResendOtp : undefined}
+            >
+              {resendText}
             </span>
           </>
         )}
@@ -233,8 +266,11 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
         {!error && (
           <p className={styles.resendText}>
             Didn't get an email?{' '}
-            <span className={styles.resendLink} onClick={!isLoading ? handleResendOtp : undefined}>
-              Resend Code
+            <span
+              className={`${styles.resendLink} ${isResendDisabled ? styles.resendLinkDisabled : ''}`}
+              onClick={!isResendDisabled ? handleResendOtp : undefined}
+            >
+              {resendText}
             </span>
           </p>
         )}

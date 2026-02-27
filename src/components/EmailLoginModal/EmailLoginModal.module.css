@@ -237,6 +237,13 @@
   color: #ffb3b3;
 }
 
+.resendLinkDisabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  text-decoration: none;
+  pointer-events: none;
+}
+
 .buttonContainer {
   display: flex;
   flex-direction: column;
