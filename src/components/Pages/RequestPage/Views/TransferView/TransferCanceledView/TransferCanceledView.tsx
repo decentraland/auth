@@ -17,7 +17,11 @@ const TransferCanceledView = memo((props: TransferCanceledViewProps) => {
   return (
     <TransferLayout>
       <CenteredContent>
-        <Title>{isTip ? t('transfer.canceled.tip_cancelled', { manaAmount: transferData.manaAmount }) : t('transfer.canceled.gift_canceled')} </Title>
+        <Title>
+          {isTip
+            ? t('transfer.canceled.tip_cancelled', { manaAmount: transferData.manaAmount })
+            : t('transfer.canceled.gift_canceled')}{' '}
+        </Title>
 
         {isTip && (
           <>

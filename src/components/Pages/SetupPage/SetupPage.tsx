@@ -427,7 +427,8 @@ export const SetupPage = () => {
                   <>
                     {t('setup.meet_avatar_description_mobile')}
                     <br />
-                    <b>{t('setup.meet_avatar_description_mobile_bold')}</b>{t('setup.meet_avatar_description_mobile_suffix')}
+                    <b>{t('setup.meet_avatar_description_mobile_bold')}</b>
+                    {t('setup.meet_avatar_description_mobile_suffix')}
                   </>
                 ) : (
                   <>
@@ -490,7 +491,12 @@ export const SetupPage = () => {
                 <div className={styles.name}>
                   <div className={styles.field}>
                     <label className={styles.fieldLabel}>{t('setup.username_label')}</label>
-                    <input className={styles.fieldInput} placeholder={t('setup.username_placeholder')} onChange={handleNameChange} value={name} />
+                    <input
+                      className={styles.fieldInput}
+                      placeholder={t('setup.username_placeholder')}
+                      onChange={handleNameChange}
+                      value={name}
+                    />
                     {showErrors && nameError ? (
                       <div className={styles.fieldMessage}>
                         <InputErrorMessage message={nameError} />
@@ -501,12 +507,15 @@ export const SetupPage = () => {
                 <div>
                   <div className={styles.field}>
                     <label className={styles.fieldLabel}>{t('setup.email_label')}</label>
-                    <input className={styles.fieldInput} placeholder={t('setup.email_placeholder')} value={email} onChange={handleEmailChange} />
+                    <input
+                      className={styles.fieldInput}
+                      placeholder={t('setup.email_placeholder')}
+                      value={email}
+                      onChange={handleEmailChange}
+                    />
                     <div className={styles.fieldMessage}>
                       {showErrors && emailError ? <InputErrorMessage className={styles.emailError} message={emailError} /> : null}
-                      <span>
-                        {t('setup.email_newsletter')}
-                      </span>
+                      <span>{t('setup.email_newsletter')}</span>
                     </div>
                   </div>
                 </div>
@@ -531,7 +540,13 @@ export const SetupPage = () => {
                   </Button>
                 </div>
               </form>
-              {deployError ? <DeployErrorMessage message={deployError} titleText={t('setup.deploy_error_title')} descriptionText={t('setup.deploy_error_description')} /> : null}
+              {deployError ? (
+                <DeployErrorMessage
+                  message={deployError}
+                  titleText={t('setup.deploy_error_title')}
+                  descriptionText={t('setup.deploy_error_description')}
+                />
+              ) : null}
             </div>
           </div>
           {!isMobile && (

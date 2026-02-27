@@ -7,11 +7,7 @@ import { Button, CircularProgress } from 'decentraland-ui2'
 import { type ConnectionLayoutProps, ConnectionLayoutState } from './ConnectionLayout.type'
 import { ConnectionContainer, ConnectionTitle, DecentralandLogo, ErrorButtonContainer, ProgressContainer } from './ConnectionLayout.styled'
 
-const getConnectionLayoutMessage = (
-  loadingState: ConnectionLayoutState,
-  providerType: ProviderType | null,
-  t: (key: string) => string
-) => {
+const getConnectionLayoutMessage = (loadingState: ConnectionLayoutState, providerType: ProviderType | null, t: (key: string) => string) => {
   switch (loadingState) {
     case ConnectionLayoutState.ERROR: {
       return t('connection_layout.error')

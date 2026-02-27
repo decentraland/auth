@@ -20,16 +20,7 @@ import {
 } from './Connection.styled'
 
 export const Connection = (props: ConnectionProps): JSX.Element => {
-  const {
-    onConnect,
-    onEmailSubmit,
-    connectionOptions,
-    className,
-    loadingOption,
-    isNewUser,
-    isEmailLoading,
-    emailError
-  } = props
+  const { onConnect, onEmailSubmit, connectionOptions, className, loadingOption, isNewUser, isEmailLoading, emailError } = props
   const { t } = useTranslation()
 
   const hasExtraOptions = connectionOptions?.extraOptions && connectionOptions.extraOptions.length > 0

@@ -1,7 +1,7 @@
 import { useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { useTranslation } from '@dcl/hooks'
 import { BrowserProvider, ethers, formatEther } from 'ethers'
+import { useTranslation } from '@dcl/hooks'
 import { ContractName, getContract, sendMetaTransaction } from 'decentraland-transactions'
 import { Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, muiIcons } from 'decentraland-ui2'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
@@ -650,9 +650,7 @@ export const RequestPage = () => {
 
           {!isDeepLinkFlow && (
             <>
-              <div className={viewStyles.description}>
-                {t('request.verification_match', { explorerText: targetConfig.explorerText })}
-              </div>
+              <div className={viewStyles.description}>{t('request.verification_match', { explorerText: targetConfig.explorerText })}</div>
               <div className={styles.code}>{requestRef.current?.code}</div>
             </>
           )}

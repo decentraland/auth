@@ -1,6 +1,6 @@
 // eslint-disable-next-line @typescript-eslint/naming-convention
-import { useTranslation } from '@dcl/hooks'
 import Tooltip from '@mui/material/Tooltip'
+import { useTranslation } from '@dcl/hooks'
 import { muiIcons } from 'decentraland-ui2'
 import { ConnectionIcon } from './ConnectionIcon'
 import { ConnectionOptionType, MetamaskEthereumWindow, connectionOptionTitles } from './Connection.types'
@@ -26,10 +26,7 @@ export const ConnectionPrimaryButton = ({
 }: ConnectionPrimaryButtonProps): JSX.Element => {
   const { t } = useTranslation()
   const isMetamaskAvailable = (window.ethereum as MetamaskEthereumWindow)?.isMetaMask
-  const error =
-    !isMetamaskAvailable && option === ConnectionOptionType.METAMASK
-      ? t('connection.metamask_not_installed')
-      : undefined
+  const error = !isMetamaskAvailable && option === ConnectionOptionType.METAMASK ? t('connection.metamask_not_installed') : undefined
 
   const isDisabled = !!loadingOption || !!error
   const children = <>{t('connection.continue_with', { provider: connectionOptionTitles[option] })}</>

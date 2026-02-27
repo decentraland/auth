@@ -12,7 +12,9 @@ export const SignInComplete = () => {
     <Container>
       <div className={styles.logo}></div>
       <div className={styles.title}>{t('request_views.sign_in_complete.title')}</div>
-      <div className={styles.description}>{t('request_views.sign_in_complete.description', { explorerText: targetConfig.explorerText })}</div>
+      <div className={styles.description}>
+        {t('request_views.sign_in_complete.description', { explorerText: targetConfig.explorerText })}
+      </div>
       <CloseWindow />
     </Container>
   )

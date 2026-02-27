@@ -34,11 +34,7 @@ import {
 
 const OTP_LENGTH = 6
 
-const getNetworkFriendlyError = (
-  errorMessage: string | undefined,
-  fallback: string,
-  networkError: string
-): string => {
+const getNetworkFriendlyError = (errorMessage: string | undefined, fallback: string, networkError: string): string => {
   if (errorMessage === 'Failed to fetch' || errorMessage?.toLowerCase().includes('network')) {
     return networkError
   }
@@ -219,7 +215,9 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
         </EmailIconContainer>
         <Title>{t('email_login_modal.title')}</Title>
         <Subtitle>
-          {t('email_login_modal.subtitle_prefix')}<strong>{email}</strong>{t('email_login_modal.subtitle_suffix')}
+          {t('email_login_modal.subtitle_prefix')}
+          <strong>{email}</strong>
+          {t('email_login_modal.subtitle_suffix')}
         </Subtitle>
 
         <OtpContainer hasError={hasError}>
@@ -259,7 +257,8 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
 
         {!error && (
           <ResendText>
-            {t('email_login_modal.didnt_get_email')}<ResendLink onClick={!isLoading ? handleResendOtp : undefined}>{t('email_login_modal.resend_code')}</ResendLink>
+            {t('email_login_modal.didnt_get_email')}
+            <ResendLink onClick={!isLoading ? handleResendOtp : undefined}>{t('email_login_modal.resend_code')}</ResendLink>
           </ResendText>
         )}
       </Content>

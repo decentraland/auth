@@ -19,7 +19,9 @@ const TransferCompletedView = (props: TransferCompletedViewProps) => {
   return (
     <TransferLayout>
       <CenteredContent>
-        <Title>{isTip ? t('transfer.completed.tip_success', { manaAmount: transferData.manaAmount }) : t('transfer.completed.gift_sent')}</Title>
+        <Title>
+          {isTip ? t('transfer.completed.tip_success', { manaAmount: transferData.manaAmount }) : t('transfer.completed.gift_sent')}
+        </Title>
 
         {isTip ? (
           <>

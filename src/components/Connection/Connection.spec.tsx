@@ -16,11 +16,7 @@ function renderConnectionNew(props: Partial<ConnectionProps>) {
   return render(
     <TranslationProvider locale="en" translations={translations} fallbackLocale="en">
       <DclThemeProvider theme={darkTheme}>
-        <ConnectionNew
-          onConnect={jest.fn()}
-          isNewUser={false}
-          {...props}
-        />
+        <ConnectionNew onConnect={jest.fn()} isNewUser={false} {...props} />
       </DclThemeProvider>
     </TranslationProvider>
   )

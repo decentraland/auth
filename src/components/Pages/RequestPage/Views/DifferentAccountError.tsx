@@ -10,7 +10,9 @@ export const DifferentAccountError = ({ requestId }: { requestId: string }) => {
     <Container canChangeAccount requestId={requestId}>
       <div className={styles.errorLogo}></div>
       <div className={styles.title}>{t('request_views.different_account.title')}</div>
-      <div className={styles.description}>{t('request_views.different_account.description', { explorerText: targetConfig.explorerText })}</div>
+      <div className={styles.description}>
+        {t('request_views.different_account.description', { explorerText: targetConfig.explorerText })}
+      </div>
     </Container>
   )
 }

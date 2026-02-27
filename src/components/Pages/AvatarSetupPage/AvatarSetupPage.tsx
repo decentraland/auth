@@ -2,9 +2,9 @@
 import * as React from 'react'
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { useTranslation } from '@dcl/hooks'
 import { Email, EthAddress } from '@dcl/schemas'
 import { PreviewUnityMode } from '@dcl/schemas/dist/dapps/preview'
-import { useTranslation } from '@dcl/hooks'
 import { CircularProgress, WearablePreview, launchDesktopApp } from 'decentraland-ui2'
 import avatarFloat from '../../../assets/animations/AvatarFloat_Lottie.json'
 import avatarParticles from '../../../assets/animations/AvatarParticles_Lottie.json'
@@ -365,12 +365,16 @@ const AvatarSetupPage: React.FC = () => {
 
         <WelcomeContainer>
           <WelcomeTitle variant="h3">
-            {t('avatar_setup.welcome_to')}<DecentralandText>{t('avatar_setup.decentraland')}</DecentralandText>
+            {t('avatar_setup.welcome_to')}
+            <DecentralandText>{t('avatar_setup.decentraland')}</DecentralandText>
           </WelcomeTitle>
         </WelcomeContainer>
 
         <InputContainer>
-          <InputLabel variant="h5">{t('avatar_setup.username_label')}{state.isEmailInherited ? '' : '*'}</InputLabel>
+          <InputLabel variant="h5">
+            {t('avatar_setup.username_label')}
+            {state.isEmailInherited ? '' : '*'}
+          </InputLabel>
           <TextInput
             variant="outlined"
             placeholder={t('avatar_setup.username_placeholder')}
@@ -406,13 +410,7 @@ const AvatarSetupPage: React.FC = () => {
         )}
 
         <CheckboxContainer>
-          {state.isEmailInherited && (
-            <CheckboxRow
-              id="marketing"
-              label={t('avatar_setup.email_newsletter')}
-              control={<CheckboxInput />}
-            />
-          )}
+          {state.isEmailInherited && <CheckboxRow id="marketing" label={t('avatar_setup.email_newsletter')} control={<CheckboxInput />} />}
           <CheckboxRow
             id="terms"
             label={
