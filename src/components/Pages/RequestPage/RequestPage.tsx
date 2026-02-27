@@ -1,5 +1,6 @@
 import { useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
+import { useTranslation } from '@dcl/hooks'
 import { BrowserProvider, ethers, formatEther } from 'ethers'
 import { ContractName, getContract, sendMetaTransaction } from 'decentraland-transactions'
 import { Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, muiIcons } from 'decentraland-ui2'
@@ -110,6 +111,7 @@ const TERMINAL_VIEWS = new Set([
 ])
 
 export const RequestPage = () => {
+  const { t } = useTranslation()
   const params = useParams()
   const [searchParams] = useSearchParams()
   const navigate = useNavigateWithSearchParams()
@@ -644,19 +646,19 @@ export const RequestPage = () => {
       return (
         <Container canChangeAccount requestId={requestId}>
           <div className={viewStyles.logo}></div>
-          <div className={viewStyles.title}>Verify Sign In</div>
+          <div className={viewStyles.title}>{t('request.verify_sign_in')}</div>
 
           {!isDeepLinkFlow && (
             <>
               <div className={viewStyles.description}>
-                Does the verification number below match the one in the {targetConfig.explorerText}?
+                {t('request.verification_match', { explorerText: targetConfig.explorerText })}
               </div>
               <div className={styles.code}>{requestRef.current?.code}</div>
             </>
           )}
 
           {isDeepLinkFlow && (
-            <div className={viewStyles.description}>Please confirm you want to sign in to {targetConfig.explorerText}</div>
+            <div className={viewStyles.description}>{t('request.deep_link_confirm', { explorerText: targetConfig.explorerText })}</div>
           )}
 
           <div className={styles.buttons}>
@@ -667,7 +669,7 @@ export const RequestPage = () => {
               className={styles.noButton}
               startIcon={<CancelOutlinedIcon />}
             >
-              {isDeepLinkFlow ? 'Cancel' : "No, it doesn't"}
+              {isDeepLinkFlow ? t('common.cancel') : t('request.no_it_doesnt')}
             </Button>
             <Button
               variant="outlined"
@@ -676,16 +678,16 @@ export const RequestPage = () => {
               className={styles.yesButton}
               startIcon={isLoading ? <CircularProgress size={20} color="inherit" /> : <CheckCircleOutlinedIcon />}
             >
-              {isDeepLinkFlow ? 'Sign In' : 'Yes, they are the same'}
+              {isDeepLinkFlow ? t('request.sign_in') : t('request.yes_same')}
             </Button>
           </div>
           {hasTimedOut && (
             <div className={styles.timeoutMessage}>
               <ErrorMessageIcon fontSize="large" />
               <div>
-                You might be logged out of your wallet extension.
+                {t('request.timeout_logged_out')}
                 <br />
-                Please check that you&apos;re logged in and try again.
+                {t('request.timeout_check_login')}
               </div>
             </div>
           )}
@@ -697,15 +699,15 @@ export const RequestPage = () => {
       return nftTransferData ? (
         <>
           <Dialog open={isTransactionModalOpen} maxWidth="xs" fullWidth>
-            <DialogTitle>Confirm Transaction</DialogTitle>
+            <DialogTitle>{t('request.transaction_dialog.title')}</DialogTitle>
             <DialogContent>
-              <p>Transaction cost: {formatEther((transactionGasCost ?? 0).toString())} ETH</p>
-              <p>Your balance: {formatEther((walletInfo?.balance ?? 0).toString())} ETH</p>
+              <p>{t('request.transaction_dialog.transaction_cost', { cost: formatEther((transactionGasCost ?? 0).toString()) })}</p>
+              <p>{t('request.transaction_dialog.your_balance', { balance: formatEther((walletInfo?.balance ?? 0).toString()) })}</p>
             </DialogContent>
             <DialogActions>
-              <Button onClick={onDenyWalletInteraction}>Cancel</Button>
+              <Button onClick={onDenyWalletInteraction}>{t('common.cancel')}</Button>
               <Button variant="contained" onClick={onApproveWalletInteraction}>
-                Confirm
+                {t('common.confirm')}
               </Button>
             </DialogActions>
           </Dialog>
@@ -722,15 +724,15 @@ export const RequestPage = () => {
       return manaTransferData ? (
         <>
           <Dialog open={isTransactionModalOpen} maxWidth="xs" fullWidth>
-            <DialogTitle>Confirm Transaction</DialogTitle>
+            <DialogTitle>{t('request.transaction_dialog.title')}</DialogTitle>
             <DialogContent>
-              <p>Transaction cost: {formatEther((transactionGasCost ?? 0).toString())} ETH</p>
-              <p>Your balance: {formatEther((walletInfo?.balance ?? 0).toString())} ETH</p>
+              <p>{t('request.transaction_dialog.transaction_cost', { cost: formatEther((transactionGasCost ?? 0).toString()) })}</p>
+              <p>{t('request.transaction_dialog.your_balance', { balance: formatEther((walletInfo?.balance ?? 0).toString()) })}</p>
             </DialogContent>
             <DialogActions>
-              <Button onClick={onDenyWalletInteraction}>Cancel</Button>
+              <Button onClick={onDenyWalletInteraction}>{t('common.cancel')}</Button>
               <Button variant="contained" onClick={onApproveWalletInteraction}>
-                Confirm
+                {t('common.confirm')}
               </Button>
             </DialogActions>
           </Dialog>
@@ -747,31 +749,31 @@ export const RequestPage = () => {
       return (
         <Container canChangeAccount requestId={requestId}>
           <Dialog open={isTransactionModalOpen} maxWidth="xs" fullWidth>
-            <DialogTitle>Confirm Transaction</DialogTitle>
+            <DialogTitle>{t('request.transaction_dialog.title')}</DialogTitle>
             <DialogContent>
-              <p>Transaction cost: {formatEther((transactionGasCost ?? 0).toString())} ETH</p>
-              <p>Your balance: {formatEther((walletInfo?.balance ?? 0).toString())} ETH</p>
+              <p>{t('request.transaction_dialog.transaction_cost', { cost: formatEther((transactionGasCost ?? 0).toString()) })}</p>
+              <p>{t('request.transaction_dialog.your_balance', { balance: formatEther((walletInfo?.balance ?? 0).toString()) })}</p>
             </DialogContent>
             <DialogActions>
-              <Button onClick={onDenyWalletInteraction}>Cancel</Button>
+              <Button onClick={onDenyWalletInteraction}>{t('common.cancel')}</Button>
               <Button variant="contained" onClick={onApproveWalletInteraction}>
-                Confirm
+                {t('common.confirm')}
               </Button>
             </DialogActions>
           </Dialog>
           <div className={viewStyles.logo}></div>
           <div className={viewStyles.title}>
             {isUserUsingWeb2Wallet
-              ? 'A scene wants to access your Decentraland account assets'
-              : `The ${targetConfig.explorerText} wants to interact with your wallet`}
+              ? t('request.wallet_interaction.title_web2')
+              : t('request.wallet_interaction.title_web3', { explorerText: targetConfig.explorerText })}
           </div>
-          <div className={viewStyles.description}>Only proceed if you are aware of all transaction details and trust this scene.</div>
+          <div className={viewStyles.description}>{t('request.wallet_interaction.description')}</div>
           <div className={styles.buttons}>
             <Button variant="outlined" disabled={isLoading} onClick={onDenyWalletInteraction}>
-              Deny
+              {t('common.deny')}
             </Button>
             <Button variant="contained" disabled={isLoading} onClick={handleApproveWalletInteraction}>
-              {isLoading ? <CircularProgress size={20} color="inherit" /> : 'Allow'}
+              {isLoading ? <CircularProgress size={20} color="inherit" /> : t('common.allow')}
             </Button>
           </div>
         </Container>

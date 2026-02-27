@@ -1,4 +1,5 @@
 import { ChangeEvent, ClipboardEvent, KeyboardEvent, useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslation } from '@dcl/hooks'
 import { GlobalStyles } from 'decentraland-ui2'
 import emailIconUrl from '../../assets/images/email.svg'
 import { TrackingEvents } from '../../modules/analytics/types'
@@ -33,15 +34,20 @@ import {
 
 const OTP_LENGTH = 6
 
-const getNetworkFriendlyError = (errorMessage: string | undefined, fallback: string): string => {
+const getNetworkFriendlyError = (
+  errorMessage: string | undefined,
+  fallback: string,
+  networkError: string
+): string => {
   if (errorMessage === 'Failed to fetch' || errorMessage?.toLowerCase().includes('network')) {
-    return 'Unable to connect. Please check your internet connection and try again.'
+    return networkError
   }
   return errorMessage || fallback
 }
 
 export const EmailLoginModal = (props: EmailLoginModalProps) => {
   const { open, email, onClose, onBack, onSuccess } = props
+  const { t } = useTranslation()
 
   const [otp, setOtp] = useState<string[]>(Array(OTP_LENGTH).fill(''))
   const [error, setError] = useState<string | null>(null)
@@ -132,7 +138,7 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
       const currentEmail = emailRef.current
 
       if (code.length !== OTP_LENGTH) {
-        setError('Please enter the complete verification code')
+        setError(t('email_login_modal.enter_complete_code'))
         return
       }
 
@@ -155,7 +161,7 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
         onSuccess({ email: currentEmail, account })
       } catch (e) {
         const errorMessage = handleError(e, 'Error verifying OTP')
-        setError(getNetworkFriendlyError(errorMessage, 'The code is invalid or expired. Please resend code'))
+        setError(getNetworkFriendlyError(errorMessage, t('email_login_modal.invalid_or_expired'), t('email_login_modal.network_error')))
         setHasError(true)
 
         // Track OTP verification failure
@@ -186,7 +192,7 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
       setTimeout(() => otpInputRefs.current[0]?.focus(), 100)
     } catch (e) {
       const errorMessage = handleError(e, 'Error resending OTP')
-      setError(getNetworkFriendlyError(errorMessage, 'Failed to resend verification code'))
+      setError(getNetworkFriendlyError(errorMessage, t('email_login_modal.failed_resend'), t('email_login_modal.network_error')))
       setHasError(true)
     } finally {
       setIsLoading(false)
@@ -211,9 +217,9 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
         <EmailIconContainer>
           <EmailIcon src={emailIconUrl} alt="" />
         </EmailIconContainer>
-        <Title>Enter verification code</Title>
+        <Title>{t('email_login_modal.title')}</Title>
         <Subtitle>
-          One time password sent to <strong>{email}</strong>. Please enter the code below to complete verification.
+          {t('email_login_modal.subtitle_prefix')}<strong>{email}</strong>{t('email_login_modal.subtitle_suffix')}
         </Subtitle>
 
         <OtpContainer hasError={hasError}>
@@ -240,20 +246,20 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
         {isLoading && !error && (
           <VerifyingContainer>
             <VerifyingLoader size={16} />
-            <VerifyingText>Verifying...</VerifyingText>
+            <VerifyingText>{t('email_login_modal.verifying')}</VerifyingText>
           </VerifyingContainer>
         )}
 
         {error && (
           <>
             <ErrorMessage>{error}</ErrorMessage>
-            <ResendLinkError onClick={!isLoading ? handleResendOtp : undefined}>Resend Code</ResendLinkError>
+            <ResendLinkError onClick={!isLoading ? handleResendOtp : undefined}>{t('email_login_modal.resend_code')}</ResendLinkError>
           </>
         )}
 
         {!error && (
           <ResendText>
-            Didn&apos;t get an email? <ResendLink onClick={!isLoading ? handleResendOtp : undefined}>Resend Code</ResendLink>
+            {t('email_login_modal.didnt_get_email')}<ResendLink onClick={!isLoading ? handleResendOtp : undefined}>{t('email_login_modal.resend_code')}</ResendLink>
           </ResendText>
         )}
       </Content>
@@ -267,7 +273,7 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
       <StyledDialog open={open} maxWidth="sm" fullWidth className={OTP_MODAL_ROOT_CLASS}>
         <Header>
           <BackButton onClick={handleBack} disabled={isLoading}>
-            <BackIcon>‹</BackIcon> BACK
+            <BackIcon>‹</BackIcon> {t('email_login_modal.back')}
           </BackButton>
           <CloseButton onClick={handleClose} disabled={isLoading}>
             ×

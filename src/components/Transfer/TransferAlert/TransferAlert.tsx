@@ -1,12 +1,12 @@
+import { useTranslation } from '@dcl/hooks'
 import { TransferAlertProps } from './TransferAlert.types'
 import { AlertContainer } from './TransferAlert.styled'
 
-const DEFAULT_TEXT = 'You can close this tab and return to the Decentraland app.'
-
 const TransferAlert = ({ children, severity = 'info', text, ...props }: TransferAlertProps) => {
+  const { t } = useTranslation()
   return (
     <AlertContainer severity={severity} {...props}>
-      {children ?? text ?? DEFAULT_TEXT}
+      {children ?? text ?? t('transfer.alert.default_text')}
     </AlertContainer>
   )
 }

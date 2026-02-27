@@ -1,0 +1,242 @@
+{
+  "common": {
+    "try_again": "Try Again",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "back": "BACK",
+    "continue": "Continue",
+    "close_window": "You can close this window.",
+    "deny": "Deny",
+    "allow": "Allow",
+    "something_went_wrong": "Something went wrong",
+    "unknown_error": "Unknown error"
+  },
+  "connection": {
+    "title": "Log in or Sign up to Jump In",
+    "title_new_user": "Create an Account to Jump In",
+    "continue_with": "Continue with {provider}",
+    "more_options": "More Options",
+    "or_continue_with": "or continue with",
+    "metamask_not_installed": "You need to install the MetaMask Browser Extension to proceed. Please install it and try again."
+  },
+  "email_input": {
+    "recommended": "Recommended",
+    "placeholder": "Enter Your Email",
+    "next": "NEXT",
+    "validation_error": "Enter A Valid Email Address"
+  },
+  "email_login_modal": {
+    "title": "Enter verification code",
+    "subtitle_prefix": "One time password sent to ",
+    "subtitle_suffix": ". Please enter the code below to complete verification.",
+    "verifying": "Verifying...",
+    "resend_code": "Resend Code",
+    "didnt_get_email": "Didn't get an email? ",
+    "back": "BACK",
+    "enter_complete_code": "Please enter the complete verification code",
+    "invalid_or_expired": "The code is invalid or expired. Please resend code",
+    "failed_resend": "Failed to resend verification code",
+    "network_error": "Unable to connect. Please check your internet connection and try again."
+  },
+  "login": {
+    "already_have_account": "Already have an account?",
+    "sign_in": "Sign In",
+    "quick_dive": "Quick dive?",
+    "explore_as_guest": "Explore as a guest",
+    "confirming_login": "Confirming login...",
+    "errors": {
+      "something_went_wrong": "Something went wrong. Please try again.",
+      "network_error": "Unable to connect. Please check your internet connection and try again.",
+      "failed_send_code": "Failed to send verification code. Please try again.",
+      "different_account_session": "Detected a different account session than the verified email. Please try logging in again.",
+      "no_connected_account": "Thirdweb connection did not return a connected account"
+    }
+  },
+  "connection_layout": {
+    "error": "You did not confirm this action in your digital wallet extension. To continue, please try again.",
+    "error_locked_wallet": "Your wallet is currently locked. To continue, please unlock your wallet and try again.",
+    "waiting_for_signature": "Confirm in your digital wallet extension to continue.",
+    "waiting_for_signature_magic": "Almost done! Confirm your request to login Decentraland",
+    "validating_sign_in": "Just a moment, we're verifying your login credentials...",
+    "loading_magic": "Redirecting..."
+  },
+  "request": {
+    "verify_sign_in": "Verify Sign In",
+    "verification_match": "Does the verification number below match the one in the {explorerText}?",
+    "deep_link_confirm": "Please confirm you want to sign in to {explorerText}",
+    "no_it_doesnt": "No, it doesn't",
+    "yes_same": "Yes, they are the same",
+    "sign_in": "Sign In",
+    "timeout_logged_out": "You might be logged out of your wallet extension.",
+    "timeout_check_login": "Please check that you're logged in and try again.",
+    "wallet_interaction": {
+      "title_web2": "A scene wants to access your Decentraland account assets",
+      "title_web3": "The {explorerText} wants to interact with your wallet",
+      "description": "Only proceed if you are aware of all transaction details and trust this scene."
+    },
+    "transaction_dialog": {
+      "title": "Confirm Transaction",
+      "transaction_cost": "Transaction cost: {cost} ETH",
+      "your_balance": "Your balance: {balance} ETH"
+    }
+  },
+  "request_views": {
+    "timeout": {
+      "title": "Looks like you took too long and the request has expired.",
+      "subtitle": "If the expiration time is still running in the Explorer app, check your computer's time to see if it's set correctly.",
+      "description": "Please return to Decentraland's {explorerText} to try again."
+    },
+    "different_account": {
+      "title": "Looks like you are connected with a different account.",
+      "description": "Please change your wallet account to the one connected to the {explorerText}."
+    },
+    "sign_in_complete": {
+      "title": "Login Successful!",
+      "description": "Return to the {explorerText} to jump in!"
+    },
+    "denied_sign_in": {
+      "title": "Did the number not match, or was this action not taken by you?",
+      "description": "If you're trying to sign in, retry the action. If this action was not initiated by you, dismiss this message."
+    },
+    "wallet_interaction_complete": {
+      "title": "Wallet interaction complete",
+      "description": "The action has been executed successfully."
+    },
+    "denied_wallet_interaction": {
+      "title": "Was this action not initiated by you?",
+      "description": "If this action was not initiated by you, dismiss this message."
+    },
+    "signing_error": {
+      "title": "There was an error while trying to submit the request.",
+      "description": "Return to the {explorerText} to try again, or contact support if the error persists."
+    },
+    "recover_error": {
+      "title": "There was an error recovering the request...",
+      "description": "The request is not available anymore. Feel free to create a new one and try again. If the expiration time is still running in the Explorer app, check your computer's time to see if it's set correctly."
+    },
+    "ip_validation_error": {
+      "title": "Security Validation Failed",
+      "description": "This confirmation request was created from a different device or network. For security reasons, you can only complete this request from the same device where it was originally initiated.",
+      "request_id": "Request ID:",
+      "reason": "Reason:"
+    },
+    "continue_in_app": {
+      "sign_in_successful": "Sign In Successful",
+      "redirect_countdown": "You will be redirected to {explorerText} in {countdown}...",
+      "return_to": "Return to {explorerText}",
+      "could_not_open": "Could not open {explorerText}",
+      "app_not_launched": "The application could not be launched. Please make sure {explorerText} is installed and try again.",
+      "go_back_login": "Go back to login"
+    },
+    "container": {
+      "use_another_profile": "Use another profile?",
+      "return_to_login": "Return to log in"
+    }
+  },
+  "transfer": {
+    "confirm": {
+      "sending_tip": "Sending {manaAmount} Tip for",
+      "confirm_tip": "Confirm {manaAmount} Tip for",
+      "sending_gift": "Sending Gift to",
+      "confirm_gift": "Confirm Gift for",
+      "creator_of": "CREATOR OF",
+      "processing_authorization": "Processing Authorization",
+      "gifting_warning": "Gifting an item cannot be undone."
+    },
+    "completed": {
+      "tip_success": "Success! {manaAmount} tip Sent to",
+      "gift_sent": "Gift Sent to",
+      "creator_of": "CREATOR OF"
+    },
+    "canceled": {
+      "tip_cancelled": "{manaAmount} Tip Cancelled",
+      "gift_canceled": "Gift Canceled",
+      "tip_not_delivered": "Your tip wasn't delivered to",
+      "gift_not_delivered": "Your gift wasn't delivered to",
+      "creator_of": "CREATOR OF"
+    },
+    "action_buttons": {
+      "cancel": "CANCEL",
+      "confirm_send": "CONFIRM & SEND"
+    },
+    "alert": {
+      "default_text": "You can close this tab and return to the Decentraland app."
+    }
+  },
+  "setup": {
+    "welcome": "Welcome to Decentraland!",
+    "journey_begins": "Your journey begins here",
+    "meet_avatar": "First, Meet Your Avatar",
+    "meet_avatar_description_desktop": "Say hi to your new digital self!\nDon't worry, of course they're not quite 'you' yet—soon you'll be able to customize them to your heart's content.",
+    "meet_avatar_description_mobile": "Choose an avatar to start your journey.",
+    "meet_avatar_description_mobile_bold": "You can customize it later on desktop",
+    "meet_avatar_description_mobile_suffix": ", where all the magic happens!",
+    "randomize": "randomize",
+    "complete_profile": "Complete your Profile",
+    "jump_into_decentraland": "jump into decentraland",
+    "continue_to": "continue to {site}",
+    "validation": {
+      "username_empty": "Please enter your username.",
+      "username_max_length": "Sorry, usernames can have a maximum of 15 characters.",
+      "username_no_spaces": "Sorry, spaces are not permitted.",
+      "username_no_special_chars": "Sorry, special characters (!@#$%) are not permitted.",
+      "email_invalid": "Invalid email, please try again.",
+      "agree_required": "Please accept the terms of use and privacy policy."
+    },
+    "username_label": "Username",
+    "username_placeholder": "Enter your username",
+    "email_label": "Email (optional)",
+    "email_placeholder": "Enter your email",
+    "email_newsletter": "Subscribe to Decentraland's newsletter to receive the latest news about events, updates, contests and more.",
+    "agree_prefix": "I agree with Decentraland's ",
+    "terms_of_use": "Terms of use",
+    "and": " and ",
+    "privacy_policy": "Privacy policy",
+    "deploy_error_title": "An error occurred while creating your account",
+    "deploy_error_description": "Please, contact support with the following error message:"
+  },
+  "avatar_setup": {
+    "confirming_login": "Confirming login...",
+    "welcome_to": "Welcome to ",
+    "decentraland": "Decentraland!",
+    "username_label": "Username",
+    "username_placeholder": "Enter your username",
+    "only_letters_numbers": "Only letters and numbers are supported",
+    "email_label": "Email",
+    "email_placeholder": "Enter your email",
+    "email_newsletter": "Subscribe to newsletter for updates on features, events, contests, and more.",
+    "terms_agree_prefix": "I agree with Decentraland's ",
+    "terms_of_use": "Terms of Use",
+    "and": " and ",
+    "privacy_policy": "Privacy Policy",
+    "terms_required_suffix": ".*",
+    "deploying": "DEPLOYING...",
+    "customize_avatar": "CUSTOMIZE MY AVATAR",
+    "deploy_error": "An error occurred while creating your profile: {error}",
+    "validation": {
+      "email_invalid": "Invalid email, please try again.",
+      "agree_required": "Please accept the terms of use and privacy policy."
+    }
+  },
+  "character_counter": {
+    "limit_reached": "Character Limit Reached"
+  },
+  "clock_sync_modal": {
+    "title": "Device Clock Out of Sync",
+    "message": "Please update your computer's time settings to the correct local time to avoid server timeout issues.",
+    "continue_to_site": "Continue to site"
+  },
+  "invalid_redirection": {
+    "title": "Invalid redirection",
+    "description": "The site you were redirected to is invalid.",
+    "go_back": "Go back to the login page"
+  },
+  "mobile_auth": {
+    "sign_in_successful": "Sign In Successful",
+    "redirect_countdown": "You will be redirected to\n{explorerText} in {countdown}...",
+    "redirecting": "Redirecting to {explorerText}...",
+    "return_to": "Return to {explorerText}",
+    "could_not_open": "Could not open {explorerText}",
+    "app_not_launched": "The application could not be launched. Please make sure {explorerText} is installed and try again."
+  }
+}

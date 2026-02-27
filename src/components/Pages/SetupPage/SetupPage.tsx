@@ -1,6 +1,7 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import classNames from 'classnames'
+import { useTranslation } from '@dcl/hooks'
 import { EthAddress } from '@dcl/schemas'
 import { Button, CircularProgress, useMobileMediaQuery } from 'decentraland-ui2'
 import backImg from '../../../assets/images/back.svg'
@@ -56,15 +57,16 @@ const InputErrorMessage = (props: { message: string; className?: string }) => {
   )
 }
 
-const DeployErrorMessage = (props: { message: string }) => (
+const DeployErrorMessage = (props: { message: string; titleText: string; descriptionText: string }) => (
   <div className={styles.errorMessage}>
-    <h4>An error occurred while creating your account</h4>
-    <p>Please, contact support with the following error message:</p>
+    <h4>{props.titleText}</h4>
+    <p>{props.descriptionText}</p>
     <p>{props.message}</p>
   </div>
 )
 
 export const SetupPage = () => {
+  const { t } = useTranslation()
   const hasStartedToWriteSomethingInName = useRef(false)
   const hasStartedToWriteSomethingInEmail = useRef(false)
   const hasCheckedAgree = useRef(false)
@@ -115,60 +117,60 @@ export const SetupPage = () => {
   // Validate the name.
   const nameError = useMemo(() => {
     if (!name.length) {
-      return 'Please enter your username.'
+      return t('setup.validation.username_empty')
     }
     if (name.length >= 15) {
-      return 'Sorry, usernames can have a maximum of 15 characters.'
+      return t('setup.validation.username_max_length')
     }
 
     if (name.includes(' ')) {
-      return 'Sorry, spaces are not permitted.'
+      return t('setup.validation.username_no_spaces')
     }
 
     if (!/^[a-zA-Z0-9]+$/.test(name)) {
-      return 'Sorry, special characters (!@#$%) are not permitted.'
+      return t('setup.validation.username_no_special_chars')
     }
 
     return ''
-  }, [name])
+  }, [name, t])
 
   // Validate the email.
   const emailError = useMemo(() => {
     if (email && !email.includes('@')) {
-      return 'Invalid email, please try again.'
+      return t('setup.validation.email_invalid')
     }
 
     return ''
-  }, [email])
+  }, [email, t])
 
   // Validate the agree checkbox.
   const agreeError = useMemo(() => {
     if (!agree) {
-      return 'Please accept the terms of use and privacy policy.'
+      return t('setup.validation.agree_required')
     }
 
     return ''
-  }, [agree])
+  }, [agree, t])
 
   // Message displayed on the button that completes the avatar creation.
   // Will display a message according to where the user will be redirected to.
   const continueMessage = useMemo(() => {
     if (redirectTo) {
       if (redirectTo.includes('play')) {
-        return 'jump into decentraland'
+        return t('setup.jump_into_decentraland')
       }
 
       const sites = ['marketplace', 'builder', 'account', 'profile', 'events', 'places', 'governance', 'dao', 'rewards']
 
       for (const site of sites) {
         if (redirectTo.includes(site)) {
-          return `continue to ${site}`
+          return t('setup.continue_to', { site })
         }
       }
     }
 
-    return 'continue'
-  }, [redirectTo])
+    return t('common.continue').toLowerCase()
+  }, [redirectTo, t])
 
   // Sets a random default profile.
   const handleRandomize = useCallback(() => {
@@ -415,24 +417,23 @@ export const SetupPage = () => {
           <div className={isMobile ? styles.mobileContainer : styles.left}>
             <div className={isMobile ? undefined : styles.leftInner}>
               <img className={styles.logo} src={logoImg} alt="logo" />
-              <div className={styles.title}>Welcome to Decentraland!</div>
+              <div className={styles.title}>{t('setup.welcome')}</div>
 
-              {!isMobile && <div className={styles.subtitle}>Your journey begins here</div>}
+              {!isMobile && <div className={styles.subtitle}>{t('setup.journey_begins')}</div>}
 
-              <div className={styles.meetYourAvatar}>First, Meet Your Avatar</div>
+              <div className={styles.meetYourAvatar}>{t('setup.meet_avatar')}</div>
               <div className={styles.meetYourAvatarDescription}>
                 {isMobile ? (
                   <>
-                    Choose an avatar to start your journey.
+                    {t('setup.meet_avatar_description_mobile')}
                     <br />
-                    <b>You can customize it later on desktop</b>, where all the magic happens!
+                    <b>{t('setup.meet_avatar_description_mobile_bold')}</b>{t('setup.meet_avatar_description_mobile_suffix')}
                   </>
                 ) : (
                   <>
-                    Say hi to your new digital self!
+                    {t('setup.meet_avatar_description_desktop').split('\n')[0]}
                     <br />
-                    Don&apos;t worry, of course they&apos;re not quite &apos;you&apos; yet—soon you&apos;ll be able to customize them to
-                    your heart&apos;s content.
+                    {t('setup.meet_avatar_description_desktop').split('\n')[1]}
                   </>
                 )}
               </div>
@@ -448,12 +449,12 @@ export const SetupPage = () => {
                 <div className={styles.randomize}>
                   <Button variant="outlined" size="small" onClick={handleRandomize} className={styles.randomizeButton}>
                     <img src={diceImg} alt="diceImg" />
-                    <span>randomize</span>
+                    <span>{t('setup.randomize')}</span>
                   </Button>
                 </div>
                 <div className={styles.continue}>
                   <Button variant="contained" size={isMobile ? 'small' : 'medium'} fullWidth={!isMobile} onClick={handleContinue}>
-                    Continue
+                    {t('common.continue')}
                   </Button>
                 </div>
               </div>
@@ -482,14 +483,14 @@ export const SetupPage = () => {
               {!isMobile && <img className={styles.logoSmall} src={logoImg} alt="logo" />}
               <div className={styles.back} onClick={handleBack}>
                 <img src={backImg} alt="backImg" />
-                <span>BACK</span>
+                <span>{t('common.back')}</span>
               </div>
-              <div className={styles.title}>Complete your Profile</div>
+              <div className={styles.title}>{t('setup.complete_profile')}</div>
               <form onSubmit={handleSubmit}>
                 <div className={styles.name}>
                   <div className={styles.field}>
-                    <label className={styles.fieldLabel}>Username</label>
-                    <input className={styles.fieldInput} placeholder="Enter your username" onChange={handleNameChange} value={name} />
+                    <label className={styles.fieldLabel}>{t('setup.username_label')}</label>
+                    <input className={styles.fieldInput} placeholder={t('setup.username_placeholder')} onChange={handleNameChange} value={name} />
                     {showErrors && nameError ? (
                       <div className={styles.fieldMessage}>
                         <InputErrorMessage message={nameError} />
@@ -499,12 +500,12 @@ export const SetupPage = () => {
                 </div>
                 <div>
                   <div className={styles.field}>
-                    <label className={styles.fieldLabel}>Email (optional)</label>
-                    <input className={styles.fieldInput} placeholder="Enter your email" value={email} onChange={handleEmailChange} />
+                    <label className={styles.fieldLabel}>{t('setup.email_label')}</label>
+                    <input className={styles.fieldInput} placeholder={t('setup.email_placeholder')} value={email} onChange={handleEmailChange} />
                     <div className={styles.fieldMessage}>
                       {showErrors && emailError ? <InputErrorMessage className={styles.emailError} message={emailError} /> : null}
                       <span>
-                        Subscribe to Decentraland&apos;s newsletter to receive the latest news about events, updates, contests and more.
+                        {t('setup.email_newsletter')}
                       </span>
                     </div>
                   </div>
@@ -512,13 +513,13 @@ export const SetupPage = () => {
                 <div className={styles.agree}>
                   <input type="checkbox" onChange={handleAgreeChange} checked={agree} className={styles.checkbox} />
                   <div>
-                    I agree with Decentraland&apos;s&nbsp;
+                    {t('setup.agree_prefix')}
                     <a target="_blank" rel="noopener noreferrer" href="https://decentraland.org/terms/">
-                      Terms of use
+                      {t('setup.terms_of_use')}
                     </a>
-                    &nbsp;and&nbsp;
+                    {t('setup.and')}
                     <a target="_blank" rel="noopener noreferrer" href="https://decentraland.org/privacy">
-                      Privacy policy
+                      {t('setup.privacy_policy')}
                     </a>
                     .
                   </div>
@@ -530,7 +531,7 @@ export const SetupPage = () => {
                   </Button>
                 </div>
               </form>
-              {deployError ? <DeployErrorMessage message={deployError} /> : null}
+              {deployError ? <DeployErrorMessage message={deployError} titleText={t('setup.deploy_error_title')} descriptionText={t('setup.deploy_error_description')} /> : null}
             </div>
           </div>
           {!isMobile && (
