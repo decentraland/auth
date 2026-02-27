@@ -56,7 +56,7 @@ HTMLCanvasElement.prototype.getContext = jest.fn(() => {
     transform: jest.fn(),
     rect: jest.fn(),
     clip: jest.fn()
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any
 })
 

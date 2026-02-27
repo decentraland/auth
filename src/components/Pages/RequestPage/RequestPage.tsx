@@ -522,9 +522,15 @@ export const RequestPage = () => {
         const contract = getContract(contractName, chainId)
         contract.address = toAddress
 
-        result = await sendMetaTransaction(connectedProvider, networkProvider, (requestRef.current?.params?.[0] as Record<string, unknown>).data as string, contract, {
-          serverURL: `${config.get('META_TRANSACTION_SERVER_URL')}/v1`
-        })
+        result = await sendMetaTransaction(
+          connectedProvider,
+          networkProvider,
+          (requestRef.current?.params?.[0] as Record<string, unknown>).data as string,
+          contract,
+          {
+            serverURL: `${config.get('META_TRANSACTION_SERVER_URL')}/v1`
+          }
+        )
       } else {
         result = await provider.send(requestRef.current?.method, requestRef.current?.params ?? [])
       }
