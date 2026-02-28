@@ -30,7 +30,7 @@
     "@dcl/schemas": "^22.1.0",
     "@dcl/single-sign-on-client": "^0.1.0",
     "@dcl/ui-env": "^1.4.0",
-    "@magic-ext/oauth2": "15.3.2-canary.1040.22248562051.0",
+    "@magic-ext/oauth2": "15.4.1",
     "@sentry/react": "^9.1.0",
     "ajv": "^8.12.0",
     "classnames": "^2.3.2",
@@ -83,5 +83,8 @@
     "vite": "^6.1.1",
     "vite-plugin-node-polyfills": "^0.23.0"
   },
-  "homepage": ""
+  "homepage": "",
+  "overrides": {
+    "@magic-ext/oauth2": "15.4.1"
+  }
 }
