@@ -1,6 +1,8 @@
 import { useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { MenuItem } from 'decentraland-ui2'
+import { Button, MenuItem, muiIcons } from 'decentraland-ui2'
+import { Container } from '../Container'
+import { ButtonsContainer, NoButton, VerificationCode, YesButton } from '../RequestPage.styled'
 import { TransferType } from '../types'
 import {
   CloseWindow,
@@ -18,8 +20,12 @@ import {
   TransferConfirmView,
   WalletInteractionComplete
 } from '../Views'
+import viewStyles from '../Views/Views.module.css'
 import { manaData, nftData } from './__data__'
 import { FloatingBar, ViewSelect } from './TestViewPage.styled'
+
+const CancelIcon = muiIcons.Cancel
+const CheckCircleIcon = muiIcons.CheckCircle
 
 type ViewIdParam = {
   viewId?: string
@@ -88,7 +94,64 @@ export const TestViewPage = () => {
       signingError: { label: 'SigningError', element: <SigningError error="Test error" /> },
       signInComplete: { label: 'SignInComplete', element: <SignInComplete /> },
       timeoutError: { label: 'TimeoutError', element: <TimeoutError requestId={DEFAULT_REQUEST_ID} /> },
-      walletInteractionComplete: { label: 'WalletInteractionComplete', element: <WalletInteractionComplete /> }
+      verifySignIn: {
+        label: 'Verify Sign In',
+        element: (
+          <Container canChangeAccount requestId={DEFAULT_REQUEST_ID}>
+            <div className={viewStyles.logo}></div>
+            <div className={viewStyles.title}>Verify Sign In</div>
+            <div className={viewStyles.description}>Does the verification number below match the one in the Explorer?</div>
+            <VerificationCode>1234</VerificationCode>
+            <ButtonsContainer>
+              <NoButton variant="outlined" startIcon={<CancelIcon />}>
+                No, it doesn&apos;t
+              </NoButton>
+              <YesButton variant="outlined" startIcon={<CheckCircleIcon />}>
+                Yes, they are the same
+              </YesButton>
+            </ButtonsContainer>
+          </Container>
+        )
+      },
+      walletInteraction: {
+        label: 'Wallet Interaction',
+        element: (
+          <Container canChangeAccount requestId={DEFAULT_REQUEST_ID}>
+            <div className={viewStyles.logo}></div>
+            <div className={viewStyles.title}>The Explorer wants to interact with your wallet</div>
+            <div className={viewStyles.description}>Only proceed if you are aware of all transaction details and trust this scene.</div>
+            <ButtonsContainer>
+              <Button variant="outlined">Deny</Button>
+              <Button variant="contained">Allow</Button>
+            </ButtonsContainer>
+          </Container>
+        )
+      },
+      walletInteractionComplete: { label: 'WalletInteractionComplete', element: <WalletInteractionComplete /> },
+      walletNftInteraction: {
+        label: 'Wallet NFT Interaction',
+        element: (
+          <TransferConfirmView
+            type={TransferType.GIFT}
+            transferData={nftData}
+            isLoading={false}
+            onDeny={() => undefined}
+            onApprove={async () => undefined}
+          />
+        )
+      },
+      walletManaInteraction: {
+        label: 'Wallet MANA Interaction',
+        element: (
+          <TransferConfirmView
+            type={TransferType.TIP}
+            transferData={manaData}
+            isLoading={false}
+            onDeny={() => undefined}
+            onApprove={async () => undefined}
+          />
+        )
+      }
     } as const
   }, [manaData, nftData])
 

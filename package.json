@@ -39,7 +39,6 @@
     "decentraland-crypto-fetch": "^2.0.1",
     "decentraland-transactions": "^3.0.2",
     "decentraland-ui2": "^1.2.1",
-    "ethers": "^6.8.0",
     "isbot": "^5.1.22",
     "lottie-react": "^2.4.1",
     "magic-sdk": "^27.0.0",
@@ -47,7 +46,8 @@
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.17.0",
     "socket.io-client": "^4.7.2",
-    "thirdweb": "^5.116.1"
+    "thirdweb": "^5.116.1",
+    "viem": "^2.43.4"
   },
   "devDependencies": {
     "@dcl/eslint-config": "^3.1.0",
@@ -77,6 +77,7 @@
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
     "prettier": "^3.8.1",
+    "rollup-plugin-visualizer": "^7.0.0",
     "ts-jest": "^29.1.1",
     "ts-node": "^10.9.1",
     "typescript": "^5.0.2",

@@ -1,6 +1,5 @@
 import { useCallback, useContext, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { RPCError } from 'magic-sdk'
 import { ProviderType } from '@dcl/schemas'
 import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
@@ -8,6 +7,7 @@ import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { useAnalytics } from '../../../hooks/useAnalytics'
 import { useAuthFlow } from '../../../hooks/useAuthFlow'
 import { ConnectionType } from '../../../modules/analytics/types'
+import { isMagicRpcError } from '../../../shared/errors'
 import { extractReferrerFromSearchParameters, locations } from '../../../shared/locations'
 import { isMobileSession } from '../../../shared/mobile'
 import { handleError } from '../../../shared/utils/errorHandler'
@@ -113,9 +113,9 @@ const DesktopCallbackPage = () => {
         skipTracking: false,
         sentryExtra: {
           oauthError: oauthError ?? undefined,
-          magicRpcCode: error instanceof RPCError ? String(error.code) : undefined,
-          magicRpcRawMessage: error instanceof RPCError ? error.rawMessage : undefined,
-          magicRpcData: error instanceof RPCError ? JSON.stringify(error.data) : undefined
+          magicRpcCode: isMagicRpcError(error) ? String(error.code) : undefined,
+          magicRpcRawMessage: isMagicRpcError(error) ? error.rawMessage : undefined,
+          magicRpcData: isMagicRpcError(error) ? JSON.stringify(error.data) : undefined
         }
       })
       navigate(locations.login())
