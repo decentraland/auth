@@ -50,7 +50,9 @@ export const TestViewPage = () => {
       loadingRequest: { label: 'LoadingRequest', element: <LoadingRequest /> },
       manaTransfer: {
         label: 'TransferConfirmView (Tip)',
-        element: <TransferConfirmView type={TransferType.TIP} transferData={manaData} isLoading={false} onDeny={noop} onApprove={asyncNoop} />
+        element: (
+          <TransferConfirmView type={TransferType.TIP} transferData={manaData} isLoading={false} onDeny={noop} onApprove={asyncNoop} />
+        )
       },
       manaTransferCanceled: {
         label: 'TransferCanceledView (Tip)',
@@ -62,7 +64,9 @@ export const TestViewPage = () => {
       },
       nftTransfer: {
         label: 'TransferConfirmView (Gift)',
-        element: <TransferConfirmView type={TransferType.GIFT} transferData={nftData} isLoading={false} onDeny={noop} onApprove={asyncNoop} />
+        element: (
+          <TransferConfirmView type={TransferType.GIFT} transferData={nftData} isLoading={false} onDeny={noop} onApprove={asyncNoop} />
+        )
       },
       nftTransferCanceled: {
         label: 'TransferCanceledView (Gift)',
@@ -87,11 +91,15 @@ export const TestViewPage = () => {
       walletInteractionComplete: { label: 'WalletInteractionComplete', element: <WalletInteractionComplete /> },
       walletNftInteraction: {
         label: 'Wallet NFT Interaction',
-        element: <TransferConfirmView type={TransferType.GIFT} transferData={nftData} isLoading={false} onDeny={noop} onApprove={asyncNoop} />
+        element: (
+          <TransferConfirmView type={TransferType.GIFT} transferData={nftData} isLoading={false} onDeny={noop} onApprove={asyncNoop} />
+        )
       },
       walletManaInteraction: {
         label: 'Wallet MANA Interaction',
-        element: <TransferConfirmView type={TransferType.TIP} transferData={manaData} isLoading={false} onDeny={noop} onApprove={asyncNoop} />
+        element: (
+          <TransferConfirmView type={TransferType.TIP} transferData={manaData} isLoading={false} onDeny={noop} onApprove={asyncNoop} />
+        )
       }
     } as const
   }, [manaData, nftData])

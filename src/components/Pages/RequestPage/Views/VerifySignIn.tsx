@@ -35,16 +35,12 @@ export const VerifySignIn = ({
 
       {!isDeepLinkFlow && (
         <>
-          <div className={styles.description}>
-            Does the verification number below match the one in the {explorerText}?
-          </div>
+          <div className={styles.description}>Does the verification number below match the one in the {explorerText}?</div>
           {code !== undefined && <VerificationCode>{code}</VerificationCode>}
         </>
       )}
 
-      {isDeepLinkFlow && (
-        <div className={styles.description}>Please confirm you want to sign in to {explorerText}</div>
-      )}
+      {isDeepLinkFlow && <div className={styles.description}>Please confirm you want to sign in to {explorerText}</div>}
 
       <ButtonsContainer>
         <NoButton variant="outlined" disabled={isLoading} onClick={onDeny} startIcon={<CancelIcon />}>
