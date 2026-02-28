@@ -1,8 +1,6 @@
 import { useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Button, MenuItem, muiIcons } from 'decentraland-ui2'
-import { Container } from '../Container'
-import { ButtonsContainer, NoButton, VerificationCode, YesButton } from '../RequestPage.styled'
+import { MenuItem } from 'decentraland-ui2'
 import { TransferType } from '../types'
 import {
   CloseWindow,
@@ -11,6 +9,7 @@ import {
   DeniedWalletInteraction,
   DifferentAccountError,
   IpValidationError,
+  LoadingRequest,
   RecoverError,
   SignInComplete,
   SigningError,
@@ -18,20 +17,20 @@ import {
   TransferCanceledView,
   TransferCompletedView,
   TransferConfirmView,
+  VerifySignIn,
+  WalletInteraction,
   WalletInteractionComplete
 } from '../Views'
-import viewStyles from '../Views/Views.module.css'
 import { manaData, nftData } from './__data__'
 import { FloatingBar, ViewSelect } from './TestViewPage.styled'
-
-const CancelIcon = muiIcons.Cancel
-const CheckCircleIcon = muiIcons.CheckCircle
 
 type ViewIdParam = {
   viewId?: string
 }
 
 const DEFAULT_REQUEST_ID = 'test-request-id'
+const noop = () => undefined
+const asyncNoop = async () => undefined
 
 export const TestViewPage = () => {
   const navigate = useNavigate()
@@ -42,25 +41,16 @@ export const TestViewPage = () => {
       closeWindow: { label: 'CloseWindow', element: <CloseWindow /> },
       continueInApp: {
         label: 'ContinueInApp',
-        element: (
-          <ContinueInApp autoStart={false} onContinue={() => undefined} requestId={DEFAULT_REQUEST_ID} deepLinkUrl="decentraland://" />
-        )
+        element: <ContinueInApp autoStart={false} onContinue={noop} requestId={DEFAULT_REQUEST_ID} deepLinkUrl="decentraland://" />
       },
       deniedSignIn: { label: 'DeniedSignIn', element: <DeniedSignIn requestId={DEFAULT_REQUEST_ID} /> },
       deniedWalletInteraction: { label: 'DeniedWalletInteraction', element: <DeniedWalletInteraction /> },
       differentAccountError: { label: 'DifferentAccountError', element: <DifferentAccountError requestId={DEFAULT_REQUEST_ID} /> },
       ipValidationError: { label: 'IpValidationError', element: <IpValidationError requestId={DEFAULT_REQUEST_ID} reason="Test reason" /> },
+      loadingRequest: { label: 'LoadingRequest', element: <LoadingRequest /> },
       manaTransfer: {
         label: 'TransferConfirmView (Tip)',
-        element: (
-          <TransferConfirmView
-            type={TransferType.TIP}
-            transferData={manaData}
-            isLoading={false}
-            onDeny={() => undefined}
-            onApprove={async () => undefined}
-          />
-        )
+        element: <TransferConfirmView type={TransferType.TIP} transferData={manaData} isLoading={false} onDeny={noop} onApprove={asyncNoop} />
       },
       manaTransferCanceled: {
         label: 'TransferCanceledView (Tip)',
@@ -72,15 +62,7 @@ export const TestViewPage = () => {
       },
       nftTransfer: {
         label: 'TransferConfirmView (Gift)',
-        element: (
-          <TransferConfirmView
-            type={TransferType.GIFT}
-            transferData={nftData}
-            isLoading={false}
-            onDeny={() => undefined}
-            onApprove={async () => undefined}
-          />
-        )
+        element: <TransferConfirmView type={TransferType.GIFT} transferData={nftData} isLoading={false} onDeny={noop} onApprove={asyncNoop} />
       },
       nftTransferCanceled: {
         label: 'TransferCanceledView (Gift)',
@@ -96,61 +78,20 @@ export const TestViewPage = () => {
       timeoutError: { label: 'TimeoutError', element: <TimeoutError requestId={DEFAULT_REQUEST_ID} /> },
       verifySignIn: {
         label: 'Verify Sign In',
-        element: (
-          <Container canChangeAccount requestId={DEFAULT_REQUEST_ID}>
-            <div className={viewStyles.logo}></div>
-            <div className={viewStyles.title}>Verify Sign In</div>
-            <div className={viewStyles.description}>Does the verification number below match the one in the Explorer?</div>
-            <VerificationCode>1234</VerificationCode>
-            <ButtonsContainer>
-              <NoButton variant="outlined" startIcon={<CancelIcon />}>
-                No, it doesn&apos;t
-              </NoButton>
-              <YesButton variant="outlined" startIcon={<CheckCircleIcon />}>
-                Yes, they are the same
-              </YesButton>
-            </ButtonsContainer>
-          </Container>
-        )
+        element: <VerifySignIn requestId={DEFAULT_REQUEST_ID} code={1234} onDeny={noop} onApprove={noop} />
       },
       walletInteraction: {
         label: 'Wallet Interaction',
-        element: (
-          <Container canChangeAccount requestId={DEFAULT_REQUEST_ID}>
-            <div className={viewStyles.logo}></div>
-            <div className={viewStyles.title}>The Explorer wants to interact with your wallet</div>
-            <div className={viewStyles.description}>Only proceed if you are aware of all transaction details and trust this scene.</div>
-            <ButtonsContainer>
-              <Button variant="outlined">Deny</Button>
-              <Button variant="contained">Allow</Button>
-            </ButtonsContainer>
-          </Container>
-        )
+        element: <WalletInteraction requestId={DEFAULT_REQUEST_ID} onDeny={noop} onApprove={noop} />
       },
       walletInteractionComplete: { label: 'WalletInteractionComplete', element: <WalletInteractionComplete /> },
       walletNftInteraction: {
         label: 'Wallet NFT Interaction',
-        element: (
-          <TransferConfirmView
-            type={TransferType.GIFT}
-            transferData={nftData}
-            isLoading={false}
-            onDeny={() => undefined}
-            onApprove={async () => undefined}
-          />
-        )
+        element: <TransferConfirmView type={TransferType.GIFT} transferData={nftData} isLoading={false} onDeny={noop} onApprove={asyncNoop} />
       },
       walletManaInteraction: {
         label: 'Wallet MANA Interaction',
-        element: (
-          <TransferConfirmView
-            type={TransferType.TIP}
-            transferData={manaData}
-            isLoading={false}
-            onDeny={() => undefined}
-            onApprove={async () => undefined}
-          />
-        )
+        element: <TransferConfirmView type={TransferType.TIP} transferData={manaData} isLoading={false} onDeny={noop} onApprove={asyncNoop} />
       }
     } as const
   }, [manaData, nftData])
