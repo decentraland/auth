@@ -19,14 +19,14 @@ const ButtonsContainer = styled(Box)({
 
 const baseButtonStyles = {
   border: '1px solid var(--text)',
-  background: '#fff !important',
-  color: '#000 !important',
-  boxShadow: 'none !important',
+  background: '#fff',
+  color: '#000',
+  boxShadow: 'none',
   display: 'flex'
 } as const
 
 const NoButton = styled(Button)({
-  '&.MuiButton-root': {
+  '&&.MuiButton-root': {
     ...baseButtonStyles,
     '&:hover': baseButtonStyles,
     '& .MuiButton-startIcon': {
@@ -36,7 +36,7 @@ const NoButton = styled(Button)({
 })
 
 const YesButton = styled(Button)({
-  '&.MuiButton-root': {
+  '&&.MuiButton-root': {
     ...baseButtonStyles,
     '&:hover': baseButtonStyles,
     '& .MuiButton-startIcon': {
