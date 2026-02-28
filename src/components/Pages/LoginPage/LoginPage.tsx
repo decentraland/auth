@@ -1,6 +1,7 @@
 import { useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import classNames from 'classnames'
 import type { AuthIdentity } from '@dcl/crypto'
+import { useTranslation } from '@dcl/hooks'
 import { ChainId } from '@dcl/schemas/dist/dapps/chain-id'
 import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
 import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
@@ -75,6 +76,7 @@ const NEW_USER_BACKGROUND_IMAGES = [ImageNew1, ImageNew2, ImageNew3, ImageNew4, 
 const NEW_USER_PARAM_VARIANTS = ['newUser', 'newuser', 'new-user', 'new_user']
 
 export const LoginPage = () => {
+  const { t } = useTranslation()
   const [isNewUser, setIsNewUser] = useState(
     NEW_USER_PARAM_VARIANTS.some(variant => new URLSearchParams(window.location.search).has(variant))
   )
@@ -193,11 +195,15 @@ export const LoginPage = () => {
         setShowEmailLoginModal(true)
       } catch (error) {
         const errorMessage = handleError(error, 'Error sending verification code')
-        // Handle network errors with a user-friendly message
+        // Clear connection type so other login options aren't disabled
+        setCurrentConnectionType(undefined)
+        // Handle known API errors with translated messages
         if (errorMessage === 'Failed to fetch' || errorMessage?.toLowerCase().includes('network')) {
-          setEmailError('Unable to connect. Please check your internet connection and try again.')
+          setEmailError(t('login.errors.network_error'))
+        } else if (errorMessage?.toLowerCase().includes('invalid email')) {
+          setEmailError(t('login.errors.invalid_email'))
         } else {
-          setEmailError(errorMessage || 'Failed to send verification code. Please try again.')
+          setEmailError(errorMessage || t('login.errors.failed_send_code'))
         }
       } finally {
         setIsEmailLoading(false)
@@ -360,11 +366,15 @@ export const LoginPage = () => {
             connectionType: ConnectionOptionType.EMAIL
           }
         })
-        setConfirmingLoginError(errorMessage || 'Something went wrong. Please try again.')
+        setConfirmingLoginError(errorMessage || t('login.errors.something_went_wrong'))
       }
     },
     [trackLoginSuccess, checkClockSynchronization, runProfileRedirect, getReferrerFromCurrentSearch]
   )
+
+  const handleEmailInputChange = useCallback(() => {
+    setEmailError(null)
+  }, [])
 
   const handleEmailLoginError = useCallback((error: string) => {
     handleError(new Error(error), 'Email login error')
@@ -489,6 +499,7 @@ export const LoginPage = () => {
                 <Connection
                   onConnect={handleOnConnect}
                   onEmailSubmit={isEmailOtpEnabled ? handleEmailSubmit : undefined}
+                  onEmailChange={handleEmailInputChange}
                   loadingOption={currentConnectionType}
                   connectionOptions={targetConfig.connectionOptions}
                   isNewUser={isNewUser}
@@ -497,15 +508,15 @@ export const LoginPage = () => {
                 />
                 {isNewUser && (
                   <div className={styles.newUserInfo}>
-                    Already have an account? <span onClick={() => setIsNewUser(false)}>Sign In</span>
+                    {t('login.already_have_account')} <span onClick={() => setIsNewUser(false)}>{t('login.sign_in')}</span>
                   </div>
                 )}
               </div>
               {showGuestOption && (
                 <div className={styles.guestInfo}>
-                  Quick dive?{' '}
+                  {t('login.quick_dive')}{' '}
                   <a href={guestRedirectToURL} onClick={handleGuestLogin}>
-                    Explore as a guest
+                    {t('login.explore_as_guest')}
                   </a>
                 </div>
               )}

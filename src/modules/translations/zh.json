@@ -1,0 +1,244 @@
+{
+  "common": {
+    "try_again": "重试",
+    "cancel": "取消",
+    "confirm": "确认",
+    "back": "返回",
+    "continue": "继续",
+    "close_window": "您可以关闭此窗口。",
+    "deny": "拒绝",
+    "allow": "允许",
+    "something_went_wrong": "出了点问题",
+    "unknown_error": "未知错误"
+  },
+  "connection": {
+    "title": "登录或注册以进入",
+    "title_new_user": "创建账户以进入",
+    "continue_with": "使用 {provider} 继续",
+    "more_options": "更多选项",
+    "or_continue_with": "或使用以下方式继续",
+    "metamask_not_installed": "您需要安装 MetaMask 浏览器扩展程序才能继续。请安装后重试。"
+  },
+  "email_input": {
+    "recommended": "推荐",
+    "placeholder": "输入您的电子邮件",
+    "next": "下一步",
+    "validation_error": "请输入有效的电子邮件地址"
+  },
+  "email_login_modal": {
+    "title": "输入验证码",
+    "subtitle_prefix": "一次性密码已发送至 ",
+    "subtitle_suffix": "。请在下方输入验证码以完成验证。",
+    "verifying": "验证中...",
+    "resend_code": "重新发送验证码",
+    "didnt_get_email": "没有收到邮件？",
+    "back": "返回",
+    "enter_complete_code": "请输入完整的验证码",
+    "invalid_or_expired": "验证码无效或已过期。请重新发送验证码",
+    "failed_verify": "验证码验证失败。请检查后重试。",
+    "failed_resend": "重新发送验证码失败",
+    "network_error": "无法连接。请检查您的网络连接后重试。"
+  },
+  "login": {
+    "already_have_account": "已有账户？",
+    "sign_in": "登录",
+    "quick_dive": "快速体验？",
+    "explore_as_guest": "以访客身份探索",
+    "confirming_login": "确认登录中...",
+    "errors": {
+      "something_went_wrong": "出了点问题。请重试。",
+      "network_error": "无法连接。请检查您的网络连接后重试。",
+      "failed_send_code": "发送验证码失败。请重试。",
+      "different_account_session": "检测到与已验证邮箱不同的账户会话。请重新登录。",
+      "no_connected_account": "Thirdweb 连接未返回已连接的账户",
+      "invalid_email": "邮箱地址无效。请检查后重试。"
+    }
+  },
+  "connection_layout": {
+    "error": "您未在数字钱包扩展程序中确认此操作。要继续，请重试。",
+    "error_locked_wallet": "您的钱包当前已锁定。要继续，请解锁钱包后重试。",
+    "waiting_for_signature": "请在数字钱包扩展程序中确认以继续。",
+    "waiting_for_signature_magic": "即将完成！请确认您的登录请求",
+    "validating_sign_in": "请稍候，我们正在验证您的登录凭据...",
+    "loading_magic": "重定向中..."
+  },
+  "request": {
+    "verify_sign_in": "验证登录",
+    "verification_match": "下方的验证号码是否与 {explorerText} 中的匹配？",
+    "deep_link_confirm": "请确认您要登录到 {explorerText}",
+    "no_it_doesnt": "不，不匹配",
+    "yes_same": "是的，它们相同",
+    "sign_in": "登录",
+    "timeout_logged_out": "您可能已从钱包扩展程序中登出。",
+    "timeout_check_login": "请检查您是否已登录后重试。",
+    "wallet_interaction": {
+      "title_web2": "一个场景想要访问您的 Decentraland 账户资产",
+      "title_web3": "{explorerText} 想要与您的钱包交互",
+      "description": "只有在您了解所有交易详情并信任此场景时才继续。"
+    },
+    "transaction_dialog": {
+      "title": "确认交易",
+      "transaction_cost": "交易费用：{cost} ETH",
+      "your_balance": "您的余额：{balance} ETH"
+    }
+  },
+  "request_views": {
+    "timeout": {
+      "title": "看起来您等待时间过长，请求已过期。",
+      "subtitle": "如果 Explorer 应用中的过期时间仍在运行，请检查您的计算机时间是否设置正确。",
+      "description": "请返回 Decentraland 的 {explorerText} 重试。"
+    },
+    "different_account": {
+      "title": "看起来您使用了不同的账户连接。",
+      "description": "请将您的钱包账户切换为连接到 {explorerText} 的账户。"
+    },
+    "sign_in_complete": {
+      "title": "登录成功！",
+      "description": "返回 {explorerText} 开始探索！"
+    },
+    "denied_sign_in": {
+      "title": "号码不匹配，或者此操作不是由您发起的？",
+      "description": "如果您正在尝试登录，请重试操作。如果此操作不是由您发起的，请忽略此消息。"
+    },
+    "wallet_interaction_complete": {
+      "title": "钱包交互完成",
+      "description": "操作已成功执行。"
+    },
+    "denied_wallet_interaction": {
+      "title": "此操作不是由您发起的？",
+      "description": "如果此操作不是由您发起的，请忽略此消息。"
+    },
+    "signing_error": {
+      "title": "提交请求时发生错误。",
+      "description": "返回 {explorerText} 重试，如果错误持续存在，请联系客服。"
+    },
+    "recover_error": {
+      "title": "恢复请求时发生错误...",
+      "description": "该请求已不可用。请随时创建新请求并重试。如果 Explorer 应用中的过期时间仍在运行，请检查您的计算机时间是否设置正确。"
+    },
+    "ip_validation_error": {
+      "title": "安全验证失败",
+      "description": "此确认请求是从不同的设备或网络创建的。出于安全原因，您只能从最初发起请求的同一设备完成此请求。",
+      "request_id": "请求 ID：",
+      "reason": "原因："
+    },
+    "continue_in_app": {
+      "sign_in_successful": "登录成功",
+      "redirect_countdown": "您将在 {countdown} 秒后被重定向到 {explorerText}...",
+      "return_to": "返回 {explorerText}",
+      "could_not_open": "无法打开 {explorerText}",
+      "app_not_launched": "应用程序无法启动。请确保已安装 {explorerText} 后重试。",
+      "go_back_login": "返回登录"
+    },
+    "container": {
+      "use_another_profile": "使用其他账户？",
+      "return_to_login": "返回登录"
+    }
+  },
+  "transfer": {
+    "confirm": {
+      "sending_tip": "正在发送 {manaAmount} 小费给",
+      "confirm_tip": "确认 {manaAmount} 小费给",
+      "sending_gift": "正在发送礼物给",
+      "confirm_gift": "确认礼物给",
+      "creator_of": "创作者",
+      "processing_authorization": "正在处理授权",
+      "gifting_warning": "赠送物品无法撤销。"
+    },
+    "completed": {
+      "tip_success": "成功！已发送 {manaAmount} 小费给",
+      "gift_sent": "礼物已发送给",
+      "creator_of": "创作者"
+    },
+    "canceled": {
+      "tip_cancelled": "{manaAmount} 小费已取消",
+      "gift_canceled": "礼物已取消",
+      "tip_not_delivered": "您的小费未送达",
+      "gift_not_delivered": "您的礼物未送达",
+      "creator_of": "创作者"
+    },
+    "action_buttons": {
+      "cancel": "取消",
+      "confirm_send": "确认并发送"
+    },
+    "alert": {
+      "default_text": "您可以关闭此标签页并返回 Decentraland 应用。"
+    }
+  },
+  "setup": {
+    "welcome": "欢迎来到 Decentraland！",
+    "journey_begins": "您的旅程从这里开始",
+    "meet_avatar": "首先，认识您的头像",
+    "meet_avatar_description_desktop": "向您的数字分身打个招呼！\n别担心，他们现在还不完全是'您'——很快您就能尽情自定义他们了。",
+    "meet_avatar_description_mobile": "选择一个头像开始您的旅程。",
+    "meet_avatar_description_mobile_bold": "您可以稍后在桌面端自定义",
+    "meet_avatar_description_mobile_suffix": "，所有精彩都在那里发生！",
+    "randomize": "随机",
+    "complete_profile": "完善您的资料",
+    "jump_into_decentraland": "进入 Decentraland",
+    "continue_to": "继续前往 {site}",
+    "validation": {
+      "username_empty": "请输入您的用户名。",
+      "username_max_length": "抱歉，用户名最多不能超过15个字符。",
+      "username_no_spaces": "抱歉，不允许使用空格。",
+      "username_no_special_chars": "抱歉，不允许使用特殊字符（!@#$%）。",
+      "email_invalid": "邮箱格式无效，请重试。",
+      "agree_required": "请接受使用条款和隐私政策。"
+    },
+    "username_label": "用户名",
+    "username_placeholder": "输入您的用户名",
+    "email_label": "电子邮件（可选）",
+    "email_placeholder": "输入您的电子邮件",
+    "email_newsletter": "订阅 Decentraland 通讯，获取活动、更新、比赛等最新消息。",
+    "agree_prefix": "我同意 Decentraland 的",
+    "terms_of_use": "使用条款",
+    "and": "和",
+    "privacy_policy": "隐私政策",
+    "deploy_error_title": "创建账户时发生错误",
+    "deploy_error_description": "请将以下错误信息提交给客服："
+  },
+  "avatar_setup": {
+    "confirming_login": "确认登录中...",
+    "welcome_to": "欢迎来到",
+    "decentraland": "Decentraland！",
+    "username_label": "用户名",
+    "username_placeholder": "输入您的用户名",
+    "only_letters_numbers": "仅支持字母和数字",
+    "email_label": "电子邮件",
+    "email_placeholder": "输入您的电子邮件",
+    "email_newsletter": "订阅通讯，获取功能、活动、比赛等更新。",
+    "terms_agree_prefix": "我同意 Decentraland 的",
+    "terms_of_use": "使用条款",
+    "and": "和",
+    "privacy_policy": "隐私政策",
+    "terms_required_suffix": "。*",
+    "deploying": "部署中...",
+    "customize_avatar": "自定义我的头像",
+    "deploy_error": "创建您的资料时发生错误：{error}",
+    "validation": {
+      "email_invalid": "邮箱格式无效，请重试。",
+      "agree_required": "请接受使用条款和隐私政策。"
+    }
+  },
+  "character_counter": {
+    "limit_reached": "已达字符上限"
+  },
+  "clock_sync_modal": {
+    "title": "设备时钟不同步",
+    "message": "请将您的计算机时间设置更新为正确的本地时间，以避免服务器超时问题。",
+    "continue_to_site": "继续访问网站"
+  },
+  "invalid_redirection": {
+    "title": "无效的重定向",
+    "description": "您被重定向到的网站无效。",
+    "go_back": "返回登录页面"
+  },
+  "mobile_auth": {
+    "sign_in_successful": "登录成功",
+    "redirect_countdown": "您将被重定向到\n{explorerText}，倒计时 {countdown}...",
+    "redirecting": "正在重定向到 {explorerText}...",
+    "return_to": "返回 {explorerText}",
+    "could_not_open": "无法打开 {explorerText}",
+    "app_not_launched": "应用程序无法启动。请确保已安装 {explorerText} 后重试。"
+  }
+}

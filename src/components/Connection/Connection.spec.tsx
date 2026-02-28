@@ -1,5 +1,7 @@
 import { act, fireEvent, render } from '@testing-library/react'
+import { TranslationProvider } from '@dcl/hooks'
 import { DclThemeProvider, darkTheme } from 'decentraland-ui2'
+import { translations } from '../../modules/translations'
 import { Connection as ConnectionNew } from './Connection'
 import { EXTRA_TEST_ID, PRIMARY_TEST_ID, SECONDARY_TEST_ID, SHOW_MORE_BUTTON_TEST_ID } from './constants'
 import { ConnectionOptionType, ConnectionProps, MetamaskEthereumWindow } from './Connection.types'
@@ -12,23 +14,11 @@ declare global {
 
 function renderConnectionNew(props: Partial<ConnectionProps>) {
   return render(
-    <DclThemeProvider theme={darkTheme}>
-      <ConnectionNew
-        i18n={{
-          title: 'Unlock Your Virtual World.',
-          titleNewUser: 'Create an Account to Jump In',
-          subtitle: 'Access and start exploring.',
-          accessWith: option => `Access with ${option}`,
-          connectWith: option => `Connect with ${option}`,
-          moreOptions: 'More Options',
-          socialMessage: element => <>Access secured by {element}</>,
-          web3Message: learnMore => <>Curious about wallets? {learnMore('Learn More')}</>
-        }}
-        onConnect={jest.fn()}
-        isNewUser={false}
-        {...props}
-      />
-    </DclThemeProvider>
+    <TranslationProvider locale="en" translations={translations} fallbackLocale="en">
+      <DclThemeProvider theme={darkTheme}>
+        <ConnectionNew onConnect={jest.fn()} isNewUser={false} {...props} />
+      </DclThemeProvider>
+    </TranslationProvider>
   )
 }
 
@@ -55,7 +45,7 @@ describe('when rendering ConnectionNew', () => {
 
     it('should render the regular title', () => {
       const { getByText } = screen
-      expect(getByText('Unlock Your Virtual World.')).toBeInTheDocument()
+      expect(getByText('Log in or Sign up to Jump In')).toBeInTheDocument()
     })
 
     it('should not render the new user title', () => {
@@ -363,7 +353,7 @@ describe('when rendering ConnectionNew', () => {
 
     it('should not render the regular title', () => {
       const { queryByText } = screen
-      expect(queryByText('Sign In to Decentraland')).not.toBeInTheDocument()
+      expect(queryByText('Log in or Sign up to Jump In')).not.toBeInTheDocument()
     })
 
     it('should not render the social message text', () => {

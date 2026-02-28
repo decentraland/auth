@@ -1,0 +1,244 @@
+{
+  "common": {
+    "try_again": "Réessayer",
+    "cancel": "Annuler",
+    "confirm": "Confirmer",
+    "back": "RETOUR",
+    "continue": "Continuer",
+    "close_window": "Vous pouvez fermer cette fenêtre.",
+    "deny": "Refuser",
+    "allow": "Autoriser",
+    "something_went_wrong": "Une erreur est survenue",
+    "unknown_error": "Erreur inconnue"
+  },
+  "connection": {
+    "title": "Connectez-vous ou inscrivez-vous pour entrer",
+    "title_new_user": "Créez un compte pour entrer",
+    "continue_with": "Continuer avec {provider}",
+    "more_options": "Plus d'options",
+    "or_continue_with": "ou continuer avec",
+    "metamask_not_installed": "Vous devez installer l'extension de navigateur MetaMask pour continuer. Veuillez l'installer et réessayer."
+  },
+  "email_input": {
+    "recommended": "Recommandé",
+    "placeholder": "Entrez votre e-mail",
+    "next": "SUIVANT",
+    "validation_error": "Entrez une adresse e-mail valide"
+  },
+  "email_login_modal": {
+    "title": "Entrez le code de vérification",
+    "subtitle_prefix": "Un mot de passe à usage unique a été envoyé à ",
+    "subtitle_suffix": ". Veuillez entrer le code ci-dessous pour compléter la vérification.",
+    "verifying": "Vérification...",
+    "resend_code": "Renvoyer le code",
+    "didnt_get_email": "Vous n'avez pas reçu d'e-mail ? ",
+    "back": "RETOUR",
+    "enter_complete_code": "Veuillez entrer le code de vérification complet",
+    "invalid_or_expired": "Le code est invalide ou expiré. Veuillez renvoyer le code",
+    "failed_verify": "Échec de la vérification du code. Veuillez vérifier et réessayer.",
+    "failed_resend": "Échec du renvoi du code de vérification",
+    "network_error": "Impossible de se connecter. Veuillez vérifier votre connexion internet et réessayer."
+  },
+  "login": {
+    "already_have_account": "Vous avez déjà un compte ?",
+    "sign_in": "Se connecter",
+    "quick_dive": "Envie d'explorer ?",
+    "explore_as_guest": "Explorer en tant qu'invité",
+    "confirming_login": "Confirmation de la connexion...",
+    "errors": {
+      "something_went_wrong": "Une erreur est survenue. Veuillez réessayer.",
+      "network_error": "Impossible de se connecter. Veuillez vérifier votre connexion internet et réessayer.",
+      "failed_send_code": "Échec de l'envoi du code de vérification. Veuillez réessayer.",
+      "different_account_session": "Une session de compte différente de l'e-mail vérifié a été détectée. Veuillez vous reconnecter.",
+      "no_connected_account": "La connexion Thirdweb n'a pas retourné de compte connecté",
+      "invalid_email": "L'adresse e-mail est invalide. Veuillez vérifier et réessayer."
+    }
+  },
+  "connection_layout": {
+    "error": "Vous n'avez pas confirmé cette action dans votre extension de portefeuille numérique. Pour continuer, veuillez réessayer.",
+    "error_locked_wallet": "Votre portefeuille est actuellement verrouillé. Pour continuer, veuillez déverrouiller votre portefeuille et réessayer.",
+    "waiting_for_signature": "Confirmez dans votre extension de portefeuille numérique pour continuer.",
+    "waiting_for_signature_magic": "Presque terminé ! Confirmez votre demande de connexion à Decentraland",
+    "validating_sign_in": "Un instant, nous vérifions vos identifiants de connexion...",
+    "loading_magic": "Redirection..."
+  },
+  "request": {
+    "verify_sign_in": "Vérifier la connexion",
+    "verification_match": "Le numéro de vérification ci-dessous correspond-il à celui dans le {explorerText} ?",
+    "deep_link_confirm": "Veuillez confirmer que vous souhaitez vous connecter à {explorerText}",
+    "no_it_doesnt": "Non, il ne correspond pas",
+    "yes_same": "Oui, ils sont identiques",
+    "sign_in": "Se connecter",
+    "timeout_logged_out": "Vous êtes peut-être déconnecté de votre extension de portefeuille.",
+    "timeout_check_login": "Veuillez vérifier que vous êtes connecté et réessayer.",
+    "wallet_interaction": {
+      "title_web2": "Une scène souhaite accéder aux actifs de votre compte Decentraland",
+      "title_web3": "Le {explorerText} souhaite interagir avec votre portefeuille",
+      "description": "Ne continuez que si vous êtes au courant de tous les détails de la transaction et faites confiance à cette scène."
+    },
+    "transaction_dialog": {
+      "title": "Confirmer la transaction",
+      "transaction_cost": "Coût de la transaction : {cost} ETH",
+      "your_balance": "Votre solde : {balance} ETH"
+    }
+  },
+  "request_views": {
+    "timeout": {
+      "title": "Il semble que vous ayez pris trop de temps et la demande a expiré.",
+      "subtitle": "Si le temps d'expiration est toujours en cours dans l'application Explorer, vérifiez que l'heure de votre ordinateur est correctement réglée.",
+      "description": "Veuillez retourner au {explorerText} de Decentraland pour réessayer."
+    },
+    "different_account": {
+      "title": "Il semble que vous êtes connecté avec un compte différent.",
+      "description": "Veuillez changer le compte de votre portefeuille pour celui connecté au {explorerText}."
+    },
+    "sign_in_complete": {
+      "title": "Connexion réussie !",
+      "description": "Retournez au {explorerText} pour entrer !"
+    },
+    "denied_sign_in": {
+      "title": "Le numéro ne correspondait pas, ou cette action n'a pas été effectuée par vous ?",
+      "description": "Si vous essayez de vous connecter, réessayez l'action. Si cette action n'a pas été initiée par vous, ignorez ce message."
+    },
+    "wallet_interaction_complete": {
+      "title": "Interaction avec le portefeuille terminée",
+      "description": "L'action a été exécutée avec succès."
+    },
+    "denied_wallet_interaction": {
+      "title": "Cette action n'a pas été initiée par vous ?",
+      "description": "Si cette action n'a pas été initiée par vous, ignorez ce message."
+    },
+    "signing_error": {
+      "title": "Une erreur est survenue lors de la soumission de la demande.",
+      "description": "Retournez au {explorerText} pour réessayer, ou contactez le support si l'erreur persiste."
+    },
+    "recover_error": {
+      "title": "Une erreur est survenue lors de la récupération de la demande...",
+      "description": "La demande n'est plus disponible. N'hésitez pas à en créer une nouvelle et réessayer. Si le temps d'expiration est toujours en cours dans l'application Explorer, vérifiez que l'heure de votre ordinateur est correctement réglée."
+    },
+    "ip_validation_error": {
+      "title": "Échec de la validation de sécurité",
+      "description": "Cette demande de confirmation a été créée depuis un appareil ou un réseau différent. Pour des raisons de sécurité, vous ne pouvez compléter cette demande que depuis l'appareil où elle a été initiée.",
+      "request_id": "ID de la demande :",
+      "reason": "Raison :"
+    },
+    "continue_in_app": {
+      "sign_in_successful": "Connexion réussie",
+      "redirect_countdown": "Vous serez redirigé vers {explorerText} dans {countdown}...",
+      "return_to": "Retourner à {explorerText}",
+      "could_not_open": "Impossible d'ouvrir {explorerText}",
+      "app_not_launched": "L'application n'a pas pu être lancée. Veuillez vous assurer que {explorerText} est installé et réessayer.",
+      "go_back_login": "Retourner à la connexion"
+    },
+    "container": {
+      "use_another_profile": "Utiliser un autre profil ?",
+      "return_to_login": "Retourner à la connexion"
+    }
+  },
+  "transfer": {
+    "confirm": {
+      "sending_tip": "Envoi d'un pourboire de {manaAmount} pour",
+      "confirm_tip": "Confirmer le pourboire de {manaAmount} pour",
+      "sending_gift": "Envoi d'un cadeau à",
+      "confirm_gift": "Confirmer le cadeau pour",
+      "creator_of": "CRÉATEUR DE",
+      "processing_authorization": "Traitement de l'autorisation",
+      "gifting_warning": "Offrir un objet est irréversible."
+    },
+    "completed": {
+      "tip_success": "Succès ! Pourboire de {manaAmount} envoyé à",
+      "gift_sent": "Cadeau envoyé à",
+      "creator_of": "CRÉATEUR DE"
+    },
+    "canceled": {
+      "tip_cancelled": "Pourboire de {manaAmount} annulé",
+      "gift_canceled": "Cadeau annulé",
+      "tip_not_delivered": "Votre pourboire n'a pas été remis à",
+      "gift_not_delivered": "Votre cadeau n'a pas été remis à",
+      "creator_of": "CRÉATEUR DE"
+    },
+    "action_buttons": {
+      "cancel": "ANNULER",
+      "confirm_send": "CONFIRMER ET ENVOYER"
+    },
+    "alert": {
+      "default_text": "Vous pouvez fermer cet onglet et retourner à l'application Decentraland."
+    }
+  },
+  "setup": {
+    "welcome": "Bienvenue sur Decentraland !",
+    "journey_begins": "Votre aventure commence ici",
+    "meet_avatar": "D'abord, découvrez votre avatar",
+    "meet_avatar_description_desktop": "Dites bonjour à votre nouveau double numérique !\nNe vous inquiétez pas, il ne vous ressemble pas encore tout à fait — bientôt vous pourrez le personnaliser à votre guise.",
+    "meet_avatar_description_mobile": "Choisissez un avatar pour commencer votre aventure.",
+    "meet_avatar_description_mobile_bold": "Vous pourrez le personnaliser plus tard sur ordinateur",
+    "meet_avatar_description_mobile_suffix": ", là où toute la magie opère !",
+    "randomize": "aléatoire",
+    "complete_profile": "Complétez votre profil",
+    "jump_into_decentraland": "entrer dans Decentraland",
+    "continue_to": "continuer vers {site}",
+    "validation": {
+      "username_empty": "Veuillez entrer votre nom d'utilisateur.",
+      "username_max_length": "Désolé, les noms d'utilisateur peuvent avoir un maximum de 15 caractères.",
+      "username_no_spaces": "Désolé, les espaces ne sont pas autorisés.",
+      "username_no_special_chars": "Désolé, les caractères spéciaux (!@#$%) ne sont pas autorisés.",
+      "email_invalid": "E-mail invalide, veuillez réessayer.",
+      "agree_required": "Veuillez accepter les conditions d'utilisation et la politique de confidentialité."
+    },
+    "username_label": "Nom d'utilisateur",
+    "username_placeholder": "Entrez votre nom d'utilisateur",
+    "email_label": "E-mail (optionnel)",
+    "email_placeholder": "Entrez votre e-mail",
+    "email_newsletter": "Abonnez-vous à la newsletter de Decentraland pour recevoir les dernières nouvelles sur les événements, mises à jour, concours et plus encore.",
+    "agree_prefix": "J'accepte les ",
+    "terms_of_use": "Conditions d'utilisation",
+    "and": " et la ",
+    "privacy_policy": "Politique de confidentialité",
+    "deploy_error_title": "Une erreur est survenue lors de la création de votre compte",
+    "deploy_error_description": "Veuillez contacter le support avec le message d'erreur suivant :"
+  },
+  "avatar_setup": {
+    "confirming_login": "Confirmation de la connexion...",
+    "welcome_to": "Bienvenue sur ",
+    "decentraland": "Decentraland !",
+    "username_label": "Nom d'utilisateur",
+    "username_placeholder": "Entrez votre nom d'utilisateur",
+    "only_letters_numbers": "Seuls les lettres et les chiffres sont acceptés",
+    "email_label": "E-mail",
+    "email_placeholder": "Entrez votre e-mail",
+    "email_newsletter": "Abonnez-vous à la newsletter pour les mises à jour sur les fonctionnalités, événements, concours et plus encore.",
+    "terms_agree_prefix": "J'accepte les ",
+    "terms_of_use": "Conditions d'utilisation",
+    "and": " et la ",
+    "privacy_policy": "Politique de confidentialité",
+    "terms_required_suffix": ".*",
+    "deploying": "DÉPLOIEMENT...",
+    "customize_avatar": "PERSONNALISER MON AVATAR",
+    "deploy_error": "Une erreur est survenue lors de la création de votre profil : {error}",
+    "validation": {
+      "email_invalid": "E-mail invalide, veuillez réessayer.",
+      "agree_required": "Veuillez accepter les conditions d'utilisation et la politique de confidentialité."
+    }
+  },
+  "character_counter": {
+    "limit_reached": "Limite de caractères atteinte"
+  },
+  "clock_sync_modal": {
+    "title": "Horloge de l'appareil désynchronisée",
+    "message": "Veuillez mettre à jour les paramètres d'heure de votre ordinateur à l'heure locale correcte pour éviter les problèmes de délai d'attente du serveur.",
+    "continue_to_site": "Continuer vers le site"
+  },
+  "invalid_redirection": {
+    "title": "Redirection invalide",
+    "description": "Le site vers lequel vous avez été redirigé est invalide.",
+    "go_back": "Retourner à la page de connexion"
+  },
+  "mobile_auth": {
+    "sign_in_successful": "Connexion réussie",
+    "redirect_countdown": "Vous serez redirigé vers\n{explorerText} dans {countdown}...",
+    "redirecting": "Redirection vers {explorerText}...",
+    "return_to": "Retourner à {explorerText}",
+    "could_not_open": "Impossible d'ouvrir {explorerText}",
+    "app_not_launched": "L'application n'a pas pu être lancée. Veuillez vous assurer que {explorerText} est installé et réessayer."
+  }
+}

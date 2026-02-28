@@ -1,18 +1,18 @@
+import { useTranslation } from '@dcl/hooks'
 import { useTargetConfig } from '../../../../hooks/targetConfig'
 import { Container } from '../Container'
 import { CloseWindow } from './CloseWindow'
 import styles from './Views.module.css'
 
 export const TimeoutError = ({ requestId }: { requestId: string }) => {
+  const { t } = useTranslation()
   const [targetConfig] = useTargetConfig()
   return (
     <Container requestId={requestId}>
       <div className={styles.errorLogo}></div>
-      <div className={styles.title}>Looks like you took too long and the request has expired.</div>
-      <div className={styles.subtitle}>
-        If the expiration time is still running in the Explorer app, check your computer&apos;s time to see if it&apos;s set correctly.
-      </div>
-      <div className={styles.description}>Please return to Decentraland&apos;s {targetConfig.explorerText} to try again.</div>
+      <div className={styles.title}>{t('request_views.timeout.title')}</div>
+      <div className={styles.subtitle}>{t('request_views.timeout.subtitle')}</div>
+      <div className={styles.description}>{t('request_views.timeout.description', { explorerText: targetConfig.explorerText })}</div>
       <CloseWindow />
     </Container>
   )

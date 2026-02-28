@@ -1,3 +1,4 @@
+import { useTranslation } from '@dcl/hooks'
 import { Rarity } from '@dcl/schemas'
 import { Box, Profile } from 'decentraland-ui2'
 import successAnimation from '../../../../../../assets/animations/successAnimation_Lottie.json'
@@ -10,6 +11,7 @@ import { TransferCompletedViewProps } from './TransferCompletedView.types'
 import { SceneImageWrapper, SuccessAnimation } from './TransferCompletedView.styled'
 
 const TransferCompletedView = (props: TransferCompletedViewProps) => {
+  const { t } = useTranslation()
   const { type, transferData } = props
   const isTip = type === TransferType.TIP
   const recipientAvatar = transferData.recipientProfile?.avatars?.[0]
@@ -17,7 +19,9 @@ const TransferCompletedView = (props: TransferCompletedViewProps) => {
   return (
     <TransferLayout>
       <CenteredContent>
-        <Title>{isTip ? `Success! ${transferData.manaAmount} tip Sent to` : 'Gift Sent to'}</Title>
+        <Title>
+          {isTip ? t('transfer.completed.tip_success', { manaAmount: transferData.manaAmount }) : t('transfer.completed.gift_sent')}
+        </Title>
 
         {isTip ? (
           <>
@@ -32,7 +36,7 @@ const TransferCompletedView = (props: TransferCompletedViewProps) => {
               highlightName
             />
 
-            <Label>CREATOR OF</Label>
+            <Label>{t('transfer.completed.creator_of')}</Label>
 
             <SceneImageWrapper>
               <TransferAssetImage src={transferData.sceneImageUrl} alt={transferData.sceneName} />
