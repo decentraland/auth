@@ -1,15 +1,15 @@
+import { useTranslation } from '@dcl/hooks'
 import { Container } from '../Container'
 import { CloseWindow } from './CloseWindow'
 import styles from './Views.module.css'
 
 export const DeniedSignIn = ({ requestId }: { requestId: string }) => {
+  const { t } = useTranslation()
   return (
     <Container canChangeAccount requestId={requestId}>
       <div className={styles.errorLogo}></div>
-      <div className={styles.title}>Did the number not match, or was this action not taken by you?</div>
-      <div className={styles.description}>
-        If you&apos;re trying to sign in, retry the action. If this action was not initiated by you, dismiss this message.
-      </div>
+      <div className={styles.title}>{t('request_views.denied_sign_in.title')}</div>
+      <div className={styles.description}>{t('request_views.denied_sign_in.description')}</div>
       <CloseWindow />
     </Container>
   )

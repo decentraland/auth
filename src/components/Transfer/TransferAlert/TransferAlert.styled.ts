@@ -10,7 +10,7 @@ const AlertContainer = styled(Alert)(({ theme }) => ({
   justifyContent: 'center',
   marginTop: theme.spacing(4.5),
   width: 'fit-content',
-  height: '46px',
+  minHeight: '46px',
   gap: theme.spacing(1.5),
   ['& .MuiAlert-icon']: {
     alignItems: 'center',

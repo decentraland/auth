@@ -1,21 +1,11 @@
-// eslint-disable-next-line @typescript-eslint/naming-convention
-import * as React from 'react'
 import { ConnectionOptionType } from './Connection.types'
-
-type ConnectionPrimaryButtonI18N = {
-  accessWith: (option: ConnectionOptionType) => React.ReactNode
-  connectWith: (option: ConnectionOptionType) => React.ReactNode
-  socialMessage: (by: React.ReactNode) => React.ReactNode
-  web3Message: (learnMore: (element: React.ReactNode) => React.ReactNode) => React.ReactNode
-}
 
 type ConnectionPrimaryButtonProps = {
   option: ConnectionOptionType
   testId?: string
   loadingOption?: ConnectionOptionType
-  i18n: ConnectionPrimaryButtonI18N
   isNewUser?: boolean
   onConnect: (wallet: ConnectionOptionType) => unknown
 }
 
-export type { ConnectionPrimaryButtonI18N, ConnectionPrimaryButtonProps }
+export type { ConnectionPrimaryButtonProps }

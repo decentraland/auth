@@ -2,6 +2,7 @@
 import * as React from 'react'
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { useTranslation } from '@dcl/hooks'
 import { Email, EthAddress } from '@dcl/schemas'
 import { PreviewUnityMode } from '@dcl/schemas/dist/dapps/preview'
 import { CircularProgress, WearablePreview, launchDesktopApp } from 'decentraland-ui2'
@@ -58,6 +59,7 @@ import {
 const MAX_CHARACTERS = 15
 
 const AvatarSetupPage: React.FC = () => {
+  const { t } = useTranslation()
   const hasTrackedReferral = useRef(false)
   const [urlSearchParams] = useSearchParams()
   const { flags, initialized: initializedFlags } = useContext(FeatureFlagsContext)
@@ -114,17 +116,17 @@ const AvatarSetupPage: React.FC = () => {
 
   const emailError = useMemo(() => {
     if (state.email && !state.email.includes('@')) {
-      return 'Invalid email, please try again.'
+      return t('avatar_setup.validation.email_invalid')
     }
     return ''
-  }, [state.email])
+  }, [state.email, t])
 
   const agreeError = useMemo(() => {
     if (!state.isTermsChecked) {
-      return 'Please accept the terms of use and privacy policy.'
+      return t('avatar_setup.validation.agree_required')
     }
     return ''
-  }, [state.isTermsChecked])
+  }, [state.isTermsChecked, t])
 
   const handleContinueClick = useCallback(() => {
     const validEmail = Email.validate(state.email)
@@ -345,7 +347,7 @@ const AvatarSetupPage: React.FC = () => {
         <AnimatedBackground variant="absolute" />
         <LoadingContainer>
           <DecentralandLogo />
-          <LoadingTitle variant="h3">Confirming login...</LoadingTitle>
+          <LoadingTitle variant="h3">{t('avatar_setup.confirming_login')}</LoadingTitle>
           <ProgressContainer>
             <CircularProgress color="inherit" />
           </ProgressContainer>
@@ -363,15 +365,19 @@ const AvatarSetupPage: React.FC = () => {
 
         <WelcomeContainer>
           <WelcomeTitle variant="h3">
-            Welcome to <DecentralandText>Decentraland!</DecentralandText>
+            {t('avatar_setup.welcome_to')}
+            <DecentralandText>{t('avatar_setup.decentraland')}</DecentralandText>
           </WelcomeTitle>
         </WelcomeContainer>
 
         <InputContainer>
-          <InputLabel variant="h5">Username{state.isEmailInherited ? '' : '*'}</InputLabel>
+          <InputLabel variant="h5">
+            {t('avatar_setup.username_label')}
+            {state.isEmailInherited ? '' : '*'}
+          </InputLabel>
           <TextInput
             variant="outlined"
-            placeholder="Enter your username"
+            placeholder={t('avatar_setup.username_placeholder')}
             value={state.username}
             onChange={handleUsernameChange}
             hasError={hasValidUsernameCharacterCount}
@@ -384,46 +390,40 @@ const AvatarSetupPage: React.FC = () => {
           {!isUsernameValid && (
             <ErrorContainer>
               <WarningIcon />
-              <ErrorText>Only letters and numbers are supported</ErrorText>
+              <ErrorText>{t('avatar_setup.only_letters_numbers')}</ErrorText>
             </ErrorContainer>
           )}
         </InputContainer>
 
         {!state.isEmailInherited && (
           <InputContainer>
-            <InputLabel variant="h5">Email</InputLabel>
+            <InputLabel variant="h5">{t('avatar_setup.email_label')}</InputLabel>
             <TextInput
               variant="outlined"
-              placeholder="Enter your email"
+              placeholder={t('avatar_setup.email_placeholder')}
               value={state.email}
               onChange={handleEmailChange}
               hasError={state.hasEmailError}
             />
-            <EmailDescription>Subscribe to newsletter for updates on features, events, contests, and more.</EmailDescription>
+            <EmailDescription>{t('avatar_setup.email_newsletter')}</EmailDescription>
           </InputContainer>
         )}
 
         <CheckboxContainer>
-          {state.isEmailInherited && (
-            <CheckboxRow
-              id="marketing"
-              label="Subscribe to newsletter for updates on features, events, contests, and more."
-              control={<CheckboxInput />}
-            />
-          )}
+          {state.isEmailInherited && <CheckboxRow id="marketing" label={t('avatar_setup.email_newsletter')} control={<CheckboxInput />} />}
           <CheckboxRow
             id="terms"
             label={
               <>
-                I agree with Decentraland&apos;s{' '}
+                {t('avatar_setup.terms_agree_prefix')}
                 <LinkCheckbox href="https://decentraland.org/terms/" target="_blank">
-                  Terms of Use
-                </LinkCheckbox>{' '}
-                and{' '}
-                <LinkCheckbox href="https://decentraland.org/privacy" target="_blank">
-                  Privacy Policy
+                  {t('avatar_setup.terms_of_use')}
                 </LinkCheckbox>
-                .*
+                {t('avatar_setup.and')}
+                <LinkCheckbox href="https://decentraland.org/privacy" target="_blank">
+                  {t('avatar_setup.privacy_policy')}
+                </LinkCheckbox>
+                {t('avatar_setup.terms_required_suffix')}
               </>
             }
             control={<CheckboxInput checked={state.isTermsChecked} onChange={handleTermsChange} />}
@@ -444,10 +444,10 @@ const AvatarSetupPage: React.FC = () => {
             !state.hasWearablePreviewLoaded
           }
         >
-          {deploying ? 'DEPLOYING...' : 'CUSTOMIZE MY AVATAR'}
+          {deploying ? t('avatar_setup.deploying') : t('avatar_setup.customize_avatar')}
         </ContinueButton>
 
-        {deployError && <ErrorLabel color="error">An error occurred while creating your profile: {deployError}</ErrorLabel>}
+        {deployError && <ErrorLabel color="error">{t('avatar_setup.deploy_error', { error: deployError })}</ErrorLabel>}
       </LeftFormSection>
 
       <RightAvatarSection>
