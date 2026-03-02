@@ -1,6 +1,6 @@
 {
   "name": "@dcl/auth-site",
-  "version": "0.0.0",
+  "version": "4.11.8",
   "description": "Auth website",
   "main": "index.js",
   "scripts": {
