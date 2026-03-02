@@ -16,7 +16,7 @@ class IntercomWidget {
     return this.instance
   }
 
-  set appId(id: string) {
+  set appId(id: string | undefined) {
     this._appId = id
     this.client = getWindowClient(id)
   }
@@ -25,9 +25,11 @@ class IntercomWidget {
     return this._appId
   }
 
-  set settings(settings: IntercomSettings) {
+  set settings(settings: IntercomSettings | undefined) {
     this._settings = settings
-    intercomWindow.intercomSettings = settings
+    if (settings !== undefined) {
+      intercomWindow.intercomSettings = settings
+    }
   }
 
   get settings(): IntercomSettings | undefined {
