@@ -95,21 +95,24 @@ interface TransactionConfirmDialogProps {
   onConfirm: () => void
 }
 
-const TransactionConfirmDialog = ({ open, transactionCost, balance, onCancel, onConfirm }: TransactionConfirmDialogProps) => (
-  <Dialog open={open} maxWidth="xs" fullWidth>
-    <DialogTitle>Confirm Transaction</DialogTitle>
-    <DialogContent>
-      <p>Transaction cost: {formatEther(transactionCost)} ETH</p>
-      <p>Your balance: {formatEther(balance)} ETH</p>
-    </DialogContent>
-    <DialogActions>
-      <Button onClick={onCancel}>Cancel</Button>
-      <Button variant="contained" onClick={onConfirm}>
-        Confirm
-      </Button>
-    </DialogActions>
-  </Dialog>
-)
+const TransactionConfirmDialog = ({ open, transactionCost, balance, onCancel, onConfirm }: TransactionConfirmDialogProps) => {
+  const { t } = useTranslation()
+  return (
+    <Dialog open={open} maxWidth="xs" fullWidth>
+      <DialogTitle>{t('request.transaction_dialog.title')}</DialogTitle>
+      <DialogContent>
+        <p>{t('request.transaction_dialog.transaction_cost', { cost: formatEther(transactionCost) })}</p>
+        <p>{t('request.transaction_dialog.your_balance', { balance: formatEther(balance) })}</p>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onCancel}>{t('common.cancel')}</Button>
+        <Button variant="contained" onClick={onConfirm}>
+          {t('common.confirm')}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  )
+}
 
 // Terminal views that should not trigger a re-fetch of the request
 const TERMINAL_VIEWS = new Set([
@@ -732,11 +735,8 @@ export const RequestPage = () => {
           />
           <WalletInteraction
             requestId={requestId}
-            title={
-              isUserUsingWeb2Wallet
-                ? 'A scene wants to access your Decentraland account assets'
-                : `The ${targetConfig.explorerText} wants to interact with your wallet`
-            }
+            isWeb2Wallet={isUserUsingWeb2Wallet}
+            explorerText={targetConfig.explorerText}
             isLoading={isLoading}
             onDeny={onDenyWalletInteraction}
             onApprove={handleApproveWalletInteraction}

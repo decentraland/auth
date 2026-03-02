@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from '@dcl/hooks'
 import { Rarity } from '@dcl/schemas'
 import { Box, Profile } from 'decentraland-ui2'
 import { TransferAlert, TransferAssetImage, TransferLayout } from '../../../../../Transfer'
@@ -13,6 +14,7 @@ import { SceneImageWrapper, SuccessAnimation } from './TransferCompletedView.sty
 type AnimationData = any
 
 const TransferCompletedView = (props: TransferCompletedViewProps) => {
+  const { t } = useTranslation()
   const [successAnimation, setSuccessAnimation] = useState<AnimationData>(null)
 
   // Dynamically imported so the 67 KB animation JSON is split into its own chunk
@@ -28,7 +30,9 @@ const TransferCompletedView = (props: TransferCompletedViewProps) => {
   return (
     <TransferLayout>
       <CenteredContent>
-        <Title>{isTip ? `Success! ${transferData.manaAmount} tip Sent to` : 'Gift Sent to'}</Title>
+        <Title>
+          {isTip ? t('transfer.completed.tip_success', { manaAmount: transferData.manaAmount }) : t('transfer.completed.gift_sent')}
+        </Title>
 
         {isTip ? (
           <>
@@ -43,7 +47,7 @@ const TransferCompletedView = (props: TransferCompletedViewProps) => {
               highlightName
             />
 
-            <Label>CREATOR OF</Label>
+            <Label>{t('transfer.completed.creator_of')}</Label>
 
             <SceneImageWrapper>
               <TransferAssetImage src={transferData.sceneImageUrl} alt={transferData.sceneName} />
