@@ -1,11 +1,11 @@
 import { useCallback, useContext, useEffect, useRef, useState } from 'react'
-import { RPCError } from 'magic-sdk'
 import { Provider } from 'decentraland-connect'
 import { Button, CircularProgress, muiIcons } from 'decentraland-ui2'
 import wrongImg from '../../../assets/images/wrong.svg'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import { createAuthServerHttpClient } from '../../../shared/auth'
+import { isMagicRpcError } from '../../../shared/errors'
 import { locations } from '../../../shared/locations'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { OAUTH_ACCESS_DENIED_ERROR, createMagicInstance } from '../../../shared/utils/magicSdk'
@@ -60,9 +60,9 @@ export const MobileCallbackPage = () => {
         },
         sentryExtra: {
           oauthError: oauthError ?? undefined,
-          magicRpcCode: err instanceof RPCError ? String(err.code) : undefined,
-          magicRpcRawMessage: err instanceof RPCError ? err.rawMessage : undefined,
-          magicRpcData: err instanceof RPCError ? JSON.stringify(err.data) : undefined
+          magicRpcCode: isMagicRpcError(err) ? String(err.code) : undefined,
+          magicRpcRawMessage: isMagicRpcError(err) ? err.rawMessage : undefined,
+          magicRpcData: isMagicRpcError(err) ? JSON.stringify(err.data) : undefined
         }
       })
       setError(err instanceof Error ? err.message : 'Authentication failed')

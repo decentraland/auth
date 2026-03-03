@@ -1,4 +1,4 @@
-import { ThirdwebClient, createThirdwebClient } from 'thirdweb'
+import { type ThirdwebClient, createThirdwebClient } from 'thirdweb'
 import { getConfiguration } from 'decentraland-connect'
 
 let thirdwebClient: ThirdwebClient | null = null

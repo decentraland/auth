@@ -1,4 +1,4 @@
-import { ethers } from 'ethers'
+import { createPublicClient, custom, decodeFunctionData, formatEther } from 'viem'
 import { Rarity } from '@dcl/schemas'
 import { ChainId } from '@dcl/schemas/dist/dapps/chain-id'
 import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
@@ -65,7 +65,8 @@ async function getNetworkProvider(chainId: ChainId): Promise<Provider> {
         */
   const connectedProvider = await getConnectedProvider()
   if (connectedProvider) {
-    const connectedChainId = Number((await new ethers.BrowserProvider(connectedProvider).getNetwork()).chainId)
+    const publicClient = createPublicClient({ transport: custom(connectedProvider) })
+    const connectedChainId = await publicClient.getChainId()
     if (Number(chainId) === connectedChainId) {
       return connectedProvider
     }
@@ -133,12 +134,13 @@ function decodeNftTransferData(data: string, contractABI: object[]): { tokenId: 
   try {
     if (!data || data.length < 10) return null
 
-    const contractInterface = new ethers.Interface(contractABI)
-
     // Decode the transaction data using the ABI
-    const decodedData = contractInterface.parseTransaction({ data })
+    const { args } = decodeFunctionData({
+      abi: contractABI as readonly unknown[],
+      data: data as `0x${string}`
+    })
 
-    if (!decodedData) {
+    if (!args || args.length < 3) {
       console.error('Failed to decode transaction data')
       return null
     }
@@ -147,8 +149,8 @@ function decodeNftTransferData(data: string, contractABI: object[]): { tokenId: 
     // transferFrom(address from, address to, uint256 tokenId)
     // safeTransferFrom(address from, address to, uint256 tokenId)
     // safeTransferFrom(address from, address to, uint256 tokenId, bytes data)
-    const toAddress = decodedData.args[1] as string // 'to' address is always the second parameter
-    const tokenId = decodedData.args[2].toString() // tokenId is always the third parameter
+    const toAddress = args[1] as string // 'to' address is always the second parameter
+    const tokenId = (args[2] as bigint).toString() // tokenId is always the third parameter
 
     return { tokenId, toAddress }
   } catch (error) {
@@ -176,19 +178,21 @@ function decodeManaTransferData(data: string): { manaAmount: string; toAddress: 
 
     const contract = getContract(ContractName.ERC20, getMetaTransactionChainId())
 
-    const contractInterface = new ethers.Interface(contract.abi)
-    const decodedData = contractInterface.parseTransaction({ data })
+    const { args } = decodeFunctionData({
+      abi: contract.abi as readonly unknown[],
+      data: data as `0x${string}`
+    })
 
-    if (!decodedData) {
+    if (!args || args.length < 2) {
       console.error('Failed to decode MANA transfer data')
       return null
     }
 
-    const toAddress = decodedData.args[0] as string
-    const amount = decodedData.args[1] as bigint
+    const toAddress = args[0] as string
+    const amount = args[1] as bigint
 
     // Convert from wei to MANA (18 decimals)
-    const manaAmount = ethers.formatEther(amount)
+    const manaAmount = formatEther(amount)
 
     return { manaAmount, toAddress }
   } catch (error) {
@@ -214,11 +218,15 @@ async function fetchNftMetadata(
   // This is necessary because the user's browser provider may be connected to a different network
   const chainId = getMetaTransactionChainId()
   const networkProvider = await getNetworkProvider(chainId)
-  const provider = new ethers.BrowserProvider(networkProvider)
+  const publicClient = createPublicClient({ transport: custom(networkProvider) })
 
   // Use the provided contract ABI to interact with the NFT contract
-  const contract = new ethers.Contract(contractAddress, contractABI, provider)
-  const tokenUri = await contract.tokenURI(tokenId)
+  const tokenUri = (await publicClient.readContract({
+    address: contractAddress as `0x${string}`,
+    abi: contractABI as readonly unknown[],
+    functionName: 'tokenURI',
+    args: [BigInt(tokenId)]
+  })) as string
 
   if (!tokenUri) {
     throw new Error(`No tokenURI returned for token ${tokenId} at contract ${contractAddress}`)
