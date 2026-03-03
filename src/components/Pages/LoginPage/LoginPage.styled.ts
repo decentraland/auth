@@ -9,7 +9,7 @@ const moveBackground = keyframes({
   }
 })
 
-const Main = styled('main')<{ isNewUser?: boolean }>(({ theme, isNewUser }) => ({
+const Main = styled('main')(({ theme }) => ({
   display: 'grid',
   gridTemplateColumns: '40% 60%',
   height: '100%',
@@ -19,15 +19,13 @@ const Main = styled('main')<{ isNewUser?: boolean }>(({ theme, isNewUser }) => (
   overflow: 'hidden',
   minWidth: 0,
   boxSizing: 'border-box',
-  // eslint-disable-next-line @typescript-eslint/naming-convention
-  '&::before': {
+  ['&::before']: {
     content: '""',
     position: 'fixed',
     width: '100%',
     height: '350%',
-    background: isNewUser
-      ? 'linear-gradient(89.65deg, rgba(149, 45, 198, 0) 29.59%, rgba(94, 30, 130, 0.559754) 39.08%, rgba(75, 25, 106, 0.750004) 45.36%, rgba(64, 23, 93, 0.859976) 54.22%, #32134C 72.84%)'
-      : 'radial-gradient(ellipse at 0 50%, transparent 10%, #e02dd3 40%, #491975 70%)',
+    background:
+      'linear-gradient(89.65deg, rgba(149, 45, 198, 0) 29.59%, rgba(94, 30, 130, 0.559754) 39.08%, rgba(75, 25, 106, 0.750004) 45.36%, rgba(64, 23, 93, 0.859976) 54.22%, #32134C 72.84%)',
     top: '-100%',
     transform: 'rotate(180deg)',
     overflow: 'hidden'
@@ -38,11 +36,8 @@ const Main = styled('main')<{ isNewUser?: boolean }>(({ theme, isNewUser }) => (
   [theme.breakpoints.down('sm')]: {
     display: 'flex',
     height: 'auto',
-    // eslint-disable-next-line @typescript-eslint/naming-convention
-    '&::before': {
-      background: isNewUser
-        ? 'linear-gradient(144.23deg, #491975 10.31%, #D72CCD 102.43%)'
-        : 'radial-gradient(ellipse at 0 50%, #e02dd3 0%, #491975 70%)'
+    ['&::before']: {
+      background: 'linear-gradient(144.23deg, #491975 10.31%, #D72CCD 102.43%)'
     }
   }
 }))

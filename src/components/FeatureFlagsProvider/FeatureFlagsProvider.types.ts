@@ -8,7 +8,6 @@ enum FeatureFlagsKeys {
   UNITY_WEARABLE_PREVIEW = 'dapps-unity-wearable-preview',
   ONBOARDING_FLOW = 'dapps-onboarding-flow',
   DISABLED_CATALYSTS = 'explorer-disabled-catalyst',
-  EMAIL_OTP_LOGIN = 'dapps-email-otp-login',
   SIGN_IN_PRIMARY_OPTION = 'dapps-sign-in-primary-option'
 }
 

@@ -38,7 +38,7 @@ import { ConnectionModal } from '../../ConnectionModal'
 import { ConnectionLayoutState } from '../../ConnectionModal/ConnectionLayout.type'
 import { EmailLoginModal } from '../../EmailLoginModal'
 import { EmailLoginResult } from '../../EmailLoginModal/EmailLoginModal.types'
-import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
+import { FeatureFlagsContext, FeatureFlagsKeys, SignInPrimaryOption } from '../../FeatureFlagsProvider'
 import { ConfirmingLogin } from './ConfirmingLogin'
 import {
   connectToProvider,
@@ -65,9 +65,10 @@ export const LoginPage = () => {
   const [showEmailLoginModal, setShowEmailLoginModal] = useState(false)
   const [currentConnectionType, setCurrentConnectionType] = useState<ConnectionOptionType>()
   const { url: redirectTo, redirect } = useAfterLoginRedirection()
-  const { initialized: flagInitialized, flags } = useContext(FeatureFlagsContext)
+  const { initialized: flagInitialized, flags, variants } = useContext(FeatureFlagsContext)
 
-  const isEmailOtpEnabled = flags[FeatureFlagsKeys.EMAIL_OTP_LOGIN] === true
+  const isOnlyEmailOption = flags[FeatureFlagsKeys.SIGN_IN_PRIMARY_OPTION]
+  const isSignInWithTwoOptions = variants[FeatureFlagsKeys.SIGN_IN_PRIMARY_OPTION]?.name === SignInPrimaryOption.TWO_OPTIONS
 
   // Email login state
   const [currentEmail, setCurrentEmail] = useState('')
@@ -196,12 +197,7 @@ export const LoginPage = () => {
       }
 
       // EMAIL is handled differently - focus the email input instead of connecting
-      // But only if email OTP is enabled
       if (connectionType === ConnectionOptionType.EMAIL) {
-        if (!isEmailOtpEnabled) {
-          // Email OTP is disabled via feature flag, ignore this auto-login attempt
-          return
-        }
         const emailInput = document.getElementById('dcl-email-input')
         if (emailInput) {
           emailInput.scrollIntoView({ behavior: 'smooth', block: 'center' })
@@ -273,8 +269,7 @@ export const LoginPage = () => {
       runProfileRedirect,
       flagInitialized,
       checkClockSynchronization,
-      getReferrerFromCurrentSearch,
-      isEmailOtpEnabled
+      getReferrerFromCurrentSearch
     ]
   )
 
@@ -428,7 +423,7 @@ export const LoginPage = () => {
 
   const backgroundImages = NEW_USER_BACKGROUND_IMAGES
   return (
-    <Main isNewUser={isNewUser}>
+    <Main>
       <BackgroundWrapper>
         <Background
           isVisible={true}
@@ -460,26 +455,26 @@ export const LoginPage = () => {
             onTryAgain={handleTryAgain}
             providerType={currentConnectionType ? fromConnectionOptionToProviderType(currentConnectionType) : null}
           />
-          {isEmailOtpEnabled && (
-            <EmailLoginModal
-              open={showEmailLoginModal}
-              email={currentEmail}
-              onClose={handleEmailLoginClose}
-              onBack={handleEmailLoginBack}
-              onSuccess={handleEmailLoginSuccess}
-              onError={handleEmailLoginError}
-            />
-          )}
+          <EmailLoginModal
+            open={showEmailLoginModal}
+            email={currentEmail}
+            onClose={handleEmailLoginClose}
+            onBack={handleEmailLoginBack}
+            onSuccess={handleEmailLoginSuccess}
+            onError={handleEmailLoginError}
+          />
           <Left>
             <LeftInfo>
               <MainContainer>
                 <Connection
                   onConnect={handleOnConnect}
-                  onEmailSubmit={isEmailOtpEnabled ? handleEmailSubmit : undefined}
+                  onEmailSubmit={handleEmailSubmit}
                   onEmailChange={handleEmailInputChange}
                   loadingOption={currentConnectionType}
                   connectionOptions={targetConfig.connectionOptions}
                   isNewUser={isNewUser}
+                  isOnlyEmailOption={isOnlyEmailOption}
+                  isSignInWithTwoOptions={isSignInWithTwoOptions}
                   isEmailLoading={isEmailLoading}
                   emailError={emailError}
                 />

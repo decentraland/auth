@@ -1,11 +1,12 @@
 import { useCallback, useState } from 'react'
 import { useTranslation } from '@dcl/hooks'
 import { Logo } from 'decentraland-ui2'
+import { useWalletOptions } from '../../hooks/useWalletOptions'
 import { ConnectionPrimaryButton } from './ConnectionPrimaryButton'
 import { ConnectionSecondaryButton } from './ConnectionSecondaryButton'
 import { EXTRA_TEST_ID, PRIMARY_TEST_ID, SECONDARY_TEST_ID, SHOW_MORE_BUTTON_TEST_ID } from './constants'
 import { EmailInput } from './EmailInput'
-import { ConnectionOptionType, ConnectionProps } from './Connection.types'
+import { ConnectionProps } from './Connection.types'
 import {
   ChevronIcon,
   ChevronUpIcon,
@@ -20,8 +21,19 @@ import {
 } from './Connection.styled'
 
 export const Connection = (props: ConnectionProps): JSX.Element => {
-  const { onConnect, onEmailSubmit, onEmailChange, connectionOptions, className, loadingOption, isNewUser, isEmailLoading, emailError } =
-    props
+  const {
+    onConnect,
+    onEmailSubmit,
+    onEmailChange,
+    connectionOptions,
+    className,
+    loadingOption,
+    isNewUser,
+    isOnlyEmailOption,
+    isSignInWithTwoOptions,
+    isEmailLoading,
+    emailError
+  } = props
   const { t } = useTranslation()
 
   const hasExtraOptions = connectionOptions?.extraOptions && connectionOptions.extraOptions.length > 0
@@ -31,16 +43,11 @@ export const Connection = (props: ConnectionProps): JSX.Element => {
     setShowMore(!showMore)
   }, [showMore])
 
-  // Filter out EMAIL from connection options (it's handled by EmailInput now)
-  const filteredPrimary =
-    connectionOptions?.primary === ConnectionOptionType.EMAIL ? connectionOptions?.secondary : connectionOptions?.primary
-  const filteredSecondary =
-    connectionOptions?.primary === ConnectionOptionType.EMAIL
-      ? connectionOptions?.extraOptions?.[0]
-      : connectionOptions?.secondary === ConnectionOptionType.EMAIL
-        ? connectionOptions?.extraOptions?.[0]
-        : connectionOptions?.secondary
-  const filteredExtraOptions = connectionOptions?.extraOptions?.filter(opt => opt !== ConnectionOptionType.EMAIL)
+  const { firstWalletOption, secondWalletOption, remainingWalletOptions } = useWalletOptions({
+    connectionOptions,
+    isOnlyEmailOption,
+    isSignInWithTwoOptions
+  })
 
   return (
     <ConnectionContainer className={className}>
@@ -51,18 +58,16 @@ export const Connection = (props: ConnectionProps): JSX.Element => {
       <MainContentContainer>
         <Title isNewUser={isNewUser}>{isNewUser ? t('connection.title_new_user') : t('connection.title')}</Title>
 
-        {/* Email Input (primary method) */}
-        {onEmailSubmit && (
-          <EmailInput onSubmit={onEmailSubmit} onEmailChange={onEmailChange} isLoading={isEmailLoading} error={emailError} />
-        )}
+        {/* Email Input (primary method - always shown) */}
+        <EmailInput onSubmit={onEmailSubmit} onEmailChange={onEmailChange} isLoading={isEmailLoading} error={emailError} />
 
         {/* Divider */}
-        {onEmailSubmit && (filteredPrimary || filteredSecondary) && <Divider>{t('connection.or_continue_with')}</Divider>}
+        {(firstWalletOption || secondWalletOption) && <Divider>{t('connection.or_continue_with')}</Divider>}
 
-        {/* MetaMask button */}
-        {filteredPrimary && (
+        {/* First wallet button (e.g., MetaMask) */}
+        {firstWalletOption && (
           <ConnectionPrimaryButton
-            option={filteredPrimary}
+            option={firstWalletOption}
             testId={PRIMARY_TEST_ID}
             loadingOption={loadingOption}
             onConnect={onConnect}
@@ -70,10 +75,10 @@ export const Connection = (props: ConnectionProps): JSX.Element => {
           />
         )}
 
-        {/* Google button */}
-        {filteredSecondary && (
+        {/* Second wallet button (e.g., Google) */}
+        {secondWalletOption && (
           <ConnectionPrimaryButton
-            option={filteredSecondary}
+            option={secondWalletOption}
             testId={SECONDARY_TEST_ID}
             loadingOption={loadingOption}
             onConnect={onConnect}
@@ -83,16 +88,16 @@ export const Connection = (props: ConnectionProps): JSX.Element => {
       </MainContentContainer>
 
       <ShowMoreContainer>
-        {hasExtraOptions && filteredExtraOptions && filteredExtraOptions.length > 0 && (
+        {hasExtraOptions && remainingWalletOptions && remainingWalletOptions.length > 0 && (
           <ShowMoreButton data-testid={SHOW_MORE_BUTTON_TEST_ID} variant="text" fullWidth onClick={handleShowMore}>
             {t('connection.more_options')}
             {showMore ? <ChevronUpIcon /> : <ChevronIcon />}
           </ShowMoreButton>
         )}
-        {showMore && filteredExtraOptions && filteredExtraOptions.length > 0 && (
+        {showMore && remainingWalletOptions && remainingWalletOptions.length > 0 && (
           <ConnectionSecondaryButton
             testId={EXTRA_TEST_ID}
-            options={filteredExtraOptions}
+            options={remainingWalletOptions}
             onConnect={onConnect}
             tooltipDirection="top"
             loadingOption={loadingOption}

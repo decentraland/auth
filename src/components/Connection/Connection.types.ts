@@ -33,6 +33,7 @@ const connectionOptionTitles: { [key in ConnectionOptionType]: string } = {
 type MetamaskEthereumWindow = typeof window.ethereum & { isMetaMask?: boolean }
 
 type ConnectionProps = {
+  shouldShowGoogleOptionAsPrimary?: boolean
   connectionOptions?: {
     primary: ConnectionOptionType
     secondary?: ConnectionOptionType
@@ -41,11 +42,13 @@ type ConnectionProps = {
   className?: string
   loadingOption?: ConnectionOptionType
   isNewUser?: boolean
+  isOnlyEmailOption?: boolean
+  isSignInWithTwoOptions?: boolean
   isEmailLoading?: boolean
   emailError?: string | null
   onConnect: (wallet: ConnectionOptionType) => unknown
-  onEmailSubmit?: (email: string) => void
-  onEmailChange?: () => void
+  onEmailSubmit: (email: string) => void
+  onEmailChange: () => void
 }
 
 export { ConnectionOptionType, connectionOptionTitles }
