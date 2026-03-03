@@ -48,7 +48,10 @@ const TransferCompletedView = (props: TransferCompletedViewProps) => {
             />
             <Label>{t('transfer.completed.creator_of')}</Label>
             <SceneImageWrapper>
-              <TransferAssetImage src={(transferData as MANATransferData).sceneImageUrl} alt={(transferData as MANATransferData).sceneName} />
+              <TransferAssetImage
+                src={(transferData as MANATransferData).sceneImageUrl}
+                alt={(transferData as MANATransferData).sceneName}
+              />
               {successAnimation ? <SuccessAnimation animationData={successAnimation} loop={true} /> : null}
             </SceneImageWrapper>
             <SceneName>{(transferData as MANATransferData).sceneName}</SceneName>
