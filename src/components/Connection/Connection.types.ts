@@ -47,8 +47,8 @@ type ConnectionProps = {
   isEmailLoading?: boolean
   emailError?: string | null
   onConnect: (wallet: ConnectionOptionType) => unknown
-  onEmailSubmit: (email: string) => void
-  onEmailChange: () => void
+  onEmailSubmit?: (email: string) => void
+  onEmailChange?: () => void
 }
 
 export { ConnectionOptionType, connectionOptionTitles }

@@ -29,8 +29,8 @@ export const Connection = (props: ConnectionProps): JSX.Element => {
     className,
     loadingOption,
     isNewUser,
-    isOnlyEmailOption,
-    isSignInWithTwoOptions,
+    isOnlyEmailOption = false,
+    isSignInWithTwoOptions = false,
     isEmailLoading,
     emailError
   } = props
@@ -58,11 +58,15 @@ export const Connection = (props: ConnectionProps): JSX.Element => {
       <MainContentContainer>
         <Title isNewUser={isNewUser}>{isNewUser ? t('connection.title_new_user') : t('connection.title')}</Title>
 
-        {/* Email Input (primary method - always shown) */}
-        <EmailInput onSubmit={onEmailSubmit} onEmailChange={onEmailChange} isLoading={isEmailLoading} error={emailError} />
+        {/* Email Input (primary method - shown only if handlers provided) */}
+        {onEmailSubmit && onEmailChange && (
+          <EmailInput onSubmit={onEmailSubmit} onEmailChange={onEmailChange} isLoading={isEmailLoading} error={emailError} />
+        )}
 
         {/* Divider */}
-        {(firstWalletOption || secondWalletOption) && <Divider>{t('connection.or_continue_with')}</Divider>}
+        {(firstWalletOption || secondWalletOption) && onEmailSubmit && onEmailChange && (
+          <Divider>{t('connection.or_continue_with')}</Divider>
+        )}
 
         {/* First wallet button (e.g., MetaMask) */}
         {firstWalletOption && (

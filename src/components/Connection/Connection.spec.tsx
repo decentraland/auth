@@ -16,13 +16,7 @@ function renderConnectionNew(props: Partial<ConnectionProps>) {
   return render(
     <TranslationProvider locale="en" translations={translations} fallbackLocale="en">
       <DclThemeProvider theme={darkTheme}>
-        <ConnectionNew
-          onConnect={jest.fn()}
-          onEmailSubmit={jest.fn()}
-          onEmailChange={jest.fn()}
-          isNewUser={false}
-          {...props}
-        />
+        <ConnectionNew onConnect={jest.fn()} onEmailSubmit={jest.fn()} onEmailChange={jest.fn()} isNewUser={false} {...props} />
       </DclThemeProvider>
     </TranslationProvider>
   )
@@ -238,7 +232,12 @@ describe('when rendering the Connection component', () => {
       onConnect = jest.fn()
       connectionOptions = {
         primary: ConnectionOptionType.EMAIL,
-        extraOptions: [ConnectionOptionType.METAMASK, ConnectionOptionType.FORTMATIC, ConnectionOptionType.WALLET_CONNECT, ConnectionOptionType.COINBASE]
+        extraOptions: [
+          ConnectionOptionType.METAMASK,
+          ConnectionOptionType.FORTMATIC,
+          ConnectionOptionType.WALLET_CONNECT,
+          ConnectionOptionType.COINBASE
+        ]
       }
       screen = renderConnectionNew({ connectionOptions, onConnect })
     })
