@@ -1,7 +1,6 @@
 import react from '@vitejs/plugin-react-swc'
 import { defineConfig, loadEnv } from 'vite'
 import { nodePolyfills } from 'vite-plugin-node-polyfills'
-import { visualizer } from 'rollup-plugin-visualizer'
 
 // https://vitejs.dev/config/
 export default defineConfig(({ command, mode }) => {
@@ -12,7 +11,6 @@ export default defineConfig(({ command, mode }) => {
       react(),
       // The catalyst client requires node polyfills to work in the browser.
       nodePolyfills({ include: ['buffer', 'stream', 'process', 'util'] }),
-      visualizer({ filename: 'dist/stats.html', gzipSize: true, brotliSize: true })
     ],
     define: {
       // eslint-disable-next-line @typescript-eslint/naming-convention

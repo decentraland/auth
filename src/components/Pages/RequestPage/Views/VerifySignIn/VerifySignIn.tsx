@@ -1,23 +1,13 @@
 import { useTranslation } from '@dcl/hooks'
-import { CircularProgress, muiIcons } from 'decentraland-ui2'
-import { Container } from '../Container'
-import { ButtonsContainer, NoButton, TimeoutMessage, VerificationCode, YesButton } from '../RequestPage.styled'
-import { ErrorMessageIcon } from './RecoverError.styled'
-import styles from './Views.module.css'
+import { Box, CircularProgress, muiIcons } from 'decentraland-ui2'
+import { Container } from '../../Container'
+import { ButtonsContainer, NoButton, TimeoutMessage, VerificationCode, YesButton } from '../../RequestPage.styled'
+import { ErrorMessageIcon } from '../RecoverError.styled'
+import styles from '../Views.module.css'
+import { VerifySignInProps } from './VerifySignIn.types'
 
 const CancelIcon = muiIcons.Cancel
 const CheckCircleIcon = muiIcons.CheckCircle
-
-interface VerifySignInProps {
-  requestId: string
-  code?: string | number
-  isLoading?: boolean
-  hasTimedOut?: boolean
-  explorerText?: string
-  isDeepLinkFlow?: boolean
-  onDeny: () => void
-  onApprove: () => void
-}
 
 export const VerifySignIn = ({
   requestId,
@@ -32,17 +22,17 @@ export const VerifySignIn = ({
   const { t } = useTranslation()
   return (
     <Container canChangeAccount requestId={requestId}>
-      <div className={styles.logo}></div>
-      <div className={styles.title}>{t('request.verify_sign_in')}</div>
+      <Box className={styles.logo}></Box>
+      <Box className={styles.title}>{t('request.verify_sign_in')}</Box>
 
       {!isDeepLinkFlow && (
         <>
-          <div className={styles.description}>{t('request.verification_match', { explorerText })}</div>
+          <Box className={styles.description}>{t('request.verification_match', { explorerText })}</Box>
           {code !== undefined && <VerificationCode>{code}</VerificationCode>}
         </>
       )}
 
-      {isDeepLinkFlow && <div className={styles.description}>{t('request.deep_link_confirm', { explorerText })}</div>}
+      {isDeepLinkFlow && <Box className={styles.description}>{t('request.deep_link_confirm', { explorerText })}</Box>}
 
       <ButtonsContainer>
         <NoButton variant="outlined" disabled={isLoading} onClick={onDeny} startIcon={<CancelIcon />}>
@@ -61,11 +51,11 @@ export const VerifySignIn = ({
       {hasTimedOut && (
         <TimeoutMessage>
           <ErrorMessageIcon fontSize="large" />
-          <div>
+          <Box>
             {t('request.timeout_logged_out')}
             <br />
             {t('request.timeout_check_login')}
-          </div>
+          </Box>
         </TimeoutMessage>
       )}
     </Container>

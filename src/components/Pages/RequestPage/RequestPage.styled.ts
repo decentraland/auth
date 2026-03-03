@@ -1,21 +1,21 @@
 import { Box, Button, styled } from 'decentraland-ui2'
 
-const VerificationCode = styled(Box)({
+const VerificationCode = styled(Box)(({ theme }) => ({
   fontSize: '100px',
   fontWeight: 700,
   lineHeight: '121.02px',
-  marginTop: '40px'
-})
+  marginTop: theme.spacing(5)
+}))
 
-const ButtonsContainer = styled(Box)({
+const ButtonsContainer = styled(Box)(({ theme }) => ({
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
   flexWrap: 'wrap',
-  gap: '24px',
-  marginTop: '40px',
+  gap: theme.spacing(3),
+  marginTop: theme.spacing(5),
   zIndex: 1
-})
+}))
 
 const baseButtonStyles = {
   border: '1px solid var(--text)',
@@ -45,16 +45,16 @@ const YesButton = styled(Button)({
   }
 })
 
-const TimeoutMessage = styled(Box)({
-  padding: '15px',
+const TimeoutMessage = styled(Box)(({ theme }) => ({
+  padding: theme.spacing(1.875),
   borderRadius: '10px',
-  marginTop: '30px',
+  marginTop: theme.spacing(3.75),
   lineBreak: 'anywhere',
   backgroundColor: '#201116bf',
   color: 'white',
   display: 'flex',
   alignItems: 'flex-start',
-  gap: '8px'
-})
+  gap: theme.spacing(1)
+}))
 
 export { VerificationCode, ButtonsContainer, NoButton, YesButton, TimeoutMessage }

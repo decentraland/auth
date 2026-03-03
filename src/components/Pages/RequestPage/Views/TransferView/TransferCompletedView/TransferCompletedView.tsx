@@ -10,8 +10,7 @@ import { SceneName } from '../TransferTipComponents.styled'
 import { TransferCompletedViewProps } from './TransferCompletedView.types'
 import { SceneImageWrapper, SuccessAnimation } from './TransferCompletedView.styled'
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnimationData = any
+type AnimationData = unknown
 
 const TransferCompletedView = (props: TransferCompletedViewProps) => {
   const { t } = useTranslation()
@@ -51,7 +50,7 @@ const TransferCompletedView = (props: TransferCompletedViewProps) => {
 
             <SceneImageWrapper>
               <TransferAssetImage src={transferData.sceneImageUrl} alt={transferData.sceneName} />
-              {successAnimation && <SuccessAnimation animationData={successAnimation} loop={true} />}
+              {successAnimation ? <SuccessAnimation animationData={successAnimation} loop={true} /> : null}
             </SceneImageWrapper>
 
             <SceneName>{transferData.sceneName}</SceneName>
@@ -67,7 +66,7 @@ const TransferCompletedView = (props: TransferCompletedViewProps) => {
                   name={transferData.name || `NFT #${transferData.tokenId}`}
                   rarity={transferData.rarity || Rarity.COMMON}
                 />
-                {successAnimation && <SuccessAnimation animationData={successAnimation} loop={true} />}
+                {successAnimation ? <SuccessAnimation animationData={successAnimation} loop={true} /> : null}
               </SceneImageWrapper>
             </Box>
 

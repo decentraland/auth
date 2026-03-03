@@ -1,17 +1,9 @@
 import { useTranslation } from '@dcl/hooks'
-import { Button, CircularProgress } from 'decentraland-ui2'
-import { Container } from '../Container'
-import { ButtonsContainer } from '../RequestPage.styled'
-import styles from './Views.module.css'
-
-interface WalletInteractionProps {
-  requestId: string
-  isWeb2Wallet?: boolean
-  explorerText?: string
-  isLoading?: boolean
-  onDeny: () => void
-  onApprove: () => void
-}
+import { Box, Button, CircularProgress } from 'decentraland-ui2'
+import { Container } from '../../Container'
+import { ButtonsContainer } from '../../RequestPage.styled'
+import styles from '../Views.module.css'
+import { WalletInteractionProps } from './WalletInteraction.types'
 
 export const WalletInteraction = ({
   requestId,
@@ -24,11 +16,11 @@ export const WalletInteraction = ({
   const { t } = useTranslation()
   return (
     <Container canChangeAccount requestId={requestId}>
-      <div className={styles.logo}></div>
-      <div className={styles.title}>
+      <Box className={styles.logo}></Box>
+      <Box className={styles.title}>
         {isWeb2Wallet ? t('request.wallet_interaction.title_web2') : t('request.wallet_interaction.title_web3', { explorerText })}
-      </div>
-      <div className={styles.description}>{t('request.wallet_interaction.description')}</div>
+      </Box>
+      <Box className={styles.description}>{t('request.wallet_interaction.description')}</Box>
       <ButtonsContainer>
         <Button variant="outlined" disabled={isLoading} onClick={onDeny}>
           {t('common.deny')}
