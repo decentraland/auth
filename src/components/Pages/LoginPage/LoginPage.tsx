@@ -65,7 +65,7 @@ export const LoginPage = () => {
   const [showEmailLoginModal, setShowEmailLoginModal] = useState(false)
   const [currentConnectionType, setCurrentConnectionType] = useState<ConnectionOptionType>()
   const { url: redirectTo, redirect } = useAfterLoginRedirection()
-  const { initialized: flagInitialized, flags, variants } = useContext(FeatureFlagsContext)
+  const { initialized: flagInitialized, flags } = useContext(FeatureFlagsContext)
 
   const isEmailOtpEnabled = flags[FeatureFlagsKeys.EMAIL_OTP_LOGIN] === true
 
