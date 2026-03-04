@@ -1,17 +1,14 @@
 import * as React from 'react'
-import { Dialog, muiIcons } from 'decentraland-ui2'
+import { Modal } from 'decentraland-ui/dist/components/Modal/Modal'
+import { ModalNavigation } from 'decentraland-ui/dist/components/ModalNavigation/ModalNavigation'
 import warningIcon from '../../assets/images/warning.svg'
-import { Actions, CloseIconButton, Content, ContinueButton, Message, WarningIcon, Title } from './ClockSyncModal.styled'
+import { Actions, Content, ContinueButton, Message, WarningIcon, Title } from './ClockSyncModal.styled'
 import { ClockSyncModalProps } from './ClockSyncModal.types'
-
-const CloseIcon = muiIcons.Close
 
 export const ClockSyncModal: React.FC<ClockSyncModalProps> = ({ open, onContinue, onClose }) => {
   return (
-    <Dialog open={open} maxWidth="xs" fullWidth>
-      <CloseIconButton onClick={onClose}>
-        <CloseIcon />
-      </CloseIconButton>
+    <Modal open={open} size="tiny">
+      <ModalNavigation title="" onClose={onClose} />
       <Content>
         <WarningIcon src={warningIcon} alt="warning" />
         <Title>Device Clock Out of Sync</Title>
@@ -22,6 +19,6 @@ export const ClockSyncModal: React.FC<ClockSyncModalProps> = ({ open, onContinue
           </ContinueButton>
         </Actions>
       </Content>
-    </Dialog>
+    </Modal>
   )
 }

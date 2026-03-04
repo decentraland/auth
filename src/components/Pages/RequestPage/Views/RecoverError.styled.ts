@@ -1,6 +1,7 @@
-import { muiIcons, styled } from 'decentraland-ui2'
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline'
+import { styled } from 'decentraland-ui2'
 
-const ErrorMessageIcon = styled(muiIcons.ErrorOutline)({
+const ErrorMessageIcon = styled(ErrorOutlineIcon)({
   color: '#fb3b3b'
 })
 

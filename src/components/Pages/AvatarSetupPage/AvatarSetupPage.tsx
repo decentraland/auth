@@ -1,9 +1,10 @@
 import * as React from 'react'
 import { useCallback, useState, useMemo, useEffect, useContext, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import CircularProgress from '@mui/material/CircularProgress'
 import { EthAddress, Email } from '@dcl/schemas'
 import { PreviewUnityMode } from '@dcl/schemas/dist/dapps/preview'
-import { CircularProgress, WearablePreview, launchDesktopApp } from 'decentraland-ui2'
+import { WearablePreview, launchDesktopApp } from 'decentraland-ui2'
 import avatarFloat from '../../../assets/animations/AvatarFloat_Lottie.json'
 import avatarParticles from '../../../assets/animations/AvatarParticles_Lottie.json'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
@@ -31,7 +32,6 @@ import {
   InputContainer,
   InputLabel,
   TextInput,
-  ErrorLabel,
   ErrorText,
   ErrorContainer,
   WarningIcon,
@@ -446,7 +446,11 @@ const AvatarSetupPage: React.FC = () => {
           {deploying ? 'DEPLOYING...' : 'CUSTOMIZE MY AVATAR'}
         </ContinueButton>
 
-        {deployError && <ErrorLabel color="error">An error occurred while creating your profile: {deployError}</ErrorLabel>}
+        {deployError && (
+          <InputLabel color="error" sx={{ mt: 2, fontSize: '14px' }}>
+            An error occurred while creating your profile: {deployError}
+          </InputLabel>
+        )}
       </LeftFormSection>
 
       <RightAvatarSection>

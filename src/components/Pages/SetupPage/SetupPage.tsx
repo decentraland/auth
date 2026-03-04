@@ -2,7 +2,12 @@ import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'r
 import { useSearchParams } from 'react-router-dom'
 import classNames from 'classnames'
 import { EthAddress } from '@dcl/schemas'
-import { Button, CircularProgress, useMobileMediaQuery } from 'decentraland-ui2'
+import { Button } from 'decentraland-ui/dist/components/Button/Button'
+import { Checkbox } from 'decentraland-ui/dist/components/Checkbox/Checkbox'
+import { Field } from 'decentraland-ui/dist/components/Field/Field'
+import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
+import { useMobileMediaQuery } from 'decentraland-ui/dist/components/Media/Media'
+import { InputOnChangeData } from 'decentraland-ui'
 import backImg from '../../../assets/images/back.svg'
 import diceImg from '../../../assets/images/dice.svg'
 import logoImg from '../../../assets/images/logo.svg'
@@ -203,8 +208,8 @@ export const SetupPage = () => {
 
   // Form input handlers.
   const handleNameChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      setName(e.target.value)
+    (_e: unknown, data: InputOnChangeData) => {
+      setName(data.value)
       if (!hasStartedToWriteSomethingInName.current) {
         trackStartAddingName()
         hasStartedToWriteSomethingInName.current = true
@@ -213,8 +218,8 @@ export const SetupPage = () => {
     [trackStartAddingName]
   )
   const handleEmailChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      setEmail(e.target.value)
+    (_e: unknown, data: InputOnChangeData) => {
+      setEmail(data.value)
       if (!hasStartedToWriteSomethingInEmail.current) {
         trackStartAddingEmail()
         hasStartedToWriteSomethingInEmail.current = true
@@ -390,7 +395,7 @@ export const SetupPage = () => {
     return (
       <div className={styles.container}>
         <div className={styles.background} />
-        <CircularProgress size={60} />
+        <Loader active size="huge" />
       </div>
     )
   }
@@ -445,13 +450,13 @@ export const SetupPage = () => {
 
               <div className={isMobile ? styles.mobileButtons : undefined}>
                 <div className={styles.randomize}>
-                  <Button variant="outlined" size="small" onClick={handleRandomize} className={styles.randomizeButton}>
+                  <Button compact inverted onClick={handleRandomize}>
                     <img src={diceImg} alt="diceImg" />
                     <span>randomize</span>
                   </Button>
                 </div>
                 <div className={styles.continue}>
-                  <Button variant="contained" size={isMobile ? 'small' : 'medium'} fullWidth={!isMobile} onClick={handleContinue}>
+                  <Button compact={isMobile} primary fluid={!isMobile} onClick={handleContinue}>
                     Continue
                   </Button>
                 </div>
@@ -486,30 +491,32 @@ export const SetupPage = () => {
               <div className={styles.title}>Complete your Profile</div>
               <form onSubmit={handleSubmit}>
                 <div className={styles.name}>
-                  <div className={styles.field}>
-                    <label className={styles.fieldLabel}>Username</label>
-                    <input className={styles.fieldInput} placeholder="Enter your username" onChange={handleNameChange} value={name} />
-                    {showErrors && nameError ? (
-                      <div className={styles.fieldMessage}>
-                        <InputErrorMessage message={nameError} />
-                      </div>
-                    ) : null}
-                  </div>
+                  <Field
+                    label="Username"
+                    placeholder="Enter your username"
+                    onChange={handleNameChange}
+                    value={name}
+                    message={showErrors && nameError ? <InputErrorMessage message={nameError} /> : undefined}
+                  />
                 </div>
                 <div>
-                  <div className={styles.field}>
-                    <label className={styles.fieldLabel}>Email (optional)</label>
-                    <input className={styles.fieldInput} placeholder="Enter your email" value={email} onChange={handleEmailChange} />
-                    <div className={styles.fieldMessage}>
-                      {showErrors && emailError ? <InputErrorMessage className={styles.emailError} message={emailError} /> : null}
-                      <span>
-                        Subscribe to Decentraland's newsletter to receive the latest news about events, updates, contests and more.
-                      </span>
-                    </div>
-                  </div>
+                  <Field
+                    label="Email (optional)"
+                    placeholder="Enter your email"
+                    value={email}
+                    message={
+                      <>
+                        {showErrors && emailError ? <InputErrorMessage className={styles.emailError} message={emailError} /> : null}
+                        <span>
+                          Subscribe to Decentraland's newsletter to receive the latest news about events, updates, contests and more.
+                        </span>
+                      </>
+                    }
+                    onChange={handleEmailChange}
+                  />
                 </div>
                 <div className={styles.agree}>
-                  <input type="checkbox" onChange={handleAgreeChange} checked={agree} className={styles.checkbox} />
+                  <Checkbox onChange={handleAgreeChange} checked={agree} />
                   <div>
                     I agree with Decentraland's&nbsp;
                     <a target="_blank" rel="noopener noreferrer" href="https://decentraland.org/terms/">
@@ -524,8 +531,8 @@ export const SetupPage = () => {
                 </div>
                 {showErrors && agreeError ? <InputErrorMessage className={styles.agreeError} message={agreeError} /> : null}
                 <div className={styles.jumpIn}>
-                  <Button variant="contained" fullWidth type="submit" disabled={!agree || deploying}>
-                    {deploying ? <CircularProgress size={20} color="inherit" /> : continueMessage}
+                  <Button primary fluid type="submit" disabled={!agree || deploying} loading={deploying}>
+                    {continueMessage}
                   </Button>
                 </div>
               </form>
