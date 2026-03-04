@@ -1,5 +1,5 @@
 import type { OAuthProvider } from '@magic-ext/oauth2'
-import { createWalletClient, custom, toHex } from 'viem'
+import { createWalletClient, custom } from 'viem'
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
 import { mainnet } from 'viem/chains'
 import { AuthIdentity, Authenticator } from '@dcl/crypto'
@@ -45,8 +45,8 @@ async function generateIdentityWithSigner(address: string, signMessage: SignMess
 
   const payload = {
     address: ephemeralAccount.address,
-    publicKey: toHex(ephemeralAccount.publicKey),
-    privateKey: toHex(privateKey)
+    publicKey: ephemeralAccount.publicKey,
+    privateKey: privateKey
   }
 
   return Authenticator.initializeAuthChain(address, payload, ONE_MONTH_IN_MINUTES, signMessage)
@@ -149,12 +149,25 @@ function isEmailLogin(connectionType: ConnectionOptionType): boolean {
   return connectionType === ConnectionOptionType.EMAIL
 }
 
+function isValidIdentity(identity: AuthIdentity): boolean {
+  const { privateKey, publicKey, address } = identity.ephemeralIdentity
+  const hexPattern = /^0x[0-9a-fA-F]+$/
+  return (
+    hexPattern.test(privateKey) &&
+    privateKey.length === 66 &&
+    hexPattern.test(publicKey) &&
+    publicKey.length === 132 &&
+    hexPattern.test(address) &&
+    address.length === 42
+  )
+}
+
 async function getIdentitySignature(address: string, provider: Provider): Promise<AuthIdentity> {
   let identity: AuthIdentity
 
   const ssoIdentity = localStorageGetIdentity(address)
 
-  if (!ssoIdentity) {
+  if (!ssoIdentity || !isValidIdentity(ssoIdentity)) {
     identity = await generateIdentity(address, provider)
     localStorageStoreIdentity(address, identity)
   } else {
@@ -171,7 +184,7 @@ async function getIdentitySignature(address: string, provider: Provider): Promis
 async function getIdentityWithSigner(address: string, signMessage: SignMessageFn): Promise<AuthIdentity> {
   const ssoIdentity = localStorageGetIdentity(address)
 
-  if (ssoIdentity) {
+  if (ssoIdentity && isValidIdentity(ssoIdentity)) {
     return ssoIdentity
   }
 
