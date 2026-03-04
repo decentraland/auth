@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import { AvatarShape } from '../../components/Pages/AvatarSetupPage/AvatarSetupPage.types'
 
-interface TrackingData {
+export interface TrackingData {
   error?: string
   context?: string
   browserTime?: number
@@ -27,7 +27,7 @@ interface TrackingData {
   supported?: boolean
 }
 
-interface SentryTags {
+export interface SentryTags {
   [key: string]: string | number | boolean | undefined
   feature?: string
   account?: string
@@ -38,7 +38,7 @@ interface SentryTags {
   environment?: string
 }
 
-interface SentryExtra {
+export interface SentryExtra {
   url?: string
   referrer?: string
   requestId?: string
@@ -53,7 +53,7 @@ interface SentryExtra {
   [key: string]: string | number | boolean | undefined
 }
 
-interface ErrorContext {
+export interface ErrorContext {
   feature?: string
   account?: string
   url?: string
@@ -65,7 +65,7 @@ interface ErrorContext {
   [key: string]: string | number | boolean | undefined
 }
 
-interface HandleErrorOptions {
+export interface HandleErrorOptions {
   trackingData?: TrackingData
   sentryTags?: SentryTags
   sentryExtra?: SentryExtra
@@ -73,5 +73,3 @@ interface HandleErrorOptions {
   skipTracking?: boolean
   trackingEvent?: string
 }
-
-export type { TrackingData, SentryTags, SentryExtra, ErrorContext, HandleErrorOptions }

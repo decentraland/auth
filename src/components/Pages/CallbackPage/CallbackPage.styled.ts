@@ -1,4 +1,4 @@
-import { Box, styled } from 'decentraland-ui2'
+import { styled, Box } from 'decentraland-ui2'
 
 const Container = styled(Box)({
   display: 'flex',

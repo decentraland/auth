@@ -1,62 +1,24 @@
-import { ChangeEvent, ClipboardEvent, KeyboardEvent, useCallback, useEffect, useRef, useState } from 'react'
-import { useTranslation } from '@dcl/hooks'
-import { GlobalStyles } from 'decentraland-ui2'
-import emailIconUrl from '../../assets/images/email.svg'
+import { useState, useCallback, useRef, useEffect, KeyboardEvent, ChangeEvent, ClipboardEvent } from 'react'
+import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
+import { Modal } from 'decentraland-ui/dist/components/Modal/Modal'
 import { TrackingEvents } from '../../modules/analytics/types'
 import { trackEvent } from '../../shared/utils/analytics'
 import { handleError } from '../../shared/utils/errorHandler'
 import { sendEmailOTP, verifyOTPAndConnect } from './utils'
 import { EmailLoginModalProps } from './EmailLoginModal.types'
-import {
-  BackButton,
-  BackIcon,
-  CloseButton,
-  Content,
-  EmailIcon,
-  EmailIconContainer,
-  ErrorMessage,
-  Header,
-  Main,
-  OTP_MODAL_ROOT_CLASS,
-  OtpContainer,
-  OtpInput,
-  ResendLink,
-  ResendLinkError,
-  ResendText,
-  StyledDialog,
-  Subtitle,
-  Title,
-  VerifyingContainer,
-  VerifyingLoader,
-  VerifyingText,
-  otpModalContainerGlobalStyles
-} from './EmailLoginModal.styled'
+import styles from './EmailLoginModal.module.css'
 
 const OTP_LENGTH = 6
 
-const getTranslatedApiError = (
-  errorMessage: string | undefined,
-  fallback: string,
-  networkError: string,
-  knownErrors?: [string, string][]
-): string => {
+const getNetworkFriendlyError = (errorMessage: string | undefined, fallback: string): string => {
   if (errorMessage === 'Failed to fetch' || errorMessage?.toLowerCase().includes('network')) {
-    return networkError
-  }
-  if (errorMessage && knownErrors) {
-    const lowerMsg = errorMessage.toLowerCase()
-    for (const [pattern, translated] of knownErrors) {
-      if (lowerMsg.includes(pattern.toLowerCase())) {
-        return translated
-      }
-    }
+    return 'Unable to connect. Please check your internet connection and try again.'
   }
   return errorMessage || fallback
 }
 
 export const EmailLoginModal = (props: EmailLoginModalProps) => {
   const { open, email, onClose, onBack, onSuccess } = props
-  const { t } = useTranslation()
 
   const [otp, setOtp] = useState<string[]>(Array(OTP_LENGTH).fill(''))
   const [error, setError] = useState<string | null>(null)
@@ -147,7 +109,7 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
       const currentEmail = emailRef.current
 
       if (code.length !== OTP_LENGTH) {
-        setError(t('email_login_modal.enter_complete_code'))
+        setError('Please enter the complete verification code')
         return
       }
 
@@ -170,11 +132,7 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
         onSuccess({ email: currentEmail, account })
       } catch (e) {
         const errorMessage = handleError(e, 'Error verifying OTP')
-        setError(
-          getTranslatedApiError(errorMessage, t('email_login_modal.invalid_or_expired'), t('email_login_modal.network_error'), [
-            ['failed to verify', t('email_login_modal.failed_verify')]
-          ])
-        )
+        setError(getNetworkFriendlyError(errorMessage, 'The code is invalid or expired. Please resend code'))
         setHasError(true)
 
         // Track OTP verification failure
@@ -205,7 +163,7 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
       setTimeout(() => otpInputRefs.current[0]?.focus(), 100)
     } catch (e) {
       const errorMessage = handleError(e, 'Error resending OTP')
-      setError(getTranslatedApiError(errorMessage, t('email_login_modal.failed_resend'), t('email_login_modal.network_error')))
+      setError(getNetworkFriendlyError(errorMessage, 'Failed to resend verification code'))
       setHasError(true)
     } finally {
       setIsLoading(false)
@@ -226,20 +184,18 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
 
   const renderContent = () => {
     return (
-      <Content>
-        <EmailIconContainer>
-          <EmailIcon src={emailIconUrl} alt="" />
-        </EmailIconContainer>
-        <Title>{t('email_login_modal.title')}</Title>
-        <Subtitle>
-          {t('email_login_modal.subtitle_prefix')}
-          <strong>{email}</strong>
-          {t('email_login_modal.subtitle_suffix')}
-        </Subtitle>
+      <div className={styles.content}>
+        <div className={styles.emailIconContainer}>
+          <div className={styles.emailIcon} />
+        </div>
+        <p className={styles.title}>Enter verification code</p>
+        <p className={styles.subtitle}>
+          One time password sent to <strong>{email}</strong>. Please enter the code below to complete verification.
+        </p>
 
-        <OtpContainer hasError={hasError}>
+        <div className={`${styles.otpContainer} ${hasError ? styles.shake : ''}`}>
           {otp.map((digit, index) => (
-            <OtpInput
+            <input
               key={index}
               ref={el => {
                 otpInputRefs.current[index] = el
@@ -251,52 +207,52 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
               onChange={(e: ChangeEvent<HTMLInputElement>) => handleOtpChange(index, e.target.value)}
               onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => handleOtpKeyDown(index, e)}
               onPaste={handleOtpPaste}
-              hasError={hasError}
+              className={`${styles.otpInput} ${hasError ? styles.otpInputError : ''}`}
               disabled={isLoading}
               autoComplete="one-time-code"
             />
           ))}
-        </OtpContainer>
+        </div>
 
         {isLoading && !error && (
-          <VerifyingContainer>
-            <VerifyingLoader size={16} />
-            <VerifyingText>{t('email_login_modal.verifying')}</VerifyingText>
-          </VerifyingContainer>
+          <div className={styles.verifyingContainer}>
+            <Loader className={styles.verifyingLoader} size="small" inline active />
+            <span className={styles.verifyingText}>Verifying...</span>
+          </div>
         )}
 
         {error && (
           <>
-            <ErrorMessage>{error}</ErrorMessage>
-            <ResendLinkError onClick={!isLoading ? handleResendOtp : undefined}>{t('email_login_modal.resend_code')}</ResendLinkError>
+            <p className={styles.errorMessage}>{error}</p>
+            <span className={styles.resendLinkError} onClick={!isLoading ? handleResendOtp : undefined}>
+              Resend Code
+            </span>
           </>
         )}
 
         {!error && (
-          <ResendText>
-            {t('email_login_modal.didnt_get_email')}
-            <ResendLink onClick={!isLoading ? handleResendOtp : undefined}>{t('email_login_modal.resend_code')}</ResendLink>
-          </ResendText>
+          <p className={styles.resendText}>
+            Didn't get an email?{' '}
+            <span className={styles.resendLink} onClick={!isLoading ? handleResendOtp : undefined}>
+              Resend Code
+            </span>
+          </p>
         )}
-      </Content>
+      </div>
     )
   }
 
   return (
-    <>
-      {/* Only inject when open so we don't affect other modals (e.g. Connection/Metamask modal) */}
-      {open && <GlobalStyles styles={otpModalContainerGlobalStyles} />}
-      <StyledDialog open={open} maxWidth="sm" fullWidth className={OTP_MODAL_ROOT_CLASS}>
-        <Header>
-          <BackButton onClick={handleBack} disabled={isLoading}>
-            <BackIcon>‹</BackIcon> {t('email_login_modal.back')}
-          </BackButton>
-          <CloseButton onClick={handleClose} disabled={isLoading}>
-            ×
-          </CloseButton>
-        </Header>
-        <Main>{renderContent()}</Main>
-      </StyledDialog>
-    </>
+    <Modal size="small" open={open} className={styles.modal}>
+      <div className={styles.header}>
+        <button className={styles.backButton} onClick={handleBack} disabled={isLoading}>
+          <span className={styles.backIcon}>‹</span> BACK
+        </button>
+        <button className={styles.closeButton} onClick={handleClose} disabled={isLoading}>
+          ×
+        </button>
+      </div>
+      <div className={styles.main}>{renderContent()}</div>
+    </Modal>
   )
 }

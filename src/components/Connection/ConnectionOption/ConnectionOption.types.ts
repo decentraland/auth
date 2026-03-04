@@ -1,4 +1,4 @@
-import type { TooltipProps } from 'decentraland-ui2'
+import type { PopupProps } from 'semantic-ui-react/dist/commonjs/modules/Popup'
 import { ConnectionOptionType } from '../Connection.types'
 
 export type ConnectionIconProps = {
@@ -7,7 +7,7 @@ export type ConnectionIconProps = {
   info?: string
   showTooltip?: boolean
   testId?: string
-  tooltipPosition?: TooltipProps['placement']
+  tooltipPosition?: PopupProps['position']
   children?: React.ReactNode
   disabled?: boolean
   loading?: boolean

@@ -1,4 +1,3 @@
-// eslint-disable-next-line @typescript-eslint/naming-convention
 import Lottie from 'lottie-react'
 import { Box, styled } from 'decentraland-ui2'
 

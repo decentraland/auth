@@ -1,0 +1,155 @@
+.main {
+  display: grid;
+  grid-template-columns: 40% 60%;
+  height: 100%;
+  position: relative;
+}
+
+.background {
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  position: absolute;
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: right;
+  animation: move-background 10s linear infinite alternate;
+  z-index: -1;
+}
+
+.main::before {
+  content: '';
+  position: fixed;
+  width: 100%;
+  height: 350%;
+  background: radial-gradient(ellipse at 0 50%, transparent 10%, #e02dd3 40%, #491975 70%);
+  top: -100%;
+  transform: rotate(180deg);
+  overflow: hidden;
+}
+
+.main.newUserMain::before {
+  background: linear-gradient(89.65deg, rgba(149, 45, 198, 0) 29.59%, rgba(94, 30, 130, 0.559754) 39.08%, rgba(75, 25, 106, 0.750004) 45.36%, rgba(64, 23, 93, 0.859976) 54.22%, #32134C 72.84%);
+}
+
+.left {
+  width: 100%;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: start;
+  padding: 80px 0;
+}
+
+.leftInfo {
+  height: 100%;
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.right {
+  display: flex;
+  flex-direction: row;
+  align-items: end;
+  justify-content: center;
+  width: 100%;
+  z-index: 1;
+}
+
+.mainContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 48px;
+}
+
+.footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 96px;
+  font-size: 18px;
+  width: 100%;
+  align-items: center;
+}
+
+.footer > p {
+  color: white;
+}
+
+.footer a {
+  color: white;
+  text-decoration: underline;
+}
+
+.newUserInfo {
+  font-size: 16px;
+  line-height: 150%;
+  letter-spacing: 0px;
+}
+
+.newUserInfo span{ 
+  color: var(--Primary-Base-Primary, #FF2D55);
+  text-decoration: underline;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.guestInfo,
+.guestInfo a {
+  color: white;
+  font-size: 16px;
+}
+
+.guestInfo {
+  border-top: 1px solid white;
+  padding-top: 15px;
+  display: flex;
+  gap: 5px;
+}
+
+.guestInfo a {
+  text-decoration: underline;
+}
+
+@media screen and (max-width: 1440px) {
+  .main {
+    grid-template-columns: 50% 50%;
+  }
+}
+
+@media screen and (max-width: 800px) {
+  .main {
+    display: flex;
+    height: auto;
+  }
+
+  .background {
+    display: none;
+  }
+
+  .main::before {
+    background: radial-gradient(ellipse at 0 50%, #e02dd3 0%, #491975 70%);
+  }
+
+  .main.newUserMain::before {
+    background: linear-gradient(144.23deg, #491975 10.31%, #D72CCD 102.43%);
+  }
+
+  .left {
+    padding: 20px;
+  }
+}
+
+@keyframes move-background {
+  from {
+    transform: translateX(0);
+  }
+  to { 
+    transform: translateX(10%);
+  }
+}

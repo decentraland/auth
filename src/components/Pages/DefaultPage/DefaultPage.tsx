@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { CircularProgress } from 'decentraland-ui2'
+import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { getCurrentConnectionData } from '../../../shared/connection/connection'
 import { locations } from '../../../shared/locations'
@@ -20,7 +20,7 @@ export const DefaultPage = () => {
 
   return (
     <div className={styles.main}>
-      <CircularProgress size={60} />
+      <Loader active size="huge" />
     </div>
   )
 }

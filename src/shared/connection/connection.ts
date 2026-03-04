@@ -2,8 +2,8 @@ import { AuthIdentity } from '@dcl/crypto'
 import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
 import { ConnectionResponse, connection } from 'decentraland-connect'
 
-type DefinedConnectionResponse = Omit<ConnectionResponse, 'account'> & { account: string }
-type ConnectionData = DefinedConnectionResponse & { identity: AuthIdentity }
+export type DefinedConnectionResponse = Omit<ConnectionResponse, 'account'> & { account: string }
+export type ConnectionData = DefinedConnectionResponse & { identity: AuthIdentity }
 
 /**
  * Gets the current connection data including the identity.
@@ -11,7 +11,7 @@ type ConnectionData = DefinedConnectionResponse & { identity: AuthIdentity }
  *
  * @returns The connection data or null if not connected.
  */
-const getCurrentConnectionData = async (): Promise<ConnectionData | null> => {
+export const getCurrentConnectionData = async (): Promise<ConnectionData | null> => {
   try {
     const previousConnection = await connection.tryPreviousConnection()
 
@@ -29,10 +29,7 @@ const getCurrentConnectionData = async (): Promise<ConnectionData | null> => {
       account: previousConnection.account,
       identity
     }
-  } catch {
+  } catch (error) {
     return null
   }
 }
-
-export type { DefinedConnectionResponse, ConnectionData }
-export { getCurrentConnectionData }

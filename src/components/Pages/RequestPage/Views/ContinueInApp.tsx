@@ -1,15 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { useTranslation } from '@dcl/hooks'
-import { muiIcons } from 'decentraland-ui2'
+import Icon from 'semantic-ui-react/dist/commonjs/elements/Icon/Icon'
+import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import { useTargetConfig } from '../../../../hooks/targetConfig'
 import { Container } from '../Container'
 import { launchDeepLink } from '../utils'
-import { ActionButton } from './ContinueInApp.styled'
 import styles from './Views.module.css'
-
-const ArrowBackIcon = muiIcons.ArrowBack
-const LoginIcon = muiIcons.Login
 
 type Props = {
   onContinue: () => void
@@ -21,7 +17,6 @@ type Props = {
 const COUNTDOWN_SECONDS = 5
 
 export const ContinueInApp = ({ onContinue, requestId, deepLinkUrl, autoStart = true }: Props) => {
-  const { t } = useTranslation()
   const [targetConfig] = useTargetConfig()
   const [searchParams] = useSearchParams()
   const [countdown, setCountdown] = useState(COUNTDOWN_SECONDS)
@@ -69,14 +64,15 @@ export const ContinueInApp = ({ onContinue, requestId, deepLinkUrl, autoStart = 
     return (
       <Container canChangeAccount={false} requestId={requestId}>
         <div className={styles.errorLogo}></div>
-        <div className={styles.title}>{t('request_views.continue_in_app.could_not_open', { explorerText: targetConfig.explorerText })}</div>
+        <div className={styles.title}>Could not open {targetConfig.explorerText}</div>
         <div className={styles.description}>
-          {t('request_views.continue_in_app.app_not_launched', { explorerText: targetConfig.explorerText })}
+          The application could not be launched. Please make sure {targetConfig.explorerText} is installed and try again.
         </div>
 
-        <ActionButton variant="contained" onClick={handleGoToLogin} startIcon={<ArrowBackIcon />}>
-          {t('request_views.continue_in_app.go_back_login')}
-        </ActionButton>
+        <Button primary onClick={handleGoToLogin} style={{ marginTop: '24px' }}>
+          <Icon name="arrow left" />
+          Go back to login
+        </Button>
       </Container>
     )
   }
@@ -84,14 +80,15 @@ export const ContinueInApp = ({ onContinue, requestId, deepLinkUrl, autoStart = 
   return (
     <Container canChangeAccount={false} requestId={requestId}>
       <div className={styles.logo}></div>
-      <div className={styles.title}>{t('request_views.continue_in_app.sign_in_successful')}</div>
+      <div className={styles.title}>Sign In Successful</div>
       <div className={styles.description}>
-        {t('request_views.continue_in_app.redirect_countdown', { explorerText: targetConfig.explorerText, countdown })}
+        You will be redirected to {targetConfig.explorerText} in {countdown}...
       </div>
 
-      <ActionButton variant="contained" onClick={attemptDeepLink} startIcon={<LoginIcon />}>
-        {t('request_views.continue_in_app.return_to', { explorerText: targetConfig.explorerText })}
-      </ActionButton>
+      <Button primary onClick={attemptDeepLink} style={{ marginTop: '24px' }}>
+        <Icon name="sign in" />
+        Return to {targetConfig.explorerText}
+      </Button>
     </Container>
   )
 }

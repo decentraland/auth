@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useRef, useState } from 'react'
+import { useCallback, useContext, useEffect, useState, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
 import { useTargetConfig } from '../../../hooks/targetConfig'
@@ -11,16 +11,16 @@ import { ConnectionLayout } from '../../ConnectionModal/ConnectionLayout'
 import { ConnectionLayoutState } from '../../ConnectionModal/ConnectionLayout.type'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import {
-  connectToProvider,
-  connectToSocialProvider,
-  fromConnectionOptionToProviderType,
   getIdentitySignature,
-  isSocialLogin
+  connectToProvider,
+  isSocialLogin,
+  fromConnectionOptionToProviderType,
+  connectToSocialProvider
 } from '../LoginPage/utils'
+import { Main } from './MobileAuthPage.styled'
 import { MobileAuthSuccess } from './MobileAuthSuccess'
 import { MobileProviderSelection } from './MobileProviderSelection'
 import { parseConnectionOptionType } from './utils'
-import { Main } from './MobileAuthPage.styled'
 
 type MobileAuthView = 'selection' | 'connecting' | 'success' | 'error'
 

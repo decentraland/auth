@@ -17,7 +17,7 @@ const PrimaryMessage = styled(Box)(({ theme }) => ({
 
 const PrimaryOptionWrapper = styled(Box)(({ theme }) => ({
   width: '100%',
-  ['& .MuiButton-contained']: {
+  ['& .ui.button.primary']: {
     backgroundColor: theme.palette.common.white,
     color: theme.palette.common.black,
     display: 'flex',
@@ -107,11 +107,6 @@ const PrimaryButtonWrapper = styled(Box, {
   fontSize: '14px'
 }))
 
-const TooltipWrapper = styled('span')({
-  display: 'block',
-  width: '100%'
-})
-
 export {
   PrimaryContainer,
   PrimaryMessage,
@@ -119,6 +114,5 @@ export {
   PrimaryOptionWrapper,
   PrimaryButton,
   primaryTooltipSlotProps,
-  PrimaryButtonWrapper,
-  TooltipWrapper
+  PrimaryButtonWrapper
 }

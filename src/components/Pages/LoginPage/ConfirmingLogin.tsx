@@ -1,7 +1,6 @@
-import { useTranslation } from '@dcl/hooks'
-import { CircularProgress, Logo } from 'decentraland-ui2'
+import { Logo, CircularProgress } from 'decentraland-ui2'
 import { AnimatedBackground } from '../../AnimatedBackground'
-import { Container, Content, RetryButton, Spinner, Subtitle, Title } from './ConfirmingLogin.styled'
+import styles from './ConfirmingLogin.module.css'
 
 export type ConfirmingLoginProps = {
   onError?: () => void
@@ -9,32 +8,34 @@ export type ConfirmingLoginProps = {
 }
 
 export const ConfirmingLogin = ({ error, onError }: ConfirmingLoginProps) => {
-  const { t } = useTranslation()
-
   if (error) {
     return (
-      <Container>
+      <div className={styles.container}>
         <AnimatedBackground variant="absolute" />
-        <Content>
+        <div className={styles.content}>
           <Logo size="huge" />
-          <Title>{t('common.something_went_wrong')}</Title>
-          <Subtitle>{error}</Subtitle>
-          {onError && <RetryButton onClick={onError}>{t('common.try_again')}</RetryButton>}
-        </Content>
-      </Container>
+          <p className={styles.title}>Something went wrong</p>
+          <p className={styles.subtitle}>{error}</p>
+          {onError && (
+            <button className={styles.retryButton} onClick={onError}>
+              Try Again
+            </button>
+          )}
+        </div>
+      </div>
     )
   }
 
   return (
-    <Container>
+    <div className={styles.container}>
       <AnimatedBackground variant="absolute" />
-      <Content>
+      <div className={styles.content}>
         <Logo size="huge" />
-        <Title>{t('login.confirming_login')}</Title>
-        <Spinner>
+        <p className={styles.title}>Confirming login...</p>
+        <div className={styles.spinner}>
           <CircularProgress color="inherit" size={40} />
-        </Spinner>
-      </Content>
-    </Container>
+        </div>
+      </div>
+    </div>
   )
 }

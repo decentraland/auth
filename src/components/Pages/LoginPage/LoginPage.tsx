@@ -1,24 +1,28 @@
-import { useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { useState, useCallback, useMemo, useEffect, useContext } from 'react'
+import classNames from 'classnames'
 import type { AuthIdentity } from '@dcl/crypto'
-import { useTranslation } from '@dcl/hooks'
 import { ChainId } from '@dcl/schemas/dist/dapps/chain-id'
 import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
 import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
 import { Env } from '@dcl/ui-env'
+import { Loader } from 'decentraland-ui/dist/components/Loader/Loader'
 import { connection } from 'decentraland-connect'
-import { CircularProgress } from 'decentraland-ui2'
-// eslint-disable-next-line @typescript-eslint/naming-convention
 import ImageNew1 from '../../../assets/images/background/image-new1.webp'
-// eslint-disable-next-line @typescript-eslint/naming-convention
 import ImageNew2 from '../../../assets/images/background/image-new2.webp'
-// eslint-disable-next-line @typescript-eslint/naming-convention
 import ImageNew3 from '../../../assets/images/background/image-new3.webp'
-// eslint-disable-next-line @typescript-eslint/naming-convention
 import ImageNew4 from '../../../assets/images/background/image-new4.webp'
-// eslint-disable-next-line @typescript-eslint/naming-convention
 import ImageNew5 from '../../../assets/images/background/image-new5.webp'
-// eslint-disable-next-line @typescript-eslint/naming-convention
 import ImageNew6 from '../../../assets/images/background/image-new6.webp'
+import Image1 from '../../../assets/images/background/image1.webp'
+import Image10 from '../../../assets/images/background/image10.webp'
+import Image2 from '../../../assets/images/background/image2.webp'
+import Image3 from '../../../assets/images/background/image3.webp'
+import Image4 from '../../../assets/images/background/image4.webp'
+import Image5 from '../../../assets/images/background/image5.webp'
+import Image6 from '../../../assets/images/background/image6.webp'
+import Image7 from '../../../assets/images/background/image7.webp'
+import Image8 from '../../../assets/images/background/image8.webp'
+import Image9 from '../../../assets/images/background/image9.webp'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import { useAnalytics } from '../../../hooks/useAnalytics'
@@ -33,7 +37,7 @@ import { disconnectWallet, sendEmailOTP } from '../../../shared/thirdweb'
 import { isClockSynchronized } from '../../../shared/utils/clockSync'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { ClockSyncModal } from '../../ClockSyncModal'
-import { Connection, ConnectionOptionType } from '../../Connection'
+import { ConnectionOptionType, Connection } from '../../Connection'
 import { ConnectionModal } from '../../ConnectionModal'
 import { ConnectionLayoutState } from '../../ConnectionModal/ConnectionLayout.type'
 import { EmailLoginModal } from '../../EmailLoginModal'
@@ -41,20 +45,20 @@ import { EmailLoginResult } from '../../EmailLoginModal/EmailLoginModal.types'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import { ConfirmingLogin } from './ConfirmingLogin'
 import {
-  connectToProvider,
-  connectToSocialProvider,
-  fromConnectionOptionToProviderType,
   getIdentitySignature,
   getIdentityWithSigner,
-  isSocialLogin
+  connectToProvider,
+  isSocialLogin,
+  fromConnectionOptionToProviderType,
+  connectToSocialProvider
 } from './utils'
-import { Background, BackgroundWrapper, GuestInfo, Left, LeftInfo, Main, MainContainer, NewUserInfo } from './LoginPage.styled'
+import styles from './LoginPage.module.css'
 
+const BACKGROUND_IMAGES = [Image1, Image2, Image3, Image4, Image5, Image6, Image7, Image8, Image9, Image10]
 const NEW_USER_BACKGROUND_IMAGES = [ImageNew1, ImageNew2, ImageNew3, ImageNew4, ImageNew5, ImageNew6]
 const NEW_USER_PARAM_VARIANTS = ['newUser', 'newuser', 'new-user', 'new_user']
 
 export const LoginPage = () => {
-  const { t } = useTranslation()
   const [isNewUser, setIsNewUser] = useState(
     NEW_USER_PARAM_VARIANTS.some(variant => new URLSearchParams(window.location.search).has(variant))
   )
@@ -67,6 +71,7 @@ export const LoginPage = () => {
   const { url: redirectTo, redirect } = useAfterLoginRedirection()
   const { initialized: flagInitialized, flags } = useContext(FeatureFlagsContext)
 
+  // Check if email OTP login is enabled via feature flag
   const isEmailOtpEnabled = flags[FeatureFlagsKeys.EMAIL_OTP_LOGIN] === true
 
   // Email login state
@@ -94,8 +99,6 @@ export const LoginPage = () => {
   const showGuestOption = !!guestRedirectToURL
 
   const [currentBackgroundIndex, setCurrentBackgroundIndex] = useState(0)
-  const [previousBackgroundIndex, setPreviousBackgroundIndex] = useState(0)
-  const [backgroundTransitioning, setBackgroundTransitioning] = useState(false)
   const [targetConfig] = useTargetConfig()
   const { checkProfileAndRedirect } = useAuthFlow()
   const { trackLoginClick, trackLoginSuccess, trackGuestLogin } = useAnalytics()
@@ -172,15 +175,11 @@ export const LoginPage = () => {
         setShowEmailLoginModal(true)
       } catch (error) {
         const errorMessage = handleError(error, 'Error sending verification code')
-        // Clear connection type so other login options aren't disabled
-        setCurrentConnectionType(undefined)
-        // Handle known API errors with translated messages
+        // Handle network errors with a user-friendly message
         if (errorMessage === 'Failed to fetch' || errorMessage?.toLowerCase().includes('network')) {
-          setEmailError(t('login.errors.network_error'))
-        } else if (errorMessage?.toLowerCase().includes('invalid email')) {
-          setEmailError(t('login.errors.invalid_email'))
+          setEmailError('Unable to connect. Please check your internet connection and try again.')
         } else {
-          setEmailError(errorMessage || t('login.errors.failed_send_code'))
+          setEmailError(errorMessage || 'Failed to send verification code. Please try again.')
         }
       } finally {
         setIsEmailLoading(false)
@@ -286,8 +285,6 @@ export const LoginPage = () => {
 
   const handleEmailLoginClose = useCallback(() => {
     setShowEmailLoginModal(false)
-    setCurrentEmail('')
-    setCurrentConnectionType(undefined)
   }, [])
 
   const handleEmailLoginBack = useCallback(() => {
@@ -343,15 +340,11 @@ export const LoginPage = () => {
             connectionType: ConnectionOptionType.EMAIL
           }
         })
-        setConfirmingLoginError(errorMessage || t('login.errors.something_went_wrong'))
+        setConfirmingLoginError(errorMessage || 'Something went wrong. Please try again.')
       }
     },
     [trackLoginSuccess, checkClockSynchronization, runProfileRedirect, getReferrerFromCurrentSearch]
   )
-
-  const handleEmailInputChange = useCallback(() => {
-    setEmailError(null)
-  }, [])
 
   const handleEmailLoginError = useCallback((error: string) => {
     handleError(new Error(error), 'Email login error')
@@ -405,51 +398,34 @@ export const LoginPage = () => {
   }, [currentConnectionType, emailLoginAddress, runProfileRedirect, getReferrerFromCurrentSearch])
 
   useEffect(() => {
-    const images = NEW_USER_BACKGROUND_IMAGES
-    const maxIndex = images.length - 1
     const backgroundInterval = setInterval(() => {
-      setCurrentBackgroundIndex(prev => {
-        setPreviousBackgroundIndex(prev)
-        setBackgroundTransitioning(true)
-        return prev >= maxIndex ? 0 : prev + 1
+      setCurrentBackgroundIndex(index => {
+        if (index === (isNewUser ? NEW_USER_BACKGROUND_IMAGES.length - 1 : BACKGROUND_IMAGES.length - 1)) {
+          return 0
+        }
+        return index + 1
       })
     }, 5000)
-    return () => clearInterval(backgroundInterval)
+    return () => {
+      clearInterval(backgroundInterval)
+    }
   }, [])
 
-  useEffect(() => {
-    if (!backgroundTransitioning) return
-    const t = setTimeout(() => {
-      setPreviousBackgroundIndex(currentBackgroundIndex)
-      setBackgroundTransitioning(false)
-    }, 1000)
-    return () => clearTimeout(t)
-  }, [backgroundTransitioning, currentBackgroundIndex])
-
-  const backgroundImages = NEW_USER_BACKGROUND_IMAGES
   return (
-    <Main isNewUser={isNewUser}>
-      <BackgroundWrapper>
-        <Background
-          isVisible={true}
-          style={{
-            backgroundImage: `url(${backgroundImages[previousBackgroundIndex]})`
-          }}
-          aria-hidden
-        />
-        <Background
-          isVisible={backgroundTransitioning}
-          style={{
-            backgroundImage: `url(${backgroundImages[currentBackgroundIndex]})`
-          }}
-          aria-hidden
-        />
-      </BackgroundWrapper>
+    <main className={classNames(styles.main, isNewUser && styles.newUserMain)}>
+      <div
+        className={styles.background}
+        style={{
+          backgroundImage: `url(${
+            isNewUser ? NEW_USER_BACKGROUND_IMAGES[currentBackgroundIndex] : BACKGROUND_IMAGES[currentBackgroundIndex]
+          })`
+        }}
+      />
       {showConfirmingLogin && !showClockSyncModal && (
         <ConfirmingLogin error={confirmingLoginError} onError={confirmingLoginError ? handleConfirmingLoginRetry : undefined} />
       )}
       {config.is(Env.DEVELOPMENT) && !flagInitialized ? (
-        <CircularProgress size={80} />
+        <Loader active size="massive" />
       ) : (
         <>
           <ClockSyncModal open={showClockSyncModal} onContinue={handleClockSyncContinue} onClose={handleClockSyncContinue} />
@@ -470,13 +446,12 @@ export const LoginPage = () => {
               onError={handleEmailLoginError}
             />
           )}
-          <Left>
-            <LeftInfo>
-              <MainContainer>
+          <div className={styles.left}>
+            <div className={styles.leftInfo}>
+              <div className={styles.mainContainer}>
                 <Connection
                   onConnect={handleOnConnect}
                   onEmailSubmit={isEmailOtpEnabled ? handleEmailSubmit : undefined}
-                  onEmailChange={handleEmailInputChange}
                   loadingOption={currentConnectionType}
                   connectionOptions={targetConfig.connectionOptions}
                   isNewUser={isNewUser}
@@ -484,23 +459,23 @@ export const LoginPage = () => {
                   emailError={emailError}
                 />
                 {isNewUser && (
-                  <NewUserInfo>
-                    {t('login.already_have_account')} <span onClick={() => setIsNewUser(false)}>{t('login.sign_in')}</span>
-                  </NewUserInfo>
+                  <div className={styles.newUserInfo}>
+                    Already have an account? <span onClick={() => setIsNewUser(false)}>Sign In</span>
+                  </div>
                 )}
-              </MainContainer>
+              </div>
               {showGuestOption && (
-                <GuestInfo>
-                  {t('login.quick_dive')}{' '}
+                <div className={styles.guestInfo}>
+                  Quick dive?{' '}
                   <a href={guestRedirectToURL} onClick={handleGuestLogin}>
-                    {t('login.explore_as_guest')}
+                    Explore as a guest
                   </a>
-                </GuestInfo>
+                </div>
               )}
-            </LeftInfo>
-          </Left>
+            </div>
+          </div>
         </>
       )}
-    </Main>
+    </main>
   )
 }

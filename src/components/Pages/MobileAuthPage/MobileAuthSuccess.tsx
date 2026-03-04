@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useTranslation } from '@dcl/hooks'
-import { Button, muiIcons } from 'decentraland-ui2'
+import ArrowBackIosNewTwoToneIcon from '@mui/icons-material/ArrowBackIosNewTwoTone'
+import LoginRoundedIcon from '@mui/icons-material/LoginRounded'
+import { Button } from 'decentraland-ui/dist/components/Button/Button'
 import logoImg from '../../../assets/images/logo.svg'
 import wrongImg from '../../../assets/images/wrong.svg'
 import { launchDeepLink } from '../RequestPage/utils'
 import { ActionButton, Background, Description, Icon, Logo, Main, SuccessContainer, Title } from './MobileAuthPage.styled'
 
-const ArrowBackIosNewTwoToneIcon = muiIcons.ArrowBackIosNewTwoTone
-const LoginRoundedIcon = muiIcons.LoginRounded
 const COUNTDOWN_SECONDS = 3
 
 type Props = {
@@ -17,7 +16,6 @@ type Props = {
 }
 
 export const MobileAuthSuccess = ({ identityId, explorerText, onTryAgain }: Props) => {
-  const { t } = useTranslation()
   const [countdown, setCountdown] = useState(COUNTDOWN_SECONDS)
   const [deepLinkFailed, setDeepLinkFailed] = useState(false)
 
@@ -54,11 +52,12 @@ export const MobileAuthSuccess = ({ identityId, explorerText, onTryAgain }: Prop
         <Background />
         <SuccessContainer>
           <Icon src={wrongImg} alt="Error" />
-          <Title>{t('mobile_auth.could_not_open', { explorerText })}</Title>
-          <Description>{t('mobile_auth.app_not_launched', { explorerText })}</Description>
+          <Title>Could not open {explorerText}</Title>
+          <Description>The application could not be launched. Please make sure {explorerText} is installed and try again.</Description>
           <ActionButton>
-            <Button variant="contained" onClick={onTryAgain} startIcon={<ArrowBackIosNewTwoToneIcon fontSize="small" />}>
-              {t('common.try_again')}
+            <Button primary onClick={onTryAgain}>
+              <ArrowBackIosNewTwoToneIcon fontSize="small" />
+              Try again
             </Button>
           </ActionButton>
         </SuccessContainer>
@@ -71,15 +70,22 @@ export const MobileAuthSuccess = ({ identityId, explorerText, onTryAgain }: Prop
       <Background />
       <SuccessContainer>
         <Logo src={logoImg} alt="Decentraland logo" />
-        <Title>{t('mobile_auth.sign_in_successful')}</Title>
+        <Title>Sign In Successful</Title>
         <Description>
-          {countdown > 0
-            ? t('mobile_auth.redirect_countdown', { explorerText, countdown })
-            : t('mobile_auth.redirecting', { explorerText })}
+          {countdown > 0 ? (
+            <>
+              You will be redirected to
+              <br />
+              {explorerText} in {countdown}...
+            </>
+          ) : (
+            `Redirecting to ${explorerText}...`
+          )}
         </Description>
         <ActionButton>
-          <Button variant="contained" onClick={attemptDeepLink} startIcon={<LoginRoundedIcon fontSize="small" />}>
-            {t('mobile_auth.return_to', { explorerText })}
+          <Button primary onClick={attemptDeepLink}>
+            <LoginRoundedIcon fontSize="small" />
+            Return to {explorerText}
           </Button>
         </ActionButton>
       </SuccessContainer>

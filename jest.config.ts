@@ -4,7 +4,7 @@ import type { Config } from 'jest'
 export default async (): Promise<Config> => {
   return {
     verbose: true,
-    testEnvironment: '<rootDir>/src/tests/jsdom-environment.ts',
+    testEnvironment: 'jsdom',
     setupFiles: ['<rootDir>/src/tests/beforeSetupTests.tsx'],
     setupFilesAfterEnv: ['<rootDir>/src/tests/afterSetupTest.ts'],
     transform: {

@@ -1,35 +1,34 @@
-// eslint-disable-next-line @typescript-eslint/naming-convention
+import NavigateNextRoundedIcon from '@mui/icons-material/NavigateNextRounded'
 import Tooltip from '@mui/material/Tooltip'
-import { useTranslation } from '@dcl/hooks'
-import { muiIcons } from 'decentraland-ui2'
+import { isSocialLogin } from '../Pages/LoginPage/utils'
 import { ConnectionIcon } from './ConnectionIcon'
-import { ConnectionOptionType, MetamaskEthereumWindow, connectionOptionTitles } from './Connection.types'
-import { ConnectionPrimaryButtonProps } from './ConnectionPrimaryButton.types'
 import {
-  PrimaryButton,
-  PrimaryButtonWrapper,
   PrimaryContainer,
   PrimaryOption,
   PrimaryOptionWrapper,
-  TooltipWrapper,
-  primaryTooltipSlotProps
+  PrimaryButton,
+  primaryTooltipSlotProps,
+  PrimaryButtonWrapper
 } from './ConnectionPrimaryButton.styled'
-
-const NavigateNextRoundedIcon = muiIcons.NavigateNextRounded
+import { ConnectionOptionType, MetamaskEthereumWindow } from './Connection.types'
+import { ConnectionPrimaryButtonProps } from './ConnectionPrimaryButton.types'
 
 export const ConnectionPrimaryButton = ({
   option,
   testId,
   loadingOption,
+  i18n,
   isNewUser,
   onConnect
 }: ConnectionPrimaryButtonProps): JSX.Element => {
-  const { t } = useTranslation()
   const isMetamaskAvailable = (window.ethereum as MetamaskEthereumWindow)?.isMetaMask
-  const error = !isMetamaskAvailable && option === ConnectionOptionType.METAMASK ? t('connection.metamask_not_installed') : undefined
+  const error =
+    !isMetamaskAvailable && option === ConnectionOptionType.METAMASK
+      ? 'You need to install the MetaMask Browser Extension to proceed. Please install it and try again.'
+      : undefined
 
   const isDisabled = !!loadingOption || !!error
-  const children = <>{t('connection.continue_with', { provider: connectionOptionTitles[option] })}</>
+  const children = <>{isSocialLogin(option) ? i18n.accessWith(option) : i18n.connectWith(option)}</>
 
   const button = (
     <PrimaryButton
@@ -52,7 +51,7 @@ export const ConnectionPrimaryButton = ({
         <PrimaryOption>
           {error ? (
             <Tooltip title={error} arrow placement="top" slotProps={primaryTooltipSlotProps}>
-              <TooltipWrapper>{button}</TooltipWrapper>
+              <span style={{ display: 'block', width: '100%' }}>{button}</span>
             </Tooltip>
           ) : (
             button

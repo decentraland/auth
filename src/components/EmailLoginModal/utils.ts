@@ -8,7 +8,7 @@ import { sendEmailOTP as thirdwebSendEmailOTP, verifyEmailOTPAndConnect } from '
  *
  * @see https://portal.thirdweb.com/wallets/users
  */
-const sendEmailOTP = async (email: string): Promise<void> => {
+export const sendEmailOTP = async (email: string): Promise<void> => {
   await thirdwebSendEmailOTP(email)
 }
 
@@ -22,9 +22,7 @@ const sendEmailOTP = async (email: string): Promise<void> => {
  *
  * @see https://portal.thirdweb.com/wallets/users
  */
-const verifyOTPAndConnect = async (email: string, otp: string) => {
+export const verifyOTPAndConnect = async (email: string, otp: string) => {
   const account = await verifyEmailOTPAndConnect(email, otp)
   return account
 }
-
-export { sendEmailOTP, verifyOTPAndConnect }

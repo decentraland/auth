@@ -1,6 +1,6 @@
 import { AnimatedBackground } from '../../AnimatedBackground'
-import { TransferLayoutProps } from './TransferLayout.types'
 import { LayoutRoot, Main } from './TransferLayout.styled'
+import { TransferLayoutProps } from './TransferLayout.types'
 
 const TransferLayout = ({ children }: TransferLayoutProps) => {
   return (

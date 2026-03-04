@@ -1,5 +1,5 @@
 import { useCallback } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 
 export const useNavigateWithSearchParams = () => {
   const navigate = useNavigate()
@@ -19,7 +19,7 @@ export const useNavigateWithSearchParams = () => {
         if (!urlFromPath.pathname) {
           throw new Error('Invalid path provided')
         }
-      } catch {
+      } catch (error) {
         throw new Error('Invalid path provided')
       }
 

@@ -1,5 +1,4 @@
-import { ChangeEvent, KeyboardEvent, useCallback, useMemo, useRef, useState } from 'react'
-import { useTranslation } from '@dcl/hooks'
+import { useState, useCallback, useRef, useMemo, KeyboardEvent, ChangeEvent } from 'react'
 import styles from './EmailInput.module.css'
 
 // RFC 5322 compliant email regex
@@ -8,13 +7,11 @@ const EMAIL_REGEX =
 
 export type EmailInputProps = {
   onSubmit: (email: string) => void
-  onEmailChange?: () => void
   isLoading?: boolean
   error?: string | null
 }
 
-export const EmailInput = ({ onSubmit, onEmailChange, isLoading, error }: EmailInputProps) => {
-  const { t } = useTranslation()
+export const EmailInput = ({ onSubmit, isLoading, error }: EmailInputProps) => {
   const [email, setEmail] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -23,13 +20,9 @@ export const EmailInput = ({ onSubmit, onEmailChange, isLoading, error }: EmailI
     return EMAIL_REGEX.test(email)
   }, [email])
 
-  const handleEmailChange = useCallback(
-    (e: ChangeEvent<HTMLInputElement>) => {
-      setEmail(e.target.value)
-      onEmailChange?.()
-    },
-    [onEmailChange]
-  )
+  const handleEmailChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+    setEmail(e.target.value)
+  }, [])
 
   const handleSubmit = useCallback(() => {
     if (isValidEmail) {
@@ -53,13 +46,13 @@ export const EmailInput = ({ onSubmit, onEmailChange, isLoading, error }: EmailI
 
   return (
     <div className={styles.container}>
-      <label className={styles.label}>{t('email_input.recommended')}</label>
+      <label className={styles.label}>Recommended</label>
       <div className={styles.inputWrapper}>
         <input
           id="dcl-email-input"
           ref={inputRef}
           type="email"
-          placeholder={t('email_input.placeholder')}
+          placeholder="Enter Your Email"
           value={email}
           onChange={handleEmailChange}
           onKeyDown={handleKeyDown}
@@ -68,11 +61,10 @@ export const EmailInput = ({ onSubmit, onEmailChange, isLoading, error }: EmailI
           autoComplete="email"
         />
         <button className={styles.nextButton} onClick={handleSubmit} disabled={isLoading || !isValid}>
-          <span className={isLoading ? styles.textHidden : undefined}>{t('email_input.next')}</span>
-          {isLoading && <span className={styles.spinner} />}
+          {isLoading ? <span className={styles.spinner} /> : 'NEXT'}
         </button>
       </div>
-      {showValidationError && <p className={styles.error}>{t('email_input.validation_error')}</p>}
+      {showValidationError && <p className={styles.error}>Enter A Valid Email Address</p>}
       {error && !showValidationError && <p className={styles.error}>{error}</p>}
     </div>
   )

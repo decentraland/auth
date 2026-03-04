@@ -1,27 +1,15 @@
-import { useEffect, useState } from 'react'
-import { useTranslation } from '@dcl/hooks'
 import { Rarity } from '@dcl/schemas'
 import { Box, Profile } from 'decentraland-ui2'
+import successAnimation from '../../../../../../assets/animations/successAnimation_Lottie.json'
 import { TransferAlert, TransferAssetImage, TransferLayout } from '../../../../../Transfer'
 import { CenteredContent, ItemName, Label, Title } from '../../../../../Transfer/Transfer.styled'
 import { TransferType } from '../../../types'
-import type { MANATransferData, NFTTransferData, ProfileAvatar } from '../../../types'
+import type { ProfileAvatar } from '../../../types'
 import { SceneName } from '../TransferTipComponents.styled'
-import { TransferCompletedViewProps } from './TransferCompletedView.types'
 import { SceneImageWrapper, SuccessAnimation } from './TransferCompletedView.styled'
-
-type AnimationData = unknown
+import { TransferCompletedViewProps } from './TransferCompletedView.types'
 
 const TransferCompletedView = (props: TransferCompletedViewProps) => {
-  const { t } = useTranslation()
-  const [successAnimation, setSuccessAnimation] = useState<AnimationData>(null)
-
-  // Dynamically imported so the 67 KB animation JSON is split into its own chunk
-  // instead of being bundled into the main bundle. This view only renders after
-  // a successful transfer, so most users never need it.
-  useEffect(() => {
-    import('../../../../../../assets/animations/successAnimation_Lottie.json').then(m => setSuccessAnimation(m.default))
-  }, [])
   const { type, transferData } = props
   const isTip = type === TransferType.TIP
   const recipientAvatar = transferData.recipientProfile?.avatars?.[0]
@@ -29,11 +17,8 @@ const TransferCompletedView = (props: TransferCompletedViewProps) => {
   return (
     <TransferLayout>
       <CenteredContent>
-        <Title>
-          {isTip
-            ? t('transfer.completed.tip_success', { manaAmount: (transferData as MANATransferData).manaAmount })
-            : t('transfer.completed.gift_sent')}
-        </Title>
+        <Title>{isTip ? `Success! ${transferData.manaAmount} tip Sent to` : 'Gift Sent to'}</Title>
+
         {isTip ? (
           <>
             <Profile
@@ -46,32 +31,35 @@ const TransferCompletedView = (props: TransferCompletedViewProps) => {
               showCopyButton
               highlightName
             />
-            <Label>{t('transfer.completed.creator_of')}</Label>
+
+            <Label>CREATOR OF</Label>
+
             <SceneImageWrapper>
-              <TransferAssetImage
-                src={(transferData as MANATransferData).sceneImageUrl}
-                alt={(transferData as MANATransferData).sceneName}
-              />
-              {successAnimation ? <SuccessAnimation animationData={successAnimation} loop={true} /> : null}
+              <TransferAssetImage src={transferData.sceneImageUrl} alt={transferData.sceneName} />
+              <SuccessAnimation animationData={successAnimation} loop={true} />
             </SceneImageWrapper>
-            <SceneName>{(transferData as MANATransferData).sceneName}</SceneName>
+
+            <SceneName>{transferData.sceneName}</SceneName>
           </>
         ) : (
           <>
             <Profile address={transferData.toAddress} avatar={recipientAvatar as ProfileAvatar} size="huge" inline />
+
             <Box>
               <SceneImageWrapper isGift>
                 <TransferAssetImage
-                  src={(transferData as NFTTransferData).imageUrl}
-                  name={(transferData as NFTTransferData).name || `NFT #${(transferData as NFTTransferData).tokenId}`}
-                  rarity={(transferData as NFTTransferData).rarity || Rarity.COMMON}
+                  src={transferData.imageUrl}
+                  name={transferData.name || `NFT #${transferData.tokenId}`}
+                  rarity={transferData.rarity || Rarity.COMMON}
                 />
-                {successAnimation ? <SuccessAnimation animationData={successAnimation} loop={true} /> : null}
+                <SuccessAnimation animationData={successAnimation} loop={true} />
               </SceneImageWrapper>
             </Box>
-            {(transferData as NFTTransferData).name && <ItemName>{(transferData as NFTTransferData).name}</ItemName>}
+
+            {transferData.name && <ItemName>{transferData.name}</ItemName>}
           </>
         )}
+
         <TransferAlert />
       </CenteredContent>
     </TransferLayout>

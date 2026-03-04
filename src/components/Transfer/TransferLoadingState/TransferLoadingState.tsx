@@ -1,6 +1,6 @@
 import { TransferCircularProgressWithTrack } from '../TransferCircularProgressWithTrack'
-import { TransferLoadingStateProps } from './TransferLoadingState.types'
 import { LoadingContainer, LoadingText } from './TransferLoadingState.styled'
+import { TransferLoadingStateProps } from './TransferLoadingState.types'
 
 const TransferLoadingState = ({ text = 'Processing Authorization' }: TransferLoadingStateProps) => {
   return (

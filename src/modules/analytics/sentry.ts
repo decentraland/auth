@@ -1,6 +1,6 @@
-import { browserTracingIntegration, init, replayIntegration, setTag, setUser } from '@sentry/react'
+import { init, setTag, setUser, browserTracingIntegration, replayIntegration } from '@sentry/react'
 import { Env } from '@dcl/ui-env/dist/env'
-import { getMobileSession, isMobileSession } from '../../shared/mobile'
+import { isMobileSession, getMobileSession } from '../../shared/mobile'
 import { config } from '../config'
 
 const mobile = isMobileSession()

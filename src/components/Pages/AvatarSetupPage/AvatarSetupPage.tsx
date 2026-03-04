@@ -1,11 +1,10 @@
-// eslint-disable-next-line @typescript-eslint/naming-convention
 import * as React from 'react'
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useState, useMemo, useEffect, useContext, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { useTranslation } from '@dcl/hooks'
-import { Email, EthAddress } from '@dcl/schemas'
+import CircularProgress from '@mui/material/CircularProgress'
+import { EthAddress, Email } from '@dcl/schemas'
 import { PreviewUnityMode } from '@dcl/schemas/dist/dapps/preview'
-import { CircularProgress, WearablePreview, launchDesktopApp } from 'decentraland-ui2'
+import { WearablePreview, launchDesktopApp } from 'decentraland-ui2'
 import avatarFloat from '../../../assets/animations/AvatarFloat_Lottie.json'
 import avatarParticles from '../../../assets/animations/AvatarParticles_Lottie.json'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
@@ -15,7 +14,7 @@ import { useSignRequest } from '../../../hooks/useSignRequest'
 import { useTrackReferral } from '../../../hooks/useTrackReferral'
 import { config } from '../../../modules/config'
 import { fetchProfile } from '../../../modules/profile'
-import { IpValidationError, createAuthServerHttpClient, createAuthServerWsClient } from '../../../shared/auth'
+import { createAuthServerHttpClient, createAuthServerWsClient, IpValidationError } from '../../../shared/auth'
 import { useCurrentConnectionData } from '../../../shared/connection/hooks'
 import { locations } from '../../../shared/locations'
 import { isProfileComplete } from '../../../shared/profile'
@@ -24,42 +23,40 @@ import { AnimatedBackground } from '../../AnimatedBackground'
 import { CharacterCounterComponent } from '../../CharacterCounter'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import { subscribeToNewsletter } from '../SetupPage/utils'
-import { deployProfileFromAvatarShape } from './utils'
-import { AvatarSetupState, AvatarShape } from './AvatarSetupPage.types'
 import {
-  AvatarParticles,
-  BackgroundShadow,
-  CheckboxContainer,
-  CheckboxInput,
-  CheckboxRow,
-  ContinueButton,
+  MainContainer,
+  LeftFormSection,
   DecentralandLogo,
-  DecentralandText,
-  EmailDescription,
-  ErrorContainer,
-  ErrorLabel,
-  ErrorText,
+  WelcomeContainer,
+  WelcomeTitle,
   InputContainer,
   InputLabel,
-  LeftFormSection,
-  LinkCheckbox,
-  LoadingContainer,
-  LoadingTitle,
-  MainContainer,
-  PreloadedWearableContainer,
-  ProgressContainer,
+  TextInput,
+  ErrorText,
+  ErrorContainer,
+  WarningIcon,
+  CheckboxContainer,
+  CheckboxRow,
+  CheckboxInput,
+  ContinueButton,
   RightAvatarSection,
   RightSectionBackground,
-  TextInput,
-  WarningIcon,
-  WelcomeContainer,
-  WelcomeTitle
+  PreloadedWearableContainer,
+  DecentralandText,
+  AvatarParticles,
+  EmailDescription,
+  LoadingContainer,
+  ProgressContainer,
+  LoadingTitle,
+  LinkCheckbox,
+  BackgroundShadow
 } from './AvatarSetupPage.styled'
+import { deployProfileFromAvatarShape } from './utils'
+import { AvatarSetupState, AvatarShape } from './AvatarSetupPage.types'
 
 const MAX_CHARACTERS = 15
 
 const AvatarSetupPage: React.FC = () => {
-  const { t } = useTranslation()
   const hasTrackedReferral = useRef(false)
   const [urlSearchParams] = useSearchParams()
   const { flags, initialized: initializedFlags } = useContext(FeatureFlagsContext)
@@ -97,7 +94,7 @@ const AvatarSetupPage: React.FC = () => {
       const url = new URL(redirectTo ?? '', window.location.origin)
       const regex = /^\/?auth\/requests\/([a-zA-Z0-9-]+)$/
       requestId = url.pathname.match(regex)?.[1] ?? null
-    } catch {
+    } catch (_e) {
       // Do nothing
     }
     return requestId
@@ -116,17 +113,17 @@ const AvatarSetupPage: React.FC = () => {
 
   const emailError = useMemo(() => {
     if (state.email && !state.email.includes('@')) {
-      return t('avatar_setup.validation.email_invalid')
+      return 'Invalid email, please try again.'
     }
     return ''
-  }, [state.email, t])
+  }, [state.email])
 
   const agreeError = useMemo(() => {
     if (!state.isTermsChecked) {
-      return t('avatar_setup.validation.agree_required')
+      return 'Please accept the terms of use and privacy policy.'
     }
     return ''
-  }, [state.isTermsChecked, t])
+  }, [state.isTermsChecked])
 
   const handleContinueClick = useCallback(() => {
     const validEmail = Email.validate(state.email)
@@ -204,7 +201,7 @@ const AvatarSetupPage: React.FC = () => {
         if (referrer && EthAddress.validate(referrer)) {
           try {
             await trackReferral(referrer, 'PATCH')
-          } catch {
+          } catch (error) {
             // Error is already handled in trackReferral
           }
         }
@@ -347,7 +344,7 @@ const AvatarSetupPage: React.FC = () => {
         <AnimatedBackground variant="absolute" />
         <LoadingContainer>
           <DecentralandLogo />
-          <LoadingTitle variant="h3">{t('avatar_setup.confirming_login')}</LoadingTitle>
+          <LoadingTitle variant="h3">Confirming login...</LoadingTitle>
           <ProgressContainer>
             <CircularProgress color="inherit" />
           </ProgressContainer>
@@ -365,19 +362,15 @@ const AvatarSetupPage: React.FC = () => {
 
         <WelcomeContainer>
           <WelcomeTitle variant="h3">
-            {t('avatar_setup.welcome_to')}
-            <DecentralandText>{t('avatar_setup.decentraland')}</DecentralandText>
+            Welcome to <DecentralandText>Decentraland!</DecentralandText>
           </WelcomeTitle>
         </WelcomeContainer>
 
         <InputContainer>
-          <InputLabel variant="h5">
-            {t('avatar_setup.username_label')}
-            {state.isEmailInherited ? '' : '*'}
-          </InputLabel>
+          <InputLabel variant="h5">Username{state.isEmailInherited ? '' : '*'}</InputLabel>
           <TextInput
             variant="outlined"
-            placeholder={t('avatar_setup.username_placeholder')}
+            placeholder="Enter your username"
             value={state.username}
             onChange={handleUsernameChange}
             hasError={hasValidUsernameCharacterCount}
@@ -390,40 +383,46 @@ const AvatarSetupPage: React.FC = () => {
           {!isUsernameValid && (
             <ErrorContainer>
               <WarningIcon />
-              <ErrorText>{t('avatar_setup.only_letters_numbers')}</ErrorText>
+              <ErrorText>Only letters and numbers are supported</ErrorText>
             </ErrorContainer>
           )}
         </InputContainer>
 
         {!state.isEmailInherited && (
           <InputContainer>
-            <InputLabel variant="h5">{t('avatar_setup.email_label')}</InputLabel>
+            <InputLabel variant="h5">Email</InputLabel>
             <TextInput
               variant="outlined"
-              placeholder={t('avatar_setup.email_placeholder')}
+              placeholder="Enter your email"
               value={state.email}
               onChange={handleEmailChange}
               hasError={state.hasEmailError}
             />
-            <EmailDescription>{t('avatar_setup.email_newsletter')}</EmailDescription>
+            <EmailDescription>Subscribe to newsletter for updates on features, events, contests, and more.</EmailDescription>
           </InputContainer>
         )}
 
         <CheckboxContainer>
-          {state.isEmailInherited && <CheckboxRow id="marketing" label={t('avatar_setup.email_newsletter')} control={<CheckboxInput />} />}
+          {state.isEmailInherited && (
+            <CheckboxRow
+              id="marketing"
+              label="Subscribe to newsletter for updates on features, events, contests, and more."
+              control={<CheckboxInput />}
+            />
+          )}
           <CheckboxRow
             id="terms"
             label={
               <>
-                {t('avatar_setup.terms_agree_prefix')}
+                I agree with Decentraland's{' '}
                 <LinkCheckbox href="https://decentraland.org/terms/" target="_blank">
-                  {t('avatar_setup.terms_of_use')}
-                </LinkCheckbox>
-                {t('avatar_setup.and')}
+                  Terms of Use
+                </LinkCheckbox>{' '}
+                and{' '}
                 <LinkCheckbox href="https://decentraland.org/privacy" target="_blank">
-                  {t('avatar_setup.privacy_policy')}
+                  Privacy Policy
                 </LinkCheckbox>
-                {t('avatar_setup.terms_required_suffix')}
+                .*
               </>
             }
             control={<CheckboxInput checked={state.isTermsChecked} onChange={handleTermsChange} />}
@@ -444,10 +443,14 @@ const AvatarSetupPage: React.FC = () => {
             !state.hasWearablePreviewLoaded
           }
         >
-          {deploying ? t('avatar_setup.deploying') : t('avatar_setup.customize_avatar')}
+          {deploying ? 'DEPLOYING...' : 'CUSTOMIZE MY AVATAR'}
         </ContinueButton>
 
-        {deployError && <ErrorLabel color="error">{t('avatar_setup.deploy_error', { error: deployError })}</ErrorLabel>}
+        {deployError && (
+          <InputLabel color="error" sx={{ mt: 2, fontSize: '14px' }}>
+            An error occurred while creating your profile: {deployError}
+          </InputLabel>
+        )}
       </LeftFormSection>
 
       <RightAvatarSection>

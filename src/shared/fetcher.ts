@@ -11,7 +11,7 @@ import type { IFetchComponent } from '@well-known-components/interfaces'
  *
  * This wrapper solves the problem by maintaining the correct context.
  */
-const createFetcher = (defaultFetcherOptions?: RequestInit & { timeout?: number }) => {
+export const createFetcher = (defaultFetcherOptions?: RequestInit & { timeout?: number }) => {
   return {
     fetch: async (url: string, init?: RequestInit) => {
       const defaultOptions = {
@@ -41,6 +41,4 @@ const createFetcher = (defaultFetcherOptions?: RequestInit & { timeout?: number 
   } as unknown as IFetchComponent
 }
 
-const fetcher = createFetcher()
-
-export { createFetcher, fetcher }
+export const fetcher = createFetcher()
