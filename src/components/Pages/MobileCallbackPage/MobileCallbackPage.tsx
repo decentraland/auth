@@ -11,7 +11,7 @@ import { handleError } from '../../../shared/utils/errorHandler'
 import { OAUTH_ACCESS_DENIED_ERROR, createMagicInstance } from '../../../shared/utils/magicSdk'
 import { ConnectionContainer, ConnectionTitle, DecentralandLogo, ProgressContainer } from '../../ConnectionModal/ConnectionLayout.styled'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
-import { getIdentitySignature } from '../LoginPage/utils'
+import { getIdentitySignature } from '../MobileAuthPage/identityUtils'
 import { ActionButton, Background, Description, Icon, Main, SuccessContainer, Title } from '../MobileAuthPage/MobileAuthPage.styled'
 import { MobileAuthSuccess } from '../MobileAuthPage/MobileAuthSuccess'
 
