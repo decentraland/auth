@@ -1,19 +1,18 @@
-// eslint-disable-next-line @typescript-eslint/naming-convention
 import Tooltip from '@mui/material/Tooltip'
 import { muiIcons } from 'decentraland-ui2'
 import { isSocialLogin } from '../Pages/LoginPage/utils'
 import { ConnectionIcon } from './ConnectionIcon'
-import { ConnectionOptionType, MetamaskEthereumWindow } from './Connection.types'
-import { ConnectionPrimaryButtonProps } from './ConnectionPrimaryButton.types'
 import {
-  PrimaryButton,
-  PrimaryButtonWrapper,
   PrimaryContainer,
   PrimaryOption,
   PrimaryOptionWrapper,
-  TooltipWrapper,
-  primaryTooltipSlotProps
+  PrimaryButton,
+  primaryTooltipSlotProps,
+  PrimaryButtonWrapper,
+  TooltipWrapper
 } from './ConnectionPrimaryButton.styled'
+import { ConnectionOptionType, MetamaskEthereumWindow } from './Connection.types'
+import { ConnectionPrimaryButtonProps } from './ConnectionPrimaryButton.types'
 
 const NavigateNextRoundedIcon = muiIcons.NavigateNextRounded
 

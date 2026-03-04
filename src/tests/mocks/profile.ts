@@ -2,9 +2,9 @@ import { Profile } from 'dcl-catalyst-client/dist/client/specs/catalyst.schemas'
 import { AuthIdentity } from '@dcl/crypto'
 import { Entity, EntityType } from '@dcl/schemas'
 
-const DEFAULT_MOCK_ADDRESS = '0x1234567890abcdef'
+export const DEFAULT_MOCK_ADDRESS = '0x1234567890abcdef'
 
-function createMockIdentity(address: string = DEFAULT_MOCK_ADDRESS): AuthIdentity {
+export function createMockIdentity(address: string = DEFAULT_MOCK_ADDRESS): AuthIdentity {
   return {
     ephemeralIdentity: {
       privateKey: 'mock-private-key',
@@ -16,7 +16,7 @@ function createMockIdentity(address: string = DEFAULT_MOCK_ADDRESS): AuthIdentit
   }
 }
 
-function createMockProfile(address: string = DEFAULT_MOCK_ADDRESS): Profile {
+export function createMockProfile(address: string = DEFAULT_MOCK_ADDRESS): Profile {
   return {
     avatars: [
       {
@@ -40,7 +40,7 @@ function createMockProfile(address: string = DEFAULT_MOCK_ADDRESS): Profile {
   }
 }
 
-function createMockEntity(address: string = DEFAULT_MOCK_ADDRESS): Entity {
+export function createMockEntity(address: string = DEFAULT_MOCK_ADDRESS): Entity {
   return {
     version: 'v3',
     id: 'mock-entity-id',
@@ -73,9 +73,7 @@ function createMockEntity(address: string = DEFAULT_MOCK_ADDRESS): Entity {
   } as Entity
 }
 
-const createMockDeploymentResult = () => ({
+export const createMockDeploymentResult = () => ({
   entityId: 'mock-entity-id',
   files: new Map()
 })
-
-export { DEFAULT_MOCK_ADDRESS, createMockIdentity, createMockProfile, createMockEntity, createMockDeploymentResult }

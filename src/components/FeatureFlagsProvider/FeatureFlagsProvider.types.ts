@@ -1,6 +1,6 @@
 import { createContext } from 'react'
 
-enum FeatureFlagsKeys {
+export enum FeatureFlagsKeys {
   MAGIC_TEST = 'dapps-magic-dev-test',
   DAPPS_MAGIC_AUTO_SIGN = 'dapps-magic-auto-sign',
   LOGIN_ON_SETUP = 'dapps-login-on-setup',
@@ -11,27 +11,24 @@ enum FeatureFlagsKeys {
   EMAIL_OTP_LOGIN = 'dapps-email-otp-login'
 }
 
-enum OnboardingFlowVariant {
+export enum OnboardingFlowVariant {
   V1 = 'V1',
   V2 = 'V2'
 }
 
 type FeatureFlagsVariants = Record<FeatureFlagsKeys, { enabled: boolean; name: string; payload?: { type: string; value: string } }>
 
-type FeatureFlagsContextType = {
+export type FeatureFlagsContextType = {
   flags: Partial<Record<FeatureFlagsKeys, boolean>>
   variants: Partial<FeatureFlagsVariants>
   initialized: boolean
 }
 
-const defaultFeatureFlagsContextValue: FeatureFlagsContextType = {
+export const defaultFeatureFlagsContextValue: FeatureFlagsContextType = {
   flags: {},
   variants: {},
   initialized: false
 }
 
 // eslint-disable-next-line @typescript-eslint/naming-convention
-const FeatureFlagsContext = createContext(defaultFeatureFlagsContextValue)
-
-export { FeatureFlagsKeys, OnboardingFlowVariant, defaultFeatureFlagsContextValue, FeatureFlagsContext }
-export type { FeatureFlagsContextType }
+export const FeatureFlagsContext = createContext(defaultFeatureFlagsContextValue)

@@ -106,7 +106,7 @@ export const SetupPage = () => {
       // Match the path: /auth/requests/0377e459-8fdf-4ce5-89f4-4f1f1c7bbb7f
       const regex = /^\/?auth\/requests\/([a-zA-Z0-9-]+)$/
       requestId = url.pathname.match(regex)?.[1] ?? null
-    } catch {
+    } catch (_e) {
       // Do nothing
     }
     return requestId
@@ -286,7 +286,7 @@ export const SetupPage = () => {
         if (referrer && EthAddress.validate(referrer)) {
           try {
             await trackReferral(referrer, 'PATCH')
-          } catch {
+          } catch (error) {
             // Error is already handled in trackReferral
           }
         }
@@ -377,7 +377,7 @@ export const SetupPage = () => {
         try {
           await trackReferral(referrer, 'POST')
           hasTrackedReferral.current = true
-        } catch {
+        } catch (error) {
           // Error is already handled in trackReferral
         }
       }
@@ -431,8 +431,7 @@ export const SetupPage = () => {
                   <>
                     Say hi to your new digital self!
                     <br />
-                    Don&apos;t worry, of course they&apos;re not quite &apos;you&apos; yet—soon you&apos;ll be able to customize them to
-                    your heart&apos;s content.
+                    Don't worry, of course they're not quite 'you' yet—soon you'll be able to customize them to your heart's content.
                   </>
                 )}
               </div>
@@ -504,7 +503,7 @@ export const SetupPage = () => {
                     <div className={styles.fieldMessage}>
                       {showErrors && emailError ? <InputErrorMessage className={styles.emailError} message={emailError} /> : null}
                       <span>
-                        Subscribe to Decentraland&apos;s newsletter to receive the latest news about events, updates, contests and more.
+                        Subscribe to Decentraland's newsletter to receive the latest news about events, updates, contests and more.
                       </span>
                     </div>
                   </div>
@@ -512,7 +511,7 @@ export const SetupPage = () => {
                 <div className={styles.agree}>
                   <input type="checkbox" onChange={handleAgreeChange} checked={agree} className={styles.checkbox} />
                   <div>
-                    I agree with Decentraland&apos;s&nbsp;
+                    I agree with Decentraland's&nbsp;
                     <a target="_blank" rel="noopener noreferrer" href="https://decentraland.org/terms/">
                       Terms of use
                     </a>

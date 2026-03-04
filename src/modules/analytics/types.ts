@@ -1,4 +1,4 @@
-enum TrackingEvents {
+export enum TrackingEvents {
   LOGIN_CLICK = 'Click Login Button',
   LOGIN_SUCCESS = 'Login Success',
   LOGIN_ERROR = 'Login Error',
@@ -21,13 +21,13 @@ enum TrackingEvents {
   OTP_RESEND = 'OTP Resend'
 }
 
-enum RequestInteractionType {
+export enum RequestInteractionType {
   VERIFY_SIGN_IN = 'Verify sign in',
   DEEP_LINK_SIGN_IN = 'Deep link sign in',
   WALLET_INTERACTION = 'Wallet interaction'
 }
 
-enum ClickEvents {
+export enum ClickEvents {
   LEARN_MORE = 'Learn More',
   DENY_SIGN_IN = 'Deny Sign In',
   DENY_WALLET_INTERACTION = 'Deny Wallet Interaction',
@@ -39,10 +39,8 @@ enum ClickEvents {
   SUBMIT_PROFILE = 'Submit profile'
 }
 
-enum ConnectionType {
+export enum ConnectionType {
   WEB3 = 'web3',
   WEB2 = 'web2',
   GUEST = 'guest'
 }
-
-export { TrackingEvents, RequestInteractionType, ClickEvents, ConnectionType }

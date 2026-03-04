@@ -3,13 +3,13 @@ import { ethers } from 'ethers'
 import { AuthIdentity, Authenticator } from '@dcl/crypto'
 import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
 import { localStorageGetIdentity, localStorageStoreIdentity } from '@dcl/single-sign-on-client'
-import { ConnectionResponse, Provider, WalletConnectV2Connector, connection, getConfiguration } from 'decentraland-connect'
+import { connection, getConfiguration, ConnectionResponse, Provider, WalletConnectV2Connector } from 'decentraland-connect'
 import { extractReferrerFromSearchParameters } from '../../../shared/locations'
 import { ConnectionOptionType } from '../../Connection'
 
 const ONE_MONTH_IN_MINUTES = 60 * 24 * 30
 
-function fromConnectionOptionToProviderType(connectionType: ConnectionOptionType, isTesting?: boolean): ProviderType {
+export function fromConnectionOptionToProviderType(connectionType: ConnectionOptionType, isTesting?: boolean): ProviderType {
   switch (connectionType) {
     case ConnectionOptionType.DISCORD:
     case ConnectionOptionType.X:
@@ -56,7 +56,7 @@ async function generateIdentity(address: string, provider: Provider): Promise<Au
   return generateIdentityWithSigner(address, message => signer.signMessage(message))
 }
 
-async function connectToSocialProvider(
+export async function connectToSocialProvider(
   connectionOption: ConnectionOptionType,
   isTesting?: boolean,
   redirectTo?: string,
@@ -106,7 +106,7 @@ async function connectToSocialProvider(
   }
 }
 
-async function connectToProvider(connectionOption: ConnectionOptionType): Promise<ConnectionResponse> {
+export async function connectToProvider(connectionOption: ConnectionOptionType): Promise<ConnectionResponse> {
   const providerType = fromConnectionOptionToProviderType(connectionOption)
 
   if (providerType === ProviderType.THIRDWEB) {
@@ -134,16 +134,16 @@ async function connectToProvider(connectionOption: ConnectionOptionType): Promis
   return connectionData
 }
 
-function isSocialLogin(connectionType: ConnectionOptionType): boolean {
+export function isSocialLogin(connectionType: ConnectionOptionType): boolean {
   const SOCIAL_LOGIN_TYPES = [ConnectionOptionType.APPLE, ConnectionOptionType.GOOGLE, ConnectionOptionType.X, ConnectionOptionType.DISCORD]
   return SOCIAL_LOGIN_TYPES.includes(connectionType)
 }
 
-function isEmailLogin(connectionType: ConnectionOptionType): boolean {
+export function isEmailLogin(connectionType: ConnectionOptionType): boolean {
   return connectionType === ConnectionOptionType.EMAIL
 }
 
-async function getIdentitySignature(address: string, provider: Provider): Promise<AuthIdentity> {
+export async function getIdentitySignature(address: string, provider: Provider): Promise<AuthIdentity> {
   let identity: AuthIdentity
 
   const ssoIdentity = localStorageGetIdentity(address)
@@ -162,7 +162,7 @@ async function getIdentitySignature(address: string, provider: Provider): Promis
  * Get or generate identity using a custom sign function (for thirdweb, etc.)
  * This allows identity generation without a traditional provider.
  */
-async function getIdentityWithSigner(address: string, signMessage: SignMessageFn): Promise<AuthIdentity> {
+export async function getIdentityWithSigner(address: string, signMessage: SignMessageFn): Promise<AuthIdentity> {
   const ssoIdentity = localStorageGetIdentity(address)
 
   if (ssoIdentity) {
@@ -174,24 +174,12 @@ async function getIdentityWithSigner(address: string, signMessage: SignMessageFn
   return identity
 }
 
-function isMobile() {
+export function isMobile() {
   const userAgent = navigator.userAgent
   return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent)
 }
 
-function isIos() {
+export function isIos() {
   const userAgent = navigator.userAgent
   return /iPhone|iPad|iPod/i.test(userAgent)
-}
-
-export {
-  fromConnectionOptionToProviderType,
-  connectToSocialProvider,
-  connectToProvider,
-  isSocialLogin,
-  isEmailLogin,
-  getIdentitySignature,
-  getIdentityWithSigner,
-  isMobile,
-  isIos
 }

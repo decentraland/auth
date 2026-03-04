@@ -7,7 +7,7 @@ let walletInstance: ReturnType<typeof inAppWallet> | null = null
 /**
  * Gets or creates the in-app wallet instance
  */
-const getInAppWallet = () => {
+export const getInAppWallet = () => {
   if (!walletInstance) {
     walletInstance = inAppWallet()
   }
@@ -31,7 +31,7 @@ const getInAppWallet = () => {
  *
  * @see https://portal.thirdweb.com/wallets/users
  */
-const sendEmailOTP = async (email: string): Promise<void> => {
+export const sendEmailOTP = async (email: string): Promise<void> => {
   const client = getThirdwebClient()
 
   await preAuthenticate({
@@ -62,7 +62,7 @@ const sendEmailOTP = async (email: string): Promise<void> => {
  *
  * @see https://portal.thirdweb.com/wallets/users
  */
-const verifyEmailOTPAndConnect = async (email: string, verificationCode: string) => {
+export const verifyEmailOTPAndConnect = async (email: string, verificationCode: string) => {
   console.log('[Thirdweb] Verifying OTP for email:', email, 'code:', verificationCode)
   const client = getThirdwebClient()
   const wallet = getInAppWallet()
@@ -88,14 +88,14 @@ const verifyEmailOTPAndConnect = async (email: string, verificationCode: string)
 /**
  * Gets the current wallet instance (if connected)
  */
-const getConnectedWallet = () => {
+export const getConnectedWallet = () => {
   return walletInstance
 }
 
 /**
  * Disconnects the current wallet and resets the instance
  */
-const disconnectWallet = async () => {
+export const disconnectWallet = async () => {
   if (walletInstance) {
     await walletInstance.disconnect()
     walletInstance = null
@@ -105,7 +105,7 @@ const disconnectWallet = async () => {
 /**
  * Checks if a wallet is currently connected
  */
-const isWalletConnected = (): boolean => {
+export const isWalletConnected = (): boolean => {
   if (!walletInstance) return false
 
   try {
@@ -115,5 +115,3 @@ const isWalletConnected = (): boolean => {
     return false
   }
 }
-
-export { getInAppWallet, sendEmailOTP, verifyEmailOTPAndConnect, getConnectedWallet, disconnectWallet, isWalletConnected }

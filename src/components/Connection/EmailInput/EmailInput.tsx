@@ -1,4 +1,4 @@
-import { ChangeEvent, KeyboardEvent, useCallback, useMemo, useRef, useState } from 'react'
+import { useState, useCallback, useRef, useMemo, KeyboardEvent, ChangeEvent } from 'react'
 import styles from './EmailInput.module.css'
 
 // RFC 5322 compliant email regex

@@ -8,14 +8,14 @@ import { Box, CircularProgress, Dialog, keyframes, styled } from 'decentraland-u
  * targeting `.MuiDialog-container` in global styles, we can apply the dark overlay to the full
  * viewport so page content does not show through.
  */
-const OTP_MODAL_ROOT_CLASS = 'otp-modal-root'
+export const OTP_MODAL_ROOT_CLASS = 'otp-modal-root'
 
 /**
  * Global styles for the OTP modal's dialog container.
  * Rendered via MUI GlobalStyles in EmailLoginModal; applies a semi-transparent dark overlay
  * to the container so the backdrop covers the whole screen consistently.
  */
-const otpModalContainerGlobalStyles = {
+export const otpModalContainerGlobalStyles = {
   [`.${OTP_MODAL_ROOT_CLASS} .MuiDialog-container`]: {
     background: 'rgba(0, 0, 0, 0.6)',
     position: 'fixed',
@@ -29,7 +29,7 @@ const shake = keyframes({
   '20%, 40%, 60%, 80%': { transform: 'translateX(6px)' }
 })
 
-const StyledDialog = styled(Dialog)(({ theme }) => ({
+export const StyledDialog = styled(Dialog)(({ theme }) => ({
   '& .MuiDialog-paper': {
     background: 'linear-gradient(135deg, #952dc6 0%, #32134c 100%)',
     borderRadius: '16px',
@@ -58,14 +58,14 @@ const StyledDialog = styled(Dialog)(({ theme }) => ({
   }
 }))
 
-const Header = styled(Box)(({ theme }) => ({
+export const Header = styled(Box)(({ theme }) => ({
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'center',
   padding: theme.spacing(2, 2.5)
 }))
 
-const BackButton = styled('button')(({ theme }) => ({
+export const BackButton = styled('button')(({ theme }) => ({
   background: 'none',
   border: 'none',
   color: 'white',
@@ -81,12 +81,12 @@ const BackButton = styled('button')(({ theme }) => ({
   '&:disabled': { opacity: 0.5, cursor: 'not-allowed' }
 }))
 
-const BackIcon = styled('span')({
+export const BackIcon = styled('span')({
   fontSize: 20,
   lineHeight: 1
 })
 
-const CloseButton = styled('button')(({ theme }) => ({
+export const CloseButton = styled('button')(({ theme }) => ({
   background: 'none',
   border: 'none',
   color: 'white',
@@ -99,21 +99,21 @@ const CloseButton = styled('button')(({ theme }) => ({
   '&:disabled': { opacity: 0.5, cursor: 'not-allowed' }
 }))
 
-const Main = styled(Box)(({ theme }) => ({
+export const Main = styled(Box)(({ theme }) => ({
   padding: theme.spacing(0, 5, 5),
   [theme.breakpoints.down('sm')]: {
     padding: theme.spacing(0, 3, 4)
   }
 }))
 
-const Content = styled(Box)({
+export const Content = styled(Box)({
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
   textAlign: 'center'
 })
 
-const EmailIconContainer = styled(Box)(({ theme }) => ({
+export const EmailIconContainer = styled(Box)(({ theme }) => ({
   width: 100,
   height: 100,
   borderRadius: '50%',
@@ -129,7 +129,7 @@ const EmailIconContainer = styled(Box)(({ theme }) => ({
   }
 }))
 
-const EmailIcon = styled('img')(({ theme }) => ({
+export const EmailIcon = styled('img')(({ theme }) => ({
   width: 48,
   height: 48,
   display: 'block',
@@ -140,7 +140,7 @@ const EmailIcon = styled('img')(({ theme }) => ({
   }
 }))
 
-const Title = styled('p')(({ theme }) => ({
+export const Title = styled('p')(({ theme }) => ({
   color: 'white',
   fontSize: 28,
   fontWeight: 600,
@@ -151,7 +151,7 @@ const Title = styled('p')(({ theme }) => ({
   }
 }))
 
-const Subtitle = styled('p')(({ theme }) => ({
+export const Subtitle = styled('p')(({ theme }) => ({
   color: 'rgba(255, 255, 255, 0.85)',
   fontSize: 14,
   lineHeight: 1.5,
@@ -167,7 +167,7 @@ const Subtitle = styled('p')(({ theme }) => ({
   }
 }))
 
-const OtpContainer = styled(Box, {
+export const OtpContainer = styled(Box, {
   shouldForwardProp: prop => prop !== 'hasError'
 })<{ hasError?: boolean }>(({ theme, hasError }) => ({
   display: 'flex',
@@ -181,7 +181,7 @@ const OtpContainer = styled(Box, {
   }
 }))
 
-const OtpInput = styled('input', {
+export const OtpInput = styled('input', {
   shouldForwardProp: prop => prop !== 'hasError'
 })<{ hasError?: boolean }>(({ theme, hasError }) => ({
   width: 52,
@@ -214,7 +214,7 @@ const OtpInput = styled('input', {
   }
 }))
 
-const VerifyingContainer = styled(Box)(({ theme }) => ({
+export const VerifyingContainer = styled(Box)(({ theme }) => ({
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
@@ -222,18 +222,18 @@ const VerifyingContainer = styled(Box)(({ theme }) => ({
   marginBottom: theme.spacing(2)
 }))
 
-const VerifyingLoader = styled(CircularProgress)({
+export const VerifyingLoader = styled(CircularProgress)({
   '&.MuiCircularProgress-root': {
     color: 'white'
   }
 })
 
-const VerifyingText = styled('span')({
+export const VerifyingText = styled('span')({
   color: 'rgba(255, 255, 255, 0.85)',
   fontSize: 14
 })
 
-const ErrorMessage = styled('p')(({ theme }) => ({
+export const ErrorMessage = styled('p')(({ theme }) => ({
   color: '#ff6b6b',
   fontSize: 14,
   margin: 0,
@@ -244,13 +244,13 @@ const ErrorMessage = styled('p')(({ theme }) => ({
   }
 }))
 
-const ResendText = styled('p')(({ theme }) => ({
+export const ResendText = styled('p')(({ theme }) => ({
   color: 'rgba(255, 255, 255, 0.7)',
   fontSize: 14,
   margin: theme.spacing(1, 0, 0)
 }))
 
-const ResendLink = styled('span')(({ theme }) => ({
+export const ResendLink = styled('span')(({ theme }) => ({
   color: theme.palette.primary.main,
   cursor: 'pointer',
   textDecoration: 'underline',
@@ -260,7 +260,7 @@ const ResendLink = styled('span')(({ theme }) => ({
   }
 }))
 
-const ResendLinkError = styled('span')({
+export const ResendLinkError = styled('span')({
   color: 'white',
   fontSize: 14,
   cursor: 'pointer',
@@ -270,28 +270,3 @@ const ResendLinkError = styled('span')({
     opacity: 0.8
   }
 })
-
-export {
-  OTP_MODAL_ROOT_CLASS,
-  otpModalContainerGlobalStyles,
-  StyledDialog,
-  Header,
-  BackButton,
-  BackIcon,
-  CloseButton,
-  Main,
-  Content,
-  EmailIconContainer,
-  EmailIcon,
-  Title,
-  Subtitle,
-  OtpContainer,
-  OtpInput,
-  VerifyingContainer,
-  VerifyingLoader,
-  VerifyingText,
-  ErrorMessage,
-  ResendText,
-  ResendLink,
-  ResendLinkError
-}

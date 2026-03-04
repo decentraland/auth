@@ -6,17 +6,17 @@ import { Rarity } from '@dcl/schemas'
 import { ChainId } from '@dcl/schemas/dist/dapps/chain-id'
 import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
 import { connection } from 'decentraland-connect'
-import { ContractName, getContract, getContractName } from 'decentraland-transactions'
+import { ContractName, getContractName, getContract } from 'decentraland-transactions'
 import { config } from '../../../modules/config'
 import {
-  checkMetaTransactionSupport,
-  decodeManaTransferData,
-  decodeNftTransferData,
-  fetchNftMetadata,
   getConnectedProvider,
-  getMetaTransactionChainId,
   getNetworkProvider,
-  isDecentralandContractAddress
+  isDecentralandContractAddress,
+  checkMetaTransactionSupport,
+  decodeNftTransferData,
+  decodeManaTransferData,
+  fetchNftMetadata,
+  getMetaTransactionChainId
 } from './utils'
 
 jest.mock('decentraland-connect')
