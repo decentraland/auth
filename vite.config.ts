@@ -10,7 +10,7 @@ export default defineConfig(({ command, mode }) => {
     plugins: [
       react(),
       // The catalyst client requires node polyfills to work in the browser.
-      nodePolyfills({ include: ['buffer', 'stream', 'process', 'util'] }),
+      nodePolyfills({ include: ['buffer', 'crypto', 'stream', 'process', 'util'] }),
     ],
     define: {
       // eslint-disable-next-line @typescript-eslint/naming-convention
