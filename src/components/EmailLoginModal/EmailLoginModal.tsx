@@ -33,6 +33,13 @@ import {
 } from './EmailLoginModal.styled'
 
 const OTP_LENGTH = 6
+const RESEND_COOLDOWN_SECONDS = 90
+
+const formatCountdown = (seconds: number): string => {
+  const minutes = Math.floor(seconds / 60)
+  const remainingSeconds = seconds % 60
+  return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`
+}
 
 const getTranslatedApiError = (
   errorMessage: string | undefined,
@@ -62,6 +69,7 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [hasError, setHasError] = useState(false)
+  const [resendCooldown, setResendCooldown] = useState(() => (open ? RESEND_COOLDOWN_SECONDS : 0))
 
   const otpInputRefs = useRef<(HTMLInputElement | null)[]>([])
   // Use ref to always have access to current email in callbacks
@@ -75,10 +83,23 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
       setError(null)
       setIsLoading(false)
       setHasError(false)
+      setResendCooldown(RESEND_COOLDOWN_SECONDS)
       // Focus first OTP input after a short delay
       setTimeout(() => otpInputRefs.current[0]?.focus(), 100)
     }
   }, [open])
+
+  useEffect(() => {
+    if (resendCooldown <= 0) {
+      return
+    }
+
+    const timeoutId = setTimeout(() => {
+      setResendCooldown(prev => Math.max(prev - 1, 0))
+    }, 1000)
+
+    return () => clearTimeout(timeoutId)
+  }, [resendCooldown])
 
   const handleOtpChange = useCallback(
     (index: number, value: string) => {
@@ -187,6 +208,10 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
   )
 
   const handleResendOtp = useCallback(async () => {
+    if (isLoading || resendCooldown > 0) {
+      return
+    }
+
     const currentEmail = emailRef.current
     setOtp(Array(OTP_LENGTH).fill(''))
     setError(null)
@@ -200,6 +225,7 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
 
       // Track OTP resend
       trackEvent(TrackingEvents.OTP_RESEND, { email: currentEmail })
+      setResendCooldown(RESEND_COOLDOWN_SECONDS)
 
       // Focus first OTP input
       setTimeout(() => otpInputRefs.current[0]?.focus(), 100)
@@ -210,7 +236,7 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [isLoading, resendCooldown, t])
 
   const handleClose = useCallback(() => {
     if (!isLoading) {
@@ -223,6 +249,10 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
       onBack()
     }
   }, [isLoading, onBack])
+
+  const isResendDisabled = isLoading || resendCooldown > 0
+  const resendCountdown = resendCooldown > 0 ? ` (${formatCountdown(resendCooldown)})` : ''
+  const resendText = `${t('email_login_modal.resend_code')}${resendCountdown}`
 
   const renderContent = () => {
     return (
@@ -268,14 +298,18 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
         {error && (
           <>
             <ErrorMessage>{error}</ErrorMessage>
-            <ResendLinkError onClick={!isLoading ? handleResendOtp : undefined}>{t('email_login_modal.resend_code')}</ResendLinkError>
+            <ResendLinkError disabled={isResendDisabled} onClick={!isResendDisabled ? handleResendOtp : undefined}>
+              {resendText}
+            </ResendLinkError>
           </>
         )}
 
         {!error && (
           <ResendText>
             {t('email_login_modal.didnt_get_email')}
-            <ResendLink onClick={!isLoading ? handleResendOtp : undefined}>{t('email_login_modal.resend_code')}</ResendLink>
+            <ResendLink disabled={isResendDisabled} onClick={!isResendDisabled ? handleResendOtp : undefined}>
+              {resendText}
+            </ResendLink>
           </ResendText>
         )}
       </Content>
