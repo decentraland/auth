@@ -153,9 +153,12 @@ function isValidIdentity(identity: AuthIdentity): boolean {
   const { privateKey, publicKey, address } = identity.ephemeralIdentity
   const hexPattern = /^0x[0-9a-fA-F]+$/
   return (
-    hexPattern.test(privateKey) && privateKey.length === 66 &&
-    hexPattern.test(publicKey) && publicKey.length === 132 &&
-    hexPattern.test(address) && address.length === 42
+    hexPattern.test(privateKey) &&
+    privateKey.length === 66 &&
+    hexPattern.test(publicKey) &&
+    publicKey.length === 132 &&
+    hexPattern.test(address) &&
+    address.length === 42
   )
 }
 

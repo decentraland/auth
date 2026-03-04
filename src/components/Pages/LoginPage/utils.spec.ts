@@ -1,7 +1,7 @@
+import { createWalletClient } from 'viem'
+import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
 import { AuthIdentity, Authenticator } from '@dcl/crypto'
 import { localStorageGetIdentity, localStorageStoreIdentity } from '@dcl/single-sign-on-client'
-import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
-import { createWalletClient } from 'viem'
 import { getIdentitySignature, getIdentityWithSigner } from './utils'
 
 jest.mock('@dcl/single-sign-on-client')
@@ -35,11 +35,7 @@ const VALID_ADDRESS = '0x' + 'ef'.repeat(20) // 42 chars
 const DOUBLE_ENCODED_PRIVATE_KEY = '0x' + 'ab'.repeat(66)
 const DOUBLE_ENCODED_PUBLIC_KEY = '0x' + 'cd'.repeat(130)
 
-function createMockIdentity(overrides?: {
-  privateKey?: string
-  publicKey?: string
-  address?: string
-}): AuthIdentity {
+function createMockIdentity(overrides?: { privateKey?: string; publicKey?: string; address?: string }): AuthIdentity {
   return {
     ephemeralIdentity: {
       privateKey: overrides?.privateKey ?? VALID_PRIVATE_KEY,
