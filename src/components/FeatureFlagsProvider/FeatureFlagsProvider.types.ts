@@ -8,18 +8,12 @@ enum FeatureFlagsKeys {
   UNITY_WEARABLE_PREVIEW = 'dapps-unity-wearable-preview',
   ONBOARDING_FLOW = 'dapps-onboarding-flow',
   DISABLED_CATALYSTS = 'explorer-disabled-catalyst',
-  EMAIL_OTP_LOGIN = 'dapps-email-otp-login',
-  SIGN_IN_PRIMARY_OPTION = 'dapps-sign-in-primary-option'
+  EMAIL_OTP_LOGIN = 'dapps-email-otp-login'
 }
 
 enum OnboardingFlowVariant {
   V1 = 'V1',
   V2 = 'V2'
-}
-
-enum SignInPrimaryOption {
-  ONE_OPTION = 'one-option',
-  TWO_OPTIONS = 'two-options'
 }
 
 type FeatureFlagsVariants = Record<FeatureFlagsKeys, { enabled: boolean; name: string; payload?: { type: string; value: string } }>
@@ -39,5 +33,5 @@ const defaultFeatureFlagsContextValue: FeatureFlagsContextType = {
 // eslint-disable-next-line @typescript-eslint/naming-convention
 const FeatureFlagsContext = createContext(defaultFeatureFlagsContextValue)
 
-export { FeatureFlagsKeys, OnboardingFlowVariant, SignInPrimaryOption, defaultFeatureFlagsContextValue, FeatureFlagsContext }
+export { FeatureFlagsKeys, OnboardingFlowVariant, defaultFeatureFlagsContextValue, FeatureFlagsContext }
 export type { FeatureFlagsContextType }
