@@ -1,6 +1,5 @@
 import { ReactNode, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { useTranslation } from '@dcl/hooks'
 import { connection } from 'decentraland-connect'
 import { useMobileMediaQuery } from 'decentraland-ui2'
 import { useNavigateWithSearchParams } from '../../../../hooks/navigation'
@@ -12,7 +11,6 @@ import styles from './Container.module.css'
 
 export const Container = (props: { children: ReactNode; requestId?: string; canChangeAccount?: boolean; hasProfile?: boolean }) => {
   const { children, requestId, canChangeAccount } = props
-  const { t } = useTranslation()
 
   const [searchParams] = useSearchParams()
   const [targetConfig, targetConfigId] = useTargetConfig()
@@ -44,9 +42,9 @@ export const Container = (props: { children: ReactNode; requestId?: string; canC
           {children}
           {canChangeAccount ? (
             <div className={styles.changeAccount}>
-              {t('request_views.container.use_another_profile')}{' '}
+              Use another profile?{' '}
               <a href="/auth/login" onClick={onChangeAccount}>
-                {t('request_views.container.return_to_login')}
+                Return to log in
               </a>
             </div>
           ) : null}

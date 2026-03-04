@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { useTranslation } from '@dcl/hooks'
 import { Rarity } from '@dcl/schemas'
 import { Profile } from 'decentraland-ui2'
 import { TransferActionButtons, TransferAssetImage, TransferLayout, TransferLoadingState } from '../../../../../Transfer'
@@ -10,7 +9,6 @@ import { SceneName } from '../TransferTipComponents.styled'
 import { TransferConfirmViewProps } from './TransferConfirmView.types'
 
 const TransferConfirmView = (props: TransferConfirmViewProps) => {
-  const { t } = useTranslation()
   const [isProcessing, setIsProcessing] = useState(false)
 
   const handleApprove = async () => {
@@ -28,12 +26,10 @@ const TransferConfirmView = (props: TransferConfirmViewProps) => {
         <Title>
           {isTip ? (
             <>
-              {isProcessing
-                ? t('transfer.confirm.sending_tip', { manaAmount: transferData.manaAmount })
-                : t('transfer.confirm.confirm_tip', { manaAmount: transferData.manaAmount })}
+              {isProcessing ? 'Sending' : 'Confirm'} {transferData.manaAmount} Tip for
             </>
           ) : (
-            <>{isProcessing ? t('transfer.confirm.sending_gift') : t('transfer.confirm.confirm_gift')}</>
+            <>{isProcessing ? 'Sending Gift to' : 'Confirm Gift for'}</>
           )}
         </Title>
 
@@ -50,7 +46,7 @@ const TransferConfirmView = (props: TransferConfirmViewProps) => {
               highlightName
             />
 
-            <Label>{t('transfer.confirm.creator_of')}</Label>
+            <Label>CREATOR OF</Label>
 
             <TransferAssetImage src={transferData.sceneImageUrl} alt={transferData.sceneName} />
 
@@ -68,12 +64,12 @@ const TransferConfirmView = (props: TransferConfirmViewProps) => {
 
             {transferData.name && <ItemName>{transferData.name}</ItemName>}
 
-            {!isProcessing && <WarningAlert severity="info">{t('transfer.confirm.gifting_warning')}</WarningAlert>}
+            {!isProcessing && <WarningAlert severity="info">Gifting an item cannot be undone.</WarningAlert>}
           </>
         )}
 
         {isProcessing ? (
-          <TransferLoadingState text={t('transfer.confirm.processing_authorization')} />
+          <TransferLoadingState text="Processing Authorization" />
         ) : (
           <TransferActionButtons isLoading={props.isLoading} onCancel={props.onDeny} onConfirm={handleApprove} />
         )}
