@@ -3,7 +3,7 @@ import { Authenticator } from '@dcl/crypto'
 import { Avatar, EntityType } from '@dcl/schemas'
 import { config } from '../../../modules/config'
 import { fetcher } from '../../../shared/fetcher'
-import { DeploymentParams, CreateAvatarMetadataParams } from './AvatarSetupPage.types'
+import { CreateAvatarMetadataParams, DeploymentParams } from './AvatarSetupPage.types'
 
 /**
  * Creates avatar metadata from the provided parameters

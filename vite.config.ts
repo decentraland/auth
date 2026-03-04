@@ -10,13 +10,18 @@ export default defineConfig(({ command, mode }) => {
     plugins: [
       react(),
       // The catalyst client requires node polyfills to work in the browser.
-      nodePolyfills()
+      nodePolyfills({ include: ['buffer', 'crypto', 'stream', 'process', 'util'] }),
     ],
     define: {
       // eslint-disable-next-line @typescript-eslint/naming-convention
       'process.env': {
         // eslint-disable-next-line @typescript-eslint/naming-convention
         VITE_REACT_APP_DCL_DEFAULT_ENV: envVariables.VITE_REACT_APP_DCL_DEFAULT_ENV
+      }
+    },
+    resolve: {
+      alias: {
+        'lottie-web': 'lottie-web/build/player/lottie_light.min.js'
       }
     },
     ...(command === 'build'
@@ -36,7 +41,7 @@ export default defineConfig(({ command, mode }) => {
                 manualChunks: {
                   thirdweb: ['thirdweb'],
                   vendor: ['react', 'react-dom', 'react-router-dom'],
-                  ui: ['decentraland-ui', 'decentraland-ui2']
+                  ui: ['decentraland-ui2']
                 }
               }
             }

@@ -1,10 +1,10 @@
 import { ConnectionOption } from './ConnectionOption'
-import { SecondaryOptionButton, ShowMoreSecondaryOptions } from './ConnectionSecondaryButton.styled'
 import { ConnectionSecondaryButtonProps } from './ConnectionSecondaryButton.types'
+import { SecondaryOptionButton, ShowMoreSecondaryOptions } from './ConnectionSecondaryButton.styled'
 
 export const ConnectionSecondaryButton = ({
   options,
-  tooltipDirection = 'top center',
+  tooltipDirection = 'top',
   testId,
   loadingOption,
   onConnect

@@ -1,6 +1,6 @@
 import { AuthIdentity } from '@dcl/crypto'
 
-export interface AvatarSetupState {
+interface AvatarSetupState {
   username: string
   email: string
   hasEmailError: boolean
@@ -10,14 +10,14 @@ export interface AvatarSetupState {
   hasWearablePreviewLoaded: boolean
 }
 
-export interface Color {
+interface Color {
   r: number
   g: number
   b: number
   a: number
 }
 
-export interface AvatarShape {
+interface AvatarShape {
   bodyShape: string
   eyeColor: Color
   skinColor: Color
@@ -25,15 +25,17 @@ export interface AvatarShape {
   wearables: string[]
 }
 
-export interface DeploymentParams {
+interface DeploymentParams {
   avatarShape: AvatarShape
   connectedAccount: string
   deploymentProfileName: string
   connectedAccountIdentity: AuthIdentity
 }
 
-export interface CreateAvatarMetadataParams {
+interface CreateAvatarMetadataParams {
   avatarShape: AvatarShape
   connectedAccount: string
   deploymentProfileName: string
 }
+
+export type { AvatarSetupState, Color, AvatarShape, DeploymentParams, CreateAvatarMetadataParams }

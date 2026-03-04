@@ -1,15 +1,17 @@
 import type { OAuthProvider } from '@magic-ext/oauth2'
-import { ethers } from 'ethers'
+import { createWalletClient, custom, toHex } from 'viem'
+import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
+import { mainnet } from 'viem/chains'
 import { AuthIdentity, Authenticator } from '@dcl/crypto'
 import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
 import { localStorageGetIdentity, localStorageStoreIdentity } from '@dcl/single-sign-on-client'
-import { connection, getConfiguration, ConnectionResponse, Provider, WalletConnectV2Connector } from 'decentraland-connect'
+import { ConnectionResponse, Provider, WalletConnectV2Connector, connection, getConfiguration } from 'decentraland-connect'
 import { extractReferrerFromSearchParameters } from '../../../shared/locations'
 import { ConnectionOptionType } from '../../Connection'
 
 const ONE_MONTH_IN_MINUTES = 60 * 24 * 30
 
-export function fromConnectionOptionToProviderType(connectionType: ConnectionOptionType, isTesting?: boolean): ProviderType {
+function fromConnectionOptionToProviderType(connectionType: ConnectionOptionType, isTesting?: boolean): ProviderType {
   switch (connectionType) {
     case ConnectionOptionType.DISCORD:
     case ConnectionOptionType.X:
@@ -38,25 +40,29 @@ export function fromConnectionOptionToProviderType(connectionType: ConnectionOpt
 type SignMessageFn = (message: string) => Promise<string>
 
 async function generateIdentityWithSigner(address: string, signMessage: SignMessageFn): Promise<AuthIdentity> {
-  const ephemeralAccount = ethers.Wallet.createRandom()
+  const privateKey = generatePrivateKey()
+  const ephemeralAccount = privateKeyToAccount(privateKey)
 
   const payload = {
-    address: ephemeralAccount.address.toString(),
-    publicKey: ethers.hexlify(ephemeralAccount.publicKey),
-    privateKey: ethers.hexlify(ephemeralAccount.privateKey)
+    address: ephemeralAccount.address,
+    publicKey: toHex(ephemeralAccount.publicKey),
+    privateKey: toHex(privateKey)
   }
 
   return Authenticator.initializeAuthChain(address, payload, ONE_MONTH_IN_MINUTES, signMessage)
 }
 
 async function generateIdentity(address: string, provider: Provider): Promise<AuthIdentity> {
-  const browserProvider = new ethers.BrowserProvider(provider)
-  const signer = await browserProvider.getSigner()
+  const walletClient = createWalletClient({
+    chain: mainnet,
+    transport: custom(provider)
+  })
+  const [account] = await walletClient.getAddresses()
 
-  return generateIdentityWithSigner(address, message => signer.signMessage(message))
+  return generateIdentityWithSigner(address, message => walletClient.signMessage({ account, message }))
 }
 
-export async function connectToSocialProvider(
+async function connectToSocialProvider(
   connectionOption: ConnectionOptionType,
   isTesting?: boolean,
   redirectTo?: string,
@@ -106,7 +112,7 @@ export async function connectToSocialProvider(
   }
 }
 
-export async function connectToProvider(connectionOption: ConnectionOptionType): Promise<ConnectionResponse> {
+async function connectToProvider(connectionOption: ConnectionOptionType): Promise<ConnectionResponse> {
   const providerType = fromConnectionOptionToProviderType(connectionOption)
 
   if (providerType === ProviderType.THIRDWEB) {
@@ -134,16 +140,16 @@ export async function connectToProvider(connectionOption: ConnectionOptionType):
   return connectionData
 }
 
-export function isSocialLogin(connectionType: ConnectionOptionType): boolean {
+function isSocialLogin(connectionType: ConnectionOptionType): boolean {
   const SOCIAL_LOGIN_TYPES = [ConnectionOptionType.APPLE, ConnectionOptionType.GOOGLE, ConnectionOptionType.X, ConnectionOptionType.DISCORD]
   return SOCIAL_LOGIN_TYPES.includes(connectionType)
 }
 
-export function isEmailLogin(connectionType: ConnectionOptionType): boolean {
+function isEmailLogin(connectionType: ConnectionOptionType): boolean {
   return connectionType === ConnectionOptionType.EMAIL
 }
 
-export async function getIdentitySignature(address: string, provider: Provider): Promise<AuthIdentity> {
+async function getIdentitySignature(address: string, provider: Provider): Promise<AuthIdentity> {
   let identity: AuthIdentity
 
   const ssoIdentity = localStorageGetIdentity(address)
@@ -162,7 +168,7 @@ export async function getIdentitySignature(address: string, provider: Provider):
  * Get or generate identity using a custom sign function (for thirdweb, etc.)
  * This allows identity generation without a traditional provider.
  */
-export async function getIdentityWithSigner(address: string, signMessage: SignMessageFn): Promise<AuthIdentity> {
+async function getIdentityWithSigner(address: string, signMessage: SignMessageFn): Promise<AuthIdentity> {
   const ssoIdentity = localStorageGetIdentity(address)
 
   if (ssoIdentity) {
@@ -174,12 +180,24 @@ export async function getIdentityWithSigner(address: string, signMessage: SignMe
   return identity
 }
 
-export function isMobile() {
+function isMobile() {
   const userAgent = navigator.userAgent
   return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent)
 }
 
-export function isIos() {
+function isIos() {
   const userAgent = navigator.userAgent
   return /iPhone|iPad|iPod/i.test(userAgent)
+}
+
+export {
+  fromConnectionOptionToProviderType,
+  connectToSocialProvider,
+  connectToProvider,
+  isSocialLogin,
+  isEmailLogin,
+  getIdentitySignature,
+  getIdentityWithSigner,
+  isMobile,
+  isIos
 }

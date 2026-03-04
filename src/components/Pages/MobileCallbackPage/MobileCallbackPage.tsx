@@ -1,29 +1,28 @@
-import { useCallback, useContext, useEffect, useState } from 'react'
-import ArrowBackIosNewTwoToneIcon from '@mui/icons-material/ArrowBackIosNewTwoTone'
-import { RPCError } from 'magic-sdk'
-import { ProviderType } from '@dcl/schemas'
-import { Button } from 'decentraland-ui/dist/components/Button/Button'
-import { connection } from 'decentraland-connect'
-import { CircularProgress } from 'decentraland-ui2'
+import { useCallback, useContext, useEffect, useRef, useState } from 'react'
+import { Provider } from 'decentraland-connect'
+import { Button, CircularProgress, muiIcons } from 'decentraland-ui2'
 import wrongImg from '../../../assets/images/wrong.svg'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import { createAuthServerHttpClient } from '../../../shared/auth'
+import { isMagicRpcError } from '../../../shared/errors'
 import { locations } from '../../../shared/locations'
 import { handleError } from '../../../shared/utils/errorHandler'
-import { createMagicInstance, OAUTH_ACCESS_DENIED_ERROR } from '../../../shared/utils/magicSdk'
+import { OAUTH_ACCESS_DENIED_ERROR, createMagicInstance } from '../../../shared/utils/magicSdk'
 import { ConnectionContainer, ConnectionTitle, DecentralandLogo, ProgressContainer } from '../../ConnectionModal/ConnectionLayout.styled'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import { getIdentitySignature } from '../LoginPage/utils'
 import { ActionButton, Background, Description, Icon, Main, SuccessContainer, Title } from '../MobileAuthPage/MobileAuthPage.styled'
 import { MobileAuthSuccess } from '../MobileAuthPage/MobileAuthSuccess'
 
+const ArrowBackIosNewTwoToneIcon = muiIcons.ArrowBackIosNewTwoTone
+
 export const MobileCallbackPage = () => {
   const navigate = useNavigateWithSearchParams()
   const { initialized, flags } = useContext(FeatureFlagsContext)
   const [targetConfig] = useTargetConfig()
 
-  const [isProcessing, setIsProcessing] = useState(false)
+  const hasStartedProcessing = useRef(false)
   const [identityId, setIdentityId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -37,20 +36,17 @@ export const MobileCallbackPage = () => {
     }
 
     try {
-      // Get OAuth result from Magic
       const magic = await createMagicInstance(!!flags[FeatureFlagsKeys.MAGIC_TEST])
-      await magic?.oauth2.getRedirectResult()
+      await magic.oauth2.getRedirectResult()
 
-      // Connect to Magic provider
-      const providerType = flags[FeatureFlagsKeys.MAGIC_TEST] ? ProviderType.MAGIC_TEST : ProviderType.MAGIC
-      const connectionData = await connection.connect(providerType)
-
-      if (!connectionData?.account || !connectionData?.provider) {
-        throw new Error('Failed to connect to Magic')
-      }
+      // Reuse the same Magic instance to avoid spawning a second iframe
+      const provider = await magic.wallet.getProvider()
+      const accounts: string[] = await provider.request({ method: 'eth_accounts' })
+      const account = accounts[0]
+      if (!account) throw new Error('Failed to get account from Magic')
 
       // Generate identity
-      const identity = await getIdentitySignature(connectionData.account.toLowerCase(), connectionData.provider)
+      const identity = await getIdentitySignature(account.toLowerCase(), provider as unknown as Provider)
 
       // Post identity to server
       const httpClient = createAuthServerHttpClient()
@@ -64,21 +60,21 @@ export const MobileCallbackPage = () => {
         },
         sentryExtra: {
           oauthError: oauthError ?? undefined,
-          magicRpcCode: err instanceof RPCError ? String(err.code) : undefined,
-          magicRpcRawMessage: err instanceof RPCError ? err.rawMessage : undefined,
-          magicRpcData: err instanceof RPCError ? JSON.stringify(err.data) : undefined
+          magicRpcCode: isMagicRpcError(err) ? String(err.code) : undefined,
+          magicRpcRawMessage: isMagicRpcError(err) ? err.rawMessage : undefined,
+          magicRpcData: isMagicRpcError(err) ? JSON.stringify(err.data) : undefined
         }
       })
       setError(err instanceof Error ? err.message : 'Authentication failed')
     }
-  }, [flags])
+  }, [flags, navigate])
 
   useEffect(() => {
-    if (!initialized || isProcessing) return
+    if (!initialized || hasStartedProcessing.current) return
+    hasStartedProcessing.current = true
 
-    setIsProcessing(true)
     processOAuthCallback()
-  }, [initialized, isProcessing, processOAuthCallback])
+  }, [initialized, processOAuthCallback])
 
   const handleRetry = useCallback(() => {
     navigate(locations.mobile())
@@ -94,8 +90,7 @@ export const MobileCallbackPage = () => {
           <Title>Authentication Failed</Title>
           <Description>{error}</Description>
           <ActionButton>
-            <Button primary onClick={handleRetry}>
-              <ArrowBackIosNewTwoToneIcon fontSize="small" />
+            <Button variant="contained" onClick={handleRetry} startIcon={<ArrowBackIosNewTwoToneIcon fontSize="small" />}>
               Try again
             </Button>
           </ActionButton>
@@ -114,7 +109,7 @@ export const MobileCallbackPage = () => {
     <Main component="main">
       <ConnectionContainer>
         <DecentralandLogo size="huge" />
-        <ConnectionTitle>Just a moment, we're verifying your login credentials...</ConnectionTitle>
+        <ConnectionTitle>Just a moment, we&apos;re verifying your login credentials...</ConnectionTitle>
         <ProgressContainer>
           <CircularProgress color="inherit" />
         </ProgressContainer>

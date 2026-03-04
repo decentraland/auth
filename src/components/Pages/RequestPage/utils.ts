@@ -1,9 +1,9 @@
-import { ethers } from 'ethers'
+import { createPublicClient, custom, decodeFunctionData, formatEther } from 'viem'
 import { Rarity } from '@dcl/schemas'
 import { ChainId } from '@dcl/schemas/dist/dapps/chain-id'
 import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
-import { connection, Provider } from 'decentraland-connect'
-import { ContractName, getContractName, getContract } from 'decentraland-transactions'
+import { Provider, connection } from 'decentraland-connect'
+import { ContractName, getContract, getContractName } from 'decentraland-transactions'
 import { config } from '../../../modules/config'
 import { isMobile } from '../LoginPage/utils'
 
@@ -14,7 +14,7 @@ const DEEPLINK_DETECTION_TIMEOUT = 500
  * Uses blur detection technique - if window loses focus, app was launched.
  * Returns true if app was detected, false otherwise.
  */
-export const launchDeepLink = (url: string): Promise<boolean> => {
+const launchDeepLink = (url: string): Promise<boolean> => {
   return new Promise(resolve => {
     if (isMobile()) {
       window.location.href = url
@@ -45,27 +45,28 @@ export const launchDeepLink = (url: string): Promise<boolean> => {
   })
 }
 
-export async function getConnectedProvider(): Promise<Provider | null> {
+async function getConnectedProvider(): Promise<Provider | null> {
   try {
     return await connection.getProvider()
-  } catch (_e) {
+  } catch {
     try {
       const { provider } = await connection.tryPreviousConnection()
       return provider
-    } catch (error) {
+    } catch {
       return null
     }
   }
 }
 
-export async function getNetworkProvider(chainId: ChainId): Promise<Provider> {
+async function getNetworkProvider(chainId: ChainId): Promise<Provider> {
   /*
           We check if the connected provider is from the same chainId, if so we return that one instead of creating one.
           This is to avoid using our own RPCs that much, and use the ones provided by the provider when possible.
         */
   const connectedProvider = await getConnectedProvider()
   if (connectedProvider) {
-    const connectedChainId = Number((await new ethers.BrowserProvider(connectedProvider).getNetwork()).chainId)
+    const publicClient = createPublicClient({ transport: custom(connectedProvider) })
+    const connectedChainId = await publicClient.getChainId()
     if (Number(chainId) === connectedChainId) {
       return connectedProvider
     }
@@ -78,7 +79,7 @@ export async function getNetworkProvider(chainId: ChainId): Promise<Provider> {
  * @param address The Ethereum address to validate
  * @returns true if the address is a valid Decentraland contract address, false otherwise
  */
-export async function isDecentralandContractAddress(address: string): Promise<boolean> {
+async function isDecentralandContractAddress(address: string): Promise<boolean> {
   try {
     const transactionApiUrl = `${config.get('META_TRANSACTION_SERVER_URL')}/v1`
     const response = await fetch(`${transactionApiUrl}/contracts/${address}`)
@@ -99,7 +100,7 @@ export async function isDecentralandContractAddress(address: string): Promise<bo
  * Gets the appropriate chain ID based on the environment.
  * @returns ChainId.MATIC_MAINNET for production/staging, ChainId.MATIC_AMOY otherwise
  */
-export function getMetaTransactionChainId(): ChainId {
+function getMetaTransactionChainId(): ChainId {
   return ['production', 'staging'].includes(config.get('ENVIRONMENT').toLowerCase()) ? ChainId.MATIC_MAINNET : ChainId.MATIC_AMOY
 }
 
@@ -108,13 +109,13 @@ export function getMetaTransactionChainId(): ChainId {
  * @param contractAddress The contract address to check
  * @returns Object with willUseMetaTransaction boolean and contractName (or null)
  */
-export async function checkMetaTransactionSupport(
+async function checkMetaTransactionSupport(
   contractAddress: string
 ): Promise<{ willUseMetaTransaction: boolean; contractName: ContractName | null }> {
   try {
     const contractName = getContractName(contractAddress)
     return { willUseMetaTransaction: true, contractName }
-  } catch (error) {
+  } catch {
     const isAcceptedAddress = await isDecentralandContractAddress(contractAddress.toLowerCase())
     if (isAcceptedAddress) {
       return { willUseMetaTransaction: true, contractName: ContractName.ERC721CollectionV2 }
@@ -129,16 +130,17 @@ export async function checkMetaTransactionSupport(
  * @param contractABI The contract ABI to use for decoding
  * @returns Object containing tokenId and toAddress, or null if decoding fails
  */
-export function decodeNftTransferData(data: string, contractABI: object[]): { tokenId: string; toAddress: string } | null {
+function decodeNftTransferData(data: string, contractABI: object[]): { tokenId: string; toAddress: string } | null {
   try {
     if (!data || data.length < 10) return null
 
-    const contractInterface = new ethers.Interface(contractABI)
-
     // Decode the transaction data using the ABI
-    const decodedData = contractInterface.parseTransaction({ data })
+    const { args } = decodeFunctionData({
+      abi: contractABI as readonly unknown[],
+      data: data as `0x${string}`
+    })
 
-    if (!decodedData) {
+    if (!args || args.length < 3) {
       console.error('Failed to decode transaction data')
       return null
     }
@@ -147,8 +149,8 @@ export function decodeNftTransferData(data: string, contractABI: object[]): { to
     // transferFrom(address from, address to, uint256 tokenId)
     // safeTransferFrom(address from, address to, uint256 tokenId)
     // safeTransferFrom(address from, address to, uint256 tokenId, bytes data)
-    const toAddress = decodedData.args[1] as string // 'to' address is always the second parameter
-    const tokenId = decodedData.args[2].toString() // tokenId is always the third parameter
+    const toAddress = args[1] as string // 'to' address is always the second parameter
+    const tokenId = (args[2] as bigint).toString() // tokenId is always the third parameter
 
     return { tokenId, toAddress }
   } catch (error) {
@@ -162,7 +164,7 @@ export function decodeNftTransferData(data: string, contractABI: object[]): { to
  * @param data The transaction data
  * @returns Object containing manaAmount and toAddress, or null if decoding fails
  */
-export function decodeManaTransferData(data: string): { manaAmount: string; toAddress: string } | null {
+function decodeManaTransferData(data: string): { manaAmount: string; toAddress: string } | null {
   try {
     if (!data || data.length < 10) return null
 
@@ -176,19 +178,21 @@ export function decodeManaTransferData(data: string): { manaAmount: string; toAd
 
     const contract = getContract(ContractName.ERC20, getMetaTransactionChainId())
 
-    const contractInterface = new ethers.Interface(contract.abi)
-    const decodedData = contractInterface.parseTransaction({ data })
+    const { args } = decodeFunctionData({
+      abi: contract.abi as readonly unknown[],
+      data: data as `0x${string}`
+    })
 
-    if (!decodedData) {
+    if (!args || args.length < 2) {
       console.error('Failed to decode MANA transfer data')
       return null
     }
 
-    const toAddress = decodedData.args[0] as string
-    const amount = decodedData.args[1] as bigint
+    const toAddress = args[0] as string
+    const amount = args[1] as bigint
 
     // Convert from wei to MANA (18 decimals)
-    const manaAmount = ethers.formatEther(amount)
+    const manaAmount = formatEther(amount)
 
     return { manaAmount, toAddress }
   } catch (error) {
@@ -205,7 +209,7 @@ export function decodeManaTransferData(data: string): { manaAmount: string; toAd
  * @returns Object containing image URL and other metadata
  * @throws Error if tokenURI is not found or metadata cannot be fetched
  */
-export async function fetchNftMetadata(
+async function fetchNftMetadata(
   contractAddress: string,
   contractABI: object[],
   tokenId: string
@@ -214,11 +218,15 @@ export async function fetchNftMetadata(
   // This is necessary because the user's browser provider may be connected to a different network
   const chainId = getMetaTransactionChainId()
   const networkProvider = await getNetworkProvider(chainId)
-  const provider = new ethers.BrowserProvider(networkProvider)
+  const publicClient = createPublicClient({ transport: custom(networkProvider) })
 
   // Use the provided contract ABI to interact with the NFT contract
-  const contract = new ethers.Contract(contractAddress, contractABI, provider)
-  const tokenUri = await contract.tokenURI(tokenId)
+  const tokenUri = (await publicClient.readContract({
+    address: contractAddress as `0x${string}`,
+    abi: contractABI as readonly unknown[],
+    functionName: 'tokenURI',
+    args: [BigInt(tokenId)]
+  })) as string
 
   if (!tokenUri) {
     throw new Error(`No tokenURI returned for token ${tokenId} at contract ${contractAddress}`)
@@ -289,7 +297,7 @@ export async function fetchNftMetadata(
  * @param creatorAddress The creator's Ethereum address
  * @returns Object containing place name and image URL if exactly one place is found, null otherwise
  */
-export async function fetchPlaceByCreatorAddress(creatorAddress: string): Promise<{ sceneName: string; sceneImageUrl: string } | null> {
+async function fetchPlaceByCreatorAddress(creatorAddress: string): Promise<{ sceneName: string; sceneImageUrl: string } | null> {
   try {
     const placesApiUrl = config.get('PLACES_API_URL')
     const response = await fetch(`${placesApiUrl}/api/places?creator_address=${creatorAddress.toLowerCase()}`)
@@ -322,4 +330,17 @@ export async function fetchPlaceByCreatorAddress(creatorAddress: string): Promis
     console.error('Error fetching place by creator address:', error)
     return null
   }
+}
+
+export {
+  launchDeepLink,
+  getConnectedProvider,
+  getNetworkProvider,
+  isDecentralandContractAddress,
+  getMetaTransactionChainId,
+  checkMetaTransactionSupport,
+  decodeNftTransferData,
+  decodeManaTransferData,
+  fetchNftMetadata,
+  fetchPlaceByCreatorAddress
 }

@@ -1,4 +1,4 @@
-import { Box, keyframes, styled, TextField } from 'decentraland-ui2'
+import { Box, TextField, keyframes, styled } from 'decentraland-ui2'
 
 const slideDown = keyframes({
   from: {

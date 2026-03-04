@@ -1,4 +1,4 @@
-.button:global(.ui.small.primary.button) {
+.button {
   min-height: 46px;
 }
 

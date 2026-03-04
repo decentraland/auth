@@ -1,4 +1,4 @@
-export interface MobileSession {
+interface MobileSession {
   u?: string
   s?: string
 }
@@ -26,7 +26,7 @@ function extractMobileDataFromState(): { isMobileFlow?: boolean; mobileUserId?: 
   return null
 }
 
-export function getMobileSession(): MobileSession | null {
+function getMobileSession(): MobileSession | null {
   if (cachedSession !== undefined) {
     return cachedSession
   }
@@ -52,11 +52,14 @@ export function getMobileSession(): MobileSession | null {
   return null
 }
 
-export function isMobileSession(): boolean {
+function isMobileSession(): boolean {
   return getMobileSession() !== null
 }
 
 // Exported for testing only
-export function resetMobileSession(): void {
+function resetMobileSession(): void {
   cachedSession = undefined
 }
+
+export type { MobileSession }
+export { getMobileSession, isMobileSession, resetMobileSession }

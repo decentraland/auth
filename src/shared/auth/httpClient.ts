@@ -4,7 +4,7 @@ import { RequestInteractionType, TrackingEvents } from '../../modules/analytics/
 import { config } from '../../modules/config'
 import { trackEvent } from '../utils/analytics'
 import { handleError } from '../utils/errorHandler'
-import { DifferentSenderError, ExpiredRequestError, RequestNotFoundError, RequestFulfilledError, IpValidationError } from './errors'
+import { DifferentSenderError, ExpiredRequestError, IpValidationError, RequestFulfilledError, RequestNotFoundError } from './errors'
 import { IdentityResponse, OutcomeError, OutcomeResponse, RecoverResponse } from './types'
 export const createAuthServerHttpClient = (authServerUrl?: string) => {
   const baseUrl = authServerUrl ?? config.get('AUTH_SERVER_URL')
@@ -13,7 +13,7 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
     let data: { error?: string }
     try {
       data = await response.json()
-    } catch (error) {
+    } catch {
       throw new Error('Unknown error')
     }
 

@@ -1,21 +1,21 @@
-import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline'
+import { useTranslation } from '@dcl/hooks'
 import { useTargetConfig } from '../../../../hooks/targetConfig'
 import { Container } from '../Container'
 import { CloseWindow } from './CloseWindow'
+import { ErrorMessageIcon } from './RecoverError.styled'
 import styles from './Views.module.css'
 
 export const SigningError = ({ error }: { error: React.ReactNode }) => {
+  const { t } = useTranslation()
   const [targetConfig] = useTargetConfig()
   return (
     <Container>
       <div className={styles.errorLogo}></div>
-      <div className={styles.title}>There was an error while trying to submit the request.</div>
-      <div className={styles.description}>
-        Return to the {targetConfig.explorerText} to try again, or contact support if the error persists.
-      </div>
+      <div className={styles.title}>{t('request_views.signing_error.title')}</div>
+      <div className={styles.description}>{t('request_views.signing_error.description', { explorerText: targetConfig.explorerText })}</div>
       <CloseWindow />
       <div className={styles.errorMessage}>
-        <ErrorOutlineIcon fontSize="large" sx={{ color: '#fb3b3b' }} /> {error}
+        <ErrorMessageIcon fontSize="large" /> {error}
       </div>
     </Container>
   )

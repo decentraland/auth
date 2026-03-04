@@ -1,5 +1,7 @@
-export type AnimatedBackgroundVariant = 'fixed' | 'absolute'
+type AnimatedBackgroundVariant = 'fixed' | 'absolute'
 
-export type AnimatedBackgroundProps = {
+type AnimatedBackgroundProps = {
   variant?: AnimatedBackgroundVariant
 }
+
+export type { AnimatedBackgroundVariant, AnimatedBackgroundProps }
