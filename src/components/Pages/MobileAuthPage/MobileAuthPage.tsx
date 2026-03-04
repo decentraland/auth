@@ -1,6 +1,5 @@
 import { useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import { createAuthServerHttpClient } from '../../../shared/auth'
 import { isErrorWithName } from '../../../shared/errors'
@@ -63,11 +62,8 @@ export const MobileAuthPage = () => {
 
           setLoadingState(ConnectionLayoutState.VALIDATING_SIGN_IN)
 
-          // Get the identity from localStorage (getIdentitySignature stores it there)
-          const storedIdentity = localStorageGetIdentity(connectionData.account?.toLowerCase() ?? '') ?? identity
-
           const httpClient = createAuthServerHttpClient()
-          const response = await httpClient.postIdentity(storedIdentity, { isMobile: true })
+          const response = await httpClient.postIdentity(identity, { isMobile: true })
 
           setIdentityId(response.identityId)
           setView('success')
