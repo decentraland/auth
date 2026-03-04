@@ -1,4 +1,4 @@
-import { isMobileSession, getMobileSession, resetMobileSession } from './mobile'
+import { getMobileSession, isMobileSession, resetMobileSession } from './mobile'
 
 function setLocation(pathname: string, search = '') {
   Object.defineProperty(window, 'location', {

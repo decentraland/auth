@@ -1,10 +1,10 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import { useCallback } from 'react'
 import { AvatarShape } from '../components/Pages/AvatarSetupPage/AvatarSetupPage.types'
-import { TrackingEvents, ClickEvents, ConnectionType } from '../modules/analytics/types'
+import { ClickEvents, ConnectionType, TrackingEvents } from '../modules/analytics/types'
 import { TRACKING_DELAY } from '../shared/constants'
 import { wait } from '../shared/time'
-import { trackEvent, trackWithDelay, identifyUser } from '../shared/utils/analytics'
+import { identifyUser, trackEvent, trackWithDelay } from '../shared/utils/analytics'
 
 interface ClickData {
   method?: string
@@ -19,7 +19,6 @@ export const useAnalytics = () => {
 
   const trackLoginSuccess = useCallback(async (data: { ethAddress?: string; type: ConnectionType | string }) => {
     await trackWithDelay(TrackingEvents.LOGIN_SUCCESS, {
-      // eslint-disable-next-line @typescript-eslint/naming-convention
       eth_address: data.ethAddress,
       type: data.type
     })
@@ -50,9 +49,8 @@ export const useAnalytics = () => {
 
   const trackTermsOfServiceSuccess = useCallback((data: { ethAddress?: string; isGuest: boolean; email?: string; name: string }) => {
     trackEvent(TrackingEvents.TERMS_OF_SERVICE_SUCCESS, {
-      // eslint-disable-next-line @typescript-eslint/naming-convention
       eth_address: data.ethAddress,
-      // eslint-disable-next-line @typescript-eslint/naming-convention
+
       is_guest: data.isGuest,
       email: data.email,
       name: data.name

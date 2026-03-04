@@ -1,8 +1,11 @@
-import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined'
+// eslint-disable-next-line @typescript-eslint/naming-convention
 import Lottie from 'lottie-react'
 import { brand, neutral } from 'decentraland-ui2/dist/theme/colors'
-import { Logo, Box, styled, Typography, TextField, Checkbox, FormControlLabel, Button, Link } from 'decentraland-ui2'
+import { Box, Button, Checkbox, FormControlLabel, Link, Logo, TextField, Typography, muiIcons, styled } from 'decentraland-ui2'
+// eslint-disable-next-line @typescript-eslint/naming-convention
 import SetupRightBackground from '../../../assets/images/setup-right-background.webp'
+
+const WarningAmberOutlinedIcon = muiIcons.WarningAmberOutlined
 
 const MainContainer = styled(Box)({
   display: 'flex',
@@ -270,6 +273,11 @@ const PreloadedWearableContainer = styled(Box, {
   visibility: 'visible'
 }))
 
+const ErrorLabel = styled(Typography)(({ theme }) => ({
+  marginTop: theme.spacing(2),
+  fontSize: '14px'
+}))
+
 export {
   MainContainer,
   BackgroundShadow,
@@ -285,6 +293,7 @@ export {
   InputLabel,
   TextInput,
   ErrorContainer,
+  ErrorLabel,
   ErrorText,
   WarningIcon,
   EmailDescription,

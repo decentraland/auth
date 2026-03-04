@@ -1,4 +1,4 @@
-import { styled, Box, Logo, Typography } from 'decentraland-ui2'
+import { Box, Logo, Typography, styled } from 'decentraland-ui2'
 
 const ConnectionContainer = styled(Box)({
   display: 'flex',

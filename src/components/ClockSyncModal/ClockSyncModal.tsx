@@ -1,24 +1,30 @@
+// eslint-disable-next-line @typescript-eslint/naming-convention
 import * as React from 'react'
-import { Modal } from 'decentraland-ui/dist/components/Modal/Modal'
-import { ModalNavigation } from 'decentraland-ui/dist/components/ModalNavigation/ModalNavigation'
+import { useTranslation } from '@dcl/hooks'
+import { Dialog, muiIcons } from 'decentraland-ui2'
 import warningIcon from '../../assets/images/warning.svg'
-import { Actions, Content, ContinueButton, Message, WarningIcon, Title } from './ClockSyncModal.styled'
 import { ClockSyncModalProps } from './ClockSyncModal.types'
+import { Actions, CloseIconButton, Content, ContinueButton, Message, Title, WarningIcon } from './ClockSyncModal.styled'
+
+const CloseIcon = muiIcons.Close
 
 export const ClockSyncModal: React.FC<ClockSyncModalProps> = ({ open, onContinue, onClose }) => {
+  const { t } = useTranslation()
   return (
-    <Modal open={open} size="tiny">
-      <ModalNavigation title="" onClose={onClose} />
+    <Dialog open={open} maxWidth="xs" fullWidth>
+      <CloseIconButton onClick={onClose}>
+        <CloseIcon />
+      </CloseIconButton>
       <Content>
         <WarningIcon src={warningIcon} alt="warning" />
-        <Title>Device Clock Out of Sync</Title>
-        <Message>Please update your computer's time settings to the correct local time to avoid server timeout issues.</Message>
+        <Title>{t('clock_sync_modal.title')}</Title>
+        <Message>{t('clock_sync_modal.message')}</Message>
         <Actions>
           <ContinueButton variant="contained" onClick={onContinue}>
-            Continue to site
+            {t('clock_sync_modal.continue_to_site')}
           </ContinueButton>
         </Actions>
       </Content>
-    </Modal>
+    </Dialog>
   )
 }

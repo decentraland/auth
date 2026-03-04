@@ -1,5 +1,5 @@
-import { ProgressContainer, ProgressSpinner, ProgressTrack } from './TransferCircularProgressWithTrack.styled'
 import { TransferCircularProgressWithTrackProps } from './TransferCircularProgressWithTrack.types'
+import { ProgressContainer, ProgressSpinner, ProgressTrack } from './TransferCircularProgressWithTrack.styled'
 
 const TransferCircularProgressWithTrack = (_props: TransferCircularProgressWithTrackProps) => {
   return (
