@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/naming-convention */
 /* eslint-disable @typescript-eslint/unbound-method */
-import { createPublicClient, decodeFunctionData, formatEther } from 'viem'
+import { ethers } from 'ethers'
 import { Rarity } from '@dcl/schemas'
 import { ChainId } from '@dcl/schemas/dist/dapps/chain-id'
 import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
@@ -22,12 +22,7 @@ import {
 jest.mock('decentraland-connect')
 jest.mock('decentraland-transactions')
 jest.mock('../../../modules/config')
-jest.mock('viem', () => ({
-  createPublicClient: jest.fn(),
-  custom: jest.fn((provider: any) => provider),
-  decodeFunctionData: jest.fn(),
-  formatEther: jest.fn()
-}))
+jest.mock('ethers')
 
 describe('when testing getConnectedProvider', () => {
   let mockProvider: any
@@ -79,7 +74,8 @@ describe('when testing getConnectedProvider', () => {
 describe('when testing getNetworkProvider', () => {
   let mockConnectedProvider: any
   let mockNetworkProvider: any
-  let mockPublicClient: any
+  let mockBrowserProvider: any
+  let mockNetwork: any
 
   beforeEach(() => {
     mockConnectedProvider = { isProvider: true }
@@ -92,11 +88,12 @@ describe('when testing getNetworkProvider', () => {
 
   describe('and the connected provider matches the requested chainId', () => {
     beforeEach(() => {
-      mockPublicClient = {
-        getChainId: jest.fn().mockResolvedValueOnce(ChainId.MATIC_MAINNET)
+      mockNetwork = { chainId: BigInt(ChainId.MATIC_MAINNET) }
+      mockBrowserProvider = {
+        getNetwork: jest.fn().mockResolvedValueOnce(mockNetwork)
       }
       jest.mocked(connection.getProvider).mockResolvedValueOnce(mockConnectedProvider)
-      jest.mocked(createPublicClient).mockReturnValueOnce(mockPublicClient)
+      jest.mocked(ethers.BrowserProvider).mockImplementationOnce(() => mockBrowserProvider)
     })
 
     it('should return the connected provider', async () => {
@@ -107,11 +104,12 @@ describe('when testing getNetworkProvider', () => {
 
   describe('and the connected provider has a different chainId', () => {
     beforeEach(() => {
-      mockPublicClient = {
-        getChainId: jest.fn().mockResolvedValueOnce(ChainId.ETHEREUM_MAINNET)
+      mockNetwork = { chainId: BigInt(ChainId.ETHEREUM_MAINNET) }
+      mockBrowserProvider = {
+        getNetwork: jest.fn().mockResolvedValueOnce(mockNetwork)
       }
       jest.mocked(connection.getProvider).mockResolvedValueOnce(mockConnectedProvider)
-      jest.mocked(createPublicClient).mockReturnValueOnce(mockPublicClient)
+      jest.mocked(ethers.BrowserProvider).mockImplementationOnce(() => mockBrowserProvider)
       jest.mocked(connection.createProvider).mockReturnValueOnce(mockNetworkProvider)
     })
 
@@ -315,11 +313,16 @@ describe('when testing checkMetaTransactionSupport', () => {
 
 describe('when testing decodeNftTransferData', () => {
   let contractABI: object[]
+  let mockInterface: any
   let transactionData: string
 
   beforeEach(() => {
     contractABI = [{ type: 'function', name: 'transferFrom' }]
     transactionData = '0x23b872dd'
+    mockInterface = {
+      parseTransaction: jest.fn()
+    }
+    jest.mocked(ethers.Interface).mockImplementation(() => mockInterface)
   })
 
   afterEach(() => {
@@ -327,11 +330,13 @@ describe('when testing decodeNftTransferData', () => {
   })
 
   describe('and the transaction data is valid', () => {
+    let mockDecodedData: any
+
     beforeEach(() => {
-      jest.mocked(decodeFunctionData).mockReturnValueOnce({
-        functionName: 'transferFrom',
+      mockDecodedData = {
         args: ['0xfrom', '0xto', BigInt(123)]
-      })
+      }
+      mockInterface.parseTransaction.mockReturnValueOnce(mockDecodedData)
     })
 
     it('should return the tokenId and toAddress', () => {
@@ -365,12 +370,9 @@ describe('when testing decodeNftTransferData', () => {
     })
   })
 
-  describe('and decoding returns insufficient args', () => {
+  describe('and parsing the transaction fails', () => {
     beforeEach(() => {
-      jest.mocked(decodeFunctionData).mockReturnValueOnce({
-        functionName: 'transferFrom',
-        args: ['0xfrom']
-      })
+      mockInterface.parseTransaction.mockReturnValueOnce(null)
     })
 
     it('should return null', () => {
@@ -381,7 +383,7 @@ describe('when testing decodeNftTransferData', () => {
 
   describe('and decoding throws an error', () => {
     beforeEach(() => {
-      jest.mocked(decodeFunctionData).mockImplementationOnce(() => {
+      mockInterface.parseTransaction.mockImplementationOnce(() => {
         throw new Error('Decoding error')
       })
     })
@@ -395,13 +397,18 @@ describe('when testing decodeNftTransferData', () => {
 
 describe('when testing decodeManaTransferData', () => {
   let transactionData: string
+  let mockInterface: any
   let mockContract: any
 
   beforeEach(() => {
     jest.mocked(config.get).mockReturnValue('production')
+    mockInterface = {
+      parseTransaction: jest.fn()
+    }
     mockContract = {
       abi: [{ type: 'function', name: 'transfer' }]
     }
+    jest.mocked(ethers.Interface).mockImplementation(() => mockInterface)
     jest.mocked(getContract).mockReturnValue(mockContract)
   })
 
@@ -410,14 +417,19 @@ describe('when testing decodeManaTransferData', () => {
   })
 
   describe('and the transaction data is a valid ERC20 transfer', () => {
+    let mockDecodedData: any
+
     beforeEach(() => {
       transactionData =
         '0xa9059cbb000000000000000000000000abcdef1234567890abcdef1234567890abcdef12000000000000000000000000000000000000000000000000016345785d8a0000'
-      jest.mocked(decodeFunctionData).mockReturnValueOnce({
-        functionName: 'transfer',
+      mockContract = {
+        abi: [{ type: 'function', name: 'transfer' }]
+      }
+      mockDecodedData = {
         args: ['0xabcdef1234567890abcdef1234567890abcdef12', BigInt('100000000000000000')]
-      })
-      jest.mocked(formatEther).mockReturnValueOnce('0.1')
+      }
+      mockInterface.parseTransaction.mockReturnValueOnce(mockDecodedData)
+      jest.mocked(ethers.formatEther).mockReturnValueOnce('0.1')
     })
 
     it('should return the manaAmount and toAddress', () => {
@@ -462,13 +474,10 @@ describe('when testing decodeManaTransferData', () => {
     })
   })
 
-  describe('and decoding returns insufficient args', () => {
+  describe('and parsing the transaction fails', () => {
     beforeEach(() => {
       transactionData = '0xa9059cbb000000000000000000000000abcdef1234567890abcdef1234567890abcdef12'
-      jest.mocked(decodeFunctionData).mockReturnValueOnce({
-        functionName: 'transfer',
-        args: ['0xabcdef1234567890abcdef1234567890abcdef12']
-      })
+      mockInterface.parseTransaction.mockReturnValueOnce(null)
     })
 
     it('should return null', () => {
@@ -480,7 +489,7 @@ describe('when testing decodeManaTransferData', () => {
   describe('and decoding throws an error', () => {
     beforeEach(() => {
       transactionData = '0xa9059cbb000000000000000000000000abcdef1234567890abcdef1234567890abcdef12'
-      jest.mocked(decodeFunctionData).mockImplementationOnce(() => {
+      mockInterface.parseTransaction.mockImplementationOnce(() => {
         throw new Error('Decoding error')
       })
     })
@@ -492,14 +501,16 @@ describe('when testing decodeManaTransferData', () => {
   })
 
   describe('and the transaction has a large amount', () => {
+    let mockDecodedData: any
+
     beforeEach(() => {
       transactionData = '0xa9059cbb000000000000000000000000abcdef1234567890abcdef1234567890abcdef12'
       // 1000 MANA in wei (1000 * 10^18)
-      jest.mocked(decodeFunctionData).mockReturnValueOnce({
-        functionName: 'transfer',
+      mockDecodedData = {
         args: ['0xabcdef1234567890abcdef1234567890abcdef12', BigInt('1000000000000000000000')]
-      })
-      jest.mocked(formatEther).mockReturnValueOnce('1000.0')
+      }
+      mockInterface.parseTransaction.mockReturnValueOnce(mockDecodedData)
+      jest.mocked(ethers.formatEther).mockReturnValueOnce('1000.0')
     })
 
     it('should correctly convert large amounts from wei to MANA', () => {
@@ -516,8 +527,9 @@ describe('when testing fetchNftMetadata', () => {
   let contractAddress: string
   let contractABI: object[]
   let tokenId: string
-  let mockPublicClient: any
+  let mockContract: any
   let mockNetworkProvider: any
+  let mockBrowserProvider: any
 
   beforeEach(() => {
     contractAddress = '0xcontract'
@@ -530,9 +542,11 @@ describe('when testing fetchNftMetadata', () => {
 
     // Mock getNetworkProvider dependencies
     mockNetworkProvider = { isNetworkProvider: true }
+    mockBrowserProvider = {}
     jest.mocked(connection.getProvider).mockRejectedValue(new Error('Not connected'))
     jest.mocked(connection.tryPreviousConnection).mockRejectedValue(new Error('No previous'))
     jest.mocked(connection.createProvider).mockReturnValue(mockNetworkProvider)
+    jest.mocked(ethers.BrowserProvider).mockImplementation(() => mockBrowserProvider)
   })
 
   afterEach(() => {
@@ -550,11 +564,10 @@ describe('when testing fetchNftMetadata', () => {
         description: 'A test NFT',
         image: 'https://example.com/image.png'
       }
-      mockPublicClient = {
-        getChainId: jest.fn().mockResolvedValue(1),
-        readContract: jest.fn().mockResolvedValueOnce(tokenUri)
+      mockContract = {
+        tokenURI: jest.fn().mockResolvedValueOnce(tokenUri)
       }
-      jest.mocked(createPublicClient).mockReturnValue(mockPublicClient)
+      jest.mocked(ethers.Contract).mockImplementationOnce(() => mockContract)
       jest.mocked(fetch).mockResolvedValueOnce({
         ok: true,
         json: jest.fn().mockResolvedValueOnce(metadata)
@@ -587,11 +600,10 @@ describe('when testing fetchNftMetadata', () => {
           { trait_type: 'Rarity', value: 'Epic' }
         ]
       }
-      mockPublicClient = {
-        getChainId: jest.fn().mockResolvedValue(1),
-        readContract: jest.fn().mockResolvedValueOnce(tokenUri)
+      mockContract = {
+        tokenURI: jest.fn().mockResolvedValueOnce(tokenUri)
       }
-      jest.mocked(createPublicClient).mockReturnValue(mockPublicClient)
+      jest.mocked(ethers.Contract).mockImplementationOnce(() => mockContract)
       jest.mocked(fetch).mockResolvedValueOnce({
         ok: true,
         json: jest.fn().mockResolvedValueOnce(metadata)
@@ -619,11 +631,10 @@ describe('when testing fetchNftMetadata', () => {
         name: 'Test NFT',
         image_url: 'https://example.com/image.png'
       }
-      mockPublicClient = {
-        getChainId: jest.fn().mockResolvedValue(1),
-        readContract: jest.fn().mockResolvedValueOnce(tokenUri)
+      mockContract = {
+        tokenURI: jest.fn().mockResolvedValueOnce(tokenUri)
       }
-      jest.mocked(createPublicClient).mockReturnValue(mockPublicClient)
+      jest.mocked(ethers.Contract).mockImplementationOnce(() => mockContract)
       jest.mocked(fetch).mockResolvedValueOnce({
         ok: true,
         json: jest.fn().mockResolvedValueOnce(metadata)
@@ -655,11 +666,10 @@ describe('when testing fetchNftMetadata', () => {
         image: 'https://example.com/image.png',
         attributes: [{ trait_type: 'Rarity', value: rarityValue }]
       }
-      mockPublicClient = {
-        getChainId: jest.fn().mockResolvedValue(1),
-        readContract: jest.fn().mockResolvedValueOnce(tokenUri)
+      mockContract = {
+        tokenURI: jest.fn().mockResolvedValueOnce(tokenUri)
       }
-      jest.mocked(createPublicClient).mockReturnValue(mockPublicClient)
+      jest.mocked(ethers.Contract).mockImplementationOnce(() => mockContract)
       jest.mocked(fetch).mockResolvedValueOnce({
         ok: true,
         json: jest.fn().mockResolvedValueOnce(metadata)
@@ -674,11 +684,10 @@ describe('when testing fetchNftMetadata', () => {
 
   describe('and the contract does not return a tokenURI', () => {
     beforeEach(() => {
-      mockPublicClient = {
-        getChainId: jest.fn().mockResolvedValue(1),
-        readContract: jest.fn().mockResolvedValueOnce(null)
+      mockContract = {
+        tokenURI: jest.fn().mockResolvedValueOnce(null)
       }
-      jest.mocked(createPublicClient).mockReturnValue(mockPublicClient)
+      jest.mocked(ethers.Contract).mockImplementationOnce(() => mockContract)
     })
 
     it('should throw an error indicating no tokenURI', async () => {
@@ -693,11 +702,10 @@ describe('when testing fetchNftMetadata', () => {
 
     beforeEach(() => {
       tokenUri = 'https://example.com/token/123'
-      mockPublicClient = {
-        getChainId: jest.fn().mockResolvedValue(1),
-        readContract: jest.fn().mockResolvedValueOnce(tokenUri)
+      mockContract = {
+        tokenURI: jest.fn().mockResolvedValueOnce(tokenUri)
       }
-      jest.mocked(createPublicClient).mockReturnValue(mockPublicClient)
+      jest.mocked(ethers.Contract).mockImplementationOnce(() => mockContract)
       jest.mocked(fetch).mockResolvedValueOnce({
         ok: false,
         status: 404,

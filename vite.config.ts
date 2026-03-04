@@ -10,18 +10,13 @@ export default defineConfig(({ command, mode }) => {
     plugins: [
       react(),
       // The catalyst client requires node polyfills to work in the browser.
-      nodePolyfills({ include: ['buffer', 'stream', 'process', 'util'] }),
+      nodePolyfills()
     ],
     define: {
       // eslint-disable-next-line @typescript-eslint/naming-convention
       'process.env': {
         // eslint-disable-next-line @typescript-eslint/naming-convention
         VITE_REACT_APP_DCL_DEFAULT_ENV: envVariables.VITE_REACT_APP_DCL_DEFAULT_ENV
-      }
-    },
-    resolve: {
-      alias: {
-        'lottie-web': 'lottie-web/build/player/lottie_light.min.js'
       }
     },
     ...(command === 'build'

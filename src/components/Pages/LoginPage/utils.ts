@@ -1,7 +1,5 @@
 import type { OAuthProvider } from '@magic-ext/oauth2'
-import { createWalletClient, custom, toHex } from 'viem'
-import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
-import { mainnet } from 'viem/chains'
+import { ethers } from 'ethers'
 import { AuthIdentity, Authenticator } from '@dcl/crypto'
 import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
 import { localStorageGetIdentity, localStorageStoreIdentity } from '@dcl/single-sign-on-client'
@@ -40,26 +38,22 @@ function fromConnectionOptionToProviderType(connectionType: ConnectionOptionType
 type SignMessageFn = (message: string) => Promise<string>
 
 async function generateIdentityWithSigner(address: string, signMessage: SignMessageFn): Promise<AuthIdentity> {
-  const privateKey = generatePrivateKey()
-  const ephemeralAccount = privateKeyToAccount(privateKey)
+  const ephemeralAccount = ethers.Wallet.createRandom()
 
   const payload = {
-    address: ephemeralAccount.address,
-    publicKey: toHex(ephemeralAccount.publicKey),
-    privateKey: toHex(privateKey)
+    address: ephemeralAccount.address.toString(),
+    publicKey: ethers.hexlify(ephemeralAccount.publicKey),
+    privateKey: ethers.hexlify(ephemeralAccount.privateKey)
   }
 
   return Authenticator.initializeAuthChain(address, payload, ONE_MONTH_IN_MINUTES, signMessage)
 }
 
 async function generateIdentity(address: string, provider: Provider): Promise<AuthIdentity> {
-  const walletClient = createWalletClient({
-    chain: mainnet,
-    transport: custom(provider)
-  })
-  const [account] = await walletClient.getAddresses()
+  const browserProvider = new ethers.BrowserProvider(provider)
+  const signer = await browserProvider.getSigner()
 
-  return generateIdentityWithSigner(address, message => walletClient.signMessage({ account, message }))
+  return generateIdentityWithSigner(address, message => signer.signMessage(message))
 }
 
 async function connectToSocialProvider(

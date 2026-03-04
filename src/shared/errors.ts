@@ -28,13 +28,5 @@ function isRpcError(error: unknown): error is RPCError {
   )
 }
 
-/**
- * Duck-typing guard for Magic SDK's RPCError.
- * Avoids importing magic-sdk at runtime just for instanceof checks.
- */
-function isMagicRpcError(error: unknown): error is { code: number; rawMessage: string; data: unknown } {
-  return error !== null && typeof error === 'object' && 'code' in error && 'rawMessage' in error
-}
-
 export type { RPCError }
-export { isErrorWithMessage, isErrorWithName, isRpcError, isMagicRpcError }
+export { isErrorWithMessage, isErrorWithName, isRpcError }

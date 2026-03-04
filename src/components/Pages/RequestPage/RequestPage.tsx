@@ -1,10 +1,9 @@
 import { useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { createPublicClient, createWalletClient, custom, formatEther } from 'viem'
-import { mainnet } from 'viem/chains'
+import { BrowserProvider, ethers, formatEther } from 'ethers'
 import { useTranslation } from '@dcl/hooks'
 import { ContractName, getContract, sendMetaTransaction } from 'decentraland-transactions'
-import { Button, Dialog, DialogActions, DialogContent, DialogTitle } from 'decentraland-ui2'
+import { Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, muiIcons } from 'decentraland-ui2'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import { useAnalytics } from '../../../hooks/useAnalytics'
@@ -31,6 +30,7 @@ import { identifyUser } from '../../../shared/utils/analytics'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { checkWebGpuSupport } from '../../../shared/utils/webgpu'
 import { FeatureFlagsContext, FeatureFlagsKeys, OnboardingFlowVariant } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
+import { Container } from './Container'
 import { MANATransferData, NFTTransferData, TransferType } from './types'
 import {
   checkMetaTransactionSupport,
@@ -48,7 +48,6 @@ import {
   DeniedWalletInteraction,
   DifferentAccountError,
   IpValidationError as IpValidationErrorView,
-  LoadingRequest,
   RecoverError,
   SignInComplete,
   SigningError,
@@ -56,10 +55,14 @@ import {
   TransferCanceledView,
   TransferCompletedView,
   TransferConfirmView,
-  VerifySignIn,
-  WalletInteraction,
   WalletInteractionComplete
 } from './Views'
+import { ErrorMessageIcon } from './Views/RecoverError.styled'
+import viewStyles from './Views/Views.module.css'
+import styles from './RequestPage.module.css'
+
+const CancelOutlinedIcon = muiIcons.CancelOutlined
+const CheckCircleOutlinedIcon = muiIcons.CheckCircleOutlined
 
 enum View {
   TIMEOUT,
@@ -88,33 +91,6 @@ enum View {
   WALLET_MANA_INTERACTION_COMPLETE
 }
 
-interface TransactionConfirmDialogProps {
-  open: boolean
-  transactionCost: bigint
-  balance: bigint
-  onCancel: () => void
-  onConfirm: () => void
-}
-
-const TransactionConfirmDialog = ({ open, transactionCost, balance, onCancel, onConfirm }: TransactionConfirmDialogProps) => {
-  const { t } = useTranslation()
-  return (
-    <Dialog open={open} maxWidth="xs" fullWidth>
-      <DialogTitle>{t('request.transaction_dialog.title')}</DialogTitle>
-      <DialogContent>
-        <p>{t('request.transaction_dialog.transaction_cost', { cost: formatEther(transactionCost) })}</p>
-        <p>{t('request.transaction_dialog.your_balance', { balance: formatEther(balance) })}</p>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onCancel}>{t('common.cancel')}</Button>
-        <Button variant="contained" onClick={onConfirm}>
-          {t('common.confirm')}
-        </Button>
-      </DialogActions>
-    </Dialog>
-  )
-}
-
 // Terminal views that should not trigger a re-fetch of the request
 const TERMINAL_VIEWS = new Set([
   View.VERIFY_SIGN_IN_COMPLETE,
@@ -135,14 +111,14 @@ const TERMINAL_VIEWS = new Set([
 ])
 
 export const RequestPage = () => {
+  const { t } = useTranslation()
   const params = useParams()
   const [searchParams] = useSearchParams()
   const navigate = useNavigateWithSearchParams()
   const { isLoading: isConnecting, account, provider, providerType, identity } = useCurrentConnectionData()
   const { flags, variants, initialized: initializedFlags } = useContext(FeatureFlagsContext)
   const { trackClick, trackWebGPUSupportCheck } = useAnalytics()
-  const publicClientRef = useRef<ReturnType<typeof createPublicClient>>()
-  const walletClientRef = useRef<ReturnType<typeof createWalletClient>>()
+  const browserProvider = useRef<BrowserProvider>()
   const [view, setView] = useState(View.LOADING_REQUEST)
   const [isLoading, setIsLoading] = useState(false)
   const [hasTimedOut, setHasTimedOut] = useState(false)
@@ -218,8 +194,7 @@ export const RequestPage = () => {
 
     const loadRequest = async () => {
       const timeTheSiteStartedLoading = Date.now()
-      publicClientRef.current = createPublicClient({ transport: custom(provider) })
-      walletClientRef.current = createWalletClient({ chain: mainnet, transport: custom(provider) })
+      browserProvider.current = new ethers.BrowserProvider(provider)
 
       const consistencyResult = await fetchProfileWithConsistencyCheck(account, disabledCatalysts)
       console.log('Loading request - Consistency result', consistencyResult)
@@ -243,7 +218,8 @@ export const RequestPage = () => {
       }
 
       try {
-        const [signerAddress] = await walletClientRef.current.getAddresses()
+        const signer = await browserProvider.current.getSigner()
+        const signerAddress = await signer.getAddress()
         identifyUser(signerAddress)
         // Recover the request from the auth server.
         const request = await authServerClient.current.recover(requestId, signerAddress, isDeepLinkFlow)
@@ -276,8 +252,9 @@ export const RequestPage = () => {
           case 'eth_sendTransaction': {
             try {
               // Get wallet info first
-              const userBalance = await publicClientRef.current.getBalance({ address: signerAddress })
-              const currentChainId = await publicClientRef.current.getChainId()
+              const signer = await browserProvider.current.getSigner()
+              const userBalance = await browserProvider.current.getBalance(signer.address)
+              const currentChainId = await browserProvider.current.getNetwork().then(network => Number(network.chainId))
               setWalletInfo({
                 balance: userBalance,
                 chainId: currentChainId
@@ -334,16 +311,9 @@ export const RequestPage = () => {
                 }
               }
 
-              const feeData = await publicClientRef.current.estimateFeesPerGas()
-              const gasPrice = feeData.gasPrice ?? feeData.maxFeePerGas ?? BigInt(0)
-              const gasEstimateTxParams = request.params?.[0] as Record<string, unknown> | undefined
-              const transactionGasEstimate = await publicClientRef.current.estimateGas({
-                account: signerAddress,
-                to: gasEstimateTxParams?.to as `0x${string}` | undefined,
-                data: gasEstimateTxParams?.data as `0x${string}` | undefined,
-                value: gasEstimateTxParams?.value ? BigInt(gasEstimateTxParams.value as string) : undefined
-              })
-              const totalGasCost = gasPrice * transactionGasEstimate
+              const gasPrice = (await browserProvider.current.getFeeData()).gasPrice ?? BigInt(0)
+              const transactionGasCost = await signer.estimateGas(request.params?.[0] as Record<string, unknown>)
+              const totalGasCost = gasPrice * transactionGasCost
               setTransactionGasCost(totalGasCost)
             } catch (e) {
               console.error('Error estimating gas (may be normal for meta transactions)', e)
@@ -403,9 +373,9 @@ export const RequestPage = () => {
     setIsLoading(true)
     trackClick(ClickEvents.DENY_SIGN_IN)
     try {
-      if (walletClientRef.current) {
-        const [address] = await walletClientRef.current.getAddresses()
-        await authServerClient.current.sendFailedOutcome(requestId, address, {
+      const signer = await browserProvider.current?.getSigner()
+      if (signer) {
+        await authServerClient.current.sendFailedOutcome(requestId, await signer.getAddress(), {
           code: -32003,
           message: 'Transaction rejected'
         })
@@ -421,16 +391,16 @@ export const RequestPage = () => {
     trackClick(ClickEvents.APPROVE_SING_IN)
     setIsLoading(true)
     setHasTimedOut(false)
-    const walletClient = walletClientRef.current
+    const provider = browserProvider.current
     let hasTimeouted = false
 
-    if (!walletClient) {
+    if (!provider) {
       setIsLoading(false)
       throw new Error('Provider not created')
     }
 
     console.log("Approve sign in verification - Getting the provider's signer")
-    const [address] = await walletClient.getAddresses()
+    const signer = await provider.getSigner()
 
     signTimeoutRef.current = setTimeout(() => {
       hasTimeouted = true
@@ -440,7 +410,7 @@ export const RequestPage = () => {
 
     try {
       console.log("Approve sign in verification - Got the provider's signer. Signing the message")
-      const signature = await walletClient.signMessage({ account: address, message: requestRef.current?.params?.[0] as string })
+      const signature = await signer.signMessage(requestRef.current?.params?.[0] as string)
 
       if (hasTimeouted) {
         throw new TimedOutError()
@@ -455,7 +425,7 @@ export const RequestPage = () => {
       } else {
         // Traditional flow - send outcome and complete
         console.log('Traditional flow - Sending outcome to server...')
-        await authServerClient.current.sendSuccessfulOutcome(requestId, address, signature)
+        await authServerClient.current.sendSuccessfulOutcome(requestId, await signer.getAddress(), signature)
         console.log('Traditional flow - Outcome sent')
         hasCompletedRef.current = true
         setView(View.VERIFY_SIGN_IN_COMPLETE)
@@ -494,9 +464,9 @@ export const RequestPage = () => {
     trackClick(ClickEvents.DENY_WALLET_INTERACTION)
 
     try {
-      if (walletClientRef.current) {
-        const [address] = await walletClientRef.current.getAddresses()
-        await authServerClient.current.sendFailedOutcome(requestId, address, {
+      const signer = await browserProvider.current?.getSigner()
+      if (signer) {
+        await authServerClient.current.sendFailedOutcome(requestId, await signer.getAddress(), {
           code: -32003,
           message: 'Transaction rejected'
         })
@@ -520,9 +490,9 @@ export const RequestPage = () => {
   const onApproveWalletInteraction = useCallback(async () => {
     setIsLoading(true)
     setIsTransactionModalOpen(false)
-    const walletClient = walletClientRef.current
+    const provider = browserProvider.current
     try {
-      if (!walletClient) {
+      if (!provider) {
         throw new Error('Provider not created')
       }
 
@@ -530,7 +500,8 @@ export const RequestPage = () => {
         throw new Error('Method not found')
       }
 
-      const [signerAddress] = await walletClient.getAddresses()
+      const signer = await provider.getSigner()
+      const signerAddress = await signer.getAddress()
       const chainId = getMetaTransactionChainId()
       const txParams = requestRef.current?.params?.[0] as Record<string, unknown> | undefined
       const toAddress = txParams?.to as string | undefined
@@ -563,10 +534,7 @@ export const RequestPage = () => {
           }
         )
       } else {
-        result = await walletClient.request({
-          method: requestRef.current?.method as 'eth_sendTransaction',
-          params: requestRef.current?.params as [Record<string, unknown>]
-        })
+        result = await provider.send(requestRef.current?.method, requestRef.current?.params ?? [])
       }
 
       trackClick(ClickEvents.APPROVE_WALLET_INTERACTION, {
@@ -599,16 +567,14 @@ export const RequestPage = () => {
 
         // Try to send failed outcome, but don't let it prevent showing the error view
         try {
-          if (walletClientRef.current) {
-            const [addr] = await walletClientRef.current.getAddresses()
-            if (isRpcError(e)) {
-              await authServerClient.current.sendFailedOutcome(requestId, addr, e.error)
-            } else {
-              await authServerClient.current.sendFailedOutcome(requestId, addr, {
-                code: 999,
-                message: isErrorWithMessage(e) ? e.message : 'Unknown error'
-              })
-            }
+          const signer = await browserProvider.current?.getSigner()
+          if (signer && isRpcError(e)) {
+            await authServerClient.current.sendFailedOutcome(requestId, await signer.getAddress(), e.error)
+          } else if (signer && !isRpcError(e)) {
+            await authServerClient.current.sendFailedOutcome(requestId, await signer.getAddress(), {
+              code: 999,
+              message: isErrorWithMessage(e) ? e.message : 'Unknown error'
+            })
           }
         } catch (failedOutcomeError) {
           // Log the error but don't prevent the error view from showing
@@ -671,31 +637,78 @@ export const RequestPage = () => {
     case View.WALLET_MANA_INTERACTION_DENIED:
       return manaTransferData ? <TransferCanceledView type={TransferType.TIP} transferData={manaTransferData} /> : null
     case View.LOADING_REQUEST:
-      return <LoadingRequest />
-    case View.VERIFY_SIGN_IN:
       return (
-        <VerifySignIn
-          requestId={requestId}
-          code={requestRef.current?.code}
-          isLoading={isLoading}
-          hasTimedOut={hasTimedOut}
-          explorerText={targetConfig.explorerText}
-          isDeepLinkFlow={isDeepLinkFlow}
-          onDeny={onDenyVerifySignIn}
-          onApprove={onApproveSignInVerification}
-        />
+        <Container>
+          <CircularProgress size={60} />
+        </Container>
       )
+    case View.VERIFY_SIGN_IN: {
+      return (
+        <Container canChangeAccount requestId={requestId}>
+          <div className={viewStyles.logo}></div>
+          <div className={viewStyles.title}>{t('request.verify_sign_in')}</div>
+
+          {!isDeepLinkFlow && (
+            <>
+              <div className={viewStyles.description}>{t('request.verification_match', { explorerText: targetConfig.explorerText })}</div>
+              <div className={styles.code}>{requestRef.current?.code}</div>
+            </>
+          )}
+
+          {isDeepLinkFlow && (
+            <div className={viewStyles.description}>{t('request.deep_link_confirm', { explorerText: targetConfig.explorerText })}</div>
+          )}
+
+          <div className={styles.buttons}>
+            <Button
+              variant="outlined"
+              disabled={isLoading}
+              onClick={onDenyVerifySignIn}
+              className={styles.noButton}
+              startIcon={<CancelOutlinedIcon />}
+            >
+              {isDeepLinkFlow ? t('common.cancel') : t('request.no_it_doesnt')}
+            </Button>
+            <Button
+              variant="outlined"
+              disabled={isLoading}
+              onClick={onApproveSignInVerification}
+              className={styles.yesButton}
+              startIcon={isLoading ? <CircularProgress size={20} color="inherit" /> : <CheckCircleOutlinedIcon />}
+            >
+              {isDeepLinkFlow ? t('request.sign_in') : t('request.yes_same')}
+            </Button>
+          </div>
+          {hasTimedOut && (
+            <div className={styles.timeoutMessage}>
+              <ErrorMessageIcon fontSize="large" />
+              <div>
+                {t('request.timeout_logged_out')}
+                <br />
+                {t('request.timeout_check_login')}
+              </div>
+            </div>
+          )}
+        </Container>
+      )
+    }
 
     case View.WALLET_NFT_INTERACTION:
       return nftTransferData ? (
         <>
-          <TransactionConfirmDialog
-            open={isTransactionModalOpen}
-            transactionCost={transactionGasCost ?? BigInt(0)}
-            balance={walletInfo?.balance ?? BigInt(0)}
-            onCancel={onDenyWalletInteraction}
-            onConfirm={onApproveWalletInteraction}
-          />
+          <Dialog open={isTransactionModalOpen} maxWidth="xs" fullWidth>
+            <DialogTitle>{t('request.transaction_dialog.title')}</DialogTitle>
+            <DialogContent>
+              <p>{t('request.transaction_dialog.transaction_cost', { cost: formatEther((transactionGasCost ?? 0).toString()) })}</p>
+              <p>{t('request.transaction_dialog.your_balance', { balance: formatEther((walletInfo?.balance ?? 0).toString()) })}</p>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={onDenyWalletInteraction}>{t('common.cancel')}</Button>
+              <Button variant="contained" onClick={onApproveWalletInteraction}>
+                {t('common.confirm')}
+              </Button>
+            </DialogActions>
+          </Dialog>
           <TransferConfirmView
             type={TransferType.GIFT}
             transferData={nftTransferData}
@@ -708,13 +721,19 @@ export const RequestPage = () => {
     case View.WALLET_MANA_INTERACTION:
       return manaTransferData ? (
         <>
-          <TransactionConfirmDialog
-            open={isTransactionModalOpen}
-            transactionCost={transactionGasCost ?? BigInt(0)}
-            balance={walletInfo?.balance ?? BigInt(0)}
-            onCancel={onDenyWalletInteraction}
-            onConfirm={onApproveWalletInteraction}
-          />
+          <Dialog open={isTransactionModalOpen} maxWidth="xs" fullWidth>
+            <DialogTitle>{t('request.transaction_dialog.title')}</DialogTitle>
+            <DialogContent>
+              <p>{t('request.transaction_dialog.transaction_cost', { cost: formatEther((transactionGasCost ?? 0).toString()) })}</p>
+              <p>{t('request.transaction_dialog.your_balance', { balance: formatEther((walletInfo?.balance ?? 0).toString()) })}</p>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={onDenyWalletInteraction}>{t('common.cancel')}</Button>
+              <Button variant="contained" onClick={onApproveWalletInteraction}>
+                {t('common.confirm')}
+              </Button>
+            </DialogActions>
+          </Dialog>
           <TransferConfirmView
             type={TransferType.TIP}
             transferData={manaTransferData}
@@ -726,23 +745,36 @@ export const RequestPage = () => {
       ) : null
     case View.WALLET_INTERACTION:
       return (
-        <>
-          <TransactionConfirmDialog
-            open={isTransactionModalOpen}
-            transactionCost={transactionGasCost ?? BigInt(0)}
-            balance={walletInfo?.balance ?? BigInt(0)}
-            onCancel={onDenyWalletInteraction}
-            onConfirm={onApproveWalletInteraction}
-          />
-          <WalletInteraction
-            requestId={requestId}
-            isWeb2Wallet={isUserUsingWeb2Wallet}
-            explorerText={targetConfig.explorerText}
-            isLoading={isLoading}
-            onDeny={onDenyWalletInteraction}
-            onApprove={handleApproveWalletInteraction}
-          />
-        </>
+        <Container canChangeAccount requestId={requestId}>
+          <Dialog open={isTransactionModalOpen} maxWidth="xs" fullWidth>
+            <DialogTitle>{t('request.transaction_dialog.title')}</DialogTitle>
+            <DialogContent>
+              <p>{t('request.transaction_dialog.transaction_cost', { cost: formatEther((transactionGasCost ?? 0).toString()) })}</p>
+              <p>{t('request.transaction_dialog.your_balance', { balance: formatEther((walletInfo?.balance ?? 0).toString()) })}</p>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={onDenyWalletInteraction}>{t('common.cancel')}</Button>
+              <Button variant="contained" onClick={onApproveWalletInteraction}>
+                {t('common.confirm')}
+              </Button>
+            </DialogActions>
+          </Dialog>
+          <div className={viewStyles.logo}></div>
+          <div className={viewStyles.title}>
+            {isUserUsingWeb2Wallet
+              ? t('request.wallet_interaction.title_web2')
+              : t('request.wallet_interaction.title_web3', { explorerText: targetConfig.explorerText })}
+          </div>
+          <div className={viewStyles.description}>{t('request.wallet_interaction.description')}</div>
+          <div className={styles.buttons}>
+            <Button variant="outlined" disabled={isLoading} onClick={onDenyWalletInteraction}>
+              {t('common.deny')}
+            </Button>
+            <Button variant="contained" disabled={isLoading} onClick={handleApproveWalletInteraction}>
+              {isLoading ? <CircularProgress size={20} color="inherit" /> : t('common.allow')}
+            </Button>
+          </div>
+        </Container>
       )
     default:
       return null
