@@ -1,5 +1,5 @@
 // This enum is kept for potential future use (e.g., multi-step flows)
-export enum EmailLoginStep {
+enum EmailLoginStep {
   ENTER_OTP = 'enter_otp'
 }
 
@@ -7,17 +7,17 @@ export enum EmailLoginStep {
  * Minimal interface for thirdweb account used for DCL identity generation.
  * We only need address and signMessage capability.
  */
-export type ThirdwebAccount = {
+type ThirdwebAccount = {
   address: string
   signMessage: (args: { message: string }) => Promise<`0x${string}`>
 }
 
-export type EmailLoginResult = {
+type EmailLoginResult = {
   email: string
   account: ThirdwebAccount
 }
 
-export type EmailLoginModalProps = {
+type EmailLoginModalProps = {
   open: boolean
   email: string
   onClose: () => void
@@ -25,3 +25,6 @@ export type EmailLoginModalProps = {
   onSuccess: (result: EmailLoginResult) => void
   onError?: (error: string) => void
 }
+
+export { EmailLoginStep }
+export type { ThirdwebAccount, EmailLoginResult, EmailLoginModalProps }

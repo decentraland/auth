@@ -1,6 +1,6 @@
-import { useLocation, Location } from 'react-router-dom'
+import { Location, useLocation } from 'react-router-dom'
 import { ConnectionOptionType } from '../components/Connection'
-import { isMobile, isIos } from '../components/Pages/LoginPage/utils'
+import { isIos, isMobile } from '../components/Pages/LoginPage/utils'
 import { extractRedirectToFromSearchParameters } from '../shared/locations'
 
 type TargetConfigId = 'default' | 'alternative' | 'ios' | 'android' | 'androidSocial' | 'androidWeb3'
@@ -123,7 +123,7 @@ const adjustWeb3OptionsForMobile = (config: TargetConfig): TargetConfig => {
 }
 
 // Exporting targetConfigs specifically for testing
-export const _targetConfigs = targetConfigs
+const _targetConfigs = targetConfigs
 
 const getTargetConfigId = (location: Location): TargetConfigId => {
   const search = new URLSearchParams(location.search)
@@ -154,7 +154,7 @@ const getTargetConfigId = (location: Location): TargetConfigId => {
       if (targetConfigIdFromRedirectTo in targetConfigs) {
         return targetConfigIdFromRedirectTo
       }
-    } catch (error) {
+    } catch {
       console.error("Can't parse redirectTo URL")
     }
   }
@@ -162,7 +162,7 @@ const getTargetConfigId = (location: Location): TargetConfigId => {
   return 'default'
 }
 
-export const useTargetConfig = (): [TargetConfig, TargetConfigId] => {
+const useTargetConfig = (): [TargetConfig, TargetConfigId] => {
   const location = useLocation()
   const targetConfigId = getTargetConfigId(location)
   let config = targetConfigs[targetConfigId]
@@ -171,3 +171,5 @@ export const useTargetConfig = (): [TargetConfig, TargetConfigId] => {
   }
   return [config, targetConfigId]
 }
+
+export { _targetConfigs, useTargetConfig }

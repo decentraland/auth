@@ -1,14 +1,14 @@
 import { IFetchComponent } from '@well-known-components/interfaces'
-import { createLambdasClient, createContentClient, DeploymentBuilder } from 'dcl-catalyst-client'
+import { DeploymentBuilder, createContentClient, createLambdasClient } from 'dcl-catalyst-client'
 import { Profile, ProfileAvatarsItem } from 'dcl-catalyst-client/dist/client/specs/catalyst.schemas'
 import { getCatalystServersFromCache } from 'dcl-catalyst-client/dist/contracts-snapshots'
 import { L1Network } from '@dcl/catalyst-contracts'
 import { AuthIdentity, Authenticator } from '@dcl/crypto'
-import { EntityType, Entity } from '@dcl/schemas'
+import { Entity, EntityType } from '@dcl/schemas'
 import { createFetcher } from '../../shared/fetcher'
 import { config } from '../config'
 
-export interface ConsistencyResult {
+interface ConsistencyResult {
   isConsistent: boolean
   profile?: Profile
   profileFetchedFrom?: string
@@ -31,18 +31,18 @@ const getCatalystServers = (network: L1Network, disabledCatalysts: string[] = []
   return catalystServersFromCache.filter(server => !disabledCatalysts.includes(server.address))
 }
 
-export async function fetchProfile(address: string, fetcher?: IFetchComponent): Promise<Profile | null> {
+async function fetchProfile(address: string, fetcher?: IFetchComponent): Promise<Profile | null> {
   const PEER_URL = config.get('PEER_URL')
   const client = createLambdasClient({ url: PEER_URL + '/lambdas', fetcher: fetcher ?? createFetcher() })
   try {
     const profile: Profile = await client.getAvatarDetails(address)
     return profile
-  } catch (error) {
+  } catch {
     return null
   }
 }
 
-export async function fetchProfileWithConsistencyCheck(
+async function fetchProfileWithConsistencyCheck(
   address: string,
   disabledCatalysts: string[],
   fetcher?: IFetchComponent
@@ -109,7 +109,7 @@ export async function fetchProfileWithConsistencyCheck(
   }
 }
 
-export async function redeployExistingProfile(
+async function redeployExistingProfile(
   profile: Profile,
   connectedAccount: string,
   connectedAccountIdentity: AuthIdentity,
@@ -122,7 +122,7 @@ export async function redeployExistingProfile(
   await redeployWithCatalystRotation(connectedAccount, connectedAccountIdentity, metadata, disabledCatalysts, fetcher)
 }
 
-export async function redeployExistingProfileWithContentServerData(
+async function redeployExistingProfileWithContentServerData(
   catalystUrl: string,
   connectedAccount: string,
   connectedAccountIdentity: AuthIdentity,
@@ -317,3 +317,6 @@ function isProfileResult(result: ProfileResult | ProfileResultError): result is 
 function isProfileResultError(result: ProfileResult | ProfileResultError): result is ProfileResultError {
   return 'error' in result
 }
+
+export { fetchProfile, fetchProfileWithConsistencyCheck, redeployExistingProfile, redeployExistingProfileWithContentServerData }
+export type { ConsistencyResult }

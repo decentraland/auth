@@ -1,11 +1,11 @@
-import { IntercomWindow, IntercomSettings } from './Intercom.types'
+import { IntercomSettings, IntercomWindow } from './Intercom.types'
 
 const intercomWindow = window as unknown as IntercomWindow
 
-export class IntercomWidget {
+class IntercomWidget {
   private _appId: string | undefined
   private _settings: IntercomSettings | undefined
-  client: ((method: string, arg?: any) => void) | undefined
+  client: ((method: string, arg?: unknown) => void) | undefined
 
   static instance: IntercomWidget
 
@@ -16,7 +16,7 @@ export class IntercomWidget {
     return this.instance
   }
 
-  set appId(id: string) {
+  set appId(id: string | undefined) {
     this._appId = id
     this.client = getWindowClient(id)
   }
@@ -25,9 +25,11 @@ export class IntercomWidget {
     return this._appId
   }
 
-  set settings(settings: IntercomSettings) {
+  set settings(settings: IntercomSettings | undefined) {
     this._settings = settings
-    intercomWindow.intercomSettings = settings
+    if (settings !== undefined) {
+      intercomWindow.intercomSettings = settings
+    }
   }
 
   get settings(): IntercomSettings | undefined {
@@ -57,7 +59,7 @@ export class IntercomWidget {
     })
   }
 
-  render(data: Record<string, any> = {}) {
+  render(data: Record<string, unknown> = {}) {
     this.client?.('reattach_activator')
     // eslint-disable-next-line @typescript-eslint/naming-convention
     this.client?.('update', { ...data, app_id: this._appId })
@@ -77,7 +79,7 @@ export class IntercomWidget {
 }
 
 function getWindowClient(appId: string | undefined) {
-  return (...args: [string, ...any[]]) => {
+  return (...args: [string, ...unknown[]]) => {
     if (!appId) {
       return console.warn('Intercom app id empty. Check that the environment is property set')
     }
@@ -115,3 +117,5 @@ function insertScript({ type = 'text/javascript', async = true, ...props }) {
 
   return script
 }
+
+export { IntercomWidget }

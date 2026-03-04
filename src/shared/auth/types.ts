@@ -1,23 +1,25 @@
-export type RecoverResponse = {
+type RecoverResponse = {
   sender: string
   expiration: string
   method: string
   code?: string
   error?: string
-  params?: any[]
+  params?: unknown[]
 }
 
-export type OutcomeResponse = {
+type OutcomeResponse = {
   error?: string
 }
 
-export type IdentityResponse = {
+type IdentityResponse = {
   identityId: string
   expiration: Date
 }
 
-export type OutcomeError = { code: number; message: string }
+type OutcomeError = { code: number; message: string }
 
-export type ValidationResponse = {
+type ValidationResponse = {
   error?: string
 }
+
+export type { RecoverResponse, OutcomeResponse, IdentityResponse, OutcomeError, ValidationResponse }

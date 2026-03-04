@@ -1,7 +1,8 @@
 import { useCallback, useRef } from 'react'
-import { BrowserProvider } from 'ethers'
+import { createWalletClient, custom } from 'viem'
+import { mainnet } from 'viem/chains'
 import type { Provider } from 'decentraland-connect'
-import { createAuthServerWsClient, ExpiredRequestError, IpValidationError, RequestFulfilledError, RecoverResponse } from '../shared/auth'
+import { ExpiredRequestError, IpValidationError, RecoverResponse, RequestFulfilledError, createAuthServerWsClient } from '../shared/auth'
 import { isErrorWithMessage } from '../shared/errors'
 import { handleError } from '../shared/utils/errorHandler'
 
@@ -62,9 +63,12 @@ export const useSignRequest = (redirect: () => void, errorHandlers?: SignRequest
           errorHandlers.onConnectionModalOpen()
         }
 
-        const browserProvider = new BrowserProvider(provider)
-        const signer = await browserProvider.getSigner()
-        signature = await signer.signMessage(request.params?.[0])
+        const walletClient = createWalletClient({
+          chain: mainnet,
+          transport: custom(provider)
+        })
+        const [address] = await walletClient.getAddresses()
+        signature = await walletClient.signMessage({ account: address, message: request.params?.[0] as string })
 
         if (errorHandlers?.onConnectionModalClose) {
           errorHandlers.onConnectionModalClose()

@@ -5,7 +5,7 @@ import { ConnectionOptionType } from '../components/Connection'
 /**
  * Login method types that can be passed via URL parameters
  */
-export type LoginMethod = 'email' | 'metamask' | 'google' | 'discord' | 'apple' | 'x' | 'fortmatic' | 'coinbase' | 'walletconnect'
+type LoginMethod = 'email' | 'metamask' | 'google' | 'discord' | 'apple' | 'x' | 'fortmatic' | 'coinbase' | 'walletconnect'
 
 const VALID_LOGIN_METHODS: LoginMethod[] = [
   'email',
@@ -94,7 +94,7 @@ function mapLoginMethodToConnectionOption(method: LoginMethod): ConnectionOption
  * - /auth/login?loginMethod=metamask → Opens MetaMask connection
  * - /auth/login?loginMethod=google&redirectTo=/play → Opens Google OAuth
  */
-export const useAutoLogin = ({ isReady, onConnect }: UseAutoLoginOptions): UseAutoLoginResult => {
+const useAutoLogin = ({ isReady, onConnect }: UseAutoLoginOptions): UseAutoLoginResult => {
   const [searchParams] = useSearchParams()
   const autoLoginTriggeredRef = useRef(false)
 
@@ -133,3 +133,6 @@ export const useAutoLogin = ({ isReady, onConnect }: UseAutoLoginOptions): UseAu
     resolvedConnectionOption
   }
 }
+
+export { useAutoLogin }
+export type { LoginMethod }
