@@ -1,4 +1,5 @@
 import { useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import classNames from 'classnames'
 import type { AuthIdentity } from '@dcl/crypto'
 import { useTranslation } from '@dcl/hooks'
 import { ChainId } from '@dcl/schemas/dist/dapps/chain-id'
@@ -19,6 +20,26 @@ import ImageNew4 from '../../../assets/images/background/image-new4.webp'
 import ImageNew5 from '../../../assets/images/background/image-new5.webp'
 // eslint-disable-next-line @typescript-eslint/naming-convention
 import ImageNew6 from '../../../assets/images/background/image-new6.webp'
+// eslint-disable-next-line @typescript-eslint/naming-convention
+import Image1 from '../../../assets/images/background/image1.webp'
+// eslint-disable-next-line @typescript-eslint/naming-convention
+import Image10 from '../../../assets/images/background/image10.webp'
+// eslint-disable-next-line @typescript-eslint/naming-convention
+import Image2 from '../../../assets/images/background/image2.webp'
+// eslint-disable-next-line @typescript-eslint/naming-convention
+import Image3 from '../../../assets/images/background/image3.webp'
+// eslint-disable-next-line @typescript-eslint/naming-convention
+import Image4 from '../../../assets/images/background/image4.webp'
+// eslint-disable-next-line @typescript-eslint/naming-convention
+import Image5 from '../../../assets/images/background/image5.webp'
+// eslint-disable-next-line @typescript-eslint/naming-convention
+import Image6 from '../../../assets/images/background/image6.webp'
+// eslint-disable-next-line @typescript-eslint/naming-convention
+import Image7 from '../../../assets/images/background/image7.webp'
+// eslint-disable-next-line @typescript-eslint/naming-convention
+import Image8 from '../../../assets/images/background/image8.webp'
+// eslint-disable-next-line @typescript-eslint/naming-convention
+import Image9 from '../../../assets/images/background/image9.webp'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import { useAnalytics } from '../../../hooks/useAnalytics'
@@ -48,8 +69,9 @@ import {
   getIdentityWithSigner,
   isSocialLogin
 } from './utils'
-import { Background, BackgroundWrapper, GuestInfo, Left, LeftInfo, Main, MainContainer, NewUserInfo } from './LoginPage.styled'
+import styles from './LoginPage.module.css'
 
+const BACKGROUND_IMAGES = [Image1, Image2, Image3, Image4, Image5, Image6, Image7, Image8, Image9, Image10]
 const NEW_USER_BACKGROUND_IMAGES = [ImageNew1, ImageNew2, ImageNew3, ImageNew4, ImageNew5, ImageNew6]
 const NEW_USER_PARAM_VARIANTS = ['newUser', 'newuser', 'new-user', 'new_user']
 
@@ -67,6 +89,7 @@ export const LoginPage = () => {
   const { url: redirectTo, redirect } = useAfterLoginRedirection()
   const { initialized: flagInitialized, flags } = useContext(FeatureFlagsContext)
 
+  // Check if email OTP login is enabled via feature flag
   const isEmailOtpEnabled = flags[FeatureFlagsKeys.EMAIL_OTP_LOGIN] === true
 
   // Email login state
@@ -405,7 +428,7 @@ export const LoginPage = () => {
   }, [currentConnectionType, emailLoginAddress, runProfileRedirect, getReferrerFromCurrentSearch])
 
   useEffect(() => {
-    const images = NEW_USER_BACKGROUND_IMAGES
+    const images = isNewUser ? NEW_USER_BACKGROUND_IMAGES : BACKGROUND_IMAGES
     const maxIndex = images.length - 1
     const backgroundInterval = setInterval(() => {
       setCurrentBackgroundIndex(prev => {
@@ -415,7 +438,7 @@ export const LoginPage = () => {
       })
     }, 5000)
     return () => clearInterval(backgroundInterval)
-  }, [])
+  }, [isNewUser])
 
   useEffect(() => {
     if (!backgroundTransitioning) return
@@ -426,25 +449,25 @@ export const LoginPage = () => {
     return () => clearTimeout(t)
   }, [backgroundTransitioning, currentBackgroundIndex])
 
-  const backgroundImages = NEW_USER_BACKGROUND_IMAGES
+  const backgroundImages = isNewUser ? NEW_USER_BACKGROUND_IMAGES : BACKGROUND_IMAGES
   return (
-    <Main isNewUser={isNewUser}>
-      <BackgroundWrapper>
-        <Background
-          isVisible={true}
+    <main className={classNames(styles.main, isNewUser && styles.newUserMain)}>
+      <div className={styles.backgroundWrapper}>
+        <div
+          className={styles.background}
           style={{
             backgroundImage: `url(${backgroundImages[previousBackgroundIndex]})`
           }}
           aria-hidden
         />
-        <Background
-          isVisible={backgroundTransitioning}
+        <div
+          className={classNames(styles.background, backgroundTransitioning ? styles.backgroundEnterActive : styles.backgroundEnter)}
           style={{
             backgroundImage: `url(${backgroundImages[currentBackgroundIndex]})`
           }}
           aria-hidden
         />
-      </BackgroundWrapper>
+      </div>
       {showConfirmingLogin && !showClockSyncModal && (
         <ConfirmingLogin error={confirmingLoginError} onError={confirmingLoginError ? handleConfirmingLoginRetry : undefined} />
       )}
@@ -470,9 +493,9 @@ export const LoginPage = () => {
               onError={handleEmailLoginError}
             />
           )}
-          <Left>
-            <LeftInfo>
-              <MainContainer>
+          <div className={styles.left}>
+            <div className={styles.leftInfo}>
+              <div className={styles.mainContainer}>
                 <Connection
                   onConnect={handleOnConnect}
                   onEmailSubmit={isEmailOtpEnabled ? handleEmailSubmit : undefined}
@@ -484,23 +507,23 @@ export const LoginPage = () => {
                   emailError={emailError}
                 />
                 {isNewUser && (
-                  <NewUserInfo>
+                  <div className={styles.newUserInfo}>
                     {t('login.already_have_account')} <span onClick={() => setIsNewUser(false)}>{t('login.sign_in')}</span>
-                  </NewUserInfo>
+                  </div>
                 )}
-              </MainContainer>
+              </div>
               {showGuestOption && (
-                <GuestInfo>
+                <div className={styles.guestInfo}>
                   {t('login.quick_dive')}{' '}
                   <a href={guestRedirectToURL} onClick={handleGuestLogin}>
                     {t('login.explore_as_guest')}
                   </a>
-                </GuestInfo>
+                </div>
               )}
-            </LeftInfo>
-          </Left>
+            </div>
+          </div>
         </>
       )}
-    </Main>
+    </main>
   )
 }
