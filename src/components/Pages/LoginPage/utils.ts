@@ -214,7 +214,7 @@ function isIos() {
 function getSignInOptionsMode(variants: Partial<FeatureFlagsVariants>): SignInOptionsMode {
   const variant = variants[FeatureFlagsKeys.SIGN_IN_PRIMARY_OPTION]
 
-  // If variant doesn't exist or is not enabled, use full mode (legacy behavior)
+  // If variant doesn't exist, use full mode (legacy behavior)
   if (!variant) {
     return SignInOptionsMode.FULL
   }

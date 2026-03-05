@@ -219,7 +219,7 @@ describe('getSignInOptionsMode', () => {
     variants = {}
   })
 
-  describe('when variant does not exist', () => {
+  describe('when feature flag does not exist', () => {
     it('should return FULL mode', () => {
       const result = getSignInOptionsMode(variants)
 
@@ -227,14 +227,7 @@ describe('getSignInOptionsMode', () => {
     })
   })
 
-  describe('when variant is not enabled', () => {
-    beforeEach(() => {
-      variants[FeatureFlagsKeys.SIGN_IN_PRIMARY_OPTION] = {
-        enabled: false,
-        name: SignInPrimaryOptionVariant.ONE_OPTION
-      }
-    })
-
+  describe('when feature flag is not enabled', () => {
     it('should return FULL mode', () => {
       const result = getSignInOptionsMode(variants)
 
@@ -242,7 +235,7 @@ describe('getSignInOptionsMode', () => {
     })
   })
 
-  describe('when variant is enabled', () => {
+  describe('when feature flag is enabled', () => {
     describe('and variant is TWO_OPTIONS', () => {
       beforeEach(() => {
         variants[FeatureFlagsKeys.SIGN_IN_PRIMARY_OPTION] = {
