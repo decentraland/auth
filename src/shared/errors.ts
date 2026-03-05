@@ -42,15 +42,15 @@ function isMagicRpcError(error: unknown): error is { code: number; rawMessage: s
  *
  * Covers:
  * - viem's UserRejectedRequestError (code 4001, EIP-1193 standard)
- *   Thrown by walletClient.signMessage() and walletClient.request()
+ *    Thrown by walletClient.signMessage() and walletClient.request()
  * - ethers v6 ACTION_REJECTED (code 'ACTION_REJECTED')
- *   Thrown when decentraland-connect returns an ethers BrowserProvider that
- *   intercepts the raw 4001 before viem can wrap it.
+ *    Thrown when decentraland-connect returns an ethers BrowserProvider that
+ *    intercepts the raw 4001 before viem can wrap it.
  * - decentraland-transactions' MetaTransactionError (code 'user_denied')
- *   Thrown by sendMetaTransaction() — but only when the wallet error message
- *   is exactly "User denied message signature". Viem uses a different message
- *   ("User rejected the request.") so the library falls through to code 'unknown',
- *   requiring a message-based fallback.
+ *    Thrown by sendMetaTransaction() — but only when the wallet error message
+ *    is exactly "User denied message signature". Viem uses a different message
+ *    ("User rejected the request.") so the library falls through to code 'unknown',
+ *    requiring a message-based fallback.
  */
 function isUserRejectedTransaction(error: unknown): boolean {
   if (error === null || typeof error !== 'object') return false
