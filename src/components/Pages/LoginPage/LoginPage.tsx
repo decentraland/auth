@@ -234,6 +234,10 @@ export const LoginPage = () => {
           }
           await getIdentitySignature(connectionData.account?.toLowerCase() ?? '', connectionData.provider)
 
+          // Clear any stored social login emails since this is a wallet login
+          localStorage.removeItem('dcl_thirdweb_user_email')
+          localStorage.removeItem('dcl_magic_user_email')
+
           await trackLoginSuccess({
             ethAddress: connectionData.account ?? undefined,
             type: providerType

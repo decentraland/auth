@@ -3,7 +3,7 @@ import * as React from 'react'
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from '@dcl/hooks'
-import { Email, EthAddress } from '@dcl/schemas'
+import { EthAddress } from '@dcl/schemas'
 import { PreviewUnityMode } from '@dcl/schemas/dist/dapps/preview'
 import { CircularProgress, WearablePreview, launchDesktopApp } from 'decentraland-ui2'
 import avatarFloat from '../../../assets/animations/AvatarFloat_Lottie.json'
@@ -17,6 +17,7 @@ import { config } from '../../../modules/config'
 import { fetchProfile } from '../../../modules/profile'
 import { IpValidationError, createAuthServerHttpClient, createAuthServerWsClient } from '../../../shared/auth'
 import { useCurrentConnectionData } from '../../../shared/connection/hooks'
+import { isEmailValid } from '../../../shared/email'
 import { locations } from '../../../shared/locations'
 import { isProfileComplete } from '../../../shared/profile'
 import { handleError } from '../../../shared/utils/errorHandler'
@@ -129,8 +130,7 @@ const AvatarSetupPage: React.FC = () => {
   }, [state.isTermsChecked, t])
 
   const handleContinueClick = useCallback(() => {
-    const validEmail = Email.validate(state.email)
-    if (state.email && state.email !== '' && !validEmail) {
+    if (state.email && state.email !== '' && !isEmailValid(state.email)) {
       setState(prev => ({ ...prev, hasEmailError: true }))
       return
     }
