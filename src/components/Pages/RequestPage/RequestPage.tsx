@@ -23,7 +23,7 @@ import {
   createAuthServerHttpClient
 } from '../../../shared/auth'
 import { useCurrentConnectionData } from '../../../shared/connection'
-import { isErrorWithMessage, isRpcError } from '../../../shared/errors'
+import { isErrorWithMessage, isRpcError, isUserRejectedTransaction } from '../../../shared/errors'
 import { extractReferrerFromSearchParameters, locations } from '../../../shared/locations'
 import { sendTipNotification } from '../../../shared/notifications'
 import { isProfileComplete } from '../../../shared/profile'
@@ -468,7 +468,22 @@ export const RequestPage = () => {
         return
       }
 
-      if (e instanceof IpValidationError) {
+      if (isUserRejectedTransaction(e)) {
+        console.info('User rejected sign-in verification in wallet — not reporting to Sentry')
+        try {
+          if (walletClientRef.current) {
+            const [addr] = await walletClientRef.current.getAddresses()
+            await authServerClient.current.sendFailedOutcome(requestId, addr, {
+              code: -32003,
+              message: 'Transaction rejected'
+            })
+          }
+        } catch (failedOutcomeError) {
+          console.error('Failed to send denied notification:', failedOutcomeError)
+        }
+        hasCompletedRef.current = true
+        setView(View.VERIFY_SIGN_IN_DENIED)
+      } else if (e instanceof IpValidationError) {
         setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
         setView(View.IP_VALIDATION_ERROR)
       } else {
@@ -589,7 +604,28 @@ export const RequestPage = () => {
         setView(View.WALLET_INTERACTION_COMPLETE)
       }
     } catch (e) {
-      if (e instanceof IpValidationError) {
+      if (isUserRejectedTransaction(e)) {
+        console.info('User rejected wallet interaction in wallet — not reporting to Sentry')
+        try {
+          if (walletClientRef.current) {
+            const [addr] = await walletClientRef.current.getAddresses()
+            await authServerClient.current.sendFailedOutcome(requestId, addr, {
+              code: -32003,
+              message: 'Transaction rejected'
+            })
+          }
+        } catch (failedOutcomeError) {
+          console.error('Failed to send denied notification:', failedOutcomeError)
+        }
+        hasCompletedRef.current = true
+        if (nftTransferData) {
+          setView(View.WALLET_NFT_INTERACTION_DENIED)
+        } else if (manaTransferData) {
+          setView(View.WALLET_MANA_INTERACTION_DENIED)
+        } else {
+          setView(View.WALLET_INTERACTION_DENIED)
+        }
+      } else if (e instanceof IpValidationError) {
         setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
         setView(View.IP_VALIDATION_ERROR)
       } else {
@@ -611,7 +647,6 @@ export const RequestPage = () => {
             }
           }
         } catch (failedOutcomeError) {
-          // Log the error but don't prevent the error view from showing
           console.error('Failed to send failed outcome:', failedOutcomeError)
         }
 
