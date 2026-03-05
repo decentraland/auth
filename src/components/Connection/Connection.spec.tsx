@@ -274,12 +274,6 @@ describe('when rendering the Connection component', () => {
           fireEvent.click(getByTestId(SHOW_MORE_BUTTON_TEST_ID))
         })
 
-        // When there's no secondary: firstWalletOption=undefined, secondWalletOption=extraOptions[0], remainingWalletOptions=extraOptions.slice(1)
-        // But wait, that's not right. Let me check the hook logic again...
-        // Actually when secondary is undefined:
-        // - firstWalletOption = undefined
-        // - secondWalletOption = extraOptions[0] = METAMASK
-        // - remainingWalletOptions = extraOptions.slice(1) = [FORTMATIC, WALLET_CONNECT, COINBASE]
         const remainingOptions = connectionOptions?.extraOptions?.slice(1) || []
         remainingOptions.forEach(option => {
           fireEvent.click(getByTestId(`${EXTRA_TEST_ID}-${option}-button`))

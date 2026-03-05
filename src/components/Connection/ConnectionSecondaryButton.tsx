@@ -1,8 +1,8 @@
 import { useTranslation } from '@dcl/hooks'
+import { shouldDisableMetaMask } from './Connection.utils'
 import { ConnectionOption } from './ConnectionOption'
 import { ConnectionSecondaryButtonProps } from './ConnectionSecondaryButton.types'
 import { SecondaryOptionButton, ShowMoreSecondaryOptions } from './ConnectionSecondaryButton.styled'
-import { shouldDisableMetaMask } from './Connection.utils'
 
 export const ConnectionSecondaryButton = ({
   options,

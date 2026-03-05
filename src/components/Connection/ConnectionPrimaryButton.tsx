@@ -2,6 +2,7 @@
 import Tooltip from '@mui/material/Tooltip'
 import { useTranslation } from '@dcl/hooks'
 import { muiIcons } from 'decentraland-ui2'
+import { shouldDisableMetaMask } from './Connection.utils'
 import { ConnectionIcon } from './ConnectionIcon'
 import { connectionOptionTitles } from './Connection.types'
 import { ConnectionPrimaryButtonProps } from './ConnectionPrimaryButton.types'
@@ -14,7 +15,6 @@ import {
   TooltipWrapper,
   primaryTooltipSlotProps
 } from './ConnectionPrimaryButton.styled'
-import { shouldDisableMetaMask } from './Connection.utils'
 
 const NavigateNextRoundedIcon = muiIcons.NavigateNextRounded
 
