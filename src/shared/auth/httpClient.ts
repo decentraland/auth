@@ -4,8 +4,13 @@ import { RequestInteractionType, TrackingEvents } from '../../modules/analytics/
 import { config } from '../../modules/config'
 import { trackEvent } from '../utils/analytics'
 import { handleError } from '../utils/errorHandler'
+import { isErrorWithMessage } from '../errors'
 import { DifferentSenderError, ExpiredRequestError, IpValidationError, RequestFulfilledError, RequestNotFoundError } from './errors'
 import { IdentityResponse, OutcomeError, OutcomeResponse, RecoverResponse } from './types'
+
+const isExpectedRequestLifecycleError = (e: unknown): boolean =>
+  e instanceof ExpiredRequestError || e instanceof RequestFulfilledError
+
 export const createAuthServerHttpClient = (authServerUrl?: string) => {
   const baseUrl = authServerUrl ?? config.get('AUTH_SERVER_URL')
 
@@ -57,7 +62,11 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
 
       return {}
     } catch (e) {
-      handleError(e, 'Error sending outcome')
+      if (isExpectedRequestLifecycleError(e)) {
+        console.info(`Request ${requestId} outcome send skipped — ${isErrorWithMessage(e) ? e.message : 'request no longer available'}`)
+      } else {
+        handleError(e, 'Error sending outcome')
+      }
       throw e
     }
   }
@@ -118,7 +127,11 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
 
       return {}
     } catch (e) {
-      handleError(e, 'Error sending outcome')
+      if (isExpectedRequestLifecycleError(e)) {
+        console.info(`Request ${requestId} outcome send skipped — ${isErrorWithMessage(e) ? e.message : 'request no longer available'}`)
+      } else {
+        handleError(e, 'Error sending outcome')
+      }
       throw e
     }
   }
