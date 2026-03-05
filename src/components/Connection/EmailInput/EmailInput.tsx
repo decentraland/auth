@@ -1,10 +1,7 @@
 import { ChangeEvent, KeyboardEvent, useCallback, useMemo, useRef, useState } from 'react'
 import { useTranslation } from '@dcl/hooks'
+import { isEmailValid } from '../../../shared/email'
 import styles from './EmailInput.module.css'
-
-// RFC 5322 compliant email regex
-const EMAIL_REGEX =
-  /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/
 
 export type EmailInputProps = {
   onSubmit: (email: string) => void
@@ -20,7 +17,7 @@ export const EmailInput = ({ onSubmit, onEmailChange, isLoading, error }: EmailI
 
   const isValidEmail = useMemo(() => {
     if (!email) return false
-    return EMAIL_REGEX.test(email)
+    return isEmailValid(email)
   }, [email])
 
   const handleEmailChange = useCallback(
