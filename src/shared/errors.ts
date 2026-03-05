@@ -58,6 +58,9 @@ function isMagicExtensionError(error: unknown): error is { code: string; rawMess
  * Covers:
  * - viem's UserRejectedRequestError (code 4001, EIP-1193 standard)
  *   Thrown by walletClient.signMessage() and walletClient.request()
+ * - ethers v6 ACTION_REJECTED (code 'ACTION_REJECTED')
+ *   Thrown when decentraland-connect returns an ethers BrowserProvider that
+ *   intercepts the raw 4001 before viem can wrap it.
  * - decentraland-transactions' MetaTransactionError (code 'user_denied')
  *   Thrown by sendMetaTransaction() — but only when the wallet error message
  *   is exactly "User denied message signature". Viem uses a different message
@@ -70,6 +73,8 @@ function isUserRejectedTransaction(error: unknown): boolean {
   const code = (error as { code: unknown }).code
   // viem UserRejectedRequestError (EIP-1193)
   if (code === 4001) return true
+  // ethers v6 — wraps raw 4001 as ACTION_REJECTED before viem sees it
+  if (code === 'ACTION_REJECTED') return true
   // decentraland-transactions MetaTransactionError with correct classification
   if (code === 'user_denied') return true
 
