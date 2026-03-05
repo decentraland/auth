@@ -29,8 +29,7 @@ export const Connection = (props: ConnectionProps): JSX.Element => {
     className,
     loadingOption,
     isNewUser,
-    isOnlyEmailOption = false,
-    isSignInWithTwoOptions = false,
+    signInOptionsMode,
     isEmailLoading,
     emailError
   } = props
@@ -45,8 +44,7 @@ export const Connection = (props: ConnectionProps): JSX.Element => {
 
   const { firstWalletOption, secondWalletOption, remainingWalletOptions } = useWalletOptions({
     connectionOptions,
-    isOnlyEmailOption,
-    isSignInWithTwoOptions
+    signInOptionsMode
   })
 
   return (

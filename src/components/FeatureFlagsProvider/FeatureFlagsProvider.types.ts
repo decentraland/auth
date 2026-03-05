@@ -16,7 +16,7 @@ enum OnboardingFlowVariant {
   V2 = 'V2'
 }
 
-enum SignInPrimaryOption {
+enum SignInPrimaryOptionVariant {
   ONE_OPTION = 'one-option',
   TWO_OPTIONS = 'two-options'
 }
@@ -38,5 +38,5 @@ const defaultFeatureFlagsContextValue: FeatureFlagsContextType = {
 // eslint-disable-next-line @typescript-eslint/naming-convention
 const FeatureFlagsContext = createContext(defaultFeatureFlagsContextValue)
 
-export { FeatureFlagsKeys, OnboardingFlowVariant, SignInPrimaryOption, defaultFeatureFlagsContextValue, FeatureFlagsContext }
-export type { FeatureFlagsContextType }
+export { FeatureFlagsKeys, OnboardingFlowVariant, SignInPrimaryOptionVariant, defaultFeatureFlagsContextValue, FeatureFlagsContext }
+export type { FeatureFlagsContextType, FeatureFlagsVariants }

@@ -37,7 +37,7 @@ const Main = styled('main')(({ theme }) => ({
     display: 'flex',
     height: 'auto',
     ['&::before']: {
-      background: 'linear-gradient(144.23deg, #491975 10.31%, #D72CCD 102.43%)'
+      background: 'linear-gradient(151.89deg, #491975 47.67%, #D72CCD 103.3%)'
     }
   }
 }))

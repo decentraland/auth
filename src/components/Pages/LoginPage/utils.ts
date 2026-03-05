@@ -7,7 +7,9 @@ import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
 import { localStorageGetIdentity, localStorageStoreIdentity } from '@dcl/single-sign-on-client'
 import { ConnectionResponse, Provider, WalletConnectV2Connector, connection, getConfiguration } from 'decentraland-connect'
 import { extractReferrerFromSearchParameters } from '../../../shared/locations'
-import { ConnectionOptionType } from '../../Connection'
+import { ConnectionOptionType, SignInOptionsMode } from '../../Connection'
+import { FeatureFlagsKeys, SignInPrimaryOptionVariant } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
+import type { FeatureFlagsVariants } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
 
 const ONE_MONTH_IN_MINUTES = 60 * 24 * 30
 
@@ -203,6 +205,29 @@ function isIos() {
   return /iPhone|iPad|iPod/i.test(userAgent)
 }
 
+/**
+ * Determines the sign-in options mode based on feature flag variants.
+ * - FULL: Show all wallet options (default/legacy behavior when variant doesn't exist or is not enabled)
+ * - ONE: Show email + one wallet option (MetaMask if available)
+ * - TWO: Show email + two wallet options (Google + MetaMask if available)
+ */
+function getSignInOptionsMode(variants: Partial<FeatureFlagsVariants>): SignInOptionsMode {
+  const variant = variants[FeatureFlagsKeys.SIGN_IN_PRIMARY_OPTION]
+
+  // If variant doesn't exist or is not enabled, use full mode (legacy behavior)
+  if (!variant) {
+    return SignInOptionsMode.FULL
+  }
+
+  // If variant is TWO_OPTIONS, use two options mode
+  if (variant.name === SignInPrimaryOptionVariant.TWO_OPTIONS) {
+    return SignInOptionsMode.TWO
+  }
+
+  // Otherwise, use one option mode (ONE_OPTION or any other value)
+  return SignInOptionsMode.ONE
+}
+
 export {
   fromConnectionOptionToProviderType,
   connectToSocialProvider,
@@ -212,5 +237,6 @@ export {
   getIdentitySignature,
   getIdentityWithSigner,
   isMobile,
-  isIos
+  isIos,
+  getSignInOptionsMode
 }

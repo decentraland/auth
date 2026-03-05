@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { ConnectionOptionType } from '../components/Connection/Connection.types'
+import { ConnectionOptionType, SignInOptionsMode } from '../components/Connection/Connection.types'
 
 type ConnectionOptions = {
   primary: ConnectionOptionType
@@ -9,8 +9,7 @@ type ConnectionOptions = {
 
 type UseWalletOptionsParams = {
   connectionOptions?: ConnectionOptions
-  isOnlyEmailOption?: boolean
-  isSignInWithTwoOptions?: boolean
+  signInOptionsMode?: SignInOptionsMode
 }
 
 type WalletOptions = {
@@ -19,18 +18,14 @@ type WalletOptions = {
   remainingWalletOptions: ConnectionOptionType[] | undefined
 }
 
-export const useWalletOptions = ({
-  connectionOptions,
-  isOnlyEmailOption,
-  isSignInWithTwoOptions
-}: UseWalletOptionsParams): WalletOptions => {
+export const useWalletOptions = ({ connectionOptions, signInOptionsMode }: UseWalletOptionsParams): WalletOptions => {
   return useMemo(() => {
     const allWalletOptions = [connectionOptions?.secondary, ...(connectionOptions?.extraOptions ?? [])].filter(
       (opt): opt is ConnectionOptionType => opt !== undefined
     )
 
-    // Current/Old behavior: show all options normally (when isOnlyEmailOption is disabled)
-    if (!isOnlyEmailOption) {
+    // FULL mode: Show all options normally (legacy behavior)
+    if (!signInOptionsMode || signInOptionsMode === SignInOptionsMode.FULL) {
       return {
         firstWalletOption: connectionOptions?.secondary,
         secondWalletOption: connectionOptions?.extraOptions?.[0],
@@ -38,13 +33,13 @@ export const useWalletOptions = ({
       }
     }
 
-    // New behavior when isOnlyEmailOption FF is enabled
+    // For ONE and TWO modes: determine which wallet options to show
     const hasEthereumProvider = !!window.ethereum
     const googleOption = allWalletOptions.find(opt => opt === ConnectionOptionType.GOOGLE)
     const metamaskOption = allWalletOptions.find(opt => opt === ConnectionOptionType.METAMASK)
 
-    // TWO options mode: Show Google + MetaMask (if Ethereum provider exists)
-    if (isSignInWithTwoOptions) {
+    // TWO mode: Show Google + MetaMask (if Ethereum provider exists)
+    if (signInOptionsMode === SignInOptionsMode.TWO) {
       if (hasEthereumProvider && metamaskOption) {
         return {
           firstWalletOption: googleOption,
@@ -61,7 +56,7 @@ export const useWalletOptions = ({
       }
     }
 
-    // ONE option mode: Show MetaMask (if Ethereum provider exists) or nothing
+    // ONE mode: Show MetaMask (if Ethereum provider exists) or nothing
     if (hasEthereumProvider && metamaskOption) {
       return {
         firstWalletOption: metamaskOption,
@@ -79,5 +74,5 @@ export const useWalletOptions = ({
       secondWalletOption: undefined,
       remainingWalletOptions: orderedOptions
     }
-  }, [connectionOptions, isOnlyEmailOption, isSignInWithTwoOptions])
+  }, [connectionOptions, signInOptionsMode])
 }

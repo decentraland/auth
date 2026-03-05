@@ -6,7 +6,7 @@ import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
 import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
 import { Env } from '@dcl/ui-env'
 import { connection } from 'decentraland-connect'
-import { CircularProgress } from 'decentraland-ui2'
+import { CircularProgress, Desktop } from 'decentraland-ui2'
 // eslint-disable-next-line @typescript-eslint/naming-convention
 import ImageNew1 from '../../../assets/images/background/image-new1.webp'
 // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -38,7 +38,7 @@ import { ConnectionModal } from '../../ConnectionModal'
 import { ConnectionLayoutState } from '../../ConnectionModal/ConnectionLayout.type'
 import { EmailLoginModal } from '../../EmailLoginModal'
 import { EmailLoginResult } from '../../EmailLoginModal/EmailLoginModal.types'
-import { FeatureFlagsContext, FeatureFlagsKeys, SignInPrimaryOption } from '../../FeatureFlagsProvider'
+import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import { ConfirmingLogin } from './ConfirmingLogin'
 import {
   connectToProvider,
@@ -46,6 +46,7 @@ import {
   fromConnectionOptionToProviderType,
   getIdentitySignature,
   getIdentityWithSigner,
+  getSignInOptionsMode,
   isSocialLogin
 } from './utils'
 import { Background, BackgroundWrapper, GuestInfo, Left, LeftInfo, Main, MainContainer, NewUserInfo } from './LoginPage.styled'
@@ -67,8 +68,7 @@ export const LoginPage = () => {
   const { url: redirectTo, redirect } = useAfterLoginRedirection()
   const { initialized: flagInitialized, flags, variants } = useContext(FeatureFlagsContext)
 
-  const isOnlyEmailOption = flags[FeatureFlagsKeys.SIGN_IN_PRIMARY_OPTION]
-  const isSignInWithTwoOptions = variants[FeatureFlagsKeys.SIGN_IN_PRIMARY_OPTION]?.name === SignInPrimaryOption.TWO_OPTIONS
+  const signInOptionsMode = getSignInOptionsMode(variants)
 
   // Email login state
   const [currentEmail, setCurrentEmail] = useState('')
@@ -424,22 +424,24 @@ export const LoginPage = () => {
   const backgroundImages = NEW_USER_BACKGROUND_IMAGES
   return (
     <Main>
-      <BackgroundWrapper>
-        <Background
-          isVisible={true}
-          style={{
-            backgroundImage: `url(${backgroundImages[previousBackgroundIndex]})`
-          }}
-          aria-hidden
-        />
-        <Background
-          isVisible={backgroundTransitioning}
-          style={{
-            backgroundImage: `url(${backgroundImages[currentBackgroundIndex]})`
-          }}
-          aria-hidden
-        />
-      </BackgroundWrapper>
+      <Desktop>
+        <BackgroundWrapper>
+          <Background
+            isVisible={true}
+            style={{
+              backgroundImage: `url(${backgroundImages[previousBackgroundIndex]})`
+            }}
+            aria-hidden
+          />
+          <Background
+            isVisible={backgroundTransitioning}
+            style={{
+              backgroundImage: `url(${backgroundImages[currentBackgroundIndex]})`
+            }}
+            aria-hidden
+          />
+        </BackgroundWrapper>
+      </Desktop>
       {showConfirmingLogin && !showClockSyncModal && (
         <ConfirmingLogin error={confirmingLoginError} onError={confirmingLoginError ? handleConfirmingLoginRetry : undefined} />
       )}
@@ -473,8 +475,7 @@ export const LoginPage = () => {
                   loadingOption={currentConnectionType}
                   connectionOptions={targetConfig.connectionOptions}
                   isNewUser={isNewUser}
-                  isOnlyEmailOption={isOnlyEmailOption}
-                  isSignInWithTwoOptions={isSignInWithTwoOptions}
+                  signInOptionsMode={signInOptionsMode}
                   isEmailLoading={isEmailLoading}
                   emailError={emailError}
                 />

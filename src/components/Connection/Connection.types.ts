@@ -1,3 +1,9 @@
+enum SignInOptionsMode {
+  FULL = 'FULL',
+  ONE = 'ONE',
+  TWO = 'TWO'
+}
+
 enum ConnectionOptionType {
   METAMASK = 'metamask',
   DAPPER = 'dapper',
@@ -42,8 +48,7 @@ type ConnectionProps = {
   className?: string
   loadingOption?: ConnectionOptionType
   isNewUser?: boolean
-  isOnlyEmailOption?: boolean
-  isSignInWithTwoOptions?: boolean
+  signInOptionsMode?: SignInOptionsMode
   isEmailLoading?: boolean
   emailError?: string | null
   onConnect: (wallet: ConnectionOptionType) => unknown
@@ -51,5 +56,5 @@ type ConnectionProps = {
   onEmailChange?: () => void
 }
 
-export { ConnectionOptionType, connectionOptionTitles }
+export { SignInOptionsMode, ConnectionOptionType, connectionOptionTitles }
 export type { MetamaskEthereumWindow, ConnectionProps }
