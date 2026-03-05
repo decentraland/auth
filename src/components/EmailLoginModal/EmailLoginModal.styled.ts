@@ -250,26 +250,34 @@ const ResendText = styled('p')(({ theme }) => ({
   margin: theme.spacing(1, 0, 0)
 }))
 
-const ResendLink = styled('span')(({ theme }) => ({
+const ResendLink = styled('span', {
+  shouldForwardProp: prop => prop !== 'disabled'
+})<{ disabled?: boolean }>(({ theme, disabled }) => ({
   color: theme.palette.primary.main,
-  cursor: 'pointer',
+  cursor: disabled ? 'not-allowed' : 'pointer',
   textDecoration: 'underline',
-  transition: 'color 0.2s',
+  transition: 'color 0.2s, opacity 0.2s',
+  opacity: disabled ? 0.5 : 1,
+  pointerEvents: disabled ? 'none' : 'auto',
   '&:hover': {
-    color: '#ffb3b3'
+    color: disabled ? theme.palette.primary.main : '#ffb3b3'
   }
 }))
 
-const ResendLinkError = styled('span')({
+const ResendLinkError = styled('span', {
+  shouldForwardProp: prop => prop !== 'disabled'
+})<{ disabled?: boolean }>(({ disabled }) => ({
   color: 'white',
   fontSize: 14,
-  cursor: 'pointer',
+  cursor: disabled ? 'not-allowed' : 'pointer',
   textDecoration: 'underline',
   transition: 'opacity 0.2s',
+  opacity: disabled ? 0.5 : 1,
+  pointerEvents: disabled ? 'none' : 'auto',
   '&:hover': {
-    opacity: 0.8
+    opacity: disabled ? 0.5 : 0.8
   }
-})
+}))
 
 export {
   OTP_MODAL_ROOT_CLASS,
