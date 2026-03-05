@@ -101,17 +101,21 @@ const DesktopCallbackPage = () => {
       const magic = await createMagicInstance(!!flags[FeatureFlagsKeys.MAGIC_TEST])
       const referrer = extractReferrerFromSearchParameters(searchParams)
 
-      // Clear any existing Magic session before completing the OAuth redirect,
-      // otherwise getRedirectResult() throws RPC -32600 ("User is already logged in")
-      if (magic && (await magic.user.isLoggedIn())) {
-        await magic.user.logout()
-      }
+      try {
+        const result = await magic?.oauth2.getRedirectResult()
 
-      const result = await magic?.oauth2.getRedirectResult()
-
-      // Store user email in localStorage if available
-      if (result?.oauth?.userInfo?.email) {
-        localStorage.setItem('dcl_magic_user_email', result.oauth.userInfo.email)
+        // Store user email in localStorage if available
+        if (result?.oauth?.userInfo?.email) {
+          localStorage.setItem('dcl_magic_user_email', result.oauth.userInfo.email)
+        }
+      } catch (error) {
+        // RPC -32600: "User is already logged in" — Magic skipped OAuth verification
+        // because a session already exists. This is safe to ignore; proceed with the
+        // existing session by calling handleContinue below.
+        const isAlreadyLoggedIn = isMagicRpcError(error) && error.code === -32600
+        if (!isAlreadyLoggedIn) {
+          throw error
+        }
       }
 
       handleContinue(referrer)
