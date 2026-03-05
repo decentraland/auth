@@ -66,7 +66,13 @@ export const useAuthFlow = () => {
    * @returns {Promise<void>} A promise that resolves after the navigation or redirect completes
    */
   const checkProfileAndRedirect = useCallback(
-    async (account: string, referrer: string | null, redirect: () => void, providedIdentity: AuthIdentity | null = null) => {
+    async (
+      account: string,
+      referrer: string | null,
+      redirect: () => void,
+      providedIdentity: AuthIdentity | null = null,
+      options?: { replace?: boolean }
+    ) => {
       if (!flagInitialized) {
         return undefined
       }
@@ -119,9 +125,9 @@ export const useAuthFlow = () => {
           const isAvatarSetupFlowAllowed = isFlowV2OnboardingFlowEnabled && hasWebGPU
 
           if (isAvatarSetupFlowAllowed) {
-            return navigate(locations.avatarSetup(redirectTo, referrer))
+            return navigate(locations.avatarSetup(redirectTo, referrer), options)
           } else {
-            return navigate(locations.setup(redirectTo, referrer))
+            return navigate(locations.setup(redirectTo, referrer), options)
           }
         }
 
@@ -133,9 +139,9 @@ export const useAuthFlow = () => {
         const isProfileIncomplete = !profile || !isProfileComplete(profile)
 
         if (isProfileIncomplete && !isAvatarSetupFlowAllowed) {
-          return navigate(locations.setup(redirectTo, referrer))
+          return navigate(locations.setup(redirectTo, referrer), options)
         } else if (isProfileIncomplete && isAvatarSetupFlowAllowed) {
-          return navigate(locations.avatarSetup(redirectTo, referrer))
+          return navigate(locations.avatarSetup(redirectTo, referrer), options)
         }
       }
 

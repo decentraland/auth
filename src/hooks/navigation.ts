@@ -1,12 +1,16 @@
 import { useCallback } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
+interface NavigateOptions {
+  replace?: boolean
+}
+
 export const useNavigateWithSearchParams = () => {
   const navigate = useNavigate()
   const location = useLocation()
 
   const enhancedNavigation = useCallback(
-    (path: string) => {
+    (path: string, options?: NavigateOptions) => {
       if (!path) {
         throw new Error('Path cannot be empty')
       }
@@ -41,10 +45,13 @@ export const useNavigateWithSearchParams = () => {
       const searchString = searchParams.toString()
 
       // Navigate to the new path with the updated search parameters
-      navigate({
-        pathname,
-        search: searchString ? `?${searchString}` : undefined
-      })
+      navigate(
+        {
+          pathname,
+          search: searchString ? `?${searchString}` : undefined
+        },
+        { replace: options?.replace }
+      )
     },
     [navigate, location]
   )
