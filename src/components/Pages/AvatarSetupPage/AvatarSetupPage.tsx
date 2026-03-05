@@ -3,11 +3,12 @@ import * as React from 'react'
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from '@dcl/hooks'
-import { Email, EthAddress } from '@dcl/schemas'
+import { EthAddress } from '@dcl/schemas'
 import { PreviewUnityMode } from '@dcl/schemas/dist/dapps/preview'
 import { CircularProgress, WearablePreview, launchDesktopApp } from 'decentraland-ui2'
 import avatarFloat from '../../../assets/animations/AvatarFloat_Lottie.json'
 import avatarParticles from '../../../assets/animations/AvatarParticles_Lottie.json'
+import { isEmailValid } from '../../../shared/email'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { useAnalytics } from '../../../hooks/useAnalytics'
@@ -129,8 +130,7 @@ const AvatarSetupPage: React.FC = () => {
   }, [state.isTermsChecked, t])
 
   const handleContinueClick = useCallback(() => {
-    const validEmail = Email.validate(state.email)
-    if (state.email && state.email !== '' && !validEmail) {
+    if (state.email && state.email !== '' && !isEmailValid(state.email)) {
       setState(prev => ({ ...prev, hasEmailError: true }))
       return
     }
