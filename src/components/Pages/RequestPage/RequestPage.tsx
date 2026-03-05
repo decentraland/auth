@@ -471,13 +471,10 @@ export const RequestPage = () => {
       if (isUserRejectedTransaction(e)) {
         console.info('User rejected sign-in verification in wallet — not reporting to Sentry')
         try {
-          if (walletClientRef.current) {
-            const [addr] = await walletClientRef.current.getAddresses()
-            await authServerClient.current.sendFailedOutcome(requestId, addr, {
-              code: -32003,
-              message: 'Transaction rejected'
-            })
-          }
+          await authServerClient.current.sendFailedOutcome(requestId, address, {
+            code: -32003,
+            message: 'Transaction rejected'
+          })
         } catch (failedOutcomeError) {
           console.error('Failed to send denied notification:', failedOutcomeError)
         }
