@@ -42,7 +42,13 @@ function isMagicRpcError(error: unknown): error is { code: number; rawMessage: s
  * unlike MagicRPCError which uses numeric codes.
  */
 function isMagicExtensionError(error: unknown): error is { code: string; rawMessage: string; data: unknown } {
-  return error !== null && typeof error === 'object' && 'code' in error && 'rawMessage' in error && typeof (error as { code: unknown }).code === 'string'
+  return (
+    error !== null &&
+    typeof error === 'object' &&
+    'code' in error &&
+    'rawMessage' in error &&
+    typeof (error as { code: unknown }).code === 'string'
+  )
 }
 
 export type { RPCError }
