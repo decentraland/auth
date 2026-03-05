@@ -7,7 +7,7 @@ import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { useAnalytics } from '../../../hooks/useAnalytics'
 import { useAuthFlow } from '../../../hooks/useAuthFlow'
 import { ConnectionType } from '../../../modules/analytics/types'
-import { isMagicRpcError } from '../../../shared/errors'
+import { isMagicExtensionError, isMagicRpcError } from '../../../shared/errors'
 import { extractReferrerFromSearchParameters, locations } from '../../../shared/locations'
 import { isMobileSession } from '../../../shared/mobile'
 import { handleError } from '../../../shared/utils/errorHandler'
@@ -120,16 +120,23 @@ const DesktopCallbackPage = () => {
 
       handleContinue(referrer)
     } catch (error) {
-      handleError(error, 'Error logging in with Magic SDK', {
-        skipTracking: false,
-        sentryExtra: {
-          oauthError: oauthError ?? undefined,
-          magicRpcCode: isMagicRpcError(error) ? String(error.code) : undefined,
-          magicRpcRawMessage: isMagicRpcError(error) ? error.rawMessage : undefined,
-          magicRpcData: isMagicRpcError(error) ? JSON.stringify(error.data) : undefined
-        }
-      })
-      navigate(locations.login(), { replace: true })
+      // MISSING_PKCE_METADATA: the OAuth session was already consumed
+      // (e.g. user navigated back to /callback). Not a real error — just redirect to login.
+      const isExpiredOAuthSession = isMagicExtensionError(error) && error.code === 'MISSING_PKCE_METADATA'
+
+      if (!isExpiredOAuthSession) {
+        handleError(error, 'Error logging in with Magic SDK', {
+          skipTracking: false,
+          sentryExtra: {
+            oauthError: oauthError ?? undefined,
+            magicRpcCode: isMagicRpcError(error) ? String(error.code) : undefined,
+            magicRpcRawMessage: isMagicRpcError(error) ? error.rawMessage : undefined,
+            magicRpcData: isMagicRpcError(error) ? JSON.stringify(error.data) : undefined
+          }
+        })
+      }
+
+      navigate(locations.login())
     }
   }, [navigate, handleContinue, flags[FeatureFlagsKeys.MAGIC_TEST], searchParams, redirectTo])
 

@@ -36,5 +36,20 @@ function isMagicRpcError(error: unknown): error is { code: number; rawMessage: s
   return error !== null && typeof error === 'object' && 'code' in error && 'rawMessage' in error
 }
 
+/**
+ * Duck-typing guard for Magic SDK's MagicExtensionError.
+ * These have string error codes (e.g. 'MISSING_PKCE_METADATA', 'STATE_MISMATCH')
+ * unlike MagicRPCError which uses numeric codes.
+ */
+function isMagicExtensionError(error: unknown): error is { code: string; rawMessage: string; data: unknown } {
+  return (
+    error !== null &&
+    typeof error === 'object' &&
+    'code' in error &&
+    'rawMessage' in error &&
+    typeof (error as { code: unknown }).code === 'string'
+  )
+}
+
 export type { RPCError }
-export { isErrorWithMessage, isErrorWithName, isRpcError, isMagicRpcError }
+export { isErrorWithMessage, isErrorWithName, isRpcError, isMagicRpcError, isMagicExtensionError }
