@@ -9,7 +9,7 @@ import { ConnectionOptionType } from '../../Connection'
 import { ConnectionLayout } from '../../ConnectionModal/ConnectionLayout'
 import { ConnectionLayoutState } from '../../ConnectionModal/ConnectionLayout.type'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
-import { connectToProvider, connectToSocialProvider, fromConnectionOptionToProviderType, isSocialLogin } from '../LoginPage/utils'
+import { connectToProvider, connectToSocialProvider, fromConnectionOptionToProviderType, isSocialLogin, requiresInjectedProvider } from '../LoginPage/utils'
 import { getIdentitySignature } from './identityUtils'
 import { MobileAuthSuccess } from './MobileAuthSuccess'
 import { MobileProviderSelection } from './MobileProviderSelection'
@@ -53,6 +53,9 @@ export const MobileAuthPage = () => {
           )
         } else {
           // Web3 wallet flow
+          if (requiresInjectedProvider(selectedConnectionType) && !window.ethereum) {
+            throw new Error('No wallet extension detected. Please install MetaMask or another Ethereum wallet.')
+          }
           setView('connecting')
           setLoadingState(ConnectionLayoutState.CONNECTING_WALLET)
           const connectionData = await connectToProvider(selectedConnectionType)
