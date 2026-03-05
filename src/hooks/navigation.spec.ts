@@ -26,10 +26,13 @@ describe('useNavigateWithSearchParams', () => {
         result.current('/test-path')
       })
 
-      expect(mockNavigate).toHaveBeenCalledWith({
-        pathname: '/test-path',
-        search: undefined
-      })
+      expect(mockNavigate).toHaveBeenCalledWith(
+        {
+          pathname: '/test-path',
+          search: undefined
+        },
+        { replace: undefined }
+      )
     })
 
     it('should navigate to the given path with its own search params', () => {
@@ -39,10 +42,13 @@ describe('useNavigateWithSearchParams', () => {
         result.current('/test-path?param1=value1&param2=value2')
       })
 
-      expect(mockNavigate).toHaveBeenCalledWith({
-        pathname: '/test-path',
-        search: '?param1=value1&param2=value2'
-      })
+      expect(mockNavigate).toHaveBeenCalledWith(
+        {
+          pathname: '/test-path',
+          search: '?param1=value1&param2=value2'
+        },
+        { replace: undefined }
+      )
     })
   })
 
@@ -58,10 +64,13 @@ describe('useNavigateWithSearchParams', () => {
         result.current('/test-path')
       })
 
-      expect(mockNavigate).toHaveBeenCalledWith({
-        pathname: '/test-path',
-        search: '?targetConfigId=123'
-      })
+      expect(mockNavigate).toHaveBeenCalledWith(
+        {
+          pathname: '/test-path',
+          search: '?targetConfigId=123'
+        },
+        { replace: undefined }
+      )
     })
 
     it('should merge targetConfigId with existing search params', () => {
@@ -71,10 +80,13 @@ describe('useNavigateWithSearchParams', () => {
         result.current('/test-path?param1=value1')
       })
 
-      expect(mockNavigate).toHaveBeenCalledWith({
-        pathname: '/test-path',
-        search: '?param1=value1&targetConfigId=123'
-      })
+      expect(mockNavigate).toHaveBeenCalledWith(
+        {
+          pathname: '/test-path',
+          search: '?param1=value1&targetConfigId=123'
+        },
+        { replace: undefined }
+      )
     })
 
     it('should overwrite targetConfigId in the path with the one from current location', () => {
@@ -84,10 +96,13 @@ describe('useNavigateWithSearchParams', () => {
         result.current('/test-path?param1=value1&targetConfigId=456')
       })
 
-      expect(mockNavigate).toHaveBeenCalledWith({
-        pathname: '/test-path',
-        search: '?param1=value1&targetConfigId=123'
-      })
+      expect(mockNavigate).toHaveBeenCalledWith(
+        {
+          pathname: '/test-path',
+          search: '?param1=value1&targetConfigId=123'
+        },
+        { replace: undefined }
+      )
     })
 
     it('should correctly merge multiple search params with targetConfigId', () => {
@@ -97,10 +112,13 @@ describe('useNavigateWithSearchParams', () => {
         result.current('/test-path?param1=value1&param2=value2')
       })
 
-      expect(mockNavigate).toHaveBeenCalledWith({
-        pathname: '/test-path',
-        search: '?param1=value1&param2=value2&targetConfigId=123'
-      })
+      expect(mockNavigate).toHaveBeenCalledWith(
+        {
+          pathname: '/test-path',
+          search: '?param1=value1&param2=value2&targetConfigId=123'
+        },
+        { replace: undefined }
+      )
     })
   })
 
@@ -112,10 +130,13 @@ describe('useNavigateWithSearchParams', () => {
         result.current('http://example.com/test-path?param1=value1')
       })
 
-      expect(mockNavigate).toHaveBeenCalledWith({
-        pathname: '/test-path',
-        search: '?param1=value1'
-      })
+      expect(mockNavigate).toHaveBeenCalledWith(
+        {
+          pathname: '/test-path',
+          search: '?param1=value1'
+        },
+        { replace: undefined }
+      )
     })
 
     it('should navigate correctly with a relative path', () => {
@@ -125,10 +146,13 @@ describe('useNavigateWithSearchParams', () => {
         result.current('test-path')
       })
 
-      expect(mockNavigate).toHaveBeenCalledWith({
-        pathname: '/test-path',
-        search: undefined
-      })
+      expect(mockNavigate).toHaveBeenCalledWith(
+        {
+          pathname: '/test-path',
+          search: undefined
+        },
+        { replace: undefined }
+      )
     })
   })
 
@@ -144,10 +168,31 @@ describe('useNavigateWithSearchParams', () => {
         result.current('/test-path')
       })
 
-      expect(mockNavigate).toHaveBeenCalledWith({
-        pathname: '/test-path',
-        search: '?targetConfigId=%2F%2Fmalicious.com'
+      expect(mockNavigate).toHaveBeenCalledWith(
+        {
+          pathname: '/test-path',
+          search: '?targetConfigId=%2F%2Fmalicious.com'
+        },
+        { replace: undefined }
+      )
+    })
+  })
+
+  describe('when using replace option', () => {
+    it('should pass replace: true to navigate', () => {
+      const { result } = renderHook(() => useNavigateWithSearchParams())
+
+      act(() => {
+        result.current('/test-path', { replace: true })
       })
+
+      expect(mockNavigate).toHaveBeenCalledWith(
+        {
+          pathname: '/test-path',
+          search: undefined
+        },
+        { replace: true }
+      )
     })
   })
 

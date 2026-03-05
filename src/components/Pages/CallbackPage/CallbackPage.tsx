@@ -76,10 +76,10 @@ const DesktopCallbackPage = () => {
         // Get the freshly generated identity from localStorage for Magic flow
         const freshIdentity = localStorageGetIdentity(ethAddress)
 
-        await checkProfileAndRedirect(connectionData.account ?? '', referrer, redirect, freshIdentity)
+        await checkProfileAndRedirect(connectionData.account ?? '', referrer, redirect, freshIdentity, { replace: true })
       } catch (error) {
         handleError(error, 'Error in callback continue flow')
-        navigate(locations.login())
+        navigate(locations.login(), { replace: true })
       }
     },
     [navigate, connectAndGenerateSignature, redirect, trackLoginSuccess, checkProfileAndRedirect, initialized]
@@ -93,13 +93,20 @@ const DesktopCallbackPage = () => {
       // User cancelled at the OAuth provider — not an error, go back to login
       // Preserve the original redirectTo from the OAuth state so the next login attempt
       // still redirects to the correct destination (e.g., Marketplace)
-      navigate(locations.login({ redirectTo }))
+      navigate(locations.login({ redirectTo }), { replace: true })
       return
     }
 
     try {
       const magic = await createMagicInstance(!!flags[FeatureFlagsKeys.MAGIC_TEST])
       const referrer = extractReferrerFromSearchParameters(searchParams)
+
+      // Clear any existing Magic session before completing the OAuth redirect,
+      // otherwise getRedirectResult() throws RPC -32600 ("User is already logged in")
+      if (magic && (await magic.user.isLoggedIn())) {
+        await magic.user.logout()
+      }
+
       const result = await magic?.oauth2.getRedirectResult()
 
       // Store user email in localStorage if available
@@ -118,9 +125,15 @@ const DesktopCallbackPage = () => {
           magicRpcData: isMagicRpcError(error) ? JSON.stringify(error.data) : undefined
         }
       })
-      navigate(locations.login())
+      navigate(locations.login(), { replace: true })
     }
   }, [navigate, handleContinue, flags[FeatureFlagsKeys.MAGIC_TEST], searchParams, redirectTo])
+
+  // Replace the current history entry so the browser back button
+  // won't return to /callback after the OAuth state has been consumed.
+  useEffect(() => {
+    window.history.replaceState(null, '', locations.login())
+  }, [])
 
   useEffect(() => {
     if (!logInStarted && initialized) {
