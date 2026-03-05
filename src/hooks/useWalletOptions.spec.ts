@@ -1,5 +1,5 @@
 import { renderHook } from '@testing-library/react'
-import { ConnectionOptionType } from '../components/Connection/Connection.types'
+import { ConnectionOptionType, SignInOptionsMode } from '../components/Connection/Connection.types'
 import { useWalletOptions } from './useWalletOptions'
 
 declare global {
@@ -19,7 +19,7 @@ describe('when using the useWalletOptions hook', () => {
     window.ethereum = originalEthereum
   })
 
-  describe('when isOnlyEmailOption is false', () => {
+  describe('when signInOptionsMode is FULL', () => {
     it('should return the secondary option as the first wallet option and the first extra option as the second wallet option', () => {
       const connectionOptions = {
         primary: ConnectionOptionType.EMAIL,
@@ -30,8 +30,7 @@ describe('when using the useWalletOptions hook', () => {
       const { result } = renderHook(() =>
         useWalletOptions({
           connectionOptions,
-          isOnlyEmailOption: false,
-          isSignInWithTwoOptions: false
+          signInOptionsMode: SignInOptionsMode.FULL
         })
       )
 
@@ -44,8 +43,7 @@ describe('when using the useWalletOptions hook', () => {
       const { result } = renderHook(() =>
         useWalletOptions({
           connectionOptions: undefined,
-          isOnlyEmailOption: false,
-          isSignInWithTwoOptions: false
+          signInOptionsMode: SignInOptionsMode.FULL
         })
       )
 
@@ -55,232 +53,222 @@ describe('when using the useWalletOptions hook', () => {
     })
   })
 
-  describe('when isOnlyEmailOption is true', () => {
-    describe('and isSignInWithTwoOptions is true', () => {
-      describe('and the Ethereum provider exists', () => {
-        beforeEach(() => {
-          window.ethereum = { isMetaMask: true }
-        })
+  describe('when signInOptionsMode is TWO', () => {
+    describe('and the Ethereum provider exists', () => {
+      beforeEach(() => {
+        window.ethereum = { isMetaMask: true }
+      })
 
-        it('should return Google as the first wallet option and MetaMask as the second wallet option', () => {
-          const connectionOptions = {
-            primary: ConnectionOptionType.EMAIL,
-            secondary: ConnectionOptionType.METAMASK,
-            extraOptions: [
-              ConnectionOptionType.GOOGLE,
-              ConnectionOptionType.APPLE,
-              ConnectionOptionType.DISCORD,
-              ConnectionOptionType.FORTMATIC
-            ]
-          }
-
-          const { result } = renderHook(() =>
-            useWalletOptions({
-              connectionOptions,
-              isOnlyEmailOption: true,
-              isSignInWithTwoOptions: true
-            })
-          )
-
-          expect(result.current.firstWalletOption).toBe(ConnectionOptionType.GOOGLE)
-          expect(result.current.secondWalletOption).toBe(ConnectionOptionType.METAMASK)
-          expect(result.current.remainingWalletOptions).toEqual([
+      it('should return Google as the first wallet option and MetaMask as the second wallet option', () => {
+        const connectionOptions = {
+          primary: ConnectionOptionType.EMAIL,
+          secondary: ConnectionOptionType.METAMASK,
+          extraOptions: [
+            ConnectionOptionType.GOOGLE,
             ConnectionOptionType.APPLE,
             ConnectionOptionType.DISCORD,
             ConnectionOptionType.FORTMATIC
-          ])
-        })
+          ]
+        }
 
-        it('should return Google as the first wallet option and undefined as the second when MetaMask is not in the available options', () => {
-          const connectionOptions = {
-            primary: ConnectionOptionType.EMAIL,
-            secondary: ConnectionOptionType.GOOGLE,
-            extraOptions: [ConnectionOptionType.APPLE, ConnectionOptionType.DISCORD]
-          }
+        const { result } = renderHook(() =>
+          useWalletOptions({
+            connectionOptions,
+            signInOptionsMode: SignInOptionsMode.TWO
+          })
+        )
 
-          const { result } = renderHook(() =>
-            useWalletOptions({
-              connectionOptions,
-              isOnlyEmailOption: true,
-              isSignInWithTwoOptions: true
-            })
-          )
-
-          expect(result.current.firstWalletOption).toBe(ConnectionOptionType.GOOGLE)
-          expect(result.current.secondWalletOption).toBeUndefined()
-          expect(result.current.remainingWalletOptions).toEqual([ConnectionOptionType.APPLE, ConnectionOptionType.DISCORD])
-        })
+        expect(result.current.firstWalletOption).toBe(ConnectionOptionType.GOOGLE)
+        expect(result.current.secondWalletOption).toBe(ConnectionOptionType.METAMASK)
+        expect(result.current.remainingWalletOptions).toEqual([
+          ConnectionOptionType.APPLE,
+          ConnectionOptionType.DISCORD,
+          ConnectionOptionType.FORTMATIC
+        ])
       })
 
-      describe('and the Ethereum provider does not exist', () => {
-        beforeEach(() => {
-          window.ethereum = undefined
-        })
+      it('should return Google as the first wallet option and undefined as the second when MetaMask is not in the available options', () => {
+        const connectionOptions = {
+          primary: ConnectionOptionType.EMAIL,
+          secondary: ConnectionOptionType.GOOGLE,
+          extraOptions: [ConnectionOptionType.APPLE, ConnectionOptionType.DISCORD]
+        }
 
-        it('should return Google as the first wallet option and move MetaMask to the remaining options', () => {
-          const connectionOptions = {
-            primary: ConnectionOptionType.EMAIL,
-            secondary: ConnectionOptionType.METAMASK,
-            extraOptions: [ConnectionOptionType.GOOGLE, ConnectionOptionType.APPLE, ConnectionOptionType.DISCORD]
-          }
+        const { result } = renderHook(() =>
+          useWalletOptions({
+            connectionOptions,
+            signInOptionsMode: SignInOptionsMode.TWO
+          })
+        )
 
-          const { result } = renderHook(() =>
-            useWalletOptions({
-              connectionOptions,
-              isOnlyEmailOption: true,
-              isSignInWithTwoOptions: true
-            })
-          )
-
-          expect(result.current.firstWalletOption).toBe(ConnectionOptionType.GOOGLE)
-          expect(result.current.secondWalletOption).toBeUndefined()
-          expect(result.current.remainingWalletOptions).toEqual([
-            ConnectionOptionType.METAMASK,
-            ConnectionOptionType.APPLE,
-            ConnectionOptionType.DISCORD
-          ])
-        })
+        expect(result.current.firstWalletOption).toBe(ConnectionOptionType.GOOGLE)
+        expect(result.current.secondWalletOption).toBeUndefined()
+        expect(result.current.remainingWalletOptions).toEqual([ConnectionOptionType.APPLE, ConnectionOptionType.DISCORD])
       })
     })
 
-    describe('and isSignInWithTwoOptions is false', () => {
-      describe('and the Ethereum provider exists', () => {
-        beforeEach(() => {
-          window.ethereum = { isMetaMask: true }
-        })
-
-        it('should return MetaMask as the first wallet option and undefined as the second wallet option', () => {
-          const connectionOptions = {
-            primary: ConnectionOptionType.EMAIL,
-            secondary: ConnectionOptionType.METAMASK,
-            extraOptions: [ConnectionOptionType.GOOGLE, ConnectionOptionType.APPLE, ConnectionOptionType.DISCORD]
-          }
-
-          const { result } = renderHook(() =>
-            useWalletOptions({
-              connectionOptions,
-              isOnlyEmailOption: true,
-              isSignInWithTwoOptions: false
-            })
-          )
-
-          expect(result.current.firstWalletOption).toBe(ConnectionOptionType.METAMASK)
-          expect(result.current.secondWalletOption).toBeUndefined()
-          expect(result.current.remainingWalletOptions).toEqual([
-            ConnectionOptionType.GOOGLE,
-            ConnectionOptionType.APPLE,
-            ConnectionOptionType.DISCORD
-          ])
-        })
-
-        it('should return undefined for both wallet options when MetaMask is not in the available options', () => {
-          const connectionOptions = {
-            primary: ConnectionOptionType.EMAIL,
-            secondary: ConnectionOptionType.GOOGLE,
-            extraOptions: [ConnectionOptionType.APPLE, ConnectionOptionType.DISCORD]
-          }
-
-          const { result } = renderHook(() =>
-            useWalletOptions({
-              connectionOptions,
-              isOnlyEmailOption: true,
-              isSignInWithTwoOptions: false
-            })
-          )
-
-          expect(result.current.firstWalletOption).toBeUndefined()
-          expect(result.current.secondWalletOption).toBeUndefined()
-          expect(result.current.remainingWalletOptions).toEqual([
-            ConnectionOptionType.GOOGLE,
-            ConnectionOptionType.APPLE,
-            ConnectionOptionType.DISCORD
-          ])
-        })
+    describe('and the Ethereum provider does not exist', () => {
+      beforeEach(() => {
+        window.ethereum = undefined
       })
 
-      describe('and the Ethereum provider does not exist', () => {
-        beforeEach(() => {
-          window.ethereum = undefined
-        })
+      it('should return Google as the first wallet option and move MetaMask to the remaining options', () => {
+        const connectionOptions = {
+          primary: ConnectionOptionType.EMAIL,
+          secondary: ConnectionOptionType.METAMASK,
+          extraOptions: [ConnectionOptionType.GOOGLE, ConnectionOptionType.APPLE, ConnectionOptionType.DISCORD]
+        }
 
-        it('should return undefined for both wallet options and move all options to remaining with Google first and MetaMask second', () => {
-          const connectionOptions = {
-            primary: ConnectionOptionType.EMAIL,
-            secondary: ConnectionOptionType.METAMASK,
-            extraOptions: [
-              ConnectionOptionType.GOOGLE,
-              ConnectionOptionType.APPLE,
-              ConnectionOptionType.DISCORD,
-              ConnectionOptionType.FORTMATIC
-            ]
-          }
+        const { result } = renderHook(() =>
+          useWalletOptions({
+            connectionOptions,
+            signInOptionsMode: SignInOptionsMode.TWO
+          })
+        )
 
-          const { result } = renderHook(() =>
-            useWalletOptions({
-              connectionOptions,
-              isOnlyEmailOption: true,
-              isSignInWithTwoOptions: false
-            })
-          )
+        expect(result.current.firstWalletOption).toBe(ConnectionOptionType.GOOGLE)
+        expect(result.current.secondWalletOption).toBeUndefined()
+        expect(result.current.remainingWalletOptions).toEqual([
+          ConnectionOptionType.METAMASK,
+          ConnectionOptionType.APPLE,
+          ConnectionOptionType.DISCORD
+        ])
+      })
+    })
+  })
 
-          expect(result.current.firstWalletOption).toBeUndefined()
-          expect(result.current.secondWalletOption).toBeUndefined()
-          expect(result.current.remainingWalletOptions).toEqual([
+  describe('when signInOptionsMode is ONE', () => {
+    describe('and the Ethereum provider exists', () => {
+      beforeEach(() => {
+        window.ethereum = { isMetaMask: true }
+      })
+
+      it('should return MetaMask as the first wallet option and undefined as the second wallet option', () => {
+        const connectionOptions = {
+          primary: ConnectionOptionType.EMAIL,
+          secondary: ConnectionOptionType.METAMASK,
+          extraOptions: [ConnectionOptionType.GOOGLE, ConnectionOptionType.APPLE, ConnectionOptionType.DISCORD]
+        }
+
+        const { result } = renderHook(() =>
+          useWalletOptions({
+            connectionOptions,
+            signInOptionsMode: SignInOptionsMode.ONE
+          })
+        )
+
+        expect(result.current.firstWalletOption).toBe(ConnectionOptionType.METAMASK)
+        expect(result.current.secondWalletOption).toBeUndefined()
+        expect(result.current.remainingWalletOptions).toEqual([
+          ConnectionOptionType.GOOGLE,
+          ConnectionOptionType.APPLE,
+          ConnectionOptionType.DISCORD
+        ])
+      })
+
+      it('should return undefined for both wallet options when MetaMask is not in the available options', () => {
+        const connectionOptions = {
+          primary: ConnectionOptionType.EMAIL,
+          secondary: ConnectionOptionType.GOOGLE,
+          extraOptions: [ConnectionOptionType.APPLE, ConnectionOptionType.DISCORD]
+        }
+
+        const { result } = renderHook(() =>
+          useWalletOptions({
+            connectionOptions,
+            signInOptionsMode: SignInOptionsMode.ONE
+          })
+        )
+
+        expect(result.current.firstWalletOption).toBeUndefined()
+        expect(result.current.secondWalletOption).toBeUndefined()
+        expect(result.current.remainingWalletOptions).toEqual([
+          ConnectionOptionType.GOOGLE,
+          ConnectionOptionType.APPLE,
+          ConnectionOptionType.DISCORD
+        ])
+      })
+    })
+
+    describe('and the Ethereum provider does not exist', () => {
+      beforeEach(() => {
+        window.ethereum = undefined
+      })
+
+      it('should return undefined for both wallet options and move all options to remaining with Google first and MetaMask second', () => {
+        const connectionOptions = {
+          primary: ConnectionOptionType.EMAIL,
+          secondary: ConnectionOptionType.METAMASK,
+          extraOptions: [
             ConnectionOptionType.GOOGLE,
-            ConnectionOptionType.METAMASK,
             ConnectionOptionType.APPLE,
             ConnectionOptionType.DISCORD,
             ConnectionOptionType.FORTMATIC
-          ])
-        })
+          ]
+        }
 
-        it('should return undefined for both wallet options and move all options to remaining with MetaMask first when Google is not available', () => {
-          const connectionOptions = {
-            primary: ConnectionOptionType.EMAIL,
-            secondary: ConnectionOptionType.METAMASK,
-            extraOptions: [ConnectionOptionType.APPLE, ConnectionOptionType.DISCORD]
-          }
+        const { result } = renderHook(() =>
+          useWalletOptions({
+            connectionOptions,
+            signInOptionsMode: SignInOptionsMode.ONE
+          })
+        )
 
-          const { result } = renderHook(() =>
-            useWalletOptions({
-              connectionOptions,
-              isOnlyEmailOption: true,
-              isSignInWithTwoOptions: false
-            })
-          )
+        expect(result.current.firstWalletOption).toBeUndefined()
+        expect(result.current.secondWalletOption).toBeUndefined()
+        expect(result.current.remainingWalletOptions).toEqual([
+          ConnectionOptionType.GOOGLE,
+          ConnectionOptionType.METAMASK,
+          ConnectionOptionType.APPLE,
+          ConnectionOptionType.DISCORD,
+          ConnectionOptionType.FORTMATIC
+        ])
+      })
 
-          expect(result.current.firstWalletOption).toBeUndefined()
-          expect(result.current.secondWalletOption).toBeUndefined()
-          expect(result.current.remainingWalletOptions).toEqual([
-            ConnectionOptionType.METAMASK,
-            ConnectionOptionType.APPLE,
-            ConnectionOptionType.DISCORD
-          ])
-        })
+      it('should return undefined for both wallet options and move all options to remaining with MetaMask first when Google is not available', () => {
+        const connectionOptions = {
+          primary: ConnectionOptionType.EMAIL,
+          secondary: ConnectionOptionType.METAMASK,
+          extraOptions: [ConnectionOptionType.APPLE, ConnectionOptionType.DISCORD]
+        }
 
-        it('should return undefined for both wallet options and move all options to remaining with Google first when MetaMask is not available', () => {
-          const connectionOptions = {
-            primary: ConnectionOptionType.EMAIL,
-            secondary: ConnectionOptionType.GOOGLE,
-            extraOptions: [ConnectionOptionType.APPLE, ConnectionOptionType.DISCORD]
-          }
+        const { result } = renderHook(() =>
+          useWalletOptions({
+            connectionOptions,
+            signInOptionsMode: SignInOptionsMode.ONE
+          })
+        )
 
-          const { result } = renderHook(() =>
-            useWalletOptions({
-              connectionOptions,
-              isOnlyEmailOption: true,
-              isSignInWithTwoOptions: false
-            })
-          )
+        expect(result.current.firstWalletOption).toBeUndefined()
+        expect(result.current.secondWalletOption).toBeUndefined()
+        expect(result.current.remainingWalletOptions).toEqual([
+          ConnectionOptionType.METAMASK,
+          ConnectionOptionType.APPLE,
+          ConnectionOptionType.DISCORD
+        ])
+      })
 
-          expect(result.current.firstWalletOption).toBeUndefined()
-          expect(result.current.secondWalletOption).toBeUndefined()
-          expect(result.current.remainingWalletOptions).toEqual([
-            ConnectionOptionType.GOOGLE,
-            ConnectionOptionType.APPLE,
-            ConnectionOptionType.DISCORD
-          ])
-        })
+      it('should return undefined for both wallet options and move all options to remaining with Google first when MetaMask is not available', () => {
+        const connectionOptions = {
+          primary: ConnectionOptionType.EMAIL,
+          secondary: ConnectionOptionType.GOOGLE,
+          extraOptions: [ConnectionOptionType.APPLE, ConnectionOptionType.DISCORD]
+        }
+
+        const { result } = renderHook(() =>
+          useWalletOptions({
+            connectionOptions,
+            signInOptionsMode: SignInOptionsMode.ONE
+          })
+        )
+
+        expect(result.current.firstWalletOption).toBeUndefined()
+        expect(result.current.secondWalletOption).toBeUndefined()
+        expect(result.current.remainingWalletOptions).toEqual([
+          ConnectionOptionType.GOOGLE,
+          ConnectionOptionType.APPLE,
+          ConnectionOptionType.DISCORD
+        ])
       })
     })
   })
@@ -297,8 +285,7 @@ describe('when using the useWalletOptions hook', () => {
         ({ connectionOptions }) =>
           useWalletOptions({
             connectionOptions,
-            isOnlyEmailOption: false,
-            isSignInWithTwoOptions: false
+            signInOptionsMode: SignInOptionsMode.FULL
           }),
         { initialProps: { connectionOptions: initialOptions } }
       )
@@ -317,12 +304,12 @@ describe('when using the useWalletOptions hook', () => {
     })
   })
 
-  describe('when the feature flags change', () => {
+  describe('when the signInOptionsMode changes', () => {
     beforeEach(() => {
       window.ethereum = { isMetaMask: true }
     })
 
-    it('should recalculate the wallet options when isOnlyEmailOption changes from false to true', () => {
+    it('should recalculate the wallet options when signInOptionsMode changes from FULL to ONE', () => {
       const connectionOptions = {
         primary: ConnectionOptionType.EMAIL,
         secondary: ConnectionOptionType.METAMASK,
@@ -330,25 +317,24 @@ describe('when using the useWalletOptions hook', () => {
       }
 
       const { result, rerender } = renderHook(
-        ({ isOnlyEmailOption }) =>
+        ({ signInOptionsMode }) =>
           useWalletOptions({
             connectionOptions,
-            isOnlyEmailOption,
-            isSignInWithTwoOptions: false
+            signInOptionsMode
           }),
-        { initialProps: { isOnlyEmailOption: false } }
+        { initialProps: { signInOptionsMode: SignInOptionsMode.FULL } }
       )
 
       expect(result.current.firstWalletOption).toBe(ConnectionOptionType.METAMASK)
       expect(result.current.secondWalletOption).toBe(ConnectionOptionType.GOOGLE)
 
-      rerender({ isOnlyEmailOption: true })
+      rerender({ signInOptionsMode: SignInOptionsMode.ONE })
 
       expect(result.current.firstWalletOption).toBe(ConnectionOptionType.METAMASK)
       expect(result.current.secondWalletOption).toBeUndefined()
     })
 
-    it('should recalculate the wallet options when isSignInWithTwoOptions changes from false to true', () => {
+    it('should recalculate the wallet options when signInOptionsMode changes from ONE to TWO', () => {
       const connectionOptions = {
         primary: ConnectionOptionType.EMAIL,
         secondary: ConnectionOptionType.METAMASK,
@@ -356,19 +342,18 @@ describe('when using the useWalletOptions hook', () => {
       }
 
       const { result, rerender } = renderHook(
-        ({ isSignInWithTwoOptions }) =>
+        ({ signInOptionsMode }) =>
           useWalletOptions({
             connectionOptions,
-            isOnlyEmailOption: true,
-            isSignInWithTwoOptions
+            signInOptionsMode
           }),
-        { initialProps: { isSignInWithTwoOptions: false } }
+        { initialProps: { signInOptionsMode: SignInOptionsMode.ONE } }
       )
 
       expect(result.current.firstWalletOption).toBe(ConnectionOptionType.METAMASK)
       expect(result.current.secondWalletOption).toBeUndefined()
 
-      rerender({ isSignInWithTwoOptions: true })
+      rerender({ signInOptionsMode: SignInOptionsMode.TWO })
 
       expect(result.current.firstWalletOption).toBe(ConnectionOptionType.GOOGLE)
       expect(result.current.secondWalletOption).toBe(ConnectionOptionType.METAMASK)

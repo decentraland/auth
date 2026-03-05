@@ -4,7 +4,7 @@ import { DclThemeProvider, darkTheme } from 'decentraland-ui2'
 import { translations } from '../../modules/translations'
 import { Connection as ConnectionNew } from './Connection'
 import { EXTRA_TEST_ID, PRIMARY_TEST_ID, SECONDARY_TEST_ID, SHOW_MORE_BUTTON_TEST_ID } from './constants'
-import { ConnectionOptionType, ConnectionProps, MetamaskEthereumWindow } from './Connection.types'
+import { ConnectionOptionType, ConnectionProps, MetamaskEthereumWindow, SignInOptionsMode } from './Connection.types'
 
 declare global {
   interface Window {
@@ -557,178 +557,172 @@ describe('when rendering the Connection component', () => {
     })
   })
 
-  describe('when the isOnlyEmailOption feature flag is enabled', () => {
-    describe('and isSignInWithTwoOptions is true', () => {
-      describe('and the user has an Ethereum provider', () => {
-        let connectionOptions: ConnectionProps['connectionOptions']
-        let oldEthereum: typeof window.ethereum
+  describe('when signInOptionsMode is TWO', () => {
+    describe('and the user has an Ethereum provider', () => {
+      let connectionOptions: ConnectionProps['connectionOptions']
+      let oldEthereum: typeof window.ethereum
 
-        beforeEach(() => {
-          oldEthereum = window.ethereum
-          window.ethereum = { isMetaMask: true }
-          connectionOptions = {
-            primary: ConnectionOptionType.EMAIL,
-            secondary: ConnectionOptionType.METAMASK,
-            extraOptions: [ConnectionOptionType.GOOGLE, ConnectionOptionType.APPLE, ConnectionOptionType.DISCORD]
-          }
-          screen = renderConnectionNew({
-            connectionOptions,
-            isOnlyEmailOption: true,
-            isSignInWithTwoOptions: true
-          })
-        })
-
-        afterEach(() => {
-          window.ethereum = oldEthereum
-        })
-
-        it('should display Google as the first wallet option and MetaMask as the second wallet option', () => {
-          const { getByTestId } = screen
-          expect(getByTestId(`${PRIMARY_TEST_ID}-${ConnectionOptionType.GOOGLE}-button`)).toBeInTheDocument()
-          expect(getByTestId(`${SECONDARY_TEST_ID}-${ConnectionOptionType.METAMASK}-button`)).toBeInTheDocument()
-        })
-
-        it('should move the remaining wallet options to the extras section', () => {
-          const { getByTestId, queryByTestId } = screen
-
-          // APPLE and DISCORD should be in extras
-          expect(queryByTestId(`${EXTRA_TEST_ID}-${ConnectionOptionType.APPLE}-button`)).not.toBeInTheDocument()
-
-          act(() => {
-            fireEvent.click(getByTestId(SHOW_MORE_BUTTON_TEST_ID))
-          })
-
-          expect(getByTestId(`${EXTRA_TEST_ID}-${ConnectionOptionType.APPLE}-button`)).toBeInTheDocument()
-          expect(getByTestId(`${EXTRA_TEST_ID}-${ConnectionOptionType.DISCORD}-button`)).toBeInTheDocument()
+      beforeEach(() => {
+        oldEthereum = window.ethereum
+        window.ethereum = { isMetaMask: true }
+        connectionOptions = {
+          primary: ConnectionOptionType.EMAIL,
+          secondary: ConnectionOptionType.METAMASK,
+          extraOptions: [ConnectionOptionType.GOOGLE, ConnectionOptionType.APPLE, ConnectionOptionType.DISCORD]
+        }
+        screen = renderConnectionNew({
+          connectionOptions,
+          signInOptionsMode: SignInOptionsMode.TWO
         })
       })
 
-      describe('and the user does not have an Ethereum provider', () => {
-        let connectionOptions: ConnectionProps['connectionOptions']
-        let oldEthereum: typeof window.ethereum
+      afterEach(() => {
+        window.ethereum = oldEthereum
+      })
 
-        beforeEach(() => {
-          oldEthereum = window.ethereum
-          window.ethereum = undefined
-          connectionOptions = {
-            primary: ConnectionOptionType.EMAIL,
-            secondary: ConnectionOptionType.METAMASK,
-            extraOptions: [ConnectionOptionType.GOOGLE, ConnectionOptionType.APPLE]
-          }
-          screen = renderConnectionNew({
-            connectionOptions,
-            isOnlyEmailOption: true,
-            isSignInWithTwoOptions: true
-          })
+      it('should display Google as the first wallet option and MetaMask as the second wallet option', () => {
+        const { getByTestId } = screen
+        expect(getByTestId(`${PRIMARY_TEST_ID}-${ConnectionOptionType.GOOGLE}-button`)).toBeInTheDocument()
+        expect(getByTestId(`${SECONDARY_TEST_ID}-${ConnectionOptionType.METAMASK}-button`)).toBeInTheDocument()
+      })
+
+      it('should move the remaining wallet options to the extras section', () => {
+        const { getByTestId, queryByTestId } = screen
+
+        // APPLE and DISCORD should be in extras
+        expect(queryByTestId(`${EXTRA_TEST_ID}-${ConnectionOptionType.APPLE}-button`)).not.toBeInTheDocument()
+
+        act(() => {
+          fireEvent.click(getByTestId(SHOW_MORE_BUTTON_TEST_ID))
         })
 
-        afterEach(() => {
-          window.ethereum = oldEthereum
-        })
-
-        it('should display only Google as the first wallet option button', () => {
-          const { getByTestId, queryByTestId } = screen
-          expect(getByTestId(`${PRIMARY_TEST_ID}-${ConnectionOptionType.GOOGLE}-button`)).toBeInTheDocument()
-          expect(queryByTestId(SECONDARY_TEST_ID)).not.toBeInTheDocument()
-        })
-
-        it('should move MetaMask to the extras section', () => {
-          const { getByTestId } = screen
-
-          act(() => {
-            fireEvent.click(getByTestId(SHOW_MORE_BUTTON_TEST_ID))
-          })
-
-          expect(getByTestId(`${EXTRA_TEST_ID}-${ConnectionOptionType.METAMASK}-button`)).toBeInTheDocument()
-        })
+        expect(getByTestId(`${EXTRA_TEST_ID}-${ConnectionOptionType.APPLE}-button`)).toBeInTheDocument()
+        expect(getByTestId(`${EXTRA_TEST_ID}-${ConnectionOptionType.DISCORD}-button`)).toBeInTheDocument()
       })
     })
 
-    describe('and isSignInWithTwoOptions is false', () => {
-      describe('and the user has an Ethereum provider', () => {
-        let connectionOptions: ConnectionProps['connectionOptions']
-        let oldEthereum: typeof window.ethereum
+    describe('and the user does not have an Ethereum provider', () => {
+      let connectionOptions: ConnectionProps['connectionOptions']
+      let oldEthereum: typeof window.ethereum
 
-        beforeEach(() => {
-          oldEthereum = window.ethereum
-          window.ethereum = { isMetaMask: true }
-          connectionOptions = {
-            primary: ConnectionOptionType.EMAIL,
-            secondary: ConnectionOptionType.METAMASK,
-            extraOptions: [ConnectionOptionType.GOOGLE, ConnectionOptionType.APPLE]
-          }
-          screen = renderConnectionNew({
-            connectionOptions,
-            isOnlyEmailOption: true,
-            isSignInWithTwoOptions: false
-          })
-        })
-
-        afterEach(() => {
-          window.ethereum = oldEthereum
-        })
-
-        it('should display only MetaMask as the first wallet option button', () => {
-          const { getByTestId, queryByTestId } = screen
-          expect(getByTestId(`${PRIMARY_TEST_ID}-${ConnectionOptionType.METAMASK}-button`)).toBeInTheDocument()
-          expect(queryByTestId(SECONDARY_TEST_ID)).not.toBeInTheDocument()
-        })
-
-        it('should move Google and Apple to the extras section', () => {
-          const { getByTestId } = screen
-
-          act(() => {
-            fireEvent.click(getByTestId(SHOW_MORE_BUTTON_TEST_ID))
-          })
-
-          expect(getByTestId(`${EXTRA_TEST_ID}-${ConnectionOptionType.GOOGLE}-button`)).toBeInTheDocument()
-          expect(getByTestId(`${EXTRA_TEST_ID}-${ConnectionOptionType.APPLE}-button`)).toBeInTheDocument()
+      beforeEach(() => {
+        oldEthereum = window.ethereum
+        window.ethereum = undefined
+        connectionOptions = {
+          primary: ConnectionOptionType.EMAIL,
+          secondary: ConnectionOptionType.METAMASK,
+          extraOptions: [ConnectionOptionType.GOOGLE, ConnectionOptionType.APPLE]
+        }
+        screen = renderConnectionNew({
+          connectionOptions,
+          signInOptionsMode: SignInOptionsMode.TWO
         })
       })
 
-      describe('and the user does not have an Ethereum provider', () => {
-        let connectionOptions: ConnectionProps['connectionOptions']
-        let oldEthereum: typeof window.ethereum
+      afterEach(() => {
+        window.ethereum = oldEthereum
+      })
 
-        beforeEach(() => {
-          oldEthereum = window.ethereum
-          window.ethereum = undefined
-          connectionOptions = {
-            primary: ConnectionOptionType.EMAIL,
-            secondary: ConnectionOptionType.METAMASK,
-            extraOptions: [ConnectionOptionType.GOOGLE, ConnectionOptionType.APPLE]
-          }
-          screen = renderConnectionNew({
-            connectionOptions,
-            isOnlyEmailOption: true,
-            isSignInWithTwoOptions: false
-          })
+      it('should display only Google as the first wallet option button', () => {
+        const { getByTestId, queryByTestId } = screen
+        expect(getByTestId(`${PRIMARY_TEST_ID}-${ConnectionOptionType.GOOGLE}-button`)).toBeInTheDocument()
+        expect(queryByTestId(SECONDARY_TEST_ID)).not.toBeInTheDocument()
+      })
+
+      it('should move MetaMask to the extras section', () => {
+        const { getByTestId } = screen
+
+        act(() => {
+          fireEvent.click(getByTestId(SHOW_MORE_BUTTON_TEST_ID))
         })
 
-        afterEach(() => {
-          window.ethereum = oldEthereum
+        expect(getByTestId(`${EXTRA_TEST_ID}-${ConnectionOptionType.METAMASK}-button`)).toBeInTheDocument()
+      })
+    })
+  })
+
+  describe('when signInOptionsMode is ONE', () => {
+    describe('and the user has an Ethereum provider', () => {
+      let connectionOptions: ConnectionProps['connectionOptions']
+      let oldEthereum: typeof window.ethereum
+
+      beforeEach(() => {
+        oldEthereum = window.ethereum
+        window.ethereum = { isMetaMask: true }
+        connectionOptions = {
+          primary: ConnectionOptionType.EMAIL,
+          secondary: ConnectionOptionType.METAMASK,
+          extraOptions: [ConnectionOptionType.GOOGLE, ConnectionOptionType.APPLE]
+        }
+        screen = renderConnectionNew({
+          connectionOptions,
+          signInOptionsMode: SignInOptionsMode.ONE
+        })
+      })
+
+      afterEach(() => {
+        window.ethereum = oldEthereum
+      })
+
+      it('should display only MetaMask as the first wallet option button', () => {
+        const { getByTestId, queryByTestId } = screen
+        expect(getByTestId(`${PRIMARY_TEST_ID}-${ConnectionOptionType.METAMASK}-button`)).toBeInTheDocument()
+        expect(queryByTestId(SECONDARY_TEST_ID)).not.toBeInTheDocument()
+      })
+
+      it('should move Google and Apple to the extras section', () => {
+        const { getByTestId } = screen
+
+        act(() => {
+          fireEvent.click(getByTestId(SHOW_MORE_BUTTON_TEST_ID))
         })
 
-        it('should not display primary or secondary wallet option buttons', () => {
-          const { queryByTestId } = screen
-          expect(queryByTestId(PRIMARY_TEST_ID)).not.toBeInTheDocument()
-          expect(queryByTestId(SECONDARY_TEST_ID)).not.toBeInTheDocument()
+        expect(getByTestId(`${EXTRA_TEST_ID}-${ConnectionOptionType.GOOGLE}-button`)).toBeInTheDocument()
+        expect(getByTestId(`${EXTRA_TEST_ID}-${ConnectionOptionType.APPLE}-button`)).toBeInTheDocument()
+      })
+    })
+
+    describe('and the user does not have an Ethereum provider', () => {
+      let connectionOptions: ConnectionProps['connectionOptions']
+      let oldEthereum: typeof window.ethereum
+
+      beforeEach(() => {
+        oldEthereum = window.ethereum
+        window.ethereum = undefined
+        connectionOptions = {
+          primary: ConnectionOptionType.EMAIL,
+          secondary: ConnectionOptionType.METAMASK,
+          extraOptions: [ConnectionOptionType.GOOGLE, ConnectionOptionType.APPLE]
+        }
+        screen = renderConnectionNew({
+          connectionOptions,
+          signInOptionsMode: SignInOptionsMode.ONE
+        })
+      })
+
+      afterEach(() => {
+        window.ethereum = oldEthereum
+      })
+
+      it('should not display primary or secondary wallet option buttons', () => {
+        const { queryByTestId } = screen
+        expect(queryByTestId(PRIMARY_TEST_ID)).not.toBeInTheDocument()
+        expect(queryByTestId(SECONDARY_TEST_ID)).not.toBeInTheDocument()
+      })
+
+      it('should move all wallet options to the extras section with Google first and MetaMask second', () => {
+        const { getByTestId } = screen
+
+        act(() => {
+          fireEvent.click(getByTestId(SHOW_MORE_BUTTON_TEST_ID))
         })
 
-        it('should move all wallet options to the extras section with Google first and MetaMask second', () => {
-          const { getByTestId } = screen
+        const extraContainer = getByTestId(EXTRA_TEST_ID)
+        const buttons = extraContainer.querySelectorAll('button')
 
-          act(() => {
-            fireEvent.click(getByTestId(SHOW_MORE_BUTTON_TEST_ID))
-          })
-
-          const extraContainer = getByTestId(EXTRA_TEST_ID)
-          const buttons = extraContainer.querySelectorAll('button')
-
-          // Check order: Google first, then MetaMask
-          expect(buttons[0]).toHaveAttribute('data-testid', `${EXTRA_TEST_ID}-${ConnectionOptionType.GOOGLE}-button`)
-          expect(buttons[1]).toHaveAttribute('data-testid', `${EXTRA_TEST_ID}-${ConnectionOptionType.METAMASK}-button`)
-        })
+        // Check order: Google first, then MetaMask
+        expect(buttons[0]).toHaveAttribute('data-testid', `${EXTRA_TEST_ID}-${ConnectionOptionType.GOOGLE}-button`)
+        expect(buttons[1]).toHaveAttribute('data-testid', `${EXTRA_TEST_ID}-${ConnectionOptionType.METAMASK}-button`)
       })
     })
   })
