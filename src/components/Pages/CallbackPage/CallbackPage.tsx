@@ -144,12 +144,6 @@ const DesktopCallbackPage = () => {
     }
   }, [navigate, handleContinue, flags[FeatureFlagsKeys.MAGIC_TEST], searchParams, redirectTo])
 
-  // Replace the current history entry so the browser back button
-  // won't return to /callback after the OAuth state has been consumed.
-  useEffect(() => {
-    window.history.replaceState(null, '', locations.login())
-  }, [])
-
   useEffect(() => {
     if (!logInStarted && initialized) {
       setLogInStarted(true)
