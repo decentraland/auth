@@ -54,6 +54,7 @@ export const EmailInput = ({ onSubmit, onEmailChange, isLoading, error }: EmailI
       <div className={styles.inputWrapper}>
         <input
           id="dcl-email-input"
+          data-testid="email-input"
           ref={inputRef}
           type="email"
           placeholder={t('email_input.placeholder')}
@@ -64,7 +65,7 @@ export const EmailInput = ({ onSubmit, onEmailChange, isLoading, error }: EmailI
           disabled={isLoading}
           autoComplete="email"
         />
-        <button className={styles.nextButton} onClick={handleSubmit} disabled={isLoading || !isValid}>
+        <button data-testid="email-submit-button" className={styles.nextButton} onClick={handleSubmit} disabled={isLoading || !isValid}>
           <span className={isLoading ? styles.textHidden : undefined}>{t('email_input.next')}</span>
           {isLoading && <span className={styles.spinner} />}
         </button>
