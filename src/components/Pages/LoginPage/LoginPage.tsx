@@ -27,7 +27,7 @@ import { useAutoLogin } from '../../../hooks/useAutoLogin'
 import { ConnectionType } from '../../../modules/analytics/types'
 import { config } from '../../../modules/config'
 import { createAuthServerHttpClient } from '../../../shared/auth'
-import { isErrorWithName } from '../../../shared/errors'
+import { isErrorWithName, isUserRejectedTransaction } from '../../../shared/errors'
 import { extractReferrerFromSearchParameters } from '../../../shared/locations'
 import { disconnectWallet, sendEmailOTP } from '../../../shared/thirdweb'
 import { isClockSynchronized } from '../../../shared/utils/clockSync'
@@ -256,12 +256,16 @@ export const LoginPage = () => {
           }
         }
       } catch (error) {
-        handleError(error, 'Error during login connection', {
-          sentryTags: {
-            isWeb2Wallet: isLoggingInThroughSocial,
-            connectionType
-          }
-        })
+        if (isUserRejectedTransaction(error)) {
+          console.info('User rejected login signature in wallet — not reporting to Sentry')
+        } else {
+          handleError(error, 'Error during login connection', {
+            sentryTags: {
+              isWeb2Wallet: isLoggingInThroughSocial,
+              connectionType
+            }
+          })
+        }
 
         if (isErrorWithName(error) && error.name === 'ErrorUnlockingWallet') {
           setLoadingState(ConnectionLayoutState.ERROR_LOCKED_WALLET)
