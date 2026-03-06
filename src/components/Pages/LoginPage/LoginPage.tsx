@@ -324,15 +324,10 @@ export const LoginPage = () => {
         // Generate identity using the thirdweb account's signMessage
         const freshIdentity = await getIdentityWithSigner(address, async (message: string) => account.signMessage({ message }))
 
-        // Ensure connector session matches the OTP-authenticated account.
-        const thirdwebConnection = await connection.connect(ProviderType.THIRDWEB, ChainId.ETHEREUM_MAINNET)
-        const connectedAddress = thirdwebConnection.account?.toLowerCase() ?? ''
-        if (!connectedAddress) {
-          throw new Error('Thirdweb connection did not return a connected account')
-        }
-        if (connectedAddress !== address) {
-          throw new Error('Detected a different account session than the verified email. Please try logging in again.')
-        }
+        // Record the Thirdweb connection so tryPreviousConnection can restore it later.
+        // We skip connection.connect(ProviderType.THIRDWEB) because it creates a new
+        // inAppWallet() whose autoConnect fails to find the session authenticated above.
+        connection.storeConnectionData(ProviderType.THIRDWEB, ChainId.ETHEREUM_MAINNET)
 
         await trackLoginSuccess({
           ethAddress: address,

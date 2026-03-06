@@ -26,6 +26,12 @@ init({
     ) {
       return null
     }
+    // Filter out clipboard errors when the document is not focused
+    if (
+      event.exception?.values?.some(exception => exception.type === 'DOMException' && exception.value?.includes('Document is not focused'))
+    ) {
+      return null
+    }
     return event
   }
 })
