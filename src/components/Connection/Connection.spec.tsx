@@ -4,7 +4,7 @@ import { DclThemeProvider, darkTheme } from 'decentraland-ui2'
 import { translations } from '../../modules/translations'
 import { Connection as ConnectionNew } from './Connection'
 import { EXTRA_TEST_ID, PRIMARY_TEST_ID, SECONDARY_TEST_ID, SHOW_MORE_BUTTON_TEST_ID } from './constants'
-import { ConnectionOptionType, ConnectionProps, MetamaskEthereumWindow } from './Connection.types'
+import { ConnectionOptionType, ConnectionProps, MetamaskEthereumWindow, SignInOptionsMode } from './Connection.types'
 
 declare global {
   interface Window {
@@ -16,13 +16,13 @@ function renderConnectionNew(props: Partial<ConnectionProps>) {
   return render(
     <TranslationProvider locale="en" translations={translations} fallbackLocale="en">
       <DclThemeProvider theme={darkTheme}>
-        <ConnectionNew onConnect={jest.fn()} isNewUser={false} {...props} />
+        <ConnectionNew onConnect={jest.fn()} onEmailSubmit={jest.fn()} onEmailChange={jest.fn()} isNewUser={false} {...props} />
       </DclThemeProvider>
     </TranslationProvider>
   )
 }
 
-describe('when rendering ConnectionNew', () => {
+describe('when rendering the Connection component', () => {
   let screen: ReturnType<typeof renderConnectionNew>
 
   describe('and there are primary, secondary and extra options', () => {
@@ -32,9 +32,9 @@ describe('when rendering ConnectionNew', () => {
     beforeEach(() => {
       onConnect = jest.fn()
       connectionOptions = {
-        primary: ConnectionOptionType.GOOGLE,
-        secondary: ConnectionOptionType.APPLE,
-        extraOptions: [ConnectionOptionType.X, ConnectionOptionType.DISCORD]
+        primary: ConnectionOptionType.EMAIL,
+        secondary: ConnectionOptionType.GOOGLE,
+        extraOptions: [ConnectionOptionType.APPLE, ConnectionOptionType.X, ConnectionOptionType.DISCORD]
       }
       screen = renderConnectionNew({ connectionOptions, onConnect })
     })
@@ -96,7 +96,9 @@ describe('when rendering ConnectionNew', () => {
       it('should show the extra options', () => {
         const { getByTestId, queryByTestId } = screen
 
-        connectionOptions?.extraOptions?.forEach(option => {
+        // Only remaining extra options (excluding the first one which is shown as secondary) should be hidden
+        const remainingExtraOptions = connectionOptions?.extraOptions?.slice(1) || []
+        remainingExtraOptions.forEach(option => {
           expect(queryByTestId(`${EXTRA_TEST_ID}-${option}-button`)).not.toBeInTheDocument()
         })
 
@@ -104,7 +106,7 @@ describe('when rendering ConnectionNew', () => {
           fireEvent.click(getByTestId(SHOW_MORE_BUTTON_TEST_ID))
         })
 
-        connectionOptions?.extraOptions?.forEach(option => {
+        remainingExtraOptions.forEach(option => {
           expect(getByTestId(`${EXTRA_TEST_ID}-${option}-button`)).toBeInTheDocument()
         })
       })
@@ -121,7 +123,8 @@ describe('when rendering ConnectionNew', () => {
             fireEvent.click(getByTestId(SHOW_MORE_BUTTON_TEST_ID))
           })
 
-          connectionOptions?.extraOptions?.forEach(option => {
+          const remainingExtraOptions = connectionOptions?.extraOptions?.slice(1) || []
+          remainingExtraOptions.forEach(option => {
             expect(queryByTestId(`${EXTRA_TEST_ID}-${option}-button`)).not.toBeInTheDocument()
           })
         })
@@ -136,7 +139,8 @@ describe('when rendering ConnectionNew', () => {
           fireEvent.click(getByTestId(SHOW_MORE_BUTTON_TEST_ID))
         })
 
-        connectionOptions?.extraOptions?.forEach(option => {
+        const remainingExtraOptions = connectionOptions?.extraOptions?.slice(1) || []
+        remainingExtraOptions.forEach(option => {
           fireEvent.click(getByTestId(`${EXTRA_TEST_ID}-${option}-button`))
           expect(onConnect).toHaveBeenCalledWith(option)
         })
@@ -156,7 +160,8 @@ describe('when rendering ConnectionNew', () => {
         isMetaMask: true
       } as MetamaskEthereumWindow
       connectionOptions = {
-        primary: ConnectionOptionType.METAMASK,
+        primary: ConnectionOptionType.EMAIL,
+        secondary: ConnectionOptionType.METAMASK,
         extraOptions: [ConnectionOptionType.FORTMATIC, ConnectionOptionType.WALLET_CONNECT, ConnectionOptionType.COINBASE]
       }
       onConnect = jest.fn()
@@ -191,7 +196,8 @@ describe('when rendering ConnectionNew', () => {
       oldEthereum = window.ethereum
       window.ethereum = undefined
       connectionOptions = {
-        primary: ConnectionOptionType.METAMASK,
+        primary: ConnectionOptionType.EMAIL,
+        secondary: ConnectionOptionType.METAMASK,
         extraOptions: [ConnectionOptionType.FORTMATIC, ConnectionOptionType.WALLET_CONNECT, ConnectionOptionType.COINBASE]
       }
       onConnect = jest.fn()
@@ -225,8 +231,13 @@ describe('when rendering ConnectionNew', () => {
     beforeEach(() => {
       onConnect = jest.fn()
       connectionOptions = {
-        primary: ConnectionOptionType.METAMASK,
-        extraOptions: [ConnectionOptionType.FORTMATIC, ConnectionOptionType.WALLET_CONNECT, ConnectionOptionType.COINBASE]
+        primary: ConnectionOptionType.EMAIL,
+        extraOptions: [
+          ConnectionOptionType.METAMASK,
+          ConnectionOptionType.FORTMATIC,
+          ConnectionOptionType.WALLET_CONNECT,
+          ConnectionOptionType.COINBASE
+        ]
       }
       screen = renderConnectionNew({ connectionOptions, onConnect })
     })
@@ -235,19 +246,22 @@ describe('when rendering ConnectionNew', () => {
       jest.resetAllMocks()
     })
 
-    it('should render the primary option', () => {
-      const { getByTestId } = screen
-      expect(getByTestId(PRIMARY_TEST_ID)).toBeInTheDocument()
+    it('should not render the primary option', () => {
+      const { queryByTestId } = screen
+      expect(queryByTestId(PRIMARY_TEST_ID)).not.toBeInTheDocument()
     })
 
-    it('should not render the secondary option', () => {
-      const { queryByTestId } = screen
-      expect(queryByTestId(SECONDARY_TEST_ID)).not.toBeInTheDocument()
+    it('should render the secondary option (first extraOption)', () => {
+      const { getByTestId } = screen
+      expect(getByTestId(SECONDARY_TEST_ID)).toBeInTheDocument()
     })
 
     it('should not render extra options by default', () => {
       const { queryByTestId } = screen
-      connectionOptions?.extraOptions?.forEach(option => {
+      // When there's no secondary, extraOptions[0] becomes the first wallet option
+      // So we need to check from index 1 onwards (which becomes secondWalletOption and remaining)
+      const remainingOptions = connectionOptions?.extraOptions?.slice(1) || []
+      remainingOptions.forEach(option => {
         expect(queryByTestId(`${EXTRA_TEST_ID}-${option}-button`)).not.toBeInTheDocument()
       })
     })
@@ -260,7 +274,8 @@ describe('when rendering ConnectionNew', () => {
           fireEvent.click(getByTestId(SHOW_MORE_BUTTON_TEST_ID))
         })
 
-        connectionOptions?.extraOptions?.forEach(option => {
+        const remainingOptions = connectionOptions?.extraOptions?.slice(1) || []
+        remainingOptions.forEach(option => {
           fireEvent.click(getByTestId(`${EXTRA_TEST_ID}-${option}-button`))
           expect(onConnect).toHaveBeenCalledWith(option)
         })
@@ -273,7 +288,8 @@ describe('when rendering ConnectionNew', () => {
 
     beforeEach(() => {
       connectionOptions = {
-        primary: ConnectionOptionType.METAMASK
+        primary: ConnectionOptionType.EMAIL,
+        secondary: ConnectionOptionType.METAMASK
       }
       screen = renderConnectionNew({ connectionOptions })
     })
@@ -325,8 +341,9 @@ describe('when rendering ConnectionNew', () => {
     beforeEach(() => {
       onConnect = jest.fn()
       connectionOptions = {
-        primary: ConnectionOptionType.GOOGLE,
-        extraOptions: [ConnectionOptionType.X, ConnectionOptionType.DISCORD]
+        primary: ConnectionOptionType.EMAIL,
+        secondary: ConnectionOptionType.X,
+        extraOptions: [ConnectionOptionType.APPLE, ConnectionOptionType.DISCORD]
       }
       screen = renderConnectionNew({ connectionOptions, onConnect, isNewUser: true })
     })
@@ -368,9 +385,8 @@ describe('when rendering ConnectionNew', () => {
 
     it('should not render the extra options by default', () => {
       const { queryByTestId } = screen
-      connectionOptions?.extraOptions?.forEach(option => {
-        expect(queryByTestId(`${EXTRA_TEST_ID}-${option}-button`)).not.toBeInTheDocument()
-      })
+      // DISCORD should be in extras (X is secondary, DISCORD is extra)
+      expect(queryByTestId(`${EXTRA_TEST_ID}-${ConnectionOptionType.DISCORD}-button`)).not.toBeInTheDocument()
     })
 
     it('should render the show more button', () => {
@@ -386,9 +402,8 @@ describe('when rendering ConnectionNew', () => {
           fireEvent.click(getByTestId(SHOW_MORE_BUTTON_TEST_ID))
         })
 
-        connectionOptions?.extraOptions?.forEach(option => {
-          expect(getByTestId(`${EXTRA_TEST_ID}-${option}-button`)).toBeInTheDocument()
-        })
+        // DISCORD should appear in extras (X is shown as secondary button)
+        expect(getByTestId(`${EXTRA_TEST_ID}-${ConnectionOptionType.DISCORD}-button`)).toBeInTheDocument()
       })
     })
   })
@@ -400,11 +415,11 @@ describe('when rendering ConnectionNew', () => {
 
     beforeEach(() => {
       onConnect = jest.fn()
-      loadingOption = ConnectionOptionType.GOOGLE
+      loadingOption = ConnectionOptionType.APPLE
       connectionOptions = {
-        primary: ConnectionOptionType.GOOGLE,
-        secondary: ConnectionOptionType.APPLE,
-        extraOptions: [ConnectionOptionType.X, ConnectionOptionType.DISCORD]
+        primary: ConnectionOptionType.EMAIL,
+        secondary: ConnectionOptionType.GOOGLE,
+        extraOptions: [ConnectionOptionType.APPLE, ConnectionOptionType.X, ConnectionOptionType.DISCORD]
       }
       screen = renderConnectionNew({ connectionOptions, onConnect, loadingOption })
     })
@@ -415,12 +430,14 @@ describe('when rendering ConnectionNew', () => {
 
     it('should disable the primary button', () => {
       const { getByTestId } = screen
+      // GOOGLE is now firstWalletOption (from secondary)
       const primaryButton = getByTestId(`${PRIMARY_TEST_ID}-${ConnectionOptionType.GOOGLE}-button`)
       expect(primaryButton).toBeDisabled()
     })
 
     it('should disable the secondary button', () => {
       const { getByTestId } = screen
+      // APPLE is now secondWalletOption (from extraOptions[0])
       const secondaryButton = getByTestId(`${SECONDARY_TEST_ID}-${ConnectionOptionType.APPLE}-button`)
       expect(secondaryButton).toBeDisabled()
     })
@@ -432,6 +449,7 @@ describe('when rendering ConnectionNew', () => {
         fireEvent.click(getByTestId(SHOW_MORE_BUTTON_TEST_ID))
       })
 
+      // X is now in remaining options (extraOptions.slice(1))
       const extraButton = getByTestId(`${EXTRA_TEST_ID}-${ConnectionOptionType.X}-button`)
       expect(extraButton).toBeDisabled()
     })
@@ -469,7 +487,8 @@ describe('when rendering ConnectionNew', () => {
 
     beforeEach(() => {
       connectionOptions = {
-        primary: ConnectionOptionType.GOOGLE
+        primary: ConnectionOptionType.EMAIL,
+        secondary: ConnectionOptionType.GOOGLE
       }
       screen = renderConnectionNew({ connectionOptions })
     })
@@ -480,6 +499,7 @@ describe('when rendering ConnectionNew', () => {
 
     it('should render the primary option', () => {
       const { getByTestId } = screen
+      // GOOGLE should be shown as firstWalletOption (primary button)
       expect(getByTestId(PRIMARY_TEST_ID)).toBeInTheDocument()
     })
   })
@@ -514,7 +534,8 @@ describe('when rendering ConnectionNew', () => {
 
     beforeEach(() => {
       connectionOptions = {
-        primary: ConnectionOptionType.METAMASK
+        primary: ConnectionOptionType.EMAIL,
+        secondary: ConnectionOptionType.METAMASK
       }
       screen = renderConnectionNew({ connectionOptions })
     })
@@ -525,7 +546,178 @@ describe('when rendering ConnectionNew', () => {
 
     it('should render the primary option', () => {
       const { getByTestId } = screen
+      // METAMASK should be shown as firstWalletOption (primary button)
       expect(getByTestId(PRIMARY_TEST_ID)).toBeInTheDocument()
+    })
+  })
+
+  describe('when signInOptionsMode is TWO', () => {
+    describe('and the user has an Ethereum provider', () => {
+      let connectionOptions: ConnectionProps['connectionOptions']
+      let oldEthereum: typeof window.ethereum
+
+      beforeEach(() => {
+        oldEthereum = window.ethereum
+        window.ethereum = { isMetaMask: true }
+        connectionOptions = {
+          primary: ConnectionOptionType.EMAIL,
+          secondary: ConnectionOptionType.METAMASK,
+          extraOptions: [ConnectionOptionType.GOOGLE, ConnectionOptionType.APPLE, ConnectionOptionType.DISCORD]
+        }
+        screen = renderConnectionNew({
+          connectionOptions,
+          signInOptionsMode: SignInOptionsMode.TWO
+        })
+      })
+
+      afterEach(() => {
+        window.ethereum = oldEthereum
+      })
+
+      it('should display Google as the first wallet option and MetaMask as the second wallet option', () => {
+        const { getByTestId } = screen
+        expect(getByTestId(`${PRIMARY_TEST_ID}-${ConnectionOptionType.GOOGLE}-button`)).toBeInTheDocument()
+        expect(getByTestId(`${SECONDARY_TEST_ID}-${ConnectionOptionType.METAMASK}-button`)).toBeInTheDocument()
+      })
+
+      it('should move the remaining wallet options to the extras section', () => {
+        const { getByTestId, queryByTestId } = screen
+
+        // APPLE and DISCORD should be in extras
+        expect(queryByTestId(`${EXTRA_TEST_ID}-${ConnectionOptionType.APPLE}-button`)).not.toBeInTheDocument()
+
+        act(() => {
+          fireEvent.click(getByTestId(SHOW_MORE_BUTTON_TEST_ID))
+        })
+
+        expect(getByTestId(`${EXTRA_TEST_ID}-${ConnectionOptionType.APPLE}-button`)).toBeInTheDocument()
+        expect(getByTestId(`${EXTRA_TEST_ID}-${ConnectionOptionType.DISCORD}-button`)).toBeInTheDocument()
+      })
+    })
+
+    describe('and the user does not have an Ethereum provider', () => {
+      let connectionOptions: ConnectionProps['connectionOptions']
+      let oldEthereum: typeof window.ethereum
+
+      beforeEach(() => {
+        oldEthereum = window.ethereum
+        window.ethereum = undefined
+        connectionOptions = {
+          primary: ConnectionOptionType.EMAIL,
+          secondary: ConnectionOptionType.METAMASK,
+          extraOptions: [ConnectionOptionType.GOOGLE, ConnectionOptionType.APPLE]
+        }
+        screen = renderConnectionNew({
+          connectionOptions,
+          signInOptionsMode: SignInOptionsMode.TWO
+        })
+      })
+
+      afterEach(() => {
+        window.ethereum = oldEthereum
+      })
+
+      it('should display only Google as the first wallet option button', () => {
+        const { getByTestId, queryByTestId } = screen
+        expect(getByTestId(`${PRIMARY_TEST_ID}-${ConnectionOptionType.GOOGLE}-button`)).toBeInTheDocument()
+        expect(queryByTestId(SECONDARY_TEST_ID)).not.toBeInTheDocument()
+      })
+
+      it('should move MetaMask to the extras section', () => {
+        const { getByTestId } = screen
+
+        act(() => {
+          fireEvent.click(getByTestId(SHOW_MORE_BUTTON_TEST_ID))
+        })
+
+        expect(getByTestId(`${EXTRA_TEST_ID}-${ConnectionOptionType.METAMASK}-button`)).toBeInTheDocument()
+      })
+    })
+  })
+
+  describe('when signInOptionsMode is ONE', () => {
+    describe('and the user has an Ethereum provider', () => {
+      let connectionOptions: ConnectionProps['connectionOptions']
+      let oldEthereum: typeof window.ethereum
+
+      beforeEach(() => {
+        oldEthereum = window.ethereum
+        window.ethereum = { isMetaMask: true }
+        connectionOptions = {
+          primary: ConnectionOptionType.EMAIL,
+          secondary: ConnectionOptionType.METAMASK,
+          extraOptions: [ConnectionOptionType.GOOGLE, ConnectionOptionType.APPLE]
+        }
+        screen = renderConnectionNew({
+          connectionOptions,
+          signInOptionsMode: SignInOptionsMode.ONE
+        })
+      })
+
+      afterEach(() => {
+        window.ethereum = oldEthereum
+      })
+
+      it('should display only MetaMask as the first wallet option button', () => {
+        const { getByTestId, queryByTestId } = screen
+        expect(getByTestId(`${PRIMARY_TEST_ID}-${ConnectionOptionType.METAMASK}-button`)).toBeInTheDocument()
+        expect(queryByTestId(SECONDARY_TEST_ID)).not.toBeInTheDocument()
+      })
+
+      it('should move Google and Apple to the extras section', () => {
+        const { getByTestId } = screen
+
+        act(() => {
+          fireEvent.click(getByTestId(SHOW_MORE_BUTTON_TEST_ID))
+        })
+
+        expect(getByTestId(`${EXTRA_TEST_ID}-${ConnectionOptionType.GOOGLE}-button`)).toBeInTheDocument()
+        expect(getByTestId(`${EXTRA_TEST_ID}-${ConnectionOptionType.APPLE}-button`)).toBeInTheDocument()
+      })
+    })
+
+    describe('and the user does not have an Ethereum provider', () => {
+      let connectionOptions: ConnectionProps['connectionOptions']
+      let oldEthereum: typeof window.ethereum
+
+      beforeEach(() => {
+        oldEthereum = window.ethereum
+        window.ethereum = undefined
+        connectionOptions = {
+          primary: ConnectionOptionType.EMAIL,
+          secondary: ConnectionOptionType.METAMASK,
+          extraOptions: [ConnectionOptionType.GOOGLE, ConnectionOptionType.APPLE]
+        }
+        screen = renderConnectionNew({
+          connectionOptions,
+          signInOptionsMode: SignInOptionsMode.ONE
+        })
+      })
+
+      afterEach(() => {
+        window.ethereum = oldEthereum
+      })
+
+      it('should not display primary or secondary wallet option buttons', () => {
+        const { queryByTestId } = screen
+        expect(queryByTestId(PRIMARY_TEST_ID)).not.toBeInTheDocument()
+        expect(queryByTestId(SECONDARY_TEST_ID)).not.toBeInTheDocument()
+      })
+
+      it('should move all wallet options to the extras section with Google first and MetaMask second', () => {
+        const { getByTestId } = screen
+
+        act(() => {
+          fireEvent.click(getByTestId(SHOW_MORE_BUTTON_TEST_ID))
+        })
+
+        const extraContainer = getByTestId(EXTRA_TEST_ID)
+        const buttons = extraContainer.querySelectorAll('button')
+
+        // Check order: Google first, then MetaMask
+        expect(buttons[0]).toHaveAttribute('data-testid', `${EXTRA_TEST_ID}-${ConnectionOptionType.GOOGLE}-button`)
+        expect(buttons[1]).toHaveAttribute('data-testid', `${EXTRA_TEST_ID}-${ConnectionOptionType.METAMASK}-button`)
+      })
     })
   })
 })

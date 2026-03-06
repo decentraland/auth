@@ -6,7 +6,7 @@ import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
 import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
 import { Env } from '@dcl/ui-env'
 import { connection } from 'decentraland-connect'
-import { CircularProgress } from 'decentraland-ui2'
+import { CircularProgress, Desktop } from 'decentraland-ui2'
 // eslint-disable-next-line @typescript-eslint/naming-convention
 import ImageNew1 from '../../../assets/images/background/image-new1.webp'
 // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -46,6 +46,7 @@ import {
   fromConnectionOptionToProviderType,
   getIdentitySignature,
   getIdentityWithSigner,
+  getSignInOptionsMode,
   isSocialLogin,
   requiresInjectedProvider
 } from './utils'
@@ -66,9 +67,9 @@ export const LoginPage = () => {
   const [showEmailLoginModal, setShowEmailLoginModal] = useState(false)
   const [currentConnectionType, setCurrentConnectionType] = useState<ConnectionOptionType>()
   const { url: redirectTo, redirect } = useAfterLoginRedirection()
-  const { initialized: flagInitialized, flags } = useContext(FeatureFlagsContext)
+  const { initialized: flagInitialized, flags, variants } = useContext(FeatureFlagsContext)
 
-  const isEmailOtpEnabled = flags[FeatureFlagsKeys.EMAIL_OTP_LOGIN] === true
+  const signInOptionsMode = getSignInOptionsMode(variants)
 
   // Email login state
   const [currentEmail, setCurrentEmail] = useState('')
@@ -197,12 +198,7 @@ export const LoginPage = () => {
       }
 
       // EMAIL is handled differently - focus the email input instead of connecting
-      // But only if email OTP is enabled
       if (connectionType === ConnectionOptionType.EMAIL) {
-        if (!isEmailOtpEnabled) {
-          // Email OTP is disabled via feature flag, ignore this auto-login attempt
-          return
-        }
         const emailInput = document.getElementById('dcl-email-input')
         if (emailInput) {
           emailInput.scrollIntoView({ behavior: 'smooth', block: 'center' })
@@ -285,8 +281,7 @@ export const LoginPage = () => {
       runProfileRedirect,
       flagInitialized,
       checkClockSynchronization,
-      getReferrerFromCurrentSearch,
-      isEmailOtpEnabled
+      getReferrerFromCurrentSearch
     ]
   )
 
@@ -439,23 +434,25 @@ export const LoginPage = () => {
 
   const backgroundImages = NEW_USER_BACKGROUND_IMAGES
   return (
-    <Main isNewUser={isNewUser}>
-      <BackgroundWrapper>
-        <Background
-          isVisible={true}
-          style={{
-            backgroundImage: `url(${backgroundImages[previousBackgroundIndex]})`
-          }}
-          aria-hidden
-        />
-        <Background
-          isVisible={backgroundTransitioning}
-          style={{
-            backgroundImage: `url(${backgroundImages[currentBackgroundIndex]})`
-          }}
-          aria-hidden
-        />
-      </BackgroundWrapper>
+    <Main>
+      <Desktop>
+        <BackgroundWrapper>
+          <Background
+            isVisible={true}
+            style={{
+              backgroundImage: `url(${backgroundImages[previousBackgroundIndex]})`
+            }}
+            aria-hidden
+          />
+          <Background
+            isVisible={backgroundTransitioning}
+            style={{
+              backgroundImage: `url(${backgroundImages[currentBackgroundIndex]})`
+            }}
+            aria-hidden
+          />
+        </BackgroundWrapper>
+      </Desktop>
       {showConfirmingLogin && !showClockSyncModal && (
         <ConfirmingLogin error={confirmingLoginError} onError={confirmingLoginError ? handleConfirmingLoginRetry : undefined} />
       )}
@@ -471,26 +468,25 @@ export const LoginPage = () => {
             onTryAgain={handleTryAgain}
             providerType={currentConnectionType ? fromConnectionOptionToProviderType(currentConnectionType) : null}
           />
-          {isEmailOtpEnabled && (
-            <EmailLoginModal
-              open={showEmailLoginModal}
-              email={currentEmail}
-              onClose={handleEmailLoginClose}
-              onBack={handleEmailLoginBack}
-              onSuccess={handleEmailLoginSuccess}
-              onError={handleEmailLoginError}
-            />
-          )}
+          <EmailLoginModal
+            open={showEmailLoginModal}
+            email={currentEmail}
+            onClose={handleEmailLoginClose}
+            onBack={handleEmailLoginBack}
+            onSuccess={handleEmailLoginSuccess}
+            onError={handleEmailLoginError}
+          />
           <Left>
             <LeftInfo>
               <MainContainer>
                 <Connection
                   onConnect={handleOnConnect}
-                  onEmailSubmit={isEmailOtpEnabled ? handleEmailSubmit : undefined}
+                  onEmailSubmit={handleEmailSubmit}
                   onEmailChange={handleEmailInputChange}
                   loadingOption={currentConnectionType}
                   connectionOptions={targetConfig.connectionOptions}
                   isNewUser={isNewUser}
+                  signInOptionsMode={signInOptionsMode}
                   isEmailLoading={isEmailLoading}
                   emailError={emailError}
                 />

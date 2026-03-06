@@ -2,7 +2,11 @@ import { createWalletClient } from 'viem'
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
 import { AuthIdentity, Authenticator } from '@dcl/crypto'
 import { localStorageGetIdentity, localStorageStoreIdentity } from '@dcl/single-sign-on-client'
-import { getIdentitySignature, getIdentityWithSigner } from './utils'
+import { Provider } from 'decentraland-connect'
+import { SignInOptionsMode } from '../../Connection/Connection.types'
+import { FeatureFlagsKeys, SignInPrimaryOptionVariant } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
+import type { FeatureFlagsVariants } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
+import { getIdentitySignature, getIdentityWithSigner, getSignInOptionsMode } from './utils'
 
 jest.mock('@dcl/single-sign-on-client')
 jest.mock('@dcl/crypto')
@@ -64,7 +68,7 @@ function setupGenerateIdentityMocks(resultIdentity: AuthIdentity) {
 
 describe('getIdentitySignature', () => {
   const address = '0x1234567890abcdef1234567890abcdef12345678'
-  const provider = {} as any
+  const provider = {} as Provider
 
   describe('when no cached identity exists', () => {
     it('should generate and store a new identity', async () => {
@@ -204,6 +208,62 @@ describe('getIdentityWithSigner', () => {
 
       expect(result).toBe(freshIdentity)
       expect(mockLocalStorageStoreIdentity).toHaveBeenCalledWith(address, freshIdentity)
+    })
+  })
+})
+
+describe('getSignInOptionsMode', () => {
+  let variants: Partial<FeatureFlagsVariants>
+
+  beforeEach(() => {
+    variants = {}
+  })
+
+  describe('when feature flag does not exist', () => {
+    it('should return FULL mode', () => {
+      const result = getSignInOptionsMode(variants)
+
+      expect(result).toBe(SignInOptionsMode.FULL)
+    })
+  })
+
+  describe('when feature flag is not enabled', () => {
+    it('should return FULL mode', () => {
+      const result = getSignInOptionsMode(variants)
+
+      expect(result).toBe(SignInOptionsMode.FULL)
+    })
+  })
+
+  describe('when feature flag is enabled', () => {
+    describe('and variant is TWO_OPTIONS', () => {
+      beforeEach(() => {
+        variants[FeatureFlagsKeys.SIGN_IN_PRIMARY_OPTION] = {
+          enabled: true,
+          name: SignInPrimaryOptionVariant.TWO_OPTIONS
+        }
+      })
+
+      it('should return TWO mode', () => {
+        const result = getSignInOptionsMode(variants)
+
+        expect(result).toBe(SignInOptionsMode.TWO)
+      })
+    })
+
+    describe('and variant is ONE_OPTION', () => {
+      beforeEach(() => {
+        variants[FeatureFlagsKeys.SIGN_IN_PRIMARY_OPTION] = {
+          enabled: true,
+          name: SignInPrimaryOptionVariant.ONE_OPTION
+        }
+      })
+
+      it('should return ONE mode', () => {
+        const result = getSignInOptionsMode(variants)
+
+        expect(result).toBe(SignInOptionsMode.ONE)
+      })
     })
   })
 })
