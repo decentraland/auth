@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { ConnectionOptionType } from '../components/Connection'
+import { requiresInjectedProvider } from '../components/Pages/LoginPage/utils'
 
 /**
  * Login method types that can be passed via URL parameters
@@ -113,6 +114,11 @@ const useAutoLogin = ({ isReady, onConnect }: UseAutoLoginOptions): UseAutoLogin
   // Auto-trigger login when ready and loginMethod is specified
   useEffect(() => {
     if (!isReady || autoLoginTriggeredRef.current || !resolvedConnectionOption) {
+      return
+    }
+
+    // Skip auto-login for injected providers (e.g. MetaMask) when no wallet extension is installed
+    if (requiresInjectedProvider(resolvedConnectionOption) && !window.ethereum) {
       return
     }
 
