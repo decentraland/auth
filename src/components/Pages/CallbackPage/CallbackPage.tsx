@@ -48,8 +48,12 @@ const DesktopCallbackPage = () => {
       return undefined
     }
 
+    if (!connectionData.account) {
+      throw new Error('No account returned from Magic connection')
+    }
+
     if (connectionData.provider) {
-      await getIdentitySignature(connectionData.account?.toLowerCase() ?? '', connectionData.provider)
+      await getIdentitySignature(connectionData.account.toLowerCase(), connectionData.provider)
     }
     return connectionData
   }, [connectToMagic, initialized])
