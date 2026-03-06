@@ -35,8 +35,6 @@ export const Connection = (props: ConnectionProps): JSX.Element => {
   } = props
   const { t } = useTranslation()
 
-  const hasExtraOptions = connectionOptions?.extraOptions && connectionOptions.extraOptions.length > 0
-
   const [showMore, setShowMore] = useState(false)
   const handleShowMore = useCallback(() => {
     setShowMore(!showMore)
@@ -90,7 +88,7 @@ export const Connection = (props: ConnectionProps): JSX.Element => {
       </MainContentContainer>
 
       <ShowMoreContainer>
-        {hasExtraOptions && remainingWalletOptions && remainingWalletOptions.length > 0 && (
+        {remainingWalletOptions && remainingWalletOptions.length > 0 && (
           <ShowMoreButton data-testid={SHOW_MORE_BUTTON_TEST_ID} variant="text" fullWidth onClick={handleShowMore}>
             {t('connection.more_options')}
             {showMore ? <ChevronUpIcon /> : <ChevronIcon />}

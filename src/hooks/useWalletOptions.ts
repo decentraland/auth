@@ -20,12 +20,23 @@ type WalletOptions = {
 
 export const useWalletOptions = ({ connectionOptions, signInOptionsMode }: UseWalletOptionsParams): WalletOptions => {
   return useMemo(() => {
-    const allWalletOptions = [connectionOptions?.secondary, ...(connectionOptions?.extraOptions ?? [])].filter(
-      (opt): opt is ConnectionOptionType => opt !== undefined
-    )
+    // Include primary in wallet options when it's not EMAIL (EMAIL is handled by EmailInput)
+    const primaryIsWallet = connectionOptions?.primary && connectionOptions.primary !== ConnectionOptionType.EMAIL
+    const allWalletOptions = [
+      ...(primaryIsWallet ? [connectionOptions.primary] : []),
+      connectionOptions?.secondary,
+      ...(connectionOptions?.extraOptions ?? [])
+    ].filter((opt): opt is ConnectionOptionType => opt !== undefined)
 
     // FULL mode: Show all options normally (legacy behavior)
     if (!signInOptionsMode || signInOptionsMode === SignInOptionsMode.FULL) {
+      if (primaryIsWallet) {
+        return {
+          firstWalletOption: connectionOptions.primary,
+          secondWalletOption: connectionOptions?.secondary,
+          remainingWalletOptions: connectionOptions?.extraOptions
+        }
+      }
       return {
         firstWalletOption: connectionOptions?.secondary,
         secondWalletOption: connectionOptions?.extraOptions?.[0],

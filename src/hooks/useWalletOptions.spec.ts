@@ -39,6 +39,65 @@ describe('when using the useWalletOptions hook', () => {
       expect(result.current.remainingWalletOptions).toEqual([ConnectionOptionType.APPLE])
     })
 
+    it('should return the primary option as the first wallet option when primary is not EMAIL (iOS config)', () => {
+      const connectionOptions = {
+        primary: ConnectionOptionType.APPLE,
+        secondary: ConnectionOptionType.WALLET_CONNECT,
+        extraOptions: [ConnectionOptionType.GOOGLE, ConnectionOptionType.DISCORD, ConnectionOptionType.X]
+      }
+
+      const { result } = renderHook(() =>
+        useWalletOptions({
+          connectionOptions,
+          signInOptionsMode: SignInOptionsMode.FULL
+        })
+      )
+
+      expect(result.current.firstWalletOption).toBe(ConnectionOptionType.APPLE)
+      expect(result.current.secondWalletOption).toBe(ConnectionOptionType.WALLET_CONNECT)
+      expect(result.current.remainingWalletOptions).toEqual([
+        ConnectionOptionType.GOOGLE,
+        ConnectionOptionType.DISCORD,
+        ConnectionOptionType.X
+      ])
+    })
+
+    it('should return the primary option as the first wallet option when primary is not EMAIL (Android config)', () => {
+      const connectionOptions = {
+        primary: ConnectionOptionType.GOOGLE,
+        secondary: ConnectionOptionType.WALLET_CONNECT,
+        extraOptions: [ConnectionOptionType.DISCORD, ConnectionOptionType.APPLE]
+      }
+
+      const { result } = renderHook(() =>
+        useWalletOptions({
+          connectionOptions,
+          signInOptionsMode: SignInOptionsMode.FULL
+        })
+      )
+
+      expect(result.current.firstWalletOption).toBe(ConnectionOptionType.GOOGLE)
+      expect(result.current.secondWalletOption).toBe(ConnectionOptionType.WALLET_CONNECT)
+      expect(result.current.remainingWalletOptions).toEqual([ConnectionOptionType.DISCORD, ConnectionOptionType.APPLE])
+    })
+
+    it('should return the primary option as the first wallet option when primary is WALLET_CONNECT and there is no secondary (androidWeb3 config)', () => {
+      const connectionOptions = {
+        primary: ConnectionOptionType.WALLET_CONNECT
+      }
+
+      const { result } = renderHook(() =>
+        useWalletOptions({
+          connectionOptions,
+          signInOptionsMode: SignInOptionsMode.FULL
+        })
+      )
+
+      expect(result.current.firstWalletOption).toBe(ConnectionOptionType.WALLET_CONNECT)
+      expect(result.current.secondWalletOption).toBeUndefined()
+      expect(result.current.remainingWalletOptions).toBeUndefined()
+    })
+
     it('should return undefined for all wallet options when no connection options are provided', () => {
       const { result } = renderHook(() =>
         useWalletOptions({
