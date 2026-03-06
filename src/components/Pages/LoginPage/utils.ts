@@ -61,6 +61,10 @@ async function generateIdentity(address: string, provider: Provider): Promise<Au
   })
   const [account] = await walletClient.getAddresses()
 
+  if (!account) {
+    throw new Error('No account found in wallet provider')
+  }
+
   return generateIdentityWithSigner(address, message => walletClient.signMessage({ account, message }))
 }
 
