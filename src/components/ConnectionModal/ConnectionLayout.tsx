@@ -49,7 +49,7 @@ const ConnectionLayout = React.memo((props: ConnectionLayoutProps) => {
   return (
     <ConnectionContainer>
       <DecentralandLogo size="huge" />
-      <ConnectionTitle>{getConnectionLayoutMessage(state, providerType, t)}</ConnectionTitle>
+      <ConnectionTitle data-testid="connection-status">{getConnectionLayoutMessage(state, providerType, t)}</ConnectionTitle>
       {isLoading && (
         <ProgressContainer>
           <CircularProgress color="inherit" />
@@ -57,7 +57,7 @@ const ConnectionLayout = React.memo((props: ConnectionLayoutProps) => {
       )}
       {isError && (
         <ErrorButtonContainer>
-          <Button variant="contained" onClick={handleTryAgain}>
+          <Button data-testid="connection-try-again-button" variant="contained" onClick={handleTryAgain}>
             {t('common.try_again')}
           </Button>
         </ErrorButtonContainer>
