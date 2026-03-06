@@ -458,16 +458,14 @@ const AvatarSetupPage: React.FC = () => {
 
       <RightAvatarSection>
         <RightSectionBackground />
-        {!isAvatarParticlesAnimationEnded && (
-          <AvatarParticles
-            animationData={avatarParticles}
-            loop={false}
-            onComplete={() => {
-              setIsAvatarParticlesAnimationEnded(true)
-            }}
-            show={!isAvatarParticlesAnimationEnded}
-          />
-        )}
+        <AvatarParticles
+          animationData={avatarParticles}
+          loop={false}
+          onComplete={() => {
+            setIsAvatarParticlesAnimationEnded(true)
+          }}
+          show={!isAvatarParticlesAnimationEnded}
+        />
         <AvatarParticles animationData={avatarFloat} loop={true} show={isAvatarParticlesAnimationEnded} />
       </RightAvatarSection>
 
