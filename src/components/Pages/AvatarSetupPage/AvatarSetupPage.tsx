@@ -21,6 +21,7 @@ import { isEmailValid } from '../../../shared/email'
 import { locations } from '../../../shared/locations'
 import { isProfileComplete } from '../../../shared/profile'
 import { handleError } from '../../../shared/utils/errorHandler'
+import { checkWebGpuSupport } from '../../../shared/utils/webgpu'
 import { AnimatedBackground } from '../../AnimatedBackground'
 import { CharacterCounterComponent } from '../../CharacterCounter'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
@@ -338,8 +339,13 @@ const AvatarSetupPage: React.FC = () => {
       return navigate(locations.login(redirectTo, referrer))
     }
 
-    initializeAvatarSetup()
-  }, [initializeAvatarSetup, account, identity, isConnecting, initializedFlags, navigate, redirectTo])
+    checkWebGpuSupport().then(hasWebGPU => {
+      if (!hasWebGPU) {
+        return navigate(locations.setup(redirectTo, referrer))
+      }
+      initializeAvatarSetup()
+    })
+  }, [initializeAvatarSetup, account, identity, isConnecting, initializedFlags, navigate, redirectTo, referrer])
 
   if (!initialized) {
     return (
