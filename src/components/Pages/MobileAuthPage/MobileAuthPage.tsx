@@ -52,7 +52,6 @@ export const MobileAuthPage = () => {
             true // isMobileFlow
           )
         } else {
-          // Web3 wallet flow
           setView('connecting')
           setLoadingState(ConnectionLayoutState.CONNECTING_WALLET)
           const connectionData = await connectToProvider(selectedConnectionType)

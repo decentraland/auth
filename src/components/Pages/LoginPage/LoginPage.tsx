@@ -46,7 +46,8 @@ import {
   fromConnectionOptionToProviderType,
   getIdentitySignature,
   getIdentityWithSigner,
-  isSocialLogin
+  isSocialLogin,
+  requiresInjectedProvider
 } from './utils'
 import { Background, BackgroundWrapper, GuestInfo, Left, LeftInfo, Main, MainContainer, NewUserInfo } from './LoginPage.styled'
 
@@ -224,6 +225,9 @@ export const LoginPage = () => {
           setLoadingState(ConnectionLayoutState.LOADING_MAGIC)
           await connectToSocialProvider(connectionType, flags[FeatureFlagsKeys.MAGIC_TEST], redirectTo)
         } else {
+          if (requiresInjectedProvider(connectionType) && !window.ethereum) {
+            throw new Error('No wallet extension detected. Please install MetaMask or another Ethereum wallet.')
+          }
           setShowConnectionLayout(true)
           setLoadingState(ConnectionLayoutState.CONNECTING_WALLET)
           const connectionData = await connectToProvider(connectionType)
@@ -398,6 +402,10 @@ export const LoginPage = () => {
 
     // Handle other connection types via connectToProvider
     if (currentConnectionType) {
+      if (requiresInjectedProvider(currentConnectionType) && !window.ethereum) {
+        handleError(new Error('No wallet extension detected'), 'Wallet extension not available for clock sync continue')
+        return
+      }
       try {
         const connectionData = await connectToProvider(currentConnectionType)
 

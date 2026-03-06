@@ -116,11 +116,19 @@ async function connectToSocialProvider(
   }
 }
 
+function requiresInjectedProvider(connectionOption: ConnectionOptionType): boolean {
+  return fromConnectionOptionToProviderType(connectionOption) === ProviderType.INJECTED
+}
+
 async function connectToProvider(connectionOption: ConnectionOptionType): Promise<ConnectionResponse> {
   const providerType = fromConnectionOptionToProviderType(connectionOption)
 
   if (providerType === ProviderType.THIRDWEB) {
     throw new Error('Email connection should use thirdweb flow, not connectToProvider')
+  }
+
+  if (providerType === ProviderType.INJECTED && !window.ethereum) {
+    throw new Error('No wallet extension detected. Please install MetaMask or another Ethereum wallet.')
   }
 
   // Clear stale WalletConnect/AppKit data to prevent session conflicts
@@ -211,6 +219,7 @@ export {
   fromConnectionOptionToProviderType,
   connectToSocialProvider,
   connectToProvider,
+  requiresInjectedProvider,
   isSocialLogin,
   isEmailLogin,
   getIdentitySignature,
