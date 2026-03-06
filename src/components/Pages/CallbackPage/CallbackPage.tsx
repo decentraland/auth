@@ -108,6 +108,11 @@ const DesktopCallbackPage = () => {
       try {
         const result = await magic?.oauth2.getRedirectResult()
 
+        // Now that Magic has consumed the OAuth params from the URL,
+        // replace the history entry so the back button won't return
+        // to /callback with stale/consumed state.
+        window.history.replaceState(null, '', locations.login())
+
         // Store user email in localStorage if available
         if (result?.oauth?.userInfo?.email) {
           localStorage.setItem('dcl_magic_user_email', result.oauth.userInfo.email)
@@ -120,6 +125,8 @@ const DesktopCallbackPage = () => {
         if (!isAlreadyLoggedIn) {
           throw error
         }
+        // Still clean up the URL for the already-logged-in path
+        window.history.replaceState(null, '', locations.login())
       }
 
       handleContinue(referrer)
@@ -143,12 +150,6 @@ const DesktopCallbackPage = () => {
       navigate(locations.login())
     }
   }, [navigate, handleContinue, flags[FeatureFlagsKeys.MAGIC_TEST], searchParams, redirectTo])
-
-  // Replace the current history entry so the browser back button
-  // won't return to /callback after the OAuth state has been consumed.
-  useEffect(() => {
-    window.history.replaceState(null, '', locations.login())
-  }, [])
 
   useEffect(() => {
     if (!logInStarted && initialized) {
