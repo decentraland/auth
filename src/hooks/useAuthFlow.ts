@@ -16,6 +16,7 @@ import { useAfterLoginRedirection } from './redirection'
 import { useTargetConfig } from './targetConfig'
 import { useAnalytics } from './useAnalytics'
 import { useDisabledCatalysts } from './useDisabledCatalysts'
+import { trackCheckpoint } from '../shared/onboarding/trackCheckpoint'
 
 /**
  * Custom hook that manages authentication flow logic including Magic connection
@@ -77,6 +78,19 @@ export const useAuthFlow = () => {
         return undefined
       }
 
+      // Marks CP2 as completed for returning users (those with an existing profile).
+      // Prevents nudge emails being sent to people who are already onboarded.
+      // Fires with wallet address AND email (if available) so both identifier types are covered.
+      const markReturningUser = () => {
+        const storedEmail = localStorage.getItem('dcl_thirdweb_user_email') || localStorage.getItem('dcl_magic_user_email')
+        if (storedEmail) {
+          trackCheckpoint({ checkpointId: 2, action: 'completed', userIdentifier: storedEmail, identifierType: 'email' })
+        }
+        if (account) {
+          trackCheckpoint({ checkpointId: 2, action: 'completed', userIdentifier: account, identifierType: 'wallet' })
+        }
+      }
+
       if (targetConfig && !targetConfig.skipSetup && account) {
         // Check profile consistency across all catalysts
         const fetcherWithTimeout = createFetcher({
@@ -98,6 +112,7 @@ export const useAuthFlow = () => {
             try {
               await redeployExistingProfile(consistencyResult.profile, account, userIdentity, disabledCatalysts, fetcherWithTimeout)
               // If redeployment succeeds, continue with the login flow
+              markReturningUser()
               return redirect()
             } catch (error) {
               console.warn('Profile redeployment failed, attempting to redeploy with content server data:', error)
@@ -111,6 +126,7 @@ export const useAuthFlow = () => {
                   fetcherWithTimeout
                 )
                 // If redeployment succeeds, continue with the login flow
+                markReturningUser()
                 return redirect()
               } catch (error) {
                 console.warn('Profile redeployment failed, falling back to onboarding:', error)
@@ -145,6 +161,7 @@ export const useAuthFlow = () => {
         }
       }
 
+      markReturningUser()
       redirect()
     },
     [

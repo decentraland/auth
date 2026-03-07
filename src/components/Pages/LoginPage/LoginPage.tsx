@@ -29,6 +29,7 @@ import { config } from '../../../modules/config'
 import { createAuthServerHttpClient } from '../../../shared/auth'
 import { isErrorWithName, isUserRejectedTransaction } from '../../../shared/errors'
 import { extractReferrerFromSearchParameters } from '../../../shared/locations'
+import { trackCheckpoint } from '../../../shared/onboarding/trackCheckpoint'
 import { disconnectWallet, sendEmailOTP } from '../../../shared/thirdweb'
 import { isClockSynchronized } from '../../../shared/utils/clockSync'
 import { handleError } from '../../../shared/utils/errorHandler'
@@ -167,6 +168,16 @@ export const LoginPage = () => {
         // Keep the flow going even if cleanup fails.
       }
 
+      trackCheckpoint({
+        checkpointId: 2,
+        action: 'reached',
+        source: 'auth',
+        userIdentifier: email,
+        identifierType: 'email',
+        email,
+        metadata: { loginMethod: ConnectionOptionType.EMAIL }
+      })
+
       try {
         // Send OTP to email
         await sendEmailOTP(email)
@@ -214,6 +225,13 @@ export const LoginPage = () => {
       trackLoginClick({
         method: connectionType,
         type: providerType
+      })
+
+      trackCheckpoint({
+        checkpointId: 2,
+        action: 'reached',
+        source: 'auth',
+        metadata: { loginMethod: connectionType }
       })
 
       try {
