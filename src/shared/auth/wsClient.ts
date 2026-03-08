@@ -1,10 +1,8 @@
 import { io } from 'socket.io-client'
-import { RequestInteractionType, TrackingEvents } from '../../modules/analytics/types'
 import { config } from '../../modules/config'
-import { trackEvent } from '../utils/analytics'
 import { handleError } from '../utils/errorHandler'
-import { DifferentSenderError, ExpiredRequestError, IpValidationError, RequestFulfilledError, RequestNotFoundError } from './errors'
 import { OutcomeError, OutcomeResponse, RecoverResponse, ValidationResponse } from './types'
+import { handleRecoverError, throwAuthServerError, trackRecoverMethod, validateRecoverResponse } from './utils'
 
 export const createAuthServerWsClient = (authServerUrl?: string) => {
   const url = authServerUrl ?? config.get('AUTH_SERVER_URL')
@@ -24,16 +22,8 @@ export const createAuthServerWsClient = (authServerUrl?: string) => {
     // Close client, we don't need it anymore
     socket.close()
 
-    if (response.error?.includes('already been fulfilled')) {
-      throw new RequestFulfilledError(message.requestId)
-    } else if (response.error?.includes('not found')) {
-      throw new RequestNotFoundError(message.requestId)
-    } else if (response.error?.includes('has expired')) {
-      throw new ExpiredRequestError(message.requestId)
-    } else if (response.error?.includes('IP validation failed')) {
-      throw new IpValidationError(message.requestId, response.error)
-    } else if (response.error) {
-      throw new Error(response.error)
+    if (response.error) {
+      throwAuthServerError(response.error, message.requestId)
     }
 
     return response
@@ -75,49 +65,12 @@ export const createAuthServerWsClient = (authServerUrl?: string) => {
         throw new Error(response.error)
       }
 
-      // If the sender defined in the request is different than the one that is connected, show an error.
-      if (response.sender && response.sender !== signerAddress.toLowerCase()) {
-        throw new DifferentSenderError(signerAddress, response.sender)
-      }
-
-      if (response.expiration && new Date(response.expiration) < new Date()) {
-        throw new ExpiredRequestError(requestId, response.expiration)
-      }
-
-      switch (response.method) {
-        case 'dcl_personal_sign':
-          trackEvent(TrackingEvents.REQUEST_INTERACTION, {
-            type: isDeepLinkFlow ? RequestInteractionType.DEEP_LINK_SIGN_IN : RequestInteractionType.VERIFY_SIGN_IN,
-            browserTime: Date.now(),
-            requestTime: new Date(response.expiration).getTime(),
-            requestType: response?.method
-          })
-          break
-        case 'eth_sendTransaction':
-          trackEvent(TrackingEvents.REQUEST_INTERACTION, {
-            type: RequestInteractionType.WALLET_INTERACTION,
-            requestType: response.method
-          })
-          break
-        default:
-          trackEvent(TrackingEvents.REQUEST_INTERACTION, {
-            type: RequestInteractionType.WALLET_INTERACTION,
-            requestType: response.method
-          })
-      }
+      validateRecoverResponse(response, signerAddress, requestId)
+      trackRecoverMethod(response, isDeepLinkFlow)
 
       return response
     } catch (e) {
-      // Don't report fulfilled requests to Sentry — they are an expected state after successful login
-      if (!(e instanceof RequestFulfilledError)) {
-        handleError(e, 'Error recovering request', {
-          trackingData: {
-            browserTime: Date.now(),
-            requestType: response?.method ?? 'Unknown'
-          },
-          trackingEvent: TrackingEvents.REQUEST_LOADING_ERROR
-        })
-      }
+      handleRecoverError(e, response)
       throw e
     }
   }

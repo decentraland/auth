@@ -1,3 +1,5 @@
+import { extractMultipleFromStateParameter } from './utils/stateParameter'
+
 interface MobileSession {
   u?: string
   s?: string
@@ -5,26 +7,6 @@ interface MobileSession {
 
 // In-memory cache: survives SPA navigations without localStorage
 let cachedSession: MobileSession | null | undefined
-
-// Helper that parses the state param from the OAuth callback (same pattern as extractRedirectToFromSearchParameters)
-function extractMobileDataFromState(): { isMobileFlow?: boolean; mobileUserId?: string; mobileSessionId?: string } | null {
-  try {
-    const params = new URLSearchParams(window.location.search)
-    const state = params.get('state')
-    if (state) {
-      const decoded = JSON.parse(atob(state))
-      const customData = JSON.parse(decoded.customData)
-      return {
-        isMobileFlow: customData.isMobileFlow,
-        mobileUserId: customData.mobileUserId,
-        mobileSessionId: customData.mobileSessionId
-      }
-    }
-  } catch {
-    // ignore malformed state
-  }
-  return null
-}
 
 function getMobileSession(): MobileSession | null {
   if (cachedSession !== undefined) {
@@ -40,8 +22,13 @@ function getMobileSession(): MobileSession | null {
   }
 
   // On callback, extract from OAuth state param
-  const stateData = extractMobileDataFromState()
-  if (stateData?.isMobileFlow) {
+  const stateData = extractMultipleFromStateParameter<{
+    isMobileFlow?: boolean
+    mobileUserId?: string
+    mobileSessionId?: string
+  }>(params, ['isMobileFlow', 'mobileUserId', 'mobileSessionId'])
+
+  if (stateData.isMobileFlow) {
     cachedSession = {
       u: stateData.mobileUserId ?? undefined,
       s: stateData.mobileSessionId ?? undefined

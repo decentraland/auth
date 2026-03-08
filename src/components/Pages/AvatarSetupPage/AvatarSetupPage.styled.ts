@@ -1,11 +1,9 @@
 // eslint-disable-next-line @typescript-eslint/naming-convention
 import Lottie from 'lottie-react'
 import { brand, neutral } from 'decentraland-ui2/dist/theme/colors'
-import { Box, Button, Checkbox, FormControlLabel, Link, Logo, TextField, Typography, muiIcons, styled } from 'decentraland-ui2'
+import { Box, Button, Checkbox, FormControlLabel, Link, Logo, TextField, Typography, styled } from 'decentraland-ui2'
 // eslint-disable-next-line @typescript-eslint/naming-convention
 import SetupRightBackground from '../../../assets/images/setup-right-background.webp'
-
-const WarningAmberOutlinedIcon = muiIcons.WarningAmberOutlined
 
 const MainContainer = styled(Box)({
   display: 'flex',
@@ -160,23 +158,6 @@ const TextInput = styled(TextField)<{ hasError?: boolean }>(({ hasError }) => ({
   }
 }))
 
-const ErrorContainer = styled(Box)({
-  display: 'flex',
-  alignItems: 'center',
-  gap: '4px'
-})
-
-const ErrorText = styled('span')({
-  color: 'rgba(224, 0, 0, 1)',
-  fontSize: '14px'
-})
-
-const WarningIcon = styled(WarningAmberOutlinedIcon)({
-  color: 'rgba(224, 0, 0, 1)',
-  height: '15px',
-  width: '15px'
-})
-
 const EmailDescription = styled(Typography)({
   fontSize: '14px',
   lineHeight: '100%',
@@ -292,10 +273,7 @@ export {
   InputContainer,
   InputLabel,
   TextInput,
-  ErrorContainer,
   ErrorLabel,
-  ErrorText,
-  WarningIcon,
   EmailDescription,
   CheckboxContainer,
   CheckboxRow,
@@ -307,3 +285,5 @@ export {
   AvatarParticles,
   PreloadedWearableContainer
 }
+
+export { ErrorContainer, ErrorText, WarningIcon } from '../../shared/ErrorDisplay.styled'

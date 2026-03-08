@@ -1,15 +1,9 @@
 import { Location, useLocation } from 'react-router-dom'
-import { ConnectionOptionType } from '../components/Connection'
+import { ConnectionOptionType, ConnectionOptions } from '../components/Connection'
 import { isIos, isMobile } from '../components/Pages/LoginPage/utils'
 import { extractRedirectToFromSearchParameters } from '../shared/locations'
 
 type TargetConfigId = 'default' | 'alternative' | 'ios' | 'android' | 'androidSocial' | 'androidWeb3'
-
-type ConnectionOptions = {
-  primary: ConnectionOptionType
-  secondary?: ConnectionOptionType
-  extraOptions?: ConnectionOptionType[]
-}
 
 type TargetConfig = {
   skipSetup: boolean

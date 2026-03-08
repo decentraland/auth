@@ -1,11 +1,5 @@
 import { useMemo } from 'react'
-import { ConnectionOptionType, SignInOptionsMode } from '../components/Connection/Connection.types'
-
-type ConnectionOptions = {
-  primary: ConnectionOptionType
-  secondary?: ConnectionOptionType
-  extraOptions?: ConnectionOptionType[]
-}
+import { ConnectionOptionType, ConnectionOptions, SignInOptionsMode } from '../components/Connection/Connection.types'
 
 type UseWalletOptionsParams = {
   connectionOptions?: ConnectionOptions

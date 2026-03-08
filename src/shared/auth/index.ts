@@ -1,4 +1,5 @@
 export * from './errors'
 export * from './httpClient'
 export * from './types'
+export * from './utils'
 export * from './wsClient'

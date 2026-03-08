@@ -38,13 +38,15 @@ const connectionOptionTitles: { [key in ConnectionOptionType]: string } = {
 
 type MetamaskEthereumWindow = typeof window.ethereum & { isMetaMask?: boolean }
 
+type ConnectionOptions = {
+  primary: ConnectionOptionType
+  secondary?: ConnectionOptionType
+  extraOptions?: ConnectionOptionType[]
+}
+
 type ConnectionProps = {
   shouldShowGoogleOptionAsPrimary?: boolean
-  connectionOptions?: {
-    primary: ConnectionOptionType
-    secondary?: ConnectionOptionType
-    extraOptions?: ConnectionOptionType[]
-  }
+  connectionOptions?: ConnectionOptions
   className?: string
   loadingOption?: ConnectionOptionType
   isNewUser?: boolean
@@ -57,4 +59,4 @@ type ConnectionProps = {
 }
 
 export { SignInOptionsMode, ConnectionOptionType, connectionOptionTitles }
-export type { MetamaskEthereumWindow, ConnectionProps }
+export type { ConnectionOptions, MetamaskEthereumWindow, ConnectionProps }

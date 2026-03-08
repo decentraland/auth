@@ -1,4 +1,5 @@
 import { Box, keyframes, styled } from 'decentraland-ui2'
+import { desktopLinearGradient, gradientPseudoElement, mobileLinearGradient } from '../../shared/GradientBackground.styled'
 
 const moveBackground = keyframes({
   from: {
@@ -20,15 +21,8 @@ const Main = styled('main')(({ theme }) => ({
   minWidth: 0,
   boxSizing: 'border-box',
   ['&::before']: {
-    content: '""',
-    position: 'fixed',
-    width: '100%',
-    height: '350%',
-    background:
-      'linear-gradient(89.65deg, rgba(149, 45, 198, 0) 29.59%, rgba(94, 30, 130, 0.559754) 39.08%, rgba(75, 25, 106, 0.750004) 45.36%, rgba(64, 23, 93, 0.859976) 54.22%, #32134C 72.84%)',
-    top: '-100%',
-    transform: 'rotate(180deg)',
-    overflow: 'hidden'
+    ...(gradientPseudoElement as object),
+    background: desktopLinearGradient
   },
   [theme.breakpoints.down('lg')]: {
     gridTemplateColumns: '50% 50%'
@@ -37,7 +31,7 @@ const Main = styled('main')(({ theme }) => ({
     display: 'flex',
     height: 'auto',
     ['&::before']: {
-      background: 'linear-gradient(151.89deg, #491975 47.67%, #D72CCD 103.3%)'
+      background: mobileLinearGradient
     }
   }
 }))
