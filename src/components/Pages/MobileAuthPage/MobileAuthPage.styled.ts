@@ -1,4 +1,5 @@
 import { Box, styled } from 'decentraland-ui2'
+import { desktopRadialGradient, gradientPseudoElement, mobileRadialGradient } from '../../shared/GradientBackground.styled'
 
 const Main = styled(Box)({
   display: 'flex',
@@ -13,19 +14,13 @@ const Main = styled(Box)({
   padding: '20vh 20px 0',
   boxSizing: 'border-box',
   ['&::before']: {
-    content: '""',
-    position: 'fixed',
-    width: '100%',
-    height: '350%',
-    background: 'radial-gradient(ellipse at 0 50%, transparent 10%, #e02dd3 40%, #491975 70%)',
-    top: '-100%',
-    transform: 'rotate(180deg)',
-    overflow: 'hidden',
+    ...(gradientPseudoElement as object),
+    background: desktopRadialGradient,
     zIndex: -1
   },
   ['@media screen and (max-width: 800px)']: {
     ['&::before']: {
-      background: 'radial-gradient(ellipse at 0 50%, #e02dd3 0%, #491975 70%)'
+      background: mobileRadialGradient
     }
   }
 })

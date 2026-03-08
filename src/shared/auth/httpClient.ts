@@ -1,11 +1,11 @@
 import { AuthIdentity } from '@dcl/crypto'
 import signedFetch from 'decentraland-crypto-fetch'
-import { RequestInteractionType, TrackingEvents } from '../../modules/analytics/types'
+import { TrackingEvents } from '../../modules/analytics/types'
 import { config } from '../../modules/config'
 import { trackEvent } from '../utils/analytics'
 import { handleError } from '../utils/errorHandler'
-import { DifferentSenderError, ExpiredRequestError, IpValidationError, RequestFulfilledError, RequestNotFoundError } from './errors'
 import { IdentityResponse, OutcomeError, OutcomeResponse, RecoverResponse } from './types'
+import { handleRecoverError, throwAuthServerError, trackRecoverMethod, validateRecoverResponse } from './utils'
 export const createAuthServerHttpClient = (authServerUrl?: string) => {
   const baseUrl = authServerUrl ?? config.get('AUTH_SERVER_URL')
 
@@ -17,16 +17,8 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
       throw new Error('Unknown error')
     }
 
-    if (data.error?.includes('already been fulfilled')) {
-      throw new RequestFulfilledError(requestId)
-    } else if (data.error?.includes('not found')) {
-      throw new RequestNotFoundError(requestId)
-    } else if (data.error?.includes('has expired')) {
-      throw new ExpiredRequestError(requestId)
-    } else if (data.error?.includes('IP validation failed')) {
-      throw new IpValidationError(requestId, data.error)
-    } else if (data.error) {
-      throw new Error(data.error)
+    if (data.error) {
+      throwAuthServerError(data.error, requestId)
     }
 
     throw new Error('Unknown error')
@@ -135,50 +127,14 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
         await extractError(response, requestId)
       }
 
-      const recoverResponse = await response.json()
+      recoverResponse = await response.json()
 
-      // If the sender defined in the request is different than the one that is connected, show an error.
-      if (recoverResponse.sender && recoverResponse.sender !== signerAddress.toLowerCase()) {
-        throw new DifferentSenderError(signerAddress, recoverResponse.sender)
-      }
+      validateRecoverResponse(recoverResponse!, signerAddress, requestId)
+      trackRecoverMethod(recoverResponse!, isDeepLinkFlow)
 
-      if (recoverResponse.expiration && new Date(recoverResponse.expiration) < new Date()) {
-        throw new ExpiredRequestError(requestId, recoverResponse.expiration)
-      }
-
-      switch (recoverResponse.method) {
-        case 'dcl_personal_sign':
-          trackEvent(TrackingEvents.REQUEST_INTERACTION, {
-            type: isDeepLinkFlow ? RequestInteractionType.DEEP_LINK_SIGN_IN : RequestInteractionType.VERIFY_SIGN_IN,
-            browserTime: Date.now(),
-            requestType: recoverResponse?.method
-          })
-          break
-        case 'eth_sendTransaction':
-          trackEvent(TrackingEvents.REQUEST_INTERACTION, {
-            type: RequestInteractionType.WALLET_INTERACTION,
-            requestType: recoverResponse.method
-          })
-          break
-        default:
-          trackEvent(TrackingEvents.REQUEST_INTERACTION, {
-            type: RequestInteractionType.WALLET_INTERACTION,
-            requestType: recoverResponse.method
-          })
-      }
-
-      return recoverResponse
+      return recoverResponse!
     } catch (e) {
-      // Don't report fulfilled requests to Sentry — they are an expected state after successful login
-      if (!(e instanceof RequestFulfilledError)) {
-        handleError(e, 'Error recovering request', {
-          trackingData: {
-            browserTime: Date.now(),
-            requestType: recoverResponse?.method ?? 'Unknown'
-          },
-          trackingEvent: TrackingEvents.REQUEST_LOADING_ERROR
-        })
-      }
+      handleRecoverError(e, recoverResponse)
       throw e
     }
   }

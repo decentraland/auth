@@ -1,4 +1,5 @@
 import { EthAddress } from '@dcl/schemas'
+import { extractFromStateParameter } from './utils/stateParameter'
 
 /**
  * Login method types for direct login via URL parameters
@@ -80,18 +81,11 @@ const locations = {
 const extractRedirectToFromSearchParameters = (searchParams: URLSearchParams): string => {
   // Extract 'redirectTo' from current search parameters
   let redirectToSearchParam = searchParams.get('redirectTo')
-  try {
-    const state = searchParams.get('state')
-    // Decode the state parameter to get the original 'redirectTo'
-    if (state) {
-      const stateRedirectToParam = atob(state)
-      const parsedRedirectTo = JSON.parse(JSON.parse(stateRedirectToParam).customData).redirectTo
-      if (parsedRedirectTo) {
-        redirectToSearchParam = parsedRedirectTo ?? null
-      }
-    }
-  } catch {
-    console.error("Can't decode state parameter")
+
+  // Try to extract from OAuth state parameter
+  const stateRedirectTo = extractFromStateParameter<string>(searchParams, 'redirectTo')
+  if (stateRedirectTo) {
+    redirectToSearchParam = stateRedirectTo
   }
 
   // Initialize redirectTo with a default value
@@ -111,17 +105,11 @@ const extractRedirectToFromSearchParameters = (searchParams: URLSearchParams): s
 
 const extractReferrerFromSearchParameters = (searchParams: URLSearchParams): string | null => {
   let referrerSearchParam = searchParams.get('referrer')
-  try {
-    const state = searchParams.get('state')
-    if (state) {
-      const stateReferrerParam = atob(state)
-      const parsedReferrer = JSON.parse(JSON.parse(stateReferrerParam).customData).referrer
-      if (parsedReferrer) {
-        referrerSearchParam = parsedReferrer ?? null
-      }
-    }
-  } catch {
-    console.error("Can't decode state parameter")
+
+  // Try to extract from OAuth state parameter
+  const stateReferrer = extractFromStateParameter<string>(searchParams, 'referrer')
+  if (stateReferrer) {
+    referrerSearchParam = stateReferrer
   }
 
   if (referrerSearchParam && !EthAddress.validate(referrerSearchParam)) {

@@ -1,6 +1,3 @@
-import { TransferType } from '../../../types'
-import type { MANATransferData, NFTTransferData } from '../../../types'
+import { BaseTransferViewProps } from '../useTransferViewData'
 
-export type TransferCompletedViewProps =
-  | { type: TransferType.TIP; transferData: MANATransferData }
-  | { type: TransferType.GIFT; transferData: NFTTransferData }
+export type TransferCompletedViewProps = BaseTransferViewProps

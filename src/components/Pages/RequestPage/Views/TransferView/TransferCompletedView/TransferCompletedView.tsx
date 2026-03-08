@@ -4,9 +4,8 @@ import { Rarity } from '@dcl/schemas'
 import { Box, Profile } from 'decentraland-ui2'
 import { TransferAlert, TransferAssetImage, TransferLayout } from '../../../../../Transfer'
 import { CenteredContent, ItemName, Label, Title } from '../../../../../Transfer/Transfer.styled'
-import { TransferType } from '../../../types'
-import type { MANATransferData, NFTTransferData, ProfileAvatar } from '../../../types'
 import { SceneName } from '../TransferTipComponents.styled'
+import { useTransferViewData } from '../useTransferViewData'
 import { TransferCompletedViewProps } from './TransferCompletedView.types'
 import { SceneImageWrapper, SuccessAnimation } from './TransferCompletedView.styled'
 
@@ -22,23 +21,19 @@ const TransferCompletedView = (props: TransferCompletedViewProps) => {
   useEffect(() => {
     import('../../../../../../assets/animations/successAnimation_Lottie.json').then(m => setSuccessAnimation(m.default))
   }, [])
-  const { type, transferData } = props
-  const isTip = type === TransferType.TIP
-  const recipientAvatar = transferData.recipientProfile?.avatars?.[0]
+  const { isTip, recipientAvatar, tipData, giftData, transferData } = useTransferViewData(props)
 
   return (
     <TransferLayout>
       <CenteredContent>
         <Title>
-          {isTip
-            ? t('transfer.completed.tip_success', { manaAmount: (transferData as MANATransferData).manaAmount })
-            : t('transfer.completed.gift_sent')}
+          {isTip ? t('transfer.completed.tip_success', { manaAmount: tipData!.manaAmount }) : t('transfer.completed.gift_sent')}
         </Title>
         {isTip ? (
           <>
             <Profile
               address={transferData.toAddress}
-              avatar={recipientAvatar as ProfileAvatar}
+              avatar={recipientAvatar}
               inline
               showBothNameAndAddress
               shortenAddress
@@ -48,28 +43,25 @@ const TransferCompletedView = (props: TransferCompletedViewProps) => {
             />
             <Label>{t('transfer.completed.creator_of')}</Label>
             <SceneImageWrapper>
-              <TransferAssetImage
-                src={(transferData as MANATransferData).sceneImageUrl}
-                alt={(transferData as MANATransferData).sceneName}
-              />
+              <TransferAssetImage src={tipData!.sceneImageUrl} alt={tipData!.sceneName} />
               {successAnimation ? <SuccessAnimation animationData={successAnimation} loop={true} /> : null}
             </SceneImageWrapper>
-            <SceneName>{(transferData as MANATransferData).sceneName}</SceneName>
+            <SceneName>{tipData!.sceneName}</SceneName>
           </>
         ) : (
           <>
-            <Profile address={transferData.toAddress} avatar={recipientAvatar as ProfileAvatar} size="huge" inline />
+            <Profile address={transferData.toAddress} avatar={recipientAvatar} size="huge" inline />
             <Box>
               <SceneImageWrapper isGift>
                 <TransferAssetImage
-                  src={(transferData as NFTTransferData).imageUrl}
-                  name={(transferData as NFTTransferData).name || `NFT #${(transferData as NFTTransferData).tokenId}`}
-                  rarity={(transferData as NFTTransferData).rarity || Rarity.COMMON}
+                  src={giftData!.imageUrl}
+                  name={giftData!.name || `NFT #${giftData!.tokenId}`}
+                  rarity={giftData!.rarity || Rarity.COMMON}
                 />
                 {successAnimation ? <SuccessAnimation animationData={successAnimation} loop={true} /> : null}
               </SceneImageWrapper>
             </Box>
-            {(transferData as NFTTransferData).name && <ItemName>{(transferData as NFTTransferData).name}</ItemName>}
+            {giftData!.name && <ItemName>{giftData!.name}</ItemName>}
           </>
         )}
         <TransferAlert />

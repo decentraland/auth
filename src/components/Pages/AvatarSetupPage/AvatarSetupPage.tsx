@@ -1,9 +1,8 @@
 // eslint-disable-next-line @typescript-eslint/naming-convention
 import * as React from 'react'
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from '@dcl/hooks'
-import { EthAddress } from '@dcl/schemas'
 import { PreviewUnityMode } from '@dcl/schemas/dist/dapps/preview'
 import { CircularProgress, WearablePreview, launchDesktopApp } from 'decentraland-ui2'
 import avatarFloat from '../../../assets/animations/AvatarFloat_Lottie.json'
@@ -11,12 +10,13 @@ import avatarParticles from '../../../assets/animations/AvatarParticles_Lottie.j
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { useAnalytics } from '../../../hooks/useAnalytics'
+import { usePostSignupActions } from '../../../hooks/usePostSignupActions'
+import { useRequestIdFromRedirect } from '../../../hooks/useRequestIdFromRedirect'
+import { useRequireAuth } from '../../../hooks/useRequireAuth'
 import { useSignRequest } from '../../../hooks/useSignRequest'
-import { useTrackReferral } from '../../../hooks/useTrackReferral'
 import { config } from '../../../modules/config'
 import { fetchProfile } from '../../../modules/profile'
 import { IpValidationError, createAuthServerHttpClient, createAuthServerWsClient } from '../../../shared/auth'
-import { useCurrentConnectionData } from '../../../shared/connection/hooks'
 import { isEmailValid } from '../../../shared/email'
 import { locations } from '../../../shared/locations'
 import { isProfileComplete } from '../../../shared/profile'
@@ -24,8 +24,7 @@ import { handleError } from '../../../shared/utils/errorHandler'
 import { checkWebGpuSupport } from '../../../shared/utils/webgpu'
 import { AnimatedBackground } from '../../AnimatedBackground'
 import { CharacterCounterComponent } from '../../CharacterCounter'
-import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
-import { subscribeToNewsletter } from '../SetupPage/utils'
+import { FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import { deployProfileFromAvatarShape } from './utils'
 import { AvatarSetupState, AvatarShape } from './AvatarSetupPage.types'
 import {
@@ -62,16 +61,14 @@ const MAX_CHARACTERS = 15
 
 const AvatarSetupPage: React.FC = () => {
   const { t } = useTranslation()
-  const hasTrackedReferral = useRef(false)
   const [urlSearchParams] = useSearchParams()
-  const { flags, initialized: initializedFlags } = useContext(FeatureFlagsContext)
+  const { isReady, isAuthenticated, flags, account, identity, provider } = useRequireAuth()
   const [initialized, setInitialized] = useState(false)
   const { url: redirectTo, redirect } = useAfterLoginRedirection()
-  const { isLoading: isConnecting, account, identity, provider } = useCurrentConnectionData()
   const { signRequest, authServerClient } = useSignRequest(redirect)
   const navigate = useNavigateWithSearchParams()
   const referrer = urlSearchParams.get('referrer')
-  const { track: trackReferral } = useTrackReferral()
+  const { trackReferralOnDeploy, trackReferralOnInit, subscribeEmail } = usePostSignupActions(referrer)
   const { trackClick, trackAvatarEditSuccess, trackTermsOfServiceSuccess, trackCheckTermsOfService } = useAnalytics()
 
   const [state, setState] = useState<AvatarSetupState>({
@@ -92,18 +89,7 @@ const AvatarSetupPage: React.FC = () => {
 
   const [isAvatarParticlesAnimationEnded, setIsAvatarParticlesAnimationEnded] = useState(false)
 
-  const requestId = useMemo(() => {
-    const redirectTo = urlSearchParams.get('redirectTo')
-    let requestId: string | null = null
-    try {
-      const url = new URL(redirectTo ?? '', window.location.origin)
-      const regex = /^\/?auth\/requests\/([a-zA-Z0-9-]+)$/
-      requestId = url.pathname.match(regex)?.[1] ?? null
-    } catch {
-      // Do nothing
-    }
-    return requestId
-  }, [urlSearchParams])
+  const requestId = useRequestIdFromRedirect()
 
   const characterCount = useMemo(() => state.username.length, [state.username])
 
@@ -202,22 +188,8 @@ const AvatarSetupPage: React.FC = () => {
           avatarShape
         })
 
-        if (referrer && EthAddress.validate(referrer)) {
-          try {
-            await trackReferral(referrer, 'PATCH')
-          } catch {
-            // Error is already handled in trackReferral
-          }
-        }
-
-        // Subscribe to the newsletter only if the user has provided an email
-        if (state.email) {
-          try {
-            await subscribeToNewsletter(state.email)
-          } catch (e) {
-            handleError(e, 'Error subscribing to newsletter', { skipTracking: true })
-          }
-        }
+        await trackReferralOnDeploy()
+        await subscribeEmail(state.email)
 
         const storedEmail = localStorage.getItem('dcl_magic_user_email')
         if (storedEmail) {
@@ -260,14 +232,14 @@ const AvatarSetupPage: React.FC = () => {
       state.email,
       account,
       identity,
-      referrer,
       requestId,
       provider,
       flags,
       redirect,
       signRequest,
       trackClick,
-      trackReferral,
+      trackReferralOnDeploy,
+      subscribeEmail,
       trackTermsOfServiceSuccess,
       isProcessingMessage
     ]
@@ -310,13 +282,10 @@ const AvatarSetupPage: React.FC = () => {
       console.warn('Failed to get user email from localStorage:', error)
     }
 
-    if (referrer && EthAddress.validate(referrer) && !hasTrackedReferral.current) {
-      await trackReferral(referrer, 'POST')
-      hasTrackedReferral.current = true
-    }
+    await trackReferralOnInit()
 
     setInitialized(true)
-  }, [account, flags, provider, referrer, redirect, trackReferral])
+  }, [account, flags, provider, redirect, trackReferralOnInit])
 
   useEffect(() => {
     window.addEventListener('message', handleMessage, false)
@@ -332,9 +301,9 @@ const AvatarSetupPage: React.FC = () => {
   }, [state.hasWearablePreviewLoaded])
 
   useEffect(() => {
-    if (isConnecting || !initializedFlags) return
+    if (!isReady) return
 
-    if (!account || !identity) {
+    if (!isAuthenticated) {
       console.warn('No previous connection found')
       return navigate(locations.login(redirectTo, referrer))
     }
@@ -345,7 +314,7 @@ const AvatarSetupPage: React.FC = () => {
       }
       initializeAvatarSetup()
     })
-  }, [initializeAvatarSetup, account, identity, isConnecting, initializedFlags, navigate, redirectTo, referrer])
+  }, [initializeAvatarSetup, account, identity, isReady, isAuthenticated, navigate, redirectTo, referrer])
 
   if (!initialized) {
     return (

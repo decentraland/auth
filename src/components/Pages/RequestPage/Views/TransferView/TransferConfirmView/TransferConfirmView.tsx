@@ -4,17 +4,14 @@ import { Rarity } from '@dcl/schemas'
 import { Profile } from 'decentraland-ui2'
 import { TransferActionButtons, TransferAssetImage, TransferLayout, TransferLoadingState } from '../../../../../Transfer'
 import { CenteredContent, ItemName, Label, Title, WarningAlert } from '../../../../../Transfer/Transfer.styled'
-import { TransferType } from '../../../types'
-import type { MANATransferData, NFTTransferData, ProfileAvatar } from '../../../types'
 import { SceneName } from '../TransferTipComponents.styled'
+import { useTransferViewData } from '../useTransferViewData'
 import { TransferConfirmViewProps } from './TransferConfirmView.types'
 
 const TransferConfirmView = (props: TransferConfirmViewProps) => {
   const { t } = useTranslation()
   const [isProcessing, setIsProcessing] = useState(false)
-  const { type, transferData } = props
-  const isTip = type === TransferType.TIP
-  const recipientAvatar = transferData.recipientProfile?.avatars?.[0]
+  const { isTip, recipientAvatar, tipData, giftData, transferData } = useTransferViewData(props)
 
   const handleApprove = async () => {
     setIsProcessing(true)
@@ -28,8 +25,8 @@ const TransferConfirmView = (props: TransferConfirmViewProps) => {
           {isTip ? (
             <>
               {isProcessing
-                ? t('transfer.confirm.sending_tip', { manaAmount: (transferData as MANATransferData).manaAmount })
-                : t('transfer.confirm.confirm_tip', { manaAmount: (transferData as MANATransferData).manaAmount })}
+                ? t('transfer.confirm.sending_tip', { manaAmount: tipData!.manaAmount })
+                : t('transfer.confirm.confirm_tip', { manaAmount: tipData!.manaAmount })}
             </>
           ) : (
             <>{isProcessing ? t('transfer.confirm.sending_gift') : t('transfer.confirm.confirm_gift')}</>
@@ -39,7 +36,7 @@ const TransferConfirmView = (props: TransferConfirmViewProps) => {
           <>
             <Profile
               address={transferData.toAddress}
-              avatar={recipientAvatar as ProfileAvatar}
+              avatar={recipientAvatar}
               size="large"
               inline
               showBothNameAndAddress
@@ -48,18 +45,18 @@ const TransferConfirmView = (props: TransferConfirmViewProps) => {
               highlightName
             />
             <Label>{t('transfer.confirm.creator_of')}</Label>
-            <TransferAssetImage src={(transferData as MANATransferData).sceneImageUrl} alt={(transferData as MANATransferData).sceneName} />
-            <SceneName>{(transferData as MANATransferData).sceneName}</SceneName>
+            <TransferAssetImage src={tipData!.sceneImageUrl} alt={tipData!.sceneName} />
+            <SceneName>{tipData!.sceneName}</SceneName>
           </>
         ) : (
           <>
-            <Profile address={transferData.toAddress} avatar={recipientAvatar as ProfileAvatar} size="huge" inline />
+            <Profile address={transferData.toAddress} avatar={recipientAvatar} size="huge" inline />
             <TransferAssetImage
-              src={(transferData as NFTTransferData).imageUrl}
-              name={(transferData as NFTTransferData).name || `NFT #${(transferData as NFTTransferData).tokenId}`}
-              rarity={(transferData as NFTTransferData).rarity || Rarity.COMMON}
+              src={giftData!.imageUrl}
+              name={giftData!.name || `NFT #${giftData!.tokenId}`}
+              rarity={giftData!.rarity || Rarity.COMMON}
             />
-            {(transferData as NFTTransferData).name && <ItemName>{(transferData as NFTTransferData).name}</ItemName>}
+            {giftData!.name && <ItemName>{giftData!.name}</ItemName>}
             {!isProcessing && <WarningAlert severity="info">{t('transfer.confirm.gifting_warning')}</WarningAlert>}
           </>
         )}

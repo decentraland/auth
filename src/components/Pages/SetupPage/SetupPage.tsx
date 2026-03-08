@@ -1,8 +1,7 @@
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import classNames from 'classnames'
 import { useTranslation } from '@dcl/hooks'
-import { EthAddress } from '@dcl/schemas'
 import { Button, CircularProgress, useMobileMediaQuery } from 'decentraland-ui2'
 import backImg from '../../../assets/images/back.svg'
 import diceImg from '../../../assets/images/dice.svg'
@@ -11,26 +10,28 @@ import wrongImg from '../../../assets/images/wrong.svg'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { useAnalytics } from '../../../hooks/useAnalytics'
+import { usePostSignupActions } from '../../../hooks/usePostSignupActions'
+import { useRequestIdFromRedirect } from '../../../hooks/useRequestIdFromRedirect'
+import { useRequireAuth } from '../../../hooks/useRequireAuth'
+import { useSetupFormValidation } from '../../../hooks/useSetupFormValidation'
 import { useSignRequest } from '../../../hooks/useSignRequest'
-import { useTrackReferral } from '../../../hooks/useTrackReferral'
 import { ClickEvents } from '../../../modules/analytics/types'
 import { fetchProfile } from '../../../modules/profile'
 import { createAuthServerHttpClient, createAuthServerWsClient } from '../../../shared/auth'
-import { useCurrentConnectionData } from '../../../shared/connection/hooks'
 import { locations } from '../../../shared/locations'
 import { isProfileComplete } from '../../../shared/profile'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { ConnectionModal } from '../../ConnectionModal'
 import { ConnectionLayoutState } from '../../ConnectionModal/ConnectionLayout.type'
 import { CustomWearablePreview } from '../../CustomWearablePreview'
-import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
+import { FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import { DifferentAccountError } from '../RequestPage/Views/DifferentAccountError'
 import { IpValidationError as IpValidationErrorView } from '../RequestPage/Views/IpValidationError'
 import { RecoverError } from '../RequestPage/Views/RecoverError'
 import { SignInComplete } from '../RequestPage/Views/SignInComplete'
 import { SigningError } from '../RequestPage/Views/SigningError'
 import { TimeoutError } from '../RequestPage/Views/TimeoutError'
-import { deployProfileFromDefault, subscribeToNewsletter } from './utils'
+import { deployProfileFromDefault } from './utils'
 import styles from './SetupPage.module.css'
 
 enum View {
@@ -70,10 +71,9 @@ export const SetupPage = () => {
   const hasStartedToWriteSomethingInName = useRef(false)
   const hasStartedToWriteSomethingInEmail = useRef(false)
   const hasCheckedAgree = useRef(false)
-  const hasTrackedReferral = useRef(false)
   const [urlSearchParams] = useSearchParams()
   const [isConnectionModalOpen, setIsConnectionModalOpen] = useState(false)
-  const { flags, initialized: initializedFlags } = useContext(FeatureFlagsContext)
+  const { isReady, isAuthenticated, flags, account, identity, provider, providerType } = useRequireAuth()
   const [initialized, setInitialized] = useState(false)
   const [view, setView] = useState(View.RANDOMIZE)
   const [profile, setProfile] = useState(getRandomDefaultProfile())
@@ -86,7 +86,6 @@ export const SetupPage = () => {
   const [deployError, setDeployError] = useState<string | null>(null)
   const isMobile = useMobileMediaQuery()
   const { url: redirectTo, redirect } = useAfterLoginRedirection()
-  const { isLoading: isConnecting, account, identity, provider, providerType } = useCurrentConnectionData()
   const navigate = useNavigateWithSearchParams()
   const referrer = urlSearchParams.get('referrer')
   const {
@@ -97,60 +96,11 @@ export const SetupPage = () => {
     trackStartAddingEmail,
     trackCheckTermsOfService
   } = useAnalytics()
-  const { track: trackReferral } = useTrackReferral()
+  const { trackReferralOnDeploy, trackReferralOnInit, subscribeEmail } = usePostSignupActions(referrer)
 
-  const requestId = useMemo(() => {
-    // Grab the request id from redirectTo parameter.
-    const redirectTo = urlSearchParams.get('redirectTo')
-    let requestId: string | null = null
-    try {
-      const url = new URL(redirectTo ?? '', window.location.origin)
-      // Match the path: /auth/requests/0377e459-8fdf-4ce5-89f4-4f1f1c7bbb7f
-      const regex = /^\/?auth\/requests\/([a-zA-Z0-9-]+)$/
-      requestId = url.pathname.match(regex)?.[1] ?? null
-    } catch {
-      // Do nothing
-    }
-    return requestId
-  }, [urlSearchParams])
+  const requestId = useRequestIdFromRedirect()
 
-  // Validate the name.
-  const nameError = useMemo(() => {
-    if (!name.length) {
-      return t('setup.validation.username_empty')
-    }
-    if (name.length >= 15) {
-      return t('setup.validation.username_max_length')
-    }
-
-    if (name.includes(' ')) {
-      return t('setup.validation.username_no_spaces')
-    }
-
-    if (!/^[a-zA-Z0-9]+$/.test(name)) {
-      return t('setup.validation.username_no_special_chars')
-    }
-
-    return ''
-  }, [name, t])
-
-  // Validate the email.
-  const emailError = useMemo(() => {
-    if (email && !email.includes('@')) {
-      return t('setup.validation.email_invalid')
-    }
-
-    return ''
-  }, [email, t])
-
-  // Validate the agree checkbox.
-  const agreeError = useMemo(() => {
-    if (!agree) {
-      return t('setup.validation.agree_required')
-    }
-
-    return ''
-  }, [agree, t])
+  const { nameError, emailError, agreeError } = useSetupFormValidation(name, email, agree)
 
   // Message displayed on the button that completes the avatar creation.
   // Will display a message according to where the user will be redirected to.
@@ -285,23 +235,8 @@ export const SetupPage = () => {
           deploymentProfileName: name
         })
 
-        if (referrer && EthAddress.validate(referrer)) {
-          try {
-            await trackReferral(referrer, 'PATCH')
-          } catch {
-            // Error is already handled in trackReferral
-          }
-        }
-
-        // Subscribe to the newsletter only if the user has provided an email.
-        if (email) {
-          // Given that the subscription is an extra step, we don't want to block the user if it fails.
-          try {
-            await subscribeToNewsletter(email)
-          } catch (e) {
-            handleError(e, 'Error subscribing to newsletter', { skipTracking: true })
-          }
-        }
+        await trackReferralOnDeploy()
+        await subscribeEmail(email)
 
         trackTermsOfServiceSuccess({
           ethAddress: account,
@@ -332,12 +267,13 @@ export const SetupPage = () => {
       agree,
       profile,
       provider,
-      referrer,
       flags[FeatureFlagsKeys.LOGIN_ON_SETUP],
       redirect,
       signRequest,
       trackClick,
       trackTermsOfServiceSuccess,
+      trackReferralOnDeploy,
+      subscribeEmail,
       account,
       identity
     ]
@@ -346,16 +282,16 @@ export const SetupPage = () => {
   // Initialization effect.
   // Will run some checks to see if the user can proceed with the simplified avatar setup flow.
   useEffect(() => {
-    if (isConnecting || !initializedFlags) return
+    if (!isReady) return
 
-    if (!account || !identity) {
+    if (!isAuthenticated) {
       console.warn('No previous connection found')
       return navigate(locations.login(redirectTo))
     }
 
     ;(async () => {
       // Check if the wallet is connected.
-      const profile = await fetchProfile(account)
+      const profile = await fetchProfile(account!)
 
       // Check that the connected account does not have a profile already.
       if (profile && isProfileComplete(profile)) {
@@ -375,18 +311,11 @@ export const SetupPage = () => {
         console.warn('Failed to get user email from localStorage:', error)
       }
 
-      if (referrer && EthAddress.validate(referrer) && !hasTrackedReferral.current) {
-        try {
-          await trackReferral(referrer, 'POST')
-          hasTrackedReferral.current = true
-        } catch {
-          // Error is already handled in trackReferral
-        }
-      }
+      await trackReferralOnInit()
 
       setInitialized(true)
     })()
-  }, [redirect, navigate, account, identity, isConnecting, initializedFlags, flags, referrer, provider])
+  }, [redirect, navigate, account, identity, isReady, isAuthenticated, flags, provider, trackReferralOnInit])
 
   if (!initialized) {
     return (
