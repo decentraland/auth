@@ -135,18 +135,33 @@ const AvatarSetupPage: React.FC = () => {
     return ''
   }, [state.isTermsChecked, t])
 
+  /**
+   * Handles the "Customize My Avatar" button click. This function runs twice:
+   * 1. On user click: validates inputs and makes the WearablePreview iframe visible.
+   * 2. Automatically via useEffect once the iframe finishes loading (hasWearablePreviewLoaded),
+   *    at which point it's safe to send commands to the preview controller.
+   *
+   * @throws {Error} If the email is present but invalid — caught internally and displayed in the error box.
+   */
   const handleContinueClick = useCallback(async () => {
     try {
       setError(null)
 
+      // Validate email format and throw to display the error in the error box
       if (state.email && state.email !== '' && !isEmailValid(state.email)) {
         setState(prev => ({ ...prev, hasEmailError: true }))
         throw new Error(t('avatar_setup.validation.email_invalid'))
       }
 
       setState(prev => ({ ...prev, hasEmailError: false, showWearablePreview: true }))
-      const wearablePreviewController = WearablePreview.createController('avatar-preview-configurator')
-      await wearablePreviewController.scene.setUsername(state.username)
+
+      // Only interact with the preview controller once the iframe has loaded.
+      // On first click, hasWearablePreviewLoaded is false — the useEffect watching
+      // it will call handleContinueClick again once the preview is ready.
+      if (state.hasWearablePreviewLoaded) {
+        const wearablePreviewController = WearablePreview.createController('avatar-preview-configurator')
+        await wearablePreviewController.scene.setUsername(state.username)
+      }
 
       trackTermsOfServiceSuccess({
         ethAddress: account,
@@ -155,10 +170,11 @@ const AvatarSetupPage: React.FC = () => {
         name: state.username
       })
     } catch (e) {
+      // Display the error in the error box below the continue button
       const errorMessage = handleError(e, 'Error setting up avatar')
       setError(errorMessage)
     }
-  }, [state.username, state.email, account, trackTermsOfServiceSuccess, t])
+  }, [state.username, state.email, state.hasWearablePreviewLoaded, account, trackTermsOfServiceSuccess, t])
 
   const handleUsernameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value

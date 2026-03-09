@@ -52,7 +52,9 @@ const BackgroundWrapper = styled(Box)({
   overflow: 'hidden'
 })
 
-const Background = styled(Box)<{ isVisible?: boolean }>(({ isVisible = true }) => ({
+const Background = styled(Box, {
+  shouldForwardProp: prop => prop !== 'isVisible'
+})<{ isVisible?: boolean }>(({ isVisible = true }) => ({
   width: '100%',
   height: '100%',
   position: 'absolute',

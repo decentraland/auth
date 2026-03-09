@@ -10,7 +10,9 @@ const CharacterCounter = styled(Box)({
   gap: '4px'
 })
 
-const CharacterCounterText = styled(Typography)<{ isError: boolean }>(({ isError }) => ({
+const CharacterCounterText = styled(Typography, {
+  shouldForwardProp: prop => prop !== 'isError'
+})<{ isError: boolean }>(({ isError }) => ({
   fontSize: '14px',
   color: isError ? 'rgba(224, 0, 0, 1)' : '#E5E7EB',
   margin: 0
