@@ -550,7 +550,7 @@ describe('AvatarSetupPage', () => {
         expect(WearablePreview.createController).not.toHaveBeenCalled()
       })
 
-      it('should reset the preview state so the user can retry', async () => {
+      it('should keep the preview loaded so the user can retry', async () => {
         const { getByPlaceholderText, getByRole } = renderAvatarSetupPage()
 
         await waitFor(() => {
@@ -570,8 +570,8 @@ describe('AvatarSetupPage', () => {
           expect(handleError).toHaveBeenCalled()
         })
 
-        // Button should be disabled again because hasWearablePreviewLoaded was reset
-        expect(getByRole('button', { name: 'CUSTOMIZE MY AVATAR' })).toBeDisabled()
+        // Button should remain enabled — the iframe is still loaded, only showWearablePreview was reset
+        expect(getByRole('button', { name: 'CUSTOMIZE MY AVATAR' })).not.toBeDisabled()
       })
     })
 
@@ -705,7 +705,7 @@ describe('AvatarSetupPage', () => {
         expect(mockTrackTermsOfServiceSuccess).not.toHaveBeenCalled()
       })
 
-      it('should reset the preview state so the user can retry', async () => {
+      it('should keep the preview loaded so the user can retry', async () => {
         const { getByPlaceholderText, getByRole } = renderAvatarSetupPage()
 
         await waitFor(() => {
@@ -724,8 +724,8 @@ describe('AvatarSetupPage', () => {
           expect(handleError).toHaveBeenCalled()
         })
 
-        // Button should be disabled again because hasWearablePreviewLoaded was reset
-        expect(getByRole('button', { name: 'CUSTOMIZE MY AVATAR' })).toBeDisabled()
+        // Button should remain enabled — the iframe is still loaded, only showWearablePreview was reset
+        expect(getByRole('button', { name: 'CUSTOMIZE MY AVATAR' })).not.toBeDisabled()
       })
     })
 

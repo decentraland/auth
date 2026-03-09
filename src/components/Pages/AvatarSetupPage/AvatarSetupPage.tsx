@@ -172,8 +172,9 @@ const AvatarSetupPage: React.FC = () => {
       // Display the error in the error box below the continue button
       const errorMessage = handleError(e, 'Error setting up avatar')
       setError(errorMessage)
-      // Reset preview state so the user can retry after an error
-      setState(prev => ({ ...prev, showWearablePreview: false, hasWearablePreviewLoaded: false }))
+      // Hide the preview overlay so the form is visible again for retry.
+      // Keep hasWearablePreviewLoaded true — the iframe is still loaded.
+      setState(prev => ({ ...prev, showWearablePreview: false }))
     }
   }, [state.username, state.email, state.hasWearablePreviewLoaded, account, trackTermsOfServiceSuccess, t])
 
