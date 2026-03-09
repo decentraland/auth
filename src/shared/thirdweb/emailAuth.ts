@@ -1,14 +1,14 @@
-import { inAppWallet, preAuthenticate } from 'thirdweb/wallets'
 import { getThirdwebClient } from './client'
 
 // Store the wallet instance for reuse
-let walletInstance: ReturnType<typeof inAppWallet> | null = null
+let walletInstance: Awaited<ReturnType<typeof import('thirdweb/wallets').inAppWallet>> | null = null
 
 /**
  * Gets or creates the in-app wallet instance
  */
-const getInAppWallet = () => {
+const getInAppWallet = async () => {
   if (!walletInstance) {
+    const { inAppWallet } = await import('thirdweb/wallets')
     walletInstance = inAppWallet()
   }
   return walletInstance
@@ -32,7 +32,8 @@ const getInAppWallet = () => {
  * @see https://portal.thirdweb.com/wallets/users
  */
 const sendEmailOTP = async (email: string): Promise<void> => {
-  const client = getThirdwebClient()
+  const client = await getThirdwebClient()
+  const { preAuthenticate } = await import('thirdweb/wallets')
 
   await preAuthenticate({
     client,
@@ -64,8 +65,8 @@ const sendEmailOTP = async (email: string): Promise<void> => {
  */
 const verifyEmailOTPAndConnect = async (email: string, verificationCode: string) => {
   console.log('[Thirdweb] Verifying OTP for email:', email, 'code:', verificationCode)
-  const client = getThirdwebClient()
-  const wallet = getInAppWallet()
+  const client = await getThirdwebClient()
+  const wallet = await getInAppWallet()
 
   try {
     const account = await wallet.connect({

@@ -2,8 +2,9 @@
 import Tooltip from '@mui/material/Tooltip'
 import { useTranslation } from '@dcl/hooks'
 import { muiIcons } from 'decentraland-ui2'
+import { shouldDisableMetaMask } from './Connection.utils'
 import { ConnectionIcon } from './ConnectionIcon'
-import { ConnectionOptionType, MetamaskEthereumWindow, connectionOptionTitles } from './Connection.types'
+import { connectionOptionTitles } from './Connection.types'
 import { ConnectionPrimaryButtonProps } from './ConnectionPrimaryButton.types'
 import {
   PrimaryButton,
@@ -25,8 +26,8 @@ export const ConnectionPrimaryButton = ({
   onConnect
 }: ConnectionPrimaryButtonProps): JSX.Element => {
   const { t } = useTranslation()
-  const isMetamaskAvailable = (window.ethereum as MetamaskEthereumWindow)?.isMetaMask
-  const error = !isMetamaskAvailable && option === ConnectionOptionType.METAMASK ? t('connection.metamask_not_installed') : undefined
+  const isMetamaskDisabled = shouldDisableMetaMask(option)
+  const error = isMetamaskDisabled ? t('connection.metamask_not_installed') : undefined
 
   const isDisabled = !!loadingOption || !!error
   const children = <>{t('connection.continue_with', { provider: connectionOptionTitles[option] })}</>

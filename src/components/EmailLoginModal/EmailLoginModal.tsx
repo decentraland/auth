@@ -271,6 +271,7 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
           {otp.map((digit, index) => (
             <OtpInput
               key={index}
+              data-testid={`otp-input-${index}`}
               ref={el => {
                 otpInputRefs.current[index] = el
               }}

@@ -51,7 +51,7 @@ function isMagicExtensionError(error: unknown): error is { code: string; rawMess
   )
 }
 
- /**
+/**
  * Detects errors caused by the user rejecting a transaction or signature in their wallet.
  * These are expected user actions, not application errors.
  *

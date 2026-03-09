@@ -22,6 +22,7 @@ import { locations } from '../../../shared/locations'
 import { trackCheckpoint } from '../../../shared/onboarding/trackCheckpoint'
 import { isProfileComplete } from '../../../shared/profile'
 import { handleError } from '../../../shared/utils/errorHandler'
+import { checkWebGpuSupport } from '../../../shared/utils/webgpu'
 import { AnimatedBackground } from '../../AnimatedBackground'
 import { CharacterCounterComponent } from '../../CharacterCounter'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
@@ -358,8 +359,13 @@ const AvatarSetupPage: React.FC = () => {
       return navigate(locations.login(redirectTo, referrer))
     }
 
-    initializeAvatarSetup()
-  }, [initializeAvatarSetup, account, identity, isConnecting, initializedFlags, navigate, redirectTo])
+    checkWebGpuSupport().then(hasWebGPU => {
+      if (!hasWebGPU) {
+        return navigate(locations.setup(redirectTo, referrer))
+      }
+      initializeAvatarSetup()
+    })
+  }, [initializeAvatarSetup, account, identity, isConnecting, initializedFlags, navigate, redirectTo, referrer])
 
   if (!initialized) {
     return (
@@ -472,16 +478,14 @@ const AvatarSetupPage: React.FC = () => {
 
       <RightAvatarSection>
         <RightSectionBackground />
-        {!isAvatarParticlesAnimationEnded && (
-          <AvatarParticles
-            animationData={avatarParticles}
-            loop={false}
-            onComplete={() => {
-              setIsAvatarParticlesAnimationEnded(true)
-            }}
-            show={!isAvatarParticlesAnimationEnded}
-          />
-        )}
+        <AvatarParticles
+          animationData={avatarParticles}
+          loop={false}
+          onComplete={() => {
+            setIsAvatarParticlesAnimationEnded(true)
+          }}
+          show={!isAvatarParticlesAnimationEnded}
+        />
         <AvatarParticles animationData={avatarFloat} loop={true} show={isAvatarParticlesAnimationEnded} />
       </RightAvatarSection>
 
