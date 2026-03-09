@@ -19,6 +19,7 @@ import { IpValidationError, createAuthServerHttpClient, createAuthServerWsClient
 import { useCurrentConnectionData } from '../../../shared/connection/hooks'
 import { isEmailValid } from '../../../shared/email'
 import { locations } from '../../../shared/locations'
+import { getStoredEmail } from '../../../shared/onboarding/getStoredEmail'
 import { trackCheckpoint } from '../../../shared/onboarding/trackCheckpoint'
 import { isProfileComplete } from '../../../shared/profile'
 import { handleError } from '../../../shared/utils/errorHandler'
@@ -311,14 +312,9 @@ const AvatarSetupPage: React.FC = () => {
     authServerClient.current = flags[FeatureFlagsKeys.HTTP_AUTH] ? createAuthServerHttpClient() : createAuthServerWsClient()
 
     // Try to get stored email from web2 auth (Magic or Thirdweb)
-    let storedEmail: string | null = null
-    try {
-      storedEmail = localStorage.getItem('dcl_thirdweb_user_email') || localStorage.getItem('dcl_magic_user_email')
-      if (storedEmail) {
-        setState(prev => ({ ...prev, email: storedEmail as string, isEmailInherited: true }))
-      }
-    } catch (error) {
-      console.warn('Failed to get user email from localStorage:', error)
+    const storedEmail = getStoredEmail()
+    if (storedEmail) {
+      setState(prev => ({ ...prev, email: storedEmail, isEmailInherited: true }))
     }
 
     trackCheckpoint({

@@ -9,6 +9,8 @@ import { fetchProfileWithConsistencyCheck, redeployExistingProfile, redeployExis
 import { useCurrentConnectionData } from '../shared/connection/hook'
 import { createFetcher } from '../shared/fetcher'
 import { locations } from '../shared/locations'
+import { getStoredEmail } from '../shared/onboarding/getStoredEmail'
+import { trackCheckpoint } from '../shared/onboarding/trackCheckpoint'
 import { isProfileComplete } from '../shared/profile'
 import { checkWebGpuSupport } from '../shared/utils/webgpu'
 import { useNavigateWithSearchParams } from './navigation'
@@ -16,7 +18,6 @@ import { useAfterLoginRedirection } from './redirection'
 import { useTargetConfig } from './targetConfig'
 import { useAnalytics } from './useAnalytics'
 import { useDisabledCatalysts } from './useDisabledCatalysts'
-import { trackCheckpoint } from '../shared/onboarding/trackCheckpoint'
 
 /**
  * Custom hook that manages authentication flow logic including Magic connection
@@ -82,7 +83,7 @@ export const useAuthFlow = () => {
       // Prevents nudge emails being sent to people who are already onboarded.
       // Fires with wallet address AND email (if available) so both identifier types are covered.
       const markReturningUser = () => {
-        const storedEmail = localStorage.getItem('dcl_thirdweb_user_email') || localStorage.getItem('dcl_magic_user_email')
+        const storedEmail = getStoredEmail()
         if (storedEmail) {
           trackCheckpoint({ checkpointId: 2, action: 'completed', userIdentifier: storedEmail, identifierType: 'email' })
         }
