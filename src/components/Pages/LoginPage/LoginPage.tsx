@@ -4,7 +4,6 @@ import { useTranslation } from '@dcl/hooks'
 import { ChainId } from '@dcl/schemas/dist/dapps/chain-id'
 import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
 import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
-import { Env } from '@dcl/ui-env'
 import { connection } from 'decentraland-connect'
 import { CircularProgress, Desktop } from 'decentraland-ui2'
 // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -25,7 +24,6 @@ import { useAnalytics } from '../../../hooks/useAnalytics'
 import { useAuthFlow } from '../../../hooks/useAuthFlow'
 import { useAutoLogin } from '../../../hooks/useAutoLogin'
 import { ConnectionType } from '../../../modules/analytics/types'
-import { config } from '../../../modules/config'
 import { createAuthServerHttpClient } from '../../../shared/auth'
 import { isErrorWithName, isUserRejectedTransaction } from '../../../shared/errors'
 import { extractReferrerFromSearchParameters } from '../../../shared/locations'
@@ -366,7 +364,7 @@ export const LoginPage = () => {
         setConfirmingLoginError(errorMessage || t('login.errors.something_went_wrong'))
       }
     },
-    [trackLoginSuccess, checkClockSynchronization, runProfileRedirect, getReferrerFromCurrentSearch]
+    [trackLoginSuccess, checkClockSynchronization, runProfileRedirect, getReferrerFromCurrentSearch, t]
   )
 
   const handleEmailInputChange = useCallback(() => {
@@ -450,6 +448,18 @@ export const LoginPage = () => {
     return () => clearTimeout(t)
   }, [backgroundTransitioning, currentBackgroundIndex])
 
+  // Wait for feature flags before rendering the page. This guarantees that any callback
+  // triggered by user interaction (e.g. handleEmailLoginSuccess → checkProfileAndRedirect)
+  // will have access to initialized flags. If you add new flag-dependent logic to this
+  // page, this loader must remain in place.
+  if (!flagInitialized) {
+    return (
+      <Main style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <CircularProgress size={80} />
+      </Main>
+    )
+  }
+
   const backgroundImages = NEW_USER_BACKGROUND_IMAGES
   return (
     <Main>
@@ -474,58 +484,52 @@ export const LoginPage = () => {
       {showConfirmingLogin && !showClockSyncModal && (
         <ConfirmingLogin error={confirmingLoginError} onError={confirmingLoginError ? handleConfirmingLoginRetry : undefined} />
       )}
-      {config.is(Env.DEVELOPMENT) && !flagInitialized ? (
-        <CircularProgress size={80} />
-      ) : (
-        <>
-          <ClockSyncModal open={showClockSyncModal} onContinue={handleClockSyncContinue} onClose={handleClockSyncContinue} />
-          <ConnectionModal
-            open={showConnectionLayout}
-            state={loadingState}
-            onClose={handleOnCloseConnectionModal}
-            onTryAgain={handleTryAgain}
-            providerType={currentConnectionType ? fromConnectionOptionToProviderType(currentConnectionType) : null}
-          />
-          <EmailLoginModal
-            open={showEmailLoginModal}
-            email={currentEmail}
-            onClose={handleEmailLoginClose}
-            onBack={handleEmailLoginBack}
-            onSuccess={handleEmailLoginSuccess}
-            onError={handleEmailLoginError}
-          />
-          <Left>
-            <LeftInfo>
-              <MainContainer>
-                <Connection
-                  onConnect={handleOnConnect}
-                  onEmailSubmit={handleEmailSubmit}
-                  onEmailChange={handleEmailInputChange}
-                  loadingOption={currentConnectionType}
-                  connectionOptions={targetConfig.connectionOptions}
-                  isNewUser={isNewUser}
-                  signInOptionsMode={signInOptionsMode}
-                  isEmailLoading={isEmailLoading}
-                  emailError={emailError}
-                />
-                {isNewUser && (
-                  <NewUserInfo>
-                    {t('login.already_have_account')} <span onClick={() => setIsNewUser(false)}>{t('login.sign_in')}</span>
-                  </NewUserInfo>
-                )}
-              </MainContainer>
-              {showGuestOption && (
-                <GuestInfo>
-                  {t('login.quick_dive')}{' '}
-                  <a href={guestRedirectToURL} onClick={handleGuestLogin}>
-                    {t('login.explore_as_guest')}
-                  </a>
-                </GuestInfo>
-              )}
-            </LeftInfo>
-          </Left>
-        </>
-      )}
+      <ClockSyncModal open={showClockSyncModal} onContinue={handleClockSyncContinue} onClose={handleClockSyncContinue} />
+      <ConnectionModal
+        open={showConnectionLayout}
+        state={loadingState}
+        onClose={handleOnCloseConnectionModal}
+        onTryAgain={handleTryAgain}
+        providerType={currentConnectionType ? fromConnectionOptionToProviderType(currentConnectionType) : null}
+      />
+      <EmailLoginModal
+        open={showEmailLoginModal}
+        email={currentEmail}
+        onClose={handleEmailLoginClose}
+        onBack={handleEmailLoginBack}
+        onSuccess={handleEmailLoginSuccess}
+        onError={handleEmailLoginError}
+      />
+      <Left>
+        <LeftInfo>
+          <MainContainer>
+            <Connection
+              onConnect={handleOnConnect}
+              onEmailSubmit={handleEmailSubmit}
+              onEmailChange={handleEmailInputChange}
+              loadingOption={currentConnectionType}
+              connectionOptions={targetConfig.connectionOptions}
+              isNewUser={isNewUser}
+              signInOptionsMode={signInOptionsMode}
+              isEmailLoading={isEmailLoading}
+              emailError={emailError}
+            />
+            {isNewUser && (
+              <NewUserInfo>
+                {t('login.already_have_account')} <span onClick={() => setIsNewUser(false)}>{t('login.sign_in')}</span>
+              </NewUserInfo>
+            )}
+          </MainContainer>
+          {showGuestOption && (
+            <GuestInfo>
+              {t('login.quick_dive')}{' '}
+              <a href={guestRedirectToURL} onClick={handleGuestLogin}>
+                {t('login.explore_as_guest')}
+              </a>
+            </GuestInfo>
+          )}
+        </LeftInfo>
+      </Left>
     </Main>
   )
 }

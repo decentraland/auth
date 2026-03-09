@@ -43,6 +43,9 @@ export const useAuthFlow = () => {
    * Connects to the Magic wallet provider based on the current feature flag configuration.
    * Returns undefined if feature flags are not yet initialized.
    *
+   * **Important:** This function requires feature flags to be initialized. Callers must ensure
+   * flags are loaded before invoking this function (e.g. by gating the page render on `flagInitialized`).
+   *
    * @returns {Promise<import('decentraland-connect').ConnectionResponse | undefined>} Resolves with the connection data,
    * or undefined when feature flags are not ready
    */
@@ -59,6 +62,10 @@ export const useAuthFlow = () => {
    * Checks profile consistency across catalysts and redirects based on profile state.
    * Handles profile redeployment if inconsistent, and navigates to setup/avatar setup
    * flows based on feature flags and WebGPU support.
+   *
+   * **Important:** This function requires feature flags to be initialized. If called before
+   * flags are ready, it returns `undefined` without calling `redirect`. Callers must ensure
+   * flags are loaded before invoking this function (e.g. by gating the page render on `flagInitialized`).
    *
    * @param {string} account - The user's account address
    * @param {string | null} referrer - The referrer URL string or null

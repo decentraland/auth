@@ -124,7 +124,9 @@ const InputLabel = styled(Typography)({
   marginBottom: '16px'
 })
 
-const TextInput = styled(TextField)<{ hasError?: boolean }>(({ hasError }) => ({
+const TextInput = styled(TextField, {
+  shouldForwardProp: prop => prop !== 'hasError'
+})<{ hasError?: boolean }>(({ hasError }) => ({
   width: '100%',
   ['& .MuiInputBase-root']: {
     zIndex: 1,
