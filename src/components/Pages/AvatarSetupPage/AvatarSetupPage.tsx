@@ -138,7 +138,6 @@ const AvatarSetupPage: React.FC = () => {
   const handleContinueClick = useCallback(async () => {
     try {
       setError(null)
-      throw new Error('There was a terrible error !!')
 
       if (state.email && state.email !== '' && !isEmailValid(state.email)) {
         setState(prev => ({ ...prev, hasEmailError: true }))
