@@ -9,6 +9,8 @@ import { fetchProfileWithConsistencyCheck, redeployExistingProfile, redeployExis
 import { useCurrentConnectionData } from '../shared/connection/hook'
 import { createFetcher } from '../shared/fetcher'
 import { locations } from '../shared/locations'
+import { getStoredEmail } from '../shared/onboarding/getStoredEmail'
+import { trackCheckpoint } from '../shared/onboarding/trackCheckpoint'
 import { isProfileComplete } from '../shared/profile'
 import { checkWebGpuSupport } from '../shared/utils/webgpu'
 import { useNavigateWithSearchParams } from './navigation'
@@ -77,6 +79,19 @@ export const useAuthFlow = () => {
         return undefined
       }
 
+      // Marks CP2 as completed for returning users (those with an existing profile).
+      // Prevents nudge emails being sent to people who are already onboarded.
+      // Fires with wallet address AND email (if available) so both identifier types are covered.
+      const markReturningUser = () => {
+        const storedEmail = getStoredEmail()
+        if (storedEmail) {
+          trackCheckpoint({ checkpointId: 2, action: 'completed', userIdentifier: storedEmail, identifierType: 'email' })
+        }
+        if (account) {
+          trackCheckpoint({ checkpointId: 2, action: 'completed', userIdentifier: account, identifierType: 'wallet' })
+        }
+      }
+
       if (targetConfig && !targetConfig.skipSetup && account) {
         // Check profile consistency across all catalysts
         const fetcherWithTimeout = createFetcher({
@@ -98,6 +113,7 @@ export const useAuthFlow = () => {
             try {
               await redeployExistingProfile(consistencyResult.profile, account, userIdentity, disabledCatalysts, fetcherWithTimeout)
               // If redeployment succeeds, continue with the login flow
+              markReturningUser()
               return redirect()
             } catch (error) {
               console.warn('Profile redeployment failed, attempting to redeploy with content server data:', error)
@@ -111,6 +127,7 @@ export const useAuthFlow = () => {
                   fetcherWithTimeout
                 )
                 // If redeployment succeeds, continue with the login flow
+                markReturningUser()
                 return redirect()
               } catch (error) {
                 console.warn('Profile redeployment failed, falling back to onboarding:', error)
@@ -145,6 +162,7 @@ export const useAuthFlow = () => {
         }
       }
 
+      markReturningUser()
       redirect()
     },
     [

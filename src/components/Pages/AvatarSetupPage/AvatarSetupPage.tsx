@@ -19,6 +19,8 @@ import { IpValidationError, createAuthServerHttpClient, createAuthServerWsClient
 import { useCurrentConnectionData } from '../../../shared/connection/hooks'
 import { isEmailValid } from '../../../shared/email'
 import { locations } from '../../../shared/locations'
+import { getStoredEmail } from '../../../shared/onboarding/getStoredEmail'
+import { trackCheckpoint } from '../../../shared/onboarding/trackCheckpoint'
 import { isProfileComplete } from '../../../shared/profile'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { checkWebGpuSupport } from '../../../shared/utils/webgpu'
@@ -202,6 +204,15 @@ const AvatarSetupPage: React.FC = () => {
           avatarShape
         })
 
+        trackCheckpoint({
+          checkpointId: 3,
+          action: 'completed',
+          source: 'auth',
+          userIdentifier: account.toLowerCase(),
+          identifierType: 'wallet',
+          email: state.email || undefined
+        })
+
         if (referrer && EthAddress.validate(referrer)) {
           try {
             await trackReferral(referrer, 'PATCH')
@@ -301,14 +312,19 @@ const AvatarSetupPage: React.FC = () => {
     authServerClient.current = flags[FeatureFlagsKeys.HTTP_AUTH] ? createAuthServerHttpClient() : createAuthServerWsClient()
 
     // Try to get stored email from web2 auth (Magic or Thirdweb)
-    try {
-      const storedEmail = localStorage.getItem('dcl_thirdweb_user_email') || localStorage.getItem('dcl_magic_user_email')
-      if (storedEmail) {
-        setState(prev => ({ ...prev, email: storedEmail, isEmailInherited: true }))
-      }
-    } catch (error) {
-      console.warn('Failed to get user email from localStorage:', error)
+    const storedEmail = getStoredEmail()
+    if (storedEmail) {
+      setState(prev => ({ ...prev, email: storedEmail, isEmailInherited: true }))
     }
+
+    trackCheckpoint({
+      checkpointId: 3,
+      action: 'reached',
+      source: 'auth',
+      userIdentifier: account.toLowerCase(),
+      identifierType: 'wallet',
+      email: storedEmail || undefined
+    })
 
     if (referrer && EthAddress.validate(referrer) && !hasTrackedReferral.current) {
       await trackReferral(referrer, 'POST')
