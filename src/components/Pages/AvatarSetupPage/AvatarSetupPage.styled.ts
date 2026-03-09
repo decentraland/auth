@@ -280,7 +280,7 @@ const ErrorLabel = styled(Typography)(({ theme }) => ({
 
 const ErrorBox = styled(Box)(({ theme }) => ({
   marginTop: theme.spacing(2),
-  padding: '16px',
+  padding: theme.spacing(2),
   borderRadius: '12px',
   backgroundColor: 'rgba(224, 0, 0, 0.1)',
   border: '1px solid rgba(224, 0, 0, 0.4)',
@@ -291,24 +291,24 @@ const ErrorBox = styled(Box)(({ theme }) => ({
   }
 }))
 
-const ErrorBoxTitle = styled(Typography)({
-  fontSize: '16px',
+const ErrorBoxTitle = styled(Typography)(({ theme }) => ({
+  fontSize: theme.typography.body1.fontSize,
   fontWeight: '600',
   color: 'rgba(255, 100, 100, 1)',
-  marginBottom: '8px'
-})
+  marginBottom: theme.spacing(1)
+}))
 
-const ErrorBoxDescription = styled(Typography)({
-  fontSize: '14px',
+const ErrorBoxDescription = styled(Typography)(({ theme }) => ({
+  fontSize: theme.typography.body2.fontSize,
   color: 'rgba(255, 200, 200, 1)'
-})
+}))
 
-const ErrorBoxDetail = styled(Typography)({
-  fontSize: '12px',
+const ErrorBoxDetail = styled(Typography)(({ theme }) => ({
+  fontSize: theme.typography.caption.fontSize,
   color: 'rgba(255, 150, 150, 0.8)',
-  marginTop: '8px',
+  marginTop: theme.spacing(1),
   wordBreak: 'break-word'
-})
+}))
 
 export {
   MainContainer,
