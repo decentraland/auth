@@ -77,7 +77,7 @@ const AvatarSetupPage: React.FC = () => {
   const navigate = useNavigateWithSearchParams()
   const referrer = urlSearchParams.get('referrer')
   const { track: trackReferral } = useTrackReferral()
-  const { trackClick, trackAvatarEditSuccess, trackTermsOfServiceSuccess, trackCheckTermsOfService } = useAnalytics()
+  const { trackAvatarEditSuccess, trackTermsOfServiceSuccess, trackCheckTermsOfService } = useAnalytics()
 
   const [state, setState] = useState<AvatarSetupState>({
     username: sessionStorage.getItem('dcl_avatar_setup_username') || '',
@@ -93,7 +93,7 @@ const AvatarSetupPage: React.FC = () => {
 
   const [error, setError] = useState<string | null>(null)
 
-  const [isProcessingMessage, setIsProcessingMessage] = useState(false)
+  const isProcessingMessageRef = useRef(false)
 
   const [isAvatarParticlesAnimationEnded, setIsAvatarParticlesAnimationEnded] = useState(false)
 
@@ -116,10 +116,7 @@ const AvatarSetupPage: React.FC = () => {
     return /^[a-zA-Z0-9]*$/.test(state.username)
   }, [state.username])
 
-  const hasValidUsernameCharacterCount = useMemo(
-    () => characterCount > MAX_CHARACTERS || !isUsernameValid,
-    [characterCount, isUsernameValid]
-  )
+  const hasUsernameError = useMemo(() => characterCount > MAX_CHARACTERS || !isUsernameValid, [characterCount, isUsernameValid])
 
   const emailError = useMemo(() => {
     if (state.email && !state.email.includes('@')) {
@@ -161,18 +158,23 @@ const AvatarSetupPage: React.FC = () => {
       if (state.hasWearablePreviewLoaded) {
         const wearablePreviewController = WearablePreview.createController('avatar-preview-configurator')
         await wearablePreviewController.scene.setUsername(state.username)
-      }
 
-      trackTermsOfServiceSuccess({
-        ethAddress: account,
-        isGuest: false,
-        email: state.email || undefined,
-        name: state.username
-      })
+        // Only track once the preview is loaded to avoid double-firing,
+        // since this function runs twice (on click + on preview load).
+        trackTermsOfServiceSuccess({
+          ethAddress: account,
+          isGuest: false,
+          email: state.email || undefined,
+          name: state.username
+        })
+      }
     } catch (e) {
       // Display the error in the error box below the continue button
       const errorMessage = handleError(e, 'Error setting up avatar')
       setError(errorMessage)
+      // Hide the preview overlay so the form is visible again for retry.
+      // Keep hasWearablePreviewLoaded true — the iframe is still loaded.
+      setState(prev => ({ ...prev, showWearablePreview: false }))
     }
   }, [state.username, state.email, state.hasWearablePreviewLoaded, account, trackTermsOfServiceSuccess, t])
 
@@ -193,7 +195,7 @@ const AvatarSetupPage: React.FC = () => {
       if (event.data.type !== 'controller_response' || event.data.payload.id !== 'customization-done') return
 
       // Prevent multiple simultaneous executions
-      if (isProcessingMessage) {
+      if (isProcessingMessageRef.current) {
         console.log('Message already being processed, skipping...')
         return
       }
@@ -212,7 +214,7 @@ const AvatarSetupPage: React.FC = () => {
       }
 
       try {
-        setIsProcessingMessage(true)
+        isProcessingMessageRef.current = true
         setDeploying(true)
         setError(null)
 
@@ -288,7 +290,7 @@ const AvatarSetupPage: React.FC = () => {
         }
         setDeploying(false)
       } finally {
-        setIsProcessingMessage(false)
+        isProcessingMessageRef.current = false
       }
     },
     [
@@ -304,10 +306,8 @@ const AvatarSetupPage: React.FC = () => {
       flags,
       redirect,
       signRequest,
-      trackClick,
-      trackReferral,
-      trackTermsOfServiceSuccess,
-      isProcessingMessage
+      trackAvatarEditSuccess,
+      trackReferral
     ]
   )
 
@@ -429,7 +429,7 @@ const AvatarSetupPage: React.FC = () => {
             placeholder={t('avatar_setup.username_placeholder')}
             value={state.username}
             onChange={handleUsernameChange}
-            hasError={hasValidUsernameCharacterCount}
+            hasError={hasUsernameError}
           />
           <CharacterCounterComponent
             characterCount={characterCount}
@@ -483,7 +483,7 @@ const AvatarSetupPage: React.FC = () => {
           variant="contained"
           onClick={handleContinueClick}
           disabled={
-            !!hasValidUsernameCharacterCount ||
+            !!hasUsernameError ||
             !isUsernameValid ||
             !!emailError ||
             !!agreeError ||

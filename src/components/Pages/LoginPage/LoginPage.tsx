@@ -197,7 +197,7 @@ export const LoginPage = () => {
         setIsEmailLoading(false)
       }
     },
-    [trackLoginClick]
+    [trackLoginClick, t]
   )
 
   const handleOnConnect = useCallback(
