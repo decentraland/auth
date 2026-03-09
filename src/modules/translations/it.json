@@ -214,7 +214,8 @@
     "terms_required_suffix": ".*",
     "deploying": "DISTRIBUZIONE...",
     "customize_avatar": "PERSONALIZZA IL MIO AVATAR",
-    "deploy_error": "Si è verificato un errore durante la creazione del tuo profilo: {error}",
+    "error_title": "Qualcosa è andato storto",
+    "error_description": "Si è verificato un errore, contatta il supporto con il seguente messaggio di errore:",
     "validation": {
       "email_invalid": "E-mail non valida, riprova.",
       "agree_required": "Accetta le condizioni d'uso e l'informativa sulla privacy."

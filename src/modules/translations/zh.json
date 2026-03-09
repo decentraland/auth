@@ -214,7 +214,8 @@
     "terms_required_suffix": "。*",
     "deploying": "部署中...",
     "customize_avatar": "自定义我的头像",
-    "deploy_error": "创建您的资料时发生错误：{error}",
+    "error_title": "出了点问题",
+    "error_description": "继续时发生错误，请将以下错误信息提交给客服：",
     "validation": {
       "email_invalid": "邮箱格式无效，请重试。",
       "agree_required": "请接受使用条款和隐私政策。"
