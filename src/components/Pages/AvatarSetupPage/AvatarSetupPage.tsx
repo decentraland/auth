@@ -40,8 +40,11 @@ import {
   DecentralandLogo,
   DecentralandText,
   EmailDescription,
+  ErrorBox,
+  ErrorBoxDescription,
+  ErrorBoxDetail,
+  ErrorBoxTitle,
   ErrorContainer,
-  ErrorLabel,
   ErrorText,
   InputContainer,
   InputLabel,
@@ -88,7 +91,7 @@ const AvatarSetupPage: React.FC = () => {
 
   const [deploying, setDeploying] = useState(false)
 
-  const [deployError, setDeployError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const [isProcessingMessage, setIsProcessingMessage] = useState(false)
 
@@ -132,22 +135,30 @@ const AvatarSetupPage: React.FC = () => {
     return ''
   }, [state.isTermsChecked, t])
 
-  const handleContinueClick = useCallback(() => {
-    if (state.email && state.email !== '' && !isEmailValid(state.email)) {
-      setState(prev => ({ ...prev, hasEmailError: true }))
-      return
-    }
-    setState(prev => ({ ...prev, hasEmailError: false, showWearablePreview: true }))
-    const wearablePreviewController = WearablePreview.createController('avatar-preview-configurator')
-    wearablePreviewController.scene.setUsername(state.username)
+  const handleContinueClick = useCallback(async () => {
+    try {
+      setError(null)
 
-    trackTermsOfServiceSuccess({
-      ethAddress: account,
-      isGuest: false,
-      email: state.email || undefined,
-      name: state.username
-    })
-  }, [state.username, state.email, account, trackTermsOfServiceSuccess])
+      if (state.email && state.email !== '' && !isEmailValid(state.email)) {
+        setState(prev => ({ ...prev, hasEmailError: true }))
+        throw new Error(t('avatar_setup.validation.email_invalid'))
+      }
+
+      setState(prev => ({ ...prev, hasEmailError: false, showWearablePreview: true }))
+      const wearablePreviewController = WearablePreview.createController('avatar-preview-configurator')
+      await wearablePreviewController.scene.setUsername(state.username)
+
+      trackTermsOfServiceSuccess({
+        ethAddress: account,
+        isGuest: false,
+        email: state.email || undefined,
+        name: state.username
+      })
+    } catch (e) {
+      const errorMessage = handleError(e, 'Error setting up avatar')
+      setError(errorMessage)
+    }
+  }, [state.username, state.email, account, trackTermsOfServiceSuccess, t])
 
   const handleUsernameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value
@@ -187,7 +198,7 @@ const AvatarSetupPage: React.FC = () => {
       try {
         setIsProcessingMessage(true)
         setDeploying(true)
-        setDeployError(null)
+        setError(null)
 
         // Deploy a new profile for the user based on the custom avatar shape
         await deployProfileFromAvatarShape({
@@ -254,10 +265,10 @@ const AvatarSetupPage: React.FC = () => {
       } catch (e) {
         if (e instanceof IpValidationError) {
           const errorMessage = handleError(e, 'IP validation failed')
-          setDeployError(errorMessage)
+          setError(errorMessage)
         } else {
           const errorMessage = handleError(e, 'Error deploying profile')
-          setDeployError(errorMessage)
+          setError(errorMessage)
         }
         setDeploying(false)
       } finally {
@@ -469,7 +480,13 @@ const AvatarSetupPage: React.FC = () => {
           {deploying ? t('avatar_setup.deploying') : t('avatar_setup.customize_avatar')}
         </ContinueButton>
 
-        {deployError && <ErrorLabel color="error">{t('avatar_setup.deploy_error', { error: deployError })}</ErrorLabel>}
+        {error && (
+          <ErrorBox>
+            <ErrorBoxTitle>{t('avatar_setup.error_title')}</ErrorBoxTitle>
+            <ErrorBoxDescription>{t('avatar_setup.error_description')}</ErrorBoxDescription>
+            <ErrorBoxDetail>{error}</ErrorBoxDetail>
+          </ErrorBox>
+        )}
       </LeftFormSection>
 
       <RightAvatarSection>

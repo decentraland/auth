@@ -214,7 +214,8 @@
     "terms_required_suffix": ".*",
     "deploying": "DESPLEGANDO...",
     "customize_avatar": "PERSONALIZAR MI AVATAR",
-    "deploy_error": "Ocurrió un error al crear tu perfil: {error}",
+    "error_title": "Algo salió mal",
+    "error_description": "Hubo un error al continuar, por favor contacta a soporte con el siguiente mensaje de error:",
     "validation": {
       "email_invalid": "Correo inválido, por favor inténtalo de nuevo.",
       "agree_required": "Por favor, acepta los términos de uso y la política de privacidad."

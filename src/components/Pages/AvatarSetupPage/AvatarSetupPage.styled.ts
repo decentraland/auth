@@ -1,4 +1,4 @@
-// eslint-disable-next-line @typescript-eslint/naming-convention
+import { alpha } from '@mui/material/styles'
 import Lottie from 'lottie-react'
 import { brand, neutral } from 'decentraland-ui2/dist/theme/colors'
 import { Box, Button, Checkbox, FormControlLabel, Link, Logo, TextField, Typography, muiIcons, styled } from 'decentraland-ui2'
@@ -278,6 +278,38 @@ const ErrorLabel = styled(Typography)(({ theme }) => ({
   fontSize: '14px'
 }))
 
+const ErrorBox = styled(Box)(({ theme }) => ({
+  marginTop: theme.spacing(2),
+  padding: theme.spacing(2),
+  borderRadius: '12px',
+  backgroundColor: alpha(theme.palette.error.main, 0.1),
+  border: `1px solid ${alpha(theme.palette.error.main, 0.4)}`,
+  width: '100%',
+  maxWidth: '400px',
+  [theme.breakpoints.down('sm')]: {
+    maxWidth: '100%'
+  }
+}))
+
+const ErrorBoxTitle = styled(Typography)(({ theme }) => ({
+  fontSize: theme.typography.body1.fontSize,
+  fontWeight: '600',
+  color: theme.palette.error.light,
+  marginBottom: theme.spacing(1)
+}))
+
+const ErrorBoxDescription = styled(Typography)(({ theme }) => ({
+  fontSize: theme.typography.body2.fontSize,
+  color: theme.palette.text.primary
+}))
+
+const ErrorBoxDetail = styled(Typography)(({ theme }) => ({
+  fontSize: theme.typography.caption.fontSize,
+  color: theme.palette.text.secondary,
+  marginTop: theme.spacing(1),
+  wordBreak: 'break-word'
+}))
+
 export {
   MainContainer,
   BackgroundShadow,
@@ -293,6 +325,10 @@ export {
   InputLabel,
   TextInput,
   ErrorContainer,
+  ErrorBox,
+  ErrorBoxDetail,
+  ErrorBoxDescription,
+  ErrorBoxTitle,
   ErrorLabel,
   ErrorText,
   WarningIcon,
