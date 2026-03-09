@@ -214,7 +214,8 @@
     "terms_required_suffix": ".*",
     "deploying": "DÉPLOIEMENT...",
     "customize_avatar": "PERSONNALISER MON AVATAR",
-    "deploy_error": "Une erreur est survenue lors de la création de votre profil : {error}",
+    "error_title": "Une erreur est survenue",
+    "error_description": "Une erreur est survenue, veuillez contacter le support avec le message d'erreur suivant :",
     "validation": {
       "email_invalid": "E-mail invalide, veuillez réessayer.",
       "agree_required": "Veuillez accepter les conditions d'utilisation et la politique de confidentialité."

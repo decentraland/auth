@@ -278,6 +278,38 @@ const ErrorLabel = styled(Typography)(({ theme }) => ({
   fontSize: '14px'
 }))
 
+const ErrorBox = styled(Box)(({ theme }) => ({
+  marginTop: theme.spacing(2),
+  padding: '16px',
+  borderRadius: '12px',
+  backgroundColor: 'rgba(224, 0, 0, 0.1)',
+  border: '1px solid rgba(224, 0, 0, 0.4)',
+  width: '100%',
+  maxWidth: '400px',
+  [theme.breakpoints.down('sm')]: {
+    maxWidth: '100%'
+  }
+}))
+
+const ErrorBoxTitle = styled(Typography)({
+  fontSize: '16px',
+  fontWeight: '600',
+  color: 'rgba(255, 100, 100, 1)',
+  marginBottom: '8px'
+})
+
+const ErrorBoxDescription = styled(Typography)({
+  fontSize: '14px',
+  color: 'rgba(255, 200, 200, 1)'
+})
+
+const ErrorBoxDetail = styled(Typography)({
+  fontSize: '12px',
+  color: 'rgba(255, 150, 150, 0.8)',
+  marginTop: '8px',
+  wordBreak: 'break-word'
+})
+
 export {
   MainContainer,
   BackgroundShadow,
@@ -293,6 +325,10 @@ export {
   InputLabel,
   TextInput,
   ErrorContainer,
+  ErrorBox,
+  ErrorBoxDetail,
+  ErrorBoxDescription,
+  ErrorBoxTitle,
   ErrorLabel,
   ErrorText,
   WarningIcon,
