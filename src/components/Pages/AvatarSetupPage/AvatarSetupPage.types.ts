@@ -38,4 +38,19 @@ interface CreateAvatarMetadataParams {
   deploymentProfileName: string
 }
 
+enum CustomizationStep {
+  PRESET_SELECTION = 0,
+  FACE_SELECTION = 1,
+  BODY_SELECTION = 2,
+  CONFIRMATION = 3
+}
+
+const CUSTOMIZATION_STEP_NAMES: Record<CustomizationStep, string> = {
+  [CustomizationStep.PRESET_SELECTION]: 'preset_selection',
+  [CustomizationStep.FACE_SELECTION]: 'face_selection',
+  [CustomizationStep.BODY_SELECTION]: 'body_selection',
+  [CustomizationStep.CONFIRMATION]: 'confirmation'
+}
+
+export { CustomizationStep, CUSTOMIZATION_STEP_NAMES }
 export type { AvatarSetupState, Color, AvatarShape, DeploymentParams, CreateAvatarMetadataParams }

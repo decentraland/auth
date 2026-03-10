@@ -69,6 +69,13 @@ export const useAnalytics = () => {
     trackEvent(TrackingEvents.CHECK_TERMS_OF_SERVICE)
   }, [])
 
+  const trackAvatarCustomizationStep = useCallback((data: { step: number; stepName: string }) => {
+    trackEvent(TrackingEvents.AVATAR_CUSTOMIZATION_STEP, {
+      step: data.step,
+      step_name: data.stepName
+    })
+  }, [])
+
   const trackWebGPUSupportCheck = useCallback((data: { supported: boolean }) => {
     trackEvent(TrackingEvents.WEBGPU_SUPPORT_CHECK, data)
   }, [])
@@ -92,6 +99,7 @@ export const useAnalytics = () => {
   }, [])
 
   return {
+    trackAvatarCustomizationStep,
     trackAvatarEditSuccess,
     trackCheckTermsOfService,
     trackClick,

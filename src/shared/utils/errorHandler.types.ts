@@ -25,6 +25,8 @@ interface TrackingData {
   isGuest?: boolean
   avatar_shape?: AvatarShape
   supported?: boolean
+  step?: number
+  step_name?: string
 }
 
 interface SentryTags {
