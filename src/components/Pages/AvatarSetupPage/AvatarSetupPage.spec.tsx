@@ -50,6 +50,7 @@ jest.mock('../../../modules/profile', () => ({
 }))
 
 jest.mock('../../../shared/auth', () => ({
+  // eslint-disable-next-line @typescript-eslint/naming-convention
   IpValidationError: class IpValidationError extends Error {
     requestId: string
     reason: string
@@ -366,7 +367,7 @@ describe('AvatarSetupPage', () => {
       const { getByRole } = renderAvatarSetupPage()
 
       await waitFor(() => {
-        expect(getByRole('button', { name: 'CUSTOMIZE MY AVATAR' })).toBeInTheDocument()
+        expect(getByRole('button', { name: 'MEET MY AVATAR' })).toBeInTheDocument()
       })
     })
 
@@ -437,7 +438,7 @@ describe('AvatarSetupPage', () => {
           target: { value: 'ThisUsernameIsTooLong' }
         })
 
-        expect(getByRole('button', { name: 'CUSTOMIZE MY AVATAR' })).toBeDisabled()
+        expect(getByRole('button', { name: 'MEET MY AVATAR' })).toBeDisabled()
       })
     })
 
@@ -473,10 +474,10 @@ describe('AvatarSetupPage', () => {
           const { getByRole } = renderAvatarSetupPage()
 
           await waitFor(() => {
-            expect(getByRole('button', { name: 'CUSTOMIZE MY AVATAR' })).toBeInTheDocument()
+            expect(getByRole('button', { name: 'MEET MY AVATAR' })).toBeInTheDocument()
           })
 
-          expect(getByRole('button', { name: 'CUSTOMIZE MY AVATAR' })).toBeDisabled()
+          expect(getByRole('button', { name: 'MEET MY AVATAR' })).toBeDisabled()
         })
       })
 
@@ -490,7 +491,7 @@ describe('AvatarSetupPage', () => {
 
           fireEvent.change(getByPlaceholderText('Enter your username'), { target: { value: 'TestUser' } })
 
-          expect(getByRole('button', { name: 'CUSTOMIZE MY AVATAR' })).toBeDisabled()
+          expect(getByRole('button', { name: 'MEET MY AVATAR' })).toBeDisabled()
         })
       })
     })
@@ -571,7 +572,7 @@ describe('AvatarSetupPage', () => {
         })
 
         // Button should remain enabled — the iframe is still loaded, only showWearablePreview was reset
-        expect(getByRole('button', { name: 'CUSTOMIZE MY AVATAR' })).not.toBeDisabled()
+        expect(getByRole('button', { name: 'MEET MY AVATAR' })).not.toBeDisabled()
       })
     })
 
@@ -725,7 +726,7 @@ describe('AvatarSetupPage', () => {
         })
 
         // Button should remain enabled — the iframe is still loaded, only showWearablePreview was reset
-        expect(getByRole('button', { name: 'CUSTOMIZE MY AVATAR' })).not.toBeDisabled()
+        expect(getByRole('button', { name: 'MEET MY AVATAR' })).not.toBeDisabled()
       })
     })
 
