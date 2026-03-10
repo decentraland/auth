@@ -35,7 +35,7 @@ export const VerifySignIn = ({
       {isDeepLinkFlow && <Box className={styles.description}>{t('request.deep_link_confirm', { explorerText })}</Box>}
 
       <ButtonsContainer>
-        <NoButton variant="outlined" disabled={isLoading} onClick={onDeny} startIcon={<CancelIcon />}>
+        <NoButton variant="outlined" disabled={isLoading} onClick={onDeny} startIcon={<CancelIcon />} data-testid="verify-sign-in-deny-button">
           {isDeepLinkFlow ? t('common.cancel') : t('request.no_it_doesnt')}
         </NoButton>
         <YesButton
@@ -43,6 +43,7 @@ export const VerifySignIn = ({
           disabled={isLoading}
           onClick={onApprove}
           startIcon={isLoading ? <CircularProgress size={20} color="inherit" /> : <CheckCircleIcon />}
+          data-testid="verify-sign-in-approve-button"
         >
           {isDeepLinkFlow ? t('request.sign_in') : t('request.yes_same')}
         </YesButton>
