@@ -167,6 +167,28 @@ const AvatarSetupPage: React.FC = () => {
           email: state.email || undefined,
           name: state.username
         })
+
+        const storedEmail = state.email || getStoredEmail()
+
+        // CP3 completed: user accepted TOS and submitted username
+        trackCheckpoint({
+          checkpointId: 3,
+          action: 'completed',
+          source: 'auth',
+          userIdentifier: storedEmail || account?.toLowerCase(),
+          identifierType: storedEmail ? 'email' : 'wallet',
+          email: storedEmail || undefined
+        })
+
+        // CP4 reached: avatar creator / starting look screen shown
+        trackCheckpoint({
+          checkpointId: 4,
+          action: 'reached',
+          source: 'auth',
+          userIdentifier: storedEmail || account?.toLowerCase(),
+          identifierType: storedEmail ? 'email' : 'wallet',
+          email: storedEmail || undefined
+        })
       }
     } catch (e) {
       // Display the error in the error box below the continue button
@@ -233,13 +255,15 @@ const AvatarSetupPage: React.FC = () => {
           avatarShape
         })
 
+        // CP4 completed: avatar customization finished and deployed
+        const emailForCheckpoint = state.email || getStoredEmail()
         trackCheckpoint({
-          checkpointId: 3,
+          checkpointId: 4,
           action: 'completed',
           source: 'auth',
-          userIdentifier: account.toLowerCase(),
-          identifierType: 'wallet',
-          email: state.email || undefined
+          userIdentifier: emailForCheckpoint || account.toLowerCase(),
+          identifierType: emailForCheckpoint ? 'email' : 'wallet',
+          email: emailForCheckpoint || undefined
         })
 
         if (referrer && EthAddress.validate(referrer)) {
@@ -277,7 +301,8 @@ const AvatarSetupPage: React.FC = () => {
           if (requestId && provider && flags[FeatureFlagsKeys.LOGIN_ON_SETUP]) {
             await signRequest(provider, requestId, account)
           } else {
-            redirect({ user: account }, config.get('DOWNLOAD_URL'))
+            const emailParam = state.email || getStoredEmail()
+            redirect({ user: account, ...(emailParam ? { email: emailParam } : {}) }, config.get('DOWNLOAD_URL'))
           }
         }
       } catch (e) {
@@ -348,8 +373,8 @@ const AvatarSetupPage: React.FC = () => {
       checkpointId: 3,
       action: 'reached',
       source: 'auth',
-      userIdentifier: account.toLowerCase(),
-      identifierType: 'wallet',
+      userIdentifier: storedEmail || account.toLowerCase(),
+      identifierType: storedEmail ? 'email' : 'wallet',
       email: storedEmail || undefined
     })
 

@@ -16,9 +16,10 @@ import { useTrackReferral } from '../../../hooks/useTrackReferral'
 import { ClickEvents } from '../../../modules/analytics/types'
 import { fetchProfile } from '../../../modules/profile'
 import { createAuthServerHttpClient, createAuthServerWsClient } from '../../../shared/auth'
-import { trackCheckpoint } from '../../../shared/onboarding/trackCheckpoint'
 import { useCurrentConnectionData } from '../../../shared/connection/hooks'
 import { locations } from '../../../shared/locations'
+import { getStoredEmail } from '../../../shared/onboarding/getStoredEmail'
+import { trackCheckpoint } from '../../../shared/onboarding/trackCheckpoint'
 import { isProfileComplete } from '../../../shared/profile'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { ConnectionModal } from '../../ConnectionModal'
@@ -315,8 +316,8 @@ export const SetupPage = () => {
           checkpointId: 3,
           action: 'completed',
           source: 'auth',
-          userIdentifier: account.toLowerCase(),
-          identifierType: 'wallet',
+          userIdentifier: email || account.toLowerCase(),
+          identifierType: email ? 'email' : 'wallet',
           email: email || undefined
         })
 
@@ -376,22 +377,17 @@ export const SetupPage = () => {
       authServerClient.current = flags[FeatureFlagsKeys.HTTP_AUTH] ? createAuthServerHttpClient() : createAuthServerWsClient()
 
       // Try to get stored email from web2 auth (Magic or Thirdweb)
-      let storedEmail: string | null = null
-      try {
-        storedEmail = localStorage.getItem('dcl_thirdweb_user_email') || localStorage.getItem('dcl_magic_user_email')
-        if (storedEmail) {
-          setEmail(storedEmail)
-        }
-      } catch (error) {
-        console.warn('Failed to get user email from localStorage:', error)
+      const storedEmail = getStoredEmail()
+      if (storedEmail) {
+        setEmail(storedEmail)
       }
 
       trackCheckpoint({
         checkpointId: 3,
         action: 'reached',
         source: 'auth',
-        userIdentifier: account.toLowerCase(),
-        identifierType: 'wallet',
+        userIdentifier: storedEmail || account.toLowerCase(),
+        identifierType: storedEmail ? 'email' : 'wallet',
         email: storedEmail || undefined
       })
 
