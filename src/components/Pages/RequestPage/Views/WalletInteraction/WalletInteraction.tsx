@@ -22,10 +22,10 @@ export const WalletInteraction = ({
       </Box>
       <Box className={styles.description}>{t('request.wallet_interaction.description')}</Box>
       <ButtonsContainer>
-        <Button variant="outlined" disabled={isLoading} onClick={onDeny}>
+        <Button variant="outlined" disabled={isLoading} onClick={onDeny} data-testid="wallet-interaction-deny-button">
           {t('common.deny')}
         </Button>
-        <Button variant="contained" disabled={isLoading} onClick={onApprove}>
+        <Button variant="contained" disabled={isLoading} onClick={onApprove} data-testid="wallet-interaction-allow-button">
           {isLoading ? <CircularProgress size={20} color="inherit" /> : t('common.allow')}
         </Button>
       </ButtonsContainer>

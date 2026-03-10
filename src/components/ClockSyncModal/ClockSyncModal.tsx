@@ -12,7 +12,7 @@ export const ClockSyncModal: React.FC<ClockSyncModalProps> = ({ open, onContinue
   const { t } = useTranslation()
   return (
     <Dialog open={open} maxWidth="xs" fullWidth>
-      <CloseIconButton onClick={onClose}>
+      <CloseIconButton onClick={onClose} data-testid="clock-sync-close-button">
         <CloseIcon />
       </CloseIconButton>
       <Content>
@@ -20,7 +20,7 @@ export const ClockSyncModal: React.FC<ClockSyncModalProps> = ({ open, onContinue
         <Title>{t('clock_sync_modal.title')}</Title>
         <Message>{t('clock_sync_modal.message')}</Message>
         <Actions>
-          <ContinueButton variant="contained" onClick={onContinue}>
+          <ContinueButton variant="contained" onClick={onContinue} data-testid="clock-sync-continue-button">
             {t('clock_sync_modal.continue_to_site')}
           </ContinueButton>
         </Actions>

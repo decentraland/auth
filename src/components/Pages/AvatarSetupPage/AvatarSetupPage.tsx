@@ -507,6 +507,7 @@ const AvatarSetupPage: React.FC = () => {
         <ContinueButton
           variant="contained"
           onClick={handleContinueClick}
+          data-testid="avatar-setup-continue-button"
           disabled={
             !!hasUsernameError ||
             !isUsernameValid ||

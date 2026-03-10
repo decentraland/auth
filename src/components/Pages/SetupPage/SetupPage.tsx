@@ -464,13 +464,13 @@ export const SetupPage = () => {
 
               <div className={isMobile ? styles.mobileButtons : undefined}>
                 <div className={styles.randomize}>
-                  <Button variant="outlined" size="small" onClick={handleRandomize} className={styles.randomizeButton}>
+                  <Button variant="outlined" size="small" onClick={handleRandomize} className={styles.randomizeButton} data-testid="setup-randomize-button">
                     <img src={diceImg} alt="diceImg" />
                     <span>{t('setup.randomize')}</span>
                   </Button>
                 </div>
                 <div className={styles.continue}>
-                  <Button variant="contained" size={isMobile ? 'small' : 'medium'} fullWidth={!isMobile} onClick={handleContinue}>
+                  <Button variant="contained" size={isMobile ? 'small' : 'medium'} fullWidth={!isMobile} onClick={handleContinue} data-testid="setup-continue-button">
                     {t('common.continue')}
                   </Button>
                 </div>
@@ -551,7 +551,7 @@ export const SetupPage = () => {
                 </div>
                 {showErrors && agreeError ? <InputErrorMessage className={styles.agreeError} message={agreeError} /> : null}
                 <div className={styles.jumpIn}>
-                  <Button variant="contained" fullWidth type="submit" disabled={!agree || deploying}>
+                  <Button variant="contained" fullWidth type="submit" disabled={!agree || deploying} data-testid="setup-submit-button">
                     {deploying ? <CircularProgress size={20} color="inherit" /> : continueMessage}
                   </Button>
                 </div>
