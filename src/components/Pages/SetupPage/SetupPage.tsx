@@ -318,7 +318,8 @@ export const SetupPage = () => {
           source: 'auth',
           userIdentifier: email || account.toLowerCase(),
           identifierType: email ? 'email' : 'wallet',
-          email: email || undefined
+          email: email || undefined,
+          wallet: account.toLowerCase()
         })
 
         // If the site to be redirect to is a request site, we need to recover the request and sign in.
@@ -388,7 +389,8 @@ export const SetupPage = () => {
         source: 'auth',
         userIdentifier: storedEmail || account.toLowerCase(),
         identifierType: storedEmail ? 'email' : 'wallet',
-        email: storedEmail || undefined
+        email: storedEmail || undefined,
+        wallet: account.toLowerCase()
       })
 
       if (referrer && EthAddress.validate(referrer) && !hasTrackedReferral.current) {
@@ -464,13 +466,25 @@ export const SetupPage = () => {
 
               <div className={isMobile ? styles.mobileButtons : undefined}>
                 <div className={styles.randomize}>
-                  <Button variant="outlined" size="small" onClick={handleRandomize} className={styles.randomizeButton} data-testid="setup-randomize-button">
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={handleRandomize}
+                    className={styles.randomizeButton}
+                    data-testid="setup-randomize-button"
+                  >
                     <img src={diceImg} alt="diceImg" />
                     <span>{t('setup.randomize')}</span>
                   </Button>
                 </div>
                 <div className={styles.continue}>
-                  <Button variant="contained" size={isMobile ? 'small' : 'medium'} fullWidth={!isMobile} onClick={handleContinue} data-testid="setup-continue-button">
+                  <Button
+                    variant="contained"
+                    size={isMobile ? 'small' : 'medium'}
+                    fullWidth={!isMobile}
+                    onClick={handleContinue}
+                    data-testid="setup-continue-button"
+                  >
                     {t('common.continue')}
                   </Button>
                 </div>
