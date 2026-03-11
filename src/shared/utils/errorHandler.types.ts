@@ -27,6 +27,7 @@ interface TrackingData {
   supported?: boolean
   step?: number
   step_name?: string
+  skipped?: boolean
 }
 
 interface SentryTags {

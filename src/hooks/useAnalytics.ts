@@ -36,12 +36,13 @@ export const useAnalytics = () => {
   }, [])
 
   const trackAvatarEditSuccess = useCallback(
-    (data: { ethAddress?: string; isGuest: boolean; profile: string; avatarShape?: AvatarShape }) => {
+    (data: { ethAddress?: string; isGuest: boolean; profile: string; avatarShape?: AvatarShape; skipped?: boolean }) => {
       trackEvent(TrackingEvents.AVATAR_EDIT_SUCCESS, {
         ethAddress: data.ethAddress,
         is_guest: data.isGuest,
         profile: data.profile,
-        avatar_shape: data.avatarShape
+        avatar_shape: data.avatarShape,
+        skipped: data.skipped
       })
     },
     []

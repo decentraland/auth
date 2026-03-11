@@ -263,7 +263,8 @@ const AvatarSetupPage: React.FC = () => {
           ethAddress: account,
           isGuest: false,
           profile: state.username,
-          avatarShape
+          avatarShape,
+          skipped: event.data.payload.result?.skipped
         })
 
         // CP4 completed: avatar customization finished and deployed
