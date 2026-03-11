@@ -19,6 +19,7 @@ import { LoginPage } from './components/Pages/LoginPage'
 import { MobileAuthPage } from './components/Pages/MobileAuthPage'
 import { MobileCallbackPage } from './components/Pages/MobileCallbackPage'
 import { FeatureFlagsProvider } from './components/FeatureFlagsProvider'
+import { ConnectionProvider } from './shared/connection'
 import { config } from './modules/config'
 import { translations } from './modules/translations'
 import { getAnalytics } from './modules/analytics/segment'
@@ -94,15 +95,17 @@ const SiteRoutes = () => {
 
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <FeatureFlagsProvider>
-      <TranslationProvider locale={initialLocale} translations={translations} fallbackLocale="en">
-        <DclThemeProvider theme={darkTheme}>
-          <BrowserRouter basename="/auth">
-            <SiteRoutes />
-          </BrowserRouter>
-        </DclThemeProvider>
-        <Intercom appId={config.get('INTERCOM_APP_ID')} settings={{ alignment: 'right' }} />
-      </TranslationProvider>
-    </FeatureFlagsProvider>
+    <ConnectionProvider>
+      <FeatureFlagsProvider>
+        <TranslationProvider locale={initialLocale} translations={translations} fallbackLocale="en">
+          <DclThemeProvider theme={darkTheme}>
+            <BrowserRouter basename="/auth">
+              <SiteRoutes />
+            </BrowserRouter>
+          </DclThemeProvider>
+          <Intercom appId={config.get('INTERCOM_APP_ID')} settings={{ alignment: 'right' }} />
+        </TranslationProvider>
+      </FeatureFlagsProvider>
+    </ConnectionProvider>
   </React.StrictMode>
 )
