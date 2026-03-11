@@ -16,7 +16,7 @@ import { useTrackReferral } from '../../../hooks/useTrackReferral'
 import { ClickEvents } from '../../../modules/analytics/types'
 import { fetchProfile } from '../../../modules/profile'
 import { createAuthServerHttpClient, createAuthServerWsClient } from '../../../shared/auth'
-import { useCurrentConnectionData } from '../../../shared/connection/hooks'
+import { useCurrentConnectionData } from '../../../shared/connection'
 import { locations } from '../../../shared/locations'
 import { getStoredEmail } from '../../../shared/onboarding/getStoredEmail'
 import { trackCheckpoint } from '../../../shared/onboarding/trackCheckpoint'
@@ -464,13 +464,25 @@ export const SetupPage = () => {
 
               <div className={isMobile ? styles.mobileButtons : undefined}>
                 <div className={styles.randomize}>
-                  <Button variant="outlined" size="small" onClick={handleRandomize} className={styles.randomizeButton} data-testid="setup-randomize-button">
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={handleRandomize}
+                    className={styles.randomizeButton}
+                    data-testid="setup-randomize-button"
+                  >
                     <img src={diceImg} alt="diceImg" />
                     <span>{t('setup.randomize')}</span>
                   </Button>
                 </div>
                 <div className={styles.continue}>
-                  <Button variant="contained" size={isMobile ? 'small' : 'medium'} fullWidth={!isMobile} onClick={handleContinue} data-testid="setup-continue-button">
+                  <Button
+                    variant="contained"
+                    size={isMobile ? 'small' : 'medium'}
+                    fullWidth={!isMobile}
+                    onClick={handleContinue}
+                    data-testid="setup-continue-button"
+                  >
                     {t('common.continue')}
                   </Button>
                 </div>
