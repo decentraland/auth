@@ -1,10 +1,13 @@
+import { PropsWithChildren } from 'react'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { ProviderType } from '@dcl/schemas'
 import { ConnectionData, getCurrentConnectionData } from './connection'
-import { useCurrentConnectionData } from './hooks'
+import { ConnectionProvider, useCurrentConnectionData } from './ConnectionProvider'
 
 // Mock the connection module
 jest.mock('./connection')
+
+const wrapper = ({ children }: PropsWithChildren) => <ConnectionProvider>{children}</ConnectionProvider>
 
 describe('useCurrentConnectionData', () => {
   let mockConnectionData: ConnectionData
@@ -35,7 +38,7 @@ describe('useCurrentConnectionData', () => {
     })
 
     it('should return the initial state where isLoading is true and the other fields are undefined', async () => {
-      const { result } = renderHook(() => useCurrentConnectionData())
+      const { result } = renderHook(() => useCurrentConnectionData(), { wrapper })
 
       const current = result.current
 
@@ -65,7 +68,7 @@ describe('useCurrentConnectionData', () => {
     })
 
     it('should return the connection data and set isLoading to false', async () => {
-      const { result } = renderHook(() => useCurrentConnectionData())
+      const { result } = renderHook(() => useCurrentConnectionData(), { wrapper })
 
       await waitFor(() => {
         expect(result.current).toEqual({
@@ -82,7 +85,7 @@ describe('useCurrentConnectionData', () => {
     })
 
     it('should return the initial state where isLoading is false and the other fields are undefined', async () => {
-      const { result } = renderHook(() => useCurrentConnectionData())
+      const { result } = renderHook(() => useCurrentConnectionData(), { wrapper })
 
       await waitFor(() => {
         expect(result.current).toEqual({
@@ -97,36 +100,22 @@ describe('useCurrentConnectionData', () => {
     })
   })
 
-  describe('when the component unmounts before the data loads', () => {
-    let resolvePromise: (value: ConnectionData) => void
-    let controlledPromise: Promise<ConnectionData>
-
+  describe('when multiple hooks consume the same provider', () => {
     beforeEach(() => {
-      controlledPromise = new Promise(resolve => {
-        resolvePromise = resolve
-      })
-      ;(getCurrentConnectionData as jest.Mock).mockImplementation(() => controlledPromise)
+      ;(getCurrentConnectionData as jest.Mock).mockResolvedValue(mockConnectionData)
     })
 
-    it('should not update state if the component is unmounted before the data is loaded', async () => {
-      const { result, unmount } = renderHook(() => useCurrentConnectionData())
+    it('should share the same connection data across hooks', async () => {
+      const { result: result1 } = renderHook(() => useCurrentConnectionData(), { wrapper })
+      const { result: result2 } = renderHook(() => useCurrentConnectionData(), { wrapper })
 
-      unmount()
-
-      // Now resolve the promise
-      act(() => {
-        resolvePromise(mockConnectionData)
+      await waitFor(() => {
+        expect(result1.current.account).toBe('0x123')
+        expect(result2.current.account).toBe('0x123')
       })
 
-      // The state should remain unchanged
-      expect(result.current).toEqual({
-        isLoading: true,
-        account: undefined,
-        identity: undefined,
-        provider: undefined,
-        providerType: undefined,
-        chainId: undefined
-      })
+      // Only one call to getCurrentConnectionData per provider instance
+      expect(getCurrentConnectionData).toHaveBeenCalledTimes(2)
     })
   })
 })
