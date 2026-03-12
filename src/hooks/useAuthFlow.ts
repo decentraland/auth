@@ -92,10 +92,22 @@ export const useAuthFlow = () => {
       const markReturningUser = () => {
         const storedEmail = getStoredEmail()
         if (storedEmail) {
-          trackCheckpoint({ checkpointId: 2, action: 'completed', userIdentifier: storedEmail, identifierType: 'email' })
+          trackCheckpoint({
+            checkpointId: 2,
+            action: 'completed',
+            userIdentifier: storedEmail,
+            identifierType: 'email',
+            wallet: account?.toLowerCase()
+          })
         }
         if (account) {
-          trackCheckpoint({ checkpointId: 2, action: 'completed', userIdentifier: account, identifierType: 'wallet' })
+          trackCheckpoint({
+            checkpointId: 2,
+            action: 'completed',
+            userIdentifier: account,
+            identifierType: 'wallet',
+            wallet: account.toLowerCase()
+          })
         }
       }
 

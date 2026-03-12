@@ -318,7 +318,8 @@ export const SetupPage = () => {
           source: 'auth',
           userIdentifier: email || account.toLowerCase(),
           identifierType: email ? 'email' : 'wallet',
-          email: email || undefined
+          email: email || undefined,
+          wallet: account.toLowerCase()
         })
 
         // If the site to be redirect to is a request site, we need to recover the request and sign in.
@@ -388,7 +389,8 @@ export const SetupPage = () => {
         source: 'auth',
         userIdentifier: storedEmail || account.toLowerCase(),
         identifierType: storedEmail ? 'email' : 'wallet',
-        email: storedEmail || undefined
+        email: storedEmail || undefined,
+        wallet: account.toLowerCase()
       })
 
       if (referrer && EthAddress.validate(referrer) && !hasTrackedReferral.current) {
