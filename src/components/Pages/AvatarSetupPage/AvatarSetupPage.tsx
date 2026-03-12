@@ -29,7 +29,7 @@ import { CharacterCounterComponent } from '../../CharacterCounter'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import { subscribeToNewsletter } from '../SetupPage/utils'
 import { deployProfileFromAvatarShape } from './utils'
-import { AvatarSetupState, AvatarShape } from './AvatarSetupPage.types'
+import { AvatarSetupState, AvatarShape, CUSTOMIZATION_STEP_NAMES, CustomizationStep } from './AvatarSetupPage.types'
 import {
   AvatarParticles,
   BackgroundShadow,
@@ -77,7 +77,7 @@ const AvatarSetupPage: React.FC = () => {
   const navigate = useNavigateWithSearchParams()
   const referrer = urlSearchParams.get('referrer')
   const { track: trackReferral } = useTrackReferral()
-  const { trackAvatarEditSuccess, trackTermsOfServiceSuccess, trackCheckTermsOfService } = useAnalytics()
+  const { trackAvatarCustomizationStep, trackAvatarEditSuccess, trackTermsOfServiceSuccess, trackCheckTermsOfService } = useAnalytics()
 
   const [state, setState] = useState<AvatarSetupState>({
     username: sessionStorage.getItem('dcl_avatar_setup_username') || '',
@@ -216,7 +216,18 @@ const AvatarSetupPage: React.FC = () => {
 
   const handleMessage = useCallback(
     async (event: MessageEvent) => {
-      if (event.data.type !== 'controller_response' || event.data.payload.id !== 'customization-done') return
+      if (event.data.type !== 'controller_response') return
+
+      if (event.data.payload.id === 'avatar-customization-step') {
+        const step = event.data.payload.result?.step as CustomizationStep
+        trackAvatarCustomizationStep({
+          step,
+          stepName: CUSTOMIZATION_STEP_NAMES[step] ?? `unknown_step_${step}`
+        })
+        return
+      }
+
+      if (event.data.payload.id !== 'customization-done') return
 
       // Prevent multiple simultaneous executions
       if (isProcessingMessageRef.current) {
@@ -254,7 +265,8 @@ const AvatarSetupPage: React.FC = () => {
           ethAddress: account,
           isGuest: false,
           profile: state.username,
-          avatarShape
+          avatarShape,
+          skipped: event.data.payload.result?.skipped
         })
 
         // CP4 completed: avatar customization finished and deployed
@@ -334,6 +346,7 @@ const AvatarSetupPage: React.FC = () => {
       flags,
       redirect,
       signRequest,
+      trackAvatarCustomizationStep,
       trackAvatarEditSuccess,
       trackReferral
     ]

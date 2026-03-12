@@ -36,12 +36,13 @@ export const useAnalytics = () => {
   }, [])
 
   const trackAvatarEditSuccess = useCallback(
-    (data: { ethAddress?: string; isGuest: boolean; profile: string; avatarShape?: AvatarShape }) => {
+    (data: { ethAddress?: string; isGuest: boolean; profile: string; avatarShape?: AvatarShape; skipped?: boolean }) => {
       trackEvent(TrackingEvents.AVATAR_EDIT_SUCCESS, {
         ethAddress: data.ethAddress,
         is_guest: data.isGuest,
         profile: data.profile,
-        avatar_shape: data.avatarShape
+        avatar_shape: data.avatarShape,
+        skipped: data.skipped
       })
     },
     []
@@ -69,6 +70,13 @@ export const useAnalytics = () => {
     trackEvent(TrackingEvents.CHECK_TERMS_OF_SERVICE)
   }, [])
 
+  const trackAvatarCustomizationStep = useCallback((data: { step: number; stepName: string }) => {
+    trackEvent(TrackingEvents.AVATAR_CUSTOMIZATION_STEP, {
+      step: data.step,
+      step_name: data.stepName
+    })
+  }, [])
+
   const trackWebGPUSupportCheck = useCallback((data: { supported: boolean }) => {
     trackEvent(TrackingEvents.WEBGPU_SUPPORT_CHECK, data)
   }, [])
@@ -92,6 +100,7 @@ export const useAnalytics = () => {
   }, [])
 
   return {
+    trackAvatarCustomizationStep,
     trackAvatarEditSuccess,
     trackCheckTermsOfService,
     trackClick,
