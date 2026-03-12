@@ -57,7 +57,12 @@ export const MobileAuthSuccess = ({ identityId, explorerText, onTryAgain }: Prop
           <Title>{t('mobile_auth.could_not_open', { explorerText })}</Title>
           <Description>{t('mobile_auth.app_not_launched', { explorerText })}</Description>
           <ActionButton>
-            <Button variant="contained" onClick={onTryAgain} startIcon={<ArrowBackIosNewTwoToneIcon fontSize="small" />}>
+            <Button
+              variant="contained"
+              onClick={onTryAgain}
+              startIcon={<ArrowBackIosNewTwoToneIcon fontSize="small" />}
+              data-testid="mobile-auth-try-again-button"
+            >
               {t('common.try_again')}
             </Button>
           </ActionButton>
@@ -78,7 +83,12 @@ export const MobileAuthSuccess = ({ identityId, explorerText, onTryAgain }: Prop
             : t('mobile_auth.redirecting', { explorerText })}
         </Description>
         <ActionButton>
-          <Button variant="contained" onClick={attemptDeepLink} startIcon={<LoginRoundedIcon fontSize="small" />}>
+          <Button
+            variant="contained"
+            onClick={attemptDeepLink}
+            startIcon={<LoginRoundedIcon fontSize="small" />}
+            data-testid="mobile-auth-return-button"
+          >
             {t('mobile_auth.return_to', { explorerText })}
           </Button>
         </ActionButton>

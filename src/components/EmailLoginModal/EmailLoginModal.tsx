@@ -323,10 +323,10 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
       {open && <GlobalStyles styles={otpModalContainerGlobalStyles} />}
       <StyledDialog open={open} maxWidth="sm" fullWidth className={OTP_MODAL_ROOT_CLASS}>
         <Header>
-          <BackButton onClick={handleBack} disabled={isLoading}>
+          <BackButton onClick={handleBack} disabled={isLoading} data-testid="email-login-back-button">
             <BackIcon>‹</BackIcon> {t('email_login_modal.back')}
           </BackButton>
-          <CloseButton onClick={handleClose} disabled={isLoading}>
+          <CloseButton onClick={handleClose} disabled={isLoading} data-testid="email-login-close-button">
             ×
           </CloseButton>
         </Header>

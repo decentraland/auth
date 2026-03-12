@@ -74,7 +74,12 @@ export const ContinueInApp = ({ onContinue, requestId, deepLinkUrl, autoStart = 
           {t('request_views.continue_in_app.app_not_launched', { explorerText: targetConfig.explorerText })}
         </div>
 
-        <ActionButton variant="contained" onClick={handleGoToLogin} startIcon={<ArrowBackIcon />}>
+        <ActionButton
+          variant="contained"
+          onClick={handleGoToLogin}
+          startIcon={<ArrowBackIcon />}
+          data-testid="continue-in-app-go-back-button"
+        >
           {t('request_views.continue_in_app.go_back_login')}
         </ActionButton>
       </Container>
@@ -89,7 +94,7 @@ export const ContinueInApp = ({ onContinue, requestId, deepLinkUrl, autoStart = 
         {t('request_views.continue_in_app.redirect_countdown', { explorerText: targetConfig.explorerText, countdown })}
       </div>
 
-      <ActionButton variant="contained" onClick={attemptDeepLink} startIcon={<LoginIcon />}>
+      <ActionButton variant="contained" onClick={attemptDeepLink} startIcon={<LoginIcon />} data-testid="continue-in-app-return-button">
         {t('request_views.continue_in_app.return_to', { explorerText: targetConfig.explorerText })}
       </ActionButton>
     </Container>

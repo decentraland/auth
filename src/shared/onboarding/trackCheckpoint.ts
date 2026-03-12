@@ -6,6 +6,7 @@ type CheckpointParams = {
   userIdentifier?: string
   identifierType?: 'email' | 'wallet'
   email?: string
+  wallet?: string
   source?: 'auth'
   metadata?: Record<string, unknown>
 }
@@ -17,6 +18,7 @@ export function trackCheckpoint(params: CheckpointParams): void {
     userIdentifier: params.userIdentifier,
     identifierType: params.identifierType,
     email: params.email,
+    wallet: params.wallet,
     source: params.source ?? 'auth',
     metadata: params.metadata
   })
