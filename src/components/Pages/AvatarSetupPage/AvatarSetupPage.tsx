@@ -16,7 +16,7 @@ import { useTrackReferral } from '../../../hooks/useTrackReferral'
 import { config } from '../../../modules/config'
 import { fetchProfile } from '../../../modules/profile'
 import { IpValidationError, createAuthServerHttpClient, createAuthServerWsClient } from '../../../shared/auth'
-import { useCurrentConnectionData } from '../../../shared/connection/hooks'
+import { useCurrentConnectionData } from '../../../shared/connection'
 import { isEmailValid } from '../../../shared/email'
 import { locations } from '../../../shared/locations'
 import { getStoredEmail } from '../../../shared/onboarding/getStoredEmail'
@@ -177,7 +177,8 @@ const AvatarSetupPage: React.FC = () => {
           source: 'auth',
           userIdentifier: storedEmail || account?.toLowerCase(),
           identifierType: storedEmail ? 'email' : 'wallet',
-          email: storedEmail || undefined
+          email: storedEmail || undefined,
+          wallet: account?.toLowerCase()
         })
 
         // CP4 reached: avatar creator / starting look screen shown
@@ -187,7 +188,8 @@ const AvatarSetupPage: React.FC = () => {
           source: 'auth',
           userIdentifier: storedEmail || account?.toLowerCase(),
           identifierType: storedEmail ? 'email' : 'wallet',
-          email: storedEmail || undefined
+          email: storedEmail || undefined,
+          wallet: account?.toLowerCase()
         })
       }
     } catch (e) {
@@ -275,7 +277,8 @@ const AvatarSetupPage: React.FC = () => {
           source: 'auth',
           userIdentifier: emailForCheckpoint || account.toLowerCase(),
           identifierType: emailForCheckpoint ? 'email' : 'wallet',
-          email: emailForCheckpoint || undefined
+          email: emailForCheckpoint || undefined,
+          wallet: account.toLowerCase()
         })
 
         if (referrer && EthAddress.validate(referrer)) {
@@ -362,8 +365,8 @@ const AvatarSetupPage: React.FC = () => {
   )
 
   const initializeAvatarSetup = useCallback(async () => {
-    if (!account) {
-      console.warn('No account found')
+    if (!account || !identity) {
+      console.warn('No previous connection found')
       return redirect()
     }
 
@@ -388,7 +391,8 @@ const AvatarSetupPage: React.FC = () => {
       source: 'auth',
       userIdentifier: storedEmail || account.toLowerCase(),
       identifierType: storedEmail ? 'email' : 'wallet',
-      email: storedEmail || undefined
+      email: storedEmail || undefined,
+      wallet: account.toLowerCase()
     })
 
     if (referrer && EthAddress.validate(referrer) && !hasTrackedReferral.current) {
@@ -397,7 +401,7 @@ const AvatarSetupPage: React.FC = () => {
     }
 
     setInitialized(true)
-  }, [account, flags, provider, referrer, redirect, trackReferral])
+  }, [account, identity, flags, provider, referrer, redirect, trackReferral])
 
   useEffect(() => {
     window.addEventListener('message', handleMessage, false)

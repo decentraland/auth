@@ -6,7 +6,7 @@ import { connection } from 'decentraland-connect'
 import { FeatureFlagsContext, FeatureFlagsKeys, OnboardingFlowVariant } from '../components/FeatureFlagsProvider'
 import { config } from '../modules/config'
 import { fetchProfileWithConsistencyCheck, redeployExistingProfile, redeployExistingProfileWithContentServerData } from '../modules/profile'
-import { useCurrentConnectionData } from '../shared/connection/hook'
+import { useCurrentConnectionData } from '../shared/connection'
 import { createFetcher } from '../shared/fetcher'
 import { locations } from '../shared/locations'
 import { getStoredEmail } from '../shared/onboarding/getStoredEmail'
@@ -92,10 +92,22 @@ export const useAuthFlow = () => {
       const markReturningUser = () => {
         const storedEmail = getStoredEmail()
         if (storedEmail) {
-          trackCheckpoint({ checkpointId: 2, action: 'completed', userIdentifier: storedEmail, identifierType: 'email' })
+          trackCheckpoint({
+            checkpointId: 2,
+            action: 'completed',
+            userIdentifier: storedEmail,
+            identifierType: 'email',
+            wallet: account?.toLowerCase()
+          })
         }
         if (account) {
-          trackCheckpoint({ checkpointId: 2, action: 'completed', userIdentifier: account, identifierType: 'wallet' })
+          trackCheckpoint({
+            checkpointId: 2,
+            action: 'completed',
+            userIdentifier: account,
+            identifierType: 'wallet',
+            wallet: account.toLowerCase()
+          })
         }
       }
 

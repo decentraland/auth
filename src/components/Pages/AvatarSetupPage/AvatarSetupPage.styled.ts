@@ -1,5 +1,5 @@
 import { alpha } from '@mui/material/styles'
-import Lottie from 'lottie-react'
+import lottie from 'lottie-react'
 import { brand, neutral } from 'decentraland-ui2/dist/theme/colors'
 import { Box, Button, Checkbox, FormControlLabel, Link, Logo, TextField, Typography, muiIcons, styled } from 'decentraland-ui2'
 // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -251,7 +251,7 @@ const RightAvatarSection = styled(Box)(({ theme }) => ({
   }
 }))
 
-const AvatarParticles = styled(Lottie, {
+const AvatarParticles = styled(lottie, {
   shouldForwardProp: prop => prop !== 'show'
 })<{ show: boolean }>(({ show }) => ({
   width: '100%',
