@@ -10,7 +10,7 @@ import { useSignRequest } from '../../../hooks/useSignRequest'
 import { useTrackReferral } from '../../../hooks/useTrackReferral'
 import { fetchProfile } from '../../../modules/profile'
 import { translations } from '../../../modules/translations'
-import { useCurrentConnectionData } from '../../../shared/connection/hooks'
+import { useCurrentConnectionData } from '../../../shared/connection'
 import { isEmailValid } from '../../../shared/email'
 import { getStoredEmail } from '../../../shared/onboarding/getStoredEmail'
 import { isProfileComplete } from '../../../shared/profile'
@@ -50,6 +50,7 @@ jest.mock('../../../modules/profile', () => ({
 }))
 
 jest.mock('../../../shared/auth', () => ({
+  // eslint-disable-next-line @typescript-eslint/naming-convention
   IpValidationError: class IpValidationError extends Error {
     requestId: string
     reason: string
@@ -64,7 +65,7 @@ jest.mock('../../../shared/auth', () => ({
   createAuthServerWsClient: jest.fn().mockReturnValue({})
 }))
 
-jest.mock('../../../shared/connection/hooks', () => ({
+jest.mock('../../../shared/connection', () => ({
   useCurrentConnectionData: jest.fn()
 }))
 

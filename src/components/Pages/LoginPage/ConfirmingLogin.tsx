@@ -19,7 +19,11 @@ export const ConfirmingLogin = ({ error, onError }: ConfirmingLoginProps) => {
           <Logo size="huge" />
           <Title>{t('common.something_went_wrong')}</Title>
           <Subtitle>{error}</Subtitle>
-          {onError && <RetryButton onClick={onError} data-testid="confirming-login-retry-button">{t('common.try_again')}</RetryButton>}
+          {onError && (
+            <RetryButton onClick={onError} data-testid="confirming-login-retry-button">
+              {t('common.try_again')}
+            </RetryButton>
+          )}
         </Content>
       </Container>
     )
