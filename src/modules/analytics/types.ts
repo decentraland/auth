@@ -3,6 +3,7 @@ enum TrackingEvents {
   LOGIN_SUCCESS = 'Login Success',
   LOGIN_ERROR = 'Login Error',
   CLICK = 'Click Button',
+  AVATAR_CUSTOMIZATION_STEP = 'Avatar Customization Step',
   AVATAR_EDIT_SUCCESS = 'Avatar Edit Success',
   TERMS_OF_SERVICE_SUCCESS = 'Terms of service success',
   REQUEST_EXPIRED = 'Expired request',
