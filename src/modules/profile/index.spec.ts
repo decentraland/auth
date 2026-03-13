@@ -221,12 +221,13 @@ describe('profile module', () => {
 
     describe('and no catalysts have the profile', () => {
       beforeEach(async () => {
+        const notFoundResponse = { error: 'Not Found', message: 'Profile not found' }
         const mockCatalysts = [{ address: 'https://catalyst1.zone' }, { address: 'https://catalyst2.zone' }]
 
         ;(getCatalystServersFromCache as jest.Mock).mockReturnValue(mockCatalysts)
-
-        const mockClientWithoutProfile = { getAvatarDetails: jest.fn().mockRejectedValue(new Error('404')) }
-        ;(createLambdasClient as jest.Mock).mockReturnValue(mockClientWithoutProfile)
+        ;(createLambdasClient as jest.Mock).mockReturnValue({
+          getAvatarDetails: jest.fn().mockResolvedValue(notFoundResponse)
+        })
 
         result = await fetchProfileWithConsistencyCheck(mockAddress, [])
       })
