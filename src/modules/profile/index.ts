@@ -71,7 +71,7 @@ async function fetchProfileWithConsistencyCheck(
           // { error: "Not Found", message: "Profile not found" } instead of throwing.
           // We must validate that the response is actually a profile.
           if (!profile.avatars) {
-            return { error: 'Invalid profile response: missing avatars', url }
+            throw new Error('Profile not found')
           }
           return { profile, url }
         } catch (error) {
