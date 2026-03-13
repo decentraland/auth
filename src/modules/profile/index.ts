@@ -36,6 +36,11 @@ async function fetchProfile(address: string, fetcher?: IFetchComponent): Promise
   const client = createLambdasClient({ url: PEER_URL + '/lambdas', fetcher: fetcher ?? createFetcher() })
   try {
     const profile: Profile = await client.getAvatarDetails(address)
+    // The catalyst client does not throw on non-OK responses (e.g. 404).
+    // Validate that the response is actually a profile.
+    if (!profile.avatars) {
+      return null
+    }
     return profile
   } catch {
     return null
@@ -61,6 +66,13 @@ async function fetchProfileWithConsistencyCheck(
         try {
           const client = createLambdasClient({ url: url + '/lambdas', fetcher: fetcher ?? createFetcher() })
           const profile = await client.getAvatarDetails(address)
+          // The catalyst client does not throw on non-OK responses (e.g. 404).
+          // It parses the JSON body regardless of status, so a 404 returns
+          // { error: "Not Found", message: "Profile not found" } instead of throwing.
+          // We must validate that the response is actually a profile.
+          if (!profile.avatars) {
+            throw new Error('Profile not found')
+          }
           return { profile, url }
         } catch (error) {
           return {
