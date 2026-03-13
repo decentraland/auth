@@ -1,4 +1,4 @@
-import { PropsWithChildren, createContext, useContext, useEffect, useState } from 'react'
+import { PropsWithChildren, createContext, useCallback, useContext, useEffect, useState } from 'react'
 import { AuthIdentity } from '@dcl/crypto'
 import { ProviderType } from '@dcl/schemas'
 import { ConnectionResponse } from 'decentraland-connect'
@@ -27,6 +27,18 @@ const ConnectionContext = createContext<ConnectionContextValue>(defaultValue)
 const ConnectionProvider = ({ children }: PropsWithChildren) => {
   const [value, setValue] = useState<ConnectionContextValue>(defaultValue)
 
+  const refetchConnectionData = useCallback(async () => {
+    const connectionData = await getCurrentConnectionData()
+    setValue({
+      isLoading: false,
+      account: connectionData?.account,
+      identity: connectionData?.identity,
+      provider: connectionData?.provider,
+      providerType: connectionData?.providerType,
+      chainId: connectionData?.chainId
+    })
+  }, [])
+
   useEffect(() => {
     let cancelled = false
 
@@ -49,6 +61,28 @@ const ConnectionProvider = ({ children }: PropsWithChildren) => {
       cancelled = true
     }
   }, [])
+
+  // Listen for wallet changes (account or chain switches) on the provider
+  useEffect(() => {
+    const provider = value.provider
+    if (!provider) return
+
+    const handleAccountsChanged = () => {
+      refetchConnectionData()
+    }
+
+    const handleChainChanged = () => {
+      refetchConnectionData()
+    }
+
+    provider.on('accountsChanged', handleAccountsChanged)
+    provider.on('chainChanged', handleChainChanged)
+
+    return () => {
+      provider.removeListener('accountsChanged', handleAccountsChanged)
+      provider.removeListener('chainChanged', handleChainChanged)
+    }
+  }, [value.provider, refetchConnectionData])
 
   return <ConnectionContext.Provider value={value}>{children}</ConnectionContext.Provider>
 }
