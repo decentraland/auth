@@ -17,14 +17,13 @@ const sendEmailOTP = async (email: string): Promise<void> => {
  *
  * @param email - The email address used for authentication
  * @param otp - The 6-digit OTP code from the email
- * @returns The connected account with wallet address
+ * @returns The wallet address of the authenticated user
  * @throws Error if the code is invalid or expired
  *
  * @see https://portal.thirdweb.com/wallets/users
  */
-const verifyOTPAndConnect = async (email: string, otp: string) => {
-  const account = await verifyEmailOTPAndConnect(email, otp)
-  return account
+const verifyOTPAndConnect = async (email: string, otp: string): Promise<string> => {
+  return verifyEmailOTPAndConnect(email, otp)
 }
 
 export { sendEmailOTP, verifyOTPAndConnect }

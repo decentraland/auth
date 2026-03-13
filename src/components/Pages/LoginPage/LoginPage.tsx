@@ -1,9 +1,6 @@
 import { useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import type { AuthIdentity } from '@dcl/crypto'
 import { useTranslation } from '@dcl/hooks'
-import { ChainId } from '@dcl/schemas/dist/dapps/chain-id'
-import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
-import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
 import { connection } from 'decentraland-connect'
 import { CircularProgress, Desktop } from 'decentraland-ui2'
 // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -25,6 +22,7 @@ import { useAuthFlow } from '../../../hooks/useAuthFlow'
 import { useAutoLogin } from '../../../hooks/useAutoLogin'
 import { ConnectionType } from '../../../modules/analytics/types'
 import { createAuthServerHttpClient } from '../../../shared/auth'
+import { useCurrentConnectionData } from '../../../shared/connection'
 import { isErrorWithName, isUserRejectedTransaction } from '../../../shared/errors'
 import { extractReferrerFromSearchParameters } from '../../../shared/locations'
 import { trackCheckpoint } from '../../../shared/onboarding/trackCheckpoint'
@@ -43,8 +41,6 @@ import {
   connectToProvider,
   connectToSocialProvider,
   fromConnectionOptionToProviderType,
-  getIdentitySignature,
-  getIdentityWithSigner,
   getSignInOptionsMode,
   isSocialLogin,
   requiresInjectedProvider
@@ -76,8 +72,6 @@ export const LoginPage = () => {
   const [emailError, setEmailError] = useState<string | null>(null)
   const [showConfirmingLogin, setShowConfirmingLogin] = useState(false)
   const [confirmingLoginError, setConfirmingLoginError] = useState<string | null>(null)
-  // Store address from email login for clock sync continuation
-  const [emailLoginAddress, setEmailLoginAddress] = useState<string | null>(null)
 
   // TODO: remove /play from redirectTo. Build guest URL only when redirect path includes /play; use its presence to show the option.
   const guestRedirectToURL = useMemo(() => {
@@ -99,6 +93,7 @@ export const LoginPage = () => {
   const [backgroundTransitioning, setBackgroundTransitioning] = useState(false)
   const [targetConfig] = useTargetConfig()
   const { checkProfileAndRedirect } = useAuthFlow()
+  const { getIdentitySignature } = useCurrentConnectionData()
   const { trackLoginClick, trackLoginSuccess, trackGuestLogin } = useAnalytics()
 
   const handleGuestLogin = useCallback(async () => {
@@ -245,10 +240,7 @@ export const LoginPage = () => {
           const connectionData = await connectToProvider(connectionType)
 
           setLoadingState(ConnectionLayoutState.WAITING_FOR_SIGNATURE)
-          if (!connectionData.provider) {
-            throw new Error('Provider is required for wallet connections')
-          }
-          await getIdentitySignature(connectionData.account?.toLowerCase() ?? '', connectionData.provider)
+          await getIdentitySignature(connectionData)
 
           // Clear any stored social login emails since this is a wallet login
           localStorage.removeItem('dcl_thirdweb_user_email')
@@ -297,7 +289,8 @@ export const LoginPage = () => {
       runProfileRedirect,
       flagInitialized,
       checkClockSynchronization,
-      getReferrerFromCurrentSearch
+      getReferrerFromCurrentSearch,
+      getIdentitySignature
     ]
   )
 
@@ -326,19 +319,9 @@ export const LoginPage = () => {
       setConfirmingLoginError(null)
 
       try {
-        const { account } = result
-        const address = account.address.toLowerCase()
+        const address = result.address.toLowerCase()
 
-        // Store address for clock sync continuation
-        setEmailLoginAddress(address)
-
-        // Generate identity using the thirdweb account's signMessage
-        const freshIdentity = await getIdentityWithSigner(address, async (message: string) => account.signMessage({ message }))
-
-        // Record the Thirdweb connection so tryPreviousConnection can restore it later.
-        // We skip connection.connect(ProviderType.THIRDWEB) because it creates a new
-        // inAppWallet() whose autoConnect fails to find the session authenticated above.
-        connection.storeConnectionData(ProviderType.THIRDWEB, ChainId.ETHEREUM_MAINNET)
+        await getIdentitySignature()
 
         await trackLoginSuccess({
           ethAddress: address,
@@ -350,7 +333,7 @@ export const LoginPage = () => {
         const isClockSync = await checkClockSynchronization()
 
         if (isClockSync) {
-          await runProfileRedirect(address, referrer, freshIdentity, () => setShowConfirmingLogin(false))
+          await runProfileRedirect(address, referrer, null, () => setShowConfirmingLogin(false))
         } else {
           // Clock sync failed - hide confirming overlay so modal is visible
           setShowConfirmingLogin(false)
@@ -364,7 +347,7 @@ export const LoginPage = () => {
         setConfirmingLoginError(errorMessage || t('login.errors.something_went_wrong'))
       }
     },
-    [trackLoginSuccess, checkClockSynchronization, runProfileRedirect, getReferrerFromCurrentSearch, t]
+    [trackLoginSuccess, checkClockSynchronization, runProfileRedirect, getReferrerFromCurrentSearch, getIdentitySignature, t]
   )
 
   const handleEmailInputChange = useCallback(() => {
@@ -397,34 +380,22 @@ export const LoginPage = () => {
   const handleClockSyncContinue = useCallback(async () => {
     setShowClockSyncModal(false)
 
+    if (!currentConnectionType) return
+
     const referrer = getReferrerFromCurrentSearch()
 
-    // Handle EMAIL login separately - use stored address instead of connectToProvider
-    if (currentConnectionType === ConnectionOptionType.EMAIL && emailLoginAddress) {
-      try {
-        const freshIdentity = localStorageGetIdentity(emailLoginAddress)
-        await runProfileRedirect(emailLoginAddress, referrer, freshIdentity)
-      } catch (error) {
-        handleError(error, 'Error during email clock sync continue flow')
-      }
+    if (requiresInjectedProvider(currentConnectionType) && !window.ethereum) {
+      handleError(new Error('No wallet extension detected'), 'Wallet extension not available for clock sync continue')
       return
     }
 
-    // Handle other connection types via connectToProvider
-    if (currentConnectionType) {
-      if (requiresInjectedProvider(currentConnectionType) && !window.ethereum) {
-        handleError(new Error('No wallet extension detected'), 'Wallet extension not available for clock sync continue')
-        return
-      }
-      try {
-        const connectionData = await connectToProvider(currentConnectionType)
-
-        await runProfileRedirect(connectionData.account ?? '', referrer, null, () => setShowConnectionLayout(false))
-      } catch (error) {
-        handleError(error, 'Error during clock sync continue flow')
-      }
+    try {
+      const connectionData = await connectToProvider(currentConnectionType)
+      await runProfileRedirect(connectionData.account ?? '', referrer, null, () => setShowConnectionLayout(false))
+    } catch (error) {
+      handleError(error, 'Error during clock sync continue flow')
     }
-  }, [currentConnectionType, emailLoginAddress, runProfileRedirect, getReferrerFromCurrentSearch])
+  }, [currentConnectionType, runProfileRedirect, getReferrerFromCurrentSearch])
 
   useEffect(() => {
     const images = NEW_USER_BACKGROUND_IMAGES
