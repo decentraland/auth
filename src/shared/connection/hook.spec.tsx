@@ -2,11 +2,13 @@ import { PropsWithChildren } from 'react'
 import { EventEmitter } from 'events'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { ProviderType } from '@dcl/schemas'
+import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
 import { ConnectionResponse, connection } from 'decentraland-connect'
 import { ConnectionData, getCurrentConnectionData } from './connection'
 import { ConnectionProvider, useCurrentConnectionData } from './ConnectionProvider'
 import { getIdentitySignature as getIdentitySignatureUtil } from './identity'
 
+jest.mock('@dcl/single-sign-on-client')
 jest.mock('./connection')
 jest.mock('./identity')
 jest.mock('decentraland-connect', () => ({
@@ -406,13 +408,11 @@ describe('useCurrentConnectionData', () => {
     })
 
     describe('and the new wallet has a stored identity', () => {
-      let updatedConnectionData: ConnectionData
+      let newIdentity: ConnectionData['identity']
 
       beforeEach(() => {
-        updatedConnectionData = createMockConnectionData({
-          account: '0x456',
-          provider: mockProvider
-        })
+        newIdentity = { ephemeralIdentity: {}, expiration: new Date(), authChain: {} } as ConnectionData['identity']
+        ;(localStorageGetIdentity as jest.Mock).mockReturnValue(newIdentity)
       })
 
       it('should update the account to the new wallet', async () => {
@@ -421,7 +421,6 @@ describe('useCurrentConnectionData', () => {
         await waitFor(() => {
           expect(result.current.account).toBe('0x123')
         })
-        ;(getCurrentConnectionData as jest.Mock).mockResolvedValue(updatedConnectionData)
 
         await act(async () => {
           ;(mockProvider as unknown as EventEmitter).emit('accountsChanged', ['0x456'])
@@ -429,25 +428,65 @@ describe('useCurrentConnectionData', () => {
 
         await waitFor(() => {
           expect(result.current.account).toBe('0x456')
+          expect(result.current.identity).toBe(newIdentity)
         })
       })
-    })
 
-    describe('and the new wallet has no stored identity', () => {
-      it('should clear the account', async () => {
+      it('should look up the identity from localStorage without reconnecting', async () => {
         const { result } = renderHook(() => useCurrentConnectionData(), { wrapper })
 
         await waitFor(() => {
           expect(result.current.account).toBe('0x123')
         })
-        ;(getCurrentConnectionData as jest.Mock).mockResolvedValue(null)
+        ;(getCurrentConnectionData as jest.Mock).mockClear()
+
+        await act(async () => {
+          ;(mockProvider as unknown as EventEmitter).emit('accountsChanged', ['0x456'])
+        })
+
+        expect(localStorageGetIdentity).toHaveBeenCalledWith('0x456')
+        expect(getCurrentConnectionData).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and the new wallet has no stored identity', () => {
+      beforeEach(() => {
+        ;(localStorageGetIdentity as jest.Mock).mockReturnValue(null)
+      })
+
+      it('should update the account with undefined identity', async () => {
+        const { result } = renderHook(() => useCurrentConnectionData(), { wrapper })
+
+        await waitFor(() => {
+          expect(result.current.account).toBe('0x123')
+        })
 
         await act(async () => {
           ;(mockProvider as unknown as EventEmitter).emit('accountsChanged', ['0x789'])
         })
 
         await waitFor(() => {
+          expect(result.current.account).toBe('0x789')
+          expect(result.current.identity).toBeUndefined()
+        })
+      })
+    })
+
+    describe('and the accounts array is empty', () => {
+      it('should clear the account and identity', async () => {
+        const { result } = renderHook(() => useCurrentConnectionData(), { wrapper })
+
+        await waitFor(() => {
+          expect(result.current.account).toBe('0x123')
+        })
+
+        await act(async () => {
+          ;(mockProvider as unknown as EventEmitter).emit('accountsChanged', [])
+        })
+
+        await waitFor(() => {
           expect(result.current.account).toBeUndefined()
+          expect(result.current.identity).toBeUndefined()
         })
       })
     })
@@ -456,25 +495,19 @@ describe('useCurrentConnectionData', () => {
   describe('when the provider emits chainChanged', () => {
     let mockProvider: ConnectionData['provider']
     let mockConnectionData: ConnectionData
-    let updatedConnectionData: ConnectionData
 
     beforeEach(() => {
       mockProvider = createMockProvider()
       mockConnectionData = createMockConnectionData({ provider: mockProvider })
-      updatedConnectionData = createMockConnectionData({
-        provider: mockProvider,
-        chainId: 137
-      })
       ;(getCurrentConnectionData as jest.Mock).mockResolvedValue(mockConnectionData)
     })
 
-    it('should update the chainId', async () => {
+    it('should update the chainId from the hex value', async () => {
       const { result } = renderHook(() => useCurrentConnectionData(), { wrapper })
 
       await waitFor(() => {
         expect(result.current.chainId).toBe(1)
       })
-      ;(getCurrentConnectionData as jest.Mock).mockResolvedValue(updatedConnectionData)
 
       await act(async () => {
         ;(mockProvider as unknown as EventEmitter).emit('chainChanged', '0x89')
@@ -483,6 +516,21 @@ describe('useCurrentConnectionData', () => {
       await waitFor(() => {
         expect(result.current.chainId).toBe(137)
       })
+    })
+
+    it('should not call getCurrentConnectionData again', async () => {
+      const { result } = renderHook(() => useCurrentConnectionData(), { wrapper })
+
+      await waitFor(() => {
+        expect(result.current.chainId).toBe(1)
+      })
+      ;(getCurrentConnectionData as jest.Mock).mockClear()
+
+      await act(async () => {
+        ;(mockProvider as unknown as EventEmitter).emit('chainChanged', '0x89')
+      })
+
+      expect(getCurrentConnectionData).not.toHaveBeenCalled()
     })
   })
 

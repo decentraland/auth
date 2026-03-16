@@ -1,6 +1,7 @@
 import { PropsWithChildren, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { AuthIdentity } from '@dcl/crypto'
 import { ProviderType } from '@dcl/schemas'
+import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
 import { ConnectionResponse, connection } from 'decentraland-connect'
 import { getCurrentConnectionData } from './connection'
 import { getIdentitySignature as getIdentitySignatureUtil } from './identity'
@@ -115,22 +116,29 @@ const ConnectionProvider = ({ children }: PropsWithChildren) => {
     const provider = state.provider
     if (!provider) return
 
-    const handleAccountsChanged = () => {
-      fetchConnectionData()
+    const handleAccountsChanged = (accounts: string[]) => {
+      const account = accounts[0]
+      if (!account) {
+        setState(prev => ({ ...prev, account: undefined, identity: undefined }))
+        return
+      }
+
+      const identity = localStorageGetIdentity(account) ?? undefined
+      setState(prev => ({ ...prev, account, identity }))
     }
 
-    const handleChainChanged = () => {
-      fetchConnectionData()
+    const handleChainChanged = (chainId: string) => {
+      setState(prev => ({ ...prev, chainId: parseInt(chainId, 16) }))
     }
 
     provider.on('accountsChanged', handleAccountsChanged)
     provider.on('chainChanged', handleChainChanged)
 
     return () => {
-      provider.removeListener('accountsChanged', handleAccountsChanged)
-      provider.removeListener('chainChanged', handleChainChanged)
+      provider.off('accountsChanged', handleAccountsChanged)
+      provider.off('chainChanged', handleChainChanged)
     }
-  }, [state.provider, fetchConnectionData])
+  }, [state.provider])
 
   const value = useMemo<ConnectionContextValue>(() => ({ ...state, getIdentitySignature }), [state, getIdentitySignature])
 
