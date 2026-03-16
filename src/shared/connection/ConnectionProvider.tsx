@@ -1,4 +1,4 @@
-import { PropsWithChildren, createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { PropsWithChildren, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { AuthIdentity } from '@dcl/crypto'
 import { ProviderType } from '@dcl/schemas'
 import { ConnectionResponse, connection } from 'decentraland-connect'
@@ -46,6 +46,9 @@ const ConnectionContext = createContext<ConnectionContextValue>(defaultValue)
 
 const ConnectionProvider = ({ children }: PropsWithChildren) => {
   const [state, setState] = useState<ConnectionState>(defaultState)
+  // Tracks an in-flight identity generation promise so that concurrent callers
+  // share a single wallet signature prompt instead of triggering duplicates.
+  const inflightIdentityRef = useRef<Promise<AuthIdentity> | null>(null)
 
   /**
    * Fetches the current connection data (account, identity, provider, etc.)
@@ -65,24 +68,42 @@ const ConnectionProvider = ({ children }: PropsWithChildren) => {
   }, [])
 
   const getIdentitySignature = useCallback(async (existingConnection?: ConnectionResponse): Promise<AuthIdentity> => {
-    const connectionResponse = existingConnection ?? (await connection.tryPreviousConnection())
-
-    if (!connectionResponse.account || !connectionResponse.provider) {
-      throw new Error('No active connection found')
+    // If an identity generation is already in progress, return the same promise
+    // to avoid prompting the user for a duplicate wallet signature.
+    if (inflightIdentityRef.current) {
+      return inflightIdentityRef.current
     }
 
-    const identity = await getIdentitySignatureUtil(connectionResponse.account, connectionResponse.provider)
+    const promise = (async () => {
+      const connectionResponse = existingConnection ?? (await connection.tryPreviousConnection())
 
-    setState({
-      isLoading: false,
-      account: connectionResponse.account,
-      identity,
-      provider: connectionResponse.provider,
-      providerType: connectionResponse.providerType,
-      chainId: connectionResponse.chainId
-    })
+      // Validate that all required fields are present, including providerType,
+      // to prevent downstream consumers from seeing an incomplete connection state.
+      if (!connectionResponse.account || !connectionResponse.provider || !connectionResponse.providerType) {
+        throw new Error('No active connection found')
+      }
 
-    return identity
+      const identity = await getIdentitySignatureUtil(connectionResponse.account, connectionResponse.provider)
+
+      setState({
+        isLoading: false,
+        account: connectionResponse.account,
+        identity,
+        provider: connectionResponse.provider,
+        providerType: connectionResponse.providerType,
+        chainId: connectionResponse.chainId
+      })
+
+      return identity
+    })()
+
+    inflightIdentityRef.current = promise
+
+    try {
+      return await promise
+    } finally {
+      inflightIdentityRef.current = null
+    }
   }, [])
 
   useEffect(() => {

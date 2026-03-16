@@ -116,6 +116,27 @@ describe('useCurrentConnectionData', () => {
     })
   })
 
+  describe('when the connection data is available but identity is undefined', () => {
+    let mockConnectionData: ConnectionData
+
+    beforeEach(() => {
+      mockConnectionData = createMockConnectionData({ identity: undefined })
+      ;(getCurrentConnectionData as jest.Mock).mockResolvedValue(mockConnectionData)
+    })
+
+    it('should return the account even without an identity', async () => {
+      const { result } = renderHook(() => useCurrentConnectionData(), { wrapper })
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false)
+        expect(result.current.account).toBe('0x123')
+        expect(result.current.identity).toBeUndefined()
+        expect(result.current.provider).toBe(mockConnectionData.provider)
+        expect(result.current.providerType).toBe(ProviderType.MAGIC)
+      })
+    })
+  })
+
   describe('when the connection data is null', () => {
     beforeEach(() => {
       ;(getCurrentConnectionData as jest.Mock).mockResolvedValue(null)
@@ -304,6 +325,75 @@ describe('useCurrentConnectionData', () => {
         })
 
         expect(getIdentitySignatureUtil).toHaveBeenCalledWith('0xdef', mockProvider)
+      })
+    })
+
+    describe('and the connection response is missing providerType', () => {
+      it('should throw an error', async () => {
+        ;(connection.tryPreviousConnection as jest.Mock).mockResolvedValue({
+          account: '0xabc',
+          provider: mockProvider,
+          providerType: undefined,
+          chainId: 1
+        })
+
+        const { result } = renderHook(() => useCurrentConnectionData(), { wrapper })
+
+        await waitFor(() => {
+          expect(result.current.isLoading).toBe(false)
+        })
+
+        await expect(
+          act(async () => {
+            await result.current.getIdentitySignature()
+          })
+        ).rejects.toThrow('No active connection found')
+      })
+    })
+
+    describe('and multiple callers invoke getIdentitySignature concurrently', () => {
+      beforeEach(() => {
+        ;(connection.tryPreviousConnection as jest.Mock).mockResolvedValue({
+          account: '0xabc',
+          provider: mockProvider,
+          providerType: ProviderType.MAGIC,
+          chainId: 1
+        })
+      })
+
+      it('should only call the identity signature utility once', async () => {
+        const { result } = renderHook(() => useCurrentConnectionData(), { wrapper })
+
+        await waitFor(() => {
+          expect(result.current.isLoading).toBe(false)
+        })
+
+        await act(async () => {
+          await Promise.all([result.current.getIdentitySignature(), result.current.getIdentitySignature()])
+        })
+
+        expect(getIdentitySignatureUtil).toHaveBeenCalledTimes(1)
+      })
+
+      it('should return the same identity to both callers', async () => {
+        const { result } = renderHook(() => useCurrentConnectionData(), { wrapper })
+
+        await waitFor(() => {
+          expect(result.current.isLoading).toBe(false)
+        })
+
+        let identity1: ConnectionData['identity']
+        let identity2: ConnectionData['identity']
+
+        await act(async () => {
+          ;[identity1, identity2] = await Promise.all([
+            result.current.getIdentitySignature(),
+            result.current.getIdentitySignature()
+          ])
+        })
+
+        expect(identity1).toBe(mockIdentity)
+        expect(identity2).toBe(mockIdentity)
       })
     })
   })
