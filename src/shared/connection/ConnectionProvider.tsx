@@ -131,12 +131,16 @@ const ConnectionProvider = ({ children }: PropsWithChildren) => {
       setState(prev => ({ ...prev, chainId: parseInt(chainId, 16) }))
     }
 
+    if (typeof provider.on !== 'function') return
+
     provider.on('accountsChanged', handleAccountsChanged)
     provider.on('chainChanged', handleChainChanged)
 
     return () => {
-      provider.off('accountsChanged', handleAccountsChanged)
-      provider.off('chainChanged', handleChainChanged)
+      if (typeof provider.off === 'function') {
+        provider.off('accountsChanged', handleAccountsChanged)
+        provider.off('chainChanged', handleChainChanged)
+      }
     }
   }, [state.provider])
 
