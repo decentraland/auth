@@ -135,8 +135,8 @@ const ConnectionProvider = ({ children }: PropsWithChildren) => {
     provider.on('chainChanged', handleChainChanged)
 
     return () => {
-      provider.removeListener('accountsChanged', handleAccountsChanged)
-      provider.removeListener('chainChanged', handleChainChanged)
+      provider.off('accountsChanged', handleAccountsChanged)
+      provider.off('chainChanged', handleChainChanged)
     }
   }, [state.provider])
 
