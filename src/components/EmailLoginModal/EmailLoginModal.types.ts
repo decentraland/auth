@@ -3,18 +3,9 @@ enum EmailLoginStep {
   ENTER_OTP = 'enter_otp'
 }
 
-/**
- * Minimal interface for thirdweb account used for DCL identity generation.
- * We only need address and signMessage capability.
- */
-type ThirdwebAccount = {
-  address: string
-  signMessage: (args: { message: string }) => Promise<`0x${string}`>
-}
-
 type EmailLoginResult = {
   email: string
-  account: ThirdwebAccount
+  address: string
 }
 
 type EmailLoginModalProps = {
@@ -27,4 +18,4 @@ type EmailLoginModalProps = {
 }
 
 export { EmailLoginStep }
-export type { ThirdwebAccount, EmailLoginResult, EmailLoginModalProps }
+export type { EmailLoginResult, EmailLoginModalProps }

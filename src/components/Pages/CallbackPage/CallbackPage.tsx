@@ -7,6 +7,7 @@ import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { useAnalytics } from '../../../hooks/useAnalytics'
 import { useAuthFlow } from '../../../hooks/useAuthFlow'
 import { ConnectionType } from '../../../modules/analytics/types'
+import { useCurrentConnectionData } from '../../../shared/connection'
 import { isMagicExtensionError, isMagicRpcError } from '../../../shared/errors'
 import { extractReferrerFromSearchParameters, locations } from '../../../shared/locations'
 import { isMobileSession } from '../../../shared/mobile'
@@ -16,7 +17,6 @@ import { AnimatedBackground } from '../../AnimatedBackground'
 import { ConnectionLayout } from '../../ConnectionModal/ConnectionLayout'
 import { ConnectionLayoutState } from '../../ConnectionModal/ConnectionLayout.type'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
-import { getIdentitySignature } from '../LoginPage/utils'
 import { MobileCallbackPage } from '../MobileCallbackPage/MobileCallbackPage'
 import { Container, Wrapper } from './CallbackPage.styled'
 
@@ -37,6 +37,7 @@ const DesktopCallbackPage = () => {
   const { initialized, flags } = useContext(FeatureFlagsContext)
   const { connectToMagic, checkProfileAndRedirect } = useAuthFlow()
   const { trackLoginSuccess } = useAnalytics()
+  const { getIdentitySignature } = useCurrentConnectionData()
 
   const connectAndGenerateSignature = useCallback(async () => {
     if (!initialized) {
@@ -53,10 +54,11 @@ const DesktopCallbackPage = () => {
     }
 
     if (connectionData.provider) {
-      await getIdentitySignature(connectionData.account.toLowerCase(), connectionData.provider)
+      await getIdentitySignature(connectionData)
     }
+
     return connectionData
-  }, [connectToMagic, initialized])
+  }, [connectToMagic, initialized, getIdentitySignature])
 
   const handleContinue = useCallback(
     async (referrer: string | null) => {

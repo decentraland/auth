@@ -10,7 +10,7 @@ export const DefaultPage = () => {
 
   useEffect(() => {
     getCurrentConnectionData().then(connectionData => {
-      if (connectionData) {
+      if (connectionData?.identity) {
         window.location.href = locations.home()
       } else {
         navigate(locations.login())

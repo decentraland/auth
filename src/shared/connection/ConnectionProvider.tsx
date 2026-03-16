@@ -1,10 +1,12 @@
-import { PropsWithChildren, createContext, useCallback, useContext, useEffect, useState } from 'react'
+import { PropsWithChildren, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { AuthIdentity } from '@dcl/crypto'
 import { ProviderType } from '@dcl/schemas'
-import { ConnectionResponse } from 'decentraland-connect'
+import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
+import { ConnectionResponse, connection } from 'decentraland-connect'
 import { getCurrentConnectionData } from './connection'
+import { getIdentitySignature as getIdentitySignatureUtil } from './identity'
 
-type ConnectionContextValue = {
+type ConnectionState = {
   isLoading: boolean
   account: string | undefined
   identity: AuthIdentity | undefined
@@ -13,7 +15,21 @@ type ConnectionContextValue = {
   chainId: number | undefined
 }
 
-const defaultValue: ConnectionContextValue = {
+type ConnectionContextValue = ConnectionState & {
+  /**
+   * Generates (or retrieves from localStorage) an identity for the currently
+   * connected wallet, then automatically refreshes the connection context.
+   *
+   * When called without arguments, it internally calls `tryPreviousConnection()`
+   * to obtain the provider and account.
+   *
+   * When a `ConnectionResponse` is passed (e.g. from a preceding `connection.connect()`
+   * call), it reuses that response directly, avoiding a redundant reconnection.
+   */
+  getIdentitySignature: (existingConnection?: ConnectionResponse) => Promise<AuthIdentity>
+}
+
+const defaultState: ConnectionState = {
   isLoading: true,
   account: undefined,
   identity: undefined,
@@ -21,15 +37,28 @@ const defaultValue: ConnectionContextValue = {
   providerType: undefined,
   chainId: undefined
 }
+
+const defaultValue: ConnectionContextValue = {
+  ...defaultState,
+  getIdentitySignature: () => Promise.reject(new Error('ConnectionProvider not mounted'))
+}
 // eslint-disable-next-line @typescript-eslint/naming-convention
 const ConnectionContext = createContext<ConnectionContextValue>(defaultValue)
 
 const ConnectionProvider = ({ children }: PropsWithChildren) => {
-  const [value, setValue] = useState<ConnectionContextValue>(defaultValue)
+  const [state, setState] = useState<ConnectionState>(defaultState)
+  // Tracks an in-flight identity generation promise so that concurrent callers
+  // share a single wallet signature prompt instead of triggering duplicates.
+  const inflightIdentityRef = useRef<Promise<AuthIdentity> | null>(null)
 
-  const refetchConnectionData = useCallback(async () => {
+  /**
+   * Fetches the current connection data (account, identity, provider, etc.)
+   * and updates the context state. Used on mount and when the provider emits
+   * wallet change events (accountsChanged, chainChanged).
+   */
+  const fetchConnectionData = useCallback(async () => {
     const connectionData = await getCurrentConnectionData()
-    setValue({
+    setState({
       isLoading: false,
       account: connectionData?.account,
       identity: connectionData?.identity,
@@ -39,40 +68,67 @@ const ConnectionProvider = ({ children }: PropsWithChildren) => {
     })
   }, [])
 
-  useEffect(() => {
-    let cancelled = false
-
-    const fetchConnectionData = async () => {
-      const connectionData = await getCurrentConnectionData()
-      if (cancelled) return
-      setValue({
-        isLoading: false,
-        account: connectionData?.account,
-        identity: connectionData?.identity,
-        provider: connectionData?.provider,
-        providerType: connectionData?.providerType,
-        chainId: connectionData?.chainId
-      })
+  const getIdentitySignature = useCallback(async (existingConnection?: ConnectionResponse): Promise<AuthIdentity> => {
+    // If an identity generation is already in progress, return the same promise
+    // to avoid prompting the user for a duplicate wallet signature.
+    if (inflightIdentityRef.current) {
+      return inflightIdentityRef.current
     }
 
-    fetchConnectionData()
+    const promise = (async () => {
+      const connectionResponse = existingConnection ?? (await connection.tryPreviousConnection())
 
-    return () => {
-      cancelled = true
+      // Validate that all required fields are present, including providerType,
+      // to prevent downstream consumers from seeing an incomplete connection state.
+      if (!connectionResponse.account || !connectionResponse.provider || !connectionResponse.providerType) {
+        throw new Error('No active connection found')
+      }
+
+      const identity = await getIdentitySignatureUtil(connectionResponse.account, connectionResponse.provider)
+
+      setState({
+        isLoading: false,
+        account: connectionResponse.account,
+        identity,
+        provider: connectionResponse.provider,
+        providerType: connectionResponse.providerType,
+        chainId: connectionResponse.chainId
+      })
+
+      return identity
+    })()
+
+    inflightIdentityRef.current = promise
+
+    try {
+      return await promise
+    } finally {
+      inflightIdentityRef.current = null
     }
   }, [])
 
+  useEffect(() => {
+    fetchConnectionData()
+  }, [fetchConnectionData])
+
   // Listen for wallet changes (account or chain switches) on the provider
   useEffect(() => {
-    const provider = value.provider
+    const provider = state.provider
     if (!provider) return
 
-    const handleAccountsChanged = () => {
-      refetchConnectionData()
+    const handleAccountsChanged = (accounts: string[]) => {
+      const account = accounts[0]
+      if (!account) {
+        setState(prev => ({ ...prev, account: undefined, identity: undefined }))
+        return
+      }
+
+      const identity = localStorageGetIdentity(account) ?? undefined
+      setState(prev => ({ ...prev, account, identity }))
     }
 
-    const handleChainChanged = () => {
-      refetchConnectionData()
+    const handleChainChanged = (chainId: string) => {
+      setState(prev => ({ ...prev, chainId: parseInt(chainId, 16) }))
     }
 
     provider.on('accountsChanged', handleAccountsChanged)
@@ -82,7 +138,9 @@ const ConnectionProvider = ({ children }: PropsWithChildren) => {
       provider.removeListener('accountsChanged', handleAccountsChanged)
       provider.removeListener('chainChanged', handleChainChanged)
     }
-  }, [value.provider, refetchConnectionData])
+  }, [state.provider])
+
+  const value = useMemo<ConnectionContextValue>(() => ({ ...state, getIdentitySignature }), [state, getIdentitySignature])
 
   return <ConnectionContext.Provider value={value}>{children}</ConnectionContext.Provider>
 }

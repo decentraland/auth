@@ -131,9 +131,12 @@ export const useAuthFlow = () => {
           if (consistencyResult.profile && consistencyResult.profileFetchedFrom && userIdentity) {
             try {
               await redeployExistingProfile(consistencyResult.profile, account, userIdentity, disabledCatalysts, fetcherWithTimeout)
-              // If redeployment succeeds, continue with the login flow
-              markReturningUser()
-              return redirect()
+              // If redeployment succeeds, check if profile is complete before redirecting
+              if (isProfileComplete(consistencyResult.profile)) {
+                markReturningUser()
+                return redirect()
+              }
+              // Profile exists but is incomplete — fall through to onboarding flow
             } catch (error) {
               console.warn('Profile redeployment failed, attempting to redeploy with content server data:', error)
               // If redeployment with lamb2 profile fails, try to redeploy with content server data
@@ -145,9 +148,12 @@ export const useAuthFlow = () => {
                   disabledCatalysts,
                   fetcherWithTimeout
                 )
-                // If redeployment succeeds, continue with the login flow
-                markReturningUser()
-                return redirect()
+                // If redeployment succeeds, check if profile is complete before redirecting
+                if (isProfileComplete(consistencyResult.profile)) {
+                  markReturningUser()
+                  return redirect()
+                }
+                // Profile exists but is incomplete — fall through to onboarding flow
               } catch (error) {
                 console.warn('Profile redeployment failed, falling back to onboarding:', error)
                 // Fall through to onboarding flow

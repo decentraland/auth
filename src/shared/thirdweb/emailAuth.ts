@@ -1,3 +1,6 @@
+import { ChainId } from '@dcl/schemas/dist/dapps/chain-id'
+import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
+import { connection } from 'decentraland-connect'
 import { getThirdwebClient } from './client'
 
 // Store the wallet instance for reuse
@@ -43,31 +46,22 @@ const sendEmailOTP = async (email: string): Promise<void> => {
 }
 
 /**
- * Verifies the OTP code and connects the wallet
- *
- * After the user receives the OTP via email, use this function to:
- * 1. Verify the code with thirdweb
- * 2. Create/access the user's wallet
- * 3. Return the connected account
+ * Verifies the OTP code, connects the thirdweb wallet, and records the
+ * connection so that `tryPreviousConnection` can restore it later.
  *
  * @param email - The email address used for authentication
  * @param verificationCode - The 6-digit OTP code from the email
- * @returns The connected wallet account with address and signing capabilities
+ * @returns The wallet address of the authenticated user
  * @throws Error if the code is invalid or expired
- *
- * @example
- * ```typescript
- * const account = await verifyEmailOTPAndConnect('user@example.com', '123456')
- * console.log('Connected as:', account.address)
- * ```
  *
  * @see https://portal.thirdweb.com/wallets/users
  */
-const verifyEmailOTPAndConnect = async (email: string, verificationCode: string) => {
+const verifyEmailOTPAndConnect = async (email: string, verificationCode: string): Promise<string> => {
   console.log('[Thirdweb] Verifying OTP for email:', email, 'code:', verificationCode)
   const client = await getThirdwebClient()
   const wallet = await getInAppWallet()
 
+  let address: string
   try {
     const account = await wallet.connect({
       client,
@@ -75,15 +69,23 @@ const verifyEmailOTPAndConnect = async (email: string, verificationCode: string)
       email,
       verificationCode
     })
+    address = account.address
     console.log('[Thirdweb] OTP verified successfully!', {
       address: account.address,
       hasSignMessage: typeof account.signMessage === 'function'
     })
-    return account
   } catch (error) {
     console.error('[Thirdweb] Error verifying OTP:', error)
     throw error
   }
+
+  // Record the Thirdweb connection so tryPreviousConnection can restore it later.
+  // The thirdweb session is persisted in browser localStorage keyed by clientId,
+  // so when tryPreviousConnection calls ThirdwebConnector.activate(), autoConnect
+  // finds the session authenticated above and returns an EIP-1193 provider.
+  connection.storeConnectionData(ProviderType.THIRDWEB, ChainId.ETHEREUM_MAINNET)
+
+  return address
 }
 
 /**
