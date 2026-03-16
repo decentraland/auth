@@ -146,5 +146,4 @@ describe('getIdentitySignature', () => {
       expect(mockLocalStorageStoreIdentity).toHaveBeenCalledWith(address, freshIdentity)
     })
   })
-
 })

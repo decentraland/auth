@@ -386,10 +386,7 @@ describe('useCurrentConnectionData', () => {
         let identity2: ConnectionData['identity']
 
         await act(async () => {
-          ;[identity1, identity2] = await Promise.all([
-            result.current.getIdentitySignature(),
-            result.current.getIdentitySignature()
-          ])
+          ;[identity1, identity2] = await Promise.all([result.current.getIdentitySignature(), result.current.getIdentitySignature()])
         })
 
         expect(identity1).toBe(mockIdentity)
