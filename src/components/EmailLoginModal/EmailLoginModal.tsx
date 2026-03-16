@@ -179,7 +179,7 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
 
       try {
         // Verify OTP and connect wallet using thirdweb
-        const account = await verifyOTPAndConnect(currentEmail, code)
+        const address = await verifyOTPAndConnect(currentEmail, code)
         console.log('[Thirdweb] OTP verified successfully!')
 
         // Store email for future reference
@@ -188,7 +188,7 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
         // Track OTP verification success
         trackEvent(TrackingEvents.OTP_VERIFICATION_SUCCESS, { email: currentEmail })
 
-        onSuccess({ email: currentEmail, account })
+        onSuccess({ email: currentEmail, address })
       } catch (e) {
         const errorMessage = handleError(e, 'Error verifying OTP')
         setError(
