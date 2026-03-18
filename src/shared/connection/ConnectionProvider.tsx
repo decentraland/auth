@@ -1,10 +1,9 @@
 import { PropsWithChildren, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { AuthIdentity } from '@dcl/crypto'
 import { ProviderType } from '@dcl/schemas'
-import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
 import { ConnectionResponse, connection } from 'decentraland-connect'
 import { getCurrentConnectionData } from './connection'
-import { getIdentitySignature as getIdentitySignatureUtil } from './identity'
+import { getCachedIdentity, getIdentitySignature as getIdentitySignatureUtil } from './identity'
 
 type ConnectionState = {
   isLoading: boolean
@@ -119,11 +118,20 @@ const ConnectionProvider = ({ children }: PropsWithChildren) => {
     const handleAccountsChanged = (accounts: string[]) => {
       const account = accounts[0]
       if (!account) {
-        setState(prev => ({ ...prev, account: undefined, identity: undefined }))
+        // Wallet disconnected — clear all connection state so downstream consumers
+        // (e.g. RequestPage checking !provider || !providerType) detect the disconnect.
+        setState(prev => ({
+          ...prev,
+          account: undefined,
+          identity: undefined,
+          provider: undefined,
+          providerType: undefined,
+          chainId: undefined
+        }))
         return
       }
 
-      const identity = localStorageGetIdentity(account) ?? undefined
+      const identity = getCachedIdentity(account)
       setState(prev => ({ ...prev, account, identity }))
     }
 

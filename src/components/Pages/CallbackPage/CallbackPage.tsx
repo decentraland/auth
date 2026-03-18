@@ -2,15 +2,18 @@ import { useCallback, useContext, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { ProviderType } from '@dcl/schemas'
 import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
+import { connection } from 'decentraland-connect'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
+import { useTargetConfig } from '../../../hooks/targetConfig'
 import { useAnalytics } from '../../../hooks/useAnalytics'
-import { useAuthFlow } from '../../../hooks/useAuthFlow'
+import { useEnsureProfile } from '../../../hooks/useEnsureProfile'
 import { ConnectionType } from '../../../modules/analytics/types'
 import { useCurrentConnectionData } from '../../../shared/connection'
 import { isMagicExtensionError, isMagicRpcError } from '../../../shared/errors'
 import { extractReferrerFromSearchParameters, locations } from '../../../shared/locations'
 import { isMobileSession } from '../../../shared/mobile'
+import { markReturningUser } from '../../../shared/onboarding/markReturningUser'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { OAUTH_ACCESS_DENIED_ERROR, createMagicInstance } from '../../../shared/utils/magicSdk'
 import { AnimatedBackground } from '../../AnimatedBackground'
@@ -35,7 +38,8 @@ const DesktopCallbackPage = () => {
   const [searchParams] = useSearchParams()
   const [logInStarted, setLogInStarted] = useState(false)
   const { initialized, flags } = useContext(FeatureFlagsContext)
-  const { connectToMagic, checkProfileAndRedirect } = useAuthFlow()
+  const [targetConfig] = useTargetConfig()
+  const { ensureProfile } = useEnsureProfile()
   const { trackLoginSuccess } = useAnalytics()
   const { getIdentitySignature } = useCurrentConnectionData()
 
@@ -44,7 +48,8 @@ const DesktopCallbackPage = () => {
       return undefined
     }
 
-    const connectionData = await connectToMagic()
+    const providerType = flags[FeatureFlagsKeys.MAGIC_TEST] ? ProviderType.MAGIC_TEST : ProviderType.MAGIC
+    const connectionData = await connection.connect(providerType)
     if (!connectionData) {
       return undefined
     }
@@ -58,7 +63,7 @@ const DesktopCallbackPage = () => {
     }
 
     return connectionData
-  }, [connectToMagic, initialized, getIdentitySignature])
+  }, [flags[FeatureFlagsKeys.MAGIC_TEST], initialized, getIdentitySignature])
 
   const handleContinue = useCallback(
     async (referrer: string | null) => {
@@ -79,16 +84,23 @@ const DesktopCallbackPage = () => {
           type: ConnectionType.WEB2
         })
 
-        // Get the freshly generated identity from localStorage for Magic flow
-        const freshIdentity = localStorageGetIdentity(ethAddress)
+        const account = connectionData.account ?? ''
 
-        await checkProfileAndRedirect(connectionData.account ?? '', referrer, redirect, freshIdentity, { replace: true })
+        if (targetConfig && !targetConfig.skipSetup && account) {
+          // Get the freshly generated identity from localStorage for Magic flow
+          const freshIdentity = localStorageGetIdentity(ethAddress)
+          const profile = await ensureProfile(account, freshIdentity, { redirectTo, referrer, navigateOptions: { replace: true } })
+          if (!profile) return
+        }
+
+        markReturningUser(account)
+        redirect()
       } catch (error) {
         handleError(error, 'Error in callback continue flow')
         navigate(locations.login(), { replace: true })
       }
     },
-    [navigate, connectAndGenerateSignature, redirect, trackLoginSuccess, checkProfileAndRedirect, initialized]
+    [navigate, connectAndGenerateSignature, redirect, trackLoginSuccess, initialized, targetConfig?.skipSetup, redirectTo, ensureProfile]
   )
 
   const logInAndRedirect = useCallback(async () => {

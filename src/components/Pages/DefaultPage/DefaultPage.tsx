@@ -16,7 +16,7 @@ export const DefaultPage = () => {
         navigate(locations.login())
       }
     })
-  }, [getCurrentConnectionData, navigate])
+  }, [navigate])
 
   return (
     <div className={styles.main}>

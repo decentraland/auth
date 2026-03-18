@@ -49,19 +49,28 @@ async function generateIdentity(address: string, provider: Provider): Promise<Au
   return generateIdentityWithSigner(address, message => walletClient.signMessage({ account, message }))
 }
 
+/**
+ * Retrieves a cached identity from localStorage and validates its structure.
+ * Returns undefined if no identity is cached or if it is structurally invalid
+ * (e.g. double-encoded hex keys).
+ */
+function getCachedIdentity(address: string): AuthIdentity | undefined {
+  const cached = localStorageGetIdentity(address)
+  if (!cached || !isValidIdentity(cached)) {
+    return undefined
+  }
+  return cached
+}
+
 async function getIdentitySignature(address: string, provider: Provider): Promise<AuthIdentity> {
-  let identity: AuthIdentity
-
-  const ssoIdentity = localStorageGetIdentity(address)
-
-  if (!ssoIdentity || !isValidIdentity(ssoIdentity)) {
-    identity = await generateIdentity(address, provider)
-    localStorageStoreIdentity(address, identity)
-  } else {
-    identity = ssoIdentity
+  const cached = getCachedIdentity(address)
+  if (cached) {
+    return cached
   }
 
+  const identity = await generateIdentity(address, provider)
+  localStorageStoreIdentity(address, identity)
   return identity
 }
 
-export { getIdentitySignature }
+export { getIdentitySignature, isValidIdentity, getCachedIdentity }
