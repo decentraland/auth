@@ -177,10 +177,7 @@ describe('deployProfileFromAvatarShape', () => {
 
       expect(mockContentClient.deploy).toHaveBeenCalledTimes(1)
       expect(mockSecondContentClient.deploy).toHaveBeenCalledTimes(1)
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to deploy profile from avatar shape on'),
-        expect.any(Error)
-      )
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Failed to deploy profile from avatar shape on'), expect.any(Error))
 
       consoleSpy.mockRestore()
     })

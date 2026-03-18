@@ -53,7 +53,9 @@ const ConnectionLayout = React.memo((props: ConnectionLayoutProps) => {
     state === ConnectionLayoutState.VALIDATING_SIGN_IN
 
   const isError =
-    state === ConnectionLayoutState.ERROR || state === ConnectionLayoutState.ERROR_LOCKED_WALLET || state === ConnectionLayoutState.ERROR_GENERIC
+    state === ConnectionLayoutState.ERROR ||
+    state === ConnectionLayoutState.ERROR_LOCKED_WALLET ||
+    state === ConnectionLayoutState.ERROR_GENERIC
 
   const handleTryAgain = useCallback(() => {
     onTryAgain()
