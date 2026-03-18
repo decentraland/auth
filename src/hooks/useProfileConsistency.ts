@@ -24,7 +24,6 @@ export const useProfileConsistency = () => {
       fetcher?: IFetchComponent
     ): Promise<CheckProfileConsistencyResult> => {
       const consistencyResult = await fetchProfileWithConsistencyCheck(account, disabledCatalysts, fetcher)
-      console.log('Profile consistency check result', consistencyResult)
 
       if (!consistencyResult.isConsistent && consistencyResult.profile && identity) {
         try {

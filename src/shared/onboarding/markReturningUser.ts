@@ -17,13 +17,11 @@ export function markReturningUser(account: string) {
       wallet: account.toLowerCase()
     })
   }
-  if (account) {
-    trackCheckpoint({
-      checkpointId: 2,
-      action: 'completed',
-      userIdentifier: account,
-      identifierType: 'wallet',
-      wallet: account.toLowerCase()
-    })
-  }
+  trackCheckpoint({
+    checkpointId: 2,
+    action: 'completed',
+    userIdentifier: account,
+    identifierType: 'wallet',
+    wallet: account.toLowerCase()
+  })
 }
