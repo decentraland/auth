@@ -1,21 +1,18 @@
 import { DeploymentBuilder, createContentClient } from 'dcl-catalyst-client'
-import { getCatalystServersFromCache } from 'dcl-catalyst-client/dist/contracts-snapshots'
 import { Authenticator } from '@dcl/crypto'
 import { EntityType } from '@dcl/schemas'
-import { config } from '../../../modules/config'
+import { getCatalystUrlsForRotation } from '../../../modules/profile'
 import { deployProfileFromAvatarShape } from './utils'
 import { AvatarShape, Color, DeploymentParams } from './AvatarSetupPage.types'
 
-jest.mock('../../../modules/config')
+jest.mock('../../../modules/profile')
 jest.mock('dcl-catalyst-client')
-jest.mock('dcl-catalyst-client/dist/contracts-snapshots')
 jest.mock('@dcl/crypto')
 
-const mockConfig = config as jest.Mocked<typeof config>
 const mockCreateContentClient = createContentClient as jest.MockedFunction<typeof createContentClient>
 const mockDeploymentBuilder = DeploymentBuilder as jest.Mocked<typeof DeploymentBuilder>
 const mockAuthenticator = Authenticator as jest.Mocked<typeof Authenticator>
-const mockGetCatalystServersFromCache = getCatalystServersFromCache as jest.MockedFunction<typeof getCatalystServersFromCache>
+const mockGetCatalystUrlsForRotation = getCatalystUrlsForRotation as jest.MockedFunction<typeof getCatalystUrlsForRotation>
 
 describe('deployProfileFromAvatarShape', () => {
   let mockParams: DeploymentParams
@@ -71,16 +68,11 @@ describe('deployProfileFromAvatarShape', () => {
       deploy: jest.fn().mockResolvedValue(undefined)
     }
 
-    mockConfig.get.mockImplementation((key: string, defaultValue?: string) => {
-      if (key === 'PEER_URL') return mockPeerUrl
-      if (key === 'ENVIRONMENT') return 'production'
-      return defaultValue ?? ''
-    })
-    mockGetCatalystServersFromCache.mockReturnValue([
-      { address: mockPeerUrl, owner: '0x1' },
-      { address: 'https://peer-ec1.decentraland.org', owner: '0x2' },
-      { address: 'https://peer-ec2.decentraland.org', owner: '0x3' }
-    ] as unknown as ReturnType<typeof getCatalystServersFromCache>)
+    mockGetCatalystUrlsForRotation.mockReturnValue([
+      mockPeerUrl + '/content',
+      'https://peer-ec1.decentraland.org/content',
+      'https://peer-ec2.decentraland.org/content'
+    ])
     mockCreateContentClient.mockReturnValue(mockContentClient as unknown as ReturnType<typeof createContentClient>)
     mockDeploymentBuilder.buildEntity.mockResolvedValue(
       mockBuiltEntity as unknown as Awaited<ReturnType<typeof DeploymentBuilder.buildEntity>>
@@ -92,7 +84,6 @@ describe('deployProfileFromAvatarShape', () => {
     it('should create content client with correct URL', async () => {
       await expect(deployProfileFromAvatarShape(mockParams)).resolves.not.toThrow()
 
-      expect(mockConfig.get).toHaveBeenCalledWith('PEER_URL', '')
       expect(mockCreateContentClient).toHaveBeenCalledWith({
         url: mockPeerUrl + '/content',
         fetcher: expect.anything()

@@ -1,9 +1,7 @@
 import { DeploymentBuilder, createContentClient } from 'dcl-catalyst-client'
-import { getCatalystServersFromCache } from 'dcl-catalyst-client/dist/contracts-snapshots'
-import { L1Network } from '@dcl/catalyst-contracts'
 import { Authenticator } from '@dcl/crypto'
 import { Avatar, EntityType } from '@dcl/schemas'
-import { config } from '../../../modules/config'
+import { getCatalystUrlsForRotation } from '../../../modules/profile'
 import { fetcher } from '../../../shared/fetcher'
 import { CreateAvatarMetadataParams, DeploymentParams } from './AvatarSetupPage.types'
 
@@ -34,20 +32,6 @@ const createAvatarMetadata = ({ avatarShape, connectedAccount, deploymentProfile
 }
 
 /**
- * Returns content API URLs for all available catalysts, with the configured PEER_URL first.
- * Used for deployment rotation — if the primary catalyst fails, subsequent URLs are tried in order.
- * @returns Content URLs in the form `{catalystAddress}/content`
- */
-function getCatalystContentUrls(): string[] {
-  const peerUrl = config.get('PEER_URL', '')
-  const environment = config.get('ENVIRONMENT')
-  const network: L1Network = environment === 'development' ? 'sepolia' : 'mainnet'
-  const catalystServers = getCatalystServersFromCache(network).filter(server => server.address !== peerUrl)
-
-  return [peerUrl + '/content', ...catalystServers.map(server => server.address + '/content')]
-}
-
-/**
  * Deploys a user profile to the Decentraland catalyst based on avatar shape configuration.
  * Rotates through available catalysts on network failures.
  * @param params - Deployment parameters including avatar shape and account info
@@ -73,7 +57,7 @@ const deployProfileFromAvatarShape = async ({
     files: new Map()
   })
 
-  const catalystUrls = getCatalystContentUrls()
+  const catalystUrls = getCatalystUrlsForRotation()
 
   for (let attempt = 0; attempt < catalystUrls.length; attempt++) {
     const catalystUrl = catalystUrls[attempt]

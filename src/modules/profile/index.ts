@@ -224,6 +224,12 @@ async function attemptRedeployment(
   })
 }
 
+/**
+ * Returns content API URLs for all available catalysts, with the configured PEER_URL first.
+ * Used for deployment rotation — if the primary catalyst fails, subsequent URLs are tried in order.
+ * @param disabledCatalysts - Catalyst addresses to exclude from the list
+ * @returns Content URLs in the form `{catalystAddress}/content`
+ */
 function getCatalystUrlsForRotation(disabledCatalysts: string[] = []): string[] {
   const PEER_URL = config.get('PEER_URL')
   const environment = config.get('ENVIRONMENT')
@@ -326,5 +332,5 @@ function isProfileResultError(result: ProfileResult | ProfileResultError): resul
   return 'error' in result
 }
 
-export { fetchProfile, fetchProfileWithConsistencyCheck, redeployExistingProfile, redeployExistingProfileWithContentServerData }
+export { fetchProfile, fetchProfileWithConsistencyCheck, getCatalystUrlsForRotation, redeployExistingProfile, redeployExistingProfileWithContentServerData }
 export type { ConsistencyResult }
