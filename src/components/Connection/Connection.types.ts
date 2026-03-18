@@ -6,6 +6,7 @@ enum SignInOptionsMode {
 
 enum ConnectionOptionType {
   METAMASK = 'metamask',
+  PHANTOM = 'phantom',
   DAPPER = 'dapper',
   FORTMATIC = 'fortmatic',
   COINBASE = 'coinbase',
@@ -22,6 +23,7 @@ enum ConnectionOptionType {
 
 const connectionOptionTitles: { [key in ConnectionOptionType]: string } = {
   [ConnectionOptionType.METAMASK]: 'MetaMask',
+  [ConnectionOptionType.PHANTOM]: 'Phantom',
   [ConnectionOptionType.DAPPER]: 'Dapper',
   [ConnectionOptionType.FORTMATIC]: 'Fortmatic',
   [ConnectionOptionType.COINBASE]: 'Coinbase',
@@ -37,6 +39,8 @@ const connectionOptionTitles: { [key in ConnectionOptionType]: string } = {
 }
 
 type MetamaskEthereumWindow = typeof window.ethereum & { isMetaMask?: boolean }
+
+type PhantomEthereumWindow = typeof window.ethereum & { isPhantom?: boolean }
 
 type ConnectionProps = {
   shouldShowGoogleOptionAsPrimary?: boolean
@@ -57,4 +61,4 @@ type ConnectionProps = {
 }
 
 export { SignInOptionsMode, ConnectionOptionType, connectionOptionTitles }
-export type { MetamaskEthereumWindow, ConnectionProps }
+export type { MetamaskEthereumWindow, PhantomEthereumWindow, ConnectionProps }

@@ -6,11 +6,12 @@ import { requiresInjectedProvider } from '../components/Pages/LoginPage/utils'
 /**
  * Login method types that can be passed via URL parameters
  */
-type LoginMethod = 'email' | 'metamask' | 'google' | 'discord' | 'apple' | 'x' | 'fortmatic' | 'coinbase' | 'walletconnect'
+type LoginMethod = 'email' | 'metamask' | 'phantom' | 'google' | 'discord' | 'apple' | 'x' | 'fortmatic' | 'coinbase' | 'walletconnect'
 
 const VALID_LOGIN_METHODS: LoginMethod[] = [
   'email',
   'metamask',
+  'phantom',
   'google',
   'discord',
   'apple',
@@ -56,6 +57,8 @@ function mapLoginMethodToConnectionOption(method: LoginMethod): ConnectionOption
       return ConnectionOptionType.EMAIL
     case 'metamask':
       return ConnectionOptionType.METAMASK
+    case 'phantom':
+      return ConnectionOptionType.PHANTOM
     case 'google':
       return ConnectionOptionType.GOOGLE
     case 'discord':
@@ -82,6 +85,7 @@ function mapLoginMethodToConnectionOption(method: LoginMethod): ConnectionOption
  * Supported login methods:
  * - email: Thirdweb email OTP flow
  * - metamask: MetaMask wallet
+ * - phantom: Phantom wallet
  * - google: Google OAuth via Magic
  * - discord: Discord OAuth via Magic
  * - apple: Apple OAuth via Magic
@@ -93,6 +97,7 @@ function mapLoginMethodToConnectionOption(method: LoginMethod): ConnectionOption
  * Examples:
  * - /auth/login?loginMethod=email → Opens email OTP modal
  * - /auth/login?loginMethod=metamask → Opens MetaMask connection
+ * - /auth/login?loginMethod=phantom → Opens Phantom connection
  * - /auth/login?loginMethod=google&redirectTo=/play → Opens Google OAuth
  */
 const useAutoLogin = ({ isReady, onConnect }: UseAutoLoginOptions): UseAutoLoginResult => {

@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { ConnectionOptionType, SignInOptionsMode } from '../components/Connection/Connection.types'
+import { isPhantomAvailable } from '../components/Pages/LoginPage/utils'
 
 type ConnectionOptions = {
   primary: ConnectionOptionType
@@ -46,16 +47,21 @@ export const useWalletOptions = ({ connectionOptions, signInOptionsMode }: UseWa
 
     // For ONE and TWO modes: determine which wallet options to show
     const hasEthereumProvider = !!window.ethereum
+    const hasPhantom = isPhantomAvailable()
     const googleOption = allWalletOptions.find(opt => opt === ConnectionOptionType.GOOGLE)
     const metamaskOption = allWalletOptions.find(opt => opt === ConnectionOptionType.METAMASK)
+    const phantomOption = allWalletOptions.find(opt => opt === ConnectionOptionType.PHANTOM)
+    
+    // Determine which wallet to show: Phantom if available, otherwise MetaMask
+    const walletOption = hasPhantom && phantomOption ? phantomOption : metamaskOption
 
-    // TWO mode: Show Google + MetaMask (if Ethereum provider exists)
+    // TWO mode: Show Google + wallet (Phantom or MetaMask, depending on availability)
     if (signInOptionsMode === SignInOptionsMode.TWO) {
-      if (hasEthereumProvider && metamaskOption) {
+      if (hasEthereumProvider && walletOption) {
         return {
           firstWalletOption: googleOption,
-          secondWalletOption: metamaskOption,
-          remainingWalletOptions: allWalletOptions.filter(opt => opt !== googleOption && opt !== metamaskOption)
+          secondWalletOption: walletOption,
+          remainingWalletOptions: allWalletOptions.filter(opt => opt !== googleOption && opt !== walletOption)
         }
       }
 
@@ -67,18 +73,18 @@ export const useWalletOptions = ({ connectionOptions, signInOptionsMode }: UseWa
       }
     }
 
-    // ONE mode: Show MetaMask (if Ethereum provider exists) or nothing
-    if (hasEthereumProvider && metamaskOption) {
+    // ONE mode: Show wallet (Phantom or MetaMask, depending on availability) or nothing
+    if (hasEthereumProvider && walletOption) {
       return {
-        firstWalletOption: metamaskOption,
+        firstWalletOption: walletOption,
         secondWalletOption: undefined,
-        remainingWalletOptions: allWalletOptions.filter(opt => opt !== metamaskOption)
+        remainingWalletOptions: allWalletOptions.filter(opt => opt !== walletOption)
       }
     }
 
-    // No Ethereum provider: All go to "More options" (Google first, MetaMask second)
-    const otherOptions = allWalletOptions.filter(opt => opt !== googleOption && opt !== metamaskOption)
-    const orderedOptions = [googleOption, metamaskOption, ...otherOptions].filter((opt): opt is ConnectionOptionType => opt !== undefined)
+    // No Ethereum provider: All go to "More options" (Google first, wallet second)
+    const otherOptions = allWalletOptions.filter(opt => opt !== googleOption && opt !== walletOption)
+    const orderedOptions = [googleOption, walletOption, ...otherOptions].filter((opt): opt is ConnectionOptionType => opt !== undefined)
 
     return {
       firstWalletOption: undefined,

@@ -22,6 +22,7 @@ function fromConnectionOptionToProviderType(connectionType: ConnectionOptionType
     case ConnectionOptionType.FORTMATIC:
       return ProviderType.FORTMATIC
     case ConnectionOptionType.METAMASK:
+    case ConnectionOptionType.PHANTOM:
     case ConnectionOptionType.DAPPER:
     case ConnectionOptionType.SAMSUNG:
       return ProviderType.INJECTED
@@ -86,11 +87,21 @@ function requiresInjectedProvider(connectionOption: ConnectionOptionType): boole
   return fromConnectionOptionToProviderType(connectionOption) === ProviderType.INJECTED
 }
 
+function isPhantomAvailable(): boolean {
+  return !!(window.ethereum && (window.ethereum as any).isPhantom)
+}
+
 async function connectToProvider(connectionOption: ConnectionOptionType): Promise<ConnectionResponse> {
   const providerType = fromConnectionOptionToProviderType(connectionOption)
 
   if (providerType === ProviderType.INJECTED && !window.ethereum) {
-    throw new Error('No wallet extension detected. Please install MetaMask or another Ethereum wallet.')
+    const walletName = connectionOption === ConnectionOptionType.PHANTOM ? 'Phantom' : 'MetaMask or another Ethereum'
+    throw new Error(`No wallet extension detected. Please install ${walletName} wallet.`)
+  }
+  
+  // Validate that Phantom is actually available when user selects Phantom
+  if (connectionOption === ConnectionOptionType.PHANTOM && !isPhantomAvailable()) {
+    throw new Error('Phantom wallet not detected. Please install Phantom wallet extension.')
   }
 
   // Clear stale WalletConnect/AppKit data to prevent session conflicts
@@ -161,6 +172,7 @@ export {
   connectToSocialProvider,
   connectToProvider,
   requiresInjectedProvider,
+  isPhantomAvailable,
   isSocialLogin,
   isEmailLogin,
   isMobile,

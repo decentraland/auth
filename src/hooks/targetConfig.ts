@@ -27,6 +27,7 @@ const defaultConfig: TargetConfig = {
     primary: ConnectionOptionType.EMAIL,
     secondary: ConnectionOptionType.METAMASK,
     extraOptions: [
+      ConnectionOptionType.PHANTOM,
       ConnectionOptionType.GOOGLE,
       ConnectionOptionType.DISCORD,
       ConnectionOptionType.APPLE,
@@ -62,6 +63,7 @@ const targetConfigs: Record<TargetConfigId, TargetConfig> = {
       primary: ConnectionOptionType.APPLE,
       secondary: ConnectionOptionType.WALLET_CONNECT,
       extraOptions: [
+        ConnectionOptionType.PHANTOM,
         ConnectionOptionType.GOOGLE,
         ConnectionOptionType.DISCORD,
         ConnectionOptionType.X,
@@ -76,6 +78,7 @@ const targetConfigs: Record<TargetConfigId, TargetConfig> = {
       primary: ConnectionOptionType.GOOGLE,
       secondary: ConnectionOptionType.WALLET_CONNECT,
       extraOptions: [
+        ConnectionOptionType.PHANTOM,
         ConnectionOptionType.DISCORD,
         ConnectionOptionType.APPLE,
         ConnectionOptionType.X,

@@ -8,6 +8,7 @@ import discordSvg from '../../assets/images/discord.svg'
 import fortmaticPng from '../../assets/images/fortmatic.png'
 import googleSvg from '../../assets/images/google.svg'
 import metamaskSvg from '../../assets/images/metamask.svg'
+import phantomSvg from '../../assets/images/phantom.svg'
 import samsungSvg from '../../assets/images/samsung-blockchain-wallet.svg'
 import walletConnectPng from '../../assets/images/wallet-connect.png'
 import xSvg from '../../assets/images/x.svg'
@@ -70,6 +71,12 @@ export const ConnectionIcon = ({ type }: ConnectionIconProps): JSX.Element | nul
       return (
         <IconWrapper {...iconProps}>
           <SvgIcon component={createIconComponent(metamaskSvg)} fontSize="large" />
+        </IconWrapper>
+      )
+    case ConnectionOptionType.PHANTOM:
+      return (
+        <IconWrapper {...iconProps}>
+          <SvgIcon component={createIconComponent(phantomSvg)} fontSize="large" />
         </IconWrapper>
       )
     case ConnectionOptionType.METAMASK_MOBILE:
