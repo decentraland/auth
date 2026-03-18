@@ -5,12 +5,24 @@ import { useTranslation } from '@dcl/hooks'
 import { ProviderType } from '@dcl/schemas'
 import { Button, CircularProgress } from 'decentraland-ui2'
 import { type ConnectionLayoutProps, ConnectionLayoutState } from './ConnectionLayout.type'
-import { ConnectionContainer, ConnectionTitle, DecentralandLogo, ErrorButtonContainer, ProgressContainer } from './ConnectionLayout.styled'
+import {
+  ConnectionContainer,
+  ConnectionTitle,
+  DecentralandLogo,
+  ErrorButtonContainer,
+  ErrorDescription,
+  ErrorDetail,
+  ErrorDetailContainer,
+  ProgressContainer
+} from './ConnectionLayout.styled'
 
 const getConnectionLayoutMessage = (loadingState: ConnectionLayoutState, providerType: ProviderType | null, t: (key: string) => string) => {
   switch (loadingState) {
     case ConnectionLayoutState.ERROR: {
       return t('connection_layout.error')
+    }
+    case ConnectionLayoutState.ERROR_GENERIC: {
+      return t('connection_layout.error_generic')
     }
     case ConnectionLayoutState.ERROR_LOCKED_WALLET: {
       return t('connection_layout.error_locked_wallet')
@@ -31,7 +43,7 @@ const getConnectionLayoutMessage = (loadingState: ConnectionLayoutState, provide
 }
 
 const ConnectionLayout = React.memo((props: ConnectionLayoutProps) => {
-  const { onTryAgain, state, providerType } = props
+  const { onTryAgain, state, providerType, errorDetail } = props
   const { t } = useTranslation()
 
   const isLoading =
@@ -40,7 +52,8 @@ const ConnectionLayout = React.memo((props: ConnectionLayoutProps) => {
     state === ConnectionLayoutState.LOADING_MAGIC ||
     state === ConnectionLayoutState.VALIDATING_SIGN_IN
 
-  const isError = state === ConnectionLayoutState.ERROR || state === ConnectionLayoutState.ERROR_LOCKED_WALLET
+  const isError =
+    state === ConnectionLayoutState.ERROR || state === ConnectionLayoutState.ERROR_LOCKED_WALLET || state === ConnectionLayoutState.ERROR_GENERIC
 
   const handleTryAgain = useCallback(() => {
     onTryAgain()
@@ -56,11 +69,19 @@ const ConnectionLayout = React.memo((props: ConnectionLayoutProps) => {
         </ProgressContainer>
       )}
       {isError && (
-        <ErrorButtonContainer>
-          <Button data-testid="connection-try-again-button" variant="contained" onClick={handleTryAgain}>
-            {t('common.try_again')}
-          </Button>
-        </ErrorButtonContainer>
+        <>
+          {errorDetail && (
+            <ErrorDetailContainer>
+              <ErrorDescription>{t('connection_layout.error_contact_support')}</ErrorDescription>
+              <ErrorDetail data-testid="connection-error-detail">{errorDetail}</ErrorDetail>
+            </ErrorDetailContainer>
+          )}
+          <ErrorButtonContainer>
+            <Button data-testid="connection-try-again-button" variant="contained" onClick={handleTryAgain}>
+              {t('common.try_again')}
+            </Button>
+          </ErrorButtonContainer>
+        </>
       )}
     </ConnectionContainer>
   )

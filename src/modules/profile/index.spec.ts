@@ -489,8 +489,9 @@ describe('profile module', () => {
         await redeployExistingProfile(mockProfile, mockAddress, mockIdentity, [], mockFetcher).catch(() => undefined)
       })
 
-      it('should attempt up to 3 catalysts maximum', () => {
-        expect(deployCallUrls.length).toBe(3)
+      it('should attempt all available catalysts', () => {
+        // PEER_URL + 4 catalysts from cache (PEER_URL is excluded from cache list) = 5
+        expect(deployCallUrls.length).toBe(5)
       })
 
       it('should start with the PEER_URL', () => {

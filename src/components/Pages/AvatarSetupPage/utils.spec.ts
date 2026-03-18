@@ -1,4 +1,5 @@
 import { DeploymentBuilder, createContentClient } from 'dcl-catalyst-client'
+import { getCatalystServersFromCache } from 'dcl-catalyst-client/dist/contracts-snapshots'
 import { Authenticator } from '@dcl/crypto'
 import { EntityType } from '@dcl/schemas'
 import { config } from '../../../modules/config'
@@ -7,12 +8,14 @@ import { AvatarShape, Color, DeploymentParams } from './AvatarSetupPage.types'
 
 jest.mock('../../../modules/config')
 jest.mock('dcl-catalyst-client')
+jest.mock('dcl-catalyst-client/dist/contracts-snapshots')
 jest.mock('@dcl/crypto')
 
 const mockConfig = config as jest.Mocked<typeof config>
 const mockCreateContentClient = createContentClient as jest.MockedFunction<typeof createContentClient>
 const mockDeploymentBuilder = DeploymentBuilder as jest.Mocked<typeof DeploymentBuilder>
 const mockAuthenticator = Authenticator as jest.Mocked<typeof Authenticator>
+const mockGetCatalystServersFromCache = getCatalystServersFromCache as jest.MockedFunction<typeof getCatalystServersFromCache>
 
 describe('deployProfileFromAvatarShape', () => {
   let mockParams: DeploymentParams
@@ -68,7 +71,16 @@ describe('deployProfileFromAvatarShape', () => {
       deploy: jest.fn().mockResolvedValue(undefined)
     }
 
-    mockConfig.get.mockReturnValue(mockPeerUrl)
+    mockConfig.get.mockImplementation((key: string, defaultValue?: string) => {
+      if (key === 'PEER_URL') return mockPeerUrl
+      if (key === 'ENVIRONMENT') return 'production'
+      return defaultValue ?? ''
+    })
+    mockGetCatalystServersFromCache.mockReturnValue([
+      { address: mockPeerUrl, owner: '0x1' },
+      { address: 'https://peer-ec1.decentraland.org', owner: '0x2' },
+      { address: 'https://peer-ec2.decentraland.org', owner: '0x3' }
+    ] as unknown as ReturnType<typeof getCatalystServersFromCache>)
     mockCreateContentClient.mockReturnValue(mockContentClient as unknown as ReturnType<typeof createContentClient>)
     mockDeploymentBuilder.buildEntity.mockResolvedValue(
       mockBuiltEntity as unknown as Awaited<ReturnType<typeof DeploymentBuilder.buildEntity>>
@@ -142,28 +154,47 @@ describe('deployProfileFromAvatarShape', () => {
       mockDeploymentBuilder.buildEntity.mockRejectedValue(new Error('Failed to build entity'))
     })
 
-    it('should throw an error and log the failure', async () => {
+    it('should throw an error', async () => {
+      await expect(deployProfileFromAvatarShape(mockParams)).rejects.toThrow('Failed to build entity')
+    })
+  })
+
+  describe('when deploy fails on first catalyst but succeeds on second', () => {
+    let mockSecondContentClient: { deploy: jest.Mock }
+
+    beforeEach(() => {
+      mockSecondContentClient = { deploy: jest.fn().mockResolvedValue(undefined) }
+      mockContentClient.deploy.mockRejectedValue(new Error('Failed to fetch'))
+      mockCreateContentClient
+        .mockReturnValueOnce(mockContentClient as unknown as ReturnType<typeof createContentClient>)
+        .mockReturnValueOnce(mockSecondContentClient as unknown as ReturnType<typeof createContentClient>)
+    })
+
+    it('should retry on the next catalyst and succeed', async () => {
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation()
 
-      await expect(deployProfileFromAvatarShape(mockParams)).rejects.toThrow('Failed to build entity')
+      await expect(deployProfileFromAvatarShape(mockParams)).resolves.not.toThrow()
 
-      expect(consoleSpy).toHaveBeenCalledWith('Failed to deploy profile from avatar shape:', expect.any(Error))
+      expect(mockContentClient.deploy).toHaveBeenCalledTimes(1)
+      expect(mockSecondContentClient.deploy).toHaveBeenCalledTimes(1)
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to deploy profile from avatar shape on'),
+        expect.any(Error)
+      )
 
       consoleSpy.mockRestore()
     })
   })
 
-  describe('when deploy fails', () => {
+  describe('when deploy fails on all catalysts', () => {
     beforeEach(() => {
       mockContentClient.deploy.mockRejectedValue(new Error('Failed to deploy'))
     })
 
-    it('should throw an error and log the failure', async () => {
+    it('should throw an error after exhausting all catalysts', async () => {
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation()
 
       await expect(deployProfileFromAvatarShape(mockParams)).rejects.toThrow('Failed to deploy')
-
-      expect(consoleSpy).toHaveBeenCalledWith('Failed to deploy profile from avatar shape:', expect.any(Error))
 
       consoleSpy.mockRestore()
     })

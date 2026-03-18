@@ -60,7 +60,9 @@
     "waiting_for_signature": "Confirm in your digital wallet extension to continue.",
     "waiting_for_signature_magic": "Almost done! Confirm your request to login Decentraland",
     "validating_sign_in": "Just a moment, we're verifying your login credentials...",
-    "loading_magic": "Redirecting..."
+    "loading_magic": "Redirecting...",
+    "error_generic": "Something went wrong. Please try again.",
+    "error_contact_support": "Or contact support with the following error message:"
   },
   "request": {
     "verify_sign_in": "Verify Sign In",

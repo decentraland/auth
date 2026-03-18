@@ -177,9 +177,8 @@ async function redeployWithCatalystRotation(
   fetcher?: IFetchComponent
 ): Promise<void> {
   const catalystUrls = getCatalystUrlsForRotation(disabledCatalysts)
-  const MAX_ATTEMPTS = Math.min(catalystUrls.length, 3)
 
-  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+  for (let attempt = 0; attempt < catalystUrls.length; attempt++) {
     const catalystUrl = catalystUrls[attempt]
 
     try {
@@ -187,10 +186,10 @@ async function redeployWithCatalystRotation(
       console.log(`Profile redeployment successful using catalyst: ${catalystUrl}`)
       return
     } catch (error) {
-      const isLastAttempt = attempt === MAX_ATTEMPTS - 1
+      const isLastAttempt = attempt === catalystUrls.length - 1
       const shouldRetry = isLastAttempt ? false : isRetryableHttpError(error)
 
-      console.warn(`Profile redeployment failed on catalyst ${catalystUrl} (attempt ${attempt + 1}/${MAX_ATTEMPTS}):`, error)
+      console.warn(`Profile redeployment failed on catalyst ${catalystUrl} (attempt ${attempt + 1}/${catalystUrls.length}):`, error)
 
       if (isLastAttempt || !shouldRetry) {
         if (isLastAttempt) {
@@ -198,9 +197,6 @@ async function redeployWithCatalystRotation(
         }
         throw error
       }
-
-      // Small delay before trying next catalyst
-      await new Promise(resolve => setTimeout(resolve, 500))
     }
   }
 }

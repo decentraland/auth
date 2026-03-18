@@ -60,7 +60,9 @@
     "waiting_for_signature": "请在数字钱包扩展程序中确认以继续。",
     "waiting_for_signature_magic": "即将完成！请确认您的登录请求",
     "validating_sign_in": "请稍候，我们正在验证您的登录凭据...",
-    "loading_magic": "重定向中..."
+    "loading_magic": "重定向中...",
+    "error_generic": "出了点问题，请重试。",
+    "error_contact_support": "或联系支持团队并提供以下错误信息："
   },
   "request": {
     "verify_sign_in": "验证登录",

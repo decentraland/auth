@@ -60,7 +60,9 @@
     "waiting_for_signature": "Conferma nella tua estensione del portafoglio digitale per continuare.",
     "waiting_for_signature_magic": "Quasi fatto! Conferma la tua richiesta di accesso a Decentraland",
     "validating_sign_in": "Un momento, stiamo verificando le tue credenziali di accesso...",
-    "loading_magic": "Reindirizzamento..."
+    "loading_magic": "Reindirizzamento...",
+    "error_generic": "Qualcosa è andato storto. Per favore, riprova.",
+    "error_contact_support": "Oppure contatta il supporto con il seguente messaggio di errore:"
   },
   "request": {
     "verify_sign_in": "Verifica l'accesso",

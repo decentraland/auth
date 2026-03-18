@@ -34,6 +34,8 @@ const DesktopCallbackPage = () => {
   const navigate = useNavigateWithSearchParams()
   const [searchParams] = useSearchParams()
   const [logInStarted, setLogInStarted] = useState(false)
+  const [layoutState, setLayoutState] = useState(ConnectionLayoutState.VALIDATING_SIGN_IN)
+  const [errorDetail, setErrorDetail] = useState<string | null>(null)
   const { initialized, flags } = useContext(FeatureFlagsContext)
   const { connectToMagic, checkProfileAndRedirect } = useAuthFlow()
   const { trackLoginSuccess } = useAnalytics()
@@ -66,29 +68,24 @@ const DesktopCallbackPage = () => {
         return
       }
 
-      try {
-        const connectionData = await connectAndGenerateSignature()
-        if (!connectionData) {
-          return
-        }
-
-        const ethAddress = connectionData.account?.toLowerCase() ?? ''
-
-        await trackLoginSuccess({
-          ethAddress,
-          type: ConnectionType.WEB2
-        })
-
-        // Get the freshly generated identity from localStorage for Magic flow
-        const freshIdentity = localStorageGetIdentity(ethAddress)
-
-        await checkProfileAndRedirect(connectionData.account ?? '', referrer, redirect, freshIdentity, { replace: true })
-      } catch (error) {
-        handleError(error, 'Error in callback continue flow')
-        navigate(locations.login(), { replace: true })
+      const connectionData = await connectAndGenerateSignature()
+      if (!connectionData) {
+        return
       }
+
+      const ethAddress = connectionData.account?.toLowerCase() ?? ''
+
+      await trackLoginSuccess({
+        ethAddress,
+        type: ConnectionType.WEB2
+      })
+
+      // Get the freshly generated identity from localStorage for Magic flow
+      const freshIdentity = localStorageGetIdentity(ethAddress)
+
+      await checkProfileAndRedirect(connectionData.account ?? '', referrer, redirect, freshIdentity, { replace: true })
     },
-    [navigate, connectAndGenerateSignature, redirect, trackLoginSuccess, checkProfileAndRedirect, initialized]
+    [connectAndGenerateSignature, redirect, trackLoginSuccess, checkProfileAndRedirect, initialized]
   )
 
   const logInAndRedirect = useCallback(async () => {
@@ -124,27 +121,35 @@ const DesktopCallbackPage = () => {
         }
       }
 
-      handleContinue(referrer)
+      await handleContinue(referrer)
     } catch (error) {
       // MISSING_PKCE_METADATA: the OAuth session was already consumed
       // (e.g. user navigated back to /callback). Not a real error — just redirect to login.
       const isExpiredOAuthSession = isMagicExtensionError(error) && error.code === 'MISSING_PKCE_METADATA'
 
-      if (!isExpiredOAuthSession) {
-        handleError(error, 'Error logging in with Magic SDK', {
-          skipTracking: false,
-          sentryExtra: {
-            oauthError: oauthError ?? undefined,
-            magicRpcCode: isMagicRpcError(error) ? String(error.code) : undefined,
-            magicRpcRawMessage: isMagicRpcError(error) ? error.rawMessage : undefined,
-            magicRpcData: isMagicRpcError(error) ? JSON.stringify(error.data) : undefined
-          }
-        })
+      if (isExpiredOAuthSession) {
+        navigate(locations.login({ redirectTo }), { replace: true })
+        return
       }
 
-      navigate(locations.login())
+      const errorMessage = handleError(error, 'Error logging in with Magic SDK', {
+        skipTracking: false,
+        sentryExtra: {
+          oauthError: oauthError ?? undefined,
+          magicRpcCode: isMagicRpcError(error) ? String(error.code) : undefined,
+          magicRpcRawMessage: isMagicRpcError(error) ? error.rawMessage : undefined,
+          magicRpcData: isMagicRpcError(error) ? JSON.stringify(error.data) : undefined
+        }
+      })
+
+      setErrorDetail(errorMessage)
+      setLayoutState(ConnectionLayoutState.ERROR_GENERIC)
     }
   }, [navigate, handleContinue, flags[FeatureFlagsKeys.MAGIC_TEST], searchParams, redirectTo])
+
+  const handleTryAgain = useCallback(() => {
+    navigate(locations.login({ redirectTo }), { replace: true })
+  }, [navigate, redirectTo])
 
   useEffect(() => {
     if (!logInStarted && initialized) {
@@ -158,9 +163,10 @@ const DesktopCallbackPage = () => {
       <AnimatedBackground variant="absolute" />
       <Wrapper>
         <ConnectionLayout
-          state={ConnectionLayoutState.VALIDATING_SIGN_IN}
+          state={layoutState}
           providerType={flags[FeatureFlagsKeys.MAGIC_TEST] ? ProviderType.MAGIC_TEST : ProviderType.MAGIC}
-          onTryAgain={connectAndGenerateSignature}
+          onTryAgain={handleTryAgain}
+          errorDetail={errorDetail}
         />
       </Wrapper>
     </Container>
