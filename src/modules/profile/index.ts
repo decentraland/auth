@@ -332,5 +332,11 @@ function isProfileResultError(result: ProfileResult | ProfileResultError): resul
   return 'error' in result
 }
 
-export { fetchProfile, fetchProfileWithConsistencyCheck, getCatalystUrlsForRotation, redeployExistingProfile, redeployExistingProfileWithContentServerData }
+export {
+  fetchProfile,
+  fetchProfileWithConsistencyCheck,
+  getCatalystUrlsForRotation,
+  redeployExistingProfile,
+  redeployExistingProfileWithContentServerData
+}
 export type { ConsistencyResult }
