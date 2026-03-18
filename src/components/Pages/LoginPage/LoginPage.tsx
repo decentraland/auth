@@ -94,8 +94,7 @@ export const LoginPage = () => {
   const [backgroundTransitioning, setBackgroundTransitioning] = useState(false)
   const [targetConfig] = useTargetConfig()
   const { ensureProfile } = useEnsureProfile()
-  const { identity } = useCurrentConnectionData()
-  const { getIdentitySignature } = useCurrentConnectionData()
+  const { identity, getIdentitySignature } = useCurrentConnectionData()
   const { trackLoginClick, trackLoginSuccess, trackGuestLogin } = useAnalytics()
 
   const handleGuestLogin = useCallback(async () => {
