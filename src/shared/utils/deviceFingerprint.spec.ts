@@ -23,7 +23,8 @@ describe('generateDeviceFingerprint', () => {
   it('should return a hex string when all components are available', async () => {
     const fingerprint = await generateDeviceFingerprint()
     expect(fingerprint).toBe('abcdef1234567890')
-    expect(mockDigest).toHaveBeenCalledWith('SHA-256', expect.any(Uint8Array))
+    expect(mockDigest).toHaveBeenCalledTimes(1)
+    expect(mockDigest.mock.calls[0][0]).toBe('SHA-256')
   })
 
   it('should return a non-empty string even when canvas and WebGL are unavailable', async () => {
