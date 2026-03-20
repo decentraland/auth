@@ -3,7 +3,7 @@ import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
 import { AuthIdentity, Authenticator } from '@dcl/crypto'
 import { localStorageGetIdentity, localStorageStoreIdentity } from '@dcl/single-sign-on-client'
 import { Provider } from 'decentraland-connect'
-import { getIdentitySignature } from './identity'
+import { getCachedIdentity, getIdentitySignature } from './identity'
 
 jest.mock('@dcl/single-sign-on-client')
 jest.mock('@dcl/crypto')
@@ -56,6 +56,67 @@ function setupGenerateIdentityMocks(resultIdentity: AuthIdentity) {
     signMessage: jest.fn().mockResolvedValue('0xsignature')
   } as unknown as ReturnType<typeof createWalletClient>)
 }
+
+describe('getCachedIdentity', () => {
+  const address = '0x1234567890abcdef1234567890abcdef12345678'
+
+  afterEach(() => {
+    jest.clearAllMocks()
+  })
+
+  describe('when no cached identity exists', () => {
+    it('should return undefined', () => {
+      mockLocalStorageGetIdentity.mockReturnValue(null)
+
+      expect(getCachedIdentity(address)).toBeUndefined()
+    })
+  })
+
+  describe('when a valid cached identity exists', () => {
+    it('should return the identity', () => {
+      const identity = createMockIdentity()
+      mockLocalStorageGetIdentity.mockReturnValue(identity)
+
+      expect(getCachedIdentity(address)).toBe(identity)
+    })
+  })
+
+  describe('when the cached identity has a double-encoded private key', () => {
+    it('should return undefined', () => {
+      const identity = createMockIdentity({ privateKey: DOUBLE_ENCODED_PRIVATE_KEY })
+      mockLocalStorageGetIdentity.mockReturnValue(identity)
+
+      expect(getCachedIdentity(address)).toBeUndefined()
+    })
+  })
+
+  describe('when the cached identity has a double-encoded public key', () => {
+    it('should return undefined', () => {
+      const identity = createMockIdentity({ publicKey: DOUBLE_ENCODED_PUBLIC_KEY })
+      mockLocalStorageGetIdentity.mockReturnValue(identity)
+
+      expect(getCachedIdentity(address)).toBeUndefined()
+    })
+  })
+
+  describe('when the cached identity has a non-hex private key', () => {
+    it('should return undefined', () => {
+      const identity = createMockIdentity({ privateKey: 'not-a-hex-key' })
+      mockLocalStorageGetIdentity.mockReturnValue(identity)
+
+      expect(getCachedIdentity(address)).toBeUndefined()
+    })
+  })
+
+  describe('when the cached identity has an invalid address', () => {
+    it('should return undefined', () => {
+      const identity = createMockIdentity({ address: '0xinvalid' })
+      mockLocalStorageGetIdentity.mockReturnValue(identity)
+
+      expect(getCachedIdentity(address)).toBeUndefined()
+    })
+  })
+})
 
 describe('getIdentitySignature', () => {
   const address = '0x1234567890abcdef1234567890abcdef12345678'

@@ -18,13 +18,14 @@ import ImageNew6 from '../../../assets/images/background/image-new6.webp'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import { useAnalytics } from '../../../hooks/useAnalytics'
-import { useAuthFlow } from '../../../hooks/useAuthFlow'
 import { useAutoLogin } from '../../../hooks/useAutoLogin'
+import { useEnsureProfile } from '../../../hooks/useEnsureProfile'
 import { ConnectionType } from '../../../modules/analytics/types'
 import { createAuthServerHttpClient } from '../../../shared/auth'
 import { useCurrentConnectionData } from '../../../shared/connection'
 import { isErrorWithName, isUserRejectedTransaction } from '../../../shared/errors'
 import { extractReferrerFromSearchParameters } from '../../../shared/locations'
+import { markReturningUser } from '../../../shared/onboarding/markReturningUser'
 import { trackCheckpoint } from '../../../shared/onboarding/trackCheckpoint'
 import { disconnectWallet, sendEmailOTP } from '../../../shared/thirdweb'
 import { isClockSynchronized } from '../../../shared/utils/clockSync'
@@ -92,8 +93,8 @@ export const LoginPage = () => {
   const [previousBackgroundIndex, setPreviousBackgroundIndex] = useState(0)
   const [backgroundTransitioning, setBackgroundTransitioning] = useState(false)
   const [targetConfig] = useTargetConfig()
-  const { checkProfileAndRedirect } = useAuthFlow()
-  const { getIdentitySignature } = useCurrentConnectionData()
+  const { ensureProfile } = useEnsureProfile()
+  const { identity, getIdentitySignature } = useCurrentConnectionData()
   const { trackLoginClick, trackLoginSuccess, trackGuestLogin } = useAnalytics()
 
   const handleGuestLogin = useCallback(async () => {
@@ -106,18 +107,18 @@ export const LoginPage = () => {
   }, [])
 
   const runProfileRedirect = useCallback(
-    async (account: string, referrer: string | null, identity: AuthIdentity | null = null, onRedirect?: () => void) => {
-      await checkProfileAndRedirect(
-        account,
-        referrer,
-        () => {
-          redirect()
-          onRedirect?.()
-        },
-        identity
-      )
+    async (account: string, referrer: string | null, providedIdentity: AuthIdentity | null = null, onRedirect?: () => void) => {
+      if (targetConfig && !targetConfig.skipSetup && account) {
+        const userIdentity = providedIdentity ?? identity
+        const profile = await ensureProfile(account, userIdentity, { redirectTo, referrer })
+        if (!profile) return
+      }
+
+      markReturningUser(account)
+      redirect()
+      onRedirect?.()
     },
-    [checkProfileAndRedirect, redirect]
+    [targetConfig?.skipSetup, redirectTo, identity, ensureProfile, redirect]
   )
 
   const checkClockSynchronization = useCallback(async (): Promise<boolean> => {

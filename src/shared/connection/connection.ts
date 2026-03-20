@@ -1,6 +1,6 @@
 import { AuthIdentity } from '@dcl/crypto'
-import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
 import { ConnectionResponse, connection } from 'decentraland-connect'
+import { getCachedIdentity } from './identity'
 
 type DefinedConnectionResponse = Omit<ConnectionResponse, 'account'> & { account: string }
 type ConnectionData = DefinedConnectionResponse & { identity: AuthIdentity | undefined }
@@ -19,10 +19,11 @@ const getCurrentConnectionData = async (): Promise<ConnectionData | null> => {
       return null
     }
 
-    // Identity may be undefined if the user hasn't signed yet or it expired.
+    // Identity may be undefined if the user hasn't signed yet, it expired,
+    // or the cached identity is structurally invalid.
     // We still return the connection data so the provider can expose the account,
     // subscribe to wallet events, and let consumers trigger identity generation.
-    const identity = localStorageGetIdentity(previousConnection.account) ?? undefined
+    const identity = getCachedIdentity(previousConnection.account)
 
     return {
       ...previousConnection,

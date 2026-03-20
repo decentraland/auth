@@ -8,11 +8,11 @@ import { Button, Dialog, DialogActions, DialogContent, DialogTitle } from 'decen
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import { useAnalytics } from '../../../hooks/useAnalytics'
-import { useDisabledCatalysts } from '../../../hooks/useDisabledCatalysts'
+import { useEnsureProfile } from '../../../hooks/useEnsureProfile'
 import { getAnalytics } from '../../../modules/analytics/segment'
 import { ClickEvents, TrackingEvents } from '../../../modules/analytics/types'
 import { config } from '../../../modules/config'
-import { fetchProfile, fetchProfileWithConsistencyCheck, redeployExistingProfile } from '../../../modules/profile'
+import { fetchProfile } from '../../../modules/profile'
 import {
   DifferentSenderError,
   ExpiredRequestError,
@@ -24,13 +24,11 @@ import {
 } from '../../../shared/auth'
 import { useCurrentConnectionData } from '../../../shared/connection'
 import { isErrorWithMessage, isRpcError, isUserRejectedTransaction } from '../../../shared/errors'
-import { extractReferrerFromSearchParameters, locations } from '../../../shared/locations'
+import { extractReferrerFromSearchParameters } from '../../../shared/locations'
 import { sendTipNotification } from '../../../shared/notifications'
-import { isProfileComplete } from '../../../shared/profile'
 import { identifyUser } from '../../../shared/utils/analytics'
 import { handleError } from '../../../shared/utils/errorHandler'
-import { checkWebGpuSupport } from '../../../shared/utils/webgpu'
-import { FeatureFlagsContext, FeatureFlagsKeys, OnboardingFlowVariant } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
+import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
 import { MANATransferData, NFTTransferData, TransferType } from './types'
 import {
   checkMetaTransactionSupport,
@@ -139,8 +137,9 @@ export const RequestPage = () => {
   const [searchParams] = useSearchParams()
   const navigate = useNavigateWithSearchParams()
   const { isLoading: isConnecting, account, provider, providerType, identity } = useCurrentConnectionData()
-  const { flags, variants, initialized: initializedFlags } = useContext(FeatureFlagsContext)
-  const { trackClick, trackWebGPUSupportCheck } = useAnalytics()
+  const { flags, initialized: initializedFlags } = useContext(FeatureFlagsContext)
+  const { trackClick } = useAnalytics()
+  const { ensureProfile } = useEnsureProfile()
   const publicClientRef = useRef<ReturnType<typeof createPublicClient>>()
   const walletClientRef = useRef<ReturnType<typeof createWalletClient>>()
   const [view, setView] = useState(View.LOADING_REQUEST)
@@ -158,6 +157,13 @@ export const RequestPage = () => {
   const viewRef = useRef(view)
   viewRef.current = view
   const hasCompletedRef = useRef(false)
+  // Ref to read the latest identity inside the effect without adding it as a dependency.
+  // Only used in the profile-check effect (profile redeployment). Callbacks like
+  // onApproveSignInVerification close over `identity` directly so they stay consistent
+  // with the account that initiated the action.
+  const identityRef = useRef(identity)
+  identityRef.current = identity
+  const [isProfileReady, setIsProfileReady] = useState(false)
   const [error, setError] = useState<string>()
   const [identityId, setIdentityId] = useState<string>()
   const timeoutRef = useRef<NodeJS.Timeout>()
@@ -168,7 +174,6 @@ export const RequestPage = () => {
   const authServerClient = useRef(createAuthServerHttpClient())
   const isDeepLinkFlow = searchParams.get('flow') === 'deeplink'
   const flowParam = isDeepLinkFlow ? '&flow=deeplink' : ''
-  const disabledCatalysts = useDisabledCatalysts()
   // Goes to the login page where the user will have to connect a wallet.
   // Preserve loginMethod from current URL if present for auto-login functionality
   const loginMethodParam = searchParams.get('loginMethod')
@@ -181,33 +186,63 @@ export const RequestPage = () => {
     navigate(finalUrl)
   }, [requestId, targetConfigId, isDeepLinkFlow, loginMethodParam])
 
-  const toSetupPage = useCallback(async () => {
-    const referrer = extractReferrerFromSearchParameters(searchParams)
-    // Check A/B testing new onboarding flow
-    const isFlowV2OnboardingFlowEnabled = variants[FeatureFlagsKeys.ONBOARDING_FLOW]?.name === OnboardingFlowVariant.V2
-
-    const hasWebGPU = await checkWebGpuSupport()
-    trackWebGPUSupportCheck({ supported: hasWebGPU })
-    const isAvatarSetupFlowAllowed = isFlowV2OnboardingFlowEnabled && hasWebGPU
-    if (isAvatarSetupFlowAllowed) {
-      navigate(locations.avatarSetup(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}${flowParam}`, referrer))
-    } else {
-      navigate(locations.setup(`/auth/requests/${requestId}?targetConfigId=${targetConfigId}${flowParam}`, referrer))
-    }
-  }, [requestId, targetConfigId, isDeepLinkFlow, variants[FeatureFlagsKeys.ONBOARDING_FLOW], searchParams])
-
+  // Effect 1: Ensure profile consistency before allowing request loading.
+  // Navigates to setup if the profile is incomplete or missing.
+  // Sets isProfileReady=true once the profile is confirmed complete (or skipped).
   useEffect(() => {
-    // Wait for the user to be connected.
+    if (isConnecting || !account || !provider || !providerType) return
+    if (!initializedFlags) return
+
+    // Reset profile readiness when the account changes so loadRequest
+    // doesn't fire with stale profile state.
+    setIsProfileReady(false)
+
+    if (targetConfig.skipSetup) {
+      setIsProfileReady(true)
+      return
+    }
+
+    let cancelled = false
+
+    const checkProfile = async () => {
+      const redirectTo = `/auth/requests/${requestId}?targetConfigId=${targetConfigId}${flowParam}`
+      const referrer = extractReferrerFromSearchParameters(searchParams)
+      const profile = await ensureProfile(account, identityRef.current, { redirectTo, referrer })
+
+      if (!cancelled && profile) {
+        setIsProfileReady(true)
+      }
+    }
+
+    checkProfile()
+
+    return () => {
+      cancelled = true
+    }
+  }, [
+    ensureProfile,
+    account,
+    provider,
+    providerType,
+    isConnecting,
+    initializedFlags,
+    requestId,
+    targetConfigId,
+    flowParam,
+    searchParams,
+    targetConfig.skipSetup
+  ])
+
+  // Effect 2: Load the request once the user is connected and the profile is ready.
+  useEffect(() => {
     if (isConnecting) return
 
-    // Check if the user is connected.
     if (!account || !provider || !providerType) {
       toLoginPage()
       return
     }
 
-    // Wait for the features to be initialized.
-    if (!initializedFlags) return
+    if (!initializedFlags || !isProfileReady) return
 
     // Don't re-fetch if we're already in a terminal view (completed, denied, error, etc.)
     // This prevents the bug where after approving, dependency changes cause a re-fetch
@@ -216,43 +251,28 @@ export const RequestPage = () => {
       return
     }
 
+    let cancelled = false
+
     const loadRequest = async () => {
       const timeTheSiteStartedLoading = Date.now()
       publicClientRef.current = createPublicClient({ transport: custom(provider) })
       walletClientRef.current = createWalletClient({ chain: mainnet, transport: custom(provider) })
-
-      const consistencyResult = await fetchProfileWithConsistencyCheck(account, disabledCatalysts)
-      console.log('Loading request - Consistency result', consistencyResult)
-      if (!consistencyResult.isConsistent && consistencyResult.profile && identity) {
-        try {
-          await redeployExistingProfile(consistencyResult.profile, account, identity, disabledCatalysts)
-        } catch (error) {
-          console.warn('Profile redeployment failed, falling back to login page:', error)
-          toLoginPage()
-        }
-      }
-
-      const profile = await fetchProfile(account)
-
-      // `alternative` has its own set up
-      if ((!targetConfig.skipSetup && !profile) || (profile && !isProfileComplete(profile))) {
-        // Goes to the setup page if the connected account does not have a profile yet.
-        console.log("There's no profile or the profile is not complete but the user is logged in, going to setup page")
-        await toSetupPage()
-        return
-      }
 
       try {
         const [signerAddress] = await walletClientRef.current.getAddresses()
         identifyUser(signerAddress)
         // Recover the request from the auth server.
         const request = await authServerClient.current.recover(requestId, signerAddress, isDeepLinkFlow)
+
+        if (cancelled) return
+
         requestRef.current = request
 
         if (flags[FeatureFlagsKeys.LOGIN_ON_SETUP]) {
           // Notify the auth server that the request needs validation.
           // This will make the explorer show the verification code to the user.
           await authServerClient.current.notifyRequestNeedsValidation(requestId)
+          if (cancelled) return
         }
 
         // Initialize the timeout to display the timeout view when the request expires.
@@ -278,6 +298,9 @@ export const RequestPage = () => {
               // Get wallet info first
               const userBalance = await publicClientRef.current.getBalance({ address: signerAddress })
               const currentChainId = await publicClientRef.current.getChainId()
+
+              if (cancelled) return
+
               setWalletInfo({
                 balance: userBalance,
                 chainId: currentChainId
@@ -294,6 +317,8 @@ export const RequestPage = () => {
                     fetchProfile(manaData.toAddress),
                     fetchPlaceByCreatorAddress(manaData.toAddress)
                   ])
+
+                  if (cancelled) return
 
                   setManaTransferData({
                     manaAmount: `${parseInt(manaData.manaAmount, 10)} MANA`,
@@ -319,6 +344,9 @@ export const RequestPage = () => {
                     fetchNftMetadata(contractAddress, contract.abi, transferData.tokenId),
                     fetchProfile(transferData.toAddress)
                   ])
+
+                  if (cancelled) return
+
                   setNftTransferData({
                     imageUrl: metadata.imageUrl,
                     tokenId: transferData.tokenId,
@@ -350,13 +378,17 @@ export const RequestPage = () => {
             }
 
             // Show regular wallet interaction view
-            setView(View.WALLET_INTERACTION)
+            if (!cancelled) {
+              setView(View.WALLET_INTERACTION)
+            }
             break
           }
           default:
             setView(View.WALLET_INTERACTION)
         }
       } catch (e) {
+        if (cancelled) return
+
         if (e instanceof DifferentSenderError) {
           setView(View.DIFFERENT_ACCOUNT)
           return
@@ -381,10 +413,11 @@ export const RequestPage = () => {
     loadRequest()
 
     return () => {
+      cancelled = true
       clearTimeout(timeoutRef.current)
       clearTimeout(signTimeoutRef.current)
     }
-  }, [toLoginPage, toSetupPage, account, provider, providerType, isConnecting, initializedFlags, identity])
+  }, [toLoginPage, account, provider, providerType, isConnecting, initializedFlags, isProfileReady, requestId, isDeepLinkFlow])
 
   useEffect(() => {
     // The timeout is only necessary on the verify sign in and wallet interaction views.
@@ -653,7 +686,7 @@ export const RequestPage = () => {
     } finally {
       setIsLoading(false)
     }
-  }, [isUserUsingWeb2Wallet, nftTransferData, manaTransferData, requestId])
+  }, [isUserUsingWeb2Wallet, nftTransferData, manaTransferData, requestId, identity])
 
   const handleApproveWalletInteraction = useCallback(async () => {
     if (isUserUsingWeb2Wallet) {
