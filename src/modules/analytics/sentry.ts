@@ -32,6 +32,10 @@ init({
     ) {
       return null
     }
+    // Filter out Sentry idle timeout errors from tracing (not real application errors)
+    if (event.exception?.values?.some(exception => exception.value?.includes('idle timeout exceeded'))) {
+      return null
+    }
     return event
   }
 })
