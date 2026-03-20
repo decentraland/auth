@@ -38,7 +38,12 @@ describe('useTrackReferral', () => {
     jest.clearAllMocks()
     mockUseCurrentConnectionData.mockReturnValue({
       identity: mockIdentity,
-      account: '0xuser'
+      account: '0xuser',
+      isLoading: false,
+      provider: undefined,
+      providerType: undefined,
+      chainId: undefined,
+      getIdentitySignature: jest.fn()
     } as ReturnType<typeof useCurrentConnectionData>)
     mockFetch.mockResolvedValue({} as Response)
     mockGenerateDeviceFingerprint.mockResolvedValue('abc123fingerprint')
