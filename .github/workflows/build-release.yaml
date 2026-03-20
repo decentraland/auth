@@ -55,4 +55,4 @@ jobs:
         with:
           sourcemaps: ${{ github.workspace }}/dist
           version: '${{ vars.SENTRY_RELEASE_PREFIX }}@${{ github.event.release.tag_name }}'
-          url_prefix: '~'
+          url_prefix: '~/@dcl/auth-site/${{ github.event.release.tag_name }}'

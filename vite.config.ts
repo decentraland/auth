@@ -31,8 +31,7 @@ export default defineConfig(({ command, mode }) => {
             commonjsOptions: {
               transformMixedEsModules: true
             },
-            // Disable sourcemaps in production to reduce memory usage during build
-            sourcemap: false,
+            sourcemap: 'hidden',
             // Increase chunk size warning limit (thirdweb is large)
             chunkSizeWarningLimit: 2000,
             rollupOptions: {
