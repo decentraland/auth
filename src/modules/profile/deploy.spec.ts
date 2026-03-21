@@ -179,14 +179,30 @@ describe('deployWithCatalystRotation', () => {
       )
     })
 
-    it('should throw after exhausting all catalysts', async () => {
+    it('should throw a DeploymentError after exhausting all catalysts', async () => {
       await expect(
         deployWithCatalystRotation({
           entity: createMockEntity()
         })
-      ).rejects.toThrow('Failed to fetch')
+      ).rejects.toThrow(DeploymentError)
 
       expect(mockCreateContentClient).toHaveBeenCalledTimes(catalystUrls.length)
+    })
+
+    it('should include the catalyst URL and original message but no status code', async () => {
+      try {
+        await deployWithCatalystRotation({
+          entity: createMockEntity()
+        })
+        fail('Expected an error to be thrown')
+      } catch (error) {
+        expect(error).toBeInstanceOf(DeploymentError)
+        const deploymentError = error as DeploymentError
+        expect(deploymentError.message).toBe('Failed to fetch')
+        expect(deploymentError.statusCode).toBeUndefined()
+        expect(deploymentError.responseBody).toBeUndefined()
+        expect(deploymentError.catalystUrl).toBe(catalystUrls[catalystUrls.length - 1])
+      }
     })
   })
 

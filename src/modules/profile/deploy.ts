@@ -51,7 +51,15 @@ async function deployWithCatalystRotation({ entity, disabledCatalysts }: DeployW
         if (isLastAttempt) {
           console.error('Profile deployment failed on all available catalysts')
         }
-        throw error
+
+        // Wrap non-DeploymentError errors (e.g. network failures) so they carry
+        // the catalyst URL context for Sentry logging.
+        if (error instanceof DeploymentError) {
+          throw error
+        }
+
+        const message = error instanceof Error ? error.message : 'Unknown error'
+        throw new DeploymentError(message, undefined, undefined, catalystUrl)
       }
     }
   }
