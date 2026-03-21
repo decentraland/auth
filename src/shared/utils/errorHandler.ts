@@ -1,8 +1,20 @@
 import { captureException } from '@sentry/react'
 import { TrackingEvents } from '../../modules/analytics/types'
+import { DeploymentError } from '../../modules/profile/errors'
 import { isErrorWithMessage } from '../errors'
 import { trackEvent } from './analytics'
-import { ErrorContext, HandleErrorOptions } from './errorHandler.types'
+import { ErrorContext, HandleErrorOptions, SentryExtra } from './errorHandler.types'
+
+function getDeploymentErrorExtra(error: unknown): SentryExtra | undefined {
+  if (error instanceof DeploymentError) {
+    return {
+      statusCode: error.statusCode,
+      responseBody: error.responseBody,
+      catalystUrl: error.catalystUrl
+    }
+  }
+  return undefined
+}
 
 const handleError = (error: unknown, context: string, options?: HandleErrorOptions) => {
   const errorMessage = isErrorWithMessage(error) ? error.message : 'Unknown error'
@@ -11,9 +23,11 @@ const handleError = (error: unknown, context: string, options?: HandleErrorOptio
     console.error(`${context}:`, errorMessage)
   }
 
+  const deploymentExtra = getDeploymentErrorExtra(error)
+
   captureException(error, {
     tags: options?.sentryTags,
-    extra: options?.sentryExtra
+    extra: { ...deploymentExtra, ...options?.sentryExtra }
   })
 
   if (!options?.skipTracking) {
