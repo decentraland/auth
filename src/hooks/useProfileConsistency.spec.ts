@@ -67,7 +67,7 @@ describe('useProfileConsistency', () => {
       it('should attempt to redeploy the profile', async () => {
         const { result } = renderHook(() => useProfileConsistency())
         await result.current.checkProfileConsistency(account, identity)
-        expect(redeployExistingProfile).toHaveBeenCalledWith(mockProfile, account, identity, mockDisabledCatalysts, undefined)
+        expect(redeployExistingProfile).toHaveBeenCalledWith(mockProfile, account, identity, mockDisabledCatalysts)
       })
 
       it('should return the profile with inconsistent status', async () => {
@@ -127,8 +127,7 @@ describe('useProfileConsistency', () => {
             'https://catalyst.example.com',
             account,
             identity,
-            mockDisabledCatalysts,
-            undefined
+            mockDisabledCatalysts
           )
         })
       })

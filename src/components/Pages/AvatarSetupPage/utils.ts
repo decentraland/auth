@@ -1,8 +1,7 @@
-import { DeploymentBuilder, createContentClient } from 'dcl-catalyst-client'
+import { DeploymentBuilder } from 'dcl-catalyst-client'
 import { Authenticator } from '@dcl/crypto'
 import { Avatar, EntityType } from '@dcl/schemas'
-import { getCatalystUrlsForRotation } from '../../../modules/profile'
-import { fetcher } from '../../../shared/fetcher'
+import { deployWithCatalystRotation } from '../../../modules/profile'
 import { CreateAvatarMetadataParams, DeploymentParams } from './AvatarSetupPage.types'
 
 /**
@@ -41,7 +40,8 @@ const deployProfileFromAvatarShape = async ({
   avatarShape,
   connectedAccount,
   deploymentProfileName,
-  connectedAccountIdentity
+  connectedAccountIdentity,
+  disabledCatalysts
 }: DeploymentParams) => {
   const avatar = createAvatarMetadata({
     avatarShape,
@@ -57,28 +57,14 @@ const deployProfileFromAvatarShape = async ({
     files: new Map()
   })
 
-  const catalystUrls = getCatalystUrlsForRotation()
-
-  for (let attempt = 0; attempt < catalystUrls.length; attempt++) {
-    const catalystUrl = catalystUrls[attempt]
-
-    try {
-      const client = createContentClient({ url: catalystUrl, fetcher })
-      await client.deploy({
-        entityId: deploymentEntity.entityId,
-        files: deploymentEntity.files,
-        authChain: Authenticator.signPayload(connectedAccountIdentity, deploymentEntity.entityId)
-      })
-      return
-    } catch (error) {
-      console.error(`Failed to deploy profile from avatar shape on ${catalystUrl} (attempt ${attempt + 1}/${catalystUrls.length}):`, error)
-
-      const isLastAttempt = attempt === catalystUrls.length - 1
-      if (isLastAttempt) {
-        throw error
-      }
-    }
-  }
+  await deployWithCatalystRotation({
+    entity: {
+      entityId: deploymentEntity.entityId,
+      files: deploymentEntity.files,
+      authChain: Authenticator.signPayload(connectedAccountIdentity, deploymentEntity.entityId)
+    },
+    disabledCatalysts
+  })
 }
 
 export { deployProfileFromAvatarShape }

@@ -27,20 +27,14 @@ export const useProfileConsistency = () => {
 
       if (!consistencyResult.isConsistent && consistencyResult.profile && identity) {
         try {
-          await redeployExistingProfile(consistencyResult.profile, account, identity, disabledCatalysts, fetcher)
+          await redeployExistingProfile(consistencyResult.profile, account, identity, disabledCatalysts)
         } catch (error) {
           console.warn('Profile redeployment failed:', error)
 
           // If the profile was fetched from a specific catalyst, try redeploying with content server data
           if (consistencyResult.profileFetchedFrom) {
             try {
-              await redeployExistingProfileWithContentServerData(
-                consistencyResult.profileFetchedFrom,
-                account,
-                identity,
-                disabledCatalysts,
-                fetcher
-              )
+              await redeployExistingProfileWithContentServerData(consistencyResult.profileFetchedFrom, account, identity, disabledCatalysts)
             } catch (contentServerError) {
               console.warn('Profile redeployment with content server data also failed:', contentServerError)
             }

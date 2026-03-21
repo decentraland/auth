@@ -1,12 +1,12 @@
 import { IFetchComponent } from '@well-known-components/interfaces'
 import { DeploymentBuilder, createContentClient, createLambdasClient } from 'dcl-catalyst-client'
 import { Profile, ProfileAvatarsItem } from 'dcl-catalyst-client/dist/client/specs/catalyst.schemas'
-import { getCatalystServersFromCache } from 'dcl-catalyst-client/dist/contracts-snapshots'
-import { L1Network } from '@dcl/catalyst-contracts'
 import { AuthIdentity, Authenticator } from '@dcl/crypto'
 import { Entity, EntityType } from '@dcl/schemas'
 import { createFetcher } from '../../shared/fetcher'
 import { config } from '../config'
+import { deployWithCatalystRotation } from './deploy'
+import { getCatalystServers, getCatalystUrlsForRotation } from './utils'
 
 interface ConsistencyResult {
   isConsistent: boolean
@@ -24,11 +24,6 @@ interface ProfileResultError {
   error: string
   url: string
   isTimeout?: boolean
-}
-
-const getCatalystServers = (network: L1Network, disabledCatalysts: string[] = []) => {
-  const catalystServersFromCache = getCatalystServersFromCache(network)
-  return catalystServersFromCache.filter(server => !disabledCatalysts.includes(server.address))
 }
 
 async function fetchProfile(address: string, fetcher?: IFetchComponent): Promise<Profile | null> {
@@ -125,90 +120,10 @@ async function redeployExistingProfile(
   profile: Profile,
   connectedAccount: string,
   connectedAccountIdentity: AuthIdentity,
-  disabledCatalysts: string[] = [],
-  _fetcher?: IFetchComponent
+  disabledCatalysts: string[] = []
 ): Promise<void> {
-  const fetcher = _fetcher ?? createFetcher()
   // Don't redeploy snapshot files, remove snapshot references from avatar
   const metadata = buildProfileMetadataWithoutSnapshots(profile)
-  await redeployWithCatalystRotation(connectedAccount, connectedAccountIdentity, metadata, disabledCatalysts, fetcher)
-}
-
-async function redeployExistingProfileWithContentServerData(
-  catalystUrl: string,
-  connectedAccount: string,
-  connectedAccountIdentity: AuthIdentity,
-  disabledCatalysts: string[] = [],
-  fetcher?: IFetchComponent
-): Promise<void> {
-  const client = createContentClient({ url: catalystUrl + '/content', fetcher: fetcher ?? createFetcher() })
-  const entity = (await client.fetchEntitiesByPointers([connectedAccount]))?.[0]
-  if (!entity) {
-    throw new Error('Profile entity not found')
-  }
-
-  // Don't redeploy snapshot files, remove snapshot references from avatar
-  const metadata = buildMetadataWithEmptyWearables(entity)
-
-  // First try to redeploy with the full content server metadata
-  // If it fails, try to redeploy with the empty wearables metadata
-  try {
-    await redeployWithCatalystRotation(connectedAccount, connectedAccountIdentity, metadata, disabledCatalysts, fetcher)
-  } catch (error) {
-    console.warn(
-      'Profile redeployment failed with full content server metadata, attempting to redeploy with empty wearables metadata:',
-      error
-    )
-    await redeployWithCatalystRotation(
-      connectedAccount,
-      connectedAccountIdentity,
-      buildMetadataWithEmptyWearables(entity),
-      disabledCatalysts,
-      fetcher
-    )
-  }
-}
-
-async function redeployWithCatalystRotation(
-  connectedAccount: string,
-  connectedAccountIdentity: AuthIdentity,
-  metadata: Partial<Profile>,
-  disabledCatalysts: string[] = [],
-  fetcher?: IFetchComponent
-): Promise<void> {
-  const catalystUrls = getCatalystUrlsForRotation(disabledCatalysts)
-
-  for (let attempt = 0; attempt < catalystUrls.length; attempt++) {
-    const catalystUrl = catalystUrls[attempt]
-
-    try {
-      await attemptRedeployment(catalystUrl, connectedAccount, connectedAccountIdentity, metadata, fetcher)
-      console.log(`Profile redeployment successful using catalyst: ${catalystUrl}`)
-      return
-    } catch (error) {
-      const isLastAttempt = attempt === catalystUrls.length - 1
-      const shouldRetry = isLastAttempt ? false : isRetryableHttpError(error)
-
-      console.warn(`Profile redeployment failed on catalyst ${catalystUrl} (attempt ${attempt + 1}/${catalystUrls.length}):`, error)
-
-      if (isLastAttempt || !shouldRetry) {
-        if (isLastAttempt) {
-          console.error('Profile redeployment failed on all available catalysts')
-        }
-        throw error
-      }
-    }
-  }
-}
-
-async function attemptRedeployment(
-  catalystUrl: string,
-  connectedAccount: string,
-  connectedAccountIdentity: AuthIdentity,
-  metadata: Partial<Profile>,
-  fetcher?: IFetchComponent
-): Promise<void> {
-  const client = createContentClient({ url: catalystUrl, fetcher: fetcher ?? createFetcher() })
 
   const deploymentEntity = await DeploymentBuilder.buildEntity({
     type: EntityType.PROFILE,
@@ -217,26 +132,60 @@ async function attemptRedeployment(
     timestamp: Date.now()
   })
 
-  await client.deploy({
-    entityId: deploymentEntity.entityId,
-    files: deploymentEntity.files,
-    authChain: Authenticator.signPayload(connectedAccountIdentity, deploymentEntity.entityId)
+  await deployWithCatalystRotation({
+    entity: {
+      entityId: deploymentEntity.entityId,
+      files: deploymentEntity.files,
+      authChain: Authenticator.signPayload(connectedAccountIdentity, deploymentEntity.entityId)
+    },
+    disabledCatalysts
   })
 }
 
-/**
- * Returns content API URLs for all available catalysts, with the configured PEER_URL first.
- * Used for deployment rotation — if the primary catalyst fails, subsequent URLs are tried in order.
- * @param disabledCatalysts - Catalyst addresses to exclude from the list
- * @returns Content URLs in the form `{catalystAddress}/content`
- */
-function getCatalystUrlsForRotation(disabledCatalysts: string[] = []): string[] {
-  const PEER_URL = config.get('PEER_URL')
-  const environment = config.get('ENVIRONMENT')
-  const network = environment === 'development' ? 'sepolia' : 'mainnet'
-  const catalystServers = getCatalystServers(network, [PEER_URL, ...disabledCatalysts])
+async function redeployExistingProfileWithContentServerData(
+  catalystUrl: string,
+  connectedAccount: string,
+  connectedAccountIdentity: AuthIdentity,
+  disabledCatalysts: string[] = []
+): Promise<void> {
+  const client = createContentClient({ url: catalystUrl + '/content', fetcher: createFetcher() })
+  const entity = (await client.fetchEntitiesByPointers([connectedAccount]))?.[0]
+  if (!entity) {
+    throw new Error('Profile entity not found')
+  }
 
-  return [PEER_URL + '/content', ...catalystServers.map(server => server.address + '/content')]
+  // Don't redeploy snapshot files, remove snapshot references from avatar
+  const metadata = buildMetadataWithEmptyWearables(entity)
+
+  const buildEntityAndDeploy = async (profileMetadata: Partial<Profile>) => {
+    const deploymentEntity = await DeploymentBuilder.buildEntity({
+      type: EntityType.PROFILE,
+      pointers: [connectedAccount],
+      metadata: profileMetadata,
+      timestamp: Date.now()
+    })
+
+    await deployWithCatalystRotation({
+      entity: {
+        entityId: deploymentEntity.entityId,
+        files: deploymentEntity.files,
+        authChain: Authenticator.signPayload(connectedAccountIdentity, deploymentEntity.entityId)
+      },
+      disabledCatalysts
+    })
+  }
+
+  // First try to redeploy with the full content server metadata
+  // If it fails, try to redeploy with the empty wearables metadata
+  try {
+    await buildEntityAndDeploy(metadata)
+  } catch (error) {
+    console.warn(
+      'Profile redeployment failed with full content server metadata, attempting to redeploy with empty wearables metadata:',
+      error
+    )
+    await buildEntityAndDeploy(buildMetadataWithEmptyWearables(entity))
+  }
 }
 
 function buildProfileMetadataWithoutSnapshots(profile: Profile): Partial<Profile> {
@@ -265,24 +214,6 @@ function buildMetadataWithEmptyWearables(entity: Entity): Partial<Profile> {
       }
     })
   }
-}
-
-function isRetryableHttpError(error: unknown): boolean {
-  // Only retry on 5xx server errors or network issues
-  // Don't retry on 4xx client errors (bad request, auth issues, etc.)
-
-  if (!error) return true // Unknown error, try next catalyst
-
-  // Try to extract status code from various error formats
-  const errorObj = error as { status?: number; statusCode?: number; response?: { status: number } }
-  const statusCode = errorObj?.status || errorObj?.statusCode || errorObj?.response?.status
-
-  if (typeof statusCode === 'number' && statusCode >= 400 && statusCode < 500) {
-    return false
-  }
-
-  // For all other errors (network, parsing, etc.), try next catalyst
-  return true
 }
 
 const TIMEOUT_STATUS_CODE = 408
@@ -339,4 +270,6 @@ export {
   redeployExistingProfile,
   redeployExistingProfileWithContentServerData
 }
+export { deployWithCatalystRotation } from './deploy'
+export { DeploymentError } from './errors'
 export type { ConsistencyResult }
