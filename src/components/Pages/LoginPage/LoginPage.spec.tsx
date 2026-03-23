@@ -109,7 +109,6 @@ jest.mock('../../../shared/locations', () => ({
   extractReferrerFromSearchParameters: jest.fn().mockReturnValue(null)
 }))
 
-// eslint-disable-next-line @typescript-eslint/naming-convention -- matches exported names
 jest.mock('../../FeatureFlagsProvider', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { createContext } = require('react')
