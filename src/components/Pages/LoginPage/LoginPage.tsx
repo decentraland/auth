@@ -241,7 +241,7 @@ export const LoginPage = () => {
           const connectionData = await connectToProvider(connectionType)
 
           setLoadingState(ConnectionLayoutState.WAITING_FOR_SIGNATURE)
-          await getIdentitySignature(connectionData)
+          const freshIdentity = await getIdentitySignature(connectionData)
 
           // Clear any stored social login emails since this is a wallet login
           localStorage.removeItem('dcl_thirdweb_user_email')
@@ -257,7 +257,7 @@ export const LoginPage = () => {
           const isClockSync = await checkClockSynchronization()
 
           if (isClockSync) {
-            await runProfileRedirect(connectionData.account ?? '', referrer, null, () => setShowConnectionLayout(false))
+            await runProfileRedirect(connectionData.account ?? '', referrer, freshIdentity, () => setShowConnectionLayout(false))
           }
         }
       } catch (error) {
@@ -322,7 +322,7 @@ export const LoginPage = () => {
       try {
         const address = result.address.toLowerCase()
 
-        await getIdentitySignature()
+        const freshIdentity = await getIdentitySignature()
 
         await trackLoginSuccess({
           ethAddress: address,
@@ -334,7 +334,7 @@ export const LoginPage = () => {
         const isClockSync = await checkClockSynchronization()
 
         if (isClockSync) {
-          await runProfileRedirect(address, referrer, null, () => setShowConfirmingLogin(false))
+          await runProfileRedirect(address, referrer, freshIdentity, () => setShowConfirmingLogin(false))
         } else {
           // Clock sync failed - hide confirming overlay so modal is visible
           setShowConfirmingLogin(false)
