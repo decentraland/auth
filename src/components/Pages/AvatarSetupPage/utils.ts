@@ -1,8 +1,7 @@
-import { DeploymentBuilder, createContentClient } from 'dcl-catalyst-client'
+import { DeploymentBuilder } from 'dcl-catalyst-client'
 import { Authenticator } from '@dcl/crypto'
 import { Avatar, EntityType } from '@dcl/schemas'
-import { config } from '../../../modules/config'
-import { fetcher } from '../../../shared/fetcher'
+import { deployWithCatalystRotation } from '../../../modules/profile'
 import { CreateAvatarMetadataParams, DeploymentParams } from './AvatarSetupPage.types'
 
 /**
@@ -32,43 +31,40 @@ const createAvatarMetadata = ({ avatarShape, connectedAccount, deploymentProfile
 }
 
 /**
- * Deploys a user profile to the Decentraland catalyst based on avatar shape configuration
+ * Deploys a user profile to the Decentraland catalyst based on avatar shape configuration.
+ * Rotates through available catalysts on network failures.
  * @param params - Deployment parameters including avatar shape and account info
- * @throws Error if deployment fails
+ * @throws Error if deployment fails on all catalysts
  */
 const deployProfileFromAvatarShape = async ({
   avatarShape,
   connectedAccount,
   deploymentProfileName,
-  connectedAccountIdentity
+  connectedAccountIdentity,
+  disabledCatalysts
 }: DeploymentParams) => {
-  try {
-    const peerUrl = config.get('PEER_URL', '')
-    const client = createContentClient({ url: peerUrl + '/content', fetcher })
+  const avatar = createAvatarMetadata({
+    avatarShape,
+    connectedAccount,
+    deploymentProfileName
+  })
 
-    const avatar = createAvatarMetadata({
-      avatarShape,
-      connectedAccount,
-      deploymentProfileName
-    })
+  const deploymentEntity = await DeploymentBuilder.buildEntity({
+    type: EntityType.PROFILE,
+    pointers: [connectedAccount],
+    metadata: { avatars: [avatar] },
+    timestamp: Date.now(),
+    files: new Map()
+  })
 
-    const deploymentEntity = await DeploymentBuilder.buildEntity({
-      type: EntityType.PROFILE,
-      pointers: [connectedAccount],
-      metadata: { avatars: [avatar] },
-      timestamp: Date.now(),
-      files: new Map()
-    })
-
-    await client.deploy({
+  await deployWithCatalystRotation({
+    entity: {
       entityId: deploymentEntity.entityId,
       files: deploymentEntity.files,
       authChain: Authenticator.signPayload(connectedAccountIdentity, deploymentEntity.entityId)
-    })
-  } catch (error) {
-    console.error('Failed to deploy profile from avatar shape:', error)
-    throw error
-  }
+    },
+    disabledCatalysts
+  })
 }
 
 export { deployProfileFromAvatarShape }

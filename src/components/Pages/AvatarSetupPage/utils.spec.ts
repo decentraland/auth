@@ -1,27 +1,22 @@
-import { DeploymentBuilder, createContentClient } from 'dcl-catalyst-client'
+import { DeploymentBuilder } from 'dcl-catalyst-client'
 import { Authenticator } from '@dcl/crypto'
 import { EntityType } from '@dcl/schemas'
-import { config } from '../../../modules/config'
+import { deployWithCatalystRotation } from '../../../modules/profile'
 import { deployProfileFromAvatarShape } from './utils'
 import { AvatarShape, Color, DeploymentParams } from './AvatarSetupPage.types'
 
-jest.mock('../../../modules/config')
+jest.mock('../../../modules/profile')
 jest.mock('dcl-catalyst-client')
 jest.mock('@dcl/crypto')
 
-const mockConfig = config as jest.Mocked<typeof config>
-const mockCreateContentClient = createContentClient as jest.MockedFunction<typeof createContentClient>
 const mockDeploymentBuilder = DeploymentBuilder as jest.Mocked<typeof DeploymentBuilder>
 const mockAuthenticator = Authenticator as jest.Mocked<typeof Authenticator>
+const mockDeployWithCatalystRotation = deployWithCatalystRotation as jest.MockedFunction<typeof deployWithCatalystRotation>
 
 describe('deployProfileFromAvatarShape', () => {
   let mockParams: DeploymentParams
-  let mockPeerUrl: string
   let mockBuiltEntity: { entityId: string; files: Map<string, Uint8Array> }
   let mockAuthChain: Array<{ type: string; payload: string; signature: string }>
-  let mockContentClient: {
-    deploy: jest.Mock
-  }
   let mockAvatarShape: AvatarShape
   let mockEyeColor: Color
   let mockSkinColor: Color
@@ -57,19 +52,13 @@ describe('deployProfileFromAvatarShape', () => {
       connectedAccountIdentity: { privateKey: 'mock-private-key' } as unknown as DeploymentParams['connectedAccountIdentity']
     }
 
-    mockPeerUrl = 'https://peer.decentraland.org'
     mockBuiltEntity = {
       entityId: 'mock-entity-id',
       files: new Map()
     }
     mockAuthChain = [{ type: 'SIGNER', payload: 'mock-payload', signature: 'mock-signature' }]
 
-    mockContentClient = {
-      deploy: jest.fn().mockResolvedValue(undefined)
-    }
-
-    mockConfig.get.mockReturnValue(mockPeerUrl)
-    mockCreateContentClient.mockReturnValue(mockContentClient as unknown as ReturnType<typeof createContentClient>)
+    mockDeployWithCatalystRotation.mockResolvedValue(undefined)
     mockDeploymentBuilder.buildEntity.mockResolvedValue(
       mockBuiltEntity as unknown as Awaited<ReturnType<typeof DeploymentBuilder.buildEntity>>
     )
@@ -77,16 +66,6 @@ describe('deployProfileFromAvatarShape', () => {
   })
 
   describe('when all parameters are valid', () => {
-    it('should create content client with correct URL', async () => {
-      await expect(deployProfileFromAvatarShape(mockParams)).resolves.not.toThrow()
-
-      expect(mockConfig.get).toHaveBeenCalledWith('PEER_URL', '')
-      expect(mockCreateContentClient).toHaveBeenCalledWith({
-        url: mockPeerUrl + '/content',
-        fetcher: expect.anything()
-      })
-    })
-
     it('should build entity with correct avatar metadata without snapshots', async () => {
       await deployProfileFromAvatarShape(mockParams)
 
@@ -126,13 +105,15 @@ describe('deployProfileFromAvatarShape', () => {
       expect(mockAuthenticator.signPayload).toHaveBeenCalledWith(mockParams.connectedAccountIdentity, mockBuiltEntity.entityId)
     })
 
-    it('should deploy with expected id, files and authChain', async () => {
+    it('should call deployWithCatalystRotation with the correct entity', async () => {
       await deployProfileFromAvatarShape(mockParams)
 
-      expect(mockContentClient.deploy).toHaveBeenCalledWith({
-        entityId: mockBuiltEntity.entityId,
-        files: mockBuiltEntity.files,
-        authChain: mockAuthChain
+      expect(mockDeployWithCatalystRotation).toHaveBeenCalledWith({
+        entity: {
+          entityId: mockBuiltEntity.entityId,
+          files: mockBuiltEntity.files,
+          authChain: mockAuthChain
+        }
       })
     })
   })
@@ -142,30 +123,18 @@ describe('deployProfileFromAvatarShape', () => {
       mockDeploymentBuilder.buildEntity.mockRejectedValue(new Error('Failed to build entity'))
     })
 
-    it('should throw an error and log the failure', async () => {
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation()
-
+    it('should throw an error', async () => {
       await expect(deployProfileFromAvatarShape(mockParams)).rejects.toThrow('Failed to build entity')
-
-      expect(consoleSpy).toHaveBeenCalledWith('Failed to deploy profile from avatar shape:', expect.any(Error))
-
-      consoleSpy.mockRestore()
     })
   })
 
-  describe('when deploy fails', () => {
+  describe('when deployWithCatalystRotation fails', () => {
     beforeEach(() => {
-      mockContentClient.deploy.mockRejectedValue(new Error('Failed to deploy'))
+      mockDeployWithCatalystRotation.mockRejectedValue(new Error('Deployment failed'))
     })
 
-    it('should throw an error and log the failure', async () => {
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation()
-
-      await expect(deployProfileFromAvatarShape(mockParams)).rejects.toThrow('Failed to deploy')
-
-      expect(consoleSpy).toHaveBeenCalledWith('Failed to deploy profile from avatar shape:', expect.any(Error))
-
-      consoleSpy.mockRestore()
+    it('should propagate the error', async () => {
+      await expect(deployProfileFromAvatarShape(mockParams)).rejects.toThrow('Deployment failed')
     })
   })
 })

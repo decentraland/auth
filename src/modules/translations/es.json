@@ -60,7 +60,9 @@
     "waiting_for_signature": "Confirma en la extensión de tu billetera digital para continuar.",
     "waiting_for_signature_magic": "¡Casi listo! Confirma tu solicitud para iniciar sesión en Decentraland",
     "validating_sign_in": "Un momento, estamos verificando tus credenciales de inicio de sesión...",
-    "loading_magic": "Redirigiendo..."
+    "loading_magic": "Redirigiendo...",
+    "error_generic": "Algo salió mal. Por favor, inténtalo de nuevo.",
+    "error_contact_support": "O contacta a soporte con el siguiente mensaje de error:"
   },
   "request": {
     "verify_sign_in": "Verificar inicio de sesión",
