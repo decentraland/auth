@@ -43,4 +43,40 @@ const ProgressContainer = styled(Box)(({ theme }) => ({
   marginBottom: theme.spacing(3)
 }))
 
-export { ConnectionContainer, DecentralandLogo, ConnectionTitle, ProgressContainer, ErrorButtonContainer }
+const ErrorDetailContainer = styled(Box)(({ theme }) => ({
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  textAlign: 'center',
+  marginTop: theme.spacing(2),
+  maxWidth: '500px'
+}))
+
+const ErrorDescription = styled(Typography)(({ theme }) => ({
+  fontSize: '14px',
+  lineHeight: '150%',
+  color: theme.palette.text.primary,
+  marginBottom: theme.spacing(2)
+}))
+
+const ErrorDetail = styled(Typography)(({ theme }) => ({
+  fontSize: '12px',
+  lineHeight: '150%',
+  color: theme.palette.text.primary,
+  fontFamily: 'monospace',
+  padding: theme.spacing(1, 2),
+  backgroundColor: theme.palette.action.hover,
+  borderRadius: theme.spacing(1),
+  wordBreak: 'break-word'
+}))
+
+export {
+  ConnectionContainer,
+  DecentralandLogo,
+  ConnectionTitle,
+  ProgressContainer,
+  ErrorButtonContainer,
+  ErrorDetailContainer,
+  ErrorDescription,
+  ErrorDetail
+}

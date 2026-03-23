@@ -30,6 +30,7 @@ interface DeploymentParams {
   connectedAccount: string
   deploymentProfileName: string
   connectedAccountIdentity: AuthIdentity
+  disabledCatalysts?: string[]
 }
 
 interface CreateAvatarMetadataParams {

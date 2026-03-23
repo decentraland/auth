@@ -2,6 +2,7 @@ import { DeploymentBuilder, createContentClient } from 'dcl-catalyst-client'
 import { AuthIdentity, Authenticator } from '@dcl/crypto'
 import { EntityType } from '@dcl/schemas'
 import { config } from '../../../modules/config'
+import { deployWithCatalystRotation } from '../../../modules/profile'
 import { fetcher } from '../../../shared/fetcher'
 
 async function subscribeToNewsletter(email: string) {
@@ -27,12 +28,14 @@ async function deployProfileFromDefault({
   defaultProfile,
   connectedAccount,
   deploymentProfileName,
-  connectedAccountIdentity
+  connectedAccountIdentity,
+  disabledCatalysts
 }: {
   defaultProfile: string
   connectedAccount: string
   deploymentProfileName: string
   connectedAccountIdentity: AuthIdentity
+  disabledCatalysts?: string[]
 }) {
   // Create the content client to fetch and deploy profiles.
   const peerUrl = config.get('PEER_URL', '')
@@ -70,11 +73,14 @@ async function deployProfileFromDefault({
     files: new Map()
   })
 
-  // Deploy the profile for the currently connected account.
-  await client.deploy({
-    entityId: deploymentEntity.entityId,
-    files: deploymentEntity.files,
-    authChain: Authenticator.signPayload(connectedAccountIdentity, deploymentEntity.entityId)
+  // Deploy the profile for the currently connected account with catalyst rotation.
+  await deployWithCatalystRotation({
+    entity: {
+      entityId: deploymentEntity.entityId,
+      files: deploymentEntity.files,
+      authChain: Authenticator.signPayload(connectedAccountIdentity, deploymentEntity.entityId)
+    },
+    disabledCatalysts
   })
 }
 
