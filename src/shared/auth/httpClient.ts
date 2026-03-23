@@ -169,16 +169,13 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
 
       return recoverResponse
     } catch (e) {
-      // Don't report fulfilled requests to Sentry — they are an expected state after successful login
-      if (!(e instanceof RequestFulfilledError)) {
-        handleError(e, 'Error recovering request', {
-          trackingData: {
-            browserTime: Date.now(),
-            requestType: recoverResponse?.method ?? 'Unknown'
-          },
-          trackingEvent: TrackingEvents.REQUEST_LOADING_ERROR
-        })
-      }
+      handleError(e, 'Error recovering request', {
+        trackingData: {
+          browserTime: Date.now(),
+          requestType: recoverResponse?.method ?? 'Unknown'
+        },
+        trackingEvent: TrackingEvents.REQUEST_LOADING_ERROR
+      })
       throw e
     }
   }
