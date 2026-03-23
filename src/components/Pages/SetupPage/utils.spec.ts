@@ -3,9 +3,11 @@ import { DeploymentPreparationData } from 'dcl-catalyst-client/dist/client/types
 import { AuthIdentity, Authenticator } from '@dcl/crypto'
 import { AuthLink, Entity, EntityType } from '@dcl/schemas'
 import { config } from '../../../modules/config'
+import { deployWithCatalystRotation } from '../../../modules/profile'
 import { deployProfileFromDefault, subscribeToNewsletter } from './utils'
 
 jest.mock('../../../modules/config')
+jest.mock('../../../modules/profile')
 jest.mock('dcl-catalyst-client')
 jest.mock('@dcl/crypto')
 
@@ -13,6 +15,7 @@ const mockConfig = config as jest.Mocked<typeof config>
 const mockCreateContentClient = createContentClient as jest.MockedFunction<typeof createContentClient>
 const mockDeploymentBuilder = DeploymentBuilder as jest.Mocked<typeof DeploymentBuilder>
 const mockAuthenticator = Authenticator as jest.Mocked<typeof Authenticator>
+const mockDeployWithCatalystRotation = deployWithCatalystRotation as jest.MockedFunction<typeof deployWithCatalystRotation>
 
 afterEach(() => {
   jest.clearAllMocks()
@@ -85,7 +88,6 @@ describe('when deploying a profile based on a default profile', () => {
   let mockBuiltEntity: DeploymentPreparationData
   let mockAuthChain: AuthLink[]
   let mockFetchEntitiesByPointers: jest.Mock
-  let mockDeploy: jest.Mock
 
   beforeEach(() => {
     mockParams = {
@@ -161,24 +163,25 @@ describe('when deploying a profile based on a default profile', () => {
     mockConfig.get.mockReturnValueOnce(mockPeerUrl)
 
     mockFetchEntitiesByPointers = jest.fn().mockResolvedValue([mockEntity])
-    mockDeploy = jest.fn()
 
     mockCreateContentClient.mockReturnValueOnce({
-      fetchEntitiesByPointers: mockFetchEntitiesByPointers,
-      deploy: mockDeploy
+      fetchEntitiesByPointers: mockFetchEntitiesByPointers
     } as unknown as ReturnType<typeof createContentClient>)
 
     mockDeploymentBuilder.buildEntity.mockResolvedValue(mockBuiltEntity)
-
     mockAuthenticator.signPayload.mockReturnValue(mockAuthChain)
+    mockDeployWithCatalystRotation.mockResolvedValue(undefined)
   })
 
-  it('should resolve by calling third party functions with the appropriate values', async () => {
-    await expect(deployProfileFromDefault(mockParams)).resolves.not.toThrow()
+  it('should fetch the default profile entity', async () => {
+    await deployProfileFromDefault(mockParams)
 
     expect(mockCreateContentClient).toHaveBeenCalledWith({ url: mockPeerUrl + '/content', fetcher: expect.anything() })
-
     expect(mockFetchEntitiesByPointers).toHaveBeenCalledWith([mockParams.defaultProfile])
+  })
+
+  it('should build the deployment entity with correct metadata', async () => {
+    await deployProfileFromDefault(mockParams)
 
     expect(mockDeploymentBuilder.buildEntity).toHaveBeenCalledWith({
       type: EntityType.PROFILE,
@@ -237,9 +240,18 @@ describe('when deploying a profile based on a default profile', () => {
         ]
       }
     })
+  })
+
+  it('should call deployWithCatalystRotation with the correct entity', async () => {
+    await deployProfileFromDefault(mockParams)
 
     expect(mockAuthenticator.signPayload).toHaveBeenCalledWith(mockParams.connectedAccountIdentity, mockBuiltEntity.entityId)
-
-    expect(mockDeploy).toHaveBeenCalledWith({ entityId: mockBuiltEntity.entityId, files: mockBuiltEntity.files, authChain: mockAuthChain })
+    expect(mockDeployWithCatalystRotation).toHaveBeenCalledWith({
+      entity: {
+        entityId: mockBuiltEntity.entityId,
+        files: mockBuiltEntity.files,
+        authChain: mockAuthChain
+      }
+    })
   })
 })

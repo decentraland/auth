@@ -11,6 +11,7 @@ import wrongImg from '../../../assets/images/wrong.svg'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { useAnalytics } from '../../../hooks/useAnalytics'
+import { useDisabledCatalysts } from '../../../hooks/useDisabledCatalysts'
 import { useSignRequest } from '../../../hooks/useSignRequest'
 import { useTrackReferral } from '../../../hooks/useTrackReferral'
 import { ClickEvents } from '../../../modules/analytics/types'
@@ -100,6 +101,7 @@ export const SetupPage = () => {
     trackCheckTermsOfService
   } = useAnalytics()
   const { track: trackReferral } = useTrackReferral()
+  const disabledCatalysts = useDisabledCatalysts()
 
   const requestId = useMemo(() => {
     // Grab the request id from redirectTo parameter.
@@ -284,7 +286,8 @@ export const SetupPage = () => {
           connectedAccount: account,
           connectedAccountIdentity: identity,
           defaultProfile: profile,
-          deploymentProfileName: name
+          deploymentProfileName: name,
+          disabledCatalysts
         })
 
         if (referrer && EthAddress.validate(referrer)) {
@@ -351,7 +354,8 @@ export const SetupPage = () => {
       trackClick,
       trackTermsOfServiceSuccess,
       account,
-      identity
+      identity,
+      disabledCatalysts
     ]
   )
 

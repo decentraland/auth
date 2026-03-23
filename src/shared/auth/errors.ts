@@ -8,6 +8,7 @@ class DifferentSenderError extends Error {
 }
 
 class ExpiredRequestError extends Error {
+  readonly skipReporting = true
   constructor(
     public readonly requestId: string,
     public readonly expiration?: string
@@ -17,12 +18,14 @@ class ExpiredRequestError extends Error {
 }
 
 class RequestNotFoundError extends Error {
+  readonly skipReporting = true
   constructor(public readonly requestId: string) {
     super(`The request ${requestId} was not found`)
   }
 }
 
 class RequestFulfilledError extends Error {
+  readonly skipReporting = true
   constructor(public readonly requestId: string) {
     super(`The request ${requestId} has already been fulfilled`)
   }

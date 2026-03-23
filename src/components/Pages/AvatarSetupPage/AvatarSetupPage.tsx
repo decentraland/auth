@@ -11,6 +11,7 @@ import avatarParticles from '../../../assets/animations/AvatarParticles_Lottie.j
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { useAnalytics } from '../../../hooks/useAnalytics'
+import { useDisabledCatalysts } from '../../../hooks/useDisabledCatalysts'
 import { useSignRequest } from '../../../hooks/useSignRequest'
 import { useTrackReferral } from '../../../hooks/useTrackReferral'
 import { config } from '../../../modules/config'
@@ -78,6 +79,7 @@ const AvatarSetupPage: React.FC = () => {
   const referrer = urlSearchParams.get('referrer')
   const { track: trackReferral } = useTrackReferral()
   const { trackAvatarCustomizationStep, trackAvatarEditSuccess, trackTermsOfServiceSuccess, trackCheckTermsOfService } = useAnalytics()
+  const disabledCatalysts = useDisabledCatalysts()
 
   const [state, setState] = useState<AvatarSetupState>({
     username: sessionStorage.getItem('dcl_avatar_setup_username') || '',
@@ -258,7 +260,8 @@ const AvatarSetupPage: React.FC = () => {
           connectedAccount: account,
           connectedAccountIdentity: identity,
           avatarShape: avatarShape,
-          deploymentProfileName: state.username
+          deploymentProfileName: state.username,
+          disabledCatalysts
         })
 
         trackAvatarEditSuccess({
@@ -348,7 +351,8 @@ const AvatarSetupPage: React.FC = () => {
       signRequest,
       trackAvatarCustomizationStep,
       trackAvatarEditSuccess,
-      trackReferral
+      trackReferral,
+      disabledCatalysts
     ]
   )
 

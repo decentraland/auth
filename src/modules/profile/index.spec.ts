@@ -1,4 +1,3 @@
-import type { IFetchComponent } from '@well-known-components/interfaces'
 import { DeploymentBuilder, createContentClient, createLambdasClient } from 'dcl-catalyst-client'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/catalyst.schemas'
 import { getCatalystServersFromCache } from 'dcl-catalyst-client/dist/contracts-snapshots'
@@ -12,6 +11,7 @@ import {
   createMockProfile
 } from '../../tests/mocks/profile'
 import { config } from '../config'
+import { DeploymentError } from './errors'
 import { fetchProfileWithConsistencyCheck, redeployExistingProfile, redeployExistingProfileWithContentServerData } from './index'
 
 // Mock dependencies
@@ -48,23 +48,18 @@ jest.spyOn(console, 'error').mockImplementation(() => undefined)
 
 const createCatalystList = (...addresses: string[]) => addresses.map(address => ({ address }))
 
-type MockFetcher = IFetchComponent & {
-  fetch: jest.Mock
-}
-
-const createMockFetcher = (): MockFetcher =>
+const createMockResponse = (ok: boolean, status: number, body: string = '') =>
   ({
-    fetch: jest.fn().mockResolvedValue({
-      arrayBuffer: jest.fn().mockResolvedValue(new ArrayBuffer(8))
-    })
-  }) as unknown as MockFetcher
+    ok,
+    status,
+    text: jest.fn().mockResolvedValue(body)
+  }) as unknown as Response
 
 const setupRedeployBase = (address: string = DEFAULT_MOCK_ADDRESS) => {
   const profile = createMockProfile(address)
   const identity = createMockIdentity(address)
-  const fetcher = createMockFetcher()
 
-  return { profile, identity, fetcher }
+  return { profile, identity }
 }
 
 describe('profile module', () => {
@@ -271,10 +266,9 @@ describe('profile module', () => {
     const mockAddress = DEFAULT_MOCK_ADDRESS
     let mockProfile: Profile
     let mockIdentity: AuthIdentity
-    let mockFetcher: MockFetcher
 
     beforeEach(() => {
-      ;({ profile: mockProfile, identity: mockIdentity, fetcher: mockFetcher } = setupRedeployBase(mockAddress))
+      ;({ profile: mockProfile, identity: mockIdentity } = setupRedeployBase(mockAddress))
       ;(DeploymentBuilder.buildEntity as jest.Mock).mockResolvedValue(createMockDeploymentResult())
       ;(Authenticator.signPayload as jest.Mock).mockReturnValue([])
       ;(getCatalystServersFromCache as jest.Mock).mockReturnValue(createCatalystList('https://catalyst1.zone', 'https://catalyst2.zone'))
@@ -282,10 +276,10 @@ describe('profile module', () => {
 
     describe('and the deployment is successful on the first catalyst', () => {
       beforeEach(async () => {
-        const mockContentClient = { deploy: jest.fn().mockResolvedValue({}) }
+        const mockContentClient = { deploy: jest.fn().mockResolvedValue(createMockResponse(true, 200)) }
         ;(createContentClient as jest.Mock).mockReturnValue(mockContentClient)
 
-        await redeployExistingProfile(mockProfile, mockAddress, mockIdentity, [], mockFetcher)
+        await redeployExistingProfile(mockProfile, mockAddress, mockIdentity, [])
       })
 
       it('should build the deployment entity with correct type and no snapshots', () => {
@@ -316,11 +310,11 @@ describe('profile module', () => {
       let mockContentClient2: { deploy: jest.Mock }
 
       beforeEach(async () => {
-        mockContentClient1 = { deploy: jest.fn().mockRejectedValue({ status: 500 }) }
-        mockContentClient2 = { deploy: jest.fn().mockResolvedValue({}) }
+        mockContentClient1 = { deploy: jest.fn().mockResolvedValue(createMockResponse(false, 500, 'Internal Server Error')) }
+        mockContentClient2 = { deploy: jest.fn().mockResolvedValue(createMockResponse(true, 200)) }
         ;(createContentClient as jest.Mock).mockReturnValueOnce(mockContentClient1).mockReturnValueOnce(mockContentClient2)
 
-        await redeployExistingProfile(mockProfile, mockAddress, mockIdentity, [], mockFetcher)
+        await redeployExistingProfile(mockProfile, mockAddress, mockIdentity, [])
       })
 
       it('should retry with the next catalyst', () => {
@@ -332,28 +326,27 @@ describe('profile module', () => {
       })
     })
 
-    describe('and all catalysts fail', () => {
+    describe('and all catalysts fail with a 5xx error', () => {
       beforeEach(() => {
-        const mockFailingClient = { deploy: jest.fn().mockRejectedValue({ status: 500 }) }
+        const mockFailingClient = { deploy: jest.fn().mockResolvedValue(createMockResponse(false, 500, 'Internal Server Error')) }
         ;(createContentClient as jest.Mock).mockReturnValue(mockFailingClient)
       })
 
-      it('should throw an error after all retries are exhausted', async () => {
-        await expect(redeployExistingProfile(mockProfile, mockAddress, mockIdentity, [], mockFetcher)).rejects.toEqual({ status: 500 })
+      it('should throw a DeploymentError after all retries are exhausted', async () => {
+        await expect(redeployExistingProfile(mockProfile, mockAddress, mockIdentity, [])).rejects.toThrow(DeploymentError)
       })
     })
 
     describe('and a 4xx error occurs', () => {
       beforeEach(() => {
-        const mockFailingClient = { deploy: jest.fn().mockRejectedValue({ status: 400 }) }
+        const mockFailingClient = { deploy: jest.fn().mockResolvedValue(createMockResponse(false, 400, 'Bad Request')) }
         ;(createContentClient as jest.Mock).mockReturnValue(mockFailingClient)
       })
 
       it('should not retry and throw immediately', async () => {
-        await expect(redeployExistingProfile(mockProfile, mockAddress, mockIdentity, [], mockFetcher)).rejects.toEqual({
-          status: 400
-        })
+        await expect(redeployExistingProfile(mockProfile, mockAddress, mockIdentity, [])).rejects.toThrow(DeploymentError)
 
+        // 1 for the deploy attempt (createContentClient is not called for buildEntity anymore)
         expect(createContentClient).toHaveBeenCalledTimes(1)
       })
     })
@@ -380,7 +373,7 @@ describe('profile module', () => {
         }
 
         const mockContentClientForDeploy = {
-          deploy: jest.fn().mockResolvedValue({})
+          deploy: jest.fn().mockResolvedValue(createMockResponse(true, 200))
         }
 
         ;(createContentClient as jest.Mock).mockReturnValueOnce(mockContentClientForFetch).mockReturnValueOnce(mockContentClientForDeploy)
@@ -434,10 +427,9 @@ describe('profile module', () => {
     const mockAddress = DEFAULT_MOCK_ADDRESS
     let mockIdentity: AuthIdentity
     let mockProfile: Profile
-    let mockFetcher: MockFetcher
 
     beforeEach(() => {
-      ;({ profile: mockProfile, identity: mockIdentity, fetcher: mockFetcher } = setupRedeployBase(mockAddress))
+      ;({ profile: mockProfile, identity: mockIdentity } = setupRedeployBase(mockAddress))
       ;(DeploymentBuilder.buildEntity as jest.Mock).mockResolvedValue(createMockDeploymentResult())
       ;(Authenticator.signPayload as jest.Mock).mockReturnValue([])
     })
@@ -451,10 +443,10 @@ describe('profile module', () => {
         ]
         ;(getCatalystServersFromCache as jest.Mock).mockReturnValue(mockCatalysts)
 
-        const mockContentClient = { deploy: jest.fn().mockResolvedValue({}) }
+        const mockContentClient = { deploy: jest.fn().mockResolvedValue(createMockResponse(true, 200)) }
         ;(createContentClient as jest.Mock).mockReturnValue(mockContentClient)
 
-        await redeployExistingProfile(mockProfile, mockAddress, mockIdentity, [], mockFetcher)
+        await redeployExistingProfile(mockProfile, mockAddress, mockIdentity, [])
       })
 
       it('should create the first content client with the PEER_URL', () => {
@@ -482,15 +474,16 @@ describe('profile module', () => {
         ;(createContentClient as jest.Mock).mockImplementation(({ url }) => {
           deployCallUrls.push(url)
           return {
-            deploy: jest.fn().mockRejectedValue({ status: 500 })
+            deploy: jest.fn().mockResolvedValue(createMockResponse(false, 500, 'Internal Server Error'))
           }
         })
 
-        await redeployExistingProfile(mockProfile, mockAddress, mockIdentity, [], mockFetcher).catch(() => undefined)
+        await redeployExistingProfile(mockProfile, mockAddress, mockIdentity, []).catch(() => undefined)
       })
 
-      it('should attempt up to 3 catalysts maximum', () => {
-        expect(deployCallUrls.length).toBe(3)
+      it('should attempt all available catalysts', () => {
+        // PEER_URL + 4 catalysts from cache (PEER_URL is excluded from cache list) = 5
+        expect(deployCallUrls.length).toBe(5)
       })
 
       it('should start with the PEER_URL', () => {
