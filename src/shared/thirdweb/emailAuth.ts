@@ -76,6 +76,11 @@ const verifyEmailOTPAndConnect = async (email: string, verificationCode: string)
     })
   } catch (error) {
     console.error('[Thirdweb] Error verifying OTP:', error)
+    // Thirdweb throws this error when the user enters an incorrect or expired OTP code.
+    // This is expected user behavior, so we skip Sentry reporting to reduce noise.
+    if (error instanceof Error && error.message === 'Failed to verify verification code') {
+      ;(error as Error & { skipReporting: boolean }).skipReporting = true
+    }
     throw error
   }
 
