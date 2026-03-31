@@ -581,7 +581,7 @@ export const RequestPage = () => {
       const toAddress = txParams?.to as string | undefined
 
       if (!toAddress) {
-        throw new Error('Contract address not found in transaction parameters')
+        throw new Error(`Contract address not found in transaction parameters. Received params: ${JSON.stringify(txParams ?? null)}`)
       }
 
       let result: string | null = null
