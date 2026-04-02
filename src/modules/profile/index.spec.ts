@@ -146,7 +146,7 @@ describe('profile module', () => {
       })
     })
 
-    describe('and some catalysts timeout while others return the profile', () => {
+    describe('and some catalysts throw while others return the profile', () => {
       beforeEach(async () => {
         mockProfile = { timestamp: 1000, avatars: [] }
 
@@ -159,43 +159,82 @@ describe('profile module', () => {
         ;(getCatalystServersFromCache as jest.Mock).mockReturnValue(mockCatalysts)
 
         const mockClientWithProfile = { getAvatarDetails: jest.fn().mockResolvedValue(mockProfile) }
-        const mockClientTimeout = {
-          getAvatarDetails: jest.fn().mockRejectedValue('Aborted')
+        const mockClientWithError = {
+          getAvatarDetails: jest.fn().mockRejectedValue('Internal failure')
         }
 
         ;(createLambdasClient as jest.Mock)
           .mockReturnValueOnce(mockClientWithProfile)
-          .mockReturnValueOnce(mockClientTimeout)
+          .mockReturnValueOnce(mockClientWithError)
           .mockReturnValueOnce(mockClientWithProfile)
 
         result = await fetchProfileWithConsistencyCheck(mockAddress, [])
       })
 
-      it('should return isConsistent as true', () => {
+      it('should return isConsistent as true because thrown errors are not considered as inconsistencies', () => {
         expect(result.isConsistent).toBe(true)
       })
 
-      it('should not surface an error because timeouts are ignored', () => {
-        expect(result.error).toBeUndefined()
+      it('should return the available profile', () => {
+        expect(result.profile).toEqual(mockProfile)
       })
     })
 
-    describe('and a non-timeout error occurs', () => {
-      const errorMessage = 'Internal failure'
-
+    describe('and some catalysts return a server error response while others return the profile', () => {
       beforeEach(async () => {
         mockProfile = { timestamp: 1000, avatars: [] }
 
-        const mockCatalysts = [{ address: 'https://catalyst1.zone' }, { address: 'https://catalyst2.zone' }]
+        const serverErrorResponse = { error: 'Internal Server Error', message: 'Something went wrong' }
+        const mockCatalysts = [
+          { address: 'https://catalyst1.zone' },
+          { address: 'https://catalyst2.zone' }
+        ]
 
         ;(getCatalystServersFromCache as jest.Mock).mockReturnValue(mockCatalysts)
 
         const mockClientWithProfile = { getAvatarDetails: jest.fn().mockResolvedValue(mockProfile) }
-        const mockClientWithError = {
-          getAvatarDetails: jest.fn().mockRejectedValue(errorMessage)
+        const mockClientWithServerError = {
+          getAvatarDetails: jest.fn().mockResolvedValue(serverErrorResponse)
         }
 
-        ;(createLambdasClient as jest.Mock).mockReturnValueOnce(mockClientWithProfile).mockReturnValueOnce(mockClientWithError)
+        ;(createLambdasClient as jest.Mock)
+          .mockReturnValueOnce(mockClientWithProfile)
+          .mockReturnValueOnce(mockClientWithServerError)
+
+        result = await fetchProfileWithConsistencyCheck(mockAddress, [])
+      })
+
+      it('should return isConsistent as true because server errors are not considered as inconsistencies', () => {
+        expect(result.isConsistent).toBe(true)
+      })
+
+      it('should return the available profile', () => {
+        expect(result.profile).toEqual(mockProfile)
+      })
+    })
+
+    describe('and some catalysts return a not found response while others return the profile', () => {
+      beforeEach(async () => {
+        mockProfile = { timestamp: 1000, avatars: [] }
+
+        const notFoundResponse = { error: 'Not Found', message: 'Profile not found' }
+        const mockCatalysts = [
+          { address: 'https://catalyst1.zone' },
+          { address: 'https://catalyst2.zone' },
+          { address: 'https://catalyst3.zone' }
+        ]
+
+        ;(getCatalystServersFromCache as jest.Mock).mockReturnValue(mockCatalysts)
+
+        const mockClientWithProfile = { getAvatarDetails: jest.fn().mockResolvedValue(mockProfile) }
+        const mockClientWithNotFound = {
+          getAvatarDetails: jest.fn().mockResolvedValue(notFoundResponse)
+        }
+
+        ;(createLambdasClient as jest.Mock)
+          .mockReturnValueOnce(mockClientWithProfile)
+          .mockReturnValueOnce(mockClientWithNotFound)
+          .mockReturnValueOnce(mockClientWithProfile)
 
         result = await fetchProfileWithConsistencyCheck(mockAddress, [])
       })
@@ -204,12 +243,38 @@ describe('profile module', () => {
         expect(result.isConsistent).toBe(false)
       })
 
-      it('should surface the error message and URL', () => {
-        expect(result.error).toContain(errorMessage)
-        expect(result.error).toContain('https://catalyst2.zone')
+      it('should return the available profile', () => {
+        expect(result.profile).toEqual(mockProfile)
+      })
+    })
+
+    describe('and a catalyst returns a not found alongside another that has a server error', () => {
+      beforeEach(async () => {
+        mockProfile = { timestamp: 1000, avatars: [] }
+
+        const notFoundResponse = { error: 'Not Found', message: 'Profile not found' }
+        const serverErrorResponse = { error: 'Internal Server Error' }
+        const mockCatalysts = [
+          { address: 'https://catalyst1.zone' },
+          { address: 'https://catalyst2.zone' },
+          { address: 'https://catalyst3.zone' }
+        ]
+
+        ;(getCatalystServersFromCache as jest.Mock).mockReturnValue(mockCatalysts)
+
+        ;(createLambdasClient as jest.Mock)
+          .mockReturnValueOnce({ getAvatarDetails: jest.fn().mockResolvedValue(mockProfile) })
+          .mockReturnValueOnce({ getAvatarDetails: jest.fn().mockResolvedValue(notFoundResponse) })
+          .mockReturnValueOnce({ getAvatarDetails: jest.fn().mockResolvedValue(serverErrorResponse) })
+
+        result = await fetchProfileWithConsistencyCheck(mockAddress, [])
       })
 
-      it('should still return the available profile', () => {
+      it('should return isConsistent as false because of the not found response', () => {
+        expect(result.isConsistent).toBe(false)
+      })
+
+      it('should return the available profile', () => {
         expect(result.profile).toEqual(mockProfile)
       })
     })
@@ -386,24 +451,72 @@ describe('profile module', () => {
         expect(mockClient.fetchEntitiesByPointers).toHaveBeenCalledWith([mockAddress])
       })
 
-      it('should build the deployment entity with empty wearables and no snapshots', () => {
-        expect(DeploymentBuilder.buildEntity).toHaveBeenCalledWith(
-          expect.objectContaining({
-            metadata: expect.objectContaining({
-              avatars: expect.arrayContaining([
-                expect.objectContaining({
-                  avatar: expect.objectContaining({
-                    wearables: []
-                  })
-                })
-              ])
-            })
-          })
-        )
-
-        // Verify snapshots were stripped
+      it('should build the deployment entity preserving wearables and without snapshots', () => {
         const callArgs = (DeploymentBuilder.buildEntity as jest.Mock).mock.calls[0][0]
+        expect(callArgs.metadata.avatars[0].avatar.wearables).toEqual(['urn:decentraland:off-chain:base-avatars:eyes_00'])
         expect(callArgs.metadata.avatars[0].avatar).not.toHaveProperty('snapshots')
+      })
+    })
+
+    describe('and the first deployment fails', () => {
+      beforeEach(async () => {
+        const mockContentClientForFetch = {
+          fetchEntitiesByPointers: jest.fn().mockResolvedValue([mockEntity])
+        }
+
+        const createFailedDeployClient = () => ({
+          deploy: jest.fn().mockResolvedValue(createMockResponse(false, 500, 'Internal Server Error'))
+        })
+
+        const createSuccessfulDeployClient = () => ({
+          deploy: jest.fn().mockResolvedValue(createMockResponse(true, 200))
+        })
+
+        // Rotation list: PEER_URL/content + 2 catalysts from getCatalystServersFromCache = 3 URLs
+        ;(createContentClient as jest.Mock)
+          .mockReturnValueOnce(mockContentClientForFetch)
+          // All catalyst rotation attempts fail for the first buildEntityAndDeploy call
+          .mockReturnValueOnce(createFailedDeployClient())
+          .mockReturnValueOnce(createFailedDeployClient())
+          .mockReturnValueOnce(createFailedDeployClient())
+          // Fallback with empty wearables succeeds on first catalyst
+          .mockReturnValueOnce(createSuccessfulDeployClient())
+
+        await redeployExistingProfileWithContentServerData(mockCatalystUrl, mockAddress, mockIdentity, [])
+      })
+
+      it('should retry with empty wearables', () => {
+        const lastCall = (DeploymentBuilder.buildEntity as jest.Mock).mock.calls.at(-1)[0]
+        expect(lastCall.metadata.avatars[0].avatar.wearables).toEqual([])
+        expect(lastCall.metadata.avatars[0].avatar).not.toHaveProperty('snapshots')
+      })
+
+      it('should have first attempted with wearables preserved', () => {
+        const firstCall = (DeploymentBuilder.buildEntity as jest.Mock).mock.calls[0][0]
+        expect(firstCall.metadata.avatars[0].avatar.wearables).toEqual(['urn:decentraland:off-chain:base-avatars:eyes_00'])
+      })
+    })
+
+    describe('and the first deployment fails with a 400 error', () => {
+      it('should throw without attempting the empty wearables fallback', async () => {
+        const mockContentClientForFetch = {
+          fetchEntitiesByPointers: jest.fn().mockResolvedValue([mockEntity])
+        }
+
+        const mockContentClientForFailedDeploy = {
+          deploy: jest.fn().mockResolvedValue(createMockResponse(false, 400, 'Bad Request'))
+        }
+
+        ;(createContentClient as jest.Mock)
+          .mockReturnValueOnce(mockContentClientForFetch)
+          .mockReturnValueOnce(mockContentClientForFailedDeploy)
+
+        await expect(
+          redeployExistingProfileWithContentServerData(mockCatalystUrl, mockAddress, mockIdentity, [])
+        ).rejects.toThrow(DeploymentError)
+
+        // Only one call to buildEntity — the fallback was never attempted
+        expect(DeploymentBuilder.buildEntity).toHaveBeenCalledTimes(1)
       })
     })
 
