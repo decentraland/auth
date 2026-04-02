@@ -185,10 +185,7 @@ describe('profile module', () => {
         mockProfile = { timestamp: 1000, avatars: [] }
 
         const serverErrorResponse = { error: 'Internal Server Error', message: 'Something went wrong' }
-        const mockCatalysts = [
-          { address: 'https://catalyst1.zone' },
-          { address: 'https://catalyst2.zone' }
-        ]
+        const mockCatalysts = [{ address: 'https://catalyst1.zone' }, { address: 'https://catalyst2.zone' }]
 
         ;(getCatalystServersFromCache as jest.Mock).mockReturnValue(mockCatalysts)
 
@@ -197,9 +194,7 @@ describe('profile module', () => {
           getAvatarDetails: jest.fn().mockResolvedValue(serverErrorResponse)
         }
 
-        ;(createLambdasClient as jest.Mock)
-          .mockReturnValueOnce(mockClientWithProfile)
-          .mockReturnValueOnce(mockClientWithServerError)
+        ;(createLambdasClient as jest.Mock).mockReturnValueOnce(mockClientWithProfile).mockReturnValueOnce(mockClientWithServerError)
 
         result = await fetchProfileWithConsistencyCheck(mockAddress, [])
       })
@@ -261,7 +256,6 @@ describe('profile module', () => {
         ]
 
         ;(getCatalystServersFromCache as jest.Mock).mockReturnValue(mockCatalysts)
-
         ;(createLambdasClient as jest.Mock)
           .mockReturnValueOnce({ getAvatarDetails: jest.fn().mockResolvedValue(mockProfile) })
           .mockReturnValueOnce({ getAvatarDetails: jest.fn().mockResolvedValue(notFoundResponse) })
@@ -486,7 +480,8 @@ describe('profile module', () => {
       })
 
       it('should retry with empty wearables', () => {
-        const lastCall = (DeploymentBuilder.buildEntity as jest.Mock).mock.calls.at(-1)[0]
+        const calls = (DeploymentBuilder.buildEntity as jest.Mock).mock.calls
+        const lastCall = calls[calls.length - 1][0]
         expect(lastCall.metadata.avatars[0].avatar.wearables).toEqual([])
         expect(lastCall.metadata.avatars[0].avatar).not.toHaveProperty('snapshots')
       })
@@ -511,9 +506,9 @@ describe('profile module', () => {
           .mockReturnValueOnce(mockContentClientForFetch)
           .mockReturnValueOnce(mockContentClientForFailedDeploy)
 
-        await expect(
-          redeployExistingProfileWithContentServerData(mockCatalystUrl, mockAddress, mockIdentity, [])
-        ).rejects.toThrow(DeploymentError)
+        await expect(redeployExistingProfileWithContentServerData(mockCatalystUrl, mockAddress, mockIdentity, [])).rejects.toThrow(
+          DeploymentError
+        )
 
         // Only one call to buildEntity — the fallback was never attempted
         expect(DeploymentBuilder.buildEntity).toHaveBeenCalledTimes(1)
