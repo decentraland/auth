@@ -6,6 +6,7 @@ import { Entity, EntityType } from '@dcl/schemas'
 import { createFetcher } from '../../shared/fetcher'
 import { config } from '../config'
 import { deployWithCatalystRotation } from './deploy'
+import { DeploymentError } from './errors'
 import { getCatalystServers, getCatalystUrlsForRotation } from './utils'
 
 interface ConsistencyResult {
@@ -23,7 +24,7 @@ interface ProfileResult {
 interface ProfileResultError {
   error: string
   url: string
-  isTimeout?: boolean
+  isNotFound?: boolean
 }
 
 async function fetchProfile(address: string, fetcher?: IFetchComponent): Promise<Profile | null> {
@@ -66,14 +67,14 @@ async function fetchProfileWithConsistencyCheck(
           // { error: "Not Found", message: "Profile not found" } instead of throwing.
           // We must validate that the response is actually a profile.
           if (!profile.avatars) {
-            throw new Error('Profile not found')
+            return { error: 'Profile not found', url, isNotFound: isNotFoundResponse(profile) }
           }
           return { profile, url }
         } catch (error) {
+          // Exceptions (network errors, timeouts, 500s) are not "not found"
           return {
             error: normalizeErrorMessage(error),
-            url,
-            isTimeout: isTimeoutError(error)
+            url
           }
         }
       })
@@ -81,7 +82,7 @@ async function fetchProfileWithConsistencyCheck(
 
     const profilesWithUrls = profileResults.filter(isProfileResult)
     const profileErrors = profileResults.filter(isProfileResultError)
-    const nonTimeoutErrors = profileErrors.filter(error => !error.isTimeout)
+    const notFoundErrors = profileErrors.filter(error => error.isNotFound)
 
     if (profilesWithUrls.length === 0) {
       return {
@@ -99,12 +100,10 @@ async function fetchProfileWithConsistencyCheck(
       return (acc?.profile?.timestamp ?? 0) > (current?.profile?.timestamp ?? 0) ? acc : current
     }, firstProfile)
 
-    const consistencyError = nonTimeoutErrors[0]
     return {
-      isConsistent: consistencyError === undefined && allProfilesHaveSameTimestamp,
+      isConsistent: allProfilesHaveSameTimestamp && notFoundErrors.length === 0,
       profile: newest.profile,
-      profileFetchedFrom: newest.url,
-      error: consistencyError ? `${consistencyError.error} (${consistencyError.url})` : undefined
+      profileFetchedFrom: newest.url
     }
   } catch (error) {
     console.error('Profile consistency check failed:', error)
@@ -155,7 +154,7 @@ async function redeployExistingProfileWithContentServerData(
   }
 
   // Don't redeploy snapshot files, remove snapshot references from avatar
-  const metadata = buildMetadataWithEmptyWearables(entity)
+  const metadata = buildProfileMetadataWithoutSnapshots(entity.metadata as Profile)
 
   const buildEntityAndDeploy = async (profileMetadata: Partial<Profile>) => {
     const deploymentEntity = await DeploymentBuilder.buildEntity({
@@ -176,10 +175,14 @@ async function redeployExistingProfileWithContentServerData(
   }
 
   // First try to redeploy with the full content server metadata
-  // If it fails, try to redeploy with the empty wearables metadata
+  // If it fails with a non-400 error, try to redeploy with the empty wearables metadata
   try {
     await buildEntityAndDeploy(metadata)
   } catch (error) {
+    if (error instanceof DeploymentError && error.statusCode === 400) {
+      throw error
+    }
+
     console.warn(
       'Profile redeployment failed with full content server metadata, attempting to redeploy with empty wearables metadata:',
       error
@@ -216,8 +219,6 @@ function buildMetadataWithEmptyWearables(entity: Entity): Partial<Profile> {
   }
 }
 
-const TIMEOUT_STATUS_CODE = 408
-
 function normalizeErrorMessage(error: unknown): string {
   if (typeof error === 'string') {
     return error
@@ -234,33 +235,22 @@ function normalizeErrorMessage(error: unknown): string {
   }
 }
 
-function isTimeoutError(error: unknown): boolean {
-  if (error instanceof Error && error.name === 'AbortError') {
-    return true
-  }
-
-  if (typeof error === 'object' && error !== null) {
-    const maybeStatus = (error as { status?: number }).status
-    if (maybeStatus === TIMEOUT_STATUS_CODE) {
-      return true
-    }
-  }
-
-  const message = normalizeErrorMessage(error)
-  return (
-    message.toLowerCase().includes('timeout') ||
-    message.toLowerCase().includes('request timeout') ||
-    message.toLowerCase().includes('aborted') ||
-    message.toLowerCase().includes('status 408')
-  )
-}
-
 function isProfileResult(result: ProfileResult | ProfileResultError): result is ProfileResult {
   return 'profile' in result
 }
 
 function isProfileResultError(result: ProfileResult | ProfileResultError): result is ProfileResultError {
   return 'error' in result
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function isNotFoundResponse(response: any): boolean {
+  const error = response?.error
+  const message = response?.message
+  return (
+    (typeof error === 'string' && error.toLowerCase().includes('not found')) ||
+    (typeof message === 'string' && message.toLowerCase().includes('not found'))
+  )
 }
 
 export {
