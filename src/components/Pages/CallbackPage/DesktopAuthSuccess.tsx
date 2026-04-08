@@ -33,8 +33,11 @@ export const DesktopAuthSuccess = ({ identityId, explorerText, onTryAgain }: Pro
   const [deepLinkFailed, setDeepLinkFailed] = useState(false)
 
   const environment = config.get('ENVIRONMENT').toLowerCase()
-  const dclenv = ENVIRONMENT_TO_DCLENV[environment] ?? 'org'
-  const deepLinkUrl = `decentraland://?dclenv=${dclenv}&signin=${identityId}`
+  const dclenv = ENVIRONMENT_TO_DCLENV[environment]
+  if (!dclenv) {
+    console.warn('Unknown ENVIRONMENT value for deep link:', environment, '— defaulting to org')
+  }
+  const deepLinkUrl = `decentraland://?dclenv=${dclenv ?? 'org'}&signin=${identityId}`
 
   const attemptDeepLink = useCallback(async () => {
     const wasLaunched = await launchDeepLink(deepLinkUrl)

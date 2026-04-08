@@ -8,6 +8,10 @@ jest.mock('./utils', () => ({
   connectToSocialProvider: (...args: unknown[]) => mockConnectToSocialProvider(...args)
 }))
 
+jest.mock('../../../shared/utils/errorHandler', () => ({
+  handleError: jest.fn()
+}))
+
 const mockTrackLoginClick = jest.fn()
 jest.mock('../../../hooks/useAnalytics', () => ({
   useAnalytics: () => ({
@@ -41,6 +45,13 @@ jest.mock('../../FeatureFlagsProvider', () => {
     },
     FeatureFlagsKeys: { MAGIC_TEST: 'dapps-magic-dev-test' }
   }
+})
+
+jest.mock('../../Pages/CallbackPage/CallbackPage.styled', () => {
+  const Div = ({ children, ...props }: React.HTMLAttributes<HTMLDivElement> & { children?: React.ReactNode }) => (
+    <div {...props}>{children}</div>
+  )
+  return { Container: Div, Wrapper: Div }
 })
 
 jest.mock('../../AnimatedBackground', () => ({
@@ -108,6 +119,28 @@ describe('SocialAutoLoginRedirect', () => {
 
       await waitFor(() => {
         expect(mockConnectToSocialProvider).toHaveBeenCalledTimes(1)
+      })
+    })
+  })
+
+  describe('when connectToSocialProvider throws an error', () => {
+    let reloadMock: jest.Mock
+
+    beforeEach(() => {
+      mockConnectToSocialProvider.mockRejectedValue(new Error('Magic SDK failed'))
+      reloadMock = jest.fn()
+      Object.defineProperty(window, 'location', {
+        value: { ...window.location, reload: reloadMock },
+        writable: true,
+        configurable: true
+      })
+    })
+
+    it('should reload the page to show the full login UI', async () => {
+      render(<SocialAutoLoginRedirect connectionType={ConnectionOptionType.GOOGLE} />)
+
+      await waitFor(() => {
+        expect(reloadMock).toHaveBeenCalled()
       })
     })
   })

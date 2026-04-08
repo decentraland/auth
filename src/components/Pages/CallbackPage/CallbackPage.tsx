@@ -109,9 +109,11 @@ const DesktopCallbackPage = () => {
           if (freshIdentity) {
             const httpClient = createAuthServerHttpClient()
             const response = await httpClient.postIdentity(freshIdentity, { isMobile: false })
+            markReturningUser(connectionData.account ?? '')
             setIdentityId(response.identityId)
             return
           }
+          console.warn('OPEN_EXPLORER_AFTER_LOGIN enabled but identity not found in localStorage for', ethAddress)
         }
 
         const account = connectionData.account ?? ''

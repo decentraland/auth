@@ -72,8 +72,9 @@ jest.mock('../../../shared/utils/magicSdk', () => ({
     })
 }))
 
+const mockMarkReturningUser = jest.fn()
 jest.mock('../../../shared/onboarding/markReturningUser', () => ({
-  markReturningUser: jest.fn()
+  markReturningUser: (...args: unknown[]) => mockMarkReturningUser(...args)
 }))
 
 jest.mock('../../../shared/onboarding/getStoredEmail', () => ({
@@ -242,6 +243,14 @@ describe('CallbackPage', () => {
       })
 
       expect(mockRedirect).not.toHaveBeenCalled()
+    })
+
+    it('should mark the user as returning', async () => {
+      renderWithProviders({ 'dapps-open-explorer-after-login': true })
+
+      await waitFor(() => {
+        expect(mockMarkReturningUser).toHaveBeenCalledWith('0xTestAccount')
+      })
     })
   })
 

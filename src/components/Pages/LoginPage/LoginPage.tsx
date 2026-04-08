@@ -442,12 +442,13 @@ export const LoginPage = () => {
 
   // When loginMethod is a social provider, skip the full login UI and redirect immediately to OAuth.
   // The full page (backgrounds, connection options, modals) is unnecessary since we just redirect away.
-  const loginMethodParam = new URLSearchParams(window.location.search).get('loginMethod')?.toLowerCase()
-  const socialAutoLoginType =
-    loginMethodParam && VALID_LOGIN_METHODS.includes(loginMethodParam as LoginMethod)
-      ? mapLoginMethodToConnectionOption(loginMethodParam as LoginMethod)
-      : null
-  if (socialAutoLoginType && isSocialLogin(socialAutoLoginType)) {
+  const socialAutoLoginType = useMemo(() => {
+    const param = new URLSearchParams(window.location.search).get('loginMethod')?.toLowerCase()
+    if (!param || !VALID_LOGIN_METHODS.includes(param as LoginMethod)) return null
+    const connectionOption = mapLoginMethodToConnectionOption(param as LoginMethod)
+    return isSocialLogin(connectionOption) ? connectionOption : null
+  }, [])
+  if (socialAutoLoginType) {
     return <SocialAutoLoginRedirect connectionType={socialAutoLoginType} />
   }
 
