@@ -13,8 +13,9 @@ jest.mock('../../../hooks/navigation', () => ({
 }))
 
 const mockRedirect = jest.fn()
+let mockRedirectUrl = 'https://decentraland.org/'
 jest.mock('../../../hooks/redirection', () => ({
-  useAfterLoginRedirection: () => ({ url: 'https://decentraland.org/', redirect: mockRedirect })
+  useAfterLoginRedirection: () => ({ url: mockRedirectUrl, redirect: mockRedirect })
 }))
 
 const mockEnsureProfile = jest.fn()
@@ -194,6 +195,7 @@ const renderWithProviders = (flags: Record<string, boolean> = {}) => {
 
 describe('CallbackPage', () => {
   beforeEach(() => {
+    mockRedirectUrl = 'https://decentraland.org/'
     mockGetRedirectResult.mockResolvedValue({ oauth: { userInfo: {} } })
     mockConnect.mockResolvedValue({
       account: '0xTestAccount',
@@ -271,6 +273,26 @@ describe('CallbackPage', () => {
       await waitFor(() => {
         expect(mockRedirect).toHaveBeenCalled()
       })
+    })
+  })
+
+  describe('when the OPEN_EXPLORER_AFTER_LOGIN flag is enabled and redirectTo has an explicit path', () => {
+    const mockIdentity = createMockIdentity()
+
+    beforeEach(() => {
+      mockRedirectUrl = 'https://decentraland.org/marketplace'
+      ;(localStorageGetIdentity as jest.Mock).mockReturnValue(mockIdentity)
+      mockPostIdentity.mockResolvedValue({ identityId: 'test-identity-id' })
+    })
+
+    it('should redirect instead of opening the deep link', async () => {
+      renderWithProviders({ 'dapps-open-explorer-after-login': true })
+
+      await waitFor(() => {
+        expect(mockRedirect).toHaveBeenCalled()
+      })
+
+      expect(mockPostIdentity).not.toHaveBeenCalled()
     })
   })
 

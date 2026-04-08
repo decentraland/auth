@@ -104,7 +104,8 @@ const DesktopCallbackPage = () => {
           type: ConnectionType.WEB2
         })
 
-        if (flags[FeatureFlagsKeys.OPEN_EXPLORER_AFTER_LOGIN]) {
+        const hasExplicitRedirect = redirectTo !== locations.home() && new URL(redirectTo, window.location.origin).pathname !== '/'
+        if (flags[FeatureFlagsKeys.OPEN_EXPLORER_AFTER_LOGIN] && !hasExplicitRedirect) {
           const freshIdentity = localStorageGetIdentity(ethAddress)
           if (freshIdentity) {
             const httpClient = createAuthServerHttpClient()
