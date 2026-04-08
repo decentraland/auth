@@ -18,7 +18,8 @@ import ImageNew6 from '../../../assets/images/background/image-new6.webp'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import { useAnalytics } from '../../../hooks/useAnalytics'
-import { useAutoLogin } from '../../../hooks/useAutoLogin'
+import { VALID_LOGIN_METHODS, mapLoginMethodToConnectionOption, useAutoLogin } from '../../../hooks/useAutoLogin'
+import type { LoginMethod } from '../../../hooks/useAutoLogin'
 import { useEnsureProfile } from '../../../hooks/useEnsureProfile'
 import { ConnectionType } from '../../../modules/analytics/types'
 import { createAuthServerHttpClient } from '../../../shared/auth'
@@ -38,6 +39,7 @@ import { EmailLoginModal } from '../../EmailLoginModal'
 import { EmailLoginResult } from '../../EmailLoginModal/EmailLoginModal.types'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import { ConfirmingLogin } from './ConfirmingLogin'
+import { SocialAutoLoginRedirect } from './SocialAutoLoginRedirect'
 import {
   connectToProvider,
   connectToSocialProvider,
@@ -436,6 +438,17 @@ export const LoginPage = () => {
         <CircularProgress size={80} />
       </Main>
     )
+  }
+
+  // When loginMethod is a social provider, skip the full login UI and redirect immediately to OAuth.
+  // The full page (backgrounds, connection options, modals) is unnecessary since we just redirect away.
+  const loginMethodParam = new URLSearchParams(window.location.search).get('loginMethod')?.toLowerCase()
+  const socialAutoLoginType =
+    loginMethodParam && VALID_LOGIN_METHODS.includes(loginMethodParam as LoginMethod)
+      ? mapLoginMethodToConnectionOption(loginMethodParam as LoginMethod)
+      : null
+  if (socialAutoLoginType && isSocialLogin(socialAutoLoginType)) {
+    return <SocialAutoLoginRedirect connectionType={socialAutoLoginType} />
   }
 
   const backgroundImages = NEW_USER_BACKGROUND_IMAGES

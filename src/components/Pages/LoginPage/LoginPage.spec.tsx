@@ -151,6 +151,10 @@ jest.mock('./ConfirmingLogin', () => ({
   ConfirmingLogin: () => <div data-testid="confirming-login" />
 }))
 
+jest.mock('./SocialAutoLoginRedirect', () => ({
+  SocialAutoLoginRedirect: () => <div data-testid="social-auto-login-redirect" />
+}))
+
 jest.mock('decentraland-connect', () => ({
   connection: {
     disconnect: jest.fn().mockResolvedValue(undefined)

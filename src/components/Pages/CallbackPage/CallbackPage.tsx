@@ -9,12 +9,13 @@ import { useTargetConfig } from '../../../hooks/targetConfig'
 import { useAnalytics } from '../../../hooks/useAnalytics'
 import { useEnsureProfile } from '../../../hooks/useEnsureProfile'
 import { ConnectionType } from '../../../modules/analytics/types'
+import { createAuthServerHttpClient } from '../../../shared/auth'
 import { useCurrentConnectionData } from '../../../shared/connection'
 import { isMagicExtensionError, isMagicRpcError } from '../../../shared/errors'
 import { extractReferrerFromSearchParameters, locations } from '../../../shared/locations'
 import { isMobileSession } from '../../../shared/mobile'
-import { markReturningUser } from '../../../shared/onboarding/markReturningUser'
 import { getStoredEmail } from '../../../shared/onboarding/getStoredEmail'
+import { markReturningUser } from '../../../shared/onboarding/markReturningUser'
 import { trackCheckpoint } from '../../../shared/onboarding/trackCheckpoint'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { OAUTH_ACCESS_DENIED_ERROR, createMagicInstance } from '../../../shared/utils/magicSdk'
@@ -23,6 +24,7 @@ import { ConnectionLayout } from '../../ConnectionModal/ConnectionLayout'
 import { ConnectionLayoutState } from '../../ConnectionModal/ConnectionLayout.type'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import { MobileCallbackPage } from '../MobileCallbackPage/MobileCallbackPage'
+import { DesktopAuthSuccess } from './DesktopAuthSuccess'
 import { Container, Wrapper } from './CallbackPage.styled'
 
 const CallbackPage = () => {
@@ -41,6 +43,7 @@ const DesktopCallbackPage = () => {
   const [logInStarted, setLogInStarted] = useState(false)
   const [layoutState, setLayoutState] = useState(ConnectionLayoutState.VALIDATING_SIGN_IN)
   const [errorDetail, setErrorDetail] = useState<string | null>(null)
+  const [identityId, setIdentityId] = useState<string | null>(null)
   const { initialized, flags } = useContext(FeatureFlagsContext)
   const [targetConfig] = useTargetConfig()
   const { ensureProfile } = useEnsureProfile()
@@ -101,6 +104,16 @@ const DesktopCallbackPage = () => {
           type: ConnectionType.WEB2
         })
 
+        if (flags[FeatureFlagsKeys.OPEN_EXPLORER_AFTER_LOGIN]) {
+          const freshIdentity = localStorageGetIdentity(ethAddress)
+          if (freshIdentity) {
+            const httpClient = createAuthServerHttpClient()
+            const response = await httpClient.postIdentity(freshIdentity, { isMobile: false })
+            setIdentityId(response.identityId)
+            return
+          }
+        }
+
         const account = connectionData.account ?? ''
 
         if (targetConfig && !targetConfig.skipSetup && account) {
@@ -117,7 +130,17 @@ const DesktopCallbackPage = () => {
         navigate(locations.login(), { replace: true })
       }
     },
-    [navigate, connectAndGenerateSignature, redirect, trackLoginSuccess, initialized, targetConfig?.skipSetup, redirectTo, ensureProfile]
+    [
+      navigate,
+      connectAndGenerateSignature,
+      redirect,
+      trackLoginSuccess,
+      initialized,
+      targetConfig?.skipSetup,
+      redirectTo,
+      ensureProfile,
+      flags[FeatureFlagsKeys.OPEN_EXPLORER_AFTER_LOGIN]
+    ]
   )
 
   const logInAndRedirect = useCallback(async () => {
@@ -189,6 +212,10 @@ const DesktopCallbackPage = () => {
       logInAndRedirect()
     }
   }, [logInAndRedirect, initialized, logInStarted])
+
+  if (identityId) {
+    return <DesktopAuthSuccess identityId={identityId} explorerText={targetConfig.explorerText} onTryAgain={handleTryAgain} />
+  }
 
   return (
     <Container>

@@ -140,5 +140,5 @@ const useAutoLogin = ({ isReady, onConnect }: UseAutoLoginOptions): UseAutoLogin
   }
 }
 
-export { useAutoLogin }
+export { useAutoLogin, mapLoginMethodToConnectionOption, VALID_LOGIN_METHODS }
 export type { LoginMethod }
