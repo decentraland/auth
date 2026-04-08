@@ -14,6 +14,8 @@ import { isMagicExtensionError, isMagicRpcError } from '../../../shared/errors'
 import { extractReferrerFromSearchParameters, locations } from '../../../shared/locations'
 import { isMobileSession } from '../../../shared/mobile'
 import { markReturningUser } from '../../../shared/onboarding/markReturningUser'
+import { getStoredEmail } from '../../../shared/onboarding/getStoredEmail'
+import { trackCheckpoint } from '../../../shared/onboarding/trackCheckpoint'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { OAUTH_ACCESS_DENIED_ERROR, createMagicInstance } from '../../../shared/utils/magicSdk'
 import { AnimatedBackground } from '../../AnimatedBackground'
@@ -80,6 +82,19 @@ const DesktopCallbackPage = () => {
         }
 
         const ethAddress = connectionData.account?.toLowerCase() ?? ''
+
+        // CP2 reached: social login callback — now we have account + email
+        const storedEmail = getStoredEmail()
+        trackCheckpoint({
+          checkpointId: 2,
+          action: 'reached',
+          source: 'auth',
+          userIdentifier: storedEmail || ethAddress,
+          identifierType: storedEmail ? 'email' : 'wallet',
+          email: storedEmail || undefined,
+          wallet: ethAddress,
+          metadata: { loginMethod: 'social' }
+        })
 
         await trackLoginSuccess({
           ethAddress,

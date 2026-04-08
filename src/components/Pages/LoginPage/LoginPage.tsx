@@ -221,15 +221,10 @@ export const LoginPage = () => {
         type: providerType
       })
 
-      trackCheckpoint({
-        checkpointId: 2,
-        action: 'reached',
-        source: 'auth',
-        metadata: { loginMethod: connectionType }
-      })
-
       try {
         if (isLoggingInThroughSocial) {
+          // CP2 reached is tracked from CallbackPage after the OAuth redirect returns
+          // (at this point we don't have the user's email or wallet yet)
           setLoadingState(ConnectionLayoutState.LOADING_MAGIC)
           await connectToSocialProvider(connectionType, flags[FeatureFlagsKeys.MAGIC_TEST], redirectTo)
         } else {
@@ -239,6 +234,17 @@ export const LoginPage = () => {
           setShowConnectionLayout(true)
           setLoadingState(ConnectionLayoutState.CONNECTING_WALLET)
           const connectionData = await connectToProvider(connectionType)
+
+          // Track CP2 reached after wallet connects so we have the account address
+          trackCheckpoint({
+            checkpointId: 2,
+            action: 'reached',
+            source: 'auth',
+            userIdentifier: connectionData.account?.toLowerCase() ?? '',
+            identifierType: 'wallet',
+            wallet: connectionData.account?.toLowerCase(),
+            metadata: { loginMethod: connectionType }
+          })
 
           setLoadingState(ConnectionLayoutState.WAITING_FOR_SIGNATURE)
           const freshIdentity = await getIdentitySignature(connectionData)
