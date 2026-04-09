@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/naming-convention -- mock shapes must match exported names */
 import { act, render, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { AuthIdentity } from '@dcl/crypto'
@@ -179,7 +178,7 @@ describe('OpenExplorerPage', () => {
       mockLaunchDeepLink.mockResolvedValue(false)
     })
 
-    it('should show a try again button', async () => {
+    it('should show both retry and go back buttons', async () => {
       const { container, getByTestId } = render(<OpenExplorerPage />)
 
       await waitFor(() => {
@@ -191,7 +190,53 @@ describe('OpenExplorerPage', () => {
       })
 
       await waitFor(() => {
-        expect(getByTestId('open-explorer-try-again-button')).toBeTruthy()
+        expect(getByTestId('open-explorer-retry-button')).toBeTruthy()
+        expect(getByTestId('open-explorer-go-back-button')).toBeTruthy()
+      })
+    })
+
+    it('should navigate to login when go back is clicked', async () => {
+      const { container, getByTestId } = render(<OpenExplorerPage />)
+
+      await waitFor(() => {
+        expect(container.textContent).toContain('Opening Decentraland app in')
+      })
+
+      // Advance timers and flush the async launchDeepLink promise
+      await act(async () => {
+        jest.advanceTimersByTime(3000)
+      })
+
+      await waitFor(() => {
+        expect(getByTestId('open-explorer-go-back-button')).toBeTruthy()
+      })
+
+      getByTestId('open-explorer-go-back-button').click()
+
+      expect(mockNavigate).toHaveBeenCalledWith(expect.stringContaining('/login'), { replace: true })
+    })
+
+    it('should restart the countdown when retry is clicked', async () => {
+      mockLaunchDeepLink.mockResolvedValueOnce(false).mockResolvedValueOnce(true)
+      const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime })
+      const { container, getByTestId } = render(<OpenExplorerPage />)
+
+      await waitFor(() => {
+        expect(container.textContent).toContain('Opening Decentraland app in')
+      })
+
+      act(() => {
+        jest.advanceTimersByTime(3000)
+      })
+
+      await waitFor(() => {
+        expect(getByTestId('open-explorer-retry-button')).toBeTruthy()
+      })
+
+      await user.click(getByTestId('open-explorer-retry-button'))
+
+      await waitFor(() => {
+        expect(container.textContent).toContain('Opening Decentraland app in 3...')
       })
     })
   })
@@ -215,11 +260,11 @@ describe('OpenExplorerPage', () => {
       mockPostIdentity.mockRejectedValue(new Error('Server error'))
     })
 
-    it('should show an error state with try again', async () => {
+    it('should show an error state with a go back to login button', async () => {
       const { getByTestId } = render(<OpenExplorerPage />)
 
       await waitFor(() => {
-        expect(getByTestId('open-explorer-try-again-button')).toBeTruthy()
+        expect(getByTestId('open-explorer-go-back-button')).toBeTruthy()
       })
     })
   })

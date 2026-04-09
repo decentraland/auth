@@ -90,7 +90,12 @@ export const OpenExplorerPage = () => {
     }
   }, [deepLinkUrl])
 
-  const handleTryAgain = useCallback(() => {
+  const handleRetryDeepLink = useCallback(() => {
+    setDeepLinkFailed(false)
+    setCountdown(COUNTDOWN_SECONDS)
+  }, [])
+
+  const handleGoBackToLogin = useCallback(() => {
     navigate(locations.login(), { replace: true })
   }, [navigate])
 
@@ -121,8 +126,8 @@ export const OpenExplorerPage = () => {
             <DecentralandLogo size="huge" />
             <ConnectionTitle>{t('mobile_auth.could_not_open', { explorerText })}</ConnectionTitle>
             <ErrorButtonContainer>
-              <Button variant="contained" onClick={handleTryAgain} data-testid="open-explorer-try-again-button">
-                {t('common.try_again')}
+              <Button variant="contained" onClick={handleGoBackToLogin} data-testid="open-explorer-go-back-button">
+                {t('request.go_back_login')}
               </Button>
             </ErrorButtonContainer>
           </ConnectionContainer>
@@ -158,8 +163,11 @@ export const OpenExplorerPage = () => {
             <>
               <ConnectionTitle>{t('mobile_auth.could_not_open', { explorerText })}</ConnectionTitle>
               <ErrorButtonContainer>
-                <Button variant="contained" onClick={handleTryAgain} data-testid="open-explorer-try-again-button">
+                <Button variant="contained" onClick={handleRetryDeepLink} data-testid="open-explorer-retry-button">
                   {t('common.try_again')}
+                </Button>
+                <Button variant="outlined" onClick={handleGoBackToLogin} data-testid="open-explorer-go-back-button">
+                  {t('request.go_back_login')}
                 </Button>
               </ErrorButtonContainer>
             </>
