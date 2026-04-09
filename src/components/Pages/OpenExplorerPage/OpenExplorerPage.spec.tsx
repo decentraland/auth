@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/naming-convention -- mock shapes must match exported names */
 import { act, render, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import type { AuthIdentity } from '@dcl/crypto'
+import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
 import { OpenExplorerPage } from './OpenExplorerPage'
 
 const mockLaunchDeepLink = jest.fn()
@@ -31,6 +33,30 @@ jest.mock('../../../hooks/targetConfig', () => ({
   ]
 }))
 
+const mockPostIdentity = jest.fn()
+jest.mock('../../../shared/auth', () => ({
+  createAuthServerHttpClient: () => ({
+    postIdentity: mockPostIdentity
+  })
+}))
+
+let mockAccount: string | undefined = '0xTestAccount'
+jest.mock('../../../shared/connection', () => ({
+  useCurrentConnectionData: () => ({
+    get account() {
+      return mockAccount
+    }
+  })
+}))
+
+jest.mock('@dcl/single-sign-on-client', () => ({
+  localStorageGetIdentity: jest.fn()
+}))
+
+jest.mock('../../../shared/utils/errorHandler', () => ({
+  handleError: jest.fn()
+}))
+
 jest.mock('@dcl/hooks', () => ({
   useTranslation: () => ({
     t: (key: string, params?: Record<string, unknown>) => {
@@ -38,6 +64,7 @@ jest.mock('@dcl/hooks', () => ({
       if (key === 'mobile_auth.redirecting') return `Redirecting to ${params?.explorerText}...`
       if (key === 'mobile_auth.could_not_open') return `Could not open ${params?.explorerText}`
       if (key === 'mobile_auth.return_to') return `Open ${params?.explorerText}`
+      if (key === 'connection_layout.validating_sign_in') return 'Verifying...'
       if (key === 'common.try_again') return 'Try again'
       return key
     }
@@ -69,7 +96,11 @@ jest.mock('../../ConnectionModal/ConnectionLayout.styled', () => {
 })
 
 jest.mock('decentraland-ui2', () => ({
-  Button: ({ children, onClick, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: string; children?: React.ReactNode }) => (
+  Button: ({
+    children,
+    onClick,
+    ...props
+  }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: string; children?: React.ReactNode }) => (
     <button onClick={onClick} {...props}>
       {children}
     </button>
@@ -77,18 +108,30 @@ jest.mock('decentraland-ui2', () => ({
   CircularProgress: () => <div data-testid="progress" />
 }))
 
-// Mock useSearchParams to control the identityId param
-let mockSearchParams = new URLSearchParams('identityId=test-id-123')
-jest.mock('react-router-dom', () => ({
-  ...jest.requireActual('react-router-dom'),
-  useSearchParams: () => [mockSearchParams]
-}))
+// --- Helpers ---
+
+const createMockIdentity = (): AuthIdentity =>
+  ({
+    ephemeralIdentity: {
+      privateKey: '0x' + 'a'.repeat(64),
+      publicKey: '0x' + 'b'.repeat(130),
+      address: '0x' + 'c'.repeat(40)
+    },
+    expiration: new Date(Date.now() + 60_000),
+    authChain: []
+  }) as unknown as AuthIdentity
+
+// --- Tests ---
 
 describe('OpenExplorerPage', () => {
+  const mockIdentity = createMockIdentity()
+
   beforeEach(() => {
     jest.useFakeTimers()
+    mockAccount = '0xTestAccount'
     mockLaunchDeepLink.mockResolvedValue(true)
-    mockSearchParams = new URLSearchParams('identityId=test-id-123')
+    ;(localStorageGetIdentity as jest.Mock).mockReturnValue(mockIdentity)
+    mockPostIdentity.mockResolvedValue({ identityId: 'test-id-123' })
   })
 
   afterEach(() => {
@@ -96,19 +139,30 @@ describe('OpenExplorerPage', () => {
     jest.clearAllMocks()
   })
 
-  describe('when rendered with an identityId search param', () => {
-    it('should show a countdown message', () => {
-      const { container } = render(<OpenExplorerPage />)
-      expect(container.textContent).toContain('Opening Decentraland app in 3...')
+  describe('when the account and identity are available', () => {
+    it('should post the identity to the auth server', async () => {
+      render(<OpenExplorerPage />)
+
+      await waitFor(() => {
+        expect(mockPostIdentity).toHaveBeenCalledWith(mockIdentity, { isMobile: false })
+      })
     })
 
-    it('should show a button to open the explorer', () => {
-      const { getByTestId } = render(<OpenExplorerPage />)
-      expect(getByTestId('open-explorer-button')).toBeTruthy()
+    it('should show a countdown after posting the identity', async () => {
+      const { container } = render(<OpenExplorerPage />)
+
+      await waitFor(() => {
+        expect(container.textContent).toContain('Opening Decentraland app in 3...')
+      })
     })
 
     it('should attempt deep link after countdown', async () => {
-      render(<OpenExplorerPage />)
+      const { container } = render(<OpenExplorerPage />)
+
+      // Wait for postIdentity to resolve and countdown to appear
+      await waitFor(() => {
+        expect(container.textContent).toContain('Opening Decentraland app in')
+      })
 
       act(() => {
         jest.advanceTimersByTime(3000)
@@ -120,13 +174,17 @@ describe('OpenExplorerPage', () => {
     })
   })
 
-  describe('when deep link fails', () => {
+  describe('when the deep link fails', () => {
     beforeEach(() => {
       mockLaunchDeepLink.mockResolvedValue(false)
     })
 
     it('should show a try again button', async () => {
-      const { getByTestId } = render(<OpenExplorerPage />)
+      const { container, getByTestId } = render(<OpenExplorerPage />)
+
+      await waitFor(() => {
+        expect(container.textContent).toContain('Opening Decentraland app in')
+      })
 
       act(() => {
         jest.advanceTimersByTime(3000)
@@ -135,42 +193,45 @@ describe('OpenExplorerPage', () => {
       await waitFor(() => {
         expect(getByTestId('open-explorer-try-again-button')).toBeTruthy()
       })
-    })
-
-    it('should navigate to login when try again is clicked', async () => {
-      const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime })
-      const { getByTestId } = render(<OpenExplorerPage />)
-
-      act(() => {
-        jest.advanceTimersByTime(3000)
-      })
-
-      await waitFor(() => {
-        expect(getByTestId('open-explorer-try-again-button')).toBeTruthy()
-      })
-
-      await user.click(getByTestId('open-explorer-try-again-button'))
-
-      expect(mockNavigate).toHaveBeenCalledWith(expect.stringContaining('/login'), { replace: true })
     })
   })
 
-  describe('when no identityId is provided', () => {
+  describe('when no account is available', () => {
     beforeEach(() => {
-      mockSearchParams = new URLSearchParams('')
+      mockAccount = undefined
     })
 
-    it('should navigate to the login page', () => {
+    it('should navigate to the login page', async () => {
       render(<OpenExplorerPage />)
 
-      expect(mockNavigate).toHaveBeenCalledWith(expect.stringContaining('/login'), { replace: true })
+      await waitFor(() => {
+        expect(mockNavigate).toHaveBeenCalledWith(expect.stringContaining('/login'), { replace: true })
+      })
+    })
+  })
+
+  describe('when postIdentity fails', () => {
+    beforeEach(() => {
+      mockPostIdentity.mockRejectedValue(new Error('Server error'))
+    })
+
+    it('should show an error state with try again', async () => {
+      const { getByTestId } = render(<OpenExplorerPage />)
+
+      await waitFor(() => {
+        expect(getByTestId('open-explorer-try-again-button')).toBeTruthy()
+      })
     })
   })
 
   describe('when the open explorer button is clicked', () => {
     it('should attempt to launch the deep link', async () => {
       const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime })
-      const { getByTestId } = render(<OpenExplorerPage />)
+      const { container, getByTestId } = render(<OpenExplorerPage />)
+
+      await waitFor(() => {
+        expect(container.textContent).toContain('Opening Decentraland app in')
+      })
 
       await user.click(getByTestId('open-explorer-button'))
 

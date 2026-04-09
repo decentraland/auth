@@ -2,7 +2,6 @@
 import { BrowserRouter } from 'react-router-dom'
 import { render, waitFor } from '@testing-library/react'
 import type { AuthIdentity } from '@dcl/crypto'
-import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
 import { CallbackPage } from './CallbackPage'
 
 // --- Mocks ---
@@ -50,13 +49,6 @@ jest.mock('../../../shared/mobile', () => ({
   isMobileSession: () => false
 }))
 
-const mockPostIdentity = jest.fn()
-jest.mock('../../../shared/auth', () => ({
-  createAuthServerHttpClient: () => ({
-    postIdentity: mockPostIdentity
-  })
-}))
-
 const mockConnect = jest.fn()
 jest.mock('decentraland-connect', () => ({
   connection: {
@@ -88,10 +80,6 @@ jest.mock('../../../shared/onboarding/trackCheckpoint', () => ({
 
 jest.mock('../../../shared/utils/errorHandler', () => ({
   handleError: jest.fn()
-}))
-
-jest.mock('@dcl/single-sign-on-client', () => ({
-  localStorageGetIdentity: jest.fn()
 }))
 
 jest.mock('../../AnimatedBackground', () => ({
@@ -185,29 +173,11 @@ describe('CallbackPage', () => {
   })
 
   describe('when the OPEN_EXPLORER_AFTER_LOGIN flag is enabled', () => {
-    const mockIdentity = createMockIdentity()
-
-    beforeEach(() => {
-      ;(localStorageGetIdentity as jest.Mock).mockReturnValue(mockIdentity)
-      mockPostIdentity.mockResolvedValue({ identityId: 'test-identity-id' })
-    })
-
-    it('should post the identity to the auth server', async () => {
+    it('should navigate to the open explorer page', async () => {
       renderWithProviders({ flags: { 'dapps-open-explorer-after-login': true } })
 
       await waitFor(() => {
-        expect(mockPostIdentity).toHaveBeenCalledWith(mockIdentity, { isMobile: false })
-      })
-    })
-
-    it('should navigate to the open explorer page with the identity id', async () => {
-      renderWithProviders({ flags: { 'dapps-open-explorer-after-login': true } })
-
-      await waitFor(() => {
-        expect(mockNavigate).toHaveBeenCalledWith(
-          expect.stringContaining('/open-explorer?identityId=test-identity-id'),
-          { replace: true }
-        )
+        expect(mockNavigate).toHaveBeenCalledWith(expect.stringContaining('/open-explorer'), { replace: true })
       })
     })
 
@@ -215,7 +185,7 @@ describe('CallbackPage', () => {
       renderWithProviders({ flags: { 'dapps-open-explorer-after-login': true } })
 
       await waitFor(() => {
-        expect(mockPostIdentity).toHaveBeenCalled()
+        expect(mockNavigate).toHaveBeenCalledWith(expect.stringContaining('/open-explorer'), { replace: true })
       })
 
       expect(mockRedirect).not.toHaveBeenCalled()
@@ -231,14 +201,14 @@ describe('CallbackPage', () => {
   })
 
   describe('when the OPEN_EXPLORER_AFTER_LOGIN flag is disabled', () => {
-    it('should not post the identity to the auth server', async () => {
+    it('should not navigate to the open explorer page', async () => {
       renderWithProviders()
 
       await waitFor(() => {
         expect(mockRedirect).toHaveBeenCalled()
       })
 
-      expect(mockPostIdentity).not.toHaveBeenCalled()
+      expect(mockNavigate).not.toHaveBeenCalledWith(expect.stringContaining('/open-explorer'), expect.anything())
     })
 
     it('should call redirect', async () => {
@@ -251,14 +221,7 @@ describe('CallbackPage', () => {
   })
 
   describe('when the OPEN_EXPLORER_AFTER_LOGIN flag is enabled and redirectTo has an explicit path', () => {
-    const mockIdentity = createMockIdentity()
-
-    beforeEach(() => {
-      ;(localStorageGetIdentity as jest.Mock).mockReturnValue(mockIdentity)
-      mockPostIdentity.mockResolvedValue({ identityId: 'test-identity-id' })
-    })
-
-    it('should redirect instead of opening the deep link', async () => {
+    it('should redirect instead of navigating to open explorer', async () => {
       renderWithProviders({
         flags: { 'dapps-open-explorer-after-login': true },
         redirectUrl: 'https://decentraland.org/marketplace'
@@ -268,23 +231,7 @@ describe('CallbackPage', () => {
         expect(mockRedirect).toHaveBeenCalled()
       })
 
-      expect(mockPostIdentity).not.toHaveBeenCalled()
-    })
-  })
-
-  describe('when the OPEN_EXPLORER_AFTER_LOGIN flag is enabled but identity is not in localStorage', () => {
-    beforeEach(() => {
-      ;(localStorageGetIdentity as jest.Mock).mockReturnValue(null)
-    })
-
-    it('should fall through to the normal redirect flow', async () => {
-      renderWithProviders({ flags: { 'dapps-open-explorer-after-login': true } })
-
-      await waitFor(() => {
-        expect(mockRedirect).toHaveBeenCalled()
-      })
-
-      expect(mockPostIdentity).not.toHaveBeenCalled()
+      expect(mockNavigate).not.toHaveBeenCalledWith(expect.stringContaining('/open-explorer'), expect.anything())
     })
   })
 

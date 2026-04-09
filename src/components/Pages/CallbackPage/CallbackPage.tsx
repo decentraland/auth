@@ -9,7 +9,6 @@ import { useTargetConfig } from '../../../hooks/targetConfig'
 import { useAnalytics } from '../../../hooks/useAnalytics'
 import { useEnsureProfile } from '../../../hooks/useEnsureProfile'
 import { ConnectionType } from '../../../modules/analytics/types'
-import { createAuthServerHttpClient } from '../../../shared/auth'
 import { useCurrentConnectionData } from '../../../shared/connection'
 import { isMagicExtensionError, isMagicRpcError } from '../../../shared/errors'
 import { extractReferrerFromSearchParameters, locations } from '../../../shared/locations'
@@ -104,15 +103,9 @@ const DesktopCallbackPage = () => {
 
         const hasExplicitRedirect = new URL(redirectTo, window.location.origin).pathname !== '/'
         if (flags[FeatureFlagsKeys.OPEN_EXPLORER_AFTER_LOGIN] && !hasExplicitRedirect) {
-          const freshIdentity = localStorageGetIdentity(ethAddress)
-          if (freshIdentity) {
-            const httpClient = createAuthServerHttpClient()
-            const response = await httpClient.postIdentity(freshIdentity, { isMobile: false })
-            markReturningUser(connectionData.account ?? '')
-            navigate(locations.openExplorer(response.identityId), { replace: true })
-            return
-          }
-          console.warn('OPEN_EXPLORER_AFTER_LOGIN enabled but identity not found in localStorage for', ethAddress)
+          markReturningUser(connectionData.account ?? '')
+          navigate(locations.openExplorer(), { replace: true })
+          return
         }
 
         const account = connectionData.account ?? ''
