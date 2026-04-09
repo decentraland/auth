@@ -109,10 +109,6 @@ jest.mock('./CallbackPage.styled', () => {
   return { Container: Div, Wrapper: Div }
 })
 
-jest.mock('./DesktopAuthSuccess', () => ({
-  DesktopAuthSuccess: ({ identityId }: { identityId: string }) => <div data-testid="desktop-auth-success" data-identity-id={identityId} />
-}))
-
 jest.mock('../MobileCallbackPage/MobileCallbackPage', () => ({
   MobileCallbackPage: () => <div data-testid="mobile-callback" />
 }))
@@ -204,13 +200,14 @@ describe('CallbackPage', () => {
       })
     })
 
-    it('should render DesktopAuthSuccess with the identity id', async () => {
-      const { getByTestId } = renderWithProviders({ flags: { 'dapps-open-explorer-after-login': true } })
+    it('should navigate to the open explorer page with the identity id', async () => {
+      renderWithProviders({ flags: { 'dapps-open-explorer-after-login': true } })
 
       await waitFor(() => {
-        const successEl = getByTestId('desktop-auth-success')
-        expect(successEl).toBeTruthy()
-        expect(successEl.getAttribute('data-identity-id')).toBe('test-identity-id')
+        expect(mockNavigate).toHaveBeenCalledWith(
+          expect.stringContaining('/open-explorer?identityId=test-identity-id'),
+          { replace: true }
+        )
       })
     })
 

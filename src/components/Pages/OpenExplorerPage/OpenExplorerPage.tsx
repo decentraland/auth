@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from '@dcl/hooks'
 import { Button, CircularProgress } from 'decentraland-ui2'
+import { useNavigateWithSearchParams } from '../../../hooks/navigation'
+import { useTargetConfig } from '../../../hooks/targetConfig'
 import { config } from '../../../modules/config'
+import { locations } from '../../../shared/locations'
 import { AnimatedBackground } from '../../AnimatedBackground'
 import {
   ConnectionContainer,
@@ -11,7 +15,7 @@ import {
   ProgressContainer
 } from '../../ConnectionModal/ConnectionLayout.styled'
 import { launchDeepLink } from '../RequestPage/utils'
-import { Container, Wrapper } from './CallbackPage.styled'
+import { Container, Wrapper } from './OpenExplorerPage.styled'
 
 const COUNTDOWN_SECONDS = 3
 
@@ -21,33 +25,46 @@ const ENVIRONMENT_TO_DCLENV: Record<string, string> = {
   production: 'org'
 }
 
-type Props = {
-  identityId: string
-  explorerText: string
-  onTryAgain: () => void
-}
-
-export const DesktopAuthSuccess = ({ identityId, explorerText, onTryAgain }: Props) => {
+export const OpenExplorerPage = () => {
   const { t } = useTranslation()
+  const navigate = useNavigateWithSearchParams()
+  const [searchParams] = useSearchParams()
+  const [targetConfig] = useTargetConfig()
   const [countdown, setCountdown] = useState(COUNTDOWN_SECONDS)
   const [deepLinkFailed, setDeepLinkFailed] = useState(false)
+
+  const identityId = searchParams.get('identityId')
+  const explorerText = targetConfig.explorerText
 
   const environment = config.get('ENVIRONMENT').toLowerCase()
   const dclenv = ENVIRONMENT_TO_DCLENV[environment]
   if (!dclenv) {
     console.warn('Unknown ENVIRONMENT value for deep link:', environment, '— defaulting to org')
   }
-  const deepLinkUrl = `decentraland://?dclenv=${dclenv ?? 'org'}&signin=${identityId}`
+  const deepLinkUrl = identityId ? `decentraland://?dclenv=${dclenv ?? 'org'}&signin=${identityId}` : null
 
   const attemptDeepLink = useCallback(async () => {
+    if (!deepLinkUrl) return
     const wasLaunched = await launchDeepLink(deepLinkUrl)
     if (!wasLaunched) {
       setDeepLinkFailed(true)
     }
   }, [deepLinkUrl])
 
+  const handleTryAgain = useCallback(() => {
+    navigate(locations.login(), { replace: true })
+  }, [navigate])
+
+  // Redirect to login if no identityId was provided
   useEffect(() => {
-    if (deepLinkFailed) return
+    if (!identityId) {
+      navigate(locations.login(), { replace: true })
+    }
+  }, [identityId, navigate])
+
+  // Countdown and auto-launch deep link
+  useEffect(() => {
+    if (deepLinkFailed || !identityId) return
 
     const interval = setInterval(() => {
       setCountdown(prev => {
@@ -61,7 +78,9 @@ export const DesktopAuthSuccess = ({ identityId, explorerText, onTryAgain }: Pro
     }, 1000)
 
     return () => clearInterval(interval)
-  }, [deepLinkFailed, attemptDeepLink])
+  }, [deepLinkFailed, attemptDeepLink, identityId])
+
+  if (!identityId) return null
 
   return (
     <Container>
@@ -73,7 +92,7 @@ export const DesktopAuthSuccess = ({ identityId, explorerText, onTryAgain }: Pro
             <>
               <ConnectionTitle>{t('mobile_auth.could_not_open', { explorerText })}</ConnectionTitle>
               <ErrorButtonContainer>
-                <Button variant="contained" onClick={onTryAgain} data-testid="desktop-auth-try-again-button">
+                <Button variant="contained" onClick={handleTryAgain} data-testid="open-explorer-try-again-button">
                   {t('common.try_again')}
                 </Button>
               </ErrorButtonContainer>
@@ -88,7 +107,7 @@ export const DesktopAuthSuccess = ({ identityId, explorerText, onTryAgain }: Pro
               <ProgressContainer>
                 <CircularProgress color="inherit" />
               </ProgressContainer>
-              <Button variant="contained" onClick={attemptDeepLink} data-testid="desktop-auth-open-explorer-button">
+              <Button variant="contained" onClick={attemptDeepLink} data-testid="open-explorer-button">
                 {t('mobile_auth.return_to', { explorerText })}
               </Button>
             </>

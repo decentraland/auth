@@ -24,7 +24,6 @@ import { ConnectionLayout } from '../../ConnectionModal/ConnectionLayout'
 import { ConnectionLayoutState } from '../../ConnectionModal/ConnectionLayout.type'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import { MobileCallbackPage } from '../MobileCallbackPage/MobileCallbackPage'
-import { DesktopAuthSuccess } from './DesktopAuthSuccess'
 import { Container, Wrapper } from './CallbackPage.styled'
 
 const CallbackPage = () => {
@@ -43,7 +42,6 @@ const DesktopCallbackPage = () => {
   const [logInStarted, setLogInStarted] = useState(false)
   const [layoutState, setLayoutState] = useState(ConnectionLayoutState.VALIDATING_SIGN_IN)
   const [errorDetail, setErrorDetail] = useState<string | null>(null)
-  const [identityId, setIdentityId] = useState<string | null>(null)
   const { initialized, flags } = useContext(FeatureFlagsContext)
   const [targetConfig] = useTargetConfig()
   const { ensureProfile } = useEnsureProfile()
@@ -111,7 +109,7 @@ const DesktopCallbackPage = () => {
             const httpClient = createAuthServerHttpClient()
             const response = await httpClient.postIdentity(freshIdentity, { isMobile: false })
             markReturningUser(connectionData.account ?? '')
-            setIdentityId(response.identityId)
+            navigate(locations.openExplorer(response.identityId), { replace: true })
             return
           }
           console.warn('OPEN_EXPLORER_AFTER_LOGIN enabled but identity not found in localStorage for', ethAddress)
@@ -215,10 +213,6 @@ const DesktopCallbackPage = () => {
       logInAndRedirect()
     }
   }, [logInAndRedirect, initialized, logInStarted])
-
-  if (identityId) {
-    return <DesktopAuthSuccess identityId={identityId} explorerText={targetConfig.explorerText} onTryAgain={handleTryAgain} />
-  }
 
   return (
     <Container>
