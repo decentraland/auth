@@ -402,6 +402,7 @@ export const RequestPage = () => {
         } else if (e instanceof RequestFulfilledError) {
           // Request was already consumed successfully — not an error, stop re-fetching
           hasCompletedRef.current = true
+          setView(View.VERIFY_SIGN_IN_COMPLETE)
           return
         }
 

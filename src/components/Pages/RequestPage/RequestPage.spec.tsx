@@ -342,13 +342,15 @@ describe('RequestPage', () => {
         mockRecover.mockRejectedValue(new RequestFulfilledError(REQUEST_ID))
       })
 
-      it('should not show any error view (request already consumed)', async () => {
+      it('should show sign-in complete view (request already consumed)', async () => {
         renderRequestPage()
         await waitFor(() => {
           expect(mockRecover).toHaveBeenCalled()
         })
-        // Should still show loading (no view change) — the fulfilled error is silently handled
-        expect(screen.getByTestId('loading-request')).toBeInTheDocument()
+        // Should show completion view — the request was already successfully consumed
+        await waitFor(() => {
+          expect(screen.getByTestId('sign-in-complete')).toBeInTheDocument()
+        })
       })
     })
 
