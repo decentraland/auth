@@ -19,7 +19,7 @@ type Props = {
 
 export const SocialAutoLoginRedirect = ({ connectionType }: Props) => {
   const { t } = useTranslation()
-  const { flags } = useContext(FeatureFlagsContext)
+  const { flags, initialized } = useContext(FeatureFlagsContext)
   const { url: redirectTo } = useAfterLoginRedirection()
   const { trackLoginClick } = useAnalytics()
   const hasStarted = useRef(false)
@@ -40,10 +40,10 @@ export const SocialAutoLoginRedirect = ({ connectionType }: Props) => {
   }, [connectionType, flags[FeatureFlagsKeys.MAGIC_TEST], redirectTo, trackLoginClick])
 
   useEffect(() => {
-    if (hasStarted.current) return
+    if (!initialized || hasStarted.current) return
     hasStarted.current = true
     startRedirect()
-  }, [startRedirect])
+  }, [initialized, startRedirect])
 
   // On failure, navigate to the login page without loginMethod to show the full UI.
   // A simple reload would loop since the URL still contains loginMethod.
