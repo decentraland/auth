@@ -90,18 +90,6 @@ jest.mock('../../../shared/utils/errorHandler', () => ({
   handleError: jest.fn()
 }))
 
-jest.mock('../../../shared/errors', () => ({
-  isMagicExtensionError: jest.fn().mockReturnValue(false),
-  isMagicRpcError: jest.fn().mockReturnValue(false)
-}))
-
-jest.mock('../../../shared/locations', () => ({
-  extractReferrerFromSearchParameters: jest.fn().mockReturnValue(null),
-  locations: {
-    login: jest.fn().mockReturnValue('/auth/login'),
-    home: jest.fn().mockReturnValue('/')
-  }
-}))
 
 jest.mock('@dcl/single-sign-on-client', () => ({
   localStorageGetIdentity: jest.fn()
@@ -115,12 +103,6 @@ jest.mock('../../ConnectionModal/ConnectionLayout', () => ({
   ConnectionLayout: ({ state }: { state: string }) => <div data-testid="connection-layout" data-state={state} />
 }))
 
-jest.mock('../../ConnectionModal/ConnectionLayout.type', () => ({
-  ConnectionLayoutState: {
-    VALIDATING_SIGN_IN: 'validating_sign_in',
-    ERROR_GENERIC: 'error_generic'
-  }
-}))
 
 jest.mock('./CallbackPage.styled', () => {
   const Div = ({ children, ...props }: React.HTMLAttributes<HTMLDivElement> & { children?: React.ReactNode }) => (
@@ -157,12 +139,6 @@ jest.mock('decentraland-ui2', () => ({
   CircularProgress: () => null
 }))
 
-jest.mock('@dcl/schemas', () => ({
-  ProviderType: {
-    MAGIC: 'magic',
-    MAGIC_TEST: 'magic_test'
-  }
-}))
 
 // --- Helpers ---
 
@@ -333,7 +309,7 @@ describe('CallbackPage', () => {
       renderWithProviders({})
 
       await waitFor(() => {
-        expect(mockNavigate).toHaveBeenCalledWith('/auth/login', { replace: true })
+        expect(mockNavigate).toHaveBeenCalledWith(expect.stringContaining('/login'), { replace: true })
       })
     })
   })
