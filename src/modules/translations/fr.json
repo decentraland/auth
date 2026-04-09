@@ -236,6 +236,9 @@
     "description": "Le site vers lequel vous avez été redirigé est invalide.",
     "go_back": "Retourner à la page de connexion"
   },
+  "social_auto_login": {
+    "redirecting_to": "Redirection vers {provider}..."
+  },
   "mobile_auth": {
     "sign_in_successful": "Connexion réussie",
     "redirect_countdown": "Vous serez redirigé vers\n{explorerText} dans {countdown}...",
