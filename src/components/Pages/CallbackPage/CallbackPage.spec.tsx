@@ -90,7 +90,6 @@ jest.mock('../../../shared/utils/errorHandler', () => ({
   handleError: jest.fn()
 }))
 
-
 jest.mock('@dcl/single-sign-on-client', () => ({
   localStorageGetIdentity: jest.fn()
 }))
@@ -102,7 +101,6 @@ jest.mock('../../AnimatedBackground', () => ({
 jest.mock('../../ConnectionModal/ConnectionLayout', () => ({
   ConnectionLayout: ({ state }: { state: string }) => <div data-testid="connection-layout" data-state={state} />
 }))
-
 
 jest.mock('./CallbackPage.styled', () => {
   const Div = ({ children, ...props }: React.HTMLAttributes<HTMLDivElement> & { children?: React.ReactNode }) => (
@@ -139,10 +137,8 @@ jest.mock('decentraland-ui2', () => ({
   CircularProgress: () => null
 }))
 
-
 // --- Helpers ---
 
-// Access the mocked FeatureFlagsContext to wrap renders
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { FeatureFlagsContext } = require('../../FeatureFlagsProvider')
 
@@ -157,7 +153,13 @@ const createMockIdentity = (): AuthIdentity =>
     authChain: []
   }) as unknown as AuthIdentity
 
-const renderWithProviders = (flags: Record<string, boolean> = {}) => {
+interface RenderOptions {
+  flags?: Record<string, boolean>
+  redirectUrl?: string
+}
+
+const renderWithProviders = ({ flags = {}, redirectUrl = 'https://decentraland.org/' }: RenderOptions = {}) => {
+  mockRedirectUrl = redirectUrl
   return render(
     <BrowserRouter>
       <FeatureFlagsContext.Provider value={{ flags, variants: {}, initialized: true }}>
@@ -171,7 +173,6 @@ const renderWithProviders = (flags: Record<string, boolean> = {}) => {
 
 describe('CallbackPage', () => {
   beforeEach(() => {
-    mockRedirectUrl = 'https://decentraland.org/'
     mockGetRedirectResult.mockResolvedValue({ oauth: { userInfo: {} } })
     mockConnect.mockResolvedValue({
       account: '0xTestAccount',
@@ -196,7 +197,7 @@ describe('CallbackPage', () => {
     })
 
     it('should post the identity to the auth server', async () => {
-      renderWithProviders({ 'dapps-open-explorer-after-login': true })
+      renderWithProviders({ flags: { 'dapps-open-explorer-after-login': true } })
 
       await waitFor(() => {
         expect(mockPostIdentity).toHaveBeenCalledWith(mockIdentity, { isMobile: false })
@@ -204,7 +205,7 @@ describe('CallbackPage', () => {
     })
 
     it('should render DesktopAuthSuccess with the identity id', async () => {
-      const { getByTestId } = renderWithProviders({ 'dapps-open-explorer-after-login': true })
+      const { getByTestId } = renderWithProviders({ flags: { 'dapps-open-explorer-after-login': true } })
 
       await waitFor(() => {
         const successEl = getByTestId('desktop-auth-success')
@@ -214,7 +215,7 @@ describe('CallbackPage', () => {
     })
 
     it('should not call redirect', async () => {
-      renderWithProviders({ 'dapps-open-explorer-after-login': true })
+      renderWithProviders({ flags: { 'dapps-open-explorer-after-login': true } })
 
       await waitFor(() => {
         expect(mockPostIdentity).toHaveBeenCalled()
@@ -224,7 +225,7 @@ describe('CallbackPage', () => {
     })
 
     it('should mark the user as returning', async () => {
-      renderWithProviders({ 'dapps-open-explorer-after-login': true })
+      renderWithProviders({ flags: { 'dapps-open-explorer-after-login': true } })
 
       await waitFor(() => {
         expect(mockMarkReturningUser).toHaveBeenCalledWith('0xTestAccount')
@@ -234,7 +235,7 @@ describe('CallbackPage', () => {
 
   describe('when the OPEN_EXPLORER_AFTER_LOGIN flag is disabled', () => {
     it('should not post the identity to the auth server', async () => {
-      renderWithProviders({})
+      renderWithProviders()
 
       await waitFor(() => {
         expect(mockRedirect).toHaveBeenCalled()
@@ -244,7 +245,7 @@ describe('CallbackPage', () => {
     })
 
     it('should call redirect', async () => {
-      renderWithProviders({})
+      renderWithProviders()
 
       await waitFor(() => {
         expect(mockRedirect).toHaveBeenCalled()
@@ -256,13 +257,15 @@ describe('CallbackPage', () => {
     const mockIdentity = createMockIdentity()
 
     beforeEach(() => {
-      mockRedirectUrl = 'https://decentraland.org/marketplace'
       ;(localStorageGetIdentity as jest.Mock).mockReturnValue(mockIdentity)
       mockPostIdentity.mockResolvedValue({ identityId: 'test-identity-id' })
     })
 
     it('should redirect instead of opening the deep link', async () => {
-      renderWithProviders({ 'dapps-open-explorer-after-login': true })
+      renderWithProviders({
+        flags: { 'dapps-open-explorer-after-login': true },
+        redirectUrl: 'https://decentraland.org/marketplace'
+      })
 
       await waitFor(() => {
         expect(mockRedirect).toHaveBeenCalled()
@@ -278,7 +281,7 @@ describe('CallbackPage', () => {
     })
 
     it('should fall through to the normal redirect flow', async () => {
-      renderWithProviders({ 'dapps-open-explorer-after-login': true })
+      renderWithProviders({ flags: { 'dapps-open-explorer-after-login': true } })
 
       await waitFor(() => {
         expect(mockRedirect).toHaveBeenCalled()
@@ -306,7 +309,7 @@ describe('CallbackPage', () => {
     })
 
     it('should navigate back to the login page', async () => {
-      renderWithProviders({})
+      renderWithProviders()
 
       await waitFor(() => {
         expect(mockNavigate).toHaveBeenCalledWith(expect.stringContaining('/login'), { replace: true })

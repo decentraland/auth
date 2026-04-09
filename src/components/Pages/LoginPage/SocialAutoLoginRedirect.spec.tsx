@@ -12,12 +12,6 @@ jest.mock('../../../shared/utils/errorHandler', () => ({
   handleError: jest.fn()
 }))
 
-jest.mock('../../../shared/locations', () => ({
-  locations: {
-    login: () => '/auth/login'
-  }
-}))
-
 const mockTrackLoginClick = jest.fn()
 jest.mock('../../../hooks/useAnalytics', () => ({
   useAnalytics: () => ({
@@ -80,6 +74,14 @@ jest.mock('decentraland-ui2', () => ({
   CircularProgress: () => <div data-testid="loading-spinner" />
 }))
 
+// --- Helpers ---
+
+const renderComponent = (connectionType: ConnectionOptionType) => {
+  return render(<SocialAutoLoginRedirect connectionType={connectionType} />)
+}
+
+// --- Tests ---
+
 describe('SocialAutoLoginRedirect', () => {
   afterEach(() => {
     jest.clearAllMocks()
@@ -87,22 +89,22 @@ describe('SocialAutoLoginRedirect', () => {
 
   describe('when rendered with a social connection type', () => {
     it('should render the animated background', () => {
-      const { getByTestId } = render(<SocialAutoLoginRedirect connectionType={ConnectionOptionType.GOOGLE} />)
+      const { getByTestId } = renderComponent(ConnectionOptionType.GOOGLE)
       expect(getByTestId('animated-background')).toBeTruthy()
     })
 
     it('should show a redirecting message with the provider name', () => {
-      const { container } = render(<SocialAutoLoginRedirect connectionType={ConnectionOptionType.GOOGLE} />)
+      const { container } = renderComponent(ConnectionOptionType.GOOGLE)
       expect(container.textContent).toContain('Redirecting to Google...')
     })
 
     it('should render a loading spinner', () => {
-      const { getByTestId } = render(<SocialAutoLoginRedirect connectionType={ConnectionOptionType.GOOGLE} />)
+      const { getByTestId } = renderComponent(ConnectionOptionType.GOOGLE)
       expect(getByTestId('loading-spinner')).toBeTruthy()
     })
 
     it('should track the login click', async () => {
-      render(<SocialAutoLoginRedirect connectionType={ConnectionOptionType.GOOGLE} />)
+      renderComponent(ConnectionOptionType.GOOGLE)
 
       await waitFor(() => {
         expect(mockTrackLoginClick).toHaveBeenCalledWith({
@@ -113,7 +115,7 @@ describe('SocialAutoLoginRedirect', () => {
     })
 
     it('should call connectToSocialProvider with the correct arguments', async () => {
-      render(<SocialAutoLoginRedirect connectionType={ConnectionOptionType.GOOGLE} />)
+      renderComponent(ConnectionOptionType.GOOGLE)
 
       await waitFor(() => {
         expect(mockConnectToSocialProvider).toHaveBeenCalledWith(ConnectionOptionType.GOOGLE, false, 'https://decentraland.org/play')
@@ -121,7 +123,7 @@ describe('SocialAutoLoginRedirect', () => {
     })
 
     it('should not call connectToSocialProvider twice', async () => {
-      render(<SocialAutoLoginRedirect connectionType={ConnectionOptionType.DISCORD} />)
+      renderComponent(ConnectionOptionType.DISCORD)
 
       await waitFor(() => {
         expect(mockConnectToSocialProvider).toHaveBeenCalledTimes(1)
@@ -142,7 +144,7 @@ describe('SocialAutoLoginRedirect', () => {
     })
 
     it('should navigate to the login page without loginMethod', async () => {
-      render(<SocialAutoLoginRedirect connectionType={ConnectionOptionType.GOOGLE} />)
+      renderComponent(ConnectionOptionType.GOOGLE)
 
       await waitFor(() => {
         expect(window.location.href).toContain('/login')
