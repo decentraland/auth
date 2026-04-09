@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/naming-convention -- mock shapes must match exported names */
+/* eslint-disable @typescript-eslint/naming-convention, import/order -- mock shapes must match exported names */
 import { render, waitFor } from '@testing-library/react'
 import { ConnectionOptionType } from '../../Connection/Connection.types'
 import { SocialAutoLoginRedirect } from './SocialAutoLoginRedirect'
@@ -36,13 +36,11 @@ jest.mock('../../FeatureFlagsProvider', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { createContext } = require('react')
   return {
-    FeatureFlagsContext: {
-      ...createContext({
-        flags: { 'dapps-magic-dev-test': false },
-        variants: {},
-        initialized: true
-      })
-    },
+    FeatureFlagsContext: createContext({
+      flags: { 'dapps-magic-dev-test': false },
+      variants: {},
+      initialized: true
+    }),
     FeatureFlagsKeys: { MAGIC_TEST: 'dapps-magic-dev-test' }
   }
 })
@@ -76,8 +74,20 @@ jest.mock('decentraland-ui2', () => ({
 
 // --- Helpers ---
 
-const renderComponent = (connectionType: ConnectionOptionType) => {
-  return render(<SocialAutoLoginRedirect connectionType={connectionType} />)
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { FeatureFlagsContext } = require('../../FeatureFlagsProvider')
+
+interface RenderOptions {
+  connectionType: ConnectionOptionType
+  initialized?: boolean
+}
+
+const renderComponent = ({ connectionType, initialized = true }: RenderOptions) => {
+  return render(
+    <FeatureFlagsContext.Provider value={{ flags: { 'dapps-magic-dev-test': false }, variants: {}, initialized }}>
+      <SocialAutoLoginRedirect connectionType={connectionType} />
+    </FeatureFlagsContext.Provider>
+  )
 }
 
 // --- Tests ---
@@ -89,22 +99,22 @@ describe('SocialAutoLoginRedirect', () => {
 
   describe('when rendered with a social connection type', () => {
     it('should render the animated background', () => {
-      const { getByTestId } = renderComponent(ConnectionOptionType.GOOGLE)
+      const { getByTestId } = renderComponent({ connectionType: ConnectionOptionType.GOOGLE })
       expect(getByTestId('animated-background')).toBeTruthy()
     })
 
     it('should show a redirecting message with the provider name', () => {
-      const { container } = renderComponent(ConnectionOptionType.GOOGLE)
+      const { container } = renderComponent({ connectionType: ConnectionOptionType.GOOGLE })
       expect(container.textContent).toContain('Redirecting to Google...')
     })
 
     it('should render a loading spinner', () => {
-      const { getByTestId } = renderComponent(ConnectionOptionType.GOOGLE)
+      const { getByTestId } = renderComponent({ connectionType: ConnectionOptionType.GOOGLE })
       expect(getByTestId('loading-spinner')).toBeTruthy()
     })
 
     it('should track the login click', async () => {
-      renderComponent(ConnectionOptionType.GOOGLE)
+      renderComponent({ connectionType: ConnectionOptionType.GOOGLE })
 
       await waitFor(() => {
         expect(mockTrackLoginClick).toHaveBeenCalledWith({
@@ -115,7 +125,7 @@ describe('SocialAutoLoginRedirect', () => {
     })
 
     it('should call connectToSocialProvider with the correct arguments', async () => {
-      renderComponent(ConnectionOptionType.GOOGLE)
+      renderComponent({ connectionType: ConnectionOptionType.GOOGLE })
 
       await waitFor(() => {
         expect(mockConnectToSocialProvider).toHaveBeenCalledWith(ConnectionOptionType.GOOGLE, false, 'https://decentraland.org/play')
@@ -123,11 +133,22 @@ describe('SocialAutoLoginRedirect', () => {
     })
 
     it('should not call connectToSocialProvider twice', async () => {
-      renderComponent(ConnectionOptionType.DISCORD)
+      renderComponent({ connectionType: ConnectionOptionType.DISCORD })
 
       await waitFor(() => {
         expect(mockConnectToSocialProvider).toHaveBeenCalledTimes(1)
       })
+    })
+  })
+
+  describe('when feature flags are not yet initialized', () => {
+    it('should not call connectToSocialProvider', async () => {
+      renderComponent({ connectionType: ConnectionOptionType.GOOGLE, initialized: false })
+
+      // Give it time to potentially fire
+      await new Promise(resolve => setTimeout(resolve, 50))
+
+      expect(mockConnectToSocialProvider).not.toHaveBeenCalled()
     })
   })
 
@@ -144,7 +165,7 @@ describe('SocialAutoLoginRedirect', () => {
     })
 
     it('should navigate to the login page without loginMethod', async () => {
-      renderComponent(ConnectionOptionType.GOOGLE)
+      renderComponent({ connectionType: ConnectionOptionType.GOOGLE })
 
       await waitFor(() => {
         expect(window.location.href).toContain('/login')

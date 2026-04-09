@@ -255,6 +255,20 @@ describe('OpenExplorerPage', () => {
     })
   })
 
+  describe('when identity is not in localStorage', () => {
+    beforeEach(() => {
+      ;(localStorageGetIdentity as jest.Mock).mockReturnValue(null)
+    })
+
+    it('should navigate to the login page', async () => {
+      render(<OpenExplorerPage />)
+
+      await waitFor(() => {
+        expect(mockNavigate).toHaveBeenCalledWith(expect.stringContaining('/login'), { replace: true })
+      })
+    })
+  })
+
   describe('when postIdentity fails', () => {
     beforeEach(() => {
       mockPostIdentity.mockRejectedValue(new Error('Server error'))
