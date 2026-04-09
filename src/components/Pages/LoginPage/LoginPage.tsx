@@ -374,9 +374,19 @@ export const LoginPage = () => {
     setShowEmailLoginModal(true)
   }, [])
 
-  // Use the auto-login hook to handle loginMethod URL parameter
+  // When loginMethod is a social provider, skip the full login UI and redirect immediately to OAuth.
+  // The full page (backgrounds, connection options, modals) is unnecessary since we just redirect away.
+  const socialAutoLoginType = useMemo(() => {
+    const param = new URLSearchParams(window.location.search).get('loginMethod')?.toLowerCase()
+    if (!param || !VALID_LOGIN_METHODS.includes(param as LoginMethod)) return null
+    const connectionOption = mapLoginMethodToConnectionOption(param as LoginMethod)
+    return isSocialLogin(connectionOption) ? connectionOption : null
+  }, [])
+
+  // Use the auto-login hook to handle loginMethod URL parameter for non-social methods.
+  // Disabled when socialAutoLoginType is set to avoid a duplicate connectToSocialProvider call.
   useAutoLogin({
-    isReady: flagInitialized,
+    isReady: flagInitialized && !socialAutoLoginType,
     onConnect: handleOnConnect
   })
 
@@ -440,14 +450,6 @@ export const LoginPage = () => {
     )
   }
 
-  // When loginMethod is a social provider, skip the full login UI and redirect immediately to OAuth.
-  // The full page (backgrounds, connection options, modals) is unnecessary since we just redirect away.
-  const socialAutoLoginType = useMemo(() => {
-    const param = new URLSearchParams(window.location.search).get('loginMethod')?.toLowerCase()
-    if (!param || !VALID_LOGIN_METHODS.includes(param as LoginMethod)) return null
-    const connectionOption = mapLoginMethodToConnectionOption(param as LoginMethod)
-    return isSocialLogin(connectionOption) ? connectionOption : null
-  }, [])
   if (socialAutoLoginType) {
     return <SocialAutoLoginRedirect connectionType={socialAutoLoginType} />
   }

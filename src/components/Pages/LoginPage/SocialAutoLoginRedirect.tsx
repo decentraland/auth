@@ -4,6 +4,7 @@ import { CircularProgress } from 'decentraland-ui2'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { useAnalytics } from '../../../hooks/useAnalytics'
 import { ConnectionType } from '../../../modules/analytics/types'
+import { locations } from '../../../shared/locations'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { AnimatedBackground } from '../../AnimatedBackground'
 import { ConnectionOptionType, connectionOptionTitles } from '../../Connection/Connection.types'
@@ -44,10 +45,11 @@ export const SocialAutoLoginRedirect = ({ connectionType }: Props) => {
     startRedirect()
   }, [startRedirect])
 
-  // On failure, reload to show the full login page so the user can retry or pick another method
+  // On failure, navigate to the login page without loginMethod to show the full UI.
+  // A simple reload would loop since the URL still contains loginMethod.
   useEffect(() => {
     if (failed) {
-      window.location.reload()
+      window.location.href = locations.login()
     }
   }, [failed])
 

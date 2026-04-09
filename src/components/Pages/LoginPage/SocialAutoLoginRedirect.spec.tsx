@@ -12,6 +12,12 @@ jest.mock('../../../shared/utils/errorHandler', () => ({
   handleError: jest.fn()
 }))
 
+jest.mock('../../../shared/locations', () => ({
+  locations: {
+    login: () => '/auth/login'
+  }
+}))
+
 const mockTrackLoginClick = jest.fn()
 jest.mock('../../../hooks/useAnalytics', () => ({
   useAnalytics: () => ({
@@ -124,23 +130,23 @@ describe('SocialAutoLoginRedirect', () => {
   })
 
   describe('when connectToSocialProvider throws an error', () => {
-    let reloadMock: jest.Mock
+    const originalHref = window.location.href
 
     beforeEach(() => {
       mockConnectToSocialProvider.mockRejectedValue(new Error('Magic SDK failed'))
-      reloadMock = jest.fn()
       Object.defineProperty(window, 'location', {
-        value: { ...window.location, reload: reloadMock },
+        value: { ...window.location, href: originalHref },
         writable: true,
         configurable: true
       })
     })
 
-    it('should reload the page to show the full login UI', async () => {
+    it('should navigate to the login page without loginMethod', async () => {
       render(<SocialAutoLoginRedirect connectionType={ConnectionOptionType.GOOGLE} />)
 
       await waitFor(() => {
-        expect(reloadMock).toHaveBeenCalled()
+        expect(window.location.href).toContain('/login')
+        expect(window.location.href).not.toContain('loginMethod')
       })
     })
   })
