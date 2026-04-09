@@ -15,7 +15,7 @@ import { AvatarSetupPage } from './components/Pages/AvatarSetupPage/AvatarSetupP
 import Intercom from './components/Intercom'
 import { CallbackPage } from './components/Pages/CallbackPage'
 import { InvalidRedirectionPage } from './components/Pages/InvalidRedirectionPage'
-import { LoginPage } from './components/Pages/LoginPage'
+import { LoginRouteGuard } from './components/Pages/LoginPage'
 import { MobileAuthPage } from './components/Pages/MobileAuthPage'
 import { MobileCallbackPage } from './components/Pages/MobileCallbackPage'
 import { OpenExplorerPage } from './components/Pages/OpenExplorerPage'
@@ -71,7 +71,7 @@ const SiteRoutes = () => {
 
   return (
     <Routes>
-      <Route path="/login" Component={LoginPage} />
+      <Route path="/login" Component={LoginRouteGuard} />
       <Route path="/invalidRedirection" Component={InvalidRedirectionPage} />
       <Route path="/callback" Component={CallbackPage} />
       <Route path="/requests/:requestId" Component={RequestPage} />
