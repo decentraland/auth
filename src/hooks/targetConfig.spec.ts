@@ -76,70 +76,31 @@ describe('useTargetConfig', () => {
     })
   })
 
-  describe('when a targetConfigId is provided as androidSocial', () => {
+  describe('when on mobile, the targetConfigId override is ignored', () => {
     beforeEach(() => {
-      ;(useLocation as jest.Mock).mockReturnValue({ search: '?targetConfigId=androidSocial' })
-      ;(isMobile as jest.Mock).mockReturnValue(false)
+      ;(isMobile as jest.Mock).mockReturnValue(true)
     })
 
-    it('should return the androidSocial config', () => {
-      const { result } = renderHook(() => useTargetConfig())
-      const [config, targetConfigId] = result.current
-
-      expect(targetConfigId).toBe('androidSocial')
-      expect(config).toEqual(_targetConfigs.androidSocial)
-    })
-  })
-
-  describe('when a targetConfigId is provided as androidWeb3', () => {
-    beforeEach(() => {
-      ;(useLocation as jest.Mock).mockReturnValue({ search: '?targetConfigId=androidWeb3' })
-      ;(isMobile as jest.Mock).mockReturnValue(false)
-    })
-
-    it('should return the androidWeb3 config', () => {
-      const { result } = renderHook(() => useTargetConfig())
-      const [config, targetConfigId] = result.current
-
-      expect(targetConfigId).toBe('androidWeb3')
-      expect(config).toEqual(_targetConfigs.androidWeb3)
-    })
-  })
-
-  describe('when a targetConfigId is provided as default', () => {
-    beforeEach(() => {
+    it('should resolve to the android config when ?targetConfigId=default and not iOS', () => {
       ;(useLocation as jest.Mock).mockReturnValue({ search: '?targetConfigId=default' })
-      ;(isMobile as jest.Mock).mockReturnValue(true)
-    })
+      ;(isIos as jest.Mock).mockReturnValue(false)
 
-    it('should return the default config', () => {
-      const { result } = renderHook(() => useTargetConfig())
-      const [config] = result.current
-
-      // Default config now has EMAIL as primary, METAMASK as secondary
-      // On mobile, METAMASK is replaced with WALLET_CONNECT
-      expect(config.connectionOptions.primary).toBe(ConnectionOptionType.EMAIL)
-      expect(config.connectionOptions.secondary).toBe(ConnectionOptionType.WALLET_CONNECT)
-      expect(config.connectionOptions.extraOptions).not.toContain(ConnectionOptionType.METAMASK)
-    })
-  })
-
-  describe('when a targetConfigId is provided as alternative', () => {
-    beforeEach(() => {
-      ;(useLocation as jest.Mock).mockReturnValue({ search: '?targetConfigId=alternative' })
-      ;(isMobile as jest.Mock).mockReturnValue(true)
-    })
-
-    it('should return the alternative config', () => {
       const { result } = renderHook(() => useTargetConfig())
       const [config, targetConfigId] = result.current
 
-      expect(targetConfigId).toBe('alternative')
-      // Alternative config inherits from default, so it also has EMAIL as primary
-      // On mobile, METAMASK is replaced with WALLET_CONNECT
-      expect(config.connectionOptions.primary).toBe(ConnectionOptionType.EMAIL)
-      expect(config.connectionOptions.secondary).toBe(ConnectionOptionType.WALLET_CONNECT)
-      expect(config.connectionOptions.extraOptions).not.toContain(ConnectionOptionType.METAMASK)
+      expect(targetConfigId).toBe('android')
+      expect(config).toEqual(_targetConfigs.android)
+    })
+
+    it('should resolve to the ios config when ?targetConfigId=alternative and on iOS', () => {
+      ;(useLocation as jest.Mock).mockReturnValue({ search: '?targetConfigId=alternative' })
+      ;(isIos as jest.Mock).mockReturnValue(true)
+
+      const { result } = renderHook(() => useTargetConfig())
+      const [config, targetConfigId] = result.current
+
+      expect(targetConfigId).toBe('ios')
+      expect(config).toEqual(_targetConfigs.ios)
     })
   })
 
@@ -171,7 +132,7 @@ describe('useTargetConfig', () => {
 
       expect(targetConfigId).toBe('ios')
       expect(config.connectionOptions.primary).toBe(ConnectionOptionType.APPLE)
-      expect(config.connectionOptions.secondary).toBe(ConnectionOptionType.WALLET_CONNECT)
+      expect(config.connectionOptions.secondary).toBe(ConnectionOptionType.GOOGLE)
     })
   })
 
@@ -188,7 +149,7 @@ describe('useTargetConfig', () => {
 
       expect(targetConfigId).toBe('android')
       expect(config.connectionOptions.primary).toBe(ConnectionOptionType.GOOGLE)
-      expect(config.connectionOptions.secondary).toBe(ConnectionOptionType.WALLET_CONNECT)
+      expect(config.connectionOptions.secondary).toBe(ConnectionOptionType.APPLE)
     })
   })
 })

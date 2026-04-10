@@ -1,8 +1,11 @@
 import { useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { useTranslation } from '@dcl/hooks'
+import { connection } from 'decentraland-connect'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import { createAuthServerHttpClient } from '../../../shared/auth'
 import { isErrorWithName } from '../../../shared/errors'
+import { disconnectWallet, sendEmailOTP } from '../../../shared/thirdweb'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { createMagicInstance } from '../../../shared/utils/magicSdk'
 import { ConnectionOptionType } from '../../Connection'
@@ -12,13 +15,17 @@ import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvide
 import { connectToProvider, connectToSocialProvider, fromConnectionOptionToProviderType, isSocialLogin } from '../LoginPage/utils'
 import { getIdentitySignature } from './identityUtils'
 import { MobileAuthSuccess } from './MobileAuthSuccess'
+import { MobileEmailLoginModal } from './MobileEmailLoginModal'
+import { EmailLoginResult } from './MobileEmailLoginModal/MobileEmailLoginModal.types'
 import { MobileProviderSelection } from './MobileProviderSelection'
+import { isTestAuthEmail, sendTestAuthCode } from './testAuth'
 import { parseConnectionOptionType } from './utils'
 import { Main } from './MobileAuthPage.styled'
 
 type MobileAuthView = 'selection' | 'connecting' | 'success' | 'error'
 
 export const MobileAuthPage = () => {
+  const { t } = useTranslation()
   const [searchParams] = useSearchParams()
   const { flags, initialized: flagInitialized } = useContext(FeatureFlagsContext)
   const [targetConfig] = useTargetConfig()
@@ -31,6 +38,13 @@ export const MobileAuthPage = () => {
   const [loadingState, setLoadingState] = useState(provider ? ConnectionLayoutState.LOADING_MAGIC : ConnectionLayoutState.CONNECTING_WALLET)
   const [identityId, setIdentityId] = useState<string | null>(null)
   const [connectionType, setConnectionType] = useState<ConnectionOptionType | undefined>(provider ?? undefined)
+
+  // Email login state
+  const [currentEmail, setCurrentEmail] = useState('')
+  const [isEmailLoading, setIsEmailLoading] = useState(false)
+  const [emailError, setEmailError] = useState<string | null>(null)
+  const [showEmailLoginModal, setShowEmailLoginModal] = useState(false)
+  const [isTestAuthSession, setIsTestAuthSession] = useState(false)
 
   const hasStartedInit = useRef(false)
 
@@ -103,6 +117,10 @@ export const MobileAuthPage = () => {
 
         localStorage.removeItem('dcl_magic_user_email')
 
+        // Clear any Thirdweb in-app wallet session so each visit starts fresh.
+        await disconnectWallet()
+        localStorage.removeItem('dcl_thirdweb_user_email')
+
         const keysToRemove: string[] = []
         for (let i = 0; i < localStorage.length; i++) {
           const key = localStorage.key(i)
@@ -134,10 +152,130 @@ export const MobileAuthPage = () => {
     }
   }, [connectionType, initiateAuth])
 
+  const handleEmailInputChange = useCallback(() => {
+    setEmailError(null)
+  }, [])
+
+  const handleEmailSubmit = useCallback(
+    async (email: string) => {
+      setCurrentEmail(email)
+      setIsEmailLoading(true)
+      setEmailError(null)
+      setConnectionType(ConnectionOptionType.EMAIL)
+
+      // Best-effort cleanup of any stale connection from a previous session.
+      try {
+        await connection.disconnect()
+        await disconnectWallet()
+      } catch {
+        // Keep the flow going even if cleanup fails.
+      }
+
+      try {
+        // For emails matching the test domain, try the test auth backend first.
+        // If the backend rejects the specific email (403), fall back to Thirdweb.
+        let useTestAuth = false
+        if (isTestAuthEmail(email)) {
+          useTestAuth = await sendTestAuthCode(email)
+        }
+        if (!useTestAuth) {
+          await sendEmailOTP(email)
+        }
+        setIsTestAuthSession(useTestAuth)
+        setShowEmailLoginModal(true)
+      } catch (error) {
+        const errorMessage = handleError(error, 'Error sending verification code', {
+          sentryTags: {
+            connectionType: ConnectionOptionType.EMAIL,
+            isMobileFlow: true
+          }
+        })
+        // Clear connection type so other login options aren't disabled
+        setConnectionType(undefined)
+        if (errorMessage === 'Failed to fetch' || errorMessage?.toLowerCase().includes('network')) {
+          setEmailError(t('login.errors.network_error'))
+        } else if (errorMessage?.toLowerCase().includes('invalid email')) {
+          setEmailError(t('login.errors.invalid_email'))
+        } else {
+          setEmailError(errorMessage || t('login.errors.failed_send_code'))
+        }
+      } finally {
+        setIsEmailLoading(false)
+      }
+    },
+    [t]
+  )
+
+  const handleEmailLoginDismiss = useCallback(() => {
+    setShowEmailLoginModal(false)
+    setCurrentEmail('')
+    setConnectionType(undefined)
+  }, [])
+
+  const handleEmailLoginSuccess = useCallback(async (result: EmailLoginResult) => {
+    setShowEmailLoginModal(false)
+    setView('connecting')
+    setLoadingState(ConnectionLayoutState.WAITING_FOR_SIGNATURE)
+
+    try {
+      const address = result.address.toLowerCase()
+      let identity
+
+      if (result.identity) {
+        // Test auth flow: identity was generated server-side by mobile-bff
+        identity = result.identity
+      } else {
+        // Normal Thirdweb flow: restore the EIP-1193 provider that
+        // verifyEmailOTPAndConnect persisted via storeConnectionData(THIRDWEB, MAINNET).
+        const connectionData = await connection.tryPreviousConnection()
+        identity = await getIdentitySignature(address, connectionData.provider)
+      }
+
+      setLoadingState(ConnectionLayoutState.VALIDATING_SIGN_IN)
+      const httpClient = createAuthServerHttpClient()
+      const response = await httpClient.postIdentity(identity, { isMobile: true })
+
+      setIdentityId(response.identityId)
+      setView('success')
+    } catch (err) {
+      handleError(err, 'Error during mobile email auth', {
+        sentryTags: {
+          connectionType: ConnectionOptionType.EMAIL,
+          isMobileFlow: true
+        }
+      })
+
+      if (isErrorWithName(err) && err.name === 'ErrorUnlockingWallet') {
+        setLoadingState(ConnectionLayoutState.ERROR_LOCKED_WALLET)
+      } else {
+        setLoadingState(ConnectionLayoutState.ERROR)
+      }
+      setView('error')
+    }
+  }, [])
+
   // Provider selection view
   if (view === 'selection') {
     return (
-      <MobileProviderSelection onConnect={initiateAuth} loadingOption={connectionType} connectionOptions={targetConfig.connectionOptions} />
+      <>
+        <MobileProviderSelection
+          onConnect={initiateAuth}
+          loadingOption={connectionType}
+          connectionOptions={targetConfig.connectionOptions}
+          onEmailSubmit={handleEmailSubmit}
+          onEmailChange={handleEmailInputChange}
+          isEmailLoading={isEmailLoading}
+          emailError={emailError}
+        />
+        <MobileEmailLoginModal
+          open={showEmailLoginModal}
+          email={currentEmail}
+          isTestAuth={isTestAuthSession}
+          onClose={handleEmailLoginDismiss}
+          onBack={handleEmailLoginDismiss}
+          onSuccess={handleEmailLoginSuccess}
+        />
+      </>
     )
   }
 
