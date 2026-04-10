@@ -1,15 +1,16 @@
-import { useCallback, useContext, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from '@dcl/hooks'
+import { Env } from '@dcl/ui-env'
 import { CircularProgress } from 'decentraland-ui2'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { useAnalytics } from '../../../hooks/useAnalytics'
 import { ConnectionType } from '../../../modules/analytics/types'
+import { config } from '../../../modules/config'
 import { locations } from '../../../shared/locations'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { AnimatedBackground } from '../../AnimatedBackground'
 import { ConnectionOptionType, connectionOptionTitles } from '../../Connection/Connection.types'
 import { ConnectionContainer, ConnectionTitle, DecentralandLogo, ProgressContainer } from '../../ConnectionModal/ConnectionLayout.styled'
-import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import { Container, Wrapper } from '../../Pages/CallbackPage/CallbackPage.styled'
 import { connectToSocialProvider } from './utils'
 
@@ -19,11 +20,12 @@ type Props = {
 
 export const SocialAutoLoginRedirect = ({ connectionType }: Props) => {
   const { t } = useTranslation()
-  const { flags, initialized } = useContext(FeatureFlagsContext)
   const { url: redirectTo } = useAfterLoginRedirection()
   const { trackLoginClick } = useAnalytics()
   const hasStarted = useRef(false)
   const [failed, setFailed] = useState(false)
+
+  const isMagicTest = config.is(Env.DEVELOPMENT)
 
   const startRedirect = useCallback(async () => {
     try {
@@ -32,18 +34,18 @@ export const SocialAutoLoginRedirect = ({ connectionType }: Props) => {
         type: ConnectionType.WEB2
       })
 
-      await connectToSocialProvider(connectionType, flags[FeatureFlagsKeys.MAGIC_TEST], redirectTo)
+      await connectToSocialProvider(connectionType, isMagicTest, redirectTo)
     } catch (error) {
       handleError(error, 'Error during social auto-login redirect')
       setFailed(true)
     }
-  }, [connectionType, flags[FeatureFlagsKeys.MAGIC_TEST], redirectTo, trackLoginClick])
+  }, [connectionType, isMagicTest, redirectTo, trackLoginClick])
 
   useEffect(() => {
-    if (!initialized || hasStarted.current) return
+    if (hasStarted.current) return
     hasStarted.current = true
     startRedirect()
-  }, [initialized, startRedirect])
+  }, [startRedirect])
 
   useEffect(() => {
     if (failed) {
