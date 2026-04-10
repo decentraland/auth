@@ -73,6 +73,7 @@ const locations = {
     `/avatar-setup${redirectTo ? `?redirectTo=${encodeURIComponent(redirectTo)}` : ''}${
       referrer ? `${redirectTo ? '&' : '?'}referrer=${encodeURIComponent(referrer)}` : ''
     }`,
+  openExplorer: () => '/open-explorer',
   mobile: (provider?: string) => `/mobile${provider ? `?provider=${encodeURIComponent(provider)}` : ''}`,
   mobileCallback: () => '/mobile/callback'
 }

@@ -101,6 +101,13 @@ const DesktopCallbackPage = () => {
           type: ConnectionType.WEB2
         })
 
+        const hasExplicitRedirect = new URL(redirectTo, window.location.origin).pathname !== '/'
+        if (flags[FeatureFlagsKeys.OPEN_EXPLORER_AFTER_LOGIN] && !hasExplicitRedirect) {
+          markReturningUser(connectionData.account ?? '')
+          navigate(locations.openExplorer(), { replace: true })
+          return
+        }
+
         const account = connectionData.account ?? ''
 
         if (targetConfig && !targetConfig.skipSetup && account) {
@@ -117,7 +124,7 @@ const DesktopCallbackPage = () => {
         navigate(locations.login(), { replace: true })
       }
     },
-    [navigate, connectAndGenerateSignature, redirect, trackLoginSuccess, initialized, targetConfig?.skipSetup, redirectTo, ensureProfile]
+    [navigate, connectAndGenerateSignature, redirect, trackLoginSuccess, initialized, targetConfig?.skipSetup, redirectTo, ensureProfile, flags[FeatureFlagsKeys.OPEN_EXPLORER_AFTER_LOGIN]]
   )
 
   const logInAndRedirect = useCallback(async () => {
