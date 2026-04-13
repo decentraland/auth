@@ -236,9 +236,6 @@
     "description": "El sitio al que fuiste redirigido es inválido.",
     "go_back": "Regresar a la página de inicio de sesión"
   },
-  "social_auto_login": {
-    "redirecting_to": "Redirigiendo a {provider}..."
-  },
   "auto_login": {
     "redirecting_to": "Redirigiendo a {provider}...",
     "verifying_credentials": "Un momento, estamos verificando tus credenciales...",

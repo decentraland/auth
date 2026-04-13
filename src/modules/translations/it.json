@@ -236,9 +236,6 @@
     "description": "Il sito a cui sei stato reindirizzato non è valido.",
     "go_back": "Torna alla pagina di accesso"
   },
-  "social_auto_login": {
-    "redirecting_to": "Reindirizzamento a {provider}..."
-  },
   "auto_login": {
     "redirecting_to": "Reindirizzamento a {provider}...",
     "verifying_credentials": "Un momento, stiamo verificando le tue credenziali...",

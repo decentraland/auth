@@ -4,7 +4,6 @@ import { Env } from '@dcl/ui-env'
 import { Button, CircularProgress } from 'decentraland-ui2'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { useAnalytics } from '../../../hooks/useAnalytics'
-import { useEnsureProfile } from '../../../hooks/useEnsureProfile'
 import { ConnectionType } from '../../../modules/analytics/types'
 import { config } from '../../../modules/config'
 import { useCurrentConnectionData } from '../../../shared/connection'
@@ -28,7 +27,6 @@ export const AutoLoginRedirect = ({ connectionType }: Props) => {
   const { trackLoginClick, trackLoginSuccess } = useAnalytics()
   const { getIdentitySignature } = useCurrentConnectionData()
   const { redirect } = useAfterLoginRedirection()
-  const { ensureProfile } = useEnsureProfile()
 
   const redirectTo = new URLSearchParams(window.location.search).get('redirectTo') ?? undefined
   const hasStarted = useRef(false)
@@ -85,7 +83,7 @@ export const AutoLoginRedirect = ({ connectionType }: Props) => {
       handleError(error, `Error during auto-login (${connectionType})`)
       setPhase('failed')
     }
-  }, [connectionType, isSocial, isMagicTest, redirectTo, trackLoginClick, trackLoginSuccess, getIdentitySignature, redirect, ensureProfile])
+  }, [connectionType, isSocial, isMagicTest, redirectTo, trackLoginClick, trackLoginSuccess, getIdentitySignature, redirect])
 
   useEffect(() => {
     if (hasStarted.current) return
@@ -103,9 +101,7 @@ export const AutoLoginRedirect = ({ connectionType }: Props) => {
 
   const statusMessage = (() => {
     if (phase === 'verifying') {
-      return isSocial
-        ? t('auto_login.verifying_credentials')
-        : t('auto_login.confirming_login')
+      return isSocial ? t('auto_login.verifying_credentials') : t('auto_login.confirming_login')
     }
     return t('auto_login.redirecting_to', { provider: providerName })
   })()
@@ -120,11 +116,7 @@ export const AutoLoginRedirect = ({ connectionType }: Props) => {
           <ProgressContainer>
             <CircularProgress color="inherit" />
           </ProgressContainer>
-          <Button
-            variant="text"
-            onClick={handleCancel}
-            sx={{ color: 'rgba(255,255,255,0.6)', textTransform: 'none', marginTop: 2 }}
-          >
+          <Button variant="text" onClick={handleCancel} sx={{ color: 'rgba(255,255,255,0.6)', textTransform: 'none', marginTop: 2 }}>
             {t('auto_login.cancel')}
           </Button>
         </ConnectionContainer>

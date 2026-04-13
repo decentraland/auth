@@ -236,9 +236,6 @@
     "description": "您被重定向到的网站无效。",
     "go_back": "返回登录页面"
   },
-  "social_auto_login": {
-    "redirecting_to": "正在重定向到 {provider}..."
-  },
   "auto_login": {
     "redirecting_to": "正在重定向到 {provider}...",
     "verifying_credentials": "请稍候，我们正在验证您的登录凭证...",
