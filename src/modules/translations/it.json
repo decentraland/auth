@@ -239,6 +239,12 @@
   "social_auto_login": {
     "redirecting_to": "Reindirizzamento a {provider}..."
   },
+  "auto_login": {
+    "redirecting_to": "Reindirizzamento a {provider}...",
+    "verifying_credentials": "Un momento, stiamo verificando le tue credenziali...",
+    "confirming_login": "Conferma accesso...",
+    "cancel": "Annulla"
+  },
   "mobile_auth": {
     "sign_in_successful": "Accesso riuscito",
     "redirect_countdown": "Sarai reindirizzato a\n{explorerText} tra {countdown}...",

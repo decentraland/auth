@@ -51,9 +51,9 @@ async function connectToSocialProvider(
     const magic = new Magic(MAGIC_KEY, {
       extensions: [new OAuthExtension()]
     })
-
     // Clear existing session before starting new OAuth flow (mirrors MobileAuthPage fix)
-    if (await magic.user.isLoggedIn()) {
+    const isLoggedIn = await magic.user.isLoggedIn()
+    if (isLoggedIn) {
       await magic.user.logout()
       localStorage.removeItem('dcl_magic_user_email')
       await connection.disconnect()
@@ -65,8 +65,10 @@ async function connectToSocialProvider(
     url.pathname = '/auth/callback'
     url.search = ''
 
+    const oauthProvider = connectionOption === ConnectionOptionType.X ? 'twitter' : (connectionOption as OAuthProvider)
+
     await magic?.oauth2.loginWithRedirect({
-      provider: connectionOption === ConnectionOptionType.X ? 'twitter' : (connectionOption as OAuthProvider),
+      provider: oauthProvider,
       redirectURI: url.href,
       customData: JSON.stringify({
         redirectTo,

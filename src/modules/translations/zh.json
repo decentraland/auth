@@ -239,6 +239,12 @@
   "social_auto_login": {
     "redirecting_to": "正在重定向到 {provider}..."
   },
+  "auto_login": {
+    "redirecting_to": "正在重定向到 {provider}...",
+    "verifying_credentials": "请稍候，我们正在验证您的登录凭证...",
+    "confirming_login": "确认登录中...",
+    "cancel": "取消"
+  },
   "mobile_auth": {
     "sign_in_successful": "登录成功",
     "redirect_countdown": "您将被重定向到\n{explorerText}，倒计时 {countdown}...",

@@ -1,6 +1,7 @@
 import { useCallback, useContext, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { ProviderType } from '@dcl/schemas'
+import { Env } from '@dcl/ui-env'
 import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
 import { connection } from 'decentraland-connect'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
@@ -13,9 +14,10 @@ import { useCurrentConnectionData } from '../../../shared/connection'
 import { isMagicExtensionError, isMagicRpcError } from '../../../shared/errors'
 import { extractReferrerFromSearchParameters, locations } from '../../../shared/locations'
 import { isMobileSession } from '../../../shared/mobile'
-import { markReturningUser } from '../../../shared/onboarding/markReturningUser'
 import { getStoredEmail } from '../../../shared/onboarding/getStoredEmail'
+import { markReturningUser } from '../../../shared/onboarding/markReturningUser'
 import { trackCheckpoint } from '../../../shared/onboarding/trackCheckpoint'
+import { config } from '../../../modules/config'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { OAUTH_ACCESS_DENIED_ERROR, createMagicInstance } from '../../../shared/utils/magicSdk'
 import { AnimatedBackground } from '../../AnimatedBackground'
@@ -52,7 +54,8 @@ const DesktopCallbackPage = () => {
       return undefined
     }
 
-    const providerType = flags[FeatureFlagsKeys.MAGIC_TEST] ? ProviderType.MAGIC_TEST : ProviderType.MAGIC
+    const isMagicTest = flags[FeatureFlagsKeys.MAGIC_TEST] ?? config.is(Env.DEVELOPMENT)
+    const providerType = isMagicTest ? ProviderType.MAGIC_TEST : ProviderType.MAGIC
     const connectionData = await connection.connect(providerType)
     if (!connectionData) {
       return undefined
@@ -125,15 +128,16 @@ const DesktopCallbackPage = () => {
     const oauthError = new URLSearchParams(window.location.search).get('error')
 
     if (oauthError === OAUTH_ACCESS_DENIED_ERROR) {
-      // User cancelled at the OAuth provider — not an error, go back to login
-      // Preserve the original redirectTo from the OAuth state so the next login attempt
-      // still redirects to the correct destination (e.g., Marketplace)
       navigate(locations.login({ redirectTo }), { replace: true })
       return
     }
 
     try {
-      const magic = await createMagicInstance(!!flags[FeatureFlagsKeys.MAGIC_TEST])
+      // Use feature flag if available, otherwise fall back to environment check.
+      // This ensures consistency with AutoLoginRedirect which uses config.is(Env.DEVELOPMENT)
+      // and doesn't wait for feature flags to load.
+      const isMagicTest = flags[FeatureFlagsKeys.MAGIC_TEST] ?? config.is(Env.DEVELOPMENT)
+      const magic = await createMagicInstance(isMagicTest)
       const referrer = extractReferrerFromSearchParameters(searchParams)
 
       try {
