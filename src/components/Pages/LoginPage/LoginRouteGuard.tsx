@@ -6,7 +6,7 @@ import { AutoLoginRedirect } from './AutoLoginRedirect'
 
 const LazyLoginPage = React.lazy(() => import('./LoginPage').then(m => ({ default: m.LoginPage })))
 
-/** Login methods that support auto-redirect without showing the full LoginPage */
+/** Login methods that support auto-login without showing the full LoginPage */
 const AUTO_LOGIN_METHODS: Record<string, ConnectionOptionType> = {
   google: ConnectionOptionType.GOOGLE,
   discord: ConnectionOptionType.DISCORD,
