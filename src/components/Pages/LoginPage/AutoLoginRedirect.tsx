@@ -45,24 +45,19 @@ export const AutoLoginRedirect = ({ connectionType }: Props) => {
   const isSocial = isSocialLogin(connectionType)
   const providerName = connectionOptionTitles[connectionType]
 
-  // Parse URL params once at render time for consistency
-  const { rawRedirectTo, targetConfigId } = useMemo(() => {
-    const params = new URLSearchParams(window.location.search)
-    return {
-      rawRedirectTo: params.get('redirectTo') ?? undefined,
-      targetConfigId: params.get('targetConfigId') ?? undefined
-    }
-  }, [])
+  // Raw redirectTo for connectToSocialProvider (needs the original, unsanitized value
+  // because Magic encodes it in customData for the OAuth callback round-trip)
+  const rawRedirectTo = useMemo(() => new URLSearchParams(window.location.search).get('redirectTo') ?? undefined, [])
 
   const handleCancel = useCallback(() => {
-    // Navigate to login page without loginMethod — shows full login UI
-    // Preserve redirectTo and targetConfigId so the user can complete the flow
-    const params = new URLSearchParams()
-    if (rawRedirectTo) params.set('redirectTo', rawRedirectTo)
-    if (targetConfigId) params.set('targetConfigId', targetConfigId)
+    // Navigate to login page without loginMethod — shows full login UI.
+    // useAfterLoginRedirection already preserves redirectTo + targetConfigId + flow,
+    // so we just need to strip loginMethod and go to the login route.
+    const params = new URLSearchParams(window.location.search)
+    params.delete('loginMethod')
     const query = params.toString()
     window.location.href = `${locations.login()}${query ? `?${query}` : ''}`
-  }, [rawRedirectTo, targetConfigId])
+  }, [])
 
   const startLogin = useCallback(async () => {
     const connectionTypeForTracking = isSocial ? ConnectionType.WEB2 : ConnectionType.WEB3
