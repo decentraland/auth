@@ -2,11 +2,11 @@ import { render, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { AuthIdentity } from '@dcl/crypto'
 import { ConnectionResponse } from 'decentraland-connect'
-import { isClockSynchronized } from '../../../shared/utils/clockSync'
+import { checkClockSync } from '../../../shared/utils/clockSync'
 import { ConnectionOptionType } from '../../Connection'
 import { LoginPage } from './LoginPage'
 
-const mockIsClockSynchronized = isClockSynchronized as jest.Mock
+const mockCheckClockSync = checkClockSync as jest.Mock
 
 // --- Mocks ---
 
@@ -252,7 +252,7 @@ describe('LoginPage', () => {
       mockConnectToProvider.mockResolvedValue(connectionResponse)
       mockGetIdentitySignature.mockResolvedValue(freshIdentity)
       mockEnsureProfile.mockResolvedValue({ avatars: [{}] })
-      mockIsClockSynchronized.mockReturnValue(true)
+      mockCheckClockSync.mockResolvedValue(true)
       mockTrackLoginSuccess.mockResolvedValue(undefined)
 
       // Provide window.ethereum so injected provider check passes
@@ -305,7 +305,7 @@ describe('LoginPage', () => {
 
       mockGetIdentitySignature.mockResolvedValue(freshIdentity)
       mockEnsureProfile.mockResolvedValue({ avatars: [{}] })
-      mockIsClockSynchronized.mockReturnValue(true)
+      mockCheckClockSync.mockResolvedValue(true)
       mockTrackLoginSuccess.mockResolvedValue(undefined)
     })
 
@@ -379,7 +379,7 @@ describe('LoginPage', () => {
       mockConnectToProvider.mockResolvedValue(connectionResponse)
       mockGetIdentitySignature.mockResolvedValue(freshIdentity)
       mockEnsureProfile.mockResolvedValue({ avatars: [{}] })
-      mockIsClockSynchronized.mockReturnValue(true)
+      mockCheckClockSync.mockResolvedValue(true)
       mockTrackLoginSuccess.mockResolvedValue(undefined)
 
       Object.defineProperty(window, 'ethereum', { value: {}, writable: true, configurable: true })
