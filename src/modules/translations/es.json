@@ -240,6 +240,7 @@
     "redirecting_to": "Redirigiendo a {provider}...",
     "verifying_credentials": "Un momento, estamos verificando tus credenciales...",
     "confirming_login": "Confirmando inicio de sesión...",
+    "error": "Algo salió mal. Redirigiendo al login...",
     "cancel": "Cancelar"
   },
   "mobile_auth": {

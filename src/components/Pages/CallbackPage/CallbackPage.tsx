@@ -2,7 +2,6 @@ import { useCallback, useContext, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { ProviderType } from '@dcl/schemas'
 import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
-import { Env } from '@dcl/ui-env'
 import { connection } from 'decentraland-connect'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
@@ -10,7 +9,6 @@ import { useTargetConfig } from '../../../hooks/targetConfig'
 import { useAnalytics } from '../../../hooks/useAnalytics'
 import { useEnsureProfile } from '../../../hooks/useEnsureProfile'
 import { ConnectionType } from '../../../modules/analytics/types'
-import { config } from '../../../modules/config'
 import { useCurrentConnectionData } from '../../../shared/connection'
 import { isMagicExtensionError, isMagicRpcError } from '../../../shared/errors'
 import { extractReferrerFromSearchParameters, locations } from '../../../shared/locations'
@@ -24,6 +22,7 @@ import { AnimatedBackground } from '../../AnimatedBackground'
 import { ConnectionLayout } from '../../ConnectionModal/ConnectionLayout'
 import { ConnectionLayoutState } from '../../ConnectionModal/ConnectionLayout.type'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
+import { isMagicTestMode } from '../LoginPage/utils'
 import { MobileCallbackPage } from '../MobileCallbackPage/MobileCallbackPage'
 import { Container, Wrapper } from './CallbackPage.styled'
 
@@ -54,8 +53,7 @@ const DesktopCallbackPage = () => {
       return undefined
     }
 
-    const isMagicTest = flags[FeatureFlagsKeys.MAGIC_TEST] ?? config.is(Env.DEVELOPMENT)
-    const providerType = isMagicTest ? ProviderType.MAGIC_TEST : ProviderType.MAGIC
+    const providerType = isMagicTestMode(flags[FeatureFlagsKeys.MAGIC_TEST]) ? ProviderType.MAGIC_TEST : ProviderType.MAGIC
     const connectionData = await connection.connect(providerType)
     if (!connectionData) {
       return undefined
@@ -133,11 +131,7 @@ const DesktopCallbackPage = () => {
     }
 
     try {
-      // Use feature flag if available, otherwise fall back to environment check.
-      // This ensures consistency with AutoLoginRedirect which uses config.is(Env.DEVELOPMENT)
-      // and doesn't wait for feature flags to load.
-      const isMagicTest = flags[FeatureFlagsKeys.MAGIC_TEST] ?? config.is(Env.DEVELOPMENT)
-      const magic = await createMagicInstance(isMagicTest)
+      const magic = await createMagicInstance(isMagicTestMode(flags[FeatureFlagsKeys.MAGIC_TEST]))
       const referrer = extractReferrerFromSearchParameters(searchParams)
 
       try {

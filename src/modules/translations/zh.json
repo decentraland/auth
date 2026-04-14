@@ -240,6 +240,7 @@
     "redirecting_to": "正在重定向到 {provider}...",
     "verifying_credentials": "请稍候，我们正在验证您的登录凭证...",
     "confirming_login": "确认登录中...",
+    "error": "出错了。正在重定向到登录页面...",
     "cancel": "取消"
   },
   "mobile_auth": {

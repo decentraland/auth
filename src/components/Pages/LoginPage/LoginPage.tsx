@@ -21,14 +21,13 @@ import { useAnalytics } from '../../../hooks/useAnalytics'
 import { useAutoLogin } from '../../../hooks/useAutoLogin'
 import { useEnsureProfile } from '../../../hooks/useEnsureProfile'
 import { ConnectionType } from '../../../modules/analytics/types'
-import { createAuthServerHttpClient } from '../../../shared/auth'
 import { useCurrentConnectionData } from '../../../shared/connection'
 import { isErrorWithName, isUserRejectedTransaction } from '../../../shared/errors'
 import { extractReferrerFromSearchParameters } from '../../../shared/locations'
 import { markReturningUser } from '../../../shared/onboarding/markReturningUser'
 import { trackCheckpoint } from '../../../shared/onboarding/trackCheckpoint'
 import { disconnectWallet, sendEmailOTP } from '../../../shared/thirdweb'
-import { isClockSynchronized } from '../../../shared/utils/clockSync'
+import { checkClockSync } from '../../../shared/utils/clockSync'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { ClockSyncModal } from '../../ClockSyncModal'
 import { Connection, ConnectionOptionType } from '../../Connection'
@@ -43,6 +42,7 @@ import {
   connectToSocialProvider,
   fromConnectionOptionToProviderType,
   getSignInOptionsMode,
+  isMagicTestMode,
   isSocialLogin,
   requiresInjectedProvider
 } from './utils'
@@ -122,23 +122,13 @@ export const LoginPage = () => {
   )
 
   const checkClockSynchronization = useCallback(async (): Promise<boolean> => {
-    try {
-      const httpClient = createAuthServerHttpClient()
-      const healthData = await httpClient.checkHealth()
-      const isSync = isClockSynchronized(healthData.timestamp)
-
-      if (!isSync) {
-        setShowConnectionLayout(false)
-        setShowClockSyncModal(true)
-        return false
-      }
-
-      return true
-    } catch (error) {
-      handleError(error, 'Error checking clock synchronization')
-      // If we can't check the clock, proceed with normal flow
-      return true
+    const isSync = await checkClockSync()
+    if (!isSync) {
+      setShowConnectionLayout(false)
+      setShowClockSyncModal(true)
+      return false
     }
+    return true
   }, [])
 
   // Handle email submit from the main page
@@ -226,7 +216,7 @@ export const LoginPage = () => {
           // CP2 reached is tracked from CallbackPage after the OAuth redirect returns
           // (at this point we don't have the user's email or wallet yet)
           setLoadingState(ConnectionLayoutState.LOADING_MAGIC)
-          await connectToSocialProvider(connectionType, flags[FeatureFlagsKeys.MAGIC_TEST], redirectTo)
+          await connectToSocialProvider(connectionType, isMagicTestMode(flags[FeatureFlagsKeys.MAGIC_TEST]), redirectTo)
         } else {
           if (requiresInjectedProvider(connectionType) && !window.ethereum) {
             throw new Error('No wallet extension detected. Please install MetaMask or another Ethereum wallet.')

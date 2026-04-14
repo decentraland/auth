@@ -1,24 +1,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from '@dcl/hooks'
-import { Env } from '@dcl/ui-env'
 import { Button, CircularProgress } from 'decentraland-ui2'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import { useAnalytics } from '../../../hooks/useAnalytics'
 import { useEnsureProfile } from '../../../hooks/useEnsureProfile'
 import { ConnectionType } from '../../../modules/analytics/types'
-import { config } from '../../../modules/config'
 import { useCurrentConnectionData } from '../../../shared/connection'
 import { isUserRejectedTransaction } from '../../../shared/errors'
 import { locations } from '../../../shared/locations'
 import { markReturningUser } from '../../../shared/onboarding/markReturningUser'
 import { trackCheckpoint } from '../../../shared/onboarding/trackCheckpoint'
+import { checkClockSync } from '../../../shared/utils/clockSync'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { AnimatedBackground } from '../../AnimatedBackground'
 import { ConnectionOptionType, connectionOptionTitles } from '../../Connection/Connection.types'
 import { ConnectionContainer, ConnectionTitle, DecentralandLogo, ProgressContainer } from '../../ConnectionModal/ConnectionLayout.styled'
 import { Container, Wrapper } from '../../Pages/CallbackPage/CallbackPage.styled'
-import { connectToProvider, connectToSocialProvider, isSocialLogin } from './utils'
+import { connectToProvider, connectToSocialProvider, isMagicTestMode, isSocialLogin } from './utils'
 
 type Props = {
   connectionType: ConnectionOptionType
@@ -37,11 +36,9 @@ export const AutoLoginRedirect = ({ connectionType }: Props) => {
   const hasStarted = useRef(false)
   const [phase, setPhase] = useState<Phase>('redirecting')
 
-  // Use env-only check for Magic test mode. This fires before feature flags
-  // load, so we use config.is() directly. CallbackPage uses
-  // flags[MAGIC_TEST] ?? config.is(Env.DEVELOPMENT) — the ?? fallback
-  // guarantees both resolve to the same value when flags haven't loaded yet.
-  const isMagicTest = config.is(Env.DEVELOPMENT)
+  // No feature flag available here (fires before flags load), so pass undefined.
+  // isMagicTestMode falls back to config.is(Env.DEVELOPMENT).
+  const isMagicTest = isMagicTestMode()
   const isSocial = isSocialLogin(connectionType)
   const providerName = connectionOptionTitles[connectionType]
 
@@ -105,9 +102,20 @@ export const AutoLoginRedirect = ({ connectionType }: Props) => {
         type: connectionTypeForTracking
       })
 
+      // Check clock sync — if drift is too large, fall back to full LoginPage
+      // which has the ClockSyncModal UI
+      if (!await checkClockSync()) {
+        handleCancel()
+        return
+      }
+
       // Ensure profile exists for new users (avatar/name setup)
       if (targetConfig && !targetConfig.skipSetup && connectionData.account) {
-        const profile = await ensureProfile(connectionData.account, freshIdentity, { redirectTo, referrer: null, navigateOptions: { replace: true } })
+        const profile = await ensureProfile(connectionData.account, freshIdentity, {
+          redirectTo,
+          referrer: null,
+          navigateOptions: { replace: true }
+        })
         if (!profile) return
       }
 
@@ -153,7 +161,7 @@ export const AutoLoginRedirect = ({ connectionType }: Props) => {
 
   const statusMessage = (() => {
     if (phase === 'failed') {
-      return t('auto_login.redirecting_to', { provider: providerName })
+      return t('auto_login.error')
     }
     if (phase === 'verifying') {
       return isSocial ? t('auto_login.verifying_credentials') : t('auto_login.confirming_login')

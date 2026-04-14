@@ -1,6 +1,8 @@
 import type { OAuthProvider } from '@magic-ext/oauth2'
 import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
+import { Env } from '@dcl/ui-env'
 import { ConnectionResponse, WalletConnectV2Connector, connection, getConfiguration } from 'decentraland-connect'
+import { config } from '../../../modules/config'
 import { extractReferrerFromSearchParameters } from '../../../shared/locations'
 import { ConnectionOptionType, SignInOptionsMode } from '../../Connection'
 import { FeatureFlagsKeys, SignInPrimaryOptionVariant } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
@@ -158,6 +160,16 @@ function getSignInOptionsMode(variants: Partial<FeatureFlagsVariants>): SignInOp
   return SignInOptionsMode.ONE
 }
 
+/**
+ * Resolves whether to use Magic Test mode.
+ * Uses feature flag when available, falls back to environment check.
+ * This ensures all components (AutoLoginRedirect, CallbackPage, LoginPage)
+ * resolve to the same value regardless of when feature flags load.
+ */
+function isMagicTestMode(flagValue?: boolean): boolean {
+  return flagValue ?? config.is(Env.DEVELOPMENT)
+}
+
 export {
   fromConnectionOptionToProviderType,
   connectToSocialProvider,
@@ -167,5 +179,6 @@ export {
   isEmailLogin,
   isMobile,
   isIos,
-  getSignInOptionsMode
+  getSignInOptionsMode,
+  isMagicTestMode
 }

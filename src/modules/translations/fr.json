@@ -240,6 +240,7 @@
     "redirecting_to": "Redirection vers {provider}...",
     "verifying_credentials": "Un instant, nous vérifions vos identifiants...",
     "confirming_login": "Confirmation de la connexion...",
+    "error": "Une erreur est survenue. Redirection vers la connexion...",
     "cancel": "Annuler"
   },
   "mobile_auth": {
