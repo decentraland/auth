@@ -67,6 +67,7 @@ jest.mock('./utils', () => ({
   connectToProvider: (...args: unknown[]) => mockConnectToProvider(...args),
   connectToSocialProvider: jest.fn(),
   fromConnectionOptionToProviderType: jest.fn().mockReturnValue('injected'),
+  isMagicTestMode: jest.fn().mockReturnValue(false),
   isSocialLogin: jest.fn().mockReturnValue(false),
   requiresInjectedProvider: jest.fn().mockReturnValue(true),
   getSignInOptionsMode: jest.fn().mockReturnValue('full')
@@ -79,7 +80,8 @@ jest.mock('../../../shared/auth', () => ({
 }))
 
 jest.mock('../../../shared/utils/clockSync', () => ({
-  isClockSynchronized: jest.fn()
+  isClockSynchronized: jest.fn(),
+  checkClockSync: jest.fn().mockResolvedValue(true)
 }))
 
 jest.mock('../../../shared/onboarding/markReturningUser', () => ({
