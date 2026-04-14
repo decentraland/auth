@@ -4,29 +4,19 @@ const Main = styled(Box)({
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
-  justifyContent: 'flex-start',
-  height: '100dvh',
-  maxHeight: '100dvh',
+  justifyContent: 'center',
+  minHeight: '100dvh',
   width: '100%',
   position: 'relative',
-  overflow: 'hidden',
-  padding: '20vh 20px 0',
+  overflowX: 'hidden',
+  padding: '40px 20px',
   boxSizing: 'border-box',
   ['&::before']: {
     content: '""',
     position: 'fixed',
-    width: '100%',
-    height: '350%',
-    background: 'radial-gradient(ellipse at 0 50%, transparent 10%, #e02dd3 40%, #491975 70%)',
-    top: '-100%',
-    transform: 'rotate(180deg)',
-    overflow: 'hidden',
+    inset: 0,
+    background: 'radial-gradient(71.22% 102.85% at 50.08% 77.11%, #7434B1 0%, #481C6C 37.11%, #2B1040 100%)',
     zIndex: -1
-  },
-  ['@media screen and (max-width: 800px)']: {
-    ['&::before']: {
-      background: 'radial-gradient(ellipse at 0 50%, #e02dd3 0%, #491975 70%)'
-    }
   }
 })
 
@@ -51,9 +41,12 @@ const MobileConnectionWrapper = styled(Box)({
   ['& > div > div:nth-of-type(2)']: {
     marginTop: '24px !important'
   },
-  // Target Title inside MainContentContainer
+  // Target Title inside MainContentContainer — shrink so the long copy
+  // ("Log in or Sign up to Jump In") fits on a single line on narrow phones.
   ['& > div > div:nth-of-type(2) > p:first-of-type']: {
-    marginBottom: '32px !important'
+    marginBottom: '32px !important',
+    fontSize: 'clamp(20px, 5.8vw, 24px) !important',
+    lineHeight: '1.3 !important'
   },
   // Target ShowMoreContainer (3rd child of ConnectionContainer)
   ['& > div > div:nth-of-type(3)']: {

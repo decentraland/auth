@@ -3,7 +3,7 @@ import { ConnectionOptionType } from '../components/Connection'
 import { isIos, isMobile } from '../components/Pages/LoginPage/utils'
 import { extractRedirectToFromSearchParameters } from '../shared/locations'
 
-type TargetConfigId = 'default' | 'alternative' | 'ios' | 'android' | 'androidSocial' | 'androidWeb3'
+type TargetConfigId = 'default' | 'alternative' | 'ios' | 'android'
 
 type ConnectionOptions = {
   primary: ConnectionOptionType
@@ -60,65 +60,17 @@ const targetConfigs: Record<TargetConfigId, TargetConfig> = {
     ...defaultMobileConfig,
     connectionOptions: {
       primary: ConnectionOptionType.APPLE,
-      secondary: ConnectionOptionType.WALLET_CONNECT,
-      extraOptions: [
-        ConnectionOptionType.GOOGLE,
-        ConnectionOptionType.DISCORD,
-        ConnectionOptionType.X,
-        ConnectionOptionType.FORTMATIC,
-        ConnectionOptionType.COINBASE
-      ]
+      secondary: ConnectionOptionType.GOOGLE,
+      extraOptions: [ConnectionOptionType.WALLET_CONNECT]
     }
   },
   android: {
     ...defaultMobileConfig,
     connectionOptions: {
       primary: ConnectionOptionType.GOOGLE,
-      secondary: ConnectionOptionType.WALLET_CONNECT,
-      extraOptions: [
-        ConnectionOptionType.DISCORD,
-        ConnectionOptionType.APPLE,
-        ConnectionOptionType.X,
-        ConnectionOptionType.FORTMATIC,
-        ConnectionOptionType.COINBASE
-      ]
+      secondary: ConnectionOptionType.APPLE,
+      extraOptions: [ConnectionOptionType.METAMASK]
     }
-  },
-  androidSocial: {
-    ...defaultMobileConfig,
-    connectionOptions: {
-      primary: ConnectionOptionType.EMAIL,
-      secondary: ConnectionOptionType.GOOGLE,
-      extraOptions: [ConnectionOptionType.APPLE, ConnectionOptionType.DISCORD, ConnectionOptionType.X]
-    }
-  },
-  androidWeb3: {
-    ...defaultMobileConfig,
-    connectionOptions: {
-      primary: ConnectionOptionType.WALLET_CONNECT
-    }
-  }
-}
-
-const adjustWeb3OptionsForMobile = (config: TargetConfig): TargetConfig => {
-  let { primary, secondary, extraOptions } = config.connectionOptions
-
-  // Replace Metamask Extension for Wallet Connect on Mobile
-  if (primary === ConnectionOptionType.METAMASK) {
-    primary = ConnectionOptionType.WALLET_CONNECT
-    extraOptions = extraOptions?.filter(option => option !== ConnectionOptionType.WALLET_CONNECT)
-  }
-
-  if (secondary === ConnectionOptionType.METAMASK) {
-    secondary = ConnectionOptionType.WALLET_CONNECT
-    extraOptions = extraOptions?.filter(option => option !== ConnectionOptionType.WALLET_CONNECT)
-  }
-
-  extraOptions = extraOptions?.filter(option => option !== ConnectionOptionType.METAMASK)
-
-  return {
-    ...config,
-    connectionOptions: { primary, secondary, extraOptions }
   }
 }
 
@@ -126,6 +78,13 @@ const adjustWeb3OptionsForMobile = (config: TargetConfig): TargetConfig => {
 const _targetConfigs = targetConfigs
 
 const getTargetConfigId = (location: Location): TargetConfigId => {
+  // On mobile, always use the OS-specific config and ignore any explicit
+  // targetConfigId override. This guarantees mobile users only ever see
+  // mobile-friendly providers (no METAMASK extension, etc.).
+  if (isMobile()) {
+    return isIos() ? 'ios' : 'android'
+  }
+
   const search = new URLSearchParams(location.search)
   const targetConfigIdParam = search.get('targetConfigId') as TargetConfigId
   const redirectTo = extractRedirectToFromSearchParameters(search)
@@ -133,11 +92,6 @@ const getTargetConfigId = (location: Location): TargetConfigId => {
   // If explicit targetConfigId is provided, use it
   if (targetConfigIdParam in targetConfigs) {
     return targetConfigIdParam
-  }
-
-  // Auto-detect iOS/Android on mobile
-  if (isMobile()) {
-    return isIos() ? 'ios' : 'android'
   }
 
   // Check redirectTo URL for targetConfigId (desktop flow)
@@ -165,11 +119,7 @@ const getTargetConfigId = (location: Location): TargetConfigId => {
 const useTargetConfig = (): [TargetConfig, TargetConfigId] => {
   const location = useLocation()
   const targetConfigId = getTargetConfigId(location)
-  let config = targetConfigs[targetConfigId]
-  if (isMobile()) {
-    config = adjustWeb3OptionsForMobile(config)
-  }
-  return [config, targetConfigId]
+  return [targetConfigs[targetConfigId], targetConfigId]
 }
 
 export { _targetConfigs, useTargetConfig }

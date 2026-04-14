@@ -5,15 +5,35 @@ type Props = {
   onConnect: (type: ConnectionOptionType) => void
   loadingOption?: ConnectionOptionType
   connectionOptions: NonNullable<ConnectionProps['connectionOptions']>
+  onEmailSubmit?: (email: string) => void
+  onEmailChange?: () => void
+  isEmailLoading?: boolean
+  emailError?: string | null
 }
 
-export const MobileProviderSelection = ({ onConnect, loadingOption, connectionOptions }: Props) => {
+export const MobileProviderSelection = ({
+  onConnect,
+  loadingOption,
+  connectionOptions,
+  onEmailSubmit,
+  onEmailChange,
+  isEmailLoading,
+  emailError
+}: Props) => {
   return (
     <Main component="main">
       <Background />
       <Content>
         <MobileConnectionWrapper>
-          <Connection onConnect={onConnect} loadingOption={loadingOption} connectionOptions={connectionOptions} />
+          <Connection
+            onConnect={onConnect}
+            onEmailSubmit={onEmailSubmit}
+            onEmailChange={onEmailChange}
+            loadingOption={loadingOption}
+            connectionOptions={connectionOptions}
+            isEmailLoading={isEmailLoading}
+            emailError={emailError}
+          />
         </MobileConnectionWrapper>
       </Content>
     </Main>

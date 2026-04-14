@@ -15,5 +15,7 @@
   "META_TRANSACTION_SERVER_URL": "https://transactions-api.decentraland.zone",
   "PLACES_API_URL": "https://places.decentraland.zone",
   "PROFILE_CONSISTENCY_CHECK_TIMEOUT": "10000",
-  "EVENTS_NOTIFIER_URL": "https://events-notifier.decentraland.zone"
+  "EVENTS_NOTIFIER_URL": "https://events-notifier.decentraland.zone",
+  "MOBILE_BFF_URL": "http://localhost:3000",
+  "TEST_AUTH_EMAIL_DOMAIN": "dclregenesislabs.xyz"
 }
