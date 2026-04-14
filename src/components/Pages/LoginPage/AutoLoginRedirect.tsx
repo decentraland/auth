@@ -107,7 +107,7 @@ export const AutoLoginRedirect = ({ connectionType }: Props) => {
 
       // Ensure profile exists for new users (avatar/name setup)
       if (targetConfig && !targetConfig.skipSetup && connectionData.account) {
-        const profile = await ensureProfile(connectionData.account, freshIdentity, { redirectTo, navigateOptions: { replace: true } })
+        const profile = await ensureProfile(connectionData.account, freshIdentity, { redirectTo, referrer: null, navigateOptions: { replace: true } })
         if (!profile) return
       }
 
