@@ -30,7 +30,7 @@ jobs:
       - run: npm ci
       - name: Build for E2E
         run: |
-          echo 'VITE_REACT_APP_DCL_DEFAULT_ENV=dev' > .env
+          printf 'VITE_REACT_APP_DCL_DEFAULT_ENV=dev\nVITE_BASE_URL=/auth\n' > .env
           npm run build
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium

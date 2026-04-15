@@ -5,8 +5,6 @@ export default defineConfig({
   timeout: 60_000,
   retries: 0,
   workers: process.env.CI ? 3 : undefined,
-  // CI: only run the smoke test file to validate the setup works
-  grep: process.env.CI ? /existing user.*full E2E/ : undefined,
   use: {
     baseURL: 'http://localhost:5174',
     headless: true,
