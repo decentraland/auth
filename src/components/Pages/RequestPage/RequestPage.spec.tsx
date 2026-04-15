@@ -4,6 +4,8 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { render, screen, waitFor } from '@testing-library/react'
 import { ProviderType } from '@dcl/schemas'
 import { DifferentSenderError, ExpiredRequestError, IpValidationError, RequestFulfilledError } from '../../../shared/auth'
+import { fetchProfile } from '../../../modules/profile'
+import { isProfileComplete } from '../../../shared/profile'
 import { FeatureFlagsContext } from '../../FeatureFlagsProvider'
 import { RequestPage } from './RequestPage'
 
@@ -82,6 +84,9 @@ jest.mock('../../../shared/errors', () => ({
 jest.mock('../../../modules/profile', () => ({
   fetchProfile: jest.fn()
 }))
+jest.mock('../../../shared/profile', () => ({
+  isProfileComplete: jest.fn().mockReturnValue(true)
+}))
 jest.mock('../../../modules/config', () => ({
   config: { get: jest.fn().mockReturnValue('10000') }
 }))
@@ -125,6 +130,7 @@ jest.mock('./Views', () => ({
   VerifySignIn: (props: any) => <div data-testid="verify-sign-in">Verify Sign In - Code: {props.code}</div>,
   DeniedSignIn: () => <div data-testid="denied-sign-in">Denied</div>,
   SignInComplete: () => <div data-testid="sign-in-complete">Complete</div>,
+  SignInCompletePage: () => <div data-testid="sign-in-complete-page">Login Successful!</div>,
   TimeoutError: () => <div data-testid="timeout-error">Timeout</div>,
   DifferentAccountError: () => <div data-testid="different-account">Different Account</div>,
   IpValidationError: (props: any) => <div data-testid="ip-validation-error">IP Error: {props.reason}</div>,
@@ -404,10 +410,28 @@ describe('RequestPage', () => {
         })
       })
 
-      it('should skip profile consistency check and proceed to recover', async () => {
+      it('should skip profile consistency check and show verify for returning user', async () => {
+        // Returning user (has profile) → shows verification screen
+        jest.mocked(fetchProfile).mockResolvedValue({ avatars: [{ name: 'TestUser' }] } as any)
+        jest.mocked(isProfileComplete).mockReturnValue(true)
+
         renderRequestPage()
         await waitFor(() => {
           expect(screen.getByTestId('verify-sign-in')).toBeInTheDocument()
+        })
+        expect(mockEnsureProfile).not.toHaveBeenCalled()
+      })
+
+      it('should auto-sign for new user and show success page', async () => {
+        // New user (no profile) → auto-signs → shows success
+        jest.mocked(fetchProfile).mockResolvedValue(null)
+        jest.mocked(isProfileComplete).mockReturnValue(false)
+        mockSignMessage.mockResolvedValue('0xsignature')
+        mockSendSuccessfulOutcome.mockResolvedValue({})
+
+        renderRequestPage()
+        await waitFor(() => {
+          expect(screen.getByTestId('sign-in-complete-page')).toBeInTheDocument()
         })
         expect(mockEnsureProfile).not.toHaveBeenCalled()
       })
