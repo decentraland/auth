@@ -12,7 +12,7 @@ export default defineConfig({
     screenshot: 'only-on-failure'
   },
   webServer: {
-    command: process.env.CI ? 'npx vite preview --port 5174' : 'npm start',
+    command: process.env.CI ? 'npx vite preview --port 5174 --base /auth' : 'npm start',
     port: 5174,
     reuseExistingServer: !process.env.CI,
     timeout: 30_000
