@@ -32,9 +32,7 @@ jobs:
         run: |
           npm run prebuild
           sed -i 's|^VITE_BASE_URL=.*|VITE_BASE_URL="/auth"|' .env
-          cat .env
           npx vite build
-          grep -o 'src="[^"]*"' dist/index.html | head -1
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
       - name: Run E2E tests

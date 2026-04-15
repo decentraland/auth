@@ -12,25 +12,7 @@ test.describe('Explorer → MetaMask: existing user — full E2E', () => {
     await mockApiRoutes(page, { hasProfile: true, onboardingToExplorer: true })
 
     // Step 1: Explorer opens auth with request ID and loginMethod
-    const errors: string[] = []
-    page.on('console', msg => { if (msg.type() === 'error') errors.push(msg.text()) })
-    page.on('pageerror', err => errors.push('PAGE_ERROR: ' + err.message))
-    page.on('response', resp => { if (resp.status() >= 400) errors.push(`HTTP ${resp.status()} ${resp.url()}`) })
-
     await page.goto(`/auth/requests/${MOCK_REQUEST_ID}?loginMethod=METAMASK`)
-
-    // Debug: capture page state
-    await page.waitForTimeout(3000)
-    const bodyText = await page.textContent('body').catch(() => 'EMPTY')
-    const url = page.url()
-    const html = await page.content()
-    const hasRoot = html.includes('id="root"')
-    const rootContent = await page.evaluate(() => document.getElementById('root')?.innerHTML?.substring(0, 200) ?? 'NO ROOT').catch(() => 'EVAL FAILED')
-    console.log(`[DEBUG] URL: ${url}`)
-    console.log(`[DEBUG] Body text (first 200): ${(bodyText || '').substring(0, 200)}`)
-    console.log(`[DEBUG] Has #root: ${hasRoot}`)
-    console.log(`[DEBUG] Root content: ${rootContent}`)
-    console.log(`[DEBUG] Errors: ${JSON.stringify(errors)}`)
 
     // Step 2: RequestPage sees no account → redirects to /login with loginMethod
     // LoginRouteGuard sees loginMethod=METAMASK → AutoLoginRedirect
