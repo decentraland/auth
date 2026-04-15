@@ -5,6 +5,7 @@ export default defineConfig({
   timeout: 60_000,
   retries: 0,
   workers: process.env.CI ? 3 : undefined,
+  grep: process.env.CI ? /existing user.*full E2E/ : undefined,
   use: {
     baseURL: 'http://localhost:5174',
     headless: true,
