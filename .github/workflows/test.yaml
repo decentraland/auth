@@ -30,13 +30,11 @@ jobs:
       - run: npm ci
       - name: Build for E2E
         run: |
-          echo "VITE_REACT_APP_DCL_DEFAULT_ENV=dev" > .env.production
-          echo "VITE_BASE_URL=/auth" >> .env.production
-          cat .env.production
-          npm run build
-          echo "=== Checking built index.html ==="
-          grep -o 'src="[^"]*"' dist/index.html || echo "NO SRC FOUND"
-          grep -o 'href="[^"]*\.js"' dist/index.html || echo "NO HREF FOUND"
+          npm run prebuild
+          sed -i 's|^VITE_BASE_URL=.*|VITE_BASE_URL="/auth"|' .env
+          cat .env
+          npx vite build
+          grep -o 'src="[^"]*"' dist/index.html | head -1
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
       - name: Run E2E tests
