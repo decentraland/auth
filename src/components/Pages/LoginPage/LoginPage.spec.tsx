@@ -79,6 +79,10 @@ jest.mock('../../../shared/auth', () => ({
   })
 }))
 
+jest.mock('../../WalletErrorModal', () => ({
+  WalletErrorModal: () => null
+}))
+
 jest.mock('../../../shared/utils/clockSync', () => ({
   isClockSynchronized: jest.fn(),
   checkClockSync: jest.fn().mockResolvedValue(true)

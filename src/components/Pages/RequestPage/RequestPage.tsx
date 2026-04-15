@@ -9,6 +9,8 @@ import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import { useAnalytics } from '../../../hooks/useAnalytics'
 import { useEnsureProfile } from '../../../hooks/useEnsureProfile'
+import { isSessionMismatch } from '../../../hooks/useSessionMismatch'
+import { useSkipSetup } from '../../../hooks/useSkipSetup'
 import { getAnalytics } from '../../../modules/analytics/segment'
 import { ClickEvents, TrackingEvents } from '../../../modules/analytics/types'
 import { config } from '../../../modules/config'
@@ -26,6 +28,7 @@ import { useCurrentConnectionData } from '../../../shared/connection'
 import { isErrorWithMessage, isRpcError, isUserRejectedTransaction } from '../../../shared/errors'
 import { extractReferrerFromSearchParameters } from '../../../shared/locations'
 import { sendTipNotification } from '../../../shared/notifications'
+import { isProfileComplete } from '../../../shared/profile'
 import { identifyUser } from '../../../shared/utils/analytics'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
@@ -49,6 +52,7 @@ import {
   LoadingRequest,
   RecoverError,
   SignInComplete,
+  SignInCompletePage,
   SigningError,
   TimeoutError,
   TransferCanceledView,
@@ -170,6 +174,7 @@ export const RequestPage = () => {
   const signTimeoutRef = useRef<NodeJS.Timeout>()
   const requestId = params.requestId ?? ''
   const [targetConfig, targetConfigId] = useTargetConfig()
+  const skipSetup = useSkipSetup()
   const isUserUsingWeb2Wallet = !!provider?.isMagic
   const authServerClient = useRef(createAuthServerHttpClient())
   const isDeepLinkFlow = searchParams.get('flow') === 'deeplink'
@@ -180,7 +185,6 @@ export const RequestPage = () => {
 
   const toLoginPage = useCallback(() => {
     const redirectToUrl = `/auth/requests/${requestId}?targetConfigId=${targetConfigId}${flowParam}`
-    // Pass loginMethod as a separate query param for /login, not inside redirectTo
     const loginMethodQuery = loginMethodParam ? `&loginMethod=${encodeURIComponent(loginMethodParam)}` : ''
     const finalUrl = `/login?redirectTo=${encodeURIComponent(redirectToUrl)}${loginMethodQuery}`
     navigate(finalUrl)
@@ -197,7 +201,7 @@ export const RequestPage = () => {
     // doesn't fire with stale profile state.
     setIsProfileReady(false)
 
-    if (targetConfig.skipSetup) {
+    if (skipSetup) {
       setIsProfileReady(true)
       return
     }
@@ -230,7 +234,7 @@ export const RequestPage = () => {
     targetConfigId,
     flowParam,
     searchParams,
-    targetConfig.skipSetup
+    skipSetup
   ])
 
   // Effect 2: Load the request once the user is connected and the profile is ready.
@@ -238,6 +242,14 @@ export const RequestPage = () => {
     if (isConnecting) return
 
     if (!account || !provider || !providerType) {
+      toLoginPage()
+      return
+    }
+
+    // If the active session doesn't match the requested loginMethod,
+    // navigate to login immediately. AutoLoginRedirect will call connectToProvider()
+    // which overrides the stale session internally.
+    if (isSessionMismatch(providerType, loginMethodParam)) {
       toLoginPage()
       return
     }
@@ -290,9 +302,38 @@ export const RequestPage = () => {
 
         // Show different views depending on the request method.
         switch (request.method) {
-          case 'dcl_personal_sign':
+          case 'dcl_personal_sign': {
+            // For new users coming from Explorer (skipSetup=true), auto-sign without
+            // showing the verification code screen. This matches the old behavior where
+            // SetupPage signed the request automatically after profile deployment.
+            // Returning users (with profile) still see the verification screen.
+            if (skipSetup) {
+              const userProfile = await fetchProfile(signerAddress)
+              if (cancelled) return
+
+              if (!userProfile || !isProfileComplete(userProfile)) {
+                // New user: auto-sign and go straight to success
+                try {
+                  const signature = await walletClientRef.current.signMessage({
+                    account: signerAddress,
+                    message: request.params?.[0] as string
+                  })
+                  if (cancelled) return
+                  await authServerClient.current.sendSuccessfulOutcome(requestId, signerAddress, signature)
+                  hasCompletedRef.current = true
+                  setView(View.VERIFY_SIGN_IN_COMPLETE)
+                  break
+                } catch (e) {
+                  // If auto-sign fails (e.g. user rejects), fall through to normal verify flow
+                  if (cancelled) return
+                  console.info('Auto-sign failed for new user, falling back to verification screen:', e)
+                }
+              }
+            }
+
             setView(View.VERIFY_SIGN_IN)
             break
+          }
           case 'eth_sendTransaction': {
             try {
               // Get wallet info first
@@ -463,7 +504,6 @@ export const RequestPage = () => {
       throw new Error('Provider not created')
     }
 
-    console.log("Approve sign in verification - Getting the provider's signer")
     const [address] = await walletClient.getAddresses()
 
     signTimeoutRef.current = setTimeout(() => {
@@ -473,7 +513,6 @@ export const RequestPage = () => {
     }, 30000)
 
     try {
-      console.log("Approve sign in verification - Got the provider's signer. Signing the message")
       const signature = await walletClient.signMessage({ account: address, message: requestRef.current?.params?.[0] as string })
 
       if (hasTimeouted) {
@@ -488,11 +527,11 @@ export const RequestPage = () => {
         setView(View.DEEP_LINK_CONTINUE_IN_APP)
       } else {
         // Traditional flow - send outcome and complete
-        console.log('Traditional flow - Sending outcome to server...')
         await authServerClient.current.sendSuccessfulOutcome(requestId, address, signature)
-        console.log('Traditional flow - Outcome sent')
         hasCompletedRef.current = true
         setView(View.VERIFY_SIGN_IN_COMPLETE)
+        // For mobile deep-link flow, auto-redirect. For Explorer (skipSetup),
+        // the SignInCompletePage shows a Continue button that triggers the deeplink.
         if (targetConfig.deepLink) {
           window.location.href = targetConfig.deepLink
         }
@@ -622,16 +661,13 @@ export const RequestPage = () => {
       hasCompletedRef.current = true
 
       if (nftTransferData) {
-        console.log('Setting view to WALLET_NFT_INTERACTION_COMPLETE')
         setView(View.WALLET_NFT_INTERACTION_COMPLETE)
       } else if (manaTransferData) {
-        console.log('Setting view to WALLET_MANA_INTERACTION_COMPLETE')
         if (result && identity) {
           await sendTipNotification(identity, result)
         }
         setView(View.WALLET_MANA_INTERACTION_COMPLETE)
       } else {
-        console.log('Setting view to WALLET_INTERACTION_COMPLETE')
         setView(View.WALLET_INTERACTION_COMPLETE)
       }
     } catch (e) {
@@ -719,7 +755,9 @@ export const RequestPage = () => {
     case View.WALLET_INTERACTION_ERROR:
       return <SigningError error={error} />
     case View.VERIFY_SIGN_IN_COMPLETE:
-      return <SignInComplete />
+      // From Explorer (skipSetup enabled): show full-page success with Continue button
+      // From web (has redirectTo): show minimal success view
+      return skipSetup ? <SignInCompletePage /> : <SignInComplete />
     case View.DEEP_LINK_CONTINUE_IN_APP:
       return <ContinueInApp onContinue={onContinueInApp} requestId={requestId} deepLinkUrl={`decentraland://open?signin=${identityId}`} />
     case View.VERIFY_SIGN_IN_DENIED:

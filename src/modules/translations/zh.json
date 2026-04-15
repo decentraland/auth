@@ -96,7 +96,9 @@
     },
     "sign_in_complete": {
       "title": "登录成功！",
-      "description": "返回 {explorerText} 开始探索！"
+      "description": "返回 {explorerText} 开始探索！",
+      "explorer_description": "您已登录 Decentraland。请返回 Decentraland 应用以完成您的账户设置！",
+      "continue": "CONTINUE"
     },
     "denied_sign_in": {
       "title": "号码不匹配，或者此操作不是由您发起的？",
@@ -250,5 +252,35 @@
     "return_to": "返回 {explorerText}",
     "could_not_open": "无法打开 {explorerText}",
     "app_not_launched": "应用程序无法启动。请确保已安装 {explorerText} 后重试。"
+  },
+  "quick_setup": {
+    "welcome": "欢迎来到",
+    "decentraland": "Decentraland!",
+    "username_label": "用户名*",
+    "username_placeholder": "输入您的用户名",
+    "email_label": "Email",
+    "email_placeholder": "输入您的电子邮件",
+    "email_helper": "订阅 Decentraland 通讯，获取功能、活动、比赛等更新信息。",
+    "agree_tos": "我同意 Decentraland 的{termsLink}和{privacyLink}。*",
+    "terms_of_use": "使用条款",
+    "privacy_policy": "隐私政策",
+    "lets_go": "LET'S GO",
+    "deploying": "DEPLOYING...",
+    "body_type_a": "BODY TYPE A",
+    "body_type_b": "BODY TYPE B",
+    "randomize": "随机",
+    "customize_later": "您可以稍后自定义您的头像。",
+    "ready_to_jump_in": "{name} 已准备好进入！",
+    "success": "成功"
+  },
+  "wallet_error_modal": {
+    "title": "钱包错误",
+    "message": "您未在数字钱包扩展程序中确认此操作。要继续，请重试。",
+    "try_again": "TRY AGAIN"
+  },
+  "login_error": {
+    "title": "出了点问题。",
+    "description": "我们无法为您登录。请返回 Decentraland 应用并重试。",
+    "try_again": "TRY AGAIN"
   }
 }

@@ -21,19 +21,16 @@ export const Container = (props: { children: ReactNode; requestId?: string; canC
   const { account } = useCurrentConnectionData()
   const isDeepLinkFlow = searchParams.get('flow') === 'deeplink'
 
-  // Preserve loginMethod from current URL for auto-login functionality
-  const loginMethodParam = searchParams.get('loginMethod')
-
   const onChangeAccount = useCallback(
     async (evt: React.MouseEvent<HTMLAnchorElement>) => {
       evt.preventDefault()
       await connection.disconnect()
       const flowParam = isDeepLinkFlow ? '&flow=deeplink' : ''
+      // Don't preserve loginMethod — the user explicitly wants to choose a different method
       const redirectToUrl = `/auth/requests/${requestId ?? ''}?targetConfigId=${targetConfigId}${flowParam}`
-      const loginMethodQuery = loginMethodParam ? `&loginMethod=${encodeURIComponent(loginMethodParam)}` : ''
-      navigate(`/login?redirectTo=${encodeURIComponent(redirectToUrl)}${loginMethodQuery}`)
+      navigate(`/login?redirectTo=${encodeURIComponent(redirectToUrl)}`)
     },
-    [requestId, targetConfigId, isDeepLinkFlow, loginMethodParam]
+    [requestId, targetConfigId, isDeepLinkFlow]
   )
 
   return (

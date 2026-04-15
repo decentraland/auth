@@ -1,33 +1,22 @@
-import { useCallback, useContext } from 'react'
-import { FeatureFlagsContext, FeatureFlagsKeys, OnboardingFlowVariant } from '../components/FeatureFlagsProvider'
+import { useCallback } from 'react'
 import { locations } from '../shared/locations'
-import { checkWebGpuSupport } from '../shared/utils/webgpu'
 import { useNavigateWithSearchParams } from './navigation'
-import { useAnalytics } from './useAnalytics'
 
 /**
- * Hook that navigates to the appropriate setup page (standard or avatar)
- * based on feature flags and WebGPU support.
+ * Hook that navigates to the compact onboarding page (/quick-setup).
+ *
+ * This is the only setup page used now — the old /setup and /avatar-setup
+ * pages are deprecated. The ONBOARDING_TO_EXPLORER FF controls whether
+ * web setup is skipped entirely (via useSkipSetup), not which page to show.
  */
 export const useSetupNavigation = () => {
   const navigate = useNavigateWithSearchParams()
-  const { variants } = useContext(FeatureFlagsContext)
-  const { trackWebGPUSupportCheck } = useAnalytics()
 
   const navigateToSetup = useCallback(
     async (redirectTo: string, referrer: string | null, options?: { replace?: boolean }) => {
-      const isFlowV2 = variants[FeatureFlagsKeys.ONBOARDING_FLOW]?.name === OnboardingFlowVariant.V2
-      const hasWebGPU = await checkWebGpuSupport()
-      trackWebGPUSupportCheck({ supported: hasWebGPU })
-      const isAvatarSetupAllowed = isFlowV2 && hasWebGPU
-
-      if (isAvatarSetupAllowed) {
-        navigate(locations.avatarSetup(redirectTo, referrer), options)
-      } else {
-        navigate(locations.setup(redirectTo, referrer), options)
-      }
+      navigate(locations.quickSetup(redirectTo, referrer), options)
     },
-    [navigate, variants[FeatureFlagsKeys.ONBOARDING_FLOW], trackWebGPUSupportCheck]
+    [navigate]
   )
 
   return { navigateToSetup }

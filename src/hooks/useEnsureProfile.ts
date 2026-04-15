@@ -34,7 +34,9 @@ export const useEnsureProfile = () => {
 
       const { profile } = await checkProfileConsistency(account, identity, fetcherWithTimeout)
 
-      if (!profile || !isProfileComplete(profile)) {
+      const complete = profile ? isProfileComplete(profile) : false
+
+      if (!profile || !complete) {
         await navigateToSetup(options.redirectTo, options.referrer, options.navigateOptions)
         return null
       }

@@ -4,10 +4,9 @@ import { ProviderType } from '@dcl/schemas'
 import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
 import { connection } from 'decentraland-connect'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
-import { useAfterLoginRedirection } from '../../../hooks/redirection'
-import { useTargetConfig } from '../../../hooks/targetConfig'
 import { useAnalytics } from '../../../hooks/useAnalytics'
 import { useEnsureProfile } from '../../../hooks/useEnsureProfile'
+import { usePostLoginRedirect } from '../../../hooks/usePostLoginRedirect'
 import { ConnectionType } from '../../../modules/analytics/types'
 import { useCurrentConnectionData } from '../../../shared/connection'
 import { isMagicExtensionError, isMagicRpcError } from '../../../shared/errors'
@@ -36,14 +35,13 @@ const CallbackPage = () => {
 }
 
 const DesktopCallbackPage = () => {
-  const { redirect, url: redirectTo } = useAfterLoginRedirection()
+  const { redirect, redirectTo, skipSetup } = usePostLoginRedirect()
   const navigate = useNavigateWithSearchParams()
   const [searchParams] = useSearchParams()
   const [logInStarted, setLogInStarted] = useState(false)
   const [layoutState, setLayoutState] = useState(ConnectionLayoutState.VALIDATING_SIGN_IN)
   const [errorDetail, setErrorDetail] = useState<string | null>(null)
   const { initialized, flags } = useContext(FeatureFlagsContext)
-  const [targetConfig] = useTargetConfig()
   const { ensureProfile } = useEnsureProfile()
   const { trackLoginSuccess } = useAnalytics()
   const { getIdentitySignature } = useCurrentConnectionData()
@@ -104,13 +102,18 @@ const DesktopCallbackPage = () => {
 
         const account = connectionData.account ?? ''
 
-        if (targetConfig && !targetConfig.skipSetup && account) {
-          // Get the freshly generated identity from localStorage for Magic flow
+        // Web flow: check that the user has a complete profile before redirecting.
+        // If the profile is missing/incomplete, ensureProfile navigates to /quick-setup
+        // and returns null — we stop here and let the setup page take over.
+        // Explorer flow (skipSetup=true): skip this check entirely — the Explorer
+        // handles onboarding in-app, so we just redirect back.
+        if (!skipSetup && account) {
           const freshIdentity = localStorageGetIdentity(ethAddress)
           const profile = await ensureProfile(account, freshIdentity, { redirectTo, referrer, navigateOptions: { replace: true } })
           if (!profile) return
         }
 
+        // Flag this user so future visits skip first-time flows
         markReturningUser(account)
         redirect()
       } catch (error) {
@@ -118,7 +121,7 @@ const DesktopCallbackPage = () => {
         navigate(locations.login(), { replace: true })
       }
     },
-    [navigate, connectAndGenerateSignature, redirect, trackLoginSuccess, initialized, targetConfig?.skipSetup, redirectTo, ensureProfile]
+    [navigate, connectAndGenerateSignature, redirect, trackLoginSuccess, initialized, skipSetup, redirectTo, ensureProfile]
   )
 
   const logInAndRedirect = useCallback(async () => {

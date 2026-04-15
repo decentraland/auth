@@ -96,7 +96,9 @@
     },
     "sign_in_complete": {
       "title": "Connexion réussie !",
-      "description": "Retournez au {explorerText} pour entrer !"
+      "description": "Retournez au {explorerText} pour entrer !",
+      "explorer_description": "Vous êtes connecté à Decentraland. Retournez à l'application Decentraland pour finaliser votre compte !",
+      "continue": "CONTINUE"
     },
     "denied_sign_in": {
       "title": "Le numéro ne correspondait pas, ou cette action n'a pas été effectuée par vous ?",
@@ -250,5 +252,35 @@
     "return_to": "Retourner à {explorerText}",
     "could_not_open": "Impossible d'ouvrir {explorerText}",
     "app_not_launched": "L'application n'a pas pu être lancée. Veuillez vous assurer que {explorerText} est installé et réessayer."
+  },
+  "quick_setup": {
+    "welcome": "Bienvenue sur",
+    "decentraland": "Decentraland!",
+    "username_label": "Nom d'utilisateur*",
+    "username_placeholder": "Entrez votre nom d'utilisateur",
+    "email_label": "Email",
+    "email_placeholder": "Entrez votre e-mail",
+    "email_helper": "Abonnez-vous à la newsletter de Decentraland pour des mises à jour sur les fonctionnalités, événements, concours et plus encore.",
+    "agree_tos": "J'accepte les {termsLink} et la {privacyLink} de Decentraland.*",
+    "terms_of_use": "Conditions d'utilisation",
+    "privacy_policy": "Politique de confidentialité",
+    "lets_go": "LET'S GO",
+    "deploying": "DEPLOYING...",
+    "body_type_a": "BODY TYPE A",
+    "body_type_b": "BODY TYPE B",
+    "randomize": "ALÉATOIRE",
+    "customize_later": "Vous pourrez personnaliser votre avatar plus tard.",
+    "ready_to_jump_in": "{name} est prêt à se lancer !",
+    "success": "SUCCÈS"
+  },
+  "wallet_error_modal": {
+    "title": "Erreur de portefeuille",
+    "message": "Vous n'avez pas confirmé cette action dans votre extension de portefeuille numérique. Pour continuer, veuillez réessayer.",
+    "try_again": "TRY AGAIN"
+  },
+  "login_error": {
+    "title": "Une erreur est survenue.",
+    "description": "Nous n'avons pas pu vous connecter. Veuillez retourner à l'application Decentraland et réessayer.",
+    "try_again": "TRY AGAIN"
   }
 }

@@ -13,6 +13,11 @@ jest.mock('../../../hooks/navigation', () => ({
   useNavigateWithSearchParams: () => mockNavigate
 }))
 
+let mockSkipSetup = false
+jest.mock('../../../hooks/useSkipSetup', () => ({
+  useSkipSetup: () => mockSkipSetup
+}))
+
 // --- Connection ---
 let mockConnectionData: Record<string, any>
 jest.mock('../../../shared/connection', () => ({
@@ -186,6 +191,7 @@ const renderRequestPage = (path = `/auth/requests/${REQUEST_ID}?targetConfigId=d
 
 describe('RequestPage', () => {
   beforeEach(() => {
+    mockSkipSetup = false
     mockFlags = {}
     mockFlagsInitialized = true
     mockTargetConfig = { skipSetup: false, explorerText: 'Explorer' }
@@ -386,6 +392,7 @@ describe('RequestPage', () => {
 
     describe('and targetConfig skips setup', () => {
       beforeEach(() => {
+        mockSkipSetup = true
         mockTargetConfig = { skipSetup: true, explorerText: 'Explorer' }
         mockGetAddresses.mockResolvedValue(['0xabc123'])
         mockRecover.mockResolvedValue({

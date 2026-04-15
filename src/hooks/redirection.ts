@@ -6,8 +6,19 @@ import { extractRedirectToFromSearchParameters, locations } from '../shared/loca
 export const useAfterLoginRedirection = () => {
   const location = useLocation()
   const search = new URLSearchParams(location.search)
+  // A redirect is "explicit" only if it points OUTSIDE of auth (e.g. marketplace, landing).
+  // Internal redirects (e.g. /auth/requests/{id} from RequestPage → login → back) are NOT
+  // explicit — they're part of the Explorer's auth flow and should not change skipSetup behavior.
+  const rawRedirectTo = search.get('redirectTo') || ''
+  const isInternalAuthRedirect = rawRedirectTo.includes('/auth/requests/') || rawRedirectTo.includes('/auth/login')
+  const hasExplicitRedirect = !isInternalAuthRedirect && (!!rawRedirectTo || !!search.get('state'))
   const redirectTo = extractRedirectToFromSearchParameters(search)
   let sanitizedRedirectTo = locations.home()
+
+  // Include the current dev server port so localhost redirects work (port 5174 etc.)
+  // In production (port 443/80) this is a no-op since those ports are always allowed.
+  const currentPort = window.location.port
+  const allowedPorts = currentPort ? [currentPort] : []
 
   try {
     let redirectToURL
@@ -18,8 +29,10 @@ export const useAfterLoginRedirection = () => {
     } else {
       redirectToURL = new URL(redirectTo)
     }
-
-    if (!validateUrlInstance(redirectToURL, { allowLocalhost: true }) || redirectToURL.hostname !== window.location.hostname) {
+    if (
+      !validateUrlInstance(redirectToURL, { allowLocalhost: true, allowedPorts }) ||
+      redirectToURL.hostname !== window.location.hostname
+    ) {
       redirectToURL = new URL('/auth/invalidRedirection', window.location.origin)
     }
 
@@ -82,7 +95,7 @@ export const useAfterLoginRedirection = () => {
       try {
         const finalUrlObj = new URL(finalUrl)
         const hasOverrideUrl = !!overrideUrl
-        const isUrlValid = validateUrlInstance(finalUrlObj, { allowLocalhost: true })
+        const isUrlValid = validateUrlInstance(finalUrlObj, { allowLocalhost: true, allowedPorts })
         const isHostnameValid = hasOverrideUrl || finalUrlObj.hostname === window.location.hostname
 
         if (!isUrlValid || !isHostnameValid) {
@@ -100,5 +113,5 @@ export const useAfterLoginRedirection = () => {
     [sanitizedRedirectTo]
   )
 
-  return { url: sanitizedRedirectTo, redirect }
+  return { url: sanitizedRedirectTo, redirect, hasExplicitRedirect }
 }
