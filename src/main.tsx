@@ -18,6 +18,7 @@ import { InvalidRedirectionPage } from './components/Pages/InvalidRedirectionPag
 import { LoginPage } from './components/Pages/LoginPage'
 import { MobileAuthPage } from './components/Pages/MobileAuthPage'
 import { MobileCallbackPage } from './components/Pages/MobileCallbackPage'
+import { OpenExplorerPage } from './components/Pages/OpenExplorerPage'
 import { FeatureFlagsProvider } from './components/FeatureFlagsProvider'
 import { ConnectionProvider } from './shared/connection'
 import { config } from './modules/config'
@@ -84,6 +85,7 @@ const SiteRoutes = () => {
           }
         />
       ) : null}
+      <Route path="/open-explorer" Component={OpenExplorerPage} />
       <Route path="/setup" Component={SetupPage} />
       <Route path="/avatar-setup" Component={AvatarSetupPage} />
       <Route path="/mobile" Component={MobileAuthPage} />
