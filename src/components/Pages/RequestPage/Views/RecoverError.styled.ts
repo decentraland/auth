@@ -1,5 +1,5 @@
-import { Button, muiIcons, styled } from 'decentraland-ui2'
 import { brand } from 'decentraland-ui2/dist/theme/colors'
+import { Button, muiIcons, styled } from 'decentraland-ui2'
 
 const ErrorMessageIcon = styled(muiIcons.ErrorOutline)({
   color: '#fb3b3b'
