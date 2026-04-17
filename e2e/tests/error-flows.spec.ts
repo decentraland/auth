@@ -21,8 +21,8 @@ test.describe('Error: auth server fails', () => {
 
     await page.waitForTimeout(10000)
 
-    // Should NOT show Login Successful
-    await expect(page.getByText('Login Successful!')).not.toBeVisible()
+    // Should NOT show success page
+    await expect(page.getByText(/signed in to Decentraland/i)).not.toBeVisible()
     // Should NOT crash (page should still be rendered)
     await expect(page.locator('body')).toBeVisible()
   })
@@ -141,11 +141,36 @@ test.describe('Error: user denies sign-in', () => {
     // Click "No"
     await page.getByRole('button', { name: /no, it doesn't/i }).click()
 
-    // Should show denied state — NOT Login Successful
-    await expect(page.getByText('Login Successful!')).not.toBeVisible()
+    // Should show denied state — NOT success page
+    await expect(page.getByText(/signed in to Decentraland/i)).not.toBeVisible()
     await expect(page.getByText(/not match|denied|wasn't you/i)).toBeVisible({ timeout: 5_000 })
   })
 })
 
-// FF disabled tests moved to routing-edge-cases.spec.ts
-// QuickSetup is now the only setup page regardless of FF state
+test.describe('Error: recover error → Try Again button', () => {
+  test.beforeEach(async ({ context }) => {
+    await injectMockWallet(context)
+  })
+
+  test('request not found → shows error with Try Again button', async ({ page }) => {
+    await mockApiRoutes(page, { hasProfile: true, onboardingToExplorer: true })
+
+    // Override: auth server returns "not found" error
+    await page.route('**/v2/requests/**', async (route, request) => {
+      if (request.method() === 'GET' && !request.url().includes('/outcome')) {
+        return route.fulfill({
+          status: 404,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: 'The request test-id was not found' })
+        })
+      }
+      return route.continue()
+    })
+
+    await page.goto(`/auth/requests/${MOCK_REQUEST_ID}?loginMethod=METAMASK`)
+
+    // Should show recover error page with description and Try Again button
+    await expect(page.getByText(/error recovering the request/i)).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByRole('button', { name: /try again/i })).toBeVisible()
+  })
+})

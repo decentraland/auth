@@ -6,7 +6,7 @@ test.describe('Explorer → MetaMask: existing user — full E2E', () => {
     await injectMockWallet(context)
   })
 
-  test('request page → auto-connect → verify code → approve → Login Successful → Continue → deeplink', async ({
+  test('request page → auto-connect → verify code → approve → success → auto-deeplink', async ({
     page
   }) => {
     await mockApiRoutes(page, { hasProfile: true, onboardingToExplorer: true })
@@ -25,27 +25,10 @@ test.describe('Explorer → MetaMask: existing user — full E2E', () => {
     // Step 4: User approves code match
     await page.getByRole('button', { name: /yes, they are the same/i }).click()
 
-    // Step 5: Login Successful page (new full-page design with Continue button)
-    await expect(page.getByText('Login Successful!')).toBeVisible({ timeout: 15_000 })
-    const continueButton = page.getByRole('button', { name: /continue/i })
-    await expect(continueButton).toBeVisible()
+    // Step 5: Success page — deeplink fires automatically on mount
+    await expect(page.getByText(/signed in to Decentraland/i)).toBeVisible({ timeout: 15_000 })
 
-    // Step 6: Click Continue → triggers decentraland:// deeplink
-    // Intercept window.location.href assignment to capture deeplink
-    await page.evaluate(() => {
-      ;(window as any).__capturedHref = null
-      const origDescriptor = Object.getOwnPropertyDescriptor(window, 'location')
-      // We can't override location directly, so patch via a proxy on href setter
-      // Instead, listen for beforeunload which fires on location change
-      window.addEventListener('beforeunload', () => {
-        // Can't capture here reliably. Use a different approach.
-      })
-    })
-
-    await continueButton.click()
-    await page.waitForTimeout(500)
-
-    // Step 7: Verify connection data persisted for SSO
+    // Step 6: Verify connection data persisted for SSO
     const hasConnectionData = await page.evaluate(() => {
       return localStorage.getItem('decentraland-connect-storage-key') !== null
     })
@@ -58,7 +41,7 @@ test.describe('Explorer → MetaMask: new user (no profile) — full E2E', () =>
     await injectMockWallet(context)
   })
 
-  test('new user auto-signs → Login Successful without verification screen', async ({ page }) => {
+  test('new user auto-signs → success without verification screen', async ({ page }) => {
     await mockApiRoutes(page, { hasProfile: false, onboardingToExplorer: true })
 
     // Step 1: Request page — new user, Explorer flow
@@ -66,9 +49,8 @@ test.describe('Explorer → MetaMask: new user (no profile) — full E2E', () =>
 
     // Step 2: New users skip the "Verify Sign In" screen entirely.
     // The request is auto-signed (matching old behavior where SetupPage signed automatically).
-    // Should go straight to Login Successful.
-    await expect(page.getByText('Login Successful!')).toBeVisible({ timeout: 20_000 })
-    await expect(page.getByRole('button', { name: /continue/i })).toBeVisible()
+    // Should go straight to success — deeplink fires automatically.
+    await expect(page.getByText(/signed in to Decentraland/i)).toBeVisible({ timeout: 20_000 })
 
     // Should NOT have shown verification code screen
     // (it resolved too fast for the verify screen to appear)
@@ -80,7 +62,7 @@ test.describe('Explorer → MetaMask: new user (no profile) — full E2E', () =>
     await page.goto(`/auth/requests/${MOCK_REQUEST_ID}?loginMethod=METAMASK`)
 
     // Should go to success, not setup
-    await expect(page.getByText('Login Successful!')).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByText(/signed in to Decentraland/i)).toBeVisible({ timeout: 20_000 })
     await expect(page.getByText(/Your journey begins here/)).not.toBeVisible()
     await expect(page.getByPlaceholder(/enter your username/i)).not.toBeVisible()
   })
@@ -111,6 +93,6 @@ test.describe('Explorer → MetaMask: verification code behavior', () => {
     await expect(page.getByText('1234')).not.toBeVisible()
     // Approve button should still work
     await page.getByRole('button', { name: /yes, they are the same/i }).click()
-    await expect(page.getByText('Login Successful!')).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText(/signed in to Decentraland/i)).toBeVisible({ timeout: 15_000 })
   })
 })

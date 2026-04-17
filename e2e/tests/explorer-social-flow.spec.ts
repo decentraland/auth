@@ -166,7 +166,7 @@ test.describe('Explorer social flow: request page after social login', () => {
    *
    * Since we can't mock Magic SDK in E2E, we simulate the post-login state by using
    * the MetaMask mock (which is already connected). The request page behavior is the
-   * same regardless of wallet type: verify code → approve → Login Successful → Continue.
+   * same regardless of wallet type: verify code → approve → success → auto-deeplink.
    *
    * Social-specific callback logic is covered by unit tests for CallbackPage.
    */
@@ -175,7 +175,7 @@ test.describe('Explorer social flow: request page after social login', () => {
     await injectMockWallet(context)
   })
 
-  test('existing user: request page → verify → approve → Login Successful → Continue', async ({ page }) => {
+  test('existing user: request page → verify → approve → success → auto-deeplink', async ({ page }) => {
     await mockApiRoutes(page, { hasProfile: true, onboardingToExplorer: true })
 
     // Simulate arriving at request page after social login (wallet already connected via mock)
@@ -189,23 +189,11 @@ test.describe('Explorer social flow: request page after social login', () => {
     // Approve
     await page.getByRole('button', { name: /yes, they are the same/i }).click()
 
-    // Login Successful with Continue button (Explorer flow)
-    await expect(page.getByText('Login Successful!')).toBeVisible({ timeout: 15_000 })
-    const continueButton = page.getByRole('button', { name: /continue/i })
-    await expect(continueButton).toBeVisible()
-
-    // Click Continue — triggers decentraland:// deeplink
-    await continueButton.click()
-    await page.waitForTimeout(500)
-
-    // Verify connection persisted for SSO
-    const hasConnectionData = await page.evaluate(() => {
-      return localStorage.getItem('decentraland-connect-storage-key') !== null
-    })
-    expect(hasConnectionData).toBe(true)
+    // Success page — deeplink fires automatically on mount
+    await expect(page.getByText(/signed in to Decentraland/i)).toBeVisible({ timeout: 15_000 })
   })
 
-  test('new user (no profile): auto-signs → Login Successful without verification', async ({
+  test('new user (no profile): auto-signs → success without verification', async ({
     page
   }) => {
     await mockApiRoutes(page, { hasProfile: false, onboardingToExplorer: true })
@@ -213,8 +201,7 @@ test.describe('Explorer social flow: request page after social login', () => {
     await page.goto(`/auth/requests/${MOCK_REQUEST_ID}?loginMethod=METAMASK`)
 
     // New users skip verification — auto-sign goes straight to success
-    await expect(page.getByText('Login Successful!')).toBeVisible({ timeout: 20_000 })
-    await expect(page.getByRole('button', { name: /continue/i })).toBeVisible()
+    await expect(page.getByText(/signed in to Decentraland/i)).toBeVisible({ timeout: 20_000 })
 
     // Should NOT show setup pages
     await expect(page.getByPlaceholder(/enter your username/i)).not.toBeVisible()

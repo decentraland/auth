@@ -215,11 +215,11 @@ export const QuickSetupPage = () => {
               control={<CheckboxInput checked={agree} onChange={(_, checked) => setAgree(checked)} />}
               label={
                 <span>
-                  I agree with Decentraland&apos;s{' '}
+                  {t('quick_setup.agree_prefix')}{' '}
                   <LinkText href="https://decentraland.org/terms" target="_blank">
                     {t('quick_setup.terms_of_use')}
                   </LinkText>{' '}
-                  and{' '}
+                  {t('quick_setup.agree_connector')}{' '}
                   <LinkText href="https://decentraland.org/privacy" target="_blank">
                     {t('quick_setup.privacy_policy')}
                   </LinkText>

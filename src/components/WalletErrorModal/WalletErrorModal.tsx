@@ -1,6 +1,6 @@
 import { useTranslation } from '@dcl/hooks'
-import { muiIcons } from 'decentraland-ui2'
-import { Backdrop, CloseButton, ErrorCircle, Message, ModalContainer, TryAgainButton } from './WalletErrorModal.styled'
+import { Dialog, muiIcons } from 'decentraland-ui2'
+import { CloseButton, ErrorCircle, Message, ModalContainer, TryAgainButton } from './WalletErrorModal.styled'
 
 const CloseIcon = muiIcons.Close
 
@@ -13,13 +13,15 @@ type WalletErrorModalProps = {
 export const WalletErrorModal = ({ open, onTryAgain, onClose }: WalletErrorModalProps) => {
   const { t } = useTranslation()
 
-  if (!open) {
-    return null
-  }
-
   return (
-    <Backdrop onClick={onClose} role="dialog" aria-modal="true" aria-label={t('wallet_error_modal.title')}>
-      <ModalContainer onClick={e => e.stopPropagation()}>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      aria-label={t('wallet_error_modal.title')}
+      PaperProps={{ sx: { background: 'transparent', boxShadow: 'none', overflow: 'visible' } }}
+      slotProps={{ backdrop: { sx: { backgroundColor: 'rgba(0, 0, 0, 0.6)' } } }}
+    >
+      <ModalContainer>
         <CloseButton onClick={onClose} aria-label={t('common.close_window')} data-testid="wallet-error-close-button">
           <CloseIcon sx={{ fontSize: 14 }} />
         </CloseButton>
@@ -41,6 +43,6 @@ export const WalletErrorModal = ({ open, onTryAgain, onClose }: WalletErrorModal
           {t('wallet_error_modal.try_again')}
         </TryAgainButton>
       </ModalContainer>
-    </Backdrop>
+    </Dialog>
   )
 }

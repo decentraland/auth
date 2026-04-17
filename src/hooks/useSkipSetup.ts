@@ -11,6 +11,11 @@ import { useTargetConfig } from './targetConfig'
  * 2. ONBOARDING_TO_EXPLORER FF + no explicit redirect — user comes from Explorer,
  *    onboarding happens in-app. For web flows (with redirectTo), we still check
  *    the profile and show a compact onboarding if needed.
+ *
+ * IMPORTANT: Feature flags may not be loaded yet when this hook first runs.
+ * Callers (e.g. RequestPage) must gate on `initializedFlags` before acting
+ * on the returned value — otherwise skipSetup=false while flags are loading
+ * could trigger profile checks prematurely.
  */
 export const useSkipSetup = (): boolean => {
   const [targetConfig] = useTargetConfig()

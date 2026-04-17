@@ -47,17 +47,13 @@ test.describe('Web → Email OTP login flow', () => {
     // The Thirdweb SDK call might fail in test, but we verify the flow triggers
     await page.waitForTimeout(3000)
 
-    // Check for OTP input fields (data-testid="otp-input-0")
+    // OTP modal should appear after email submission
     const otpInput = page.locator('[data-testid="otp-input-0"]')
-    const otpVisible = await otpInput.isVisible().catch(() => false)
+    await expect(otpInput).toBeVisible({ timeout: 10_000 })
 
-    // Either OTP modal appeared (thirdweb mock worked) or an error state
-    // Both are acceptable — we verified the email submission triggers the flow
-    if (otpVisible) {
-      // OTP modal rendered — verify all 6 inputs
-      for (let i = 0; i < 6; i++) {
-        await expect(page.locator(`[data-testid="otp-input-${i}"]`)).toBeVisible()
-      }
+    // OTP modal rendered — verify all 6 inputs
+    for (let i = 0; i < 6; i++) {
+      await expect(page.locator(`[data-testid="otp-input-${i}"]`)).toBeVisible()
     }
   })
 
@@ -82,25 +78,23 @@ test.describe('Web → Email OTP login flow', () => {
 
     // Wait for OTP modal
     const otpInput0 = page.locator('[data-testid="otp-input-0"]')
-    const otpVisible = await otpInput0.isVisible({ timeout: 5000 }).catch(() => false)
+    await expect(otpInput0).toBeVisible({ timeout: 10_000 })
 
-    if (otpVisible) {
-      // Type digits — each should auto-focus the next
-      await otpInput0.fill('1')
-      await expect(page.locator('[data-testid="otp-input-1"]')).toBeFocused()
+    // Type digits — each should auto-focus the next
+    await otpInput0.fill('1')
+    await expect(page.locator('[data-testid="otp-input-1"]')).toBeFocused()
 
-      // Verify paste works
-      await otpInput0.focus()
-      await page.keyboard.press('Control+A')
-      // Type all 6 digits
-      for (let i = 0; i < 6; i++) {
-        await page.locator(`[data-testid="otp-input-${i}"]`).fill(String(i + 1))
-      }
+    // Verify paste works
+    await otpInput0.focus()
+    await page.keyboard.press('Control+A')
+    // Type all 6 digits
+    for (let i = 0; i < 6; i++) {
+      await page.locator(`[data-testid="otp-input-${i}"]`).fill(String(i + 1))
+    }
 
-      // All inputs should have values
-      for (let i = 0; i < 6; i++) {
-        await expect(page.locator(`[data-testid="otp-input-${i}"]`)).toHaveValue(String(i + 1))
-      }
+    // All inputs should have values
+    for (let i = 0; i < 6; i++) {
+      await expect(page.locator(`[data-testid="otp-input-${i}"]`)).toHaveValue(String(i + 1))
     }
   })
 
@@ -122,17 +116,15 @@ test.describe('Web → Email OTP login flow', () => {
     await submitButton2.click()
 
     const otpInput0 = page.locator('[data-testid="otp-input-0"]')
-    const otpVisible = await otpInput0.isVisible({ timeout: 5000 }).catch(() => false)
+    await expect(otpInput0).toBeVisible({ timeout: 10_000 })
 
-    if (otpVisible) {
-      // Click back button
-      const backButton = page.locator('[data-testid="email-login-back-button"]')
-      await expect(backButton).toBeVisible()
-      await backButton.click()
+    // Click back button
+    const backButton = page.locator('[data-testid="email-login-back-button"]')
+    await expect(backButton).toBeVisible()
+    await backButton.click()
 
-      // OTP modal should close
-      await expect(otpInput0).not.toBeVisible({ timeout: 3000 })
-    }
+    // OTP modal should close
+    await expect(otpInput0).not.toBeVisible({ timeout: 3000 })
   })
 
   test('OTP modal: close button should dismiss modal', async ({ page }) => {
@@ -153,15 +145,13 @@ test.describe('Web → Email OTP login flow', () => {
     await submitButton2.click()
 
     const otpInput0 = page.locator('[data-testid="otp-input-0"]')
-    const otpVisible = await otpInput0.isVisible({ timeout: 5000 }).catch(() => false)
+    await expect(otpInput0).toBeVisible({ timeout: 10_000 })
 
-    if (otpVisible) {
-      const closeButton = page.locator('[data-testid="email-login-close-button"]')
-      await expect(closeButton).toBeVisible()
-      await closeButton.click()
+    const closeButton = page.locator('[data-testid="email-login-close-button"]')
+    await expect(closeButton).toBeVisible()
+    await closeButton.click()
 
-      await expect(otpInput0).not.toBeVisible({ timeout: 3000 })
-    }
+    await expect(otpInput0).not.toBeVisible({ timeout: 3000 })
   })
 
   test('email loginMethod=email should render LoginPage (not AutoLoginRedirect)', async ({ page }) => {

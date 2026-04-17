@@ -10,7 +10,15 @@ export const useAfterLoginRedirection = () => {
   // Internal redirects (e.g. /auth/requests/{id} from RequestPage → login → back) are NOT
   // explicit — they're part of the Explorer's auth flow and should not change skipSetup behavior.
   const rawRedirectTo = search.get('redirectTo') || ''
-  const isInternalAuthRedirect = rawRedirectTo.includes('/auth/requests/') || rawRedirectTo.includes('/auth/login')
+  let isInternalAuthRedirect = false
+  try {
+    const redirectUrl = rawRedirectTo.startsWith('/') ? new URL(rawRedirectTo, window.location.origin) : new URL(rawRedirectTo)
+    isInternalAuthRedirect =
+      redirectUrl.hostname === window.location.hostname &&
+      (redirectUrl.pathname.startsWith('/auth/requests/') || redirectUrl.pathname.startsWith('/auth/login'))
+  } catch {
+    // Malformed URL — not an internal redirect
+  }
   const hasExplicitRedirect = !isInternalAuthRedirect && (!!rawRedirectTo || !!search.get('state'))
   const redirectTo = extractRedirectToFromSearchParameters(search)
   let sanitizedRedirectTo = locations.home()

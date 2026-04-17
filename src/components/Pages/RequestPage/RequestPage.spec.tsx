@@ -134,7 +134,7 @@ jest.mock('./Views', () => ({
   TimeoutError: () => <div data-testid="timeout-error">Timeout</div>,
   DifferentAccountError: () => <div data-testid="different-account">Different Account</div>,
   IpValidationError: (props: any) => <div data-testid="ip-validation-error">IP Error: {props.reason}</div>,
-  RecoverError: (props: any) => <div data-testid="recover-error">Error: {props.error}</div>,
+  RecoverError: () => <div data-testid="recover-error">Recover Error</div>,
   SigningError: (props: any) => <div data-testid="signing-error">Signing Error: {props.error}</div>,
   WalletInteraction: () => <div data-testid="wallet-interaction">Wallet Interaction</div>,
   WalletInteractionComplete: () => <div data-testid="wallet-interaction-complete">Wallet Complete</div>,

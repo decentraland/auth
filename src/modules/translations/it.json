@@ -97,7 +97,8 @@
     "sign_in_complete": {
       "title": "Accesso riuscito!",
       "description": "Torna al {explorerText} per entrare!",
-      "explorer_description": "Hai effettuato l'accesso a Decentraland. Torna all'app Decentraland per completare il tuo account!",
+      "explorer_description_line1": "Hai effettuato l'accesso a Decentraland.",
+      "explorer_description_line2": "Torna a Decentraland App per completare il tuo account!",
       "continue": "CONTINUE"
     },
     "denied_sign_in": {
@@ -118,7 +119,8 @@
     },
     "recover_error": {
       "title": "Si è verificato un errore durante il recupero della richiesta...",
-      "description": "La richiesta non è più disponibile. Creane una nuova e riprova. Se il tempo di scadenza è ancora in corso nell'app Explorer, controlla che l'ora del tuo computer sia impostata correttamente."
+      "description": "La richiesta non è più disponibile. Creane una nuova e riprova. Se il tempo di scadenza è ancora in corso nell'app Explorer, controlla che l'ora del tuo computer sia impostata correttamente.",
+      "try_again": "TRY AGAIN"
     },
     "ip_validation_error": {
       "title": "Validazione di sicurezza non riuscita",
@@ -262,6 +264,8 @@
     "email_placeholder": "Inserisci la tua e-mail",
     "email_helper": "Iscriviti alla newsletter di Decentraland per aggiornamenti su funzionalità, eventi, concorsi e altro ancora.",
     "agree_tos": "Accetto i {termsLink} e la {privacyLink} di Decentraland.*",
+    "agree_prefix": "Accetto i",
+    "agree_connector": "e la",
     "terms_of_use": "Condizioni d'uso",
     "privacy_policy": "Informativa sulla privacy",
     "lets_go": "LET'S GO",

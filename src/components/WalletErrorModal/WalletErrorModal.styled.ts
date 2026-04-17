@@ -1,19 +1,6 @@
 import { brand } from 'decentraland-ui2/dist/theme/colors'
 import { Box, Button, IconButton, styled } from 'decentraland-ui2'
 
-const Backdrop = styled(Box)({
-  position: 'fixed',
-  top: 0,
-  left: 0,
-  width: '100vw',
-  height: '100vh',
-  backgroundColor: 'rgba(0, 0, 0, 0.6)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  zIndex: 1300
-})
-
 const ModalContainer = styled(Box)({
   position: 'relative',
   width: 611,
@@ -86,4 +73,4 @@ const TryAgainButton = styled(Button)({
 })
 /* eslint-enable @typescript-eslint/naming-convention */
 
-export { Backdrop, CloseButton, ErrorCircle, Message, ModalContainer, TryAgainButton }
+export { CloseButton, ErrorCircle, Message, ModalContainer, TryAgainButton }

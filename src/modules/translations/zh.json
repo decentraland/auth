@@ -97,7 +97,8 @@
     "sign_in_complete": {
       "title": "登录成功！",
       "description": "返回 {explorerText} 开始探索！",
-      "explorer_description": "您已登录 Decentraland。请返回 Decentraland 应用以完成您的账户设置！",
+      "explorer_description_line1": "您已登录 Decentraland。",
+      "explorer_description_line2": "请返回 Decentraland App 以完成您的账户设置！",
       "continue": "CONTINUE"
     },
     "denied_sign_in": {
@@ -118,7 +119,8 @@
     },
     "recover_error": {
       "title": "恢复请求时发生错误...",
-      "description": "该请求已不可用。请随时创建新请求并重试。如果 Explorer 应用中的过期时间仍在运行，请检查您的计算机时间是否设置正确。"
+      "description": "该请求已不可用。请随时创建新请求并重试。如果 Explorer 应用中的过期时间仍在运行，请检查您的计算机时间是否设置正确。",
+      "try_again": "TRY AGAIN"
     },
     "ip_validation_error": {
       "title": "安全验证失败",
@@ -262,6 +264,8 @@
     "email_placeholder": "输入您的电子邮件",
     "email_helper": "订阅 Decentraland 通讯，获取功能、活动、比赛等更新信息。",
     "agree_tos": "我同意 Decentraland 的{termsLink}和{privacyLink}。*",
+    "agree_prefix": "我同意 Decentraland 的",
+    "agree_connector": "和",
     "terms_of_use": "使用条款",
     "privacy_policy": "隐私政策",
     "lets_go": "LET'S GO",

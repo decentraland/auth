@@ -313,10 +313,12 @@ export const RequestPage = () => {
 
               if (!userProfile || !isProfileComplete(userProfile)) {
                 // New user: auto-sign and go straight to success
+                const autoSignMessage = request.params?.[0]
+                if (typeof autoSignMessage !== 'string') break
                 try {
                   const signature = await walletClientRef.current.signMessage({
                     account: signerAddress,
-                    message: request.params?.[0] as string
+                    message: autoSignMessage
                   })
                   if (cancelled) return
                   await authServerClient.current.sendSuccessfulOutcome(requestId, signerAddress, signature)
@@ -459,7 +461,7 @@ export const RequestPage = () => {
       clearTimeout(timeoutRef.current)
       clearTimeout(signTimeoutRef.current)
     }
-  }, [toLoginPage, account, provider, providerType, isConnecting, initializedFlags, isProfileReady, requestId, isDeepLinkFlow])
+  }, [toLoginPage, account, provider, providerType, isConnecting, initializedFlags, isProfileReady, requestId, isDeepLinkFlow, skipSetup])
 
   useEffect(() => {
     // The timeout is only necessary on the verify sign in and wallet interaction views.
@@ -513,7 +515,9 @@ export const RequestPage = () => {
     }, 30000)
 
     try {
-      const signature = await walletClient.signMessage({ account: address, message: requestRef.current?.params?.[0] as string })
+      const signMessage = requestRef.current?.params?.[0]
+      if (typeof signMessage !== 'string') throw new Error('Invalid sign message in request params')
+      const signature = await walletClient.signMessage({ account: address, message: signMessage })
 
       if (hasTimeouted) {
         throw new TimedOutError()
@@ -750,7 +754,7 @@ export const RequestPage = () => {
     case View.IP_VALIDATION_ERROR:
       return <IpValidationErrorView requestId={requestId} reason={error || 'Unknown error'} />
     case View.LOADING_ERROR:
-      return <RecoverError error={error} />
+      return <RecoverError />
     case View.VERIFY_SIGN_IN_ERROR:
     case View.WALLET_INTERACTION_ERROR:
       return <SigningError error={error} />
