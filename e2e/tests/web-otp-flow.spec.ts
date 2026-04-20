@@ -18,40 +18,27 @@ test.describe('Web → Email OTP login flow', () => {
   test('should open OTP modal after entering email', async ({ page }) => {
     await mockApiRoutes(page, { hasProfile: true, onboardingToExplorer: true })
 
-    // Mock Thirdweb's sendEmailOTP — intercept the API call
-    await page.route('**/embedded-wallet/**', async route => {
-      return route.fulfill({ status: 200, contentType: 'application/json', body: '{}' })
-    })
-    await page.route('**/in-app-wallet/**', async route => {
-      return route.fulfill({ status: 200, contentType: 'application/json', body: '{}' })
-    })
-    await page.route('**/thirdweb.com/**', async route => {
-      return route.fulfill({ status: 200, contentType: 'application/json', body: '{}' })
+    // Mock sendEmailOTP so it resolves immediately without hitting Thirdweb SDK
+    await page.addInitScript(() => {
+      ;(window as Record<string, unknown>).__TEST_MOCK_SEND_OTP__ = true
     })
 
     await page.goto('/auth/login')
 
-    // Wait for the login page to load
     const emailInput = page.getByPlaceholder(/email/i)
     await expect(emailInput).toBeVisible({ timeout: 15_000 })
 
-    // Enter email
     await emailInput.fill('test@example.com')
 
-    // Click the NEXT/submit button for email
     const submitButton = page.locator('[data-testid="email-submit-button"]')
     await expect(submitButton).toBeVisible({ timeout: 5000 })
     await submitButton.click()
 
-    // OTP modal should appear (or at least the email was submitted)
-    // The Thirdweb SDK call might fail in test, but we verify the flow triggers
-    await page.waitForTimeout(3000)
-
-    // OTP modal should appear after email submission
+    // OTP modal should appear after sendEmailOTP resolves
     const otpInput = page.locator('[data-testid="otp-input-0"]')
     await expect(otpInput).toBeVisible({ timeout: 10_000 })
 
-    // OTP modal rendered — verify all 6 inputs
+    // Verify all 6 inputs rendered
     for (let i = 0; i < 6; i++) {
       await expect(page.locator(`[data-testid="otp-input-${i}"]`)).toBeVisible()
     }
@@ -60,10 +47,9 @@ test.describe('Web → Email OTP login flow', () => {
   test('OTP modal: should accept digit input and auto-focus next', async ({ page }) => {
     await mockApiRoutes(page, { hasProfile: true, onboardingToExplorer: true })
 
-    // Mock all Thirdweb calls
-    await page.route('**/embedded-wallet/**', route => route.fulfill({ status: 200, body: '{}' }))
-    await page.route('**/in-app-wallet/**', route => route.fulfill({ status: 200, body: '{}' }))
-    await page.route('**/thirdweb.com/**', route => route.fulfill({ status: 200, body: '{}' }))
+    await page.addInitScript(() => {
+      ;(window as Record<string, unknown>).__TEST_MOCK_SEND_OTP__ = true
+    })
 
     await page.goto('/auth/login')
 
@@ -71,12 +57,10 @@ test.describe('Web → Email OTP login flow', () => {
     await expect(emailInput).toBeVisible({ timeout: 15_000 })
     await emailInput.fill('test@example.com')
 
-    // Submit email
     const submitButton2 = page.locator('[data-testid="email-submit-button"]')
     await expect(submitButton2).toBeVisible({ timeout: 5000 })
     await submitButton2.click()
 
-    // Wait for OTP modal
     const otpInput0 = page.locator('[data-testid="otp-input-0"]')
     await expect(otpInput0).toBeVisible({ timeout: 10_000 })
 
@@ -84,9 +68,6 @@ test.describe('Web → Email OTP login flow', () => {
     await otpInput0.fill('1')
     await expect(page.locator('[data-testid="otp-input-1"]')).toBeFocused()
 
-    // Verify paste works
-    await otpInput0.focus()
-    await page.keyboard.press('Control+A')
     // Type all 6 digits
     for (let i = 0; i < 6; i++) {
       await page.locator(`[data-testid="otp-input-${i}"]`).fill(String(i + 1))
@@ -101,9 +82,9 @@ test.describe('Web → Email OTP login flow', () => {
   test('OTP modal: back button should close modal', async ({ page }) => {
     await mockApiRoutes(page, { hasProfile: true, onboardingToExplorer: true })
 
-    await page.route('**/embedded-wallet/**', route => route.fulfill({ status: 200, body: '{}' }))
-    await page.route('**/in-app-wallet/**', route => route.fulfill({ status: 200, body: '{}' }))
-    await page.route('**/thirdweb.com/**', route => route.fulfill({ status: 200, body: '{}' }))
+    await page.addInitScript(() => {
+      ;(window as Record<string, unknown>).__TEST_MOCK_SEND_OTP__ = true
+    })
 
     await page.goto('/auth/login')
 
@@ -118,21 +99,19 @@ test.describe('Web → Email OTP login flow', () => {
     const otpInput0 = page.locator('[data-testid="otp-input-0"]')
     await expect(otpInput0).toBeVisible({ timeout: 10_000 })
 
-    // Click back button
     const backButton = page.locator('[data-testid="email-login-back-button"]')
     await expect(backButton).toBeVisible()
     await backButton.click()
 
-    // OTP modal should close
     await expect(otpInput0).not.toBeVisible({ timeout: 3000 })
   })
 
   test('OTP modal: close button should dismiss modal', async ({ page }) => {
     await mockApiRoutes(page, { hasProfile: true, onboardingToExplorer: true })
 
-    await page.route('**/embedded-wallet/**', route => route.fulfill({ status: 200, body: '{}' }))
-    await page.route('**/in-app-wallet/**', route => route.fulfill({ status: 200, body: '{}' }))
-    await page.route('**/thirdweb.com/**', route => route.fulfill({ status: 200, body: '{}' }))
+    await page.addInitScript(() => {
+      ;(window as Record<string, unknown>).__TEST_MOCK_SEND_OTP__ = true
+    })
 
     await page.goto('/auth/login')
 
