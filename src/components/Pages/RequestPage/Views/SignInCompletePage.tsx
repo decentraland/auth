@@ -4,7 +4,7 @@ import { config } from '../../../../modules/config'
 import { AnimatedBackground } from '../../../AnimatedBackground'
 import { CenteredContainer, CheckIconLarge, Description } from './SignInCompletePage.styled'
 
-export function getExplorerDeeplink(): string {
+function getExplorerDeeplink(): string {
   const env = config.get('ENVIRONMENT').toLowerCase()
   if (env === 'production') return 'decentraland://'
   return `decentraland://?dclenv=${env === 'development' ? 'zone' : env}`
@@ -14,7 +14,7 @@ type Props = {
   onContinue?: () => void
 }
 
-export const SignInCompletePage = ({ onContinue }: Props) => {
+const SignInCompletePage = ({ onContinue }: Props) => {
   const { t } = useTranslation()
 
   useEffect(() => {
@@ -39,3 +39,5 @@ export const SignInCompletePage = ({ onContinue }: Props) => {
     </CenteredContainer>
   )
 }
+
+export { SignInCompletePage, getExplorerDeeplink }
