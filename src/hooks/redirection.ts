@@ -10,21 +10,22 @@ export const useAfterLoginRedirection = () => {
   // Internal redirects (e.g. /auth/requests/{id} from RequestPage → login → back) are NOT
   // explicit — they're part of the Explorer's auth flow and should not change skipSetup behavior.
   const rawRedirectTo = search.get('redirectTo') || ''
-  let isInternalAuthRedirect = false
+  let isAuthRedirection = false
   try {
     const redirectUrl = rawRedirectTo.startsWith('/') ? new URL(rawRedirectTo, window.location.origin) : new URL(rawRedirectTo)
-    isInternalAuthRedirect =
+    isAuthRedirection =
       redirectUrl.hostname === window.location.hostname &&
       (redirectUrl.pathname.startsWith('/auth/requests/') || redirectUrl.pathname.startsWith('/auth/login'))
   } catch {
     // Malformed URL — not an internal redirect
   }
-  const hasExplicitRedirect = !isInternalAuthRedirect && (!!rawRedirectTo || !!search.get('state'))
+  const hasExplicitRedirect = !isAuthRedirection && (!!rawRedirectTo || !!search.get('state'))
   const redirectTo = extractRedirectToFromSearchParameters(search)
   let sanitizedRedirectTo = locations.home()
 
-  // Include the current dev server port so localhost redirects work (port 5174 etc.)
-  // In production (port 443/80) this is a no-op since those ports are always allowed.
+  // Required: validateUrlInstance rejects non-standard ports by default.
+  // Without this, localhost dev servers (port 5174 etc.) and E2E tests
+  // would have all redirects blocked. In production (443/80) this is a no-op.
   const currentPort = window.location.port
   const allowedPorts = currentPort ? [currentPort] : []
 
@@ -37,10 +38,7 @@ export const useAfterLoginRedirection = () => {
     } else {
       redirectToURL = new URL(redirectTo)
     }
-    if (
-      !validateUrlInstance(redirectToURL, { allowLocalhost: true, allowedPorts }) ||
-      redirectToURL.hostname !== window.location.hostname
-    ) {
+    if (!validateUrlInstance(redirectToURL, { allowLocalhost: true, allowedPorts }) || redirectToURL.hostname !== window.location.hostname) {
       redirectToURL = new URL('/auth/invalidRedirection', window.location.origin)
     }
 

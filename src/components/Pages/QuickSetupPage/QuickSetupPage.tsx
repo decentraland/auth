@@ -4,6 +4,7 @@ import { CircularProgress, useMobileMediaQuery } from 'decentraland-ui2'
 import bodyTypeIconSvg from '../../../assets/images/body-type-icon.svg'
 import randomizeIconSvg from '../../../assets/images/randomize-icon.svg'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
+import { useDisabledCatalysts } from '../../../hooks/useDisabledCatalysts'
 import { useCurrentConnectionData } from '../../../shared/connection'
 import { trackCheckpoint } from '../../../shared/onboarding/trackCheckpoint'
 import { handleError } from '../../../shared/utils/errorHandler'
@@ -90,7 +91,7 @@ export const QuickSetupPage = () => {
     return `${baseUrl}/?profile=${account}&disableBackground=true&lockBeta=true&unity=true&mode=jesus`
   }, [account])
 
-  const disabledCatalysts = useMemo(() => [] as string[], [])
+  const disabledCatalysts = useDisabledCatalysts()
 
   const nameError = name.length > MAX_NAME_LENGTH
   const canSubmit = name.trim().length > 0 && agree && !nameError && !deploying

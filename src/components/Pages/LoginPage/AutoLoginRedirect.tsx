@@ -56,8 +56,7 @@ export const AutoLoginRedirect = ({ connectionType }: Props) => {
     // Uses navigate() to respect the basename (/auth).
     const params = new URLSearchParams(window.location.search)
     params.delete('loginMethod')
-    const query = params.toString()
-    navigate(`${locations.login()}${query ? `?${query}` : ''}`, { replace: true })
+    navigate(locations.login({ queryParams: params }), { replace: true })
   }, [navigate])
 
   const startLogin = useCallback(async () => {
@@ -133,8 +132,7 @@ export const AutoLoginRedirect = ({ connectionType }: Props) => {
         const params = new URLSearchParams(window.location.search)
         params.delete('loginMethod')
         params.set('walletError', 'rejected')
-        const query = params.toString()
-        navigate(`${locations.login()}${query ? `?${query}` : ''}`, { replace: true })
+        navigate(locations.login({ queryParams: params }), { replace: true })
         return
       }
       handleError(error, `Error during auto-login (${connectionType})`)
