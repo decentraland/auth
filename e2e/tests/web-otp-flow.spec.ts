@@ -1,14 +1,14 @@
 import { test, expect } from '@playwright/test'
-import { injectMockWallet, mockApiRoutes, MOCK_WALLET } from '../helpers/setup'
+import { injectMockWallet, mockApiRoutes, mockThirdwebRoutes } from '../helpers/setup'
 
 test.describe('Web → Email OTP login flow', () => {
-  test.beforeEach(async ({ context }) => {
+  test.beforeEach(async ({ context, page }) => {
     await injectMockWallet(context)
+    await mockApiRoutes(page, { hasProfile: true, onboardingToExplorer: true })
+    await mockThirdwebRoutes(page)
   })
 
   test('should show email input on LoginPage', async ({ page }) => {
-    await mockApiRoutes(page, { hasProfile: true, onboardingToExplorer: true })
-
     await page.goto('/auth/login')
 
     // LoginPage should render with email input (lazy loaded)
@@ -16,13 +16,6 @@ test.describe('Web → Email OTP login flow', () => {
   })
 
   test('should open OTP modal after entering email', async ({ page }) => {
-    await mockApiRoutes(page, { hasProfile: true, onboardingToExplorer: true })
-
-    // Mock sendEmailOTP so it resolves immediately without hitting Thirdweb SDK
-    await page.addInitScript(() => {
-      ;(window as Record<string, unknown>).__TEST_MOCK_SEND_OTP__ = true
-    })
-
     await page.goto('/auth/login')
 
     const emailInput = page.getByPlaceholder(/email/i)
@@ -34,7 +27,7 @@ test.describe('Web → Email OTP login flow', () => {
     await expect(submitButton).toBeVisible({ timeout: 5000 })
     await submitButton.click()
 
-    // OTP modal should appear after sendEmailOTP resolves
+    // OTP modal should appear after sendEmailOTP resolves (network-mocked)
     const otpInput = page.locator('[data-testid="otp-input-0"]')
     await expect(otpInput).toBeVisible({ timeout: 10_000 })
 
@@ -45,12 +38,6 @@ test.describe('Web → Email OTP login flow', () => {
   })
 
   test('OTP modal: should accept digit input and auto-focus next', async ({ page }) => {
-    await mockApiRoutes(page, { hasProfile: true, onboardingToExplorer: true })
-
-    await page.addInitScript(() => {
-      ;(window as Record<string, unknown>).__TEST_MOCK_SEND_OTP__ = true
-    })
-
     await page.goto('/auth/login')
 
     const emailInput = page.getByPlaceholder(/email/i)
@@ -80,12 +67,6 @@ test.describe('Web → Email OTP login flow', () => {
   })
 
   test('OTP modal: back button should close modal', async ({ page }) => {
-    await mockApiRoutes(page, { hasProfile: true, onboardingToExplorer: true })
-
-    await page.addInitScript(() => {
-      ;(window as Record<string, unknown>).__TEST_MOCK_SEND_OTP__ = true
-    })
-
     await page.goto('/auth/login')
 
     const emailInput = page.getByPlaceholder(/email/i)
@@ -107,12 +88,6 @@ test.describe('Web → Email OTP login flow', () => {
   })
 
   test('OTP modal: close button should dismiss modal', async ({ page }) => {
-    await mockApiRoutes(page, { hasProfile: true, onboardingToExplorer: true })
-
-    await page.addInitScript(() => {
-      ;(window as Record<string, unknown>).__TEST_MOCK_SEND_OTP__ = true
-    })
-
     await page.goto('/auth/login')
 
     const emailInput = page.getByPlaceholder(/email/i)
@@ -134,8 +109,6 @@ test.describe('Web → Email OTP login flow', () => {
   })
 
   test('email loginMethod=email should render LoginPage (not AutoLoginRedirect)', async ({ page }) => {
-    await mockApiRoutes(page, { hasProfile: true, onboardingToExplorer: true })
-
     // Email is NOT in AUTO_LOGIN_METHODS — should show full LoginPage
     await page.goto('/auth/login?loginMethod=email')
 

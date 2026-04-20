@@ -57,7 +57,6 @@ const sendEmailOTP = async (email: string): Promise<void> => {
  * @see https://portal.thirdweb.com/wallets/users
  */
 const verifyEmailOTPAndConnect = async (email: string, verificationCode: string): Promise<string> => {
-  console.log('[Thirdweb] Verifying OTP for email:', email, 'code:', verificationCode)
   const client = await getThirdwebClient()
   const wallet = await getInAppWallet()
 
@@ -70,10 +69,6 @@ const verifyEmailOTPAndConnect = async (email: string, verificationCode: string)
       verificationCode
     })
     address = account.address
-    console.log('[Thirdweb] OTP verified successfully!', {
-      address: account.address,
-      hasSignMessage: typeof account.signMessage === 'function'
-    })
   } catch (error) {
     console.error('[Thirdweb] Error verifying OTP:', error)
     // Thirdweb throws this error when the user enters an incorrect or expired OTP code.

@@ -195,6 +195,95 @@ export async function mockApiRoutes(page: Page, options: SetupOptions = {}) {
 }
 
 /**
+ * Options controlling mocked Thirdweb SDK behavior.
+ */
+type ThirdwebMockOptions = {
+  /** Address returned by the verify-OTP callback. Defaults to MOCK_WALLET. */
+  walletAddress?: string
+  /** When true, the verify-OTP endpoint returns 400 (invalid code). Default: false. */
+  failVerify?: boolean
+  /** When true, the send-OTP endpoint returns 500. Default: false. */
+  failSend?: boolean
+}
+
+/**
+ * Intercept Thirdweb in-app-wallet HTTP traffic so tests never hit the real
+ * SDK backend. Covers:
+ *   - `POST /api/2024-05-05/login/email`          → send OTP
+ *   - `POST /api/2024-05-05/login/email/callback` → verify OTP
+ *   - Any other `embedded-wallet.thirdweb.com`, `c.thirdweb.com`,
+ *     or `social.thirdweb.com` requests are stubbed to avoid real calls.
+ *
+ * Must be called BEFORE any action that would trigger a Thirdweb network call.
+ */
+export async function mockThirdwebRoutes(page: Page, options: ThirdwebMockOptions = {}) {
+  const { walletAddress = MOCK_WALLET, failVerify = false, failSend = false } = options
+
+  await page.route('**/embedded-wallet.thirdweb.com/**', async route => {
+    const url = route.request().url()
+    const method = route.request().method()
+
+    // Send OTP — POST /api/<date>/login/email
+    if (method === 'POST' && /\/login\/email(\?|$)/.test(url)) {
+      if (failSend) {
+        return route.fulfill({
+          status: 500,
+          contentType: 'application/json',
+          body: JSON.stringify({ message: 'Failed to send verification code' })
+        })
+      }
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ isNewUser: true })
+      })
+    }
+
+    // Verify OTP — POST /api/<date>/login/email/callback
+    if (method === 'POST' && /\/login\/email\/callback/.test(url)) {
+      if (failVerify) {
+        return route.fulfill({
+          status: 400,
+          contentType: 'application/json',
+          body: JSON.stringify({ message: 'Failed to verify verification code' })
+        })
+      }
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          storedToken: {
+            authDetails: {
+              email: 'test@example.com',
+              userWalletId: walletAddress,
+              walletAddress
+            },
+            cookieString: 'e2e-mock-cookie',
+            developerClientId: 'e2e-mock-client',
+            jwtToken: 'e2e-mock-jwt',
+            shouldStoreCookieString: true
+          },
+          walletDetails: {
+            walletAddress
+          }
+        })
+      })
+    }
+
+    // Any other thirdweb call → stub as success to avoid real network
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: '{}'
+    })
+  })
+
+  // Thirdweb analytics / telemetry
+  await page.route('**/c.thirdweb.com/**', route => route.abort())
+  await page.route('**/social.thirdweb.com/**', route => route.abort())
+}
+
+/**
  * Inject a previous connection into localStorage so that ConnectionProvider
  * restores the wallet via tryPreviousConnection() on mount — without needing
  * the user to go through the login flow.
