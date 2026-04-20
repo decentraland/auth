@@ -16,43 +16,49 @@ describe('isSessionMismatch', () => {
     })
   })
 
-  describe('when session is social (MAGIC) and loginMethod is METAMASK', () => {
-    it('should return true (mismatch)', () => {
+  describe('social session + wallet loginMethod → mismatch', () => {
+    it('should detect mismatch for MAGIC + METAMASK', () => {
       expect(isSessionMismatch(ProviderType.MAGIC, 'METAMASK')).toBe(true)
       expect(isSessionMismatch(ProviderType.MAGIC, 'metamask')).toBe(true)
     })
-  })
 
-  describe('when session is social (MAGIC_TEST) and loginMethod is METAMASK', () => {
-    it('should return true (mismatch)', () => {
+    it('should detect mismatch for MAGIC_TEST + METAMASK', () => {
       expect(isSessionMismatch(ProviderType.MAGIC_TEST, 'METAMASK')).toBe(true)
     })
-  })
 
-  describe('when session is social (THIRDWEB) and loginMethod is METAMASK', () => {
-    it('should return true (mismatch)', () => {
+    it('should detect mismatch for THIRDWEB + METAMASK', () => {
       expect(isSessionMismatch(ProviderType.THIRDWEB, 'METAMASK')).toBe(true)
+    })
+
+    it('should detect mismatch for social session + other wallet methods', () => {
+      expect(isSessionMismatch(ProviderType.MAGIC, 'WALLETCONNECT')).toBe(true)
+      expect(isSessionMismatch(ProviderType.THIRDWEB, 'COINBASE')).toBe(true)
+      expect(isSessionMismatch(ProviderType.MAGIC, 'FORTMATIC')).toBe(true)
     })
   })
 
-  describe('when session is wallet (INJECTED) and loginMethod is social', () => {
-    it('should return true (mismatch)', () => {
+  describe('wallet session + social loginMethod → mismatch', () => {
+    it('should detect mismatch for INJECTED + social methods', () => {
       expect(isSessionMismatch(ProviderType.INJECTED, 'GOOGLE')).toBe(true)
       expect(isSessionMismatch(ProviderType.INJECTED, 'DISCORD')).toBe(true)
       expect(isSessionMismatch(ProviderType.INJECTED, 'APPLE')).toBe(true)
       expect(isSessionMismatch(ProviderType.INJECTED, 'X')).toBe(true)
+      expect(isSessionMismatch(ProviderType.INJECTED, 'EMAIL')).toBe(true)
     })
   })
 
-  describe('when session matches loginMethod', () => {
+  describe('matching session + loginMethod → no mismatch', () => {
     it('should return false for social session + social loginMethod', () => {
       expect(isSessionMismatch(ProviderType.MAGIC, 'GOOGLE')).toBe(false)
       expect(isSessionMismatch(ProviderType.MAGIC_TEST, 'DISCORD')).toBe(false)
       expect(isSessionMismatch(ProviderType.THIRDWEB, 'APPLE')).toBe(false)
+      expect(isSessionMismatch(ProviderType.THIRDWEB, 'EMAIL')).toBe(false)
     })
 
     it('should return false for wallet session + wallet loginMethod', () => {
       expect(isSessionMismatch(ProviderType.INJECTED, 'METAMASK')).toBe(false)
+      expect(isSessionMismatch(ProviderType.WALLET_CONNECT_V2, 'WALLETCONNECT')).toBe(false)
+      expect(isSessionMismatch(ProviderType.WALLET_LINK, 'COINBASE')).toBe(false)
     })
   })
 })

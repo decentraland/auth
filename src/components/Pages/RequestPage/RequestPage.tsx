@@ -60,7 +60,8 @@ import {
   TransferConfirmView,
   VerifySignIn,
   WalletInteraction,
-  WalletInteractionComplete
+  WalletInteractionComplete,
+  getExplorerDeeplink
 } from './Views'
 
 enum View {
@@ -754,7 +755,13 @@ export const RequestPage = () => {
     case View.IP_VALIDATION_ERROR:
       return <IpValidationErrorView requestId={requestId} reason={error || 'Unknown error'} />
     case View.LOADING_ERROR:
-      return <RecoverError />
+      return (
+        <RecoverError
+          onTryAgain={() => {
+            window.location.href = getExplorerDeeplink()
+          }}
+        />
+      )
     case View.VERIFY_SIGN_IN_ERROR:
     case View.WALLET_INTERACTION_ERROR:
       return <SigningError error={error} />

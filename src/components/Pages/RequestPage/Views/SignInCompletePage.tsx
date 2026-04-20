@@ -4,7 +4,7 @@ import { config } from '../../../../modules/config'
 import { AnimatedBackground } from '../../../AnimatedBackground'
 import { CenteredContainer, CheckIconLarge, Description } from './SignInCompletePage.styled'
 
-function getExplorerDeeplink(): string {
+export function getExplorerDeeplink(): string {
   const env = config.get('ENVIRONMENT').toLowerCase()
   if (env === 'production') return 'decentraland://'
   return `decentraland://?dclenv=${env === 'development' ? 'zone' : env}`

@@ -38,7 +38,10 @@ export const useAfterLoginRedirection = () => {
     } else {
       redirectToURL = new URL(redirectTo)
     }
-    if (!validateUrlInstance(redirectToURL, { allowLocalhost: true, allowedPorts }) || redirectToURL.hostname !== window.location.hostname) {
+    if (
+      !validateUrlInstance(redirectToURL, { allowLocalhost: true, allowedPorts }) ||
+      redirectToURL.hostname !== window.location.hostname
+    ) {
       redirectToURL = new URL('/auth/invalidRedirection', window.location.origin)
     }
 

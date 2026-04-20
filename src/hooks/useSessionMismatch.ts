@@ -1,5 +1,9 @@
 import { ProviderType } from '@dcl/schemas'
 
+const SOCIAL_PROVIDER_TYPES = new Set<string>([ProviderType.MAGIC, ProviderType.MAGIC_TEST, ProviderType.THIRDWEB])
+
+const WALLET_LOGIN_METHODS = new Set(['METAMASK', 'WALLETCONNECT', 'COINBASE', 'FORTMATIC'])
+
 /**
  * Checks if the active session provider type matches the requested login method.
  * Returns true if there's a mismatch (e.g., social session but wallet login requested).
@@ -7,10 +11,9 @@ import { ProviderType } from '@dcl/schemas'
 export function isSessionMismatch(providerType: string | undefined, loginMethod: string | null): boolean {
   if (!loginMethod || !providerType) return false
 
-  const isSocialSession =
-    providerType === ProviderType.MAGIC || providerType === ProviderType.MAGIC_TEST || providerType === ProviderType.THIRDWEB
+  const isSocialSession = SOCIAL_PROVIDER_TYPES.has(providerType)
+  const isWalletLoginMethod = WALLET_LOGIN_METHODS.has(loginMethod.toUpperCase())
 
-  const isWalletLoginMethod = loginMethod.toUpperCase() === 'METAMASK'
-
+  // Mismatch: social session + wallet login request, or wallet session + social login request
   return (isSocialSession && isWalletLoginMethod) || (!isSocialSession && !isWalletLoginMethod)
 }
