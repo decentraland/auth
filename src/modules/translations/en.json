@@ -96,7 +96,10 @@
     },
     "sign_in_complete": {
       "title": "Login Successful!",
-      "description": "Return to the {explorerText} to jump in!"
+      "description": "Return to the {explorerText} to jump in!",
+      "explorer_description_line1": "You are signed in to Decentraland.",
+      "explorer_description_line2": "Return to Decentraland App to complete your account!",
+      "continue": "CONTINUE"
     },
     "denied_sign_in": {
       "title": "Did the number not match, or was this action not taken by you?",
@@ -116,7 +119,8 @@
     },
     "recover_error": {
       "title": "There was an error recovering the request...",
-      "description": "The request is not available anymore. Feel free to create a new one and try again. If the expiration time is still running in the Explorer app, check your computer's time to see if it's set correctly."
+      "description": "The request is not available anymore. Feel free to create a new one and try again. If the expiration time is still running in the Explorer app, check your computer's time to see if it's set correctly.",
+      "try_again": "TRY AGAIN"
     },
     "ip_validation_error": {
       "title": "Security Validation Failed",
@@ -242,6 +246,38 @@
     "confirming_login": "Confirming login...",
     "error": "Something went wrong. Redirecting to login...",
     "cancel": "Cancel"
+  },
+  "quick_setup": {
+    "welcome": "Welcome to",
+    "decentraland": "Decentraland!",
+    "username_label": "Username*",
+    "username_placeholder": "Enter your username",
+    "email_label": "Email",
+    "email_placeholder": "Enter your email",
+    "email_helper": "Subscribe to Decentraland's newsletter for updates on features, events, contests, and more.",
+    "agree_tos": "I agree with Decentraland's {termsLink} and {privacyLink}.*",
+    "agree_prefix": "I agree with Decentraland's",
+    "agree_connector": "and",
+    "terms_of_use": "Terms of Use",
+    "privacy_policy": "Privacy Policy",
+    "lets_go": "LET'S GO",
+    "deploying": "DEPLOYING...",
+    "body_type_a": "BODY TYPE A",
+    "body_type_b": "BODY TYPE B",
+    "randomize": "RANDOMIZE",
+    "customize_later": "You can customize your avatar later.",
+    "ready_to_jump_in": "{name} is Ready to Jump In!",
+    "success": "SUCCESS"
+  },
+  "wallet_error_modal": {
+    "title": "Wallet Error",
+    "message": "You did not confirm this action in your digital wallet extension. To continue, please try again.",
+    "try_again": "TRY AGAIN"
+  },
+  "login_error": {
+    "title": "Something went wrong.",
+    "description": "We couldn't sign you in. Please return to the Decentraland app and try again.",
+    "try_again": "TRY AGAIN"
   },
   "mobile_auth": {
     "sign_in_successful": "Sign In Successful",

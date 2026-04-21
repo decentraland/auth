@@ -15,6 +15,11 @@ interface LoginOptions {
    * Login method: 'email' for thirdweb email OTP
    */
   loginMethod?: LoginMethod
+  /**
+   * Additional query parameters to append to the login URL.
+   * Useful for preserving existing search params (e.g. walletError).
+   */
+  queryParams?: URLSearchParams | Record<string, string>
 }
 
 const buildQueryString = (params: Record<string, string | undefined | null>): string => {
@@ -46,12 +51,20 @@ const locations = {
     }
 
     // New signature: login(options: LoginOptions)
-    const { redirectTo, referrer, loginMethod } = options
-    return `/login${buildQueryString({
+    const { redirectTo, referrer, loginMethod, queryParams } = options
+    const base = buildQueryString({
       redirectTo,
       referrer: referrer ?? undefined,
       loginMethod
-    })}`
+    })
+    if (queryParams) {
+      const extra = queryParams instanceof URLSearchParams ? queryParams : new URLSearchParams(queryParams)
+      const baseParams = new URLSearchParams(base.replace(/^\?/, ''))
+      extra.forEach((value, key) => baseParams.set(key, value))
+      const merged = baseParams.toString()
+      return `/login${merged ? `?${merged}` : ''}`
+    }
+    return `/login${base}`
   },
 
   /**
@@ -71,6 +84,10 @@ const locations = {
     }`,
   avatarSetup: (redirectTo?: string, referrer?: string | null) =>
     `/avatar-setup${redirectTo ? `?redirectTo=${encodeURIComponent(redirectTo)}` : ''}${
+      referrer ? `${redirectTo ? '&' : '?'}referrer=${encodeURIComponent(referrer)}` : ''
+    }`,
+  quickSetup: (redirectTo?: string, referrer?: string | null) =>
+    `/quick-setup${redirectTo ? `?redirectTo=${encodeURIComponent(redirectTo)}` : ''}${
       referrer ? `${redirectTo ? '&' : '?'}referrer=${encodeURIComponent(referrer)}` : ''
     }`,
   mobile: (provider?: string) => `/mobile${provider ? `?provider=${encodeURIComponent(provider)}` : ''}`,

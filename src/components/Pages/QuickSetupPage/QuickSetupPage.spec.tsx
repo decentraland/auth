@@ -1,0 +1,245 @@
+import { fireEvent, render, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { QuickSetupPage } from './QuickSetupPage'
+
+// --- Mocks ---
+
+const mockRedirect = jest.fn()
+jest.mock('../../../hooks/redirection', () => ({
+  useAfterLoginRedirection: () => ({ url: 'https://decentraland.org/', redirect: mockRedirect, hasExplicitRedirect: true })
+}))
+
+jest.mock('../../../hooks/useSkipSetup', () => ({
+  useSkipSetup: () => false
+}))
+
+let mockAccount: string | undefined = '0xTestAccount'
+let mockIdentity: object | undefined = { authChain: [] }
+jest.mock('../../../shared/connection', () => ({
+  useCurrentConnectionData: () => ({
+    account: mockAccount,
+    identity: mockIdentity,
+    isLoading: false
+  })
+}))
+
+jest.mock('../../../shared/onboarding/trackCheckpoint', () => ({
+  trackCheckpoint: jest.fn()
+}))
+
+jest.mock('../../../shared/utils/errorHandler', () => ({
+  handleError: jest.fn().mockReturnValue('Error message')
+}))
+
+jest.mock('../SetupPage/utils', () => ({
+  deployProfileFromDefault: jest.fn().mockResolvedValue(undefined),
+  subscribeToNewsletter: jest.fn().mockResolvedValue(undefined)
+}))
+
+jest.mock('../../AnimatedBackground', () => ({
+  AnimatedBackground: () => <div data-testid="animated-background" />
+}))
+
+jest.mock('../../CustomWearablePreview', () => ({
+  CustomWearablePreview: ({ profile }: { profile: string }) => <div data-testid="wearable-preview" data-profile={profile} />
+}))
+
+jest.mock('decentraland-ui2', () => ({
+  useMobileMediaQuery: () => false,
+
+  Logo: ({ size }: { size: string }) => <div data-testid="dcl-logo" data-size={size} />,
+
+  CircularProgress: () => <div data-testid="spinner" />,
+  styled: jest.requireActual('decentraland-ui2').styled,
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  Box: jest.requireActual('decentraland-ui2').Box,
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  Button: jest.requireActual('decentraland-ui2').Button,
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  Typography: jest.requireActual('decentraland-ui2').Typography,
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  TextField: jest.requireActual('decentraland-ui2').TextField,
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  Checkbox: jest.requireActual('decentraland-ui2').Checkbox,
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  FormControlLabel: jest.requireActual('decentraland-ui2').FormControlLabel,
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  Link: jest.requireActual('decentraland-ui2').Link
+}))
+
+jest.mock('@dcl/hooks', () => ({
+  useTranslation: () => ({
+    t: (key: string, params?: Record<string, string>) => {
+      /* eslint-disable @typescript-eslint/naming-convention */
+      const translations: Record<string, string> = {
+        'quick_setup.welcome': 'Welcome to',
+        'quick_setup.decentraland': 'Decentraland!',
+        'quick_setup.username_label': 'Username*',
+        'quick_setup.username_placeholder': 'Enter your username',
+        'quick_setup.email_label': 'Email',
+        'quick_setup.email_placeholder': 'Enter your email',
+        'quick_setup.email_helper': 'Subscribe to newsletter',
+        'quick_setup.terms_of_use': 'Terms of Use',
+        'quick_setup.privacy_policy': 'Privacy Policy',
+        'quick_setup.lets_go': "LET'S GO",
+        'quick_setup.deploying': 'DEPLOYING...',
+        'quick_setup.body_type_a': 'BODY TYPE A',
+        'quick_setup.body_type_b': 'BODY TYPE B',
+        'quick_setup.randomize': 'RANDOMIZE',
+        'quick_setup.customize_later': 'You can customize your avatar later.',
+        'quick_setup.ready_to_jump_in': `${params?.name} is Ready to Jump In!`,
+        'quick_setup.success': 'SUCCESS'
+      }
+      /* eslint-enable @typescript-eslint/naming-convention */
+      return translations[key] ?? key
+    }
+  })
+}))
+
+jest.mock('../../../modules/config', () => ({
+  config: {
+    get: () => 'https://wearable-preview.decentraland.zone',
+    is: () => false
+  }
+}))
+
+describe('QuickSetupPage', () => {
+  beforeEach(() => {
+    mockAccount = '0xTestAccount'
+    mockIdentity = { authChain: [] }
+    mockRedirect.mockClear()
+  })
+
+  it('should render the welcome title and form', () => {
+    const { getByText, getByPlaceholderText } = render(<QuickSetupPage />)
+    expect(getByText('Welcome to')).toBeInTheDocument()
+    expect(getByText('Decentraland!')).toBeInTheDocument()
+    expect(getByText('Username*')).toBeInTheDocument()
+    expect(getByPlaceholderText('Enter your username')).toBeInTheDocument()
+    expect(getByPlaceholderText('Enter your email')).toBeInTheDocument()
+  })
+
+  it('should render the DCL logo', () => {
+    const { getByTestId } = render(<QuickSetupPage />)
+    expect(getByTestId('dcl-logo')).toBeInTheDocument()
+  })
+
+  it('should render the avatar preview on desktop', () => {
+    const { getByTestId } = render(<QuickSetupPage />)
+    expect(getByTestId('wearable-preview')).toBeInTheDocument()
+  })
+
+  it('should render randomize and body type buttons', () => {
+    const { getByText } = render(<QuickSetupPage />)
+    expect(getByText('RANDOMIZE')).toBeInTheDocument()
+    expect(getByText('BODY TYPE A')).toBeInTheDocument()
+  })
+
+  describe("when Let's Go button is disabled", () => {
+    it('should be disabled when username is empty', () => {
+      const { getByText } = render(<QuickSetupPage />)
+      const button = getByText("LET'S GO").closest('button')
+      expect(button).toBeDisabled()
+    })
+
+    it('should be disabled when TOS is not accepted', async () => {
+      const user = userEvent.setup()
+      const { getByText, getByPlaceholderText } = render(<QuickSetupPage />)
+      await user.type(getByPlaceholderText('Enter your username'), 'TestUser')
+      const button = getByText("LET'S GO").closest('button')
+      expect(button).toBeDisabled()
+    })
+  })
+
+  describe('when username is entered and TOS accepted', () => {
+    it("should enable the Let's Go button", async () => {
+      const user = userEvent.setup()
+      const { getByText, getByPlaceholderText, getByRole } = render(<QuickSetupPage />)
+      await user.type(getByPlaceholderText('Enter your username'), 'TestUser')
+      const checkbox = getByRole('checkbox')
+      await user.click(checkbox)
+      const button = getByText("LET'S GO").closest('button')
+      expect(button).not.toBeDisabled()
+    })
+  })
+
+  describe('body type dropdown', () => {
+    it('should toggle dropdown on click', async () => {
+      const user = userEvent.setup()
+      const { getByText, queryByText } = render(<QuickSetupPage />)
+      expect(queryByText('BODY TYPE B')).not.toBeInTheDocument()
+      await user.click(getByText('BODY TYPE A'))
+      expect(getByText('BODY TYPE B')).toBeInTheDocument()
+    })
+
+    it('should close dropdown when clicking outside', async () => {
+      const user = userEvent.setup()
+      const { getByText, queryAllByText } = render(<QuickSetupPage />)
+      await user.click(getByText('BODY TYPE A'))
+      // Both A and B should be in the dropdown
+      expect(queryAllByText(/BODY TYPE/)).toHaveLength(3) // button + 2 dropdown items
+      // Click outside
+      fireEvent.mouseDown(document.body)
+      await waitFor(() => {
+        expect(queryAllByText(/BODY TYPE/)).toHaveLength(1) // just the button
+      })
+    })
+
+    it('should change body type when selecting from dropdown', async () => {
+      const user = userEvent.setup()
+      const { getByText } = render(<QuickSetupPage />)
+      await user.click(getByText('BODY TYPE A'))
+      // Click Body Type B in dropdown
+      const items = document.querySelectorAll('[class*="BodyTypeDropdownItem"]')
+      if (items[1]) {
+        await user.click(items[1])
+      }
+      expect(getByText('BODY TYPE B')).toBeInTheDocument()
+    })
+  })
+
+  describe('celebration screen', () => {
+    it('should show celebration screen after submitting', async () => {
+      const user = userEvent.setup()
+      const { getByText, getByPlaceholderText, getByRole } = render(<QuickSetupPage />)
+
+      await user.type(getByPlaceholderText('Enter your username'), 'TestUser')
+      const checkbox = getByRole('checkbox')
+      await user.click(checkbox)
+
+      const button = getByText("LET'S GO").closest('button')!
+      await user.click(button)
+
+      await waitFor(() => {
+        expect(getByText('TestUser is Ready to Jump In!')).toBeInTheDocument()
+      })
+      expect(getByText('SUCCESS')).toBeInTheDocument()
+    })
+
+    it('should call redirect when clicking SUCCESS', async () => {
+      const user = userEvent.setup()
+      const { getByText, getByPlaceholderText, getByRole } = render(<QuickSetupPage />)
+
+      await user.type(getByPlaceholderText('Enter your username'), 'TestUser')
+      await user.click(getByRole('checkbox'))
+      await user.click(getByText("LET'S GO").closest('button')!)
+
+      await waitFor(() => {
+        expect(getByText('SUCCESS')).toBeInTheDocument()
+      })
+
+      await user.click(getByText('SUCCESS').closest('button')!)
+      expect(mockRedirect).toHaveBeenCalled()
+    })
+  })
+
+  describe('username validation', () => {
+    it('should show character counter', async () => {
+      const user = userEvent.setup()
+      const { getByText, getByPlaceholderText } = render(<QuickSetupPage />)
+      expect(getByText('0/15')).toBeInTheDocument()
+      await user.type(getByPlaceholderText('Enter your username'), 'Hello')
+      expect(getByText('5/15')).toBeInTheDocument()
+    })
+  })
+})

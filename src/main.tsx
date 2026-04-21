@@ -12,6 +12,7 @@ import { RequestPage } from './components/Pages/RequestPage'
 import { SetupPage } from './components/Pages/SetupPage'
 import { DefaultPage } from './components/Pages/DefaultPage'
 import { AvatarSetupPage } from './components/Pages/AvatarSetupPage/AvatarSetupPage'
+import { QuickSetupPage } from './components/Pages/QuickSetupPage/QuickSetupPage'
 import Intercom from './components/Intercom'
 import { CallbackPage } from './components/Pages/CallbackPage'
 import { InvalidRedirectionPage } from './components/Pages/InvalidRedirectionPage'
@@ -86,6 +87,7 @@ const SiteRoutes = () => {
       ) : null}
       <Route path="/setup" Component={SetupPage} />
       <Route path="/avatar-setup" Component={AvatarSetupPage} />
+      <Route path="/quick-setup" Component={QuickSetupPage} />
       <Route path="/mobile" Component={MobileAuthPage} />
       <Route path="/mobile/callback" Component={MobileCallbackPage} />
       <Route path="*" Component={DefaultPage} />

@@ -96,7 +96,10 @@
     },
     "sign_in_complete": {
       "title": "Accesso riuscito!",
-      "description": "Torna al {explorerText} per entrare!"
+      "description": "Torna al {explorerText} per entrare!",
+      "explorer_description_line1": "Hai effettuato l'accesso a Decentraland.",
+      "explorer_description_line2": "Torna a Decentraland App per completare il tuo account!",
+      "continue": "CONTINUE"
     },
     "denied_sign_in": {
       "title": "Il numero non corrispondeva, o questa azione non è stata eseguita da te?",
@@ -116,7 +119,8 @@
     },
     "recover_error": {
       "title": "Si è verificato un errore durante il recupero della richiesta...",
-      "description": "La richiesta non è più disponibile. Creane una nuova e riprova. Se il tempo di scadenza è ancora in corso nell'app Explorer, controlla che l'ora del tuo computer sia impostata correttamente."
+      "description": "La richiesta non è più disponibile. Creane una nuova e riprova. Se il tempo di scadenza è ancora in corso nell'app Explorer, controlla che l'ora del tuo computer sia impostata correttamente.",
+      "try_again": "TRY AGAIN"
     },
     "ip_validation_error": {
       "title": "Validazione di sicurezza non riuscita",
@@ -250,5 +254,37 @@
     "return_to": "Torna a {explorerText}",
     "could_not_open": "Impossibile aprire {explorerText}",
     "app_not_launched": "L'applicazione non è stata avviata. Assicurati che {explorerText} sia installato e riprova."
+  },
+  "quick_setup": {
+    "welcome": "Benvenuto su",
+    "decentraland": "Decentraland!",
+    "username_label": "Nome utente*",
+    "username_placeholder": "Inserisci il tuo nome utente",
+    "email_label": "Email",
+    "email_placeholder": "Inserisci la tua e-mail",
+    "email_helper": "Iscriviti alla newsletter di Decentraland per aggiornamenti su funzionalità, eventi, concorsi e altro ancora.",
+    "agree_tos": "Accetto i {termsLink} e la {privacyLink} di Decentraland.*",
+    "agree_prefix": "Accetto i",
+    "agree_connector": "e la",
+    "terms_of_use": "Condizioni d'uso",
+    "privacy_policy": "Informativa sulla privacy",
+    "lets_go": "LET'S GO",
+    "deploying": "DEPLOYING...",
+    "body_type_a": "BODY TYPE A",
+    "body_type_b": "BODY TYPE B",
+    "randomize": "CASUALE",
+    "customize_later": "Potrai personalizzare il tuo avatar più tardi.",
+    "ready_to_jump_in": "{name} è pronto a entrare!",
+    "success": "SUCCESSO"
+  },
+  "wallet_error_modal": {
+    "title": "Errore del portafoglio",
+    "message": "Non hai confermato questa azione nella tua estensione del portafoglio digitale. Per continuare, riprova.",
+    "try_again": "TRY AGAIN"
+  },
+  "login_error": {
+    "title": "Qualcosa è andato storto.",
+    "description": "Non siamo riusciti ad effettuare il tuo accesso. Torna all'app Decentraland e riprova.",
+    "try_again": "TRY AGAIN"
   }
 }

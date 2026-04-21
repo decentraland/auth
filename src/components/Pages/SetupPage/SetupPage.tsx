@@ -423,7 +423,7 @@ export const SetupPage = () => {
     case View.DIFFERENT_ACCOUNT:
       return <DifferentAccountError requestId={requestId ?? ''} />
     case View.RECOVER_ERROR:
-      return <RecoverError error={requestError} />
+      return <RecoverError onTryAgain={() => navigate(locations.login())} />
     case View.SIGN_IN_COMPLETE:
       return <SignInComplete />
     case View.SIGNING_ERROR:

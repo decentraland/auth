@@ -310,13 +310,11 @@ async function fetchPlaceByCreatorAddress(creatorAddress: string): Promise<{ sce
     const data = await response.json()
 
     if (!data.ok || !data.data || data.data.length === 0) {
-      console.log(`No places found for creator address: ${creatorAddress}`)
       return null
     }
 
     // Only return place data if exactly one place is found
     if (data.data.length !== 1) {
-      console.log(`Multiple places found for creator address: ${creatorAddress}, showing default view`)
       return null
     }
 

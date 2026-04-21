@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useTranslation } from '@dcl/hooks'
 import { Button, CircularProgress } from 'decentraland-ui2'
-import { useAfterLoginRedirection } from '../../../hooks/redirection'
-import { useTargetConfig } from '../../../hooks/targetConfig'
 import { useAnalytics } from '../../../hooks/useAnalytics'
 import { useEnsureProfile } from '../../../hooks/useEnsureProfile'
+import { usePostLoginRedirect } from '../../../hooks/usePostLoginRedirect'
 import { ConnectionType } from '../../../modules/analytics/types'
 import { useCurrentConnectionData } from '../../../shared/connection'
 import { isUserRejectedTransaction } from '../../../shared/errors'
@@ -17,24 +17,29 @@ import { AnimatedBackground } from '../../AnimatedBackground'
 import { ConnectionOptionType, connectionOptionTitles } from '../../Connection/Connection.types'
 import { ConnectionContainer, ConnectionTitle, DecentralandLogo, ProgressContainer } from '../../ConnectionModal/ConnectionLayout.styled'
 import { Container, Wrapper } from '../../Pages/CallbackPage/CallbackPage.styled'
+import { LoginErrorPage } from '../../Pages/LoginErrorPage'
 import { connectToProvider, connectToSocialProvider, isMagicTestMode, isSocialLogin } from './utils'
 
 type Props = {
   connectionType: ConnectionOptionType
 }
 
-type Phase = 'redirecting' | 'verifying' | 'failed'
+type Phase = 'redirecting' | 'verifying' | 'failed' | 'error'
 
 export const AutoLoginRedirect = ({ connectionType }: Props) => {
   const { t } = useTranslation()
   const { trackLoginClick, trackLoginSuccess } = useAnalytics()
   const { getIdentitySignature } = useCurrentConnectionData()
-  const { redirect, url: redirectTo } = useAfterLoginRedirection()
-  const [targetConfig] = useTargetConfig()
+  const { redirect, redirectTo, skipSetup } = usePostLoginRedirect()
   const { ensureProfile } = useEnsureProfile()
+  const navigate = useNavigate()
 
   const hasStarted = useRef(false)
   const [phase, setPhase] = useState<Phase>('redirecting')
+  // Use a ref for skipSetup so the startLogin callback always reads the latest value.
+  // The callback fires once via useEffect, but skipSetup may change after FF loads.
+  const skipSetupRef = useRef(skipSetup)
+  skipSetupRef.current = skipSetup
 
   // No feature flag available here (fires before flags load), so pass undefined.
   // isMagicTestMode falls back to config.is(Env.DEVELOPMENT).
@@ -48,13 +53,11 @@ export const AutoLoginRedirect = ({ connectionType }: Props) => {
 
   const handleCancel = useCallback(() => {
     // Navigate to login page without loginMethod — shows full login UI.
-    // useAfterLoginRedirection already preserves redirectTo + targetConfigId + flow,
-    // so we just need to strip loginMethod and go to the login route.
+    // Uses navigate() to respect the basename (/auth).
     const params = new URLSearchParams(window.location.search)
     params.delete('loginMethod')
-    const query = params.toString()
-    window.location.href = `${locations.login()}${query ? `?${query}` : ''}`
-  }, [])
+    navigate(locations.login({ queryParams: params }), { replace: true })
+  }, [navigate])
 
   const startLogin = useCallback(async () => {
     const connectionTypeForTracking = isSocial ? ConnectionType.WEB2 : ConnectionType.WEB3
@@ -104,13 +107,14 @@ export const AutoLoginRedirect = ({ connectionType }: Props) => {
 
       // Check clock sync — if drift is too large, fall back to full LoginPage
       // which has the ClockSyncModal UI
-      if (!await checkClockSync()) {
+      if (!(await checkClockSync())) {
         handleCancel()
         return
       }
 
       // Ensure profile exists for new users (avatar/name setup)
-      if (targetConfig && !targetConfig.skipSetup && connectionData.account) {
+      // Read from ref to get the latest value (FF may have loaded during the async flow)
+      if (!skipSetupRef.current && connectionData.account) {
         const profile = await ensureProfile(connectionData.account, freshIdentity, {
           redirectTo,
           referrer: null,
@@ -123,12 +127,16 @@ export const AutoLoginRedirect = ({ connectionType }: Props) => {
       redirect()
     } catch (error) {
       if (isUserRejectedTransaction(error)) {
-        // User cancelled the signature in wallet — not an error, go to full login
-        handleCancel()
+        // User cancelled the signature in wallet — navigate to login with walletError param
+        // so LoginPage can show the WalletErrorModal. Uses navigate() to respect basename.
+        const params = new URLSearchParams(window.location.search)
+        params.delete('loginMethod')
+        params.set('walletError', 'rejected')
+        navigate(locations.login({ queryParams: params }), { replace: true })
         return
       }
       handleError(error, `Error during auto-login (${connectionType})`)
-      setPhase('failed')
+      setPhase('error')
     }
   }, [
     connectionType,
@@ -141,7 +149,7 @@ export const AutoLoginRedirect = ({ connectionType }: Props) => {
     getIdentitySignature,
     redirect,
     ensureProfile,
-    targetConfig?.skipSetup,
+    skipSetup,
     handleCancel
   ])
 
@@ -151,13 +159,15 @@ export const AutoLoginRedirect = ({ connectionType }: Props) => {
     startLogin()
   }, [startLogin])
 
-  useEffect(() => {
-    if (phase === 'failed') {
-      // Small delay so the user sees the error state before navigating
-      const timer = setTimeout(handleCancel, 2000)
-      return () => clearTimeout(timer)
-    }
-  }, [phase, handleCancel])
+  const handleErrorTryAgain = useCallback(() => {
+    setPhase('redirecting')
+    hasStarted.current = false
+    startLogin()
+  }, [startLogin])
+
+  if (phase === 'error') {
+    return <LoginErrorPage onTryAgain={handleErrorTryAgain} />
+  }
 
   const statusMessage = (() => {
     if (phase === 'failed') {

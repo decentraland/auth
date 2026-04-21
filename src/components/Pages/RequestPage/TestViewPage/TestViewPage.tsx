@@ -76,7 +76,7 @@ export const TestViewPage = () => {
         label: 'TransferCompletedView (Gift)',
         element: <TransferCompletedView type={TransferType.GIFT} transferData={nftData} />
       },
-      recoverError: { label: 'RecoverError', element: <RecoverError error="Test error" /> },
+      recoverError: { label: 'RecoverError', element: <RecoverError onTryAgain={() => alert('try again')} /> },
       signingError: { label: 'SigningError', element: <SigningError error="Test error" /> },
       signInComplete: { label: 'SignInComplete', element: <SignInComplete /> },
       timeoutError: { label: 'TimeoutError', element: <TimeoutError requestId={DEFAULT_REQUEST_ID} /> },
