@@ -172,7 +172,6 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
         return
       }
 
-      console.log('[Thirdweb] Submitting OTP for email:', currentEmail)
       setIsLoading(true)
       setError(null)
       setHasError(false)
@@ -180,7 +179,6 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
       try {
         // Verify OTP and connect wallet using thirdweb
         const address = await verifyOTPAndConnect(currentEmail, code)
-        console.log('[Thirdweb] OTP verified successfully!')
 
         // Store email for future reference
         localStorage.setItem('dcl_thirdweb_user_email', currentEmail)
@@ -219,7 +217,6 @@ export const EmailLoginModal = (props: EmailLoginModalProps) => {
     setIsLoading(true)
 
     try {
-      console.log('[Thirdweb] Resending OTP to:', currentEmail)
       // Re-send OTP using thirdweb
       await sendEmailOTP(currentEmail)
 

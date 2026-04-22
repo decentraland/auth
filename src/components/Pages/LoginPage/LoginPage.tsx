@@ -15,20 +15,19 @@ import ImageNew4 from '../../../assets/images/background/image-new4.webp'
 import ImageNew5 from '../../../assets/images/background/image-new5.webp'
 // eslint-disable-next-line @typescript-eslint/naming-convention
 import ImageNew6 from '../../../assets/images/background/image-new6.webp'
-import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import { useAnalytics } from '../../../hooks/useAnalytics'
 import { useAutoLogin } from '../../../hooks/useAutoLogin'
 import { useEnsureProfile } from '../../../hooks/useEnsureProfile'
+import { usePostLoginRedirect } from '../../../hooks/usePostLoginRedirect'
 import { ConnectionType } from '../../../modules/analytics/types'
-import { createAuthServerHttpClient } from '../../../shared/auth'
 import { useCurrentConnectionData } from '../../../shared/connection'
 import { isErrorWithName, isUserRejectedTransaction } from '../../../shared/errors'
 import { extractReferrerFromSearchParameters } from '../../../shared/locations'
 import { markReturningUser } from '../../../shared/onboarding/markReturningUser'
 import { trackCheckpoint } from '../../../shared/onboarding/trackCheckpoint'
 import { disconnectWallet, sendEmailOTP } from '../../../shared/thirdweb'
-import { isClockSynchronized } from '../../../shared/utils/clockSync'
+import { checkClockSync } from '../../../shared/utils/clockSync'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { ClockSyncModal } from '../../ClockSyncModal'
 import { Connection, ConnectionOptionType } from '../../Connection'
@@ -37,12 +36,14 @@ import { ConnectionLayoutState } from '../../ConnectionModal/ConnectionLayout.ty
 import { EmailLoginModal } from '../../EmailLoginModal'
 import { EmailLoginResult } from '../../EmailLoginModal/EmailLoginModal.types'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
+import { WalletErrorModal } from '../../WalletErrorModal'
 import { ConfirmingLogin } from './ConfirmingLogin'
 import {
   connectToProvider,
   connectToSocialProvider,
   fromConnectionOptionToProviderType,
   getSignInOptionsMode,
+  isMagicTestMode,
   isSocialLogin,
   requiresInjectedProvider
 } from './utils'
@@ -62,10 +63,16 @@ export const LoginPage = () => {
   const [showClockSyncModal, setShowClockSyncModal] = useState(false)
   const [showEmailLoginModal, setShowEmailLoginModal] = useState(false)
   const [currentConnectionType, setCurrentConnectionType] = useState<ConnectionOptionType>()
-  const { url: redirectTo, redirect } = useAfterLoginRedirection()
+  const { redirect, redirectTo, skipSetup } = usePostLoginRedirect()
   const { initialized: flagInitialized, flags, variants } = useContext(FeatureFlagsContext)
 
   const signInOptionsMode = getSignInOptionsMode(variants)
+
+  // Wallet error modal state (shown when redirected from AutoLoginRedirect after MM rejection)
+  const [showWalletErrorModal, setShowWalletErrorModal] = useState(() => {
+    const params = new URLSearchParams(window.location.search)
+    return params.get('walletError') === 'rejected'
+  })
 
   // Email login state
   const [currentEmail, setCurrentEmail] = useState('')
@@ -108,7 +115,7 @@ export const LoginPage = () => {
 
   const runProfileRedirect = useCallback(
     async (account: string, referrer: string | null, providedIdentity: AuthIdentity | null = null, onRedirect?: () => void) => {
-      if (targetConfig && !targetConfig.skipSetup && account) {
+      if (!skipSetup && account) {
         const userIdentity = providedIdentity ?? identity
         const profile = await ensureProfile(account, userIdentity, { redirectTo, referrer })
         if (!profile) return
@@ -118,27 +125,17 @@ export const LoginPage = () => {
       redirect()
       onRedirect?.()
     },
-    [targetConfig?.skipSetup, redirectTo, identity, ensureProfile, redirect]
+    [skipSetup, redirectTo, identity, ensureProfile, redirect]
   )
 
   const checkClockSynchronization = useCallback(async (): Promise<boolean> => {
-    try {
-      const httpClient = createAuthServerHttpClient()
-      const healthData = await httpClient.checkHealth()
-      const isSync = isClockSynchronized(healthData.timestamp)
-
-      if (!isSync) {
-        setShowConnectionLayout(false)
-        setShowClockSyncModal(true)
-        return false
-      }
-
-      return true
-    } catch (error) {
-      handleError(error, 'Error checking clock synchronization')
-      // If we can't check the clock, proceed with normal flow
-      return true
+    const isSync = await checkClockSync()
+    if (!isSync) {
+      setShowConnectionLayout(false)
+      setShowClockSyncModal(true)
+      return false
     }
+    return true
   }, [])
 
   // Handle email submit from the main page
@@ -226,7 +223,7 @@ export const LoginPage = () => {
           // CP2 reached is tracked from CallbackPage after the OAuth redirect returns
           // (at this point we don't have the user's email or wallet yet)
           setLoadingState(ConnectionLayoutState.LOADING_MAGIC)
-          await connectToSocialProvider(connectionType, flags[FeatureFlagsKeys.MAGIC_TEST], redirectTo)
+          await connectToSocialProvider(connectionType, isMagicTestMode(flags[FeatureFlagsKeys.MAGIC_TEST]), redirectTo)
         } else {
           if (requiresInjectedProvider(connectionType) && !window.ethereum) {
             throw new Error('No wallet extension detected. Please install MetaMask or another Ethereum wallet.')
@@ -306,6 +303,25 @@ export const LoginPage = () => {
     setCurrentConnectionType(undefined)
     setLoadingState(ConnectionLayoutState.CONNECTING_WALLET)
   }, [setShowConnectionLayout])
+
+  const handleWalletErrorClose = useCallback(() => {
+    setShowWalletErrorModal(false)
+    const params = new URLSearchParams(window.location.search)
+    params.delete('walletError')
+    const query = params.toString()
+    const newUrl = `${window.location.pathname}${query ? `?${query}` : ''}`
+    window.history.replaceState({}, '', newUrl)
+  }, [])
+
+  const handleWalletErrorTryAgain = useCallback(() => {
+    setShowWalletErrorModal(false)
+    const params = new URLSearchParams(window.location.search)
+    params.delete('walletError')
+    const query = params.toString()
+    const newUrl = `${window.location.pathname}${query ? `?${query}` : ''}`
+    window.history.replaceState({}, '', newUrl)
+    handleOnConnect(ConnectionOptionType.METAMASK)
+  }, [handleOnConnect])
 
   const handleEmailLoginClose = useCallback(() => {
     setShowEmailLoginModal(false)
@@ -462,6 +478,7 @@ export const LoginPage = () => {
       {showConfirmingLogin && !showClockSyncModal && (
         <ConfirmingLogin error={confirmingLoginError} onError={confirmingLoginError ? handleConfirmingLoginRetry : undefined} />
       )}
+      <WalletErrorModal open={showWalletErrorModal} onTryAgain={handleWalletErrorTryAgain} onClose={handleWalletErrorClose} />
       <ClockSyncModal open={showClockSyncModal} onContinue={handleClockSyncContinue} onClose={handleClockSyncContinue} />
       <ConnectionModal
         open={showConnectionLayout}

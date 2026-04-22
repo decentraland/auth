@@ -12,10 +12,11 @@ import { RequestPage } from './components/Pages/RequestPage'
 import { SetupPage } from './components/Pages/SetupPage'
 import { DefaultPage } from './components/Pages/DefaultPage'
 import { AvatarSetupPage } from './components/Pages/AvatarSetupPage/AvatarSetupPage'
+import { QuickSetupPage } from './components/Pages/QuickSetupPage/QuickSetupPage'
 import Intercom from './components/Intercom'
 import { CallbackPage } from './components/Pages/CallbackPage'
 import { InvalidRedirectionPage } from './components/Pages/InvalidRedirectionPage'
-import { LoginPage } from './components/Pages/LoginPage'
+import { LoginRouteGuard } from './components/Pages/LoginPage'
 import { MobileAuthPage } from './components/Pages/MobileAuthPage'
 import { MobileCallbackPage } from './components/Pages/MobileCallbackPage'
 import { FeatureFlagsProvider } from './components/FeatureFlagsProvider'
@@ -70,7 +71,7 @@ const SiteRoutes = () => {
 
   return (
     <Routes>
-      <Route path="/login" Component={LoginPage} />
+      <Route path="/login" Component={LoginRouteGuard} />
       <Route path="/invalidRedirection" Component={InvalidRedirectionPage} />
       <Route path="/callback" Component={CallbackPage} />
       <Route path="/requests/:requestId" Component={RequestPage} />
@@ -86,6 +87,7 @@ const SiteRoutes = () => {
       ) : null}
       <Route path="/setup" Component={SetupPage} />
       <Route path="/avatar-setup" Component={AvatarSetupPage} />
+      <Route path="/quick-setup" Component={QuickSetupPage} />
       <Route path="/mobile" Component={MobileAuthPage} />
       <Route path="/mobile/callback" Component={MobileCallbackPage} />
       <Route path="*" Component={DefaultPage} />

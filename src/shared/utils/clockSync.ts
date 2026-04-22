@@ -23,4 +23,21 @@ const getClockDifference = (serverTimestamp: number): number => {
   return Math.round(timeDifference / (60 * 1000)) // Convert to minutes
 }
 
-export { isClockSynchronized, getClockDifference }
+/**
+ * Checks clock synchronization against the auth server.
+ * Returns true if the clock is in sync (or if the check fails — best-effort).
+ */
+async function checkClockSync(): Promise<boolean> {
+  try {
+    // Lazy import to avoid circular dependency with auth httpClient
+    const { createAuthServerHttpClient } = await import('../auth')
+    const httpClient = createAuthServerHttpClient()
+    const healthData = await httpClient.checkHealth()
+    return isClockSynchronized(healthData.timestamp)
+  } catch {
+    // If we can't check the clock, proceed with normal flow
+    return true
+  }
+}
+
+export { isClockSynchronized, getClockDifference, checkClockSync }

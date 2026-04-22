@@ -2,11 +2,11 @@ import { render, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { AuthIdentity } from '@dcl/crypto'
 import { ConnectionResponse } from 'decentraland-connect'
-import { isClockSynchronized } from '../../../shared/utils/clockSync'
+import { checkClockSync } from '../../../shared/utils/clockSync'
 import { ConnectionOptionType } from '../../Connection'
 import { LoginPage } from './LoginPage'
 
-const mockIsClockSynchronized = isClockSynchronized as jest.Mock
+const mockCheckClockSync = checkClockSync as jest.Mock
 
 // --- Mocks ---
 
@@ -67,6 +67,7 @@ jest.mock('./utils', () => ({
   connectToProvider: (...args: unknown[]) => mockConnectToProvider(...args),
   connectToSocialProvider: jest.fn(),
   fromConnectionOptionToProviderType: jest.fn().mockReturnValue('injected'),
+  isMagicTestMode: jest.fn().mockReturnValue(false),
   isSocialLogin: jest.fn().mockReturnValue(false),
   requiresInjectedProvider: jest.fn().mockReturnValue(true),
   getSignInOptionsMode: jest.fn().mockReturnValue('full')
@@ -78,8 +79,13 @@ jest.mock('../../../shared/auth', () => ({
   })
 }))
 
+jest.mock('../../WalletErrorModal', () => ({
+  WalletErrorModal: () => null
+}))
+
 jest.mock('../../../shared/utils/clockSync', () => ({
-  isClockSynchronized: jest.fn()
+  isClockSynchronized: jest.fn(),
+  checkClockSync: jest.fn().mockResolvedValue(true)
 }))
 
 jest.mock('../../../shared/onboarding/markReturningUser', () => ({
@@ -250,7 +256,7 @@ describe('LoginPage', () => {
       mockConnectToProvider.mockResolvedValue(connectionResponse)
       mockGetIdentitySignature.mockResolvedValue(freshIdentity)
       mockEnsureProfile.mockResolvedValue({ avatars: [{}] })
-      mockIsClockSynchronized.mockReturnValue(true)
+      mockCheckClockSync.mockResolvedValue(true)
       mockTrackLoginSuccess.mockResolvedValue(undefined)
 
       // Provide window.ethereum so injected provider check passes
@@ -303,7 +309,7 @@ describe('LoginPage', () => {
 
       mockGetIdentitySignature.mockResolvedValue(freshIdentity)
       mockEnsureProfile.mockResolvedValue({ avatars: [{}] })
-      mockIsClockSynchronized.mockReturnValue(true)
+      mockCheckClockSync.mockResolvedValue(true)
       mockTrackLoginSuccess.mockResolvedValue(undefined)
     })
 
@@ -377,7 +383,7 @@ describe('LoginPage', () => {
       mockConnectToProvider.mockResolvedValue(connectionResponse)
       mockGetIdentitySignature.mockResolvedValue(freshIdentity)
       mockEnsureProfile.mockResolvedValue({ avatars: [{}] })
-      mockIsClockSynchronized.mockReturnValue(true)
+      mockCheckClockSync.mockResolvedValue(true)
       mockTrackLoginSuccess.mockResolvedValue(undefined)
 
       Object.defineProperty(window, 'ethereum', { value: {}, writable: true, configurable: true })

@@ -1,6 +1,8 @@
 import type { OAuthProvider } from '@magic-ext/oauth2'
 import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
+import { Env } from '@dcl/ui-env'
 import { ConnectionResponse, WalletConnectV2Connector, connection, getConfiguration } from 'decentraland-connect'
+import { config } from '../../../modules/config'
 import { extractReferrerFromSearchParameters } from '../../../shared/locations'
 import { ConnectionOptionType, SignInOptionsMode } from '../../Connection'
 import { FeatureFlagsKeys, SignInPrimaryOptionVariant } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
@@ -51,9 +53,9 @@ async function connectToSocialProvider(
     const magic = new Magic(MAGIC_KEY, {
       extensions: [new OAuthExtension()]
     })
-
     // Clear existing session before starting new OAuth flow (mirrors MobileAuthPage fix)
-    if (await magic.user.isLoggedIn()) {
+    const isLoggedIn = await magic.user.isLoggedIn()
+    if (isLoggedIn) {
       await magic.user.logout()
       localStorage.removeItem('dcl_magic_user_email')
       await connection.disconnect()
@@ -65,8 +67,10 @@ async function connectToSocialProvider(
     url.pathname = '/auth/callback'
     url.search = ''
 
+    const oauthProvider = connectionOption === ConnectionOptionType.X ? 'twitter' : (connectionOption as OAuthProvider)
+
     await magic?.oauth2.loginWithRedirect({
-      provider: connectionOption === ConnectionOptionType.X ? 'twitter' : (connectionOption as OAuthProvider),
+      provider: oauthProvider,
       redirectURI: url.href,
       customData: JSON.stringify({
         redirectTo,
@@ -156,6 +160,16 @@ function getSignInOptionsMode(variants: Partial<FeatureFlagsVariants>): SignInOp
   return SignInOptionsMode.ONE
 }
 
+/**
+ * Resolves whether to use Magic Test mode.
+ * Uses feature flag when available, falls back to environment check.
+ * This ensures all components (AutoLoginRedirect, CallbackPage, LoginPage)
+ * resolve to the same value regardless of when feature flags load.
+ */
+function isMagicTestMode(flagValue?: boolean): boolean {
+  return flagValue ?? config.is(Env.DEVELOPMENT)
+}
+
 export {
   fromConnectionOptionToProviderType,
   connectToSocialProvider,
@@ -165,5 +179,6 @@ export {
   isEmailLogin,
   isMobile,
   isIos,
-  getSignInOptionsMode
+  getSignInOptionsMode,
+  isMagicTestMode
 }

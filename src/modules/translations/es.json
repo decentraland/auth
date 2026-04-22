@@ -96,7 +96,10 @@
     },
     "sign_in_complete": {
       "title": "¡Inicio de sesión exitoso!",
-      "description": "¡Regresa a la {explorerText} para entrar!"
+      "description": "¡Regresa a la {explorerText} para entrar!",
+      "explorer_description_line1": "Has iniciado sesión en Decentraland.",
+      "explorer_description_line2": "¡Regresa a Decentraland App para completar tu cuenta!",
+      "continue": "CONTINUE"
     },
     "denied_sign_in": {
       "title": "¿El número no coincidió o esta acción no fue realizada por ti?",
@@ -116,7 +119,8 @@
     },
     "recover_error": {
       "title": "Hubo un error al recuperar la solicitud...",
-      "description": "La solicitud ya no está disponible. Siéntete libre de crear una nueva e intentar de nuevo. Si el tiempo de expiración aún está corriendo en la aplicación Explorer, verifica la hora de tu computadora para ver si está configurada correctamente."
+      "description": "La solicitud ya no está disponible. Siéntete libre de crear una nueva e intentar de nuevo. Si el tiempo de expiración aún está corriendo en la aplicación Explorer, verifica la hora de tu computadora para ver si está configurada correctamente.",
+      "try_again": "TRY AGAIN"
     },
     "ip_validation_error": {
       "title": "Validación de seguridad fallida",
@@ -236,6 +240,13 @@
     "description": "El sitio al que fuiste redirigido es inválido.",
     "go_back": "Regresar a la página de inicio de sesión"
   },
+  "auto_login": {
+    "redirecting_to": "Redirigiendo a {provider}...",
+    "verifying_credentials": "Un momento, estamos verificando tus credenciales...",
+    "confirming_login": "Confirmando inicio de sesión...",
+    "error": "Algo salió mal. Redirigiendo al login...",
+    "cancel": "Cancelar"
+  },
   "mobile_auth": {
     "sign_in_successful": "Inicio de sesión exitoso",
     "redirect_countdown": "Serás redirigido a\n{explorerText} en {countdown}...",
@@ -243,5 +254,37 @@
     "return_to": "Regresar a {explorerText}",
     "could_not_open": "No se pudo abrir {explorerText}",
     "app_not_launched": "La aplicación no pudo ser iniciada. Por favor, asegúrate de que {explorerText} esté instalado e inténtalo de nuevo."
+  },
+  "quick_setup": {
+    "welcome": "Bienvenido a",
+    "decentraland": "Decentraland!",
+    "username_label": "Nombre de usuario*",
+    "username_placeholder": "Ingresa tu nombre de usuario",
+    "email_label": "Email",
+    "email_placeholder": "Ingresa tu correo electrónico",
+    "email_helper": "Suscríbete al boletín de Decentraland para recibir actualizaciones sobre funciones, eventos, concursos y más.",
+    "agree_tos": "Estoy de acuerdo con los {termsLink} y la {privacyLink} de Decentraland.*",
+    "agree_prefix": "Estoy de acuerdo con los",
+    "agree_connector": "y la",
+    "terms_of_use": "Términos de uso",
+    "privacy_policy": "Política de privacidad",
+    "lets_go": "LET'S GO",
+    "deploying": "DEPLOYING...",
+    "body_type_a": "BODY TYPE A",
+    "body_type_b": "BODY TYPE B",
+    "randomize": "ALEATORIZAR",
+    "customize_later": "Puedes personalizar tu avatar más tarde.",
+    "ready_to_jump_in": "¡{name} está listo para entrar!",
+    "success": "ÉXITO"
+  },
+  "wallet_error_modal": {
+    "title": "Error de billetera",
+    "message": "No confirmaste esta acción en la extensión de tu billetera digital. Para continuar, por favor inténtalo de nuevo.",
+    "try_again": "TRY AGAIN"
+  },
+  "login_error": {
+    "title": "Algo salió mal.",
+    "description": "No pudimos iniciar tu sesión. Por favor, regresa a la aplicación de Decentraland e inténtalo de nuevo.",
+    "try_again": "TRY AGAIN"
   }
 }

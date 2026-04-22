@@ -64,15 +64,48 @@ npm run start
 
 ## Testing
 
-### Running Tests
+### Unit Tests
 
 ```bash
 npm test
 ```
 
-### Test Structure
+Unit test files live alongside source files using the `*.spec.ts` / `*.spec.tsx` convention.
 
-Test files are located in `src/tests/`, using the `*.test.ts` naming convention.
+### E2E Tests (Playwright)
+
+E2E tests live in `e2e/tests/` and cover the full auth flows (Explorer, web, social, OTP, error handling, etc.) using a mock MetaMask provider and intercepted API routes.
+
+**Prerequisites**: the dev server must be running on port 5174 (Playwright starts it automatically via `webServer` config, or reuses an existing one).
+
+```bash
+# Run all E2E tests (headless)
+npm run test:e2e
+
+# Run all E2E tests with browser visible, one at a time
+npm run test:e2e:headed
+
+# Run a specific test file
+npx playwright test e2e/tests/explorer-metamask-flow.spec.ts
+
+# Run a specific test file headed (see the browser)
+npx playwright test e2e/tests/explorer-metamask-flow.spec.ts --headed --workers=1
+
+# Run a single test by name (grep)
+npx playwright test -g "new user auto-signs"
+
+# Run a single test by name, headed
+npx playwright test -g "new user auto-signs" --headed --workers=1
+
+# Show the HTML report after a run
+npx playwright show-report
+```
+
+**Tips**:
+- `--headed` opens a real browser window so you can watch the test
+- `--workers=1` runs tests sequentially (easier to follow visually)
+- `-g "text"` filters by test name (partial match)
+- Failed tests save screenshots to `test-results/`
 
 ## AI Agent Context
 
