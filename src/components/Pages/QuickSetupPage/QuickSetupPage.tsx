@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from '@dcl/hooks'
 import { useMobileMediaQuery } from 'decentraland-ui2'
-import bodyTypeIconSvg from '../../../assets/images/body-type-icon.svg'
+import bodyTypeIconWomanSvg from '../../../assets/images/body-type-icon-woman.svg'
+import bodyTypeIconManSvg from '../../../assets/images/body-type-icon.svg'
 import randomizeIconSvg from '../../../assets/images/randomize-icon.svg'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { useDisabledCatalysts } from '../../../hooks/useDisabledCatalysts'
@@ -49,11 +50,14 @@ const MAX_NAME_LENGTH = 15
 
 type BodyType = 'A' | 'B'
 
+// Catalyst convention: defaults 1-80 are BaseFemale, defaults 81-160 are BaseMale.
+// Body Type A is displayed with the man icon and Body Type B with the woman icon,
+// so A maps to the Male range and B to the Female range.
 function getRandomDefaultProfile(bodyType: BodyType) {
   if (bodyType === 'A') {
-    return 'default' + (Math.floor(Math.random() * 80) + 1)
+    return 'default' + (Math.floor(Math.random() * 80) + 81)
   }
-  return 'default' + (Math.floor(Math.random() * 80) + 81)
+  return 'default' + (Math.floor(Math.random() * 80) + 1)
 }
 
 export const QuickSetupPage = () => {
@@ -243,7 +247,7 @@ export const QuickSetupPage = () => {
             <RandomizeBar>
               <div ref={bodyTypeRef} style={{ position: 'relative' }}>
                 <BodyTypeButton onClick={() => setBodyTypeOpen(!bodyTypeOpen)}>
-                  <img src={bodyTypeIconSvg} alt="" width="24" height="24" />
+                  <img src={bodyType === 'A' ? bodyTypeIconManSvg : bodyTypeIconWomanSvg} alt="" width="24" height="24" />
                   {bodyType === 'A' ? t('quick_setup.body_type_a') : t('quick_setup.body_type_b')}
                   <BodyTypeChevron open={bodyTypeOpen}>
                     <svg width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -254,7 +258,7 @@ export const QuickSetupPage = () => {
                 {bodyTypeOpen && (
                   <BodyTypeDropdown>
                     <BodyTypeDropdownItem selected={bodyType === 'A'} onClick={() => handleSelectBodyType('A')}>
-                      <img src={bodyTypeIconSvg} alt="" width="24" height="24" />
+                      <img src={bodyTypeIconManSvg} alt="" width="24" height="24" />
                       {t('quick_setup.body_type_a')}
                       {bodyType === 'A' && (
                         <svg
@@ -270,7 +274,7 @@ export const QuickSetupPage = () => {
                       )}
                     </BodyTypeDropdownItem>
                     <BodyTypeDropdownItem selected={bodyType === 'B'} onClick={() => handleSelectBodyType('B')}>
-                      <img src={bodyTypeIconSvg} alt="" width="24" height="24" />
+                      <img src={bodyTypeIconWomanSvg} alt="" width="24" height="24" />
                       {t('quick_setup.body_type_b')}
                       {bodyType === 'B' && (
                         <svg

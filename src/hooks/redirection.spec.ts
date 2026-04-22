@@ -33,6 +33,89 @@ describe('when using the redirection hook', () => {
       const { result } = renderHook(() => useAfterLoginRedirection())
       expect(result.current.url).toBe('http://localhost/test')
     })
+
+    describe('and the state-encoded redirectTo points to an internal auth path (/auth/requests/)', () => {
+      beforeEach(() => {
+        mockedUseLocation.mockReturnValue({
+          search: `state=${btoa(JSON.stringify({ customData: JSON.stringify({ redirectTo: 'http://localhost/auth/requests/abc123' }) }))}`
+        } as Location)
+      })
+
+      it('should report hasExplicitRedirect as false (Explorer flow via Magic OAuth)', () => {
+        const { result } = renderHook(() => useAfterLoginRedirection())
+        expect(result.current.hasExplicitRedirect).toBe(false)
+      })
+    })
+
+    describe('and the state-encoded redirectTo points to the login page (/auth/login)', () => {
+      beforeEach(() => {
+        mockedUseLocation.mockReturnValue({
+          search: `state=${btoa(JSON.stringify({ customData: JSON.stringify({ redirectTo: 'http://localhost/auth/login' }) }))}`
+        } as Location)
+      })
+
+      it('should report hasExplicitRedirect as false (internal auth redirection)', () => {
+        const { result } = renderHook(() => useAfterLoginRedirection())
+        expect(result.current.hasExplicitRedirect).toBe(false)
+      })
+    })
+
+    describe('and the state-encoded redirectTo points to an external web URL (marketplace)', () => {
+      beforeEach(() => {
+        mockedUseLocation.mockReturnValue({
+          search: `state=${btoa(JSON.stringify({ customData: JSON.stringify({ redirectTo: 'http://localhost/marketplace' }) }))}`
+        } as Location)
+      })
+
+      it('should report hasExplicitRedirect as true (web flow)', () => {
+        const { result } = renderHook(() => useAfterLoginRedirection())
+        expect(result.current.hasExplicitRedirect).toBe(true)
+      })
+    })
+
+    describe('and the state parameter cannot be decoded', () => {
+      beforeEach(() => {
+        mockedUseLocation.mockReturnValue({ search: 'state=not-valid-base64' } as Location)
+      })
+
+      it('should fall back to treating state as an explicit redirect', () => {
+        const { result } = renderHook(() => useAfterLoginRedirection())
+        expect(result.current.hasExplicitRedirect).toBe(true)
+      })
+    })
+  })
+
+  describe('and only an internal redirectTo query parameter is present (/auth/requests/)', () => {
+    beforeEach(() => {
+      mockedUseLocation.mockReturnValue({ search: 'redirectTo=/auth/requests/abc123' } as Location)
+    })
+
+    it('should report hasExplicitRedirect as false', () => {
+      const { result } = renderHook(() => useAfterLoginRedirection())
+      expect(result.current.hasExplicitRedirect).toBe(false)
+    })
+  })
+
+  describe('and an external redirectTo query parameter is present', () => {
+    beforeEach(() => {
+      mockedUseLocation.mockReturnValue({ search: 'redirectTo=http://localhost/marketplace' } as Location)
+    })
+
+    it('should report hasExplicitRedirect as true', () => {
+      const { result } = renderHook(() => useAfterLoginRedirection())
+      expect(result.current.hasExplicitRedirect).toBe(true)
+    })
+  })
+
+  describe('and no redirectTo nor state parameters are present', () => {
+    beforeEach(() => {
+      mockedUseLocation.mockReturnValue({ search: '' } as Location)
+    })
+
+    it('should report hasExplicitRedirect as false', () => {
+      const { result } = renderHook(() => useAfterLoginRedirection())
+      expect(result.current.hasExplicitRedirect).toBe(false)
+    })
   })
 
   describe('and the current URL contains a targetConfigId parameter', () => {

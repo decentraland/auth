@@ -219,3 +219,84 @@ test.describe('Web social: callback error handling', () => {
     expect(isOnLogin || hasErrorView).toBe(true)
   })
 })
+
+/**
+ * In production, when a user initiates social login (Magic OAuth) from the Explorer
+ * (or anywhere that sets redirectTo=/auth/requests/...), the `redirectTo` query param
+ * is stripped from the URL and Magic stashes it inside the OAuth `state` parameter
+ * (base64(JSON.stringify({ customData: JSON.stringify({ redirectTo, referrer, ... }) }))).
+ *
+ * The callback page must decode that state to recover the original redirectTo,
+ * otherwise internal redirects (Explorer → callback → back) are misclassified as
+ * external, which causes the user to land on /quick-setup instead of returning to
+ * the Explorer sign-in flow.
+ */
+const buildMagicState = (redirectTo: string) =>
+  btoa(JSON.stringify({ customData: JSON.stringify({ redirectTo, referrer: null }) }))
+
+test.describe('Web social: state-encoded redirectTo (Magic OAuth round-trip)', () => {
+  test.beforeEach(async ({ context }) => {
+    await injectMockWallet(context)
+  })
+
+  test('callback access_denied with state containing internal /auth/requests/ → login keeps internal redirectTo', async ({
+    page
+  }) => {
+    await mockApiRoutes(page, { hasProfile: true, onboardingToExplorer: true })
+    await page.route('**/magic.link/**', route => route.abort())
+
+    const internalRedirect = '/auth/requests/abc123'
+    const state = buildMagicState(internalRedirect)
+
+    // Explorer flow: user cancelled at provider, browser returns with access_denied
+    // and the original redirectTo stashed in state (no redirectTo query param).
+    await page.goto(`/auth/callback?error=access_denied&state=${encodeURIComponent(state)}`)
+
+    // Should end up on login — NOT on quick-setup
+    await page.waitForURL('**/login**', { timeout: 10_000 })
+    expect(page.url()).toContain('/login')
+    expect(page.url()).not.toContain('/quick-setup')
+
+    // The internal redirectTo should have been decoded out of state and re-applied
+    // to the login URL so the Explorer flow can resume.
+    const url = new URL(page.url())
+    const loginRedirectTo = url.searchParams.get('redirectTo') ?? ''
+    expect(loginRedirectTo).toContain('/auth/requests/abc123')
+  })
+
+  test('callback access_denied with state containing external web path → login keeps external redirectTo', async ({
+    page
+  }) => {
+    await mockApiRoutes(page, { hasProfile: true, onboardingToExplorer: true })
+    await page.route('**/magic.link/**', route => route.abort())
+
+    // Use a same-origin non-/auth path so the redirect passes hostname sanitization
+    // (cross-domain redirects are rewritten to /auth/invalidRedirection — correct security
+    // behavior, but orthogonal to what this test covers).
+    const externalPath = 'http://localhost:5174/marketplace'
+    const state = buildMagicState(externalPath)
+
+    await page.goto(`/auth/callback?error=access_denied&state=${encodeURIComponent(state)}`)
+
+    await page.waitForURL('**/login**', { timeout: 10_000 })
+    expect(page.url()).toContain('/login')
+
+    // External redirectTo should be preserved so that after re-auth the user still
+    // lands on the marketplace (and not on /quick-setup or home).
+    const url = new URL(page.url())
+    const loginRedirectTo = url.searchParams.get('redirectTo') ?? ''
+    expect(loginRedirectTo).toContain('/marketplace')
+    expect(loginRedirectTo).not.toContain('invalidRedirection')
+  })
+
+  test('callback with malformed state should not crash and should not land on quick-setup', async ({ page }) => {
+    await mockApiRoutes(page, { hasProfile: true, onboardingToExplorer: true })
+    await page.route('**/magic.link/**', route => route.abort())
+
+    await page.goto(`/auth/callback?error=access_denied&state=not-valid-base64-at-all`)
+
+    // Should recover (land on login or show error) but never end up on quick-setup.
+    await page.waitForTimeout(5000)
+    expect(page.url()).not.toContain('/quick-setup')
+  })
+})
