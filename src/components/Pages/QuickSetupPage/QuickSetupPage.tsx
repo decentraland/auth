@@ -265,7 +265,7 @@ export const QuickSetupPage = () => {
                           xmlns="http://www.w3.org/2000/svg"
                           style={{ marginLeft: 'auto' }}
                         >
-                          <path d="M1 5L4.5 8.5L12 1" stroke="#161518" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                          <path d="M1 5L4.5 8.5L12 1" stroke="#FF7439" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
                       )}
                     </BodyTypeDropdownItem>
@@ -281,7 +281,7 @@ export const QuickSetupPage = () => {
                           xmlns="http://www.w3.org/2000/svg"
                           style={{ marginLeft: 'auto' }}
                         >
-                          <path d="M1 5L4.5 8.5L12 1" stroke="#161518" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                          <path d="M1 5L4.5 8.5L12 1" stroke="#FF7439" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
                       )}
                     </BodyTypeDropdownItem>

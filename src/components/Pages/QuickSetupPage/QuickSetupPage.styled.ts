@@ -236,9 +236,15 @@ const RandomizeButton = styled(Button)({
     display: 'flex',
     gap: '10px',
     transition: 'background-color 0.2s, color 0.2s',
-    ['&:hover']: {
+    ['& img']: {
+      transition: 'filter 0.2s'
+    },
+    ['&.MuiButton-textPrimary:not(.Mui-disabled):not(.Mui-focusVisible):hover, &:hover']: {
       backgroundColor: '#fcfcfc',
-      color: '#161518'
+      color: '#161518',
+      ['& img']: {
+        filter: 'brightness(0)'
+      }
     }
   }
 })
@@ -258,9 +264,15 @@ const BodyTypeButton = styled(Button)({
     gap: '4px',
     alignItems: 'center',
     transition: 'background-color 0.2s, color 0.2s',
-    ['&:hover']: {
+    ['& img']: {
+      transition: 'filter 0.2s'
+    },
+    ['&.MuiButton-textPrimary:not(.Mui-disabled):not(.Mui-focusVisible):hover, &:hover']: {
       backgroundColor: '#fcfcfc',
-      color: '#161518'
+      color: '#161518',
+      ['& img']: {
+        filter: 'brightness(0)'
+      }
     }
   }
 })
@@ -283,7 +295,7 @@ const BodyTypeDropdown = styled(Box)({
 
 const BodyTypeDropdownItem = styled(Box, {
   shouldForwardProp: prop => prop !== 'selected'
-})<{ selected?: boolean }>(({ selected }) => ({
+})<{ selected?: boolean }>(() => ({
   display: 'flex',
   alignItems: 'center',
   gap: '4px',
@@ -296,7 +308,10 @@ const BodyTypeDropdownItem = styled(Box, {
   fontSize: '14px',
   textTransform: 'uppercase' as const,
   color: '#161518',
-  backgroundColor: selected ? '#f0f0f0' : 'transparent',
+  backgroundColor: 'transparent',
+  ['& img']: {
+    filter: 'brightness(0)'
+  },
   ['&:hover']: {
     backgroundColor: '#f0f0f0'
   }
