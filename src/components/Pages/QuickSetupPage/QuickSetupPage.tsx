@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from '@dcl/hooks'
-import { CircularProgress, useMobileMediaQuery } from 'decentraland-ui2'
+import { useMobileMediaQuery } from 'decentraland-ui2'
 import bodyTypeIconSvg from '../../../assets/images/body-type-icon.svg'
 import randomizeIconSvg from '../../../assets/images/randomize-icon.svg'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
@@ -11,6 +11,7 @@ import { handleError } from '../../../shared/utils/errorHandler'
 import { AnimatedBackground } from '../../AnimatedBackground'
 import { CustomWearablePreview } from '../../CustomWearablePreview'
 import { deployProfileFromDefault, subscribeToNewsletter } from '../SetupPage/utils'
+import { getCelebrateAnimation, prefetchCelebrateAnimation } from './celebratePrefetch'
 import {
   AvatarWrapper,
   BackgroundShadow,
@@ -18,7 +19,7 @@ import {
   BodyTypeChevron,
   BodyTypeDropdown,
   BodyTypeDropdownItem,
-  CelebrationAvatarWrapper,
+  CelebrateAnimation,
   CelebrationBackground,
   CelebrationOverlay,
   CelebrationTitle,
@@ -70,8 +71,14 @@ export const QuickSetupPage = () => {
   const [profile, setProfile] = useState(() => getRandomDefaultProfile('A'))
   const [showCelebration, setShowCelebration] = useState(false)
   const [bodyTypeOpen, setBodyTypeOpen] = useState(false)
-  const [celebrationLoading, setCelebrationLoading] = useState(true)
+  const [celebrationAnimData, setCelebrationAnimData] = useState<unknown>(null)
   const bodyTypeRef = useRef<HTMLDivElement>(null)
+
+  // Start downloading the 16 MB Lottie animation as soon as the page mounts.
+  // By the time the user fills in the form and submits, it should be cached.
+  useEffect(() => {
+    prefetchCelebrateAnimation()
+  }, [])
 
   // Close body type dropdown on click outside
   useEffect(() => {
@@ -84,12 +91,6 @@ export const QuickSetupPage = () => {
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [bodyTypeOpen])
-
-  const wearablePreviewUrl = useMemo(() => {
-    if (!account) return ''
-    const baseUrl = 'https://wearable-preview.decentraland.org'
-    return `${baseUrl}/?profile=${account}&disableBackground=true&lockBeta=true&unity=true&mode=jesus`
-  }, [account])
 
   const disabledCatalysts = useDisabledCatalysts()
 
@@ -141,6 +142,11 @@ export const QuickSetupPage = () => {
         })
 
         setShowCelebration(true)
+        getCelebrateAnimation()
+          .then(setCelebrationAnimData)
+          .catch(() => {
+            // Animation failed to load — celebration screen still shows without it
+          })
       } catch (err) {
         const errorMessage = handleError(err, 'Error deploying profile')
         setDeployError(errorMessage)
@@ -156,18 +162,10 @@ export const QuickSetupPage = () => {
         <AnimatedBackground variant="absolute" />
         <CelebrationBackground />
         <CelebrationOverlay>
-          <CelebrationTitle>{t('quick_setup.ready_to_jump_in', { name: name.trim() })}</CelebrationTitle>
-          <CelebrationAvatarWrapper>
-            {celebrationLoading && <CircularProgress size={60} />}
-            <iframe
-              src={wearablePreviewUrl}
-              title="Avatar Preview"
-              onLoad={() => setCelebrationLoading(false)}
-              style={{ opacity: celebrationLoading ? 0 : 1, transition: 'opacity 0.3s' }}
-            />
-          </CelebrationAvatarWrapper>
+          <CelebrationTitle>Your account is Ready!</CelebrationTitle>
+          {celebrationAnimData ? <CelebrateAnimation animationData={celebrationAnimData} loop={false} /> : null}
           <SuccessButton variant="contained" onClick={() => redirect()}>
-            {t('quick_setup.success')}
+            Start Exploring
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M3 8H13M13 8L9 4M13 8L9 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>

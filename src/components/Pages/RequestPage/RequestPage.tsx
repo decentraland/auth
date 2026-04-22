@@ -251,7 +251,10 @@ export const RequestPage = () => {
     // AutoLoginRedirect even if a wallet is already connected. This ensures new
     // users without a profile get the clean AutoLoginRedirect spinner instead of
     // RequestPage's verification UI (which shows a broken wearable preview for
-    // users without a profile).
+    // users without a profile). This also fires for returning users with a cached
+    // wallet — they take an extra round-trip through AutoLoginRedirect, but this
+    // is intentional to keep the routing logic simple and avoid race conditions
+    // with feature flag loading timing.
     if (skipSetup && loginMethodParam) {
       toLoginPage()
       return
@@ -332,9 +335,16 @@ export const RequestPage = () => {
                   setView(View.VERIFY_SIGN_IN_COMPLETE)
                   break
                 } catch (e) {
-                  // If auto-sign fails (e.g. user rejects), fall through to normal verify flow
                   if (cancelled) return
-                  console.info('Auto-sign failed for new user, falling back to verification screen:', e)
+                  console.info('Auto-sign failed for new user:', e instanceof Error ? e.message : String(e))
+                  if (isUserRejectedTransaction(e)) {
+                    hasCompletedRef.current = true
+                    setView(View.VERIFY_SIGN_IN_DENIED)
+                    break
+                  }
+                  setError(e instanceof Error ? e.message : 'Auto-sign failed')
+                  setView(View.VERIFY_SIGN_IN_ERROR)
+                  break
                 }
               }
             }

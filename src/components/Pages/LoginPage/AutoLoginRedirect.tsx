@@ -112,9 +112,12 @@ export const AutoLoginRedirect = ({ connectionType }: Props) => {
         return
       }
 
-      // Ensure profile exists for new users (avatar/name setup)
-      // Read from ref to get the latest value (FF may have loaded during the async flow)
-      if (!skipSetupRef.current && connectionData.account) {
+      // Ensure profile exists for new users (avatar/name setup).
+      // Skip ensureProfile entirely for Explorer flows (redirectTo points to /auth/requests/).
+      // The RequestPage handles profile checking and auto-sign for those flows.
+      // For web flows, ensureProfile navigates to QuickSetup if the user has no profile.
+      const isExplorerRedirect = rawRedirectTo?.includes('/auth/requests/') ?? false
+      if (!isExplorerRedirect && !skipSetupRef.current && connectionData.account) {
         const profile = await ensureProfile(connectionData.account, freshIdentity, {
           redirectTo,
           referrer: null,

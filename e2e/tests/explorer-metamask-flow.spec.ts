@@ -94,6 +94,26 @@ test.describe('Explorer → MetaMask: cached wallet + new user', () => {
     // Should NOT have shown the verification code screen
     await expect(page.getByText('Verify Sign In')).not.toBeVisible()
   })
+
+  test('cached wallet session + returning user → completes verify flow', async ({
+    context,
+    page
+  }) => {
+    await mockApiRoutes(page, { hasProfile: true, onboardingToExplorer: true })
+
+    // Simulate a previously connected wallet with existing profile
+    await injectPreviousConnection(context)
+
+    await page.goto(`/auth/requests/${MOCK_REQUEST_ID}?loginMethod=METAMASK`)
+
+    // Returning user with cached wallet + loginMethodParam takes an extra round-trip
+    // through AutoLoginRedirect, then reaches verify screen
+    await expect(page.getByText('Verify Sign In')).toBeVisible({ timeout: 15_000 })
+
+    // Approve and complete
+    await page.getByRole('button', { name: /yes, they are the same/i }).click()
+    await expect(page.getByText(/signed in to Decentraland/i)).toBeVisible({ timeout: 15_000 })
+  })
 })
 
 test.describe('Explorer → MetaMask: verification code behavior', () => {

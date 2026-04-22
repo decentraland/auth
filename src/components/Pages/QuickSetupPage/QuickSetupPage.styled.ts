@@ -1,3 +1,5 @@
+// eslint-disable-next-line @typescript-eslint/naming-convention
+import Lottie from 'lottie-react'
 import { brand, neutral } from 'decentraland-ui2/dist/theme/colors'
 import { Box, Button, Checkbox, FormControlLabel, Link, Logo, TextField, Typography, styled } from 'decentraland-ui2'
 
@@ -357,8 +359,7 @@ const CelebrationTitle = styled(Typography)({
   lineHeight: 1.167,
   color: 'white',
   textAlign: 'center',
-  zIndex: 2,
-  marginBottom: '24px'
+  zIndex: 2
 })
 
 const CelebrationAvatarWrapper = styled(Box)({
@@ -380,6 +381,14 @@ const CelebrationAvatarWrapper = styled(Box)({
     left: '50%',
     transform: 'translate(-50%, -50%)'
   }
+})
+
+const CelebrateAnimation = styled(Lottie)({
+  width: 720,
+  height: 720,
+  flexShrink: 0,
+  zIndex: 2,
+  pointerEvents: 'none'
 })
 
 const SuccessButton = styled(Button)({
@@ -432,5 +441,6 @@ export {
   CelebrationBackground,
   CelebrationTitle,
   CelebrationAvatarWrapper,
+  CelebrateAnimation,
   SuccessButton
 }
