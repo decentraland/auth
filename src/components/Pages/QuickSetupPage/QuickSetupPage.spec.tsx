@@ -196,6 +196,42 @@ describe('QuickSetupPage', () => {
       }
       expect(getByText('BODY TYPE B')).toBeInTheDocument()
     })
+
+    describe('default profile range per body type', () => {
+      // Catalyst convention (verified against peer.decentraland.org):
+      //   defaults 1-80   → BaseFemale
+      //   defaults 81-160 → BaseMale
+      // Body Type A is displayed with the man icon → must map to the Male range (81-160).
+      // Body Type B is displayed with the woman icon → must map to the Female range (1-80).
+      const extractDefaultNumber = (profile: string): number => {
+        const match = /^default(\d+)$/.exec(profile)
+        return match ? Number(match[1]) : NaN
+      }
+
+      it('should use a default in the BaseMale range (81-160) when Body Type A is active', () => {
+        const { getByTestId } = render(<QuickSetupPage />)
+        const profile = getByTestId('wearable-preview').getAttribute('data-profile') ?? ''
+        const n = extractDefaultNumber(profile)
+        expect(n).toBeGreaterThanOrEqual(81)
+        expect(n).toBeLessThanOrEqual(160)
+      })
+
+      it('should use a default in the BaseFemale range (1-80) when Body Type B is selected', async () => {
+        const user = userEvent.setup()
+        const { getByText, getByTestId } = render(<QuickSetupPage />)
+        // Open the dropdown (clicking the button that currently reads "BODY TYPE A")
+        await user.click(getByText('BODY TYPE A'))
+        // After opening, the dropdown contains two "BODY TYPE B" occurrences are NOT expected —
+        // only one (the dropdown item). Click it to select Body Type B.
+        await user.click(getByText('BODY TYPE B'))
+        await waitFor(() => {
+          const profile = getByTestId('wearable-preview').getAttribute('data-profile') ?? ''
+          const n = extractDefaultNumber(profile)
+          expect(n).toBeGreaterThanOrEqual(1)
+          expect(n).toBeLessThanOrEqual(80)
+        })
+      })
+    })
   })
 
   describe('celebration screen', () => {

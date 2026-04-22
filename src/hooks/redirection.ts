@@ -3,13 +3,33 @@ import { useLocation } from 'react-router-dom'
 import { validateUrlInstance } from '@dcl/schemas'
 import { extractRedirectToFromSearchParameters, locations } from '../shared/locations'
 
+// Magic OAuth round-trip encodes the original redirectTo inside the `state` query param
+// (as JSON.stringify({ customData: JSON.stringify({ redirectTo, ... }) }) then base64).
+// On /auth/callback the URL has only `state` — no `redirectTo` — so we decode it here
+// to recover the intent of the original login request.
+const extractRedirectToFromState = (search: URLSearchParams): string => {
+  const state = search.get('state')
+  if (!state) return ''
+  try {
+    const parsedRedirectTo = JSON.parse(JSON.parse(atob(state)).customData).redirectTo
+    return typeof parsedRedirectTo === 'string' ? parsedRedirectTo : ''
+  } catch {
+    return ''
+  }
+}
+
 export const useAfterLoginRedirection = () => {
   const location = useLocation()
   const search = new URLSearchParams(location.search)
   // A redirect is "explicit" only if it points OUTSIDE of auth (e.g. marketplace, landing).
   // Internal redirects (e.g. /auth/requests/{id} from RequestPage → login → back) are NOT
   // explicit — they're part of the Explorer's auth flow and should not change skipSetup behavior.
-  const rawRedirectTo = search.get('redirectTo') || ''
+  //
+  // For social login via Magic OAuth, the original `redirectTo` is encoded in the `state`
+  // query param (Magic stores it in customData during the OAuth round-trip), so we must
+  // decode it here too — otherwise the Explorer → social → callback flow would incorrectly
+  // be treated as an external redirect and trigger the web quick-setup path.
+  const rawRedirectTo = search.get('redirectTo') || extractRedirectToFromState(search)
   let isAuthRedirection = false
   try {
     const redirectUrl = rawRedirectTo.startsWith('/') ? new URL(rawRedirectTo, window.location.origin) : new URL(rawRedirectTo)
