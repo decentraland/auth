@@ -247,6 +247,19 @@ export const RequestPage = () => {
       return
     }
 
+    // When coming from Explorer (skipSetup + loginMethod), always route through
+    // AutoLoginRedirect even if a wallet is already connected. This ensures new
+    // users without a profile get the clean AutoLoginRedirect spinner instead of
+    // RequestPage's verification UI (which shows a broken wearable preview for
+    // users without a profile). This also fires for returning users with a cached
+    // wallet — they take an extra round-trip through AutoLoginRedirect, but this
+    // is intentional to keep the routing logic simple and avoid race conditions
+    // with feature flag loading timing.
+    if (skipSetup && loginMethodParam) {
+      toLoginPage()
+      return
+    }
+
     // If the active session doesn't match the requested loginMethod,
     // navigate to login immediately. AutoLoginRedirect will call connectToProvider()
     // which overrides the stale session internally.
@@ -281,13 +294,6 @@ export const RequestPage = () => {
 
         requestRef.current = request
 
-        if (flags[FeatureFlagsKeys.LOGIN_ON_SETUP]) {
-          // Notify the auth server that the request needs validation.
-          // This will make the explorer show the verification code to the user.
-          await authServerClient.current.notifyRequestNeedsValidation(requestId)
-          if (cancelled) return
-        }
-
         // Initialize the timeout to display the timeout view when the request expires.
         timeoutRef.current = setTimeout(
           () => {
@@ -313,7 +319,9 @@ export const RequestPage = () => {
               if (cancelled) return
 
               if (!userProfile || !isProfileComplete(userProfile)) {
-                // New user: auto-sign and go straight to success
+                // New user: auto-sign and go straight to success.
+                // Do NOT call notifyRequestNeedsValidation — the Explorer should
+                // not show the verification code screen for new users.
                 const autoSignMessage = request.params?.[0]
                 if (typeof autoSignMessage !== 'string') break
                 try {
@@ -327,11 +335,26 @@ export const RequestPage = () => {
                   setView(View.VERIFY_SIGN_IN_COMPLETE)
                   break
                 } catch (e) {
-                  // If auto-sign fails (e.g. user rejects), fall through to normal verify flow
                   if (cancelled) return
-                  console.info('Auto-sign failed for new user, falling back to verification screen:', e)
+                  console.info('Auto-sign failed for new user:', e instanceof Error ? e.message : String(e))
+                  if (isUserRejectedTransaction(e)) {
+                    hasCompletedRef.current = true
+                    setView(View.VERIFY_SIGN_IN_DENIED)
+                    break
+                  }
+                  setError(e instanceof Error ? e.message : 'Auto-sign failed')
+                  setView(View.VERIFY_SIGN_IN_ERROR)
+                  break
                 }
               }
+            }
+
+            // Notify the auth server that the request needs validation.
+            // This tells the Explorer to show the verification code screen.
+            // Only reached for returning users (new users auto-signed above).
+            if (flags[FeatureFlagsKeys.LOGIN_ON_SETUP]) {
+              await authServerClient.current.notifyRequestNeedsValidation(requestId)
+              if (cancelled) return
             }
 
             setView(View.VERIFY_SIGN_IN)

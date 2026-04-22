@@ -1,3 +1,5 @@
+// eslint-disable-next-line @typescript-eslint/naming-convention
+import Lottie from 'lottie-react'
 import { Box, styled } from 'decentraland-ui2'
 
 const CenteredContainer = styled(Box)({
@@ -12,14 +14,10 @@ const CenteredContainer = styled(Box)({
   gap: 78
 })
 
-const CheckIconLarge = styled(Box)({
+const SuccessAnimation = styled(Lottie)({
   flexShrink: 0,
-  width: 94,
-  height: 94,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  zIndex: 1
+  zIndex: 1,
+  pointerEvents: 'none'
 })
 
 const Description = styled('p')({
@@ -34,4 +32,4 @@ const Description = styled('p')({
   zIndex: 1
 })
 
-export { CenteredContainer, CheckIconLarge, Description }
+export { CenteredContainer, Description, SuccessAnimation }

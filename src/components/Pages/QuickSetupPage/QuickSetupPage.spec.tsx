@@ -211,9 +211,9 @@ describe('QuickSetupPage', () => {
       await user.click(button)
 
       await waitFor(() => {
-        expect(getByText('TestUser is Ready to Jump In!')).toBeInTheDocument()
+        expect(getByText('Your account is Ready!')).toBeInTheDocument()
       })
-      expect(getByText('SUCCESS')).toBeInTheDocument()
+      expect(getByText('Start Exploring')).toBeInTheDocument()
     })
 
     it('should call redirect when clicking SUCCESS', async () => {
@@ -225,10 +225,10 @@ describe('QuickSetupPage', () => {
       await user.click(getByText("LET'S GO").closest('button')!)
 
       await waitFor(() => {
-        expect(getByText('SUCCESS')).toBeInTheDocument()
+        expect(getByText('Start Exploring')).toBeInTheDocument()
       })
 
-      await user.click(getByText('SUCCESS').closest('button')!)
+      await user.click(getByText('Start Exploring').closest('button')!)
       expect(mockRedirect).toHaveBeenCalled()
     })
   })

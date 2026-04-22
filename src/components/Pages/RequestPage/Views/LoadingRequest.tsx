@@ -1,10 +1,22 @@
 import { CircularProgress } from 'decentraland-ui2'
-import { Container } from '../Container'
+import { AnimatedBackground } from '../../../AnimatedBackground'
 
 export const LoadingRequest = () => {
   return (
-    <Container>
-      <CircularProgress size={60} />
-    </Container>
+    <div>
+      <AnimatedBackground />
+      <div
+        style={{
+          position: 'absolute',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100%',
+          width: '100%'
+        }}
+      >
+        <CircularProgress size={60} />
+      </div>
+    </div>
   )
 }

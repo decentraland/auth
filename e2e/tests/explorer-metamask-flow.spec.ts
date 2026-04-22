@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { injectMockWallet, mockApiRoutes, MOCK_REQUEST_ID } from '../helpers/setup'
+import { injectMockWallet, injectPreviousConnection, mockApiRoutes, MOCK_REQUEST_ID } from '../helpers/setup'
 
 test.describe('Explorer → MetaMask: existing user — full E2E', () => {
   test.beforeEach(async ({ context }) => {
@@ -65,6 +65,54 @@ test.describe('Explorer → MetaMask: new user (no profile) — full E2E', () =>
     await expect(page.getByText(/signed in to Decentraland/i)).toBeVisible({ timeout: 20_000 })
     await expect(page.getByText(/Your journey begins here/)).not.toBeVisible()
     await expect(page.getByPlaceholder(/enter your username/i)).not.toBeVisible()
+  })
+})
+
+test.describe('Explorer → MetaMask: cached wallet + new user', () => {
+  test.beforeEach(async ({ context }) => {
+    await injectMockWallet(context)
+  })
+
+  test('cached wallet session + new user → routes through AutoLoginRedirect, not broken RequestPage UI', async ({
+    context,
+    page
+  }) => {
+    await mockApiRoutes(page, { hasProfile: false, onboardingToExplorer: true })
+
+    // Simulate a previously connected wallet (e.g. user connected before but never created a profile)
+    await injectPreviousConnection(context)
+
+    // Navigate to request page with loginMethod — simulates Explorer opening auth
+    await page.goto(`/auth/requests/${MOCK_REQUEST_ID}?loginMethod=METAMASK`)
+
+    // With skipSetup + loginMethod, RequestPage should redirect to /login
+    // which renders AutoLoginRedirect (clean spinner, no broken wearable preview).
+    // AutoLoginRedirect connects, signs, and redirects back to the request page
+    // where auto-sign completes for the new user.
+    await expect(page.getByText(/signed in to Decentraland/i)).toBeVisible({ timeout: 20_000 })
+
+    // Should NOT have shown the verification code screen
+    await expect(page.getByText('Verify Sign In')).not.toBeVisible()
+  })
+
+  test('cached wallet session + returning user → completes verify flow', async ({
+    context,
+    page
+  }) => {
+    await mockApiRoutes(page, { hasProfile: true, onboardingToExplorer: true })
+
+    // Simulate a previously connected wallet with existing profile
+    await injectPreviousConnection(context)
+
+    await page.goto(`/auth/requests/${MOCK_REQUEST_ID}?loginMethod=METAMASK`)
+
+    // Returning user with cached wallet + loginMethodParam takes an extra round-trip
+    // through AutoLoginRedirect, then reaches verify screen
+    await expect(page.getByText('Verify Sign In')).toBeVisible({ timeout: 15_000 })
+
+    // Approve and complete
+    await page.getByRole('button', { name: /yes, they are the same/i }).click()
+    await expect(page.getByText(/signed in to Decentraland/i)).toBeVisible({ timeout: 15_000 })
   })
 })
 

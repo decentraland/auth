@@ -48,7 +48,6 @@ export const Container = (props: { children: ReactNode; requestId?: string; canC
             </div>
           ) : null}
         </div>
-        {/* This assumes that the user has a profile */}
         {targetConfig.showWearablePreview && account && !isMobile && (
           <div className={styles.right}>{<CustomWearablePreview profile={account} />}</div>
         )}
