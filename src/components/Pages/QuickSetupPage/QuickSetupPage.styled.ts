@@ -416,7 +416,6 @@ const SuccessButton = styled(Button)({
     fontWeight: 600,
     letterSpacing: '0.46px',
     textTransform: 'uppercase',
-    marginTop: '24px',
     zIndex: 2,
     display: 'flex',
     gap: '8px',
