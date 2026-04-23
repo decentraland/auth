@@ -414,7 +414,10 @@ export const SetupPage = () => {
     return (
       <div className={styles.container}>
         <div className={styles.background} />
-        <CircularProgress size={60} />
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+          <p style={{ color: 'white', fontSize: '16px', margin: 0 }}>{t('connection_layout.validating_sign_in')}</p>
+          <CircularProgress size={60} />
+        </div>
       </div>
     )
   }

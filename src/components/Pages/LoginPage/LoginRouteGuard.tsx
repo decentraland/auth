@@ -1,8 +1,8 @@
 // eslint-disable-next-line @typescript-eslint/naming-convention
 import React, { Suspense } from 'react'
-import { CircularProgress } from 'decentraland-ui2'
 import { ConnectionOptionType } from '../../Connection/Connection.types'
 import { AutoLoginRedirect } from './AutoLoginRedirect'
+import { ConfirmingLogin } from './ConfirmingLogin'
 
 const LazyLoginPage = React.lazy(() => import('./LoginPage').then(m => ({ default: m.LoginPage })))
 
@@ -29,13 +29,7 @@ export const LoginRouteGuard = () => {
   }
 
   return (
-    <Suspense
-      fallback={
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-          <CircularProgress size={80} />
-        </div>
-      }
-    >
+    <Suspense fallback={<ConfirmingLogin />}>
       <LazyLoginPage />
     </Suspense>
   )

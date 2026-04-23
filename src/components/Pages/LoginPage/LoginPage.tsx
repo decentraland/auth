@@ -448,7 +448,8 @@ export const LoginPage = () => {
   // page, this loader must remain in place.
   if (!flagInitialized) {
     return (
-      <Main style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+      <Main style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: '16px' }}>
+        <p style={{ color: 'white', fontSize: '16px', margin: 0 }}>{t('connection_layout.validating_sign_in')}</p>
         <CircularProgress size={80} />
       </Main>
     )
