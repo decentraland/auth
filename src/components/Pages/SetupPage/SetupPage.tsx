@@ -20,7 +20,6 @@ import { createAuthServerHttpClient, createAuthServerWsClient } from '../../../s
 import { useCurrentConnectionData } from '../../../shared/connection'
 import { locations } from '../../../shared/locations'
 import { getStoredEmail } from '../../../shared/onboarding/getStoredEmail'
-import { trackCheckpoint } from '../../../shared/onboarding/trackCheckpoint'
 import { isProfileComplete } from '../../../shared/profile'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { ConnectionModal } from '../../ConnectionModal'
@@ -315,16 +314,6 @@ export const SetupPage = () => {
           name
         })
 
-        trackCheckpoint({
-          checkpointId: 3,
-          action: 'completed',
-          source: 'auth',
-          userIdentifier: email || account.toLowerCase(),
-          identifierType: email ? 'email' : 'wallet',
-          email: email || undefined,
-          wallet: account.toLowerCase()
-        })
-
         // If the site to be redirect to is a request site, we need to recover the request and sign in.
         if (requestId && provider && flags[FeatureFlagsKeys.LOGIN_ON_SETUP]) {
           await signRequest(provider, requestId, account)
@@ -386,16 +375,6 @@ export const SetupPage = () => {
       if (storedEmail) {
         setEmail(storedEmail)
       }
-
-      trackCheckpoint({
-        checkpointId: 3,
-        action: 'reached',
-        source: 'auth',
-        userIdentifier: storedEmail || account.toLowerCase(),
-        identifierType: storedEmail ? 'email' : 'wallet',
-        email: storedEmail || undefined,
-        wallet: account.toLowerCase()
-      })
 
       if (referrer && EthAddress.validate(referrer) && !hasTrackedReferral.current) {
         try {

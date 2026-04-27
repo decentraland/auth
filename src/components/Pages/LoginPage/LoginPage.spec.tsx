@@ -88,10 +88,6 @@ jest.mock('../../../shared/utils/clockSync', () => ({
   checkClockSync: jest.fn().mockResolvedValue(true)
 }))
 
-jest.mock('../../../shared/onboarding/markReturningUser', () => ({
-  markReturningUser: jest.fn()
-}))
-
 jest.mock('../../../shared/onboarding/trackCheckpoint', () => ({
   trackCheckpoint: jest.fn()
 }))

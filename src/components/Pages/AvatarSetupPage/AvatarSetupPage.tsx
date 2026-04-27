@@ -21,7 +21,6 @@ import { useCurrentConnectionData } from '../../../shared/connection'
 import { isEmailValid } from '../../../shared/email'
 import { locations } from '../../../shared/locations'
 import { getStoredEmail } from '../../../shared/onboarding/getStoredEmail'
-import { trackCheckpoint } from '../../../shared/onboarding/trackCheckpoint'
 import { isProfileComplete } from '../../../shared/profile'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { checkWebGpuSupport } from '../../../shared/utils/webgpu'
@@ -170,29 +169,6 @@ const AvatarSetupPage: React.FC = () => {
           name: state.username
         })
 
-        const storedEmail = state.email || getStoredEmail()
-
-        // CP3 completed: user accepted TOS and submitted username
-        trackCheckpoint({
-          checkpointId: 3,
-          action: 'completed',
-          source: 'auth',
-          userIdentifier: storedEmail || account?.toLowerCase(),
-          identifierType: storedEmail ? 'email' : 'wallet',
-          email: storedEmail || undefined,
-          wallet: account?.toLowerCase()
-        })
-
-        // CP4 reached: avatar creator / starting look screen shown
-        trackCheckpoint({
-          checkpointId: 4,
-          action: 'reached',
-          source: 'auth',
-          userIdentifier: storedEmail || account?.toLowerCase(),
-          identifierType: storedEmail ? 'email' : 'wallet',
-          email: storedEmail || undefined,
-          wallet: account?.toLowerCase()
-        })
       }
     } catch (e) {
       // Display the error in the error box below the continue button
@@ -270,18 +246,6 @@ const AvatarSetupPage: React.FC = () => {
           profile: state.username,
           avatarShape,
           skipped: event.data.payload.result?.skipped
-        })
-
-        // CP4 completed: avatar customization finished and deployed
-        const emailForCheckpoint = state.email || getStoredEmail()
-        trackCheckpoint({
-          checkpointId: 4,
-          action: 'completed',
-          source: 'auth',
-          userIdentifier: emailForCheckpoint || account.toLowerCase(),
-          identifierType: emailForCheckpoint ? 'email' : 'wallet',
-          email: emailForCheckpoint || undefined,
-          wallet: account.toLowerCase()
         })
 
         if (referrer && EthAddress.validate(referrer)) {
@@ -388,16 +352,6 @@ const AvatarSetupPage: React.FC = () => {
     if (storedEmail) {
       setState(prev => ({ ...prev, email: storedEmail, isEmailInherited: true }))
     }
-
-    trackCheckpoint({
-      checkpointId: 3,
-      action: 'reached',
-      source: 'auth',
-      userIdentifier: storedEmail || account.toLowerCase(),
-      identifierType: storedEmail ? 'email' : 'wallet',
-      email: storedEmail || undefined,
-      wallet: account.toLowerCase()
-    })
 
     if (referrer && EthAddress.validate(referrer) && !hasTrackedReferral.current) {
       await trackReferral(referrer, 'POST')
