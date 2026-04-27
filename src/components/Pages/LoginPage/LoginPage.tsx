@@ -24,7 +24,7 @@ import { ConnectionType } from '../../../modules/analytics/types'
 import { useCurrentConnectionData } from '../../../shared/connection'
 import { isErrorWithName, isUserRejectedTransaction } from '../../../shared/errors'
 import { extractReferrerFromSearchParameters } from '../../../shared/locations'
-import { trackCheckpoint } from '../../../shared/onboarding/trackCheckpoint'
+import { trackCheckpoint, trackCheckpointWhenReady } from '../../../shared/onboarding/trackCheckpoint'
 import { disconnectWallet, sendEmailOTP } from '../../../shared/thirdweb'
 import { checkClockSync } from '../../../shared/utils/clockSync'
 import { handleError } from '../../../shared/utils/errorHandler'
@@ -105,8 +105,10 @@ export const LoginPage = () => {
 
   // CP2 reached: user opened the auth login page. Anonymous identifier comes
   // from the Segment cookie shared with landing on decentraland.org.
+  // Wrapped in `trackCheckpointWhenReady` because the analytics.js stub may
+  // shadow `analytics.user()` until the real library loads.
   useEffect(() => {
-    trackCheckpoint({ checkpointId: 2, action: 'reached', source: 'auth' })
+    trackCheckpointWhenReady({ checkpointId: 2, action: 'reached', source: 'auth' })
   }, [])
 
   const handleGuestLogin = useCallback(async () => {

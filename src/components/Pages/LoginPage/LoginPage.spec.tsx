@@ -89,7 +89,8 @@ jest.mock('../../../shared/utils/clockSync', () => ({
 }))
 
 jest.mock('../../../shared/onboarding/trackCheckpoint', () => ({
-  trackCheckpoint: jest.fn()
+  trackCheckpoint: jest.fn(),
+  trackCheckpointWhenReady: jest.fn()
 }))
 
 jest.mock('../../../shared/thirdweb', () => ({
