@@ -15,6 +15,8 @@ const CenteredContainer = styled(Box)({
 })
 
 const SuccessAnimation = styled(Lottie)({
+  width: 500,
+  height: 500,
   flexShrink: 0,
   zIndex: 1,
   pointerEvents: 'none'
