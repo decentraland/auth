@@ -97,7 +97,7 @@
     "sign_in_complete": {
       "title": "Login Successful!",
       "description": "Return to the {explorerText} to jump in!",
-      "explorer_title": "Sing In successful!",
+      "explorer_title": "Sign In successful!",
       "explorer_description_line2": "Return to Decentraland App to complete your account!",
       "continue": "CONTINUE"
     },

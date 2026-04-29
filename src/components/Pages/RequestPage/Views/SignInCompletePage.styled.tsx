@@ -10,8 +10,7 @@ const CenteredContainer = styled(Box)({
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
-  justifyContent: 'center',
-  gap: 78
+  justifyContent: 'center'
 })
 
 const SuccessAnimation = styled(Lottie)({
@@ -38,8 +37,8 @@ const TitleRow = styled(Box)({
 })
 
 const TitleCheckIcon = styled('svg')({
-  width: 45.773,
-  height: 45.773,
+  width: 46,
+  height: 46,
   flexShrink: 0,
   display: 'block'
 })
@@ -51,7 +50,7 @@ const Title = styled('h1')({
   lineHeight: 1.167,
   color: '#FCFCFC',
   margin: 0,
-  whiteSpace: 'nowrap'
+  textAlign: 'center'
 })
 
 const Description = styled('p')({
