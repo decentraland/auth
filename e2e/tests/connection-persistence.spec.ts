@@ -43,7 +43,7 @@ test.describe('Previous connection: returning user with persisted wallet', () =>
     // Verify → approve → success
     await expect(page.getByText('Verify Sign In')).toBeVisible({ timeout: 15_000 })
     await page.getByRole('button', { name: /yes, they are the same/i }).click()
-    await expect(page.getByText(/signed in to Decentraland/i)).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText(/Sign In successful/i)).toBeVisible({ timeout: 15_000 })
   })
 
   test('Web: returning existing user with redirectTo → skips login page entirely', async ({ page }) => {

@@ -22,7 +22,7 @@ test.describe('Error: auth server fails', () => {
     await page.waitForTimeout(10000)
 
     // Should NOT show success page
-    await expect(page.getByText(/signed in to Decentraland/i)).not.toBeVisible()
+    await expect(page.getByText(/Sign In successful/i)).not.toBeVisible()
     // Should NOT crash (page should still be rendered)
     await expect(page.locator('body')).toBeVisible()
   })
@@ -142,7 +142,7 @@ test.describe('Error: user denies sign-in', () => {
     await page.getByRole('button', { name: /no, it doesn't/i }).click()
 
     // Should show denied state — NOT success page
-    await expect(page.getByText(/signed in to Decentraland/i)).not.toBeVisible()
+    await expect(page.getByText(/Sign In successful/i)).not.toBeVisible()
     await expect(page.getByText(/not match|denied|wasn't you/i)).toBeVisible({ timeout: 5_000 })
   })
 })
