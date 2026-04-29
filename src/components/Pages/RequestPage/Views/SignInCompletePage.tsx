@@ -3,7 +3,15 @@ import { useTranslation } from '@dcl/hooks'
 import successAnimationData from '../../../../assets/animations/Success_Lottie.json'
 import { config } from '../../../../modules/config'
 import { AnimatedBackground } from '../../../AnimatedBackground'
-import { CenteredContainer, Description, SuccessAnimation } from './SignInCompletePage.styled'
+import {
+  CenteredContainer,
+  Description,
+  SuccessAnimation,
+  TextBlock,
+  Title,
+  TitleCheckIcon,
+  TitleRow
+} from './SignInCompletePage.styled'
 
 function getExplorerDeeplink(): string {
   const env = config.get('ENVIRONMENT').toLowerCase()
@@ -27,11 +35,23 @@ const SignInCompletePage = ({ onContinue }: Props) => {
     <CenteredContainer>
       <AnimatedBackground variant="absolute" />
       <SuccessAnimation animationData={successAnimationData} loop={false} />
-      <Description>
-        {t('request_views.sign_in_complete.explorer_description_line1')}
-        <br />
-        {t('request_views.sign_in_complete.explorer_description_line2')}
-      </Description>
+      <TextBlock>
+        <TitleRow>
+          <TitleCheckIcon viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="12" fill="#34CE77" />
+            <path
+              d="M7 12.5l3.2 3.2L17 9"
+              fill="none"
+              stroke="#FCFCFC"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </TitleCheckIcon>
+          <Title>{t('request_views.sign_in_complete.explorer_title')}</Title>
+        </TitleRow>
+        <Description>{t('request_views.sign_in_complete.explorer_description_line2')}</Description>
+      </TextBlock>
     </CenteredContainer>
   )
 }

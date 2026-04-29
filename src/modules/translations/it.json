@@ -97,7 +97,7 @@
     "sign_in_complete": {
       "title": "Accesso riuscito!",
       "description": "Torna al {explorerText} per entrare!",
-      "explorer_description_line1": "Hai effettuato l'accesso a Decentraland.",
+      "explorer_title": "Accesso riuscito!",
       "explorer_description_line2": "Torna a Decentraland App per completare il tuo account!",
       "continue": "CONTINUE"
     },
