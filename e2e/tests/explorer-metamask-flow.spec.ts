@@ -26,7 +26,7 @@ test.describe('Explorer → MetaMask: existing user — full E2E', () => {
     await page.getByRole('button', { name: /yes, they are the same/i }).click()
 
     // Step 5: Success page — deeplink fires automatically on mount
-    await expect(page.getByText(/signed in to Decentraland/i)).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText(/Sign In successful/i)).toBeVisible({ timeout: 15_000 })
 
     // Step 6: Verify connection data persisted for SSO
     const hasConnectionData = await page.evaluate(() => {
@@ -50,7 +50,7 @@ test.describe('Explorer → MetaMask: new user (no profile) — full E2E', () =>
     // Step 2: New users skip the "Verify Sign In" screen entirely.
     // The request is auto-signed (matching old behavior where SetupPage signed automatically).
     // Should go straight to success — deeplink fires automatically.
-    await expect(page.getByText(/signed in to Decentraland/i)).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByText(/Sign In successful/i)).toBeVisible({ timeout: 20_000 })
 
     // Should NOT have shown verification code screen
     // (it resolved too fast for the verify screen to appear)
@@ -62,7 +62,7 @@ test.describe('Explorer → MetaMask: new user (no profile) — full E2E', () =>
     await page.goto(`/auth/requests/${MOCK_REQUEST_ID}?loginMethod=METAMASK`)
 
     // Should go to success, not setup
-    await expect(page.getByText(/signed in to Decentraland/i)).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByText(/Sign In successful/i)).toBeVisible({ timeout: 20_000 })
     await expect(page.getByText(/Your journey begins here/)).not.toBeVisible()
     await expect(page.getByPlaceholder(/enter your username/i)).not.toBeVisible()
   })
@@ -89,7 +89,7 @@ test.describe('Explorer → MetaMask: cached wallet + new user', () => {
     // which renders AutoLoginRedirect (clean spinner, no broken wearable preview).
     // AutoLoginRedirect connects, signs, and redirects back to the request page
     // where auto-sign completes for the new user.
-    await expect(page.getByText(/signed in to Decentraland/i)).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByText(/Sign In successful/i)).toBeVisible({ timeout: 20_000 })
 
     // Should NOT have shown the verification code screen
     await expect(page.getByText('Verify Sign In')).not.toBeVisible()
@@ -112,7 +112,7 @@ test.describe('Explorer → MetaMask: cached wallet + new user', () => {
 
     // Approve and complete
     await page.getByRole('button', { name: /yes, they are the same/i }).click()
-    await expect(page.getByText(/signed in to Decentraland/i)).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText(/Sign In successful/i)).toBeVisible({ timeout: 15_000 })
   })
 })
 
@@ -141,6 +141,6 @@ test.describe('Explorer → MetaMask: verification code behavior', () => {
     await expect(page.getByText('1234')).not.toBeVisible()
     // Approve button should still work
     await page.getByRole('button', { name: /yes, they are the same/i }).click()
-    await expect(page.getByText(/signed in to Decentraland/i)).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText(/Sign In successful/i)).toBeVisible({ timeout: 15_000 })
   })
 })

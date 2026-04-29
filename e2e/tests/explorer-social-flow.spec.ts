@@ -190,7 +190,7 @@ test.describe('Explorer social flow: request page after social login', () => {
     await page.getByRole('button', { name: /yes, they are the same/i }).click()
 
     // Success page — deeplink fires automatically on mount
-    await expect(page.getByText(/signed in to Decentraland/i)).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText(/Sign In successful/i)).toBeVisible({ timeout: 15_000 })
   })
 
   test('new user (no profile): auto-signs → success without verification', async ({
@@ -201,7 +201,7 @@ test.describe('Explorer social flow: request page after social login', () => {
     await page.goto(`/auth/requests/${MOCK_REQUEST_ID}?loginMethod=METAMASK`)
 
     // New users skip verification — auto-sign goes straight to success
-    await expect(page.getByText(/signed in to Decentraland/i)).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByText(/Sign In successful/i)).toBeVisible({ timeout: 20_000 })
 
     // Should NOT show setup pages
     await expect(page.getByPlaceholder(/enter your username/i)).not.toBeVisible()

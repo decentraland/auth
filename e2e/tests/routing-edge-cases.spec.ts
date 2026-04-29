@@ -82,7 +82,7 @@ test.describe('skipSetup logic: FF + redirectTo interaction', () => {
     await page.getByRole('button', { name: /yes, they are the same/i }).click()
 
     // skipSetup=true → SignInCompletePage (deeplink fires automatically on mount)
-    await expect(page.getByText(/signed in to Decentraland/i)).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText(/Sign In successful/i)).toBeVisible({ timeout: 15_000 })
   })
 
   test('FF enabled + external redirectTo (Web flow) → skipSetup=false → SignInComplete (minimal)', async ({
@@ -100,7 +100,7 @@ test.describe('skipSetup logic: FF + redirectTo interaction', () => {
     await page.getByRole('button', { name: /yes, they are the same/i }).click()
 
     // Should show some completion view
-    await expect(page.getByText(/signed in to Decentraland/i)).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText(/Sign In successful/i)).toBeVisible({ timeout: 15_000 })
 
     // Note: whether Continue button appears depends on how redirectTo flows through
     // the useSkipSetup hook. The key assertion is that we reach completion.

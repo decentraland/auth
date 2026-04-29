@@ -97,7 +97,7 @@
     "sign_in_complete": {
       "title": "¡Inicio de sesión exitoso!",
       "description": "¡Regresa a la {explorerText} para entrar!",
-      "explorer_description_line1": "Has iniciado sesión en Decentraland.",
+      "explorer_title": "¡Inicio de sesión exitoso!",
       "explorer_description_line2": "¡Regresa a Decentraland App para completar tu cuenta!",
       "continue": "CONTINUE"
     },

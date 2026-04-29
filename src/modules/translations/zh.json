@@ -97,7 +97,7 @@
     "sign_in_complete": {
       "title": "登录成功！",
       "description": "返回 {explorerText} 开始探索！",
-      "explorer_description_line1": "您已登录 Decentraland。",
+      "explorer_title": "登录成功！",
       "explorer_description_line2": "请返回 Decentraland App 以完成您的账户设置！",
       "continue": "CONTINUE"
     },
