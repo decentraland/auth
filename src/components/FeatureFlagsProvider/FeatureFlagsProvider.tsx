@@ -36,7 +36,17 @@ export const FeatureFlagsProvider = (props: PropsWithChildren<unknown>) => {
 
           setValue(prev => ({ ...prev, flags: mergedFlags, variants: mergedVariants, initialized: true }))
         } catch (error) {
-          setValue(prev => ({ ...prev, flags: {}, variants: {}, initialized: true }))
+          // Don't blow away previously-loaded flags on a transient refresh
+          // failure. The polling loop runs every FEATURE_FLAGS_INTERVAL, and a
+          // single network blip used to wipe `flags`/`variants` to `{}`, which
+          // can flip downstream guards like `useSkipSetup` and route the user
+          // to /quick-setup mid-flow. We only fall back to empty if we never
+          // loaded successfully (first mount).
+          setValue(prev => ({
+            flags: prev.initialized ? prev.flags : {},
+            variants: prev.initialized ? prev.variants : {},
+            initialized: true
+          }))
           console.error('Error fetching feature flags', error)
         } finally {
           if (timeoutId) {
