@@ -9,7 +9,6 @@ import { ConnectionType } from '../../../modules/analytics/types'
 import { useCurrentConnectionData } from '../../../shared/connection'
 import { isUserRejectedTransaction } from '../../../shared/errors'
 import { locations } from '../../../shared/locations'
-import { markReturningUser } from '../../../shared/onboarding/markReturningUser'
 import { trackCheckpoint } from '../../../shared/onboarding/trackCheckpoint'
 import { checkClockSync } from '../../../shared/utils/clockSync'
 import { handleError } from '../../../shared/utils/errorHandler'
@@ -83,13 +82,11 @@ export const AutoLoginRedirect = ({ connectionType }: Props) => {
       // MetaMask connected — now verify and redirect
       setPhase('verifying')
 
-      // Track CP2 reached after wallet connects (matches LoginPage behavior)
+      // CP2 completed: identity established via Metamask auto-login.
       trackCheckpoint({
         checkpointId: 2,
-        action: 'reached',
+        action: 'completed',
         source: 'auth',
-        userIdentifier: ethAddress,
-        identifierType: 'wallet',
         wallet: ethAddress,
         metadata: { loginMethod: connectionType }
       })
@@ -126,7 +123,6 @@ export const AutoLoginRedirect = ({ connectionType }: Props) => {
         if (!profile) return
       }
 
-      markReturningUser(connectionData.account ?? '')
       redirect()
     } catch (error) {
       if (isUserRejectedTransaction(error)) {

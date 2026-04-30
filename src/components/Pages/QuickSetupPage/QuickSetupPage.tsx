@@ -7,7 +7,6 @@ import randomizeIconSvg from '../../../assets/images/randomize-icon.svg'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { useDisabledCatalysts } from '../../../hooks/useDisabledCatalysts'
 import { useCurrentConnectionData } from '../../../shared/connection'
-import { trackCheckpoint } from '../../../shared/onboarding/trackCheckpoint'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { AnimatedBackground } from '../../AnimatedBackground'
 import { CustomWearablePreview } from '../../CustomWearablePreview'
@@ -135,15 +134,6 @@ export const QuickSetupPage = () => {
             handleError(err, 'Error subscribing to newsletter', { skipTracking: true })
           }
         }
-
-        trackCheckpoint({
-          checkpointId: 3,
-          action: 'completed',
-          source: 'auth',
-          userIdentifier: account.toLowerCase(),
-          identifierType: 'wallet',
-          wallet: account.toLowerCase()
-        })
 
         setShowCelebration(true)
         getCelebrateAnimation()

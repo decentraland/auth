@@ -24,8 +24,7 @@ import { ConnectionType } from '../../../modules/analytics/types'
 import { useCurrentConnectionData } from '../../../shared/connection'
 import { isErrorWithName, isUserRejectedTransaction } from '../../../shared/errors'
 import { extractReferrerFromSearchParameters } from '../../../shared/locations'
-import { markReturningUser } from '../../../shared/onboarding/markReturningUser'
-import { trackCheckpoint } from '../../../shared/onboarding/trackCheckpoint'
+import { trackCheckpoint, trackCheckpointWhenReady } from '../../../shared/onboarding/trackCheckpoint'
 import { disconnectWallet, sendEmailOTP } from '../../../shared/thirdweb'
 import { checkClockSync } from '../../../shared/utils/clockSync'
 import { handleError } from '../../../shared/utils/errorHandler'
@@ -104,6 +103,14 @@ export const LoginPage = () => {
   const { identity, getIdentitySignature } = useCurrentConnectionData()
   const { trackLoginClick, trackLoginSuccess, trackGuestLogin } = useAnalytics()
 
+  // CP2 reached: user opened the auth login page. Anonymous identifier comes
+  // from the Segment cookie shared with landing on decentraland.org.
+  // Wrapped in `trackCheckpointWhenReady` because the analytics.js stub may
+  // shadow `analytics.user()` until the real library loads.
+  useEffect(() => {
+    trackCheckpointWhenReady({ checkpointId: 2, action: 'reached', source: 'auth' })
+  }, [])
+
   const handleGuestLogin = useCallback(async () => {
     await trackGuestLogin()
   }, [trackGuestLogin])
@@ -121,7 +128,6 @@ export const LoginPage = () => {
         if (!profile) return
       }
 
-      markReturningUser(account)
       redirect()
       onRedirect?.()
     },
@@ -158,16 +164,6 @@ export const LoginPage = () => {
       } catch {
         // Keep the flow going even if cleanup fails.
       }
-
-      trackCheckpoint({
-        checkpointId: 2,
-        action: 'reached',
-        source: 'auth',
-        userIdentifier: email,
-        identifierType: 'email',
-        email,
-        metadata: { loginMethod: ConnectionOptionType.EMAIL }
-      })
 
       try {
         // Send OTP to email
@@ -232,13 +228,13 @@ export const LoginPage = () => {
           setLoadingState(ConnectionLayoutState.CONNECTING_WALLET)
           const connectionData = await connectToProvider(connectionType)
 
-          // Track CP2 reached after wallet connects so we have the account address
+          // CP2 completed: wallet identity established. The anonymousId from
+          // the shared Segment cookie remains the user_id; we just enrich the
+          // row with the wallet (and email if any was stored from a prior flow).
           trackCheckpoint({
             checkpointId: 2,
-            action: 'reached',
+            action: 'completed',
             source: 'auth',
-            userIdentifier: connectionData.account?.toLowerCase() ?? '',
-            identifierType: 'wallet',
             wallet: connectionData.account?.toLowerCase(),
             metadata: { loginMethod: connectionType }
           })
@@ -346,6 +342,16 @@ export const LoginPage = () => {
 
         const freshIdentity = await getIdentitySignature()
 
+        // CP2 completed: Email OTP verified, identity established with email + wallet.
+        trackCheckpoint({
+          checkpointId: 2,
+          action: 'completed',
+          source: 'auth',
+          email: currentEmail || undefined,
+          wallet: address,
+          metadata: { loginMethod: ConnectionOptionType.EMAIL }
+        })
+
         await trackLoginSuccess({
           ethAddress: address,
           type: ConnectionType.WEB2
@@ -370,7 +376,7 @@ export const LoginPage = () => {
         setConfirmingLoginError(errorMessage || t('login.errors.something_went_wrong'))
       }
     },
-    [trackLoginSuccess, checkClockSynchronization, runProfileRedirect, getReferrerFromCurrentSearch, getIdentitySignature, t]
+    [trackLoginSuccess, checkClockSynchronization, runProfileRedirect, getReferrerFromCurrentSearch, getIdentitySignature, currentEmail, t]
   )
 
   const handleEmailInputChange = useCallback(() => {

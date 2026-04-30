@@ -13,7 +13,6 @@ import { isMagicExtensionError, isMagicRpcError } from '../../../shared/errors'
 import { extractReferrerFromSearchParameters, locations } from '../../../shared/locations'
 import { isMobileSession } from '../../../shared/mobile'
 import { getStoredEmail } from '../../../shared/onboarding/getStoredEmail'
-import { markReturningUser } from '../../../shared/onboarding/markReturningUser'
 import { trackCheckpoint } from '../../../shared/onboarding/trackCheckpoint'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { OAUTH_ACCESS_DENIED_ERROR, createMagicInstance } from '../../../shared/utils/magicSdk'
@@ -82,14 +81,14 @@ const DesktopCallbackPage = () => {
 
         const ethAddress = connectionData.account?.toLowerCase() ?? ''
 
-        // CP2 reached: social login callback — now we have account + email
+        // CP2 completed: social login callback finished — we have the wallet
+        // and (for Magic) an email. user_id stays as the anonymousId from the
+        // shared Segment cookie; we just enrich the row.
         const storedEmail = getStoredEmail()
         trackCheckpoint({
           checkpointId: 2,
-          action: 'reached',
+          action: 'completed',
           source: 'auth',
-          userIdentifier: storedEmail || ethAddress,
-          identifierType: storedEmail ? 'email' : 'wallet',
           email: storedEmail || undefined,
           wallet: ethAddress,
           metadata: { loginMethod: 'social' }
@@ -113,8 +112,6 @@ const DesktopCallbackPage = () => {
           if (!profile) return
         }
 
-        // Flag this user so future visits skip first-time flows
-        markReturningUser(account)
         redirect()
       } catch (error) {
         handleError(error, 'Error in callback continue flow')
