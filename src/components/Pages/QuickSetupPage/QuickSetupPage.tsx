@@ -131,7 +131,12 @@ export const QuickSetupPage = () => {
           disabledCatalysts
         })
 
-        const newsletterEmail = inheritedEmail ? (subscribeNewsletter ? inheritedEmail : '') : email.trim()
+        let newsletterEmail = ''
+        if (inheritedEmail && subscribeNewsletter) {
+          newsletterEmail = inheritedEmail
+        } else if (!inheritedEmail) {
+          newsletterEmail = email.trim()
+        }
         if (newsletterEmail) {
           try {
             await subscribeToNewsletter(newsletterEmail)

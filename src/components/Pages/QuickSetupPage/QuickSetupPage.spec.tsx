@@ -338,4 +338,36 @@ describe('QuickSetupPage', () => {
       expect(subscribeToNewsletter).not.toHaveBeenCalled()
     })
   })
+
+  describe('when only the Magic-issued email is stored in localStorage', () => {
+    const magicEmail = 'magic@example.com'
+
+    beforeEach(() => {
+      ;(subscribeToNewsletter as jest.Mock).mockClear()
+      localStorage.removeItem('dcl_thirdweb_user_email')
+      localStorage.setItem('dcl_magic_user_email', magicEmail)
+    })
+
+    afterEach(() => {
+      localStorage.removeItem('dcl_magic_user_email')
+    })
+
+    it('should hide the email input and use the Magic email when subscribing', async () => {
+      const user = userEvent.setup()
+      const { getByText, getByPlaceholderText, queryByPlaceholderText, getAllByRole } = render(<QuickSetupPage />)
+
+      expect(queryByPlaceholderText('Enter your email')).not.toBeInTheDocument()
+
+      await user.type(getByPlaceholderText('Enter your username'), 'TestUser')
+      const checkboxes = getAllByRole('checkbox')
+      await user.click(checkboxes[0])
+      await user.click(checkboxes[1])
+
+      await user.click(getByText("LET'S GO").closest('button')!)
+
+      await waitFor(() => {
+        expect(subscribeToNewsletter).toHaveBeenCalledWith(magicEmail)
+      })
+    })
+  })
 })
