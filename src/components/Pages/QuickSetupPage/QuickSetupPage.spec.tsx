@@ -1,5 +1,6 @@
 import { fireEvent, render, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { subscribeToNewsletter } from '../SetupPage/utils'
 import { QuickSetupPage } from './QuickSetupPage'
 
 // --- Mocks ---
@@ -79,6 +80,7 @@ jest.mock('@dcl/hooks', () => ({
         'quick_setup.email_label': 'Email',
         'quick_setup.email_placeholder': 'Enter your email',
         'quick_setup.email_helper': 'Subscribe to newsletter',
+        'quick_setup.newsletter_subscribe': 'Subscribe to newsletter for updates on features, events, contests, and more.',
         'quick_setup.terms_of_use': 'Terms of Use',
         'quick_setup.privacy_policy': 'Privacy Policy',
         'quick_setup.lets_go': "LET'S GO",
@@ -276,6 +278,96 @@ describe('QuickSetupPage', () => {
       expect(getByText('0/15')).toBeInTheDocument()
       await user.type(getByPlaceholderText('Enter your username'), 'Hello')
       expect(getByText('5/15')).toBeInTheDocument()
+    })
+  })
+
+  describe('when the user signed in with a flow that already collected the email (Google / email + OTP)', () => {
+    const inheritedEmail = 'inherited@example.com'
+
+    beforeEach(() => {
+      ;(subscribeToNewsletter as jest.Mock).mockClear()
+      localStorage.setItem('dcl_thirdweb_user_email', inheritedEmail)
+    })
+
+    afterEach(() => {
+      localStorage.removeItem('dcl_thirdweb_user_email')
+      localStorage.removeItem('dcl_magic_user_email')
+    })
+
+    it('should not render the email input field', () => {
+      const { queryByPlaceholderText } = render(<QuickSetupPage />)
+      expect(queryByPlaceholderText('Enter your email')).not.toBeInTheDocument()
+    })
+
+    it('should render the newsletter subscription checkbox', () => {
+      const { getByText } = render(<QuickSetupPage />)
+      expect(getByText('Subscribe to newsletter for updates on features, events, contests, and more.')).toBeInTheDocument()
+    })
+
+    it('should subscribe with the inherited email when the newsletter checkbox is checked', async () => {
+      const user = userEvent.setup()
+      const { getByText, getByPlaceholderText, getAllByRole } = render(<QuickSetupPage />)
+
+      await user.type(getByPlaceholderText('Enter your username'), 'TestUser')
+      // Checkboxes order: [newsletter, terms]
+      const checkboxes = getAllByRole('checkbox')
+      await user.click(checkboxes[0])
+      await user.click(checkboxes[1])
+
+      await user.click(getByText("LET'S GO").closest('button')!)
+
+      await waitFor(() => {
+        expect(subscribeToNewsletter).toHaveBeenCalledWith(inheritedEmail)
+      })
+    })
+
+    it('should not subscribe when the newsletter checkbox is left unchecked', async () => {
+      const user = userEvent.setup()
+      const { getByText, getByPlaceholderText, getAllByRole } = render(<QuickSetupPage />)
+
+      await user.type(getByPlaceholderText('Enter your username'), 'TestUser')
+      // Only check the terms checkbox (index 1)
+      const checkboxes = getAllByRole('checkbox')
+      await user.click(checkboxes[1])
+
+      await user.click(getByText("LET'S GO").closest('button')!)
+
+      await waitFor(() => {
+        expect(getByText('Your account is Ready!')).toBeInTheDocument()
+      })
+      expect(subscribeToNewsletter).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('when only the Magic-issued email is stored in localStorage', () => {
+    const magicEmail = 'magic@example.com'
+
+    beforeEach(() => {
+      ;(subscribeToNewsletter as jest.Mock).mockClear()
+      localStorage.removeItem('dcl_thirdweb_user_email')
+      localStorage.setItem('dcl_magic_user_email', magicEmail)
+    })
+
+    afterEach(() => {
+      localStorage.removeItem('dcl_magic_user_email')
+    })
+
+    it('should hide the email input and use the Magic email when subscribing', async () => {
+      const user = userEvent.setup()
+      const { getByText, getByPlaceholderText, queryByPlaceholderText, getAllByRole } = render(<QuickSetupPage />)
+
+      expect(queryByPlaceholderText('Enter your email')).not.toBeInTheDocument()
+
+      await user.type(getByPlaceholderText('Enter your username'), 'TestUser')
+      const checkboxes = getAllByRole('checkbox')
+      await user.click(checkboxes[0])
+      await user.click(checkboxes[1])
+
+      await user.click(getByText("LET'S GO").closest('button')!)
+
+      await waitFor(() => {
+        expect(subscribeToNewsletter).toHaveBeenCalledWith(magicEmail)
+      })
     })
   })
 })
