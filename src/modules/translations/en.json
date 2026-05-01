@@ -255,6 +255,7 @@
     "email_label": "Email",
     "email_placeholder": "Enter your email",
     "email_helper": "Subscribe to Decentraland's newsletter for updates on features, events, contests, and more.",
+    "newsletter_subscribe": "Subscribe to newsletter for updates on features, events, contests, and more.",
     "agree_tos": "I agree with Decentraland's {termsLink} and {privacyLink}.*",
     "agree_prefix": "I agree with Decentraland's",
     "agree_connector": "and",
