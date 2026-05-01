@@ -76,6 +76,42 @@ test.describe('Error: MetaMask rejection → WalletErrorModal', () => {
   })
 })
 
+test.describe('Auto-login with MetaMask but no injected provider', () => {
+  test('?loginMethod=METAMASK without window.ethereum → redirect to /login (no error page)', async ({ context, page }) => {
+    // Explicitly clear window.ethereum so AutoLoginRedirect's `!window.ethereum`
+    // branch fires. Can't use injectMockWallet here — it sets up the provider.
+    await context.addInitScript(`
+      (function() {
+        delete window.ethereum;
+        Object.defineProperty(window, 'ethereum', {
+          value: undefined,
+          writable: true,
+          configurable: true
+        });
+      })();
+    `)
+
+    await mockApiRoutes(page, { hasProfile: true, onboardingToExplorer: true })
+
+    await page.goto(
+      `/auth/login?redirectTo=${encodeURIComponent(`/auth/requests/${MOCK_REQUEST_ID}`)}&loginMethod=METAMASK`
+    )
+
+    // Should land on the regular login page (no `loginMethod=` in URL anymore).
+    await page.waitForURL(/\/auth\/login(?!.*loginMethod)/, { timeout: 10_000 })
+
+    // Should NOT show the LoginErrorPage.
+    await expect(page.getByText('Something went wrong.')).not.toBeVisible()
+    await expect(page.getByText(/couldn't sign you in/i)).not.toBeVisible()
+
+    // The MetaMask connection button should be present and disabled (per
+    // shouldDisableMetaMask: !window.ethereum.isMetaMask).
+    const metamaskButton = page.getByRole('button', { name: /metamask/i }).first()
+    await expect(metamaskButton).toBeVisible({ timeout: 10_000 })
+    await expect(metamaskButton).toBeDisabled()
+  })
+})
+
 test.describe('Error: generic login error → LoginErrorPage', () => {
   test.beforeEach(async ({ context }) => {
     await injectMockWallet(context)
