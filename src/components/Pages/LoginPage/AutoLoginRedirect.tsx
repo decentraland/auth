@@ -72,9 +72,13 @@ export const AutoLoginRedirect = ({ connectionType }: Props) => {
         return
       }
 
-      // Wallet (MetaMask/injected) — connect directly, no redirect needed
+      // Wallet (MetaMask/injected) — connect directly, no redirect needed.
+      // If no injected provider is available we can't auto-login, so route the
+      // user to the full login page where the wallet button is disabled and
+      // they can pick another method instead of seeing a hard error screen.
       if (!window.ethereum) {
-        throw new Error('No wallet extension detected. Please install MetaMask or another Ethereum wallet.')
+        handleCancel()
+        return
       }
 
       const connectionData = await connectToProvider(connectionType)
