@@ -263,6 +263,7 @@
     "email_label": "Email",
     "email_placeholder": "输入您的电子邮件",
     "email_helper": "订阅 Decentraland 通讯，获取功能、活动、比赛等更新信息。",
+    "newsletter_subscribe": "订阅通讯，获取功能、活动、比赛等更新信息。",
     "agree_tos": "我同意 Decentraland 的{termsLink}和{privacyLink}。*",
     "agree_prefix": "我同意 Decentraland 的",
     "agree_connector": "和",

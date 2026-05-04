@@ -263,6 +263,7 @@
     "email_label": "Email",
     "email_placeholder": "Ingresa tu correo electrónico",
     "email_helper": "Suscríbete al boletín de Decentraland para recibir actualizaciones sobre funciones, eventos, concursos y más.",
+    "newsletter_subscribe": "Suscríbete al boletín para recibir actualizaciones sobre funciones, eventos, concursos y más.",
     "agree_tos": "Estoy de acuerdo con los {termsLink} y la {privacyLink} de Decentraland.*",
     "agree_prefix": "Estoy de acuerdo con los",
     "agree_connector": "y la",

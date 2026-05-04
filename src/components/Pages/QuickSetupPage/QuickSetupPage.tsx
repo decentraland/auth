@@ -7,6 +7,7 @@ import randomizeIconSvg from '../../../assets/images/randomize-icon.svg'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { useDisabledCatalysts } from '../../../hooks/useDisabledCatalysts'
 import { useCurrentConnectionData } from '../../../shared/connection'
+import { getStoredEmail } from '../../../shared/onboarding/getStoredEmail'
 import { trackCheckpoint } from '../../../shared/onboarding/trackCheckpoint'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { AnimatedBackground } from '../../AnimatedBackground'
@@ -66,8 +67,10 @@ export const QuickSetupPage = () => {
   const { account, identity } = useCurrentConnectionData()
   const isMobile = useMobileMediaQuery()
 
+  const [inheritedEmail] = useState<string | null>(() => getStoredEmail())
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
+  const [subscribeNewsletter, setSubscribeNewsletter] = useState(false)
   const [agree, setAgree] = useState(false)
   const [deploying, setDeploying] = useState(false)
   const [deployError, setDeployError] = useState<string | null>(null)
@@ -128,9 +131,15 @@ export const QuickSetupPage = () => {
           disabledCatalysts
         })
 
-        if (email.trim()) {
+        let newsletterEmail = ''
+        if (inheritedEmail && subscribeNewsletter) {
+          newsletterEmail = inheritedEmail
+        } else if (!inheritedEmail) {
+          newsletterEmail = email.trim()
+        }
+        if (newsletterEmail) {
           try {
-            await subscribeToNewsletter(email.trim())
+            await subscribeToNewsletter(newsletterEmail)
           } catch (err) {
             handleError(err, 'Error subscribing to newsletter', { skipTracking: true })
           }
@@ -157,7 +166,7 @@ export const QuickSetupPage = () => {
         setDeploying(false)
       }
     },
-    [canSubmit, account, identity, profile, name, email, disabledCatalysts]
+    [canSubmit, account, identity, profile, name, email, inheritedEmail, subscribeNewsletter, disabledCatalysts]
   )
 
   if (showCelebration) {
@@ -204,15 +213,26 @@ export const QuickSetupPage = () => {
               {name.length}/{MAX_NAME_LENGTH}
             </CharCount>
 
-            <InputLabel>{t('quick_setup.email_label')}</InputLabel>
-            <UsernameInput
-              placeholder={t('quick_setup.email_placeholder')}
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              type="email"
-              fullWidth
-            />
-            <EmailHelperText>{t('quick_setup.email_helper')}</EmailHelperText>
+            {!inheritedEmail && (
+              <>
+                <InputLabel>{t('quick_setup.email_label')}</InputLabel>
+                <UsernameInput
+                  placeholder={t('quick_setup.email_placeholder')}
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  type="email"
+                  fullWidth
+                />
+                <EmailHelperText>{t('quick_setup.email_helper')}</EmailHelperText>
+              </>
+            )}
+
+            {inheritedEmail && (
+              <CheckboxRow
+                control={<CheckboxInput checked={subscribeNewsletter} onChange={(_, checked) => setSubscribeNewsletter(checked)} />}
+                label={t('quick_setup.newsletter_subscribe')}
+              />
+            )}
 
             <CheckboxRow
               control={<CheckboxInput checked={agree} onChange={(_, checked) => setAgree(checked)} />}
