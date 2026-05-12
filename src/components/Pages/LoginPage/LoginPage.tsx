@@ -252,8 +252,7 @@ export const LoginPage = () => {
 
           await trackLoginSuccess({
             ethAddress: connectionData.account ?? undefined,
-            type: providerType,
-            method: connectionType
+            type: providerType
           })
 
           const referrer = getReferrerFromCurrentSearch()
@@ -349,8 +348,7 @@ export const LoginPage = () => {
 
         await trackLoginSuccess({
           ethAddress: address,
-          type: ConnectionType.WEB2,
-          method: ConnectionOptionType.EMAIL
+          type: ConnectionType.WEB2
         })
 
         const referrer = getReferrerFromCurrentSearch()

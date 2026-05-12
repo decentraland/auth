@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import { useCallback } from 'react'
+import { ConnectionOptionType } from '../components/Connection'
 import { AvatarShape } from '../components/Pages/AvatarSetupPage/AvatarSetupPage.types'
 import { ClickEvents, ConnectionType, TrackingEvents } from '../modules/analytics/types'
 import { TRACKING_DELAY } from '../shared/constants'
@@ -13,21 +14,24 @@ interface ClickData {
 }
 
 export const useAnalytics = () => {
-  const trackLoginClick = useCallback((data: { method?: string; type: ConnectionType | string }) => {
+  const trackLoginClick = useCallback((data: { method?: ConnectionOptionType; type: ConnectionType | string }) => {
     trackEvent(TrackingEvents.LOGIN_CLICK, data)
   }, [])
 
-  const trackLoginSuccess = useCallback(async (data: { ethAddress?: string; type: ConnectionType | string; method?: string }) => {
-    await trackWithDelay(TrackingEvents.LOGIN_SUCCESS, {
-      eth_address: data.ethAddress,
-      type: data.type,
-      method: data.method
-    })
+  const trackLoginSuccess = useCallback(
+    async (data: { ethAddress?: string; type: ConnectionType | string; method?: ConnectionOptionType }) => {
+      await trackWithDelay(TrackingEvents.LOGIN_SUCCESS, {
+        eth_address: data.ethAddress,
+        type: data.type,
+        method: data.method
+      })
 
-    if (data.ethAddress) {
-      identifyUser(data.ethAddress)
-    }
-  }, [])
+      if (data.ethAddress) {
+        identifyUser(data.ethAddress)
+      }
+    },
+    []
+  )
 
   const trackClick = useCallback((action: ClickEvents, additionalData?: ClickData) => {
     trackEvent(TrackingEvents.CLICK, {

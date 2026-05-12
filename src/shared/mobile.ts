@@ -1,39 +1,54 @@
+import { ConnectionOptionType } from '../components/Connection'
+
 interface MobileSession {
   u?: string
   s?: string
 }
 
-// In-memory cache: survives SPA navigations without localStorage
-let cachedSession: MobileSession | null | undefined
+interface OAuthCustomState {
+  isMobileFlow?: boolean
+  mobileUserId?: string
+  mobileSessionId?: string
+  connectionOption?: ConnectionOptionType
+  redirectTo?: string
+  referrer?: string
+}
 
-// Helper that parses the state param from the OAuth callback (same pattern as extractRedirectToFromSearchParameters)
-function extractCustomDataFromState(): Record<string, unknown> | null {
+// In-memory caches: survive SPA navigations without localStorage. Module-scoped so we don't
+// re-parse the state param on every read (and so consumers can read it after Magic's
+// getRedirectResult() strips it from the URL, as long as the first read happened earlier).
+let cachedSession: MobileSession | null | undefined
+let cachedCustomData: OAuthCustomState | null | undefined
+
+// Parses the OAuth `state` query param produced by the social-login redirect.
+// Same pattern as extractRedirectToFromSearchParameters — returns null on missing/malformed state.
+function extractCustomDataFromState(): OAuthCustomState | null {
+  if (cachedCustomData !== undefined) {
+    return cachedCustomData
+  }
+
   try {
     const params = new URLSearchParams(window.location.search)
     const state = params.get('state')
     if (state) {
       const decoded = JSON.parse(atob(state))
-      return JSON.parse(decoded.customData)
+      cachedCustomData = JSON.parse(decoded.customData) as OAuthCustomState
+      return cachedCustomData
     }
   } catch {
     // ignore malformed state
   }
+  cachedCustomData = null
   return null
 }
 
-function extractMobileDataFromState(): { isMobileFlow?: boolean; mobileUserId?: string; mobileSessionId?: string } | null {
-  const customData = extractCustomDataFromState()
-  if (!customData) return null
-  return {
-    isMobileFlow: customData.isMobileFlow as boolean | undefined,
-    mobileUserId: customData.mobileUserId as string | undefined,
-    mobileSessionId: customData.mobileSessionId as string | undefined
-  }
+function isConnectionOptionType(value: unknown): value is ConnectionOptionType {
+  return typeof value === 'string' && (Object.values(ConnectionOptionType) as string[]).includes(value)
 }
 
-function getConnectionOptionFromState(): string | undefined {
-  const customData = extractCustomDataFromState()
-  return customData?.connectionOption as string | undefined
+function getConnectionOptionFromState(): ConnectionOptionType | undefined {
+  const value = extractCustomDataFromState()?.connectionOption
+  return isConnectionOptionType(value) ? value : undefined
 }
 
 function getMobileSession(): MobileSession | null {
@@ -50,11 +65,11 @@ function getMobileSession(): MobileSession | null {
   }
 
   // On callback, extract from OAuth state param
-  const stateData = extractMobileDataFromState()
-  if (stateData?.isMobileFlow) {
+  const customData = extractCustomDataFromState()
+  if (customData?.isMobileFlow) {
     cachedSession = {
-      u: stateData.mobileUserId ?? undefined,
-      s: stateData.mobileSessionId ?? undefined
+      u: customData.mobileUserId,
+      s: customData.mobileSessionId
     }
     return cachedSession
   }
@@ -69,7 +84,8 @@ function isMobileSession(): boolean {
 // Exported for testing only
 function resetMobileSession(): void {
   cachedSession = undefined
+  cachedCustomData = undefined
 }
 
-export type { MobileSession }
+export type { MobileSession, OAuthCustomState }
 export { getMobileSession, isMobileSession, resetMobileSession, getConnectionOptionFromState }
