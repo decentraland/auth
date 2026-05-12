@@ -11,7 +11,7 @@ import { ConnectionType } from '../../../modules/analytics/types'
 import { useCurrentConnectionData } from '../../../shared/connection'
 import { isMagicExtensionError, isMagicRpcError } from '../../../shared/errors'
 import { extractReferrerFromSearchParameters, locations } from '../../../shared/locations'
-import { isMobileSession } from '../../../shared/mobile'
+import { getConnectionOptionFromState, isMobileSession } from '../../../shared/mobile'
 import { getStoredEmail } from '../../../shared/onboarding/getStoredEmail'
 import { markReturningUser } from '../../../shared/onboarding/markReturningUser'
 import { trackCheckpoint } from '../../../shared/onboarding/trackCheckpoint'
@@ -74,6 +74,9 @@ const DesktopCallbackPage = () => {
         return
       }
 
+      // Capture before Magic's getRedirectResult() strips the `state` query param
+      const oauthConnectionOption = getConnectionOptionFromState()
+
       try {
         const connectionData = await connectAndGenerateSignature()
         if (!connectionData) {
@@ -97,7 +100,8 @@ const DesktopCallbackPage = () => {
 
         await trackLoginSuccess({
           ethAddress,
-          type: ConnectionType.WEB2
+          type: ConnectionType.WEB2,
+          method: oauthConnectionOption
         })
 
         const account = connectionData.account ?? ''

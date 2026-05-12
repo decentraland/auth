@@ -76,6 +76,7 @@ async function connectToSocialProvider(
         redirectTo,
         referrer,
         isMobileFlow,
+        connectionOption,
         ...(isMobileFlow && {
           mobileUserId: search.get('u') ?? undefined,
           mobileSessionId: search.get('s') ?? undefined

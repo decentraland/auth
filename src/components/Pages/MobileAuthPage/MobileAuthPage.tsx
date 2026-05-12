@@ -3,6 +3,8 @@ import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from '@dcl/hooks'
 import { connection } from 'decentraland-connect'
 import { useTargetConfig } from '../../../hooks/targetConfig'
+import { useAnalytics } from '../../../hooks/useAnalytics'
+import { ConnectionType } from '../../../modules/analytics/types'
 import { createAuthServerHttpClient } from '../../../shared/auth'
 import { isErrorWithName } from '../../../shared/errors'
 import { disconnectWallet, sendEmailOTP } from '../../../shared/thirdweb'
@@ -12,7 +14,13 @@ import { ConnectionOptionType } from '../../Connection'
 import { ConnectionLayout } from '../../ConnectionModal/ConnectionLayout'
 import { ConnectionLayoutState } from '../../ConnectionModal/ConnectionLayout.type'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
-import { connectToProvider, connectToSocialProvider, fromConnectionOptionToProviderType, isSocialLogin } from '../LoginPage/utils'
+import {
+  connectToProvider,
+  connectToSocialProvider,
+  fromConnectionOptionToProviderType,
+  isEmailLogin,
+  isSocialLogin
+} from '../LoginPage/utils'
 import { getIdentitySignature } from './identityUtils'
 import { MobileAuthSuccess } from './MobileAuthSuccess'
 import { MobileEmailLoginModal } from './MobileEmailLoginModal'
@@ -29,9 +37,13 @@ export const MobileAuthPage = () => {
   const [searchParams] = useSearchParams()
   const { flags, initialized: flagInitialized } = useContext(FeatureFlagsContext)
   const [targetConfig] = useTargetConfig()
+  const { trackLoginClick, trackLoginSuccess } = useAnalytics()
 
   const providerParam = searchParams.get('provider')
-  const provider = parseConnectionOptionType(providerParam)
+  const parsedProvider = parseConnectionOptionType(providerParam)
+  // Email has its own OTP flow (handleEmailSubmit) and can't be auto-initiated via initiateAuth,
+  // so treat ?provider=email as if no provider was given
+  const provider = parsedProvider && !isEmailLogin(parsedProvider) ? parsedProvider : null
 
   // If provider param is present, start with connecting view and loading state to avoid button flash
   const [view, setView] = useState<MobileAuthView>(provider ? 'connecting' : 'selection')
@@ -54,8 +66,13 @@ export const MobileAuthPage = () => {
 
       setConnectionType(selectedConnectionType)
 
+      const isLoggingInThroughSocial = isSocialLogin(selectedConnectionType)
+      const connectionTypeForTracking =
+        isLoggingInThroughSocial || isEmailLogin(selectedConnectionType) ? ConnectionType.WEB2 : ConnectionType.WEB3
+      trackLoginClick({ method: selectedConnectionType, type: connectionTypeForTracking })
+
       try {
-        if (isSocialLogin(selectedConnectionType)) {
+        if (isLoggingInThroughSocial) {
           // OAuth flow - will redirect to provider
           setView('connecting')
           setLoadingState(ConnectionLayoutState.LOADING_MAGIC)
@@ -71,12 +88,19 @@ export const MobileAuthPage = () => {
           const connectionData = await connectToProvider(selectedConnectionType)
 
           setLoadingState(ConnectionLayoutState.WAITING_FOR_SIGNATURE)
-          const identity = await getIdentitySignature(connectionData.account?.toLowerCase() ?? '', connectionData.provider)
+          const ethAddress = connectionData.account?.toLowerCase() ?? ''
+          const identity = await getIdentitySignature(ethAddress, connectionData.provider)
 
           setLoadingState(ConnectionLayoutState.VALIDATING_SIGN_IN)
 
           const httpClient = createAuthServerHttpClient()
           const response = await httpClient.postIdentity(identity, { isMobile: true })
+
+          await trackLoginSuccess({
+            ethAddress,
+            type: connectionTypeForTracking,
+            method: selectedConnectionType
+          })
 
           setIdentityId(response.identityId)
           setView('success')
@@ -97,7 +121,7 @@ export const MobileAuthPage = () => {
         setView('error')
       }
     },
-    [flagInitialized]
+    [flagInitialized, flags, trackLoginClick, trackLoginSuccess]
   )
   // Clear cached sessions and optionally auto-initiate auth in a single sequential flow.
   // This prevents a race condition where clearCachedSessions (magic.user.logout) and
@@ -163,6 +187,8 @@ export const MobileAuthPage = () => {
       setEmailError(null)
       setConnectionType(ConnectionOptionType.EMAIL)
 
+      trackLoginClick({ method: ConnectionOptionType.EMAIL, type: ConnectionType.WEB2 })
+
       // Best-effort cleanup of any stale connection from a previous session.
       try {
         await connection.disconnect()
@@ -203,7 +229,7 @@ export const MobileAuthPage = () => {
         setIsEmailLoading(false)
       }
     },
-    [t]
+    [t, trackLoginClick]
   )
 
   const handleEmailLoginDismiss = useCallback(() => {
@@ -212,47 +238,56 @@ export const MobileAuthPage = () => {
     setConnectionType(undefined)
   }, [])
 
-  const handleEmailLoginSuccess = useCallback(async (result: EmailLoginResult) => {
-    setShowEmailLoginModal(false)
-    setView('connecting')
-    setLoadingState(ConnectionLayoutState.WAITING_FOR_SIGNATURE)
+  const handleEmailLoginSuccess = useCallback(
+    async (result: EmailLoginResult) => {
+      setShowEmailLoginModal(false)
+      setView('connecting')
+      setLoadingState(ConnectionLayoutState.WAITING_FOR_SIGNATURE)
 
-    try {
-      const address = result.address.toLowerCase()
-      let identity
+      try {
+        const address = result.address.toLowerCase()
+        let identity
 
-      if (result.identity) {
-        // Test auth flow: identity was generated server-side by mobile-bff
-        identity = result.identity
-      } else {
-        // Normal Thirdweb flow: restore the EIP-1193 provider that
-        // verifyEmailOTPAndConnect persisted via storeConnectionData(THIRDWEB, MAINNET).
-        const connectionData = await connection.tryPreviousConnection()
-        identity = await getIdentitySignature(address, connectionData.provider)
-      }
-
-      setLoadingState(ConnectionLayoutState.VALIDATING_SIGN_IN)
-      const httpClient = createAuthServerHttpClient()
-      const response = await httpClient.postIdentity(identity, { isMobile: true })
-
-      setIdentityId(response.identityId)
-      setView('success')
-    } catch (err) {
-      handleError(err, 'Error during mobile email auth', {
-        sentryTags: {
-          connectionType: ConnectionOptionType.EMAIL,
-          isMobileFlow: true
+        if (result.identity) {
+          // Test auth flow: identity was generated server-side by mobile-bff
+          identity = result.identity
+        } else {
+          // Normal Thirdweb flow: restore the EIP-1193 provider that
+          // verifyEmailOTPAndConnect persisted via storeConnectionData(THIRDWEB, MAINNET).
+          const connectionData = await connection.tryPreviousConnection()
+          identity = await getIdentitySignature(address, connectionData.provider)
         }
-      })
 
-      if (isErrorWithName(err) && err.name === 'ErrorUnlockingWallet') {
-        setLoadingState(ConnectionLayoutState.ERROR_LOCKED_WALLET)
-      } else {
-        setLoadingState(ConnectionLayoutState.ERROR)
+        setLoadingState(ConnectionLayoutState.VALIDATING_SIGN_IN)
+        const httpClient = createAuthServerHttpClient()
+        const response = await httpClient.postIdentity(identity, { isMobile: true })
+
+        await trackLoginSuccess({
+          ethAddress: address,
+          type: ConnectionType.WEB2,
+          method: ConnectionOptionType.EMAIL
+        })
+
+        setIdentityId(response.identityId)
+        setView('success')
+      } catch (err) {
+        handleError(err, 'Error during mobile email auth', {
+          sentryTags: {
+            connectionType: ConnectionOptionType.EMAIL,
+            isMobileFlow: true
+          }
+        })
+
+        if (isErrorWithName(err) && err.name === 'ErrorUnlockingWallet') {
+          setLoadingState(ConnectionLayoutState.ERROR_LOCKED_WALLET)
+        } else {
+          setLoadingState(ConnectionLayoutState.ERROR)
+        }
+        setView('error')
       }
-      setView('error')
-    }
-  }, [])
+    },
+    [trackLoginSuccess]
+  )
 
   // Provider selection view
   if (view === 'selection') {

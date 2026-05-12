@@ -17,10 +17,11 @@ export const useAnalytics = () => {
     trackEvent(TrackingEvents.LOGIN_CLICK, data)
   }, [])
 
-  const trackLoginSuccess = useCallback(async (data: { ethAddress?: string; type: ConnectionType | string }) => {
+  const trackLoginSuccess = useCallback(async (data: { ethAddress?: string; type: ConnectionType | string; method?: string }) => {
     await trackWithDelay(TrackingEvents.LOGIN_SUCCESS, {
       eth_address: data.ethAddress,
-      type: data.type
+      type: data.type,
+      method: data.method
     })
 
     if (data.ethAddress) {
