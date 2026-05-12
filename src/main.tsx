@@ -50,8 +50,25 @@ const analytics = getAnalytics()
 analytics?.load(config.get('SEGMENT_API_KEY'))
 
 const mobileSession = getMobileSession()
-if (mobileSession?.u) {
-  analytics?.identify(mobileSession.u)
+if (mobileSession && (mobileSession.u || mobileSession.s)) {
+  const mobileContext = {
+    ...(mobileSession.u && { mobile_user_id: mobileSession.u }),
+    ...(mobileSession.s && { mobile_session_id: mobileSession.s })
+  }
+
+  analytics?.addSourceMiddleware(({ payload, next }) => {
+    const obj = payload.obj as { type?: string; properties?: Record<string, unknown>; traits?: Record<string, unknown> }
+    if (obj.type === 'identify' || obj.type === 'group') {
+      obj.traits = { ...(obj.traits || {}), ...mobileContext }
+    } else {
+      obj.properties = { ...(obj.properties || {}), ...mobileContext }
+    }
+    next(payload)
+  })
+
+  if (mobileSession.u) {
+    analytics?.identify(mobileSession.u, mobileContext)
+  }
 }
 
 const DevTestViewPage = !config.is(Env.PRODUCTION)
