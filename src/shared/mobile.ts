@@ -21,7 +21,7 @@ let cachedSession: MobileSession | null | undefined
 let cachedCustomData: OAuthCustomState | null | undefined
 
 // Parses the OAuth `state` query param produced by the social-login redirect.
-// Same pattern as extractRedirectToFromSearchParameters — returns null on missing/malformed state.
+// Returns null on missing/malformed state.
 function extractCustomDataFromState(): OAuthCustomState | null {
   if (cachedCustomData !== undefined) {
     return cachedCustomData
