@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/naming-convention */
-import { setupAnalytics } from './setupAnalytics'
+import { setupMobileAnalytics } from './setupMobileAnalytics'
 
 interface MiddlewarePayload {
   obj: { type?: string; properties?: Record<string, unknown>; traits?: Record<string, unknown> }
@@ -9,7 +9,7 @@ type Middleware = (input: { payload: MiddlewarePayload; next: (payload: Middlewa
 function createAnalyticsStub() {
   const addSourceMiddleware = jest.fn()
   const identify = jest.fn()
-  // setupAnalytics casts the input to a richer shape internally; the cast through `unknown`
+  // setupMobileAnalytics casts the input to a richer shape internally; the cast through `unknown`
   // is enough for jest mocks here.
   return { addSourceMiddleware, identify } as unknown as SegmentAnalytics.AnalyticsJS & {
     addSourceMiddleware: jest.Mock
@@ -17,10 +17,10 @@ function createAnalyticsStub() {
   }
 }
 
-describe('setupAnalytics', () => {
+describe('setupMobileAnalytics', () => {
   describe('when analytics is undefined', () => {
     it('should not throw', () => {
-      expect(() => setupAnalytics(undefined, { u: 'u1', s: 's1' })).not.toThrow()
+      expect(() => setupMobileAnalytics(undefined, { u: 'u1', s: 's1' })).not.toThrow()
     })
   })
 
@@ -29,7 +29,7 @@ describe('setupAnalytics', () => {
 
     beforeEach(() => {
       analytics = createAnalyticsStub()
-      setupAnalytics(analytics, null)
+      setupMobileAnalytics(analytics, null)
     })
 
     it('should not register a middleware', () => {
@@ -46,7 +46,7 @@ describe('setupAnalytics', () => {
 
     beforeEach(() => {
       analytics = createAnalyticsStub()
-      setupAnalytics(analytics, {})
+      setupMobileAnalytics(analytics, {})
     })
 
     it('should not register a middleware', () => {
@@ -63,7 +63,7 @@ describe('setupAnalytics', () => {
 
     beforeEach(() => {
       analytics = createAnalyticsStub()
-      setupAnalytics(analytics, { s: 'sess-1' })
+      setupMobileAnalytics(analytics, { s: 'sess-1' })
     })
 
     it('should register a source middleware that attaches mobile_session_id', () => {
@@ -87,7 +87,7 @@ describe('setupAnalytics', () => {
 
     beforeEach(() => {
       analytics = createAnalyticsStub()
-      setupAnalytics(analytics, { u: 'user-1', s: 'sess-1' })
+      setupMobileAnalytics(analytics, { u: 'user-1', s: 'sess-1' })
     })
 
     it('should call identify with the mobile user id and both context fields as traits', () => {

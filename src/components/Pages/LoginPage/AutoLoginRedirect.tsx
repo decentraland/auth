@@ -106,7 +106,8 @@ export const AutoLoginRedirect = ({ connectionType }: Props) => {
 
       await trackLoginSuccess({
         ethAddress: connectionData.account ?? undefined,
-        type: connectionTypeForTracking
+        type: connectionTypeForTracking,
+        method: connectionType
       })
 
       // Check clock sync — if drift is too large, fall back to full LoginPage
