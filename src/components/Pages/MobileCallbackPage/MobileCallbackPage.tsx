@@ -81,7 +81,7 @@ export const MobileCallbackPage = () => {
       })
       setError(err instanceof Error ? err.message : 'Authentication failed')
     }
-  }, [flags, navigate, trackLoginSuccess])
+  }, [flags[FeatureFlagsKeys.MAGIC_TEST], navigate, trackLoginSuccess])
 
   useEffect(() => {
     if (!initialized || hasStartedProcessing.current) return

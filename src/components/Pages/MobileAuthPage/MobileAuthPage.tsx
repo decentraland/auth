@@ -121,7 +121,7 @@ export const MobileAuthPage = () => {
         setView('error')
       }
     },
-    [flagInitialized, flags, trackLoginClick, trackLoginSuccess]
+    [flagInitialized, flags[FeatureFlagsKeys.MAGIC_TEST], trackLoginClick, trackLoginSuccess]
   )
   // Clear cached sessions and optionally auto-initiate auth in a single sequential flow.
   // This prevents a race condition where clearCachedSessions (magic.user.logout) and
@@ -164,7 +164,7 @@ export const MobileAuthPage = () => {
     }
 
     initialize()
-  }, [flagInitialized, flags, provider, initiateAuth])
+  }, [flagInitialized, flags[FeatureFlagsKeys.MAGIC_TEST], provider, initiateAuth])
 
   const handleTryAgain = useCallback(() => {
     if (connectionType) {

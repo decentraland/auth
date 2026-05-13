@@ -4,6 +4,7 @@ import { ConnectionOptionType } from '../components/Connection'
 import { AvatarShape } from '../components/Pages/AvatarSetupPage/AvatarSetupPage.types'
 import { ClickEvents, ConnectionType, TrackingEvents } from '../modules/analytics/types'
 import { TRACKING_DELAY } from '../shared/constants'
+import { isMobileSession } from '../shared/mobile'
 import { wait } from '../shared/time'
 import { identifyUser, trackEvent, trackWithDelay } from '../shared/utils/analytics'
 
@@ -26,7 +27,9 @@ export const useAnalytics = () => {
         method: data.method
       })
 
-      if (data.ethAddress) {
+      // Mobile sessions are identified by mobile_user_id via setupMobileAnalytics;
+      // identifying by ethAddress here would orphan that mapping.
+      if (data.ethAddress && !isMobileSession()) {
         identifyUser(data.ethAddress)
       }
     },
