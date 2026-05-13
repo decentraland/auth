@@ -24,7 +24,7 @@ export const useAnalytics = () => {
       await trackWithDelay(TrackingEvents.LOGIN_SUCCESS, {
         eth_address: data.ethAddress,
         type: data.type,
-        method: data.method
+        ...(data.method && {method: data.method})
       })
 
       // Mobile sessions are identified by mobile_user_id via setupMobileAnalytics;
