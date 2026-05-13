@@ -63,7 +63,7 @@ export const MobileAuthPage = () => {
   const hasStartedInit = useRef(false)
 
   const initiateAuth = useCallback(
-    async (selectedConnectionType: ConnectionOptionType) => {
+    async (selectedConnectionType: ConnectionOptionType, options: { fromClick?: boolean } = { fromClick: true }) => {
       if (!flagInitialized) return
 
       setConnectionType(selectedConnectionType)
@@ -71,15 +71,19 @@ export const MobileAuthPage = () => {
       const isLoggingInThroughSocial = isSocialLogin(selectedConnectionType)
       const connectionTypeForTracking =
         isLoggingInThroughSocial || isEmailLogin(selectedConnectionType) ? ConnectionType.WEB2 : ConnectionType.WEB3
-      trackLoginClick({ method: selectedConnectionType, type: connectionTypeForTracking })
+      if (options.fromClick) {
+        trackLoginClick({ method: selectedConnectionType, type: connectionTypeForTracking })
+      }
 
       try {
         if (isLoggingInThroughSocial) {
           // OAuth flow - will redirect to provider
           setView('connecting')
           setLoadingState(ConnectionLayoutState.LOADING_MAGIC)
-          // Give Segment a moment to send LOGIN_CLICK before the page navigates away
-          await wait(TRACKING_DELAY)
+          if (options.fromClick) {
+            // Give Segment a moment to send LOGIN_CLICK before the page navigates away
+            await wait(TRACKING_DELAY)
+          }
           await connectToSocialProvider(
             selectedConnectionType,
             flags[FeatureFlagsKeys.MAGIC_TEST],
@@ -161,9 +165,11 @@ export const MobileAuthPage = () => {
         console.warn('Failed to clear cached sessions:', err)
       }
 
-      // Step 2: Auto-initiate auth if provider param is present
+      // Step 2: Auto-initiate auth if provider param is present.
+      // fromClick: false → no LOGIN_CLICK is sent because the user didn't click anything on this app;
+      // the click happened in the partner mobile app that produced the deep link.
       if (provider) {
-        initiateAuth(provider)
+        initiateAuth(provider, { fromClick: false })
       }
     }
 

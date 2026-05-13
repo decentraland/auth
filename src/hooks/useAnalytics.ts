@@ -20,6 +20,12 @@ export const useAnalytics = () => {
 
   const trackLoginSuccess = useCallback(
     async (data: { ethAddress?: string; type: ConnectionType | string; method?: ConnectionOptionType }) => {
+      // `method` is currently only sent from the mobile flow. On desktop every login is preceded by
+      // a user click in this app, so LOGIN_CLICK already carries `method` and the LOGIN_SUCCESS that
+      // follows can be correlated by session — `method` on success is redundant there. On mobile,
+      // entries through a deep link from the partner app are automatic (no click in this app), so
+      // there is no preceding LOGIN_CLICK to attribute the provider, and `method` has to ride on
+      // LOGIN_SUCCESS itself.
       await trackWithDelay(TrackingEvents.LOGIN_SUCCESS, {
         eth_address: data.ethAddress,
         type: data.type,
