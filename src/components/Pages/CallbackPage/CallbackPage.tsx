@@ -12,14 +12,12 @@ import { useCurrentConnectionData } from '../../../shared/connection'
 import { isMagicExtensionError, isMagicRpcError } from '../../../shared/errors'
 import { extractReferrerFromSearchParameters, locations } from '../../../shared/locations'
 import { isMobileSession } from '../../../shared/mobile'
-import { getConnectionOptionFromState } from '../../../shared/oauthState'
 import { getStoredEmail } from '../../../shared/onboarding/getStoredEmail'
 import { markReturningUser } from '../../../shared/onboarding/markReturningUser'
 import { trackCheckpoint } from '../../../shared/onboarding/trackCheckpoint'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { OAUTH_ACCESS_DENIED_ERROR, createMagicInstance } from '../../../shared/utils/magicSdk'
 import { AnimatedBackground } from '../../AnimatedBackground'
-import { ConnectionOptionType } from '../../Connection'
 import { ConnectionLayout } from '../../ConnectionModal/ConnectionLayout'
 import { ConnectionLayoutState } from '../../ConnectionModal/ConnectionLayout.type'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
@@ -71,7 +69,7 @@ const DesktopCallbackPage = () => {
   }, [flags[FeatureFlagsKeys.MAGIC_TEST], initialized, getIdentitySignature])
 
   const handleContinue = useCallback(
-    async (referrer: string | null, connectionOption: ConnectionOptionType | undefined) => {
+    async (referrer: string | null) => {
       if (!initialized) {
         return
       }
@@ -99,8 +97,7 @@ const DesktopCallbackPage = () => {
 
         await trackLoginSuccess({
           ethAddress,
-          type: ConnectionType.WEB2,
-          method: connectionOption
+          type: ConnectionType.WEB2
         })
 
         const account = connectionData.account ?? ''
@@ -130,8 +127,6 @@ const DesktopCallbackPage = () => {
   const logInAndRedirect = useCallback(async () => {
     // Check for OAuth error in URL params before getRedirectResult() strips them
     const oauthError = new URLSearchParams(window.location.search).get('error')
-    // Same constraint: capture connectionOption from the OAuth `state` param before Magic strips it
-    const connectionOption = getConnectionOptionFromState()
 
     if (oauthError === OAUTH_ACCESS_DENIED_ERROR) {
       navigate(locations.login({ redirectTo }), { replace: true })
@@ -159,7 +154,7 @@ const DesktopCallbackPage = () => {
         }
       }
 
-      await handleContinue(referrer, connectionOption)
+      await handleContinue(referrer)
     } catch (error) {
       // MISSING_PKCE_METADATA: the OAuth session was already consumed
       // (e.g. user navigated back to /callback). Not a real error — just redirect to login.

@@ -299,20 +299,6 @@ describe('LoginPage', () => {
         expect(mockGetIdentitySignature).toHaveBeenCalledWith(connectionResponse)
       })
     })
-
-    it('should pass method to trackLoginSuccess so it lands in analytics', async () => {
-      render(<LoginPage />)
-
-      await waitFor(() => {
-        expect(capturedOnConnect).toBeDefined()
-      })
-
-      capturedOnConnect!(ConnectionOptionType.METAMASK)
-
-      await waitFor(() => {
-        expect(mockTrackLoginSuccess).toHaveBeenCalledWith(expect.objectContaining({ method: ConnectionOptionType.METAMASK }))
-      })
-    })
   })
 
   describe('when an email login completes successfully', () => {
@@ -376,29 +362,6 @@ describe('LoginPage', () => {
 
       await waitFor(() => {
         expect(mockGetIdentitySignature).toHaveBeenCalledWith()
-      })
-    })
-
-    it('should pass method=email to trackLoginSuccess', async () => {
-      const user = userEvent.setup()
-      render(<LoginPage />)
-
-      await waitFor(() => {
-        expect(capturedOnEmailSubmit).toBeDefined()
-      })
-
-      capturedOnEmailSubmit!('test@example.com')
-
-      const successButton = await waitFor(() => {
-        const btn = document.querySelector('[data-testid="mock-email-success"]')
-        expect(btn).toBeTruthy()
-        return btn as HTMLElement
-      })
-
-      await user.click(successButton)
-
-      await waitFor(() => {
-        expect(mockTrackLoginSuccess).toHaveBeenCalledWith(expect.objectContaining({ method: ConnectionOptionType.EMAIL }))
       })
     })
   })

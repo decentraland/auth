@@ -76,12 +76,12 @@ async function connectToSocialProvider(
         redirectTo,
         referrer,
         isMobileFlow,
-        // Read back by both CallbackPage and MobileCallbackPage via getConnectionOptionFromState()
-        // (see shared/oauthState) so we know which OAuth provider (Google/Apple/Discord/X) the user picked.
-        connectionOption,
         ...(isMobileFlow && {
           mobileUserId: search.get('u') ?? undefined,
-          mobileSessionId: search.get('s') ?? undefined
+          mobileSessionId: search.get('s') ?? undefined,
+          // Read back by MobileCallbackPage via getConnectionOptionFromState() so analytics know
+          // which OAuth provider (Google/Apple/Discord/X) the mobile user picked.
+          connectionOption
         })
       }),
       ...(isMobileFlow && { loginHint: '' }) // Force account picker on mobile
