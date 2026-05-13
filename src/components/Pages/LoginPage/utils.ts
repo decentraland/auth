@@ -77,7 +77,7 @@ async function connectToSocialProvider(
         referrer,
         isMobileFlow,
         // Read back by both CallbackPage and MobileCallbackPage via getConnectionOptionFromState()
-        // so we know which OAuth provider (Google/Apple/Discord/X) the user picked.
+        // (see shared/oauthState) so we know which OAuth provider (Google/Apple/Discord/X) the user picked.
         connectionOption,
         ...(isMobileFlow && {
           mobileUserId: search.get('u') ?? undefined,

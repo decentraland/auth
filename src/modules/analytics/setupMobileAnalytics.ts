@@ -28,7 +28,7 @@ interface AnalyticsTarget {
  * Segment event for the lifetime of the page, and identifies the mobile user if
  * we know who they are. No-op when there is no mobile session.
  */
-export function setupMobileAnalytics(analytics: SegmentAnalytics.AnalyticsJS | undefined, mobileSession: MobileSession | null): void {
+function setupMobileAnalytics(analytics: SegmentAnalytics.AnalyticsJS | undefined, mobileSession: MobileSession | null): void {
   if (!analytics || !mobileSession || (!mobileSession.u && !mobileSession.s)) {
     return
   }
@@ -54,3 +54,5 @@ export function setupMobileAnalytics(analytics: SegmentAnalytics.AnalyticsJS | u
     target.identify(mobileSession.u, mobileContext)
   }
 }
+
+export { setupMobileAnalytics }
