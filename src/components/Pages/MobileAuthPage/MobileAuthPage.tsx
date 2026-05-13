@@ -38,6 +38,7 @@ export const MobileAuthPage = () => {
   const { t } = useTranslation()
   const [searchParams] = useSearchParams()
   const { flags, initialized: flagInitialized } = useContext(FeatureFlagsContext)
+  const isMagicTest = !!flags[FeatureFlagsKeys.MAGIC_TEST]
   const [targetConfig] = useTargetConfig()
   const { trackLoginClick, trackLoginSuccess } = useAnalytics()
 
@@ -86,7 +87,7 @@ export const MobileAuthPage = () => {
           }
           await connectToSocialProvider(
             selectedConnectionType,
-            flags[FeatureFlagsKeys.MAGIC_TEST],
+            isMagicTest,
             undefined, // redirectTo not needed for mobile
             true // isMobileFlow
           )
@@ -129,7 +130,7 @@ export const MobileAuthPage = () => {
         setView('error')
       }
     },
-    [flagInitialized, flags[FeatureFlagsKeys.MAGIC_TEST], trackLoginClick, trackLoginSuccess]
+    [flagInitialized, isMagicTest, trackLoginClick, trackLoginSuccess]
   )
   // Clear cached sessions and optionally auto-initiate auth in a single sequential flow.
   // This prevents a race condition where clearCachedSessions (magic.user.logout) and
@@ -142,7 +143,7 @@ export const MobileAuthPage = () => {
     const initialize = async () => {
       // Step 1: Clear cached sessions
       try {
-        const magic = await createMagicInstance(!!flags[FeatureFlagsKeys.MAGIC_TEST])
+        const magic = await createMagicInstance(isMagicTest)
         if (await magic?.user.isLoggedIn()) {
           await magic?.user.logout()
         }
@@ -176,7 +177,7 @@ export const MobileAuthPage = () => {
     initialize()
     // The hasStartedInit ref makes this effect single-fire: deps beyond flagInitialized/provider
     // are kept to satisfy exhaustive-deps but won't actually re-trigger initialization.
-  }, [flagInitialized, flags[FeatureFlagsKeys.MAGIC_TEST], provider, initiateAuth])
+  }, [flagInitialized, isMagicTest, provider, initiateAuth])
 
   const handleTryAgain = useCallback(() => {
     if (connectionType) {

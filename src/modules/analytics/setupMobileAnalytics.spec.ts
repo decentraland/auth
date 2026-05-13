@@ -68,6 +68,26 @@ describe('setupMobileAnalytics', () => {
     })
   })
 
+  describe('when only the mobile user id is present', () => {
+    let analytics: ReturnType<typeof createAnalyticsStub>
+
+    beforeEach(() => {
+      analytics = createAnalyticsStub()
+      setupMobileAnalytics(analytics, { u: 'user-1' })
+    })
+
+    it('should register a source middleware that attaches mobile_user_id', () => {
+      const middleware = analytics.addSourceMiddleware.mock.calls[0][0] as Middleware
+      const next = jest.fn()
+      const payload = { obj: { type: 'track', properties: { foo: 'bar' } } }
+
+      middleware({ payload, next })
+
+      expect(payload.obj.properties).toEqual({ foo: 'bar', mobile_user_id: 'user-1' })
+      expect(next).toHaveBeenCalledWith(payload)
+    })
+  })
+
   describe('when both u and s are present', () => {
     let analytics: ReturnType<typeof createAnalyticsStub>
 

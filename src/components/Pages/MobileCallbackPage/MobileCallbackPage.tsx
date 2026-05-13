@@ -23,6 +23,7 @@ const ArrowBackIosNewTwoToneIcon = muiIcons.ArrowBackIosNewTwoTone
 export const MobileCallbackPage = () => {
   const navigate = useNavigateWithSearchParams()
   const { initialized, flags } = useContext(FeatureFlagsContext)
+  const isMagicTest = !!flags[FeatureFlagsKeys.MAGIC_TEST]
   const [targetConfig] = useTargetConfig()
   const { trackLoginSuccess } = useAnalytics()
 
@@ -43,7 +44,7 @@ export const MobileCallbackPage = () => {
     const oauthConnectionOption = getConnectionOptionFromState()
 
     try {
-      const magic = await createMagicInstance(!!flags[FeatureFlagsKeys.MAGIC_TEST])
+      const magic = await createMagicInstance(isMagicTest)
       await magic.oauth2.getRedirectResult()
 
       // Reuse the same Magic instance to avoid spawning a second iframe
@@ -81,7 +82,7 @@ export const MobileCallbackPage = () => {
       })
       setError(err instanceof Error ? err.message : 'Authentication failed')
     }
-  }, [flags[FeatureFlagsKeys.MAGIC_TEST], navigate, trackLoginSuccess])
+  }, [isMagicTest, navigate, trackLoginSuccess])
 
   useEffect(() => {
     if (!initialized || hasStartedProcessing.current) return
