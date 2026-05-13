@@ -1,12 +1,12 @@
 import { ConnectionOptionType } from '../components/Connection'
 
+// Only the fields actually consumed by the app. Other customData entries
+// (redirectTo, referrer, etc.) are not cached so they don't linger in memory.
 interface OAuthCustomState {
   isMobileFlow?: boolean
   mobileUserId?: string
   mobileSessionId?: string
   connectionOption?: ConnectionOptionType
-  redirectTo?: string
-  referrer?: string
 }
 
 // Module-scoped cache: survives SPA navigations without localStorage, and lets consumers
@@ -26,7 +26,13 @@ function extractCustomDataFromState(): OAuthCustomState | null {
     const state = params.get('state')
     if (state) {
       const decoded = JSON.parse(atob(state))
-      cachedCustomData = JSON.parse(decoded.customData) as OAuthCustomState
+      const raw = JSON.parse(decoded.customData)
+      cachedCustomData = {
+        isMobileFlow: raw.isMobileFlow,
+        mobileUserId: raw.mobileUserId,
+        mobileSessionId: raw.mobileSessionId,
+        connectionOption: raw.connectionOption
+      }
       return cachedCustomData
     }
   } catch {

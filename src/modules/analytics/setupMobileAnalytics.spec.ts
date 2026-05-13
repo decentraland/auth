@@ -8,12 +8,10 @@ type Middleware = (input: { payload: MiddlewarePayload; next: (payload: Middlewa
 
 function createAnalyticsStub() {
   const addSourceMiddleware = jest.fn()
-  const identify = jest.fn()
   // setupMobileAnalytics casts the input to a richer shape internally; the cast through `unknown`
   // is enough for jest mocks here.
-  return { addSourceMiddleware, identify } as unknown as SegmentAnalytics.AnalyticsJS & {
+  return { addSourceMiddleware } as unknown as SegmentAnalytics.AnalyticsJS & {
     addSourceMiddleware: jest.Mock
-    identify: jest.Mock
   }
 }
 
@@ -35,10 +33,6 @@ describe('setupMobileAnalytics', () => {
     it('should not register a middleware', () => {
       expect(analytics.addSourceMiddleware).not.toHaveBeenCalled()
     })
-
-    it('should not call identify', () => {
-      expect(analytics.identify).not.toHaveBeenCalled()
-    })
   })
 
   describe('when the mobile session has neither u nor s', () => {
@@ -51,10 +45,6 @@ describe('setupMobileAnalytics', () => {
 
     it('should not register a middleware', () => {
       expect(analytics.addSourceMiddleware).not.toHaveBeenCalled()
-    })
-
-    it('should not call identify', () => {
-      expect(analytics.identify).not.toHaveBeenCalled()
     })
   })
 
@@ -76,10 +66,6 @@ describe('setupMobileAnalytics', () => {
       expect(payload.obj.properties).toEqual({ foo: 'bar', mobile_session_id: 'sess-1' })
       expect(next).toHaveBeenCalledWith(payload)
     })
-
-    it('should not call identify when there is no user id', () => {
-      expect(analytics.identify).not.toHaveBeenCalled()
-    })
   })
 
   describe('when both u and s are present', () => {
@@ -88,13 +74,6 @@ describe('setupMobileAnalytics', () => {
     beforeEach(() => {
       analytics = createAnalyticsStub()
       setupMobileAnalytics(analytics, { u: 'user-1', s: 'sess-1' })
-    })
-
-    it('should call identify with the mobile user id and both context fields as traits', () => {
-      expect(analytics.identify).toHaveBeenCalledWith('user-1', {
-        mobile_user_id: 'user-1',
-        mobile_session_id: 'sess-1'
-      })
     })
 
     it('should attach mobile context to track events under properties', () => {

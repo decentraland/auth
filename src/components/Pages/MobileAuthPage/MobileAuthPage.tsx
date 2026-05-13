@@ -6,8 +6,10 @@ import { useTargetConfig } from '../../../hooks/targetConfig'
 import { useAnalytics } from '../../../hooks/useAnalytics'
 import { ConnectionType } from '../../../modules/analytics/types'
 import { createAuthServerHttpClient } from '../../../shared/auth'
+import { TRACKING_DELAY } from '../../../shared/constants'
 import { isErrorWithName } from '../../../shared/errors'
 import { disconnectWallet, sendEmailOTP } from '../../../shared/thirdweb'
+import { wait } from '../../../shared/time'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { createMagicInstance } from '../../../shared/utils/magicSdk'
 import { ConnectionOptionType } from '../../Connection'
@@ -76,6 +78,8 @@ export const MobileAuthPage = () => {
           // OAuth flow - will redirect to provider
           setView('connecting')
           setLoadingState(ConnectionLayoutState.LOADING_MAGIC)
+          // Give Segment a moment to send LOGIN_CLICK before the page navigates away
+          await wait(TRACKING_DELAY)
           await connectToSocialProvider(
             selectedConnectionType,
             flags[FeatureFlagsKeys.MAGIC_TEST],
@@ -164,6 +168,8 @@ export const MobileAuthPage = () => {
     }
 
     initialize()
+    // The hasStartedInit ref makes this effect single-fire: deps beyond flagInitialized/provider
+    // are kept to satisfy exhaustive-deps but won't actually re-trigger initialization.
   }, [flagInitialized, flags[FeatureFlagsKeys.MAGIC_TEST], provider, initiateAuth])
 
   const handleTryAgain = useCallback(() => {

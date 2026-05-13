@@ -20,13 +20,13 @@ type SegmentSourceMiddleware = (input: {
 // but is missing from the @types/segment-analytics definitions, so we narrow to what we need.
 interface AnalyticsTarget {
   addSourceMiddleware: (mw: SegmentSourceMiddleware) => void
-  identify: SegmentAnalytics.AnalyticsJS['identify']
 }
 
 /**
  * Attaches mobile-session context (mobile_user_id / mobile_session_id) to every
- * Segment event for the lifetime of the page, and identifies the mobile user if
- * we know who they are. No-op when there is no mobile session.
+ * Segment event for the lifetime of the page. Mobile context travels as
+ * properties/traits — the Segment userId is still set elsewhere via identify(ethAddress).
+ * No-op when there is no mobile session.
  */
 function setupMobileAnalytics(analytics: SegmentAnalytics.AnalyticsJS | undefined, mobileSession: MobileSession | null): void {
   if (!analytics || !mobileSession || (!mobileSession.u && !mobileSession.s)) {
@@ -49,10 +49,6 @@ function setupMobileAnalytics(analytics: SegmentAnalytics.AnalyticsJS | undefine
     }
     next(payload)
   })
-
-  if (mobileSession.u) {
-    target.identify(mobileSession.u, mobileContext)
-  }
 }
 
 export { setupMobileAnalytics }
