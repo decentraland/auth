@@ -24,6 +24,7 @@ import { ConnectionProvider } from './shared/connection'
 import { config } from './modules/config'
 import { translations } from './modules/translations'
 import { getAnalytics } from './modules/analytics/segment'
+import { setupMobileAnalytics } from './modules/analytics/setupMobileAnalytics'
 import './modules/analytics/snippet'
 import './modules/analytics/sentry'
 import { getMobileSession } from './shared/mobile'
@@ -49,10 +50,7 @@ const initialLocale = getInitialLocale()
 const analytics = getAnalytics()
 analytics?.load(config.get('SEGMENT_API_KEY'))
 
-const mobileSession = getMobileSession()
-if (mobileSession?.u) {
-  analytics?.identify(mobileSession.u)
-}
+setupMobileAnalytics(analytics, getMobileSession())
 
 const DevTestViewPage = !config.is(Env.PRODUCTION)
   ? React.lazy(async () => {

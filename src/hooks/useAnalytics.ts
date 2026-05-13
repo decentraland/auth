@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import { useCallback } from 'react'
+import { ConnectionOptionType } from '../components/Connection'
 import { AvatarShape } from '../components/Pages/AvatarSetupPage/AvatarSetupPage.types'
 import { ClickEvents, ConnectionType, TrackingEvents } from '../modules/analytics/types'
 import { TRACKING_DELAY } from '../shared/constants'
@@ -13,20 +14,30 @@ interface ClickData {
 }
 
 export const useAnalytics = () => {
-  const trackLoginClick = useCallback((data: { method?: string; type: ConnectionType | string }) => {
+  const trackLoginClick = useCallback((data: { method?: ConnectionOptionType; type: ConnectionType | string }) => {
     trackEvent(TrackingEvents.LOGIN_CLICK, data)
   }, [])
 
-  const trackLoginSuccess = useCallback(async (data: { ethAddress?: string; type: ConnectionType | string }) => {
-    await trackWithDelay(TrackingEvents.LOGIN_SUCCESS, {
-      eth_address: data.ethAddress,
-      type: data.type
-    })
+  const trackLoginSuccess = useCallback(
+    async (data: { ethAddress?: string; type: ConnectionType | string; method?: ConnectionOptionType }) => {
+      // `method` is currently only sent from the mobile flow. On desktop every login is preceded by
+      // a user click in this app, so LOGIN_CLICK already carries `method` and the LOGIN_SUCCESS that
+      // follows can be correlated by session — `method` on success is redundant there. On mobile,
+      // entries through a deep link from the partner app are automatic (no click in this app), so
+      // there is no preceding LOGIN_CLICK to attribute the provider, and `method` has to ride on
+      // LOGIN_SUCCESS itself.
+      await trackWithDelay(TrackingEvents.LOGIN_SUCCESS, {
+        eth_address: data.ethAddress,
+        type: data.type,
+        ...(data.method && { method: data.method })
+      })
 
-    if (data.ethAddress) {
-      identifyUser(data.ethAddress)
-    }
-  }, [])
+      if (data.ethAddress) {
+        identifyUser(data.ethAddress)
+      }
+    },
+    []
+  )
 
   const trackClick = useCallback((action: ClickEvents, additionalData?: ClickData) => {
     trackEvent(TrackingEvents.CLICK, {
