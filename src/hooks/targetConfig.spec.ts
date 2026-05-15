@@ -151,5 +151,19 @@ describe('useTargetConfig', () => {
       expect(config.connectionOptions.primary).toBe(ConnectionOptionType.GOOGLE)
       expect(config.connectionOptions.secondary).toBe(ConnectionOptionType.APPLE)
     })
+
+    it('should include WALLET_CONNECT in extraOptions', () => {
+      const { result } = renderHook(() => useTargetConfig())
+      const [config] = result.current
+
+      expect(config.connectionOptions.extraOptions).toContain(ConnectionOptionType.WALLET_CONNECT)
+    })
+
+    it('should include METAMASK in extraOptions', () => {
+      const { result } = renderHook(() => useTargetConfig())
+      const [config] = result.current
+
+      expect(config.connectionOptions.extraOptions).toContain(ConnectionOptionType.METAMASK)
+    })
   })
 })
