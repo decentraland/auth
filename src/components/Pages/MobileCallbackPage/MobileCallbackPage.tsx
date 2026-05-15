@@ -4,9 +4,12 @@ import { Button, CircularProgress, muiIcons } from 'decentraland-ui2'
 import wrongImg from '../../../assets/images/wrong.svg'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useTargetConfig } from '../../../hooks/targetConfig'
+import { useAnalytics } from '../../../hooks/useAnalytics'
+import { ConnectionType } from '../../../modules/analytics/types'
 import { createAuthServerHttpClient } from '../../../shared/auth'
 import { isMagicRpcError } from '../../../shared/errors'
 import { locations } from '../../../shared/locations'
+import { getConnectionOptionFromState } from '../../../shared/oauthState'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { OAUTH_ACCESS_DENIED_ERROR, createMagicInstance } from '../../../shared/utils/magicSdk'
 import { ConnectionContainer, ConnectionTitle, DecentralandLogo, ProgressContainer } from '../../ConnectionModal/ConnectionLayout.styled'
@@ -20,7 +23,9 @@ const ArrowBackIosNewTwoToneIcon = muiIcons.ArrowBackIosNewTwoTone
 export const MobileCallbackPage = () => {
   const navigate = useNavigateWithSearchParams()
   const { initialized, flags } = useContext(FeatureFlagsContext)
+  const isMagicTest = !!flags[FeatureFlagsKeys.MAGIC_TEST]
   const [targetConfig] = useTargetConfig()
+  const { trackLoginSuccess } = useAnalytics()
 
   const hasStartedProcessing = useRef(false)
   const [identityId, setIdentityId] = useState<string | null>(null)
@@ -35,8 +40,11 @@ export const MobileCallbackPage = () => {
       return
     }
 
+    // Capture before getRedirectResult() strips the `state` query param
+    const oauthConnectionOption = getConnectionOptionFromState()
+
     try {
-      const magic = await createMagicInstance(!!flags[FeatureFlagsKeys.MAGIC_TEST])
+      const magic = await createMagicInstance(isMagicTest)
       await magic.oauth2.getRedirectResult()
 
       // Reuse the same Magic instance to avoid spawning a second iframe
@@ -46,11 +54,18 @@ export const MobileCallbackPage = () => {
       if (!account) throw new Error('Failed to get account from Magic')
 
       // Generate identity
-      const identity = await getIdentitySignature(account.toLowerCase(), provider as unknown as Provider)
+      const ethAddress = account.toLowerCase()
+      const identity = await getIdentitySignature(ethAddress, provider as unknown as Provider)
 
       // Post identity to server
       const httpClient = createAuthServerHttpClient()
       const response = await httpClient.postIdentity(identity, { isMobile: true })
+
+      await trackLoginSuccess({
+        ethAddress,
+        type: ConnectionType.WEB2,
+        method: oauthConnectionOption
+      })
 
       setIdentityId(response.identityId)
     } catch (err) {
@@ -67,7 +82,7 @@ export const MobileCallbackPage = () => {
       })
       setError(err instanceof Error ? err.message : 'Authentication failed')
     }
-  }, [flags, navigate])
+  }, [isMagicTest, navigate, trackLoginSuccess])
 
   useEffect(() => {
     if (!initialized || hasStartedProcessing.current) return

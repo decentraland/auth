@@ -1,4 +1,5 @@
 import { getMobileSession, isMobileSession, resetMobileSession } from './mobile'
+import { resetOauthStateCache } from './oauthState'
 
 function setLocation(pathname: string, search = '') {
   Object.defineProperty(window, 'location', {
@@ -14,6 +15,7 @@ function makeState(customData: Record<string, unknown>): string {
 describe('mobile session', () => {
   beforeEach(() => {
     resetMobileSession()
+    resetOauthStateCache()
     setLocation('/auth/login')
   })
 
