@@ -69,7 +69,11 @@ const targetConfigs: Record<TargetConfigId, TargetConfig> = {
     connectionOptions: {
       primary: ConnectionOptionType.GOOGLE,
       secondary: ConnectionOptionType.APPLE,
-      extraOptions: [ConnectionOptionType.METAMASK]
+      // Include both wallet options for parity with iOS: MetaMask covers the
+      // DApp Browser path, WalletConnect covers every other mobile wallet
+      // (Trust, Rainbow, Coinbase, etc.). Without WalletConnect, Android
+      // users in Samsung Internet / Chrome only see a disabled MetaMask.
+      extraOptions: [ConnectionOptionType.METAMASK, ConnectionOptionType.WALLET_CONNECT]
     }
   }
 }
