@@ -272,7 +272,13 @@ const PreloadedWearableContainer = styled(Box, {
   pointerEvents: isVisible ? 'auto' : 'none',
   zIndex: isVisible ? 1000 : 0,
   transition: 'opacity 0.3s ease-in-out',
-  visibility: 'visible'
+  visibility: 'visible',
+  // The WearablePreview iframe defaults to display:inline, which adds a
+  // baseline descender gap and overflows the 100vh viewport by a few pixels,
+  // surfacing as scrollbars next to the avatar.
+  ['& iframe']: {
+    display: 'block'
+  }
 }))
 
 const ErrorLabel = styled(Typography)(({ theme }) => ({
