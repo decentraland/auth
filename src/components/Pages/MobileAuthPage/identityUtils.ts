@@ -2,7 +2,7 @@ import { createWalletClient, custom } from 'viem'
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
 import { mainnet } from 'viem/chains'
 import { AuthIdentity, Authenticator } from '@dcl/crypto'
-import { localStorageGetIdentity, localStorageStoreIdentity } from '@dcl/single-sign-on-client'
+import { localStorageStoreIdentity } from '@dcl/single-sign-on-client'
 import { Provider } from 'decentraland-connect'
 
 const ONE_MONTH_IN_MINUTES = 60 * 24 * 30
@@ -36,13 +36,10 @@ async function generateIdentity(address: string, provider: Provider): Promise<Au
   return generateIdentityWithSigner(address, message => walletClient.signMessage({ account, message }))
 }
 
+// Always generates a fresh ephemeral and overwrites any existing identity in SSO storage.
+// See src/shared/connection/identity.ts for the full rationale — short-circuiting on a
+// cached identity would mean dapps reading SSO storage cannot detect a re-signin.
 export async function getIdentitySignature(address: string, provider: Provider): Promise<AuthIdentity> {
-  const ssoIdentity = localStorageGetIdentity(address)
-
-  if (ssoIdentity) {
-    return ssoIdentity
-  }
-
   const identity = await generateIdentity(address, provider)
   localStorageStoreIdentity(address, identity)
   return identity

@@ -62,12 +62,12 @@ function getCachedIdentity(address: string): AuthIdentity | undefined {
   return cached
 }
 
+// Always generates a fresh ephemeral and overwrites any existing identity in SSO storage.
+// Rotating the ephemeral on every sign-in is the only signal cross-domain consumers
+// (e.g. dapps reading SSO storage) have to detect "the user just re-signed in with this
+// wallet". Short-circuiting on a cached identity makes that detection impossible because
+// storage looks identical before and after.
 async function getIdentitySignature(address: string, provider: Provider): Promise<AuthIdentity> {
-  const cached = getCachedIdentity(address)
-  if (cached) {
-    return cached
-  }
-
   const identity = await generateIdentity(address, provider)
   localStorageStoreIdentity(address, identity)
   return identity

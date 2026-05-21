@@ -1,9 +1,9 @@
 import { createWalletClient } from 'viem'
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
 import { AuthIdentity, Authenticator } from '@dcl/crypto'
-import { localStorageGetIdentity, localStorageStoreIdentity } from '@dcl/single-sign-on-client'
+import { localStorageStoreIdentity } from '@dcl/single-sign-on-client'
 import { Provider } from 'decentraland-connect'
-import { getCachedIdentity, getIdentitySignature } from './identity'
+import { getIdentitySignature } from './identityUtils'
 
 jest.mock('@dcl/single-sign-on-client')
 jest.mock('@dcl/crypto')
@@ -16,21 +16,20 @@ jest.mock('viem/chains', () => ({
   mainnet: {}
 }))
 
-const mockLocalStorageGetIdentity = localStorageGetIdentity as jest.MockedFunction<typeof localStorageGetIdentity>
 const mockLocalStorageStoreIdentity = localStorageStoreIdentity as jest.MockedFunction<typeof localStorageStoreIdentity>
 const mockGeneratePrivateKey = generatePrivateKey as jest.MockedFunction<typeof generatePrivateKey>
 const mockPrivateKeyToAccount = privateKeyToAccount as jest.MockedFunction<typeof privateKeyToAccount>
 const mockCreateWalletClient = createWalletClient as jest.MockedFunction<typeof createWalletClient>
 const mockAuthenticator = Authenticator as jest.Mocked<typeof Authenticator>
 
-// Valid hex values with correct lengths
-const VALID_PRIVATE_KEY = '0x' + 'ab'.repeat(32) // 66 chars
-const VALID_PUBLIC_KEY = '0x' + 'cd'.repeat(65) // 132 chars
-const VALID_ADDRESS = '0x' + 'ef'.repeat(20) // 42 chars
+const VALID_PRIVATE_KEY = '0x' + 'ab'.repeat(32)
+const VALID_PUBLIC_KEY = '0x' + 'cd'.repeat(65)
+const VALID_ADDRESS = '0x' + 'ef'.repeat(20)
 
-// Double-encoded private key (66 bytes = 132 hex chars + 0x prefix = 134 chars)
-const DOUBLE_ENCODED_PRIVATE_KEY = '0x' + 'ab'.repeat(66)
-const DOUBLE_ENCODED_PUBLIC_KEY = '0x' + 'cd'.repeat(130)
+// Mobile flow uses a 3-month ephemeral expiration vs 1 month on desktop.
+// Asserting this catches drift between identity.ts and identityUtils.ts if either
+// is changed without updating the other.
+const MOBILE_EPHEMERAL_MINUTES = 60 * 24 * 30 * 3
 
 function createMockIdentity(overrides?: { privateKey?: string; publicKey?: string; address?: string }): AuthIdentity {
   return {
@@ -57,68 +56,7 @@ function setupGenerateIdentityMocks(resultIdentity: AuthIdentity) {
   } as unknown as ReturnType<typeof createWalletClient>)
 }
 
-describe('getCachedIdentity', () => {
-  const address = '0x1234567890abcdef1234567890abcdef12345678'
-
-  afterEach(() => {
-    jest.clearAllMocks()
-  })
-
-  describe('when no cached identity exists', () => {
-    it('should return undefined', () => {
-      mockLocalStorageGetIdentity.mockReturnValue(null)
-
-      expect(getCachedIdentity(address)).toBeUndefined()
-    })
-  })
-
-  describe('when a valid cached identity exists', () => {
-    it('should return the identity', () => {
-      const identity = createMockIdentity()
-      mockLocalStorageGetIdentity.mockReturnValue(identity)
-
-      expect(getCachedIdentity(address)).toBe(identity)
-    })
-  })
-
-  describe('when the cached identity has a double-encoded private key', () => {
-    it('should return undefined', () => {
-      const identity = createMockIdentity({ privateKey: DOUBLE_ENCODED_PRIVATE_KEY })
-      mockLocalStorageGetIdentity.mockReturnValue(identity)
-
-      expect(getCachedIdentity(address)).toBeUndefined()
-    })
-  })
-
-  describe('when the cached identity has a double-encoded public key', () => {
-    it('should return undefined', () => {
-      const identity = createMockIdentity({ publicKey: DOUBLE_ENCODED_PUBLIC_KEY })
-      mockLocalStorageGetIdentity.mockReturnValue(identity)
-
-      expect(getCachedIdentity(address)).toBeUndefined()
-    })
-  })
-
-  describe('when the cached identity has a non-hex private key', () => {
-    it('should return undefined', () => {
-      const identity = createMockIdentity({ privateKey: 'not-a-hex-key' })
-      mockLocalStorageGetIdentity.mockReturnValue(identity)
-
-      expect(getCachedIdentity(address)).toBeUndefined()
-    })
-  })
-
-  describe('when the cached identity has an invalid address', () => {
-    it('should return undefined', () => {
-      const identity = createMockIdentity({ address: '0xinvalid' })
-      mockLocalStorageGetIdentity.mockReturnValue(identity)
-
-      expect(getCachedIdentity(address)).toBeUndefined()
-    })
-  })
-})
-
-describe('getIdentitySignature', () => {
+describe('getIdentitySignature (mobile)', () => {
   const address = '0x1234567890abcdef1234567890abcdef12345678'
   const provider = {} as Provider
 
@@ -126,30 +64,32 @@ describe('getIdentitySignature', () => {
     jest.clearAllMocks()
   })
 
-  describe('when no cached identity exists', () => {
-    it('should generate and store a new identity', async () => {
+  describe('when no identity exists in SSO storage', () => {
+    it('should generate a new identity and store it', async () => {
       const freshIdentity = createMockIdentity()
-      mockLocalStorageGetIdentity.mockReturnValue(null)
       setupGenerateIdentityMocks(freshIdentity)
 
       const result = await getIdentitySignature(address, provider)
 
       expect(result).toBe(freshIdentity)
       expect(mockLocalStorageStoreIdentity).toHaveBeenCalledWith(address, freshIdentity)
+      expect(mockAuthenticator.initializeAuthChain).toHaveBeenCalledWith(
+        address,
+        expect.any(Object),
+        MOBILE_EPHEMERAL_MINUTES,
+        expect.any(Function)
+      )
     })
   })
 
-  describe('when a valid cached identity already exists', () => {
+  describe('when a valid identity already exists in SSO storage', () => {
     it('should still generate a fresh identity and overwrite SSO storage', async () => {
-      const cachedIdentity = createMockIdentity()
       const freshIdentity = createMockIdentity({ privateKey: '0x' + '11'.repeat(32) })
-      mockLocalStorageGetIdentity.mockReturnValue(cachedIdentity)
       setupGenerateIdentityMocks(freshIdentity)
 
       const result = await getIdentitySignature(address, provider)
 
       expect(result).toBe(freshIdentity)
-      expect(result).not.toBe(cachedIdentity)
       expect(mockLocalStorageStoreIdentity).toHaveBeenCalledWith(address, freshIdentity)
       expect(mockAuthenticator.initializeAuthChain).toHaveBeenCalledTimes(1)
     })
@@ -160,11 +100,9 @@ describe('getIdentitySignature', () => {
       const firstIdentity = createMockIdentity({ privateKey: '0x' + '11'.repeat(32) })
       const secondIdentity = createMockIdentity({ privateKey: '0x' + '22'.repeat(32) })
 
-      mockLocalStorageGetIdentity.mockReturnValue(null)
       setupGenerateIdentityMocks(firstIdentity)
       const first = await getIdentitySignature(address, provider)
 
-      mockLocalStorageGetIdentity.mockReturnValue(firstIdentity)
       mockAuthenticator.initializeAuthChain.mockResolvedValueOnce(secondIdentity)
       const second = await getIdentitySignature(address, provider)
 
