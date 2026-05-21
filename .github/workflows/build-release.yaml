@@ -10,8 +10,6 @@ on:
 
 jobs:
   build-release:
-    permissions:
-      id-token: write
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@main
@@ -21,7 +19,14 @@ jobs:
           node-version: 24.x
           cache: 'npm'
       - name: Set package.json version
-        uses: decentraland/oddish-action@master
+        # Pinned to the last oddish-action commit BEFORE the Trusted Publishing
+        # (OIDC) patch was merged. This workflow authenticates to npm via
+        # `NODE_AUTH_TOKEN` (classic token), so we want oddish to keep writing
+        # `_authToken=${NODE_AUTH_TOKEN}` to `.npmrc` unconditionally. The
+        # post-OIDC oddish would otherwise try to skip that write when an OIDC
+        # token request URL is present, breaking classic auth.
+        # Bump only after confirming compatibility with the classic-token flow.
+        uses: decentraland/oddish-action@9f0ba286ebfc06407aaba65b16645247a74e2e1c # pre-OIDC, node16 runtime
         with:
           deterministic-snapshot: true
           only-update-versions: true
@@ -35,7 +40,8 @@ jobs:
           NODE_PATH: 'src'
           NODE_OPTIONS: '--max-old-space-size=6144'
       - name: Publish
-        uses: decentraland/oddish-action@master
+        # See note above on the oddish-action pin.
+        uses: decentraland/oddish-action@9f0ba286ebfc06407aaba65b16645247a74e2e1c # pre-OIDC, node16 runtime
         with:
           cwd: './dist'
           deterministic-snapshot: true
@@ -44,6 +50,9 @@ jobs:
           gitlab-token: ${{ secrets.GITLAB_CDN_DEPLOYER_TOKEN }}
           gitlab-pipeline-url: ${{ secrets.GITLAB_CDN_DEPLOYER_URL }}
         env:
+          # Requires a rotated NPM_TOKEN with "Bypass 2FA" enabled — without that,
+          # this step fails with `EOTP` because the npm account requires OTP on
+          # writes. Trusted Publishing (OIDC) is the long-term replacement.
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: Create Sentry release
         if: github.event_name == 'release' && github.event.action == 'created'
