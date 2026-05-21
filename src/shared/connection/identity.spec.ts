@@ -139,72 +139,41 @@ describe('getIdentitySignature', () => {
     })
   })
 
-  describe('when a valid cached identity exists', () => {
-    it('should return the cached identity without regenerating', async () => {
+  describe('when a valid cached identity already exists', () => {
+    it('should still generate a fresh identity and overwrite SSO storage', async () => {
       const cachedIdentity = createMockIdentity()
+      const freshIdentity = createMockIdentity({ privateKey: '0x' + '11'.repeat(32) })
       mockLocalStorageGetIdentity.mockReturnValue(cachedIdentity)
-
-      const result = await getIdentitySignature(address, provider)
-
-      expect(result).toBe(cachedIdentity)
-      expect(mockLocalStorageStoreIdentity).not.toHaveBeenCalled()
-      expect(mockAuthenticator.initializeAuthChain).not.toHaveBeenCalled()
-    })
-  })
-
-  describe('when the cached identity has a double-encoded private key', () => {
-    it('should discard it and generate a new identity', async () => {
-      const invalidIdentity = createMockIdentity({ privateKey: DOUBLE_ENCODED_PRIVATE_KEY })
-      const freshIdentity = createMockIdentity()
-      mockLocalStorageGetIdentity.mockReturnValue(invalidIdentity)
       setupGenerateIdentityMocks(freshIdentity)
 
       const result = await getIdentitySignature(address, provider)
 
       expect(result).toBe(freshIdentity)
+      expect(result).not.toBe(cachedIdentity)
       expect(mockLocalStorageStoreIdentity).toHaveBeenCalledWith(address, freshIdentity)
+      expect(mockAuthenticator.initializeAuthChain).toHaveBeenCalledTimes(1)
     })
   })
 
-  describe('when the cached identity has a double-encoded public key', () => {
-    it('should discard it and generate a new identity', async () => {
-      const invalidIdentity = createMockIdentity({ publicKey: DOUBLE_ENCODED_PUBLIC_KEY })
-      const freshIdentity = createMockIdentity()
-      mockLocalStorageGetIdentity.mockReturnValue(invalidIdentity)
-      setupGenerateIdentityMocks(freshIdentity)
+  describe('when called twice in a row for the same wallet', () => {
+    it('should generate two distinct identities and overwrite SSO storage each time', async () => {
+      const firstIdentity = createMockIdentity({ privateKey: '0x' + '11'.repeat(32) })
+      const secondIdentity = createMockIdentity({ privateKey: '0x' + '22'.repeat(32) })
 
-      const result = await getIdentitySignature(address, provider)
+      mockLocalStorageGetIdentity.mockReturnValue(null)
+      setupGenerateIdentityMocks(firstIdentity)
+      const first = await getIdentitySignature(address, provider)
 
-      expect(result).toBe(freshIdentity)
-      expect(mockLocalStorageStoreIdentity).toHaveBeenCalledWith(address, freshIdentity)
-    })
-  })
+      mockLocalStorageGetIdentity.mockReturnValue(firstIdentity)
+      mockAuthenticator.initializeAuthChain.mockResolvedValueOnce(secondIdentity)
+      const second = await getIdentitySignature(address, provider)
 
-  describe('when the cached identity has an invalid address', () => {
-    it('should discard it and generate a new identity', async () => {
-      const invalidIdentity = createMockIdentity({ address: '0xinvalid' })
-      const freshIdentity = createMockIdentity()
-      mockLocalStorageGetIdentity.mockReturnValue(invalidIdentity)
-      setupGenerateIdentityMocks(freshIdentity)
-
-      const result = await getIdentitySignature(address, provider)
-
-      expect(result).toBe(freshIdentity)
-      expect(mockLocalStorageStoreIdentity).toHaveBeenCalledWith(address, freshIdentity)
-    })
-  })
-
-  describe('when the cached identity has a non-hex private key', () => {
-    it('should discard it and generate a new identity', async () => {
-      const invalidIdentity = createMockIdentity({ privateKey: 'not-a-hex-key' })
-      const freshIdentity = createMockIdentity()
-      mockLocalStorageGetIdentity.mockReturnValue(invalidIdentity)
-      setupGenerateIdentityMocks(freshIdentity)
-
-      const result = await getIdentitySignature(address, provider)
-
-      expect(result).toBe(freshIdentity)
-      expect(mockLocalStorageStoreIdentity).toHaveBeenCalledWith(address, freshIdentity)
+      expect(first).toBe(firstIdentity)
+      expect(second).toBe(secondIdentity)
+      expect(first).not.toBe(second)
+      expect(mockLocalStorageStoreIdentity).toHaveBeenNthCalledWith(1, address, firstIdentity)
+      expect(mockLocalStorageStoreIdentity).toHaveBeenNthCalledWith(2, address, secondIdentity)
+      expect(mockAuthenticator.initializeAuthChain).toHaveBeenCalledTimes(2)
     })
   })
 })
