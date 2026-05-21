@@ -11,49 +11,66 @@ on:
 jobs:
   build-release:
     runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: read
+
     steps:
       - uses: actions/checkout@main
+
       - name: Use Node.js 24.x
         uses: actions/setup-node@v4.0.2
         with:
           node-version: 24.x
           cache: 'npm'
+
+      - name: Enable npm 11.14.1 via corepack
+        # npm Trusted Publishing requires npm CLI >= 11.5.1. We pin to 11.14.1
+        # because npm 11.15.0 silently fails the OIDC token exchange and surfaces
+        # only a generic `ENEEDAUTH / npm adduser` message — the regression
+        # tracked in npm/cli#9088. 11.14.1 is the last version verified to publish
+        # via Trusted Publishers. Bump only after confirming OIDC works end-to-end.
+        # Corepack is used (instead of `npm install -g`) to avoid the self-upgrade
+        # corruption where npm overwrites its own modules mid-install.
+        run: |
+          corepack enable npm
+          corepack install -g npm@11.14.1
+          npm --version
+
       - name: Set package.json version
-        # Pinned to the last oddish-action commit BEFORE the Trusted Publishing
-        # (OIDC) patch was merged. This workflow authenticates to npm via
-        # `NODE_AUTH_TOKEN` (classic token), so we want oddish to keep writing
-        # `_authToken=${NODE_AUTH_TOKEN}` to `.npmrc` unconditionally. The
-        # post-OIDC oddish would otherwise try to skip that write when an OIDC
-        # token request URL is present, breaking classic auth.
-        # Bump only after confirming compatibility with the classic-token flow.
-        uses: decentraland/oddish-action@9f0ba286ebfc06407aaba65b16645247a74e2e1c # pre-OIDC, node16 runtime
+        uses: decentraland/oddish-action@0074f2d535c43b5c83f136525304a6277166d77f # master @ feat/support-npm-trusted-publishing
         with:
           deterministic-snapshot: true
           only-update-versions: true
+
       - name: Install
         run: npm install
         env:
           HUSKY: 0
+
       - name: Build
         run: npm run build
         env:
           NODE_PATH: 'src'
           NODE_OPTIONS: '--max-old-space-size=6144'
+
       - name: Publish
-        # See note above on the oddish-action pin.
-        uses: decentraland/oddish-action@9f0ba286ebfc06407aaba65b16645247a74e2e1c # pre-OIDC, node16 runtime
+        # Auth via npm Trusted Publishers (OIDC) — `id-token: write` is granted on
+        # this job and no `NODE_AUTH_TOKEN` is provided, so the OIDC-aware oddish
+        # skips writing `_authToken` to `.npmrc` and lets npm 11 do the handshake.
+        # Requires a Trusted Publisher entry for `build-release.yaml` at
+        # https://www.npmjs.com/package/@dcl/auth-site/access
+        uses: decentraland/oddish-action@0074f2d535c43b5c83f136525304a6277166d77f # master @ feat/support-npm-trusted-publishing
         with:
           cwd: './dist'
           deterministic-snapshot: true
+          provenance: true
           registry-url: 'https://registry.npmjs.org'
           access: public
           gitlab-token: ${{ secrets.GITLAB_CDN_DEPLOYER_TOKEN }}
           gitlab-pipeline-url: ${{ secrets.GITLAB_CDN_DEPLOYER_URL }}
-        env:
-          # Requires a rotated NPM_TOKEN with "Bypass 2FA" enabled — without that,
-          # this step fails with `EOTP` because the npm account requires OTP on
-          # writes. Trusted Publishing (OIDC) is the long-term replacement.
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
       - name: Create Sentry release
         if: github.event_name == 'release' && github.event.action == 'created'
         uses: getsentry/action-release@v1
