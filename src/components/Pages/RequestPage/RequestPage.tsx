@@ -18,6 +18,7 @@ import { fetchProfile } from '../../../modules/profile'
 import {
   DifferentSenderError,
   ExpiredRequestError,
+  ImpersonatedSignInError,
   IpValidationError,
   RecoverResponse,
   RequestFulfilledError,
@@ -470,6 +471,13 @@ export const RequestPage = () => {
           // Request was already consumed successfully — not an error, stop re-fetching
           hasCompletedRef.current = true
           setView(View.VERIFY_SIGN_IN_COMPLETE)
+          return
+        } else if (e instanceof ImpersonatedSignInError) {
+          // A non-dcl_personal_sign request tried to sign a sign-in payload. Block it
+          // outright instead of offering a retry that would re-trigger the same attack.
+          hasCompletedRef.current = true
+          setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
+          setView(View.VERIFY_SIGN_IN_ERROR)
           return
         }
 

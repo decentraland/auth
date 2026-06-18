@@ -4,7 +4,13 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { render, screen, waitFor } from '@testing-library/react'
 import { ProviderType } from '@dcl/schemas'
 import { fetchProfile } from '../../../modules/profile'
-import { DifferentSenderError, ExpiredRequestError, IpValidationError, RequestFulfilledError } from '../../../shared/auth'
+import {
+  DifferentSenderError,
+  ExpiredRequestError,
+  ImpersonatedSignInError,
+  IpValidationError,
+  RequestFulfilledError
+} from '../../../shared/auth'
 import { isProfileComplete } from '../../../shared/profile'
 import { FeatureFlagsContext } from '../../FeatureFlagsProvider'
 import { RequestPage } from './RequestPage'
@@ -377,6 +383,21 @@ describe('RequestPage', () => {
         renderRequestPage()
         await waitFor(() => {
           expect(screen.getByTestId('recover-error')).toBeInTheDocument()
+        })
+      })
+    })
+
+    describe('and recovery fails with an ImpersonatedSignInError', () => {
+      beforeEach(() => {
+        mockGetAddresses.mockResolvedValue(['0xabc123'])
+        mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'User' }] })
+        mockRecover.mockRejectedValue(new ImpersonatedSignInError('personal_sign'))
+      })
+
+      it('should show the signing error view instead of offering a retry', async () => {
+        renderRequestPage()
+        await waitFor(() => {
+          expect(screen.getByTestId('signing-error')).toBeInTheDocument()
         })
       })
     })

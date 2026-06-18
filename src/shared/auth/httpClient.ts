@@ -5,6 +5,7 @@ import { config } from '../../modules/config'
 import { trackEvent } from '../utils/analytics'
 import { handleError } from '../utils/errorHandler'
 import { DifferentSenderError, ExpiredRequestError, IpValidationError, RequestFulfilledError, RequestNotFoundError } from './errors'
+import { assertRequestIsNotImpersonatingSignIn } from './signMethodGuard'
 import { IdentityResponse, OutcomeError, OutcomeResponse, RecoverResponse } from './types'
 export const createAuthServerHttpClient = (authServerUrl?: string) => {
   const baseUrl = authServerUrl ?? config.get('AUTH_SERVER_URL')
@@ -145,6 +146,10 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
       if (recoverResponse.expiration && new Date(recoverResponse.expiration) < new Date()) {
         throw new ExpiredRequestError(requestId, recoverResponse.expiration)
       }
+
+      // Reject requests that try to replicate the dcl_personal_sign sign-in through a
+      // generic signing method (e.g. personal_sign), which would bypass its protections.
+      assertRequestIsNotImpersonatingSignIn(recoverResponse.method, recoverResponse.params)
 
       switch (recoverResponse.method) {
         case 'dcl_personal_sign':

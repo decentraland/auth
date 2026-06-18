@@ -1,4 +1,5 @@
 export * from './errors'
 export * from './httpClient'
+export * from './signMethodGuard'
 export * from './types'
 export * from './wsClient'

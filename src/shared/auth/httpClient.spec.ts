@@ -2,7 +2,7 @@ import { AuthIdentity } from '@dcl/crypto'
 import signedFetchMock from 'decentraland-crypto-fetch'
 import { getAnalytics } from '../../modules/analytics/segment'
 import { config } from '../../modules/config'
-import { DifferentSenderError, ExpiredRequestError, RequestNotFoundError } from './errors'
+import { DifferentSenderError, ExpiredRequestError, ImpersonatedSignInError, RequestNotFoundError } from './errors'
 import { createAuthServerHttpClient } from './httpClient'
 import { RecoverResponse } from './types'
 // Mock dependencies
@@ -136,6 +136,27 @@ describe('createAuthServerClient', () => {
 
       it('should throw the network error', async () => {
         await expect(client.recover(mockRequestId, mockSignerAddress)).rejects.toThrow('Network error')
+      })
+    })
+
+    describe('when a non dcl_personal_sign method carries a sign-in payload', () => {
+      beforeEach(() => {
+        mockResponse.method = 'personal_sign'
+        mockResponse.params = [
+          [
+            'Decentraland Login',
+            'Ephemeral address: 0x1234567890123456789012345678901234567890',
+            'Expiration: 2100-01-01T00:00:00.000Z'
+          ].join('\n')
+        ]
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockResponse)
+        })
+      })
+
+      it('should throw an ImpersonatedSignInError', async () => {
+        await expect(client.recover(mockRequestId, mockSignerAddress)).rejects.toBeInstanceOf(ImpersonatedSignInError)
       })
     })
   })
