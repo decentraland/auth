@@ -48,4 +48,26 @@ class TimedOutError extends Error {
   }
 }
 
-export { DifferentSenderError, ExpiredRequestError, RequestNotFoundError, RequestFulfilledError, IpValidationError, TimedOutError }
+/**
+ * Thrown when a request whose method is not `dcl_personal_sign` (e.g. a plain
+ * `personal_sign`) asks the user to sign a Decentraland identity-authorization
+ * payload. Allowing it would let a malicious site replicate the `dcl_personal_sign`
+ * sign-in flow through the generic signing path, bypassing its protections, and
+ * obtain a valid auth chain that impersonates the user.
+ */
+class ImpersonatedSignInError extends Error {
+  constructor(public readonly method: string) {
+    super(`The "${method}" method cannot be used to sign a Decentraland sign-in payload`)
+    this.name = 'ImpersonatedSignInError'
+  }
+}
+
+export {
+  DifferentSenderError,
+  ExpiredRequestError,
+  RequestNotFoundError,
+  RequestFulfilledError,
+  IpValidationError,
+  TimedOutError,
+  ImpersonatedSignInError
+}

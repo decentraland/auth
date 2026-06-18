@@ -4,6 +4,7 @@ import { config } from '../../modules/config'
 import { trackEvent } from '../utils/analytics'
 import { handleError } from '../utils/errorHandler'
 import { DifferentSenderError, ExpiredRequestError, IpValidationError, RequestFulfilledError, RequestNotFoundError } from './errors'
+import { assertRequestIsNotImpersonatingSignIn } from './signMethodGuard'
 import { OutcomeError, OutcomeResponse, RecoverResponse, ValidationResponse } from './types'
 
 export const createAuthServerWsClient = (authServerUrl?: string) => {
@@ -83,6 +84,10 @@ export const createAuthServerWsClient = (authServerUrl?: string) => {
       if (response.expiration && new Date(response.expiration) < new Date()) {
         throw new ExpiredRequestError(requestId, response.expiration)
       }
+
+      // Reject requests that try to replicate the dcl_personal_sign sign-in through a
+      // generic signing method (e.g. personal_sign), which would bypass its protections.
+      assertRequestIsNotImpersonatingSignIn(response.method, response.params)
 
       switch (response.method) {
         case 'dcl_personal_sign':
