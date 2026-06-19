@@ -3,7 +3,7 @@ import { ConnectionOptionType } from '../components/Connection'
 import { isIos, isMobile } from '../components/Pages/LoginPage/utils'
 import { extractRedirectToFromSearchParameters } from '../shared/locations'
 
-type TargetConfigId = 'default' | 'alternative' | 'ios' | 'android'
+type TargetConfigId = 'default' | 'alternative' | 'ios' | 'android' | 'creator-hub'
 
 type ConnectionOptions = {
   primary: ConnectionOptionType
@@ -75,6 +75,13 @@ const targetConfigs: Record<TargetConfigId, TargetConfig> = {
       // users in Samsung Internet / Chrome only see a disabled MetaMask.
       extraOptions: [ConnectionOptionType.METAMASK, ConnectionOptionType.WALLET_CONNECT]
     }
+  },
+  'creator-hub': {
+    ...defaultConfig,
+    skipSetup: true,
+    showWearablePreview: false,
+    explorerText: 'Creator Hub',
+    deepLink: 'dcl-creator-hub://open'
   }
 }
 

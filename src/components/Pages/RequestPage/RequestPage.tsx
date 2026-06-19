@@ -801,7 +801,7 @@ export const RequestPage = () => {
       // From web (has redirectTo): show minimal success view
       return skipSetup ? <SignInCompletePage /> : <SignInComplete />
     case View.DEEP_LINK_CONTINUE_IN_APP:
-      return <ContinueInApp onContinue={onContinueInApp} requestId={requestId} deepLinkUrl={`decentraland://open?signin=${identityId}`} />
+      return <ContinueInApp onContinue={onContinueInApp} requestId={requestId} deepLinkUrl={`${targetConfig.deepLink || 'decentraland://open'}?signin=${identityId}`} />
     case View.VERIFY_SIGN_IN_DENIED:
       return <DeniedSignIn requestId={requestId} />
     case View.WALLET_INTERACTION_COMPLETE:
