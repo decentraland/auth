@@ -79,7 +79,7 @@ const targetConfigs: Record<TargetConfigId, TargetConfig> = {
   'creator-hub': {
     ...defaultConfig,
     skipSetup: true,
-    showWearablePreview: false,
+    showWearablePreview: true,
     explorerText: 'Creator Hub',
     deepLink: 'dcl-creator-hub://'
   }
