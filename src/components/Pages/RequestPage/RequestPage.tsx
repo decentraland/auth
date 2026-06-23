@@ -151,6 +151,7 @@ export const RequestPage = () => {
   const [view, setView] = useState(View.LOADING_REQUEST)
   const [isLoading, setIsLoading] = useState(false)
   const [hasTimedOut, setHasTimedOut] = useState(false)
+  const [skipDeepLinkRedirect, setSkipDeepLinkRedirect] = useState(false)
   const [walletInfo, setWalletInfo] = useState<{
     balance: bigint
     chainId: number
@@ -774,6 +775,8 @@ export const RequestPage = () => {
 
     trackClick(ClickEvents.IDENTITY_DEEP_LINK_OPENED)
 
+    // The deep link already fired in ContinueInApp — skip the auto-redirect in SignInCompletePage
+    setSkipDeepLinkRedirect(true)
     // Show completion view
     setView(View.VERIFY_SIGN_IN_COMPLETE)
   }, [identityId, trackClick])
@@ -789,7 +792,7 @@ export const RequestPage = () => {
       return (
         <RecoverError
           onTryAgain={() => {
-            window.location.href = getExplorerDeeplink()
+            window.location.href = getExplorerDeeplink(targetConfig.deepLink)
           }}
         />
       )
@@ -799,7 +802,11 @@ export const RequestPage = () => {
     case View.VERIFY_SIGN_IN_COMPLETE:
       // From Explorer (skipSetup enabled): show full-page success with Continue button
       // From web (has redirectTo): show minimal success view
-      return skipSetup ? <SignInCompletePage /> : <SignInComplete />
+      return skipSetup ? (
+        <SignInCompletePage skipRedirect={skipDeepLinkRedirect} deepLink={targetConfig.deepLink} />
+      ) : (
+        <SignInComplete />
+      )
     case View.DEEP_LINK_CONTINUE_IN_APP:
       return <ContinueInApp onContinue={onContinueInApp} requestId={requestId} deepLinkUrl={`${targetConfig.deepLink || 'decentraland://'}open?signin=${identityId}`} />
     case View.VERIFY_SIGN_IN_DENIED:

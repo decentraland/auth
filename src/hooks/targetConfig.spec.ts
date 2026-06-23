@@ -122,7 +122,7 @@ describe('useTargetConfig', () => {
       const { result } = renderHook(() => useTargetConfig())
       const [config] = result.current
 
-      expect(config.deepLink).toBe('dcl-creator-hub://open')
+      expect(config.deepLink).toBe('dcl-creator-hub://')
     })
   })
 
