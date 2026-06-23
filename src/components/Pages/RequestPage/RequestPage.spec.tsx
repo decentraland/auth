@@ -460,20 +460,16 @@ describe('RequestPage', () => {
         expect(mockEnsureProfile).not.toHaveBeenCalled()
       })
 
-      it('should post identity and show ContinueInApp for new user in deep link flow', async () => {
-        // New user + deep link flow → auto-signs → posts identity → shows ContinueInApp
+      it('should skip auto-sign and show confirmation page for new user in deep link flow', async () => {
         jest.mocked(fetchProfile).mockResolvedValue(null)
         jest.mocked(isProfileComplete).mockReturnValue(false)
-        mockSignMessage.mockResolvedValue('0xsignature')
-        mockPostIdentity.mockResolvedValue({ identityId: 'test-identity-id', expiration: new Date() })
 
         renderRequestPage(`/auth/requests/${REQUEST_ID}?targetConfigId=default&flow=deeplink`)
         await waitFor(() => {
-          expect(screen.getByTestId('continue-in-app')).toBeInTheDocument()
+          expect(screen.getByTestId('verify-sign-in')).toBeInTheDocument()
         })
-        expect(mockPostIdentity).toHaveBeenCalledWith(mockConnectionData.identity)
+        expect(mockSignMessage).not.toHaveBeenCalled()
         expect(mockSendSuccessfulOutcome).not.toHaveBeenCalled()
-        expect(mockEnsureProfile).not.toHaveBeenCalled()
       })
     })
 

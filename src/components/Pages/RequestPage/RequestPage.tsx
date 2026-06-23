@@ -316,7 +316,7 @@ export const RequestPage = () => {
             // showing the verification code screen. This matches the old behavior where
             // SetupPage signed the request automatically after profile deployment.
             // Returning users (with profile) still see the verification screen.
-            if (skipSetup) {
+            if (skipSetup && !isDeepLinkFlow) {
               const userProfile = await fetchProfile(signerAddress)
               if (cancelled) return
 
@@ -332,20 +332,9 @@ export const RequestPage = () => {
                     message: autoSignMessage
                   })
                   if (cancelled) return
-
-                  if (isDeepLinkFlow && identityRef.current) {
-                    // Deep link flow: post identity so the requesting app can retrieve it
-                    // via the deep link URL. Do NOT send the WebSocket outcome — Creator Hub
-                    // listens for the deep link, not the relay message.
-                    const httpClient = createAuthServerHttpClient()
-                    const identityResponse = await httpClient.postIdentity(identityRef.current)
-                    setIdentityId(identityResponse.identityId)
-                    setView(View.DEEP_LINK_CONTINUE_IN_APP)
-                  } else {
-                    await authServerClient.current.sendSuccessfulOutcome(requestId, signerAddress, signature)
-                    hasCompletedRef.current = true
-                    setView(View.VERIFY_SIGN_IN_COMPLETE)
-                  }
+                  await authServerClient.current.sendSuccessfulOutcome(requestId, signerAddress, signature)
+                  hasCompletedRef.current = true
+                  setView(View.VERIFY_SIGN_IN_COMPLETE)
                   break
                 } catch (e) {
                   if (cancelled) return
