@@ -5,23 +5,28 @@ import { config } from '../../../../modules/config'
 import { AnimatedBackground } from '../../../AnimatedBackground'
 import { CenteredContainer, Description, SuccessAnimation, TextBlock, Title, TitleCheckIcon, TitleRow } from './SignInCompletePage.styled'
 
-function getExplorerDeeplink(): string {
+function getExplorerDeeplink(deepLink?: string): string {
   const env = config.get('ENVIRONMENT').toLowerCase()
-  if (env === 'production') return 'decentraland://'
-  return `decentraland://?dclenv=${env === 'development' ? 'zone' : env}`
+  const base = deepLink || 'decentraland://'
+  if (env === 'production') return base
+  return `${base}?dclenv=${env === 'development' ? 'zone' : env}`
 }
 
 type Props = {
   onContinue?: () => void
+  deepLink?: string
+  skipRedirect?: boolean
 }
 
-const SignInCompletePage = ({ onContinue }: Props) => {
+const SignInCompletePage = ({ onContinue, deepLink, skipRedirect }: Props) => {
   const { t } = useTranslation()
 
   useEffect(() => {
     onContinue?.()
-    window.location.href = getExplorerDeeplink()
-  }, [onContinue])
+    if (!skipRedirect) {
+      window.location.href = getExplorerDeeplink(deepLink)
+    }
+  }, [onContinue, deepLink, skipRedirect])
 
   return (
     <CenteredContainer>

@@ -104,6 +104,28 @@ describe('useTargetConfig', () => {
     })
   })
 
+  describe('when a targetConfigId is provided as creator-hub', () => {
+    beforeEach(() => {
+      ;(useLocation as jest.Mock).mockReturnValue({ search: '?targetConfigId=creator-hub' })
+      ;(isMobile as jest.Mock).mockReturnValue(false)
+    })
+
+    it('should return the creator-hub config', () => {
+      const { result } = renderHook(() => useTargetConfig())
+      const [config, targetConfigId] = result.current
+
+      expect(targetConfigId).toBe('creator-hub')
+      expect(config).toEqual(_targetConfigs['creator-hub'])
+    })
+
+    it('should have the correct deep link protocol', () => {
+      const { result } = renderHook(() => useTargetConfig())
+      const [config] = result.current
+
+      expect(config.deepLink).toBe('dcl-creator-hub://')
+    })
+  })
+
   describe('when an invalid targetConfigId is provided', () => {
     beforeEach(() => {
       ;(useLocation as jest.Mock).mockReturnValue({ search: '?targetConfigId=invalid' })
