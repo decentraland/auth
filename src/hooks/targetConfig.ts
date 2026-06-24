@@ -61,7 +61,12 @@ const targetConfigs: Record<TargetConfigId, TargetConfig> = {
     connectionOptions: {
       primary: ConnectionOptionType.APPLE,
       secondary: ConnectionOptionType.GOOGLE,
-      extraOptions: [ConnectionOptionType.WALLET_CONNECT]
+      // Include both wallet options for parity with Android: MetaMask covers the
+      // in-app DApp Browser path (connects through the injected provider directly,
+      // with no WalletConnect relay/app-switching back-and-forth), WalletConnect
+      // covers every other mobile wallet (Trust, Rainbow, etc.). The
+      // MetaMask option auto-disables in regular Safari where no provider is injected.
+      extraOptions: [ConnectionOptionType.METAMASK, ConnectionOptionType.WALLET_CONNECT]
     }
   },
   android: {
