@@ -59,6 +59,7 @@ const mockRecover = jest.fn()
 const mockSendSuccessfulOutcome = jest.fn()
 const mockSendFailedOutcome = jest.fn()
 const mockNotifyRequestNeedsValidation = jest.fn()
+const mockPostIdentity = jest.fn()
 jest.mock('../../../shared/auth', () => {
   const actual = jest.requireActual('../../../shared/auth')
   return {
@@ -67,7 +68,8 @@ jest.mock('../../../shared/auth', () => {
       recover: mockRecover,
       sendSuccessfulOutcome: mockSendSuccessfulOutcome,
       sendFailedOutcome: mockSendFailedOutcome,
-      notifyRequestNeedsValidation: mockNotifyRequestNeedsValidation
+      notifyRequestNeedsValidation: mockNotifyRequestNeedsValidation,
+      postIdentity: mockPostIdentity
     })
   }
 })
@@ -146,6 +148,7 @@ jest.mock('./Views', () => ({
   WalletInteractionComplete: () => <div data-testid="wallet-interaction-complete">Wallet Complete</div>,
   DeniedWalletInteraction: () => <div data-testid="denied-wallet-interaction">Denied Wallet</div>,
   ContinueInApp: () => <div data-testid="continue-in-app">Continue in App</div>,
+  getExplorerDeeplink: jest.fn().mockReturnValue('decentraland://open'),
   TransferConfirmView: () => <div data-testid="transfer-confirm">Transfer Confirm</div>,
   TransferCompletedView: () => <div data-testid="transfer-completed">Transfer Completed</div>,
   TransferCanceledView: () => <div data-testid="transfer-canceled">Transfer Canceled</div>
@@ -455,6 +458,18 @@ describe('RequestPage', () => {
           expect(screen.getByTestId('sign-in-complete-page')).toBeInTheDocument()
         })
         expect(mockEnsureProfile).not.toHaveBeenCalled()
+      })
+
+      it('should skip auto-sign and show confirmation page for new user in deep link flow', async () => {
+        jest.mocked(fetchProfile).mockResolvedValue(null)
+        jest.mocked(isProfileComplete).mockReturnValue(false)
+
+        renderRequestPage(`/auth/requests/${REQUEST_ID}?targetConfigId=default&flow=deeplink`)
+        await waitFor(() => {
+          expect(screen.getByTestId('verify-sign-in')).toBeInTheDocument()
+        })
+        expect(mockSignMessage).not.toHaveBeenCalled()
+        expect(mockSendSuccessfulOutcome).not.toHaveBeenCalled()
       })
     })
 
