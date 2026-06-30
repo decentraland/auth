@@ -2,6 +2,7 @@ import { useCallback } from 'react'
 import fetch from 'decentraland-crypto-fetch'
 import { config } from '../modules/config'
 import { useCurrentConnectionData } from '../shared/connection'
+import { generateDeviceFingerprint } from '../shared/utils/deviceFingerprint'
 import { handleErrorWithContext } from '../shared/utils/errorHandler'
 
 const REFERRAL_SERVER_URL = config.get('REFERRAL_SERVER_URL')
@@ -18,11 +19,19 @@ export const useTrackReferral = () => {
       try {
         const body = method === 'POST' ? JSON.stringify({ referrer }) : undefined
 
+        const deviceFingerprint = await generateDeviceFingerprint()
+
+        const headers: Record<string, string> = {
+          contentType: 'application/json'
+        }
+
+        if (deviceFingerprint) {
+          headers['x-device-fingerprint'] = deviceFingerprint
+        }
+
         await fetch(`${REFERRAL_SERVER_URL}/referral-progress`, {
           method,
-          headers: {
-            contentType: 'application/json'
-          },
+          headers,
           ...(body && { body }),
           identity
         })
