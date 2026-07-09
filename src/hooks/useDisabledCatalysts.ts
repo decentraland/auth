@@ -20,7 +20,10 @@ export const useDisabledCatalysts = (): string[] => {
     }
 
     try {
-      return JSON.parse(payloadValue)
+      const parsed = JSON.parse(payloadValue)
+      // The payload comes from remote feature-flag config; only trust it if it's actually
+      // an array of catalyst addresses, otherwise downstream `.includes`/spread would throw.
+      return Array.isArray(parsed) ? parsed : EMPTY_LIST
     } catch {
       return EMPTY_LIST
     }

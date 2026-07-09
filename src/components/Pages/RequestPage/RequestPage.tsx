@@ -4,7 +4,7 @@ import { createPublicClient, createWalletClient, custom, formatEther } from 'vie
 import { mainnet } from 'viem/chains'
 import { useTranslation } from '@dcl/hooks'
 import { ContractName, getContract, sendMetaTransaction } from 'decentraland-transactions'
-import { Button, Dialog, DialogActions, DialogContent, DialogTitle } from 'decentraland-ui2'
+import { Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle } from 'decentraland-ui2'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import { useAnalytics } from '../../../hooks/useAnalytics'
@@ -96,11 +96,12 @@ interface TransactionConfirmDialogProps {
   open: boolean
   transactionCost: bigint
   balance: bigint
+  isLoading?: boolean
   onCancel: () => void
   onConfirm: () => void
 }
 
-const TransactionConfirmDialog = ({ open, transactionCost, balance, onCancel, onConfirm }: TransactionConfirmDialogProps) => {
+const TransactionConfirmDialog = ({ open, transactionCost, balance, isLoading, onCancel, onConfirm }: TransactionConfirmDialogProps) => {
   const { t } = useTranslation()
   return (
     <Dialog open={open} maxWidth="xs" fullWidth>
@@ -110,9 +111,11 @@ const TransactionConfirmDialog = ({ open, transactionCost, balance, onCancel, on
         <p>{t('request.transaction_dialog.your_balance', { balance: formatEther(balance) })}</p>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onCancel}>{t('common.cancel')}</Button>
-        <Button variant="contained" onClick={onConfirm}>
-          {t('common.confirm')}
+        <Button onClick={onCancel} disabled={isLoading}>
+          {t('common.cancel')}
+        </Button>
+        <Button variant="contained" onClick={onConfirm} disabled={isLoading}>
+          {isLoading ? <CircularProgress size={20} color="inherit" /> : t('common.confirm')}
         </Button>
       </DialogActions>
     </Dialog>
@@ -164,6 +167,9 @@ export const RequestPage = () => {
   const viewRef = useRef(view)
   viewRef.current = view
   const hasCompletedRef = useRef(false)
+  // Guards against re-entrant approvals (e.g. a fast double-click on the confirm dialog),
+  // which would otherwise fire two transactions before `isLoading` re-renders the buttons.
+  const isApprovingRef = useRef(false)
   // Ref to read the latest identity inside the effect without adding it as a dependency.
   // Only used in the profile-check effect (profile redeployment). Callbacks like
   // onApproveSignInVerification close over `identity` directly so they stay consistent
@@ -331,17 +337,21 @@ export const RequestPage = () => {
         requestRef.current = request
 
         // Initialize the timeout to display the timeout view when the request expires.
-        timeoutRef.current = setTimeout(
-          () => {
+        // Guard against an unparseable expiration: `new Date(...).getTime()` would be NaN,
+        // which setTimeout coerces to 0 and fires the timeout view immediately.
+        // A negative delay (a request that is already past its expiration) is intentional:
+        // setTimeout coerces it to 0 so the timeout view shows right away.
+        const expirationDelay = new Date(request.expiration).getTime() - Date.now()
+        if (!Number.isNaN(expirationDelay)) {
+          timeoutRef.current = setTimeout(() => {
             getAnalytics()?.track(TrackingEvents.REQUEST_EXPIRED, {
               browserTime: Date.now(),
               requestTime: new Date(request.expiration).getTime(),
               timeTheSiteStartedLoading
             })
             setView(View.TIMEOUT)
-          },
-          new Date(request.expiration).getTime() - Date.now()
-        )
+          }, expirationDelay)
+        }
 
         // Show different views depending on the request method.
         switch (request.method) {
@@ -414,7 +424,7 @@ export const RequestPage = () => {
               const transactionData = txParams?.data as string | undefined
               const contractAddress = txParams?.to as string | undefined
               if (transactionData && contractAddress) {
-                const manaData = decodeManaTransferData(transactionData)
+                const manaData = decodeManaTransferData(transactionData, contractAddress)
                 if (manaData) {
                   const [recipientProfile, placeInfo] = await Promise.all([
                     fetchProfile(manaData.toAddress),
@@ -424,7 +434,9 @@ export const RequestPage = () => {
                   if (cancelled) return
 
                   setManaTransferData({
-                    manaAmount: `${parseInt(manaData.manaAmount, 10)} MANA`,
+                    // Show the exact formatted amount (formatEther already trims trailing zeros).
+                    // parseInt truncated fractional MANA, under-displaying what is actually signed.
+                    manaAmount: `${manaData.manaAmount} MANA`,
                     toAddress: manaData.toAddress,
                     recipientProfile: recipientProfile || undefined,
                     sceneName: placeInfo?.sceneName || 'Unknown Place',
@@ -692,6 +704,10 @@ export const RequestPage = () => {
   }, [nftTransferData, manaTransferData, requestId])
 
   const onApproveWalletInteraction = useCallback(async () => {
+    // Prevent duplicate submissions — the confirm dialog buttons aren't disabled synchronously,
+    // so a double-click could otherwise re-enter before the first call flips isLoading.
+    if (isApprovingRef.current) return
+    isApprovingRef.current = true
     setIsLoading(true)
     setIsTransactionModalOpen(false)
     const walletClient = walletClientRef.current
@@ -811,6 +827,7 @@ export const RequestPage = () => {
       }
     } finally {
       setIsLoading(false)
+      isApprovingRef.current = false
     }
   }, [isUserUsingWeb2Wallet, nftTransferData, manaTransferData, requestId, identity])
 
@@ -904,6 +921,7 @@ export const RequestPage = () => {
             open={isTransactionModalOpen}
             transactionCost={transactionGasCost ?? BigInt(0)}
             balance={walletInfo?.balance ?? BigInt(0)}
+            isLoading={isLoading}
             onCancel={onDenyWalletInteraction}
             onConfirm={onApproveWalletInteraction}
           />
@@ -923,6 +941,7 @@ export const RequestPage = () => {
             open={isTransactionModalOpen}
             transactionCost={transactionGasCost ?? BigInt(0)}
             balance={walletInfo?.balance ?? BigInt(0)}
+            isLoading={isLoading}
             onCancel={onDenyWalletInteraction}
             onConfirm={onApproveWalletInteraction}
           />
@@ -942,6 +961,7 @@ export const RequestPage = () => {
             open={isTransactionModalOpen}
             transactionCost={transactionGasCost ?? BigInt(0)}
             balance={walletInfo?.balance ?? BigInt(0)}
+            isLoading={isLoading}
             onCancel={onDenyWalletInteraction}
             onConfirm={onApproveWalletInteraction}
           />

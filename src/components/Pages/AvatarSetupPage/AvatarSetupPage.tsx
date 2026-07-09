@@ -218,6 +218,17 @@ const AvatarSetupPage: React.FC = () => {
 
   const handleMessage = useCallback(
     async (event: MessageEvent) => {
+      // Only trust messages coming from the WearablePreview iframe. Without this check any
+      // page holding a handle to this window (popup/iframe) could post a forged
+      // `customization-done` payload and deploy an attacker-chosen profile with the user's identity.
+      let previewOrigin: string
+      try {
+        previewOrigin = new URL(config.get('WEARABLE_PREVIEW_URL')).origin
+      } catch {
+        return
+      }
+      if (event.origin !== previewOrigin) return
+
       if (event.data.type !== 'controller_response') return
 
       if (event.data.payload.id === 'avatar-customization-step') {

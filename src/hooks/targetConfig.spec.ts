@@ -141,6 +141,21 @@ describe('useTargetConfig', () => {
     })
   })
 
+  describe('when the targetConfigId is an inherited Object.prototype key', () => {
+    beforeEach(() => {
+      ;(useLocation as jest.Mock).mockReturnValue({ search: '?targetConfigId=constructor' })
+      ;(isMobile as jest.Mock).mockReturnValue(false)
+    })
+
+    it('should return the default config instead of a prototype value', () => {
+      const { result } = renderHook(() => useTargetConfig())
+      const [config, targetConfigId] = result.current
+
+      expect(targetConfigId).toBe('default')
+      expect(config).toEqual(_targetConfigs.default)
+    })
+  })
+
   describe('when on iOS mobile with no targetConfigId', () => {
     beforeEach(() => {
       ;(useLocation as jest.Mock).mockReturnValue({ search: '' })

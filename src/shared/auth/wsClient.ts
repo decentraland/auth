@@ -7,6 +7,25 @@ import { DifferentSenderError, ExpiredRequestError, IpValidationError, RequestFu
 import { assertRequestIsNotImpersonatingSignIn } from './signMethodGuard'
 import { OutcomeError, OutcomeResponse, RecoverResponse, ValidationResponse } from './types'
 
+// Fail fast instead of hanging forever if the auth server is unreachable or never acks.
+const CONNECT_TIMEOUT_MS = 15000
+const ACK_TIMEOUT_MS = 30000
+
+const withTimeout = <T>(promise: Promise<T>, ms: number, message: string): Promise<T> =>
+  new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), ms)
+    promise.then(
+      value => {
+        clearTimeout(timer)
+        resolve(value)
+      },
+      error => {
+        clearTimeout(timer)
+        reject(error)
+      }
+    )
+  })
+
 export const createAuthServerWsClient = (authServerUrl?: string) => {
   const url = authServerUrl ?? config.get('AUTH_SERVER_URL')
 
@@ -16,15 +35,36 @@ export const createAuthServerWsClient = (authServerUrl?: string) => {
   ): Promise<T> => {
     const socket = io(url)
 
-    await new Promise<void>(resolve => {
-      socket.on('connect', resolve)
-    })
+    try {
+      // Reject (rather than hang) if the connection can't be established or times out.
+      await withTimeout(
+        new Promise<void>((resolve, reject) => {
+          socket.on('connect', () => {
+            // Detach the error handler once connected so a later reconnection error
+            // (before socket.close) can't call reject on an already-settled promise.
+            socket.off('connect_error', reject)
+            resolve()
+          })
+          socket.on('connect_error', reject)
+        }),
+        CONNECT_TIMEOUT_MS,
+        'Timed out connecting to the auth server'
+      )
 
-    const response = await socket.emitWithAck(event, message)
+      const response = await withTimeout(
+        socket.emitWithAck(event, message),
+        ACK_TIMEOUT_MS,
+        'Timed out waiting for the auth server response'
+      )
 
-    // Close client, we don't need it anymore
-    socket.close()
+      return handleResponse<T>(response, message)
+    } finally {
+      // Always close the socket, including on connect/ack timeouts and errors.
+      socket.close()
+    }
+  }
 
+  const handleResponse = <T>(response: { error?: string } & T, message: { requestId: string }): T => {
     if (response.error?.includes('already been fulfilled')) {
       throw new RequestFulfilledError(message.requestId)
     } else if (response.error?.includes('not found')) {

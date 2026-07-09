@@ -160,19 +160,31 @@ function decodeNftTransferData(data: string, contractABI: object[]): { tokenId: 
 }
 
 /**
- * Decodes MANA (ERC20) transfer data to extract amount and destination address
+ * Decodes MANA (ERC20) transfer data to extract amount and destination address.
+ * Only decodes when the transaction targets the canonical MANA token contract, so an
+ * arbitrary ERC20 transfer can't be presented to the user as a MANA tip.
  * @param data The transaction data
+ * @param contractAddress The transaction `to` address (the token contract being called)
  * @returns Object containing manaAmount and toAddress, or null if decoding fails
  */
-function decodeManaTransferData(data: string): { manaAmount: string; toAddress: string } | null {
+function decodeManaTransferData(data: string, contractAddress: string): { manaAmount: string; toAddress: string } | null {
   try {
     if (!data || data.length < 10) return null
+    if (!contractAddress) return null
 
     // ERC20 transfer function signature: transfer(address to, uint256 amount)
     const transferFunctionSignature = '0xa9059cbb'
 
     // Check if this is a transfer function call
     if (!data.startsWith(transferFunctionSignature)) {
+      return null
+    }
+
+    // Only treat this as a MANA transfer if it targets the canonical MANA token contract.
+    // Without this, any ERC20 transfer (`transfer(to, amount)`) would be mislabeled as MANA
+    // and its amount mis-formatted (formatEther assumes 18 decimals).
+    const manaContract = getContract(ContractName.MANAToken, getMetaTransactionChainId())
+    if (contractAddress.toLowerCase() !== manaContract.address.toLowerCase()) {
       return null
     }
 
@@ -232,8 +244,19 @@ async function fetchNftMetadata(
     throw new Error(`No tokenURI returned for token ${tokenId} at contract ${contractAddress}`)
   }
 
-  // Handle IPFS URIs
+  // The tokenURI comes from an arbitrary (attacker-chosen) contract, so only allow http(s)
+  // before fetching. This blocks schemes like javascript:/data:/file: from being passed to fetch.
   const metadataUrl = tokenUri
+
+  let metadataProtocol: string
+  try {
+    metadataProtocol = new URL(metadataUrl).protocol
+  } catch {
+    throw new Error(`Invalid tokenURI for token ${tokenId} at contract ${contractAddress}`)
+  }
+  if (metadataProtocol !== 'https:' && metadataProtocol !== 'http:') {
+    throw new Error(`Unsupported tokenURI scheme "${metadataProtocol}" for token ${tokenId} at contract ${contractAddress}`)
+  }
 
   // Fetch the metadata JSON
   const metadataResponse = await fetch(metadataUrl)
@@ -243,7 +266,22 @@ async function fetchNftMetadata(
 
   const metadata = await metadataResponse.json()
 
-  const imageUrl = metadata.image || metadata.image_url
+  // The metadata comes from an attacker-controllable contract/URL, so only surface http(s)
+  // image URLs. This drops data:/other-scheme values as defense-in-depth (the actual transfer
+  // token/recipient come from the decoded tx, not this cosmetic field); a dropped image just
+  // falls back to the view's placeholder rather than breaking it.
+  const rawImageUrl = metadata.image || metadata.image_url
+  let imageUrl = ''
+  if (typeof rawImageUrl === 'string') {
+    try {
+      const imageProtocol = new URL(rawImageUrl).protocol
+      if (imageProtocol === 'https:' || imageProtocol === 'http:') {
+        imageUrl = rawImageUrl
+      }
+    } catch {
+      // Ignore malformed image URLs — leave imageUrl empty.
+    }
+  }
 
   // Extract rarity from attributes
   let rarity: Rarity = Rarity.COMMON
