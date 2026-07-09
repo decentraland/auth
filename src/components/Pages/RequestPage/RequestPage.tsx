@@ -615,7 +615,7 @@ export const RequestPage = () => {
         setIsLoading(false)
       }
     }
-  }, [setIsLoading, isUserUsingWeb2Wallet, isLoading, identity])
+  }, [setIsLoading, isUserUsingWeb2Wallet, isLoading, identity, isBridgeOnly])
 
   const onDenyWalletInteraction = useCallback(async () => {
     setIsLoading(true)
