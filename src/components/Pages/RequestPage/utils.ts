@@ -45,6 +45,36 @@ const launchDeepLink = (url: string): Promise<boolean> => {
   })
 }
 
+// Query params every client deep link carries: dclenv on non-production environments and
+// the bridge-only flag when the auth site was opened with it.
+function getDeeplinkQueryParams(bridgeOnly?: boolean): URLSearchParams {
+  const env = config.get('ENVIRONMENT').toLowerCase()
+  const params = new URLSearchParams()
+  if (env !== 'production') {
+    params.set('dclenv', env === 'development' ? 'zone' : env)
+  }
+  if (bridgeOnly) {
+    params.set('bridge-only', 'true')
+  }
+  return params
+}
+
+// Builds the bare client deep link (e.g. after the traditional signing flow completes).
+function getExplorerDeeplink(deepLink?: string, bridgeOnly?: boolean): string {
+  const base = deepLink || 'decentraland://'
+  const query = getDeeplinkQueryParams(bridgeOnly).toString()
+  return query ? `${base}?${query}` : base
+}
+
+// Builds the `open?signin=<identityId>` deep link that hands a posted identity to the
+// client, carrying the same query params (dclenv, bridge-only) as the bare deep link.
+// Seeding signin into the URLSearchParams encodes the id and keeps a single `?`-joined query.
+function getSigninDeeplink(deepLink: string | undefined, identityId: string, bridgeOnly?: boolean): string {
+  const params = new URLSearchParams({ signin: identityId })
+  getDeeplinkQueryParams(bridgeOnly).forEach((value, key) => params.set(key, value))
+  return `${deepLink || 'decentraland://'}open?${params.toString()}`
+}
+
 async function getConnectedProvider(): Promise<Provider | null> {
   try {
     return await connection.getProvider()
@@ -370,6 +400,8 @@ async function fetchPlaceByCreatorAddress(creatorAddress: string): Promise<{ sce
 
 export {
   launchDeepLink,
+  getExplorerDeeplink,
+  getSigninDeeplink,
   getConnectedProvider,
   getNetworkProvider,
   isDecentralandContractAddress,

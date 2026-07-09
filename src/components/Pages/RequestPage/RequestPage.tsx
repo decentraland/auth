@@ -18,6 +18,7 @@ import { fetchProfile } from '../../../modules/profile'
 import {
   DifferentSenderError,
   ExpiredRequestError,
+  IdentityResponse,
   ImpersonatedSignInError,
   IpValidationError,
   RecoverResponse,
@@ -27,7 +28,12 @@ import {
 } from '../../../shared/auth'
 import { useCurrentConnectionData } from '../../../shared/connection'
 import { isErrorWithMessage, isRpcError, isUserRejectedTransaction } from '../../../shared/errors'
-import { extractReferrerFromSearchParameters, isBridgeOnlyEnabled } from '../../../shared/locations'
+import {
+  CLIENT_LOGIN_REQUEST_ID,
+  buildRequestPageUrl,
+  extractReferrerFromSearchParameters,
+  isBridgeOnlyEnabled
+} from '../../../shared/locations'
 import { sendTipNotification } from '../../../shared/notifications'
 import { isProfileComplete } from '../../../shared/profile'
 import { identifyUser } from '../../../shared/utils/analytics'
@@ -41,10 +47,13 @@ import {
   fetchNftMetadata,
   fetchPlaceByCreatorAddress,
   getConnectedProvider,
+  getExplorerDeeplink,
   getMetaTransactionChainId,
-  getNetworkProvider
+  getNetworkProvider,
+  getSigninDeeplink
 } from './utils'
 import {
+  ClientLoginError,
   ContinueInApp,
   DeniedSignIn,
   DeniedWalletInteraction,
@@ -61,8 +70,7 @@ import {
   TransferConfirmView,
   VerifySignIn,
   WalletInteraction,
-  WalletInteractionComplete,
-  getExplorerDeeplink
+  WalletInteractionComplete
 } from './Views'
 
 enum View {
@@ -79,6 +87,8 @@ enum View {
   VERIFY_SIGN_IN_COMPLETE,
   // Deep Link Flow
   DEEP_LINK_CONTINUE_IN_APP,
+  // Client-login pseudo request (identity post failed)
+  CLIENT_LOGIN_ERROR,
   // Wallet Interaction
   WALLET_INTERACTION,
   WALLET_NFT_INTERACTION,
@@ -128,6 +138,7 @@ const TERMINAL_VIEWS = new Set([
   View.VERIFY_SIGN_IN_DENIED,
   View.VERIFY_SIGN_IN_ERROR,
   View.DEEP_LINK_CONTINUE_IN_APP,
+  View.CLIENT_LOGIN_ERROR,
   View.WALLET_INTERACTION_COMPLETE,
   View.WALLET_NFT_INTERACTION_COMPLETE,
   View.WALLET_MANA_INTERACTION_COMPLETE,
@@ -170,6 +181,12 @@ export const RequestPage = () => {
   // Guards against re-entrant approvals (e.g. a fast double-click on the confirm dialog),
   // which would otherwise fire two transactions before `isLoading` re-renders the buttons.
   const isApprovingRef = useRef(false)
+  // Shares the in-flight identity POST across effect re-runs so the client-login flow
+  // creates the identity exactly once; cleared on failure so a retry can re-post.
+  const clientLoginPromiseRef = useRef<Promise<IdentityResponse> | null>(null)
+  // Tracks the deep-link-opened analytics event so it fires once even though the
+  // client-login ContinueInApp view stays mounted across manual re-launches.
+  const hasTrackedDeepLinkRef = useRef(false)
   // Ref to read the latest identity inside the effect without adding it as a dependency.
   // Only used in the profile-check effect (profile redeployment). Callbacks like
   // onApproveSignInVerification close over `identity` directly so they stay consistent
@@ -187,21 +204,23 @@ export const RequestPage = () => {
   const isUserUsingWeb2Wallet = !!provider?.isMagic
   const authServerClient = useRef(createAuthServerHttpClient())
   const isDeepLinkFlow = searchParams.get('flow') === 'deeplink'
-  const flowParam = isDeepLinkFlow ? '&flow=deeplink' : ''
+  // The `client-login` pseudo request id has no backing auth-server request: skip the
+  // whole recover/verify flow and hand the signed identity to the client via the deep
+  // link, the same way the standalone mobile flow does.
+  const isClientLoginFlow = requestId === CLIENT_LOGIN_REQUEST_ID
   // The bridge-only flag rides inside redirectTo so it survives logins/callbacks and can be
   // appended to the client deep link once the flow completes.
   const isBridgeOnly = isBridgeOnlyEnabled(searchParams)
-  const bridgeOnlyParam = isBridgeOnly ? '&bridge-only=true' : ''
   // Goes to the login page where the user will have to connect a wallet.
   // Preserve loginMethod from current URL if present for auto-login functionality
   const loginMethodParam = searchParams.get('loginMethod')
 
   const toLoginPage = useCallback(() => {
-    const redirectToUrl = `/auth/requests/${requestId}?targetConfigId=${targetConfigId}${flowParam}${bridgeOnlyParam}`
+    const redirectToUrl = buildRequestPageUrl(requestId, targetConfigId, { isDeepLinkFlow, isBridgeOnly })
     const loginMethodQuery = loginMethodParam ? `&loginMethod=${encodeURIComponent(loginMethodParam)}` : ''
     const finalUrl = `/login?redirectTo=${encodeURIComponent(redirectToUrl)}${loginMethodQuery}`
     navigate(finalUrl)
-  }, [requestId, targetConfigId, flowParam, bridgeOnlyParam, loginMethodParam, navigate])
+  }, [requestId, targetConfigId, isDeepLinkFlow, isBridgeOnly, loginMethodParam, navigate])
 
   // Effect 1: Ensure profile consistency before allowing request loading.
   // Navigates to setup if the profile is incomplete or missing.
@@ -222,7 +241,7 @@ export const RequestPage = () => {
     let cancelled = false
 
     const checkProfile = async () => {
-      const redirectTo = `/auth/requests/${requestId}?targetConfigId=${targetConfigId}${flowParam}${bridgeOnlyParam}`
+      const redirectTo = buildRequestPageUrl(requestId, targetConfigId, { isDeepLinkFlow, isBridgeOnly })
       const referrer = extractReferrerFromSearchParameters(searchParams)
       const profile = await ensureProfile(account, identityRef.current, { redirectTo, referrer })
 
@@ -245,8 +264,8 @@ export const RequestPage = () => {
     initializedFlags,
     requestId,
     targetConfigId,
-    flowParam,
-    bridgeOnlyParam,
+    isDeepLinkFlow,
+    isBridgeOnly,
     searchParams,
     skipSetup
   ])
@@ -291,6 +310,39 @@ export const RequestPage = () => {
     }
 
     let cancelled = false
+
+    // Client-login flow: no request to recover. Post the identity generated during login
+    // to the auth server and let the client retrieve it through the `open?signin=<id>`
+    // deep link, which ContinueInApp fires immediately for this flow.
+    const completeClientLoginFlow = async () => {
+      identifyUser(account)
+
+      const currentIdentity = identityRef.current
+      if (!currentIdentity) {
+        // The login page always generates an identity on connect, so this only happens
+        // when the cached identity is missing or expired — log in again to get one.
+        toLoginPage()
+        return
+      }
+
+      try {
+        // Reuse an in-flight POST if the effect re-runs mid-request so the identity is
+        // created exactly once instead of leaving an orphaned identity on the server.
+        if (!clientLoginPromiseRef.current) {
+          clientLoginPromiseRef.current = authServerClient.current.postIdentity(currentIdentity)
+        }
+        const identityResponse = await clientLoginPromiseRef.current
+        if (cancelled) return
+        setIdentityId(identityResponse.identityId)
+        setView(View.DEEP_LINK_CONTINUE_IN_APP)
+      } catch (e) {
+        // Clear the shared promise so Try Again (a page reload) can post again.
+        clientLoginPromiseRef.current = null
+        if (cancelled) return
+        setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
+        setView(View.CLIENT_LOGIN_ERROR)
+      }
+    }
 
     const loadRequest = async () => {
       const timeTheSiteStartedLoading = Date.now()
@@ -504,14 +556,30 @@ export const RequestPage = () => {
       }
     }
 
-    loadRequest()
+    if (isClientLoginFlow) {
+      completeClientLoginFlow()
+    } else {
+      loadRequest()
+    }
 
     return () => {
       cancelled = true
       clearTimeout(timeoutRef.current)
       clearTimeout(signTimeoutRef.current)
     }
-  }, [toLoginPage, account, provider, providerType, isConnecting, initializedFlags, isProfileReady, requestId, isDeepLinkFlow, skipSetup])
+  }, [
+    toLoginPage,
+    account,
+    provider,
+    providerType,
+    isConnecting,
+    initializedFlags,
+    isProfileReady,
+    requestId,
+    isDeepLinkFlow,
+    isClientLoginFlow,
+    skipSetup
+  ])
 
   useEffect(() => {
     // The timeout is only necessary on the verify sign in and wallet interaction views.
@@ -797,13 +865,28 @@ export const RequestPage = () => {
   const onContinueInApp = useCallback(() => {
     if (!identityId) return
 
-    trackClick(ClickEvents.IDENTITY_DEEP_LINK_OPENED)
+    // Track the open once — the client-login view stays mounted and may re-launch the deep
+    // link (return button or retry), which must not re-count the event.
+    if (!hasTrackedDeepLinkRef.current) {
+      hasTrackedDeepLinkRef.current = true
+      trackClick(ClickEvents.IDENTITY_DEEP_LINK_OPENED)
+    }
+
+    // Client-login flow: the client was opened via the deep link and there is nothing to
+    // navigate to — stay on the ContinueInApp view, which doubles as the retry fallback.
+    if (isClientLoginFlow) return
 
     // The deep link already fired in ContinueInApp — skip the auto-redirect in SignInCompletePage
     setSkipDeepLinkRedirect(true)
     // Show completion view
     setView(View.VERIFY_SIGN_IN_COMPLETE)
-  }, [identityId, trackClick])
+  }, [identityId, trackClick, isClientLoginFlow])
+
+  const onRetryClientLogin = useCallback(() => {
+    // A fresh mount re-runs completeClientLoginFlow: the view resets to LOADING_REQUEST and
+    // the in-flight promise ref clears, re-posting the identity with the still-cached login.
+    window.location.reload()
+  }, [])
 
   switch (view) {
     case View.TIMEOUT:
@@ -823,6 +906,8 @@ export const RequestPage = () => {
     case View.VERIFY_SIGN_IN_ERROR:
     case View.WALLET_INTERACTION_ERROR:
       return <SigningError error={error} />
+    case View.CLIENT_LOGIN_ERROR:
+      return <ClientLoginError error={error} onTryAgain={onRetryClientLogin} />
     case View.VERIFY_SIGN_IN_COMPLETE:
       // From Explorer (skipSetup enabled): show full-page success with Continue button
       // From web (has redirectTo): show minimal success view
@@ -836,7 +921,8 @@ export const RequestPage = () => {
         <ContinueInApp
           onContinue={onContinueInApp}
           requestId={requestId}
-          deepLinkUrl={`${targetConfig.deepLink || 'decentraland://'}open?signin=${identityId}${bridgeOnlyParam}`}
+          deepLinkUrl={getSigninDeeplink(targetConfig.deepLink, identityId ?? '', isBridgeOnly)}
+          immediate={isClientLoginFlow}
         />
       )
     case View.VERIFY_SIGN_IN_DENIED:

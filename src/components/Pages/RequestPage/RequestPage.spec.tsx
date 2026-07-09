@@ -11,9 +11,11 @@ import {
   IpValidationError,
   RequestFulfilledError
 } from '../../../shared/auth'
+import { isBridgeOnlyEnabled } from '../../../shared/locations'
 import { isProfileComplete } from '../../../shared/profile'
 import { FeatureFlagsContext } from '../../FeatureFlagsProvider'
 import { RequestPage } from './RequestPage'
+import { getSigninDeeplink } from './utils'
 
 // --- Navigation ---
 const mockNavigate = jest.fn()
@@ -77,7 +79,9 @@ jest.mock('../../../shared/auth', () => {
 // --- Shared modules ---
 jest.mock('../../../shared/locations', () => ({
   extractReferrerFromSearchParameters: jest.fn().mockReturnValue(null),
-  isBridgeOnlyEnabled: jest.fn().mockReturnValue(false)
+  isBridgeOnlyEnabled: jest.fn().mockReturnValue(false),
+  CLIENT_LOGIN_REQUEST_ID: 'client-login',
+  buildRequestPageUrl: (requestId: string, targetConfigId: string) => `/auth/requests/${requestId}?targetConfigId=${targetConfigId}`
 }))
 jest.mock('../../../shared/utils/analytics', () => ({
   identifyUser: jest.fn()
@@ -149,7 +153,7 @@ jest.mock('./Views', () => ({
   WalletInteractionComplete: () => <div data-testid="wallet-interaction-complete">Wallet Complete</div>,
   DeniedWalletInteraction: () => <div data-testid="denied-wallet-interaction">Denied Wallet</div>,
   ContinueInApp: () => <div data-testid="continue-in-app">Continue in App</div>,
-  getExplorerDeeplink: jest.fn().mockReturnValue('decentraland://open'),
+  ClientLoginError: (props: any) => <div data-testid="client-login-error">Client Login Error: {props.error}</div>,
   TransferConfirmView: () => <div data-testid="transfer-confirm">Transfer Confirm</div>,
   TransferCompletedView: () => <div data-testid="transfer-completed">Transfer Completed</div>,
   TransferCanceledView: () => <div data-testid="transfer-canceled">Transfer Canceled</div>
@@ -163,6 +167,8 @@ jest.mock('./utils', () => ({
   fetchNftMetadata: jest.fn(),
   fetchPlaceByCreatorAddress: jest.fn(),
   getConnectedProvider: jest.fn(),
+  getExplorerDeeplink: jest.fn().mockReturnValue('decentraland://open'),
+  getSigninDeeplink: jest.fn().mockReturnValue('decentraland://open?signin=anIdentityId'),
   getMetaTransactionChainId: jest.fn().mockReturnValue(137),
   getNetworkProvider: jest.fn()
 }))
@@ -188,6 +194,7 @@ jest.mock('@dcl/hooks', () => ({
 }))
 
 const REQUEST_ID = 'test-request-123'
+const CLIENT_LOGIN_REQUEST_PATH = '/auth/requests/client-login?targetConfigId=default'
 
 let mockFlags: Partial<Record<string, boolean>>
 let mockFlagsInitialized: boolean
@@ -471,6 +478,88 @@ describe('RequestPage', () => {
         })
         expect(mockSignMessage).not.toHaveBeenCalled()
         expect(mockSendSuccessfulOutcome).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and the request id is the client-login pseudo request id', () => {
+      beforeEach(() => {
+        mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'User' }] })
+      })
+
+      describe('and the connected user has an identity', () => {
+        beforeEach(() => {
+          mockPostIdentity.mockResolvedValueOnce({ identityId: 'anIdentityId' })
+        })
+
+        it('should post the identity to the auth server and show the continue in app view', async () => {
+          renderRequestPage(CLIENT_LOGIN_REQUEST_PATH)
+          await waitFor(() => {
+            expect(screen.getByTestId('continue-in-app')).toBeInTheDocument()
+          })
+          expect(mockPostIdentity).toHaveBeenCalledWith(mockConnectionData.identity)
+        })
+
+        it('should not recover any request from the auth server', async () => {
+          renderRequestPage(CLIENT_LOGIN_REQUEST_PATH)
+          await waitFor(() => {
+            expect(screen.getByTestId('continue-in-app')).toBeInTheDocument()
+          })
+          expect(mockRecover).not.toHaveBeenCalled()
+        })
+
+        it('should build the signin deep link without the bridge-only flag', async () => {
+          renderRequestPage(CLIENT_LOGIN_REQUEST_PATH)
+          await waitFor(() => {
+            expect(screen.getByTestId('continue-in-app')).toBeInTheDocument()
+          })
+          expect(jest.mocked(getSigninDeeplink)).toHaveBeenCalledWith(undefined, 'anIdentityId', false)
+        })
+      })
+
+      describe('and the bridge-only flag is enabled', () => {
+        beforeEach(() => {
+          jest.mocked(isBridgeOnlyEnabled).mockReturnValue(true)
+          mockPostIdentity.mockResolvedValueOnce({ identityId: 'anIdentityId' })
+        })
+
+        afterEach(() => {
+          jest.mocked(isBridgeOnlyEnabled).mockReturnValue(false)
+        })
+
+        it('should build the signin deep link with the bridge-only flag', async () => {
+          renderRequestPage(CLIENT_LOGIN_REQUEST_PATH)
+          await waitFor(() => {
+            expect(screen.getByTestId('continue-in-app')).toBeInTheDocument()
+          })
+          expect(jest.mocked(getSigninDeeplink)).toHaveBeenCalledWith(undefined, 'anIdentityId', true)
+        })
+      })
+
+      describe('and the connected user has no identity', () => {
+        beforeEach(() => {
+          mockConnectionData = { ...mockConnectionData, identity: null }
+        })
+
+        it('should navigate to the login page without posting an identity', async () => {
+          renderRequestPage(CLIENT_LOGIN_REQUEST_PATH)
+          await waitFor(() => {
+            expect(mockNavigate).toHaveBeenCalledWith(expect.stringContaining('/login?redirectTo='))
+          })
+          expect(mockPostIdentity).not.toHaveBeenCalled()
+        })
+      })
+
+      describe('and posting the identity fails', () => {
+        beforeEach(() => {
+          mockPostIdentity.mockRejectedValueOnce(new Error('Failed to create identity'))
+        })
+
+        it('should show the client login error view', async () => {
+          renderRequestPage(CLIENT_LOGIN_REQUEST_PATH)
+          await waitFor(() => {
+            expect(screen.getByTestId('client-login-error')).toBeInTheDocument()
+          })
+        })
       })
     })
 

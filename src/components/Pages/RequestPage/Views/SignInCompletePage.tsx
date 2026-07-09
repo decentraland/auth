@@ -1,23 +1,9 @@
 import { useEffect } from 'react'
 import { useTranslation } from '@dcl/hooks'
 import successAnimationData from '../../../../assets/animations/Success_Lottie.json'
-import { config } from '../../../../modules/config'
 import { AnimatedBackground } from '../../../AnimatedBackground'
+import { getExplorerDeeplink } from '../utils'
 import { CenteredContainer, Description, SuccessAnimation, TextBlock, Title, TitleCheckIcon, TitleRow } from './SignInCompletePage.styled'
-
-function getExplorerDeeplink(deepLink?: string, bridgeOnly?: boolean): string {
-  const env = config.get('ENVIRONMENT').toLowerCase()
-  const base = deepLink || 'decentraland://'
-  const params = new URLSearchParams()
-  if (env !== 'production') {
-    params.set('dclenv', env === 'development' ? 'zone' : env)
-  }
-  if (bridgeOnly) {
-    params.set('bridge-only', 'true')
-  }
-  const query = params.toString()
-  return query ? `${base}?${query}` : base
-}
 
 type Props = {
   onContinue?: () => void
@@ -54,4 +40,4 @@ const SignInCompletePage = ({ onContinue, deepLink, skipRedirect, bridgeOnly }: 
   )
 }
 
-export { SignInCompletePage, getExplorerDeeplink }
+export { SignInCompletePage }

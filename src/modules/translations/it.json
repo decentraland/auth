@@ -122,6 +122,10 @@
       "description": "La richiesta non è più disponibile. Creane una nuova e riprova. Se il tempo di scadenza è ancora in corso nell'app Explorer, controlla che l'ora del tuo computer sia impostata correttamente.",
       "try_again": "TRY AGAIN"
     },
+    "client_login_error": {
+      "title": "Non è stato possibile completare l'accesso",
+      "description": "Si è verificato un problema durante il completamento dell'accesso. Riprova."
+    },
     "ip_validation_error": {
       "title": "Validazione di sicurezza non riuscita",
       "description": "Questa richiesta di conferma è stata creata da un dispositivo o una rete diversa. Per motivi di sicurezza, puoi completare questa richiesta solo dallo stesso dispositivo da cui è stata originariamente avviata.",
@@ -131,6 +135,7 @@
     "continue_in_app": {
       "sign_in_successful": "Accesso riuscito",
       "redirect_countdown": "Sarai reindirizzato a {explorerText} tra {countdown}...",
+      "redirecting": "Reindirizzamento a {explorerText}...",
       "return_to": "Torna a {explorerText}",
       "could_not_open": "Impossibile aprire {explorerText}",
       "app_not_launched": "L'applicazione non è stata avviata. Assicurati che {explorerText} sia installato e riprova.",

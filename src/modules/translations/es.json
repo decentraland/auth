@@ -122,6 +122,10 @@
       "description": "La solicitud ya no está disponible. Siéntete libre de crear una nueva e intentar de nuevo. Si el tiempo de expiración aún está corriendo en la aplicación Explorer, verifica la hora de tu computadora para ver si está configurada correctamente.",
       "try_again": "TRY AGAIN"
     },
+    "client_login_error": {
+      "title": "No pudimos completar tu inicio de sesión",
+      "description": "Algo salió mal al finalizar tu inicio de sesión. Inténtalo de nuevo."
+    },
     "ip_validation_error": {
       "title": "Validación de seguridad fallida",
       "description": "Esta solicitud de confirmación fue creada desde un dispositivo o red diferente. Por razones de seguridad, solo puedes completar esta solicitud desde el mismo dispositivo donde fue iniciada originalmente.",
@@ -131,6 +135,7 @@
     "continue_in_app": {
       "sign_in_successful": "Inicio de sesión exitoso",
       "redirect_countdown": "Serás redirigido a {explorerText} en {countdown}...",
+      "redirecting": "Redirigiendo a {explorerText}...",
       "return_to": "Regresar a {explorerText}",
       "could_not_open": "No se pudo abrir {explorerText}",
       "app_not_launched": "La aplicación no pudo ser iniciada. Por favor, asegúrate de que {explorerText} esté instalado e inténtalo de nuevo.",

@@ -3,7 +3,7 @@ import { useTranslation } from '@dcl/hooks'
 import { Button, muiIcons } from 'decentraland-ui2'
 import logoImg from '../../../assets/images/logo.svg'
 import wrongImg from '../../../assets/images/wrong.svg'
-import { launchDeepLink } from '../RequestPage/utils'
+import { getSigninDeeplink, launchDeepLink } from '../RequestPage/utils'
 import { ActionButton, Background, Description, Icon, Logo, Main, SuccessContainer, Title } from './MobileAuthPage.styled'
 
 const ArrowBackIosNewTwoToneIcon = muiIcons.ArrowBackIosNewTwoTone
@@ -21,7 +21,9 @@ export const MobileAuthSuccess = ({ identityId, explorerText, onTryAgain }: Prop
   const [countdown, setCountdown] = useState(COUNTDOWN_SECONDS)
   const [deepLinkFailed, setDeepLinkFailed] = useState(false)
 
-  const deepLinkUrl = `decentraland://open?signin=${identityId}`
+  // Reuse the shared builder so the mobile handoff carries dclenv (on non-production)
+  // like the desktop/client-login deep links, instead of a bare signin URL.
+  const deepLinkUrl = getSigninDeeplink(undefined, identityId)
 
   const attemptDeepLink = useCallback(async () => {
     const wasLaunched = await launchDeepLink(deepLinkUrl)
