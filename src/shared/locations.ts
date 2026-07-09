@@ -163,5 +163,17 @@ const isBridgeOnlyEnabled = (searchParams: URLSearchParams): boolean => {
   return value === '' || value === 'true'
 }
 
+// Pseudo request id for `/auth/requests/login`. It has no backing auth-server request:
+// the user just logs in and the signed identity is handed to the client through the
+// `open?signin=<identityId>` deep link, mirroring the standalone mobile flow.
+const LOGIN_REQUEST_ID = 'login'
+
 export type { LoginMethod }
-export { locations, extractRedirectToFromSearchParameters, extractReferrerFromSearchParameters, isBridgeOnlyEnabled, BRIDGE_ONLY_PARAM }
+export {
+  locations,
+  extractRedirectToFromSearchParameters,
+  extractReferrerFromSearchParameters,
+  isBridgeOnlyEnabled,
+  BRIDGE_ONLY_PARAM,
+  LOGIN_REQUEST_ID
+}

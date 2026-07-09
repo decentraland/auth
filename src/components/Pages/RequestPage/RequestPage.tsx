@@ -27,7 +27,7 @@ import {
 } from '../../../shared/auth'
 import { useCurrentConnectionData } from '../../../shared/connection'
 import { isErrorWithMessage, isRpcError, isUserRejectedTransaction } from '../../../shared/errors'
-import { extractReferrerFromSearchParameters, isBridgeOnlyEnabled } from '../../../shared/locations'
+import { LOGIN_REQUEST_ID, extractReferrerFromSearchParameters, isBridgeOnlyEnabled } from '../../../shared/locations'
 import { sendTipNotification } from '../../../shared/notifications'
 import { isProfileComplete } from '../../../shared/profile'
 import { identifyUser } from '../../../shared/utils/analytics'
@@ -182,6 +182,10 @@ export const RequestPage = () => {
   const authServerClient = useRef(createAuthServerHttpClient())
   const isDeepLinkFlow = searchParams.get('flow') === 'deeplink'
   const flowParam = isDeepLinkFlow ? '&flow=deeplink' : ''
+  // The `login` pseudo request id has no backing auth-server request: skip the whole
+  // recover/verify flow and hand the signed identity to the client via the deep link,
+  // the same way the standalone mobile flow does.
+  const isLoginFlow = requestId === LOGIN_REQUEST_ID
   // The bridge-only flag rides inside redirectTo so it survives logins/callbacks and can be
   // appended to the client deep link once the flow completes.
   const isBridgeOnly = isBridgeOnlyEnabled(searchParams)
@@ -285,6 +289,31 @@ export const RequestPage = () => {
     }
 
     let cancelled = false
+
+    // Login flow: no request to recover. Post the identity generated during login to the
+    // auth server and let the client retrieve it through the `open?signin=<id>` deep link.
+    const completeLoginFlow = async () => {
+      identifyUser(account)
+
+      const currentIdentity = identityRef.current
+      if (!currentIdentity) {
+        // The login page always generates an identity on connect, so this only happens
+        // when the cached identity is missing or expired — log in again to get one.
+        toLoginPage()
+        return
+      }
+
+      try {
+        const identityResponse = await authServerClient.current.postIdentity(currentIdentity)
+        if (cancelled) return
+        setIdentityId(identityResponse.identityId)
+        setView(View.DEEP_LINK_CONTINUE_IN_APP)
+      } catch (e) {
+        if (cancelled) return
+        setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
+        setView(View.LOADING_ERROR)
+      }
+    }
 
     const loadRequest = async () => {
       const timeTheSiteStartedLoading = Date.now()
@@ -492,14 +521,30 @@ export const RequestPage = () => {
       }
     }
 
-    loadRequest()
+    if (isLoginFlow) {
+      completeLoginFlow()
+    } else {
+      loadRequest()
+    }
 
     return () => {
       cancelled = true
       clearTimeout(timeoutRef.current)
       clearTimeout(signTimeoutRef.current)
     }
-  }, [toLoginPage, account, provider, providerType, isConnecting, initializedFlags, isProfileReady, requestId, isDeepLinkFlow, skipSetup])
+  }, [
+    toLoginPage,
+    account,
+    provider,
+    providerType,
+    isConnecting,
+    initializedFlags,
+    isProfileReady,
+    requestId,
+    isDeepLinkFlow,
+    isLoginFlow,
+    skipSetup
+  ])
 
   useEffect(() => {
     // The timeout is only necessary on the verify sign in and wallet interaction views.

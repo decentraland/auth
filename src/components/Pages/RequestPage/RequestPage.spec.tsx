@@ -77,7 +77,8 @@ jest.mock('../../../shared/auth', () => {
 // --- Shared modules ---
 jest.mock('../../../shared/locations', () => ({
   extractReferrerFromSearchParameters: jest.fn().mockReturnValue(null),
-  isBridgeOnlyEnabled: jest.fn().mockReturnValue(false)
+  isBridgeOnlyEnabled: jest.fn().mockReturnValue(false),
+  LOGIN_REQUEST_ID: 'login'
 }))
 jest.mock('../../../shared/utils/analytics', () => ({
   identifyUser: jest.fn()
@@ -188,6 +189,7 @@ jest.mock('@dcl/hooks', () => ({
 }))
 
 const REQUEST_ID = 'test-request-123'
+const LOGIN_REQUEST_PATH = '/auth/requests/login?targetConfigId=default'
 
 let mockFlags: Partial<Record<string, boolean>>
 let mockFlagsInitialized: boolean
@@ -471,6 +473,61 @@ describe('RequestPage', () => {
         })
         expect(mockSignMessage).not.toHaveBeenCalled()
         expect(mockSendSuccessfulOutcome).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and the request id is the login pseudo request id', () => {
+      beforeEach(() => {
+        mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'User' }] })
+      })
+
+      describe('and the connected user has an identity', () => {
+        beforeEach(() => {
+          mockPostIdentity.mockResolvedValueOnce({ identityId: 'anIdentityId' })
+        })
+
+        it('should post the identity to the auth server and show the continue in app view', async () => {
+          renderRequestPage(LOGIN_REQUEST_PATH)
+          await waitFor(() => {
+            expect(screen.getByTestId('continue-in-app')).toBeInTheDocument()
+          })
+          expect(mockPostIdentity).toHaveBeenCalledWith(mockConnectionData.identity)
+        })
+
+        it('should not recover any request from the auth server', async () => {
+          renderRequestPage(LOGIN_REQUEST_PATH)
+          await waitFor(() => {
+            expect(screen.getByTestId('continue-in-app')).toBeInTheDocument()
+          })
+          expect(mockRecover).not.toHaveBeenCalled()
+        })
+      })
+
+      describe('and the connected user has no identity', () => {
+        beforeEach(() => {
+          mockConnectionData = { ...mockConnectionData, identity: null }
+        })
+
+        it('should navigate to the login page without posting an identity', async () => {
+          renderRequestPage(LOGIN_REQUEST_PATH)
+          await waitFor(() => {
+            expect(mockNavigate).toHaveBeenCalledWith(expect.stringContaining('/login?redirectTo='))
+          })
+          expect(mockPostIdentity).not.toHaveBeenCalled()
+        })
+      })
+
+      describe('and posting the identity fails', () => {
+        beforeEach(() => {
+          mockPostIdentity.mockRejectedValueOnce(new Error('Failed to create identity'))
+        })
+
+        it('should show the recover error view', async () => {
+          renderRequestPage(LOGIN_REQUEST_PATH)
+          await waitFor(() => {
+            expect(screen.getByTestId('recover-error')).toBeInTheDocument()
+          })
+        })
       })
     })
 

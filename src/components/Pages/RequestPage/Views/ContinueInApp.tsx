@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from '@dcl/hooks'
 import { muiIcons } from 'decentraland-ui2'
 import { useTargetConfig } from '../../../../hooks/targetConfig'
+import { LOGIN_REQUEST_ID } from '../../../../shared/locations'
 import { Container } from '../Container'
 import { launchDeepLink } from '../utils'
 import { ActionButton } from './ContinueInApp.styled'
@@ -41,8 +42,15 @@ export const ContinueInApp = ({ onContinue, requestId, deepLinkUrl, autoStart = 
     const newParams = new URLSearchParams(searchParams)
     newParams.delete('flow')
     const queryString = newParams.toString()
-    const loginUrl = `/auth/requests/${requestId}${queryString ? `?${queryString}` : ''}`
-    window.location.href = loginUrl
+    const requestUrl = `/auth/requests/${requestId}${queryString ? `?${queryString}` : ''}`
+    if (requestId === LOGIN_REQUEST_ID) {
+      // The login pseudo request has no traditional flow to fall back to — going back to
+      // the request page would just retry the same deep link. Send the user to the login
+      // page instead so they can retry, with another method if they want.
+      window.location.href = `/auth/login?redirectTo=${encodeURIComponent(requestUrl)}`
+      return
+    }
+    window.location.href = requestUrl
   }, [requestId, searchParams])
 
   useEffect(() => {

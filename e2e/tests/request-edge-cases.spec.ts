@@ -84,6 +84,57 @@ test.describe('Deep link flow (flow=deeplink)', () => {
   })
 })
 
+test.describe('Login pseudo request id (/auth/requests/login)', () => {
+  /**
+   * `/auth/requests/login` runs the deep-link login handoff without a backing
+   * auth-server request: the user logs in, the signed identity is posted to the
+   * auth server, and the client retrieves it via the open?signin=<identityId>
+   * deep link — same handoff as the standalone mobile flow.
+   */
+
+  test.beforeEach(async ({ context }) => {
+    await injectMockWallet(context)
+  })
+
+  test('login id: auto-connect → posts identity → shows ContinueInApp without recovering a request', async ({ page }) => {
+    await mockApiRoutes(page, { hasProfile: true, onboardingToExplorer: true })
+
+    // Track auth-server request recoveries — the pseudo id must never trigger one.
+    // Registered after mockApiRoutes so it runs first; fallback() defers to it.
+    let recoverCalled = false
+    await page.route('**/v2/requests/**', async (route, request) => {
+      if (request.method() === 'GET' && !request.url().includes('/outcome')) {
+        recoverCalled = true
+      }
+      return route.fallback()
+    })
+
+    // Mock the /identities POST endpoint
+    let postedIdentity = false
+    await page.route('**/identities', async (route, request) => {
+      if (request.method() === 'POST') {
+        postedIdentity = true
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ identityId: 'test-identity-123' })
+        })
+      }
+      return route.continue()
+    })
+
+    await page.goto('/auth/requests/login?loginMethod=METAMASK')
+
+    // AutoLoginRedirect connects the mock wallet, generates the identity and returns
+    // here; the identity is posted and ContinueInApp shows with the countdown.
+    await expect(page.getByText(/Sign In Successful/i)).toBeVisible({ timeout: 20_000 })
+    await expect(page.locator('[data-testid="continue-in-app-return-button"]')).toBeVisible({ timeout: 10_000 })
+
+    expect(postedIdentity).toBe(true)
+    expect(recoverCalled).toBe(false)
+  })
+})
+
 test.describe('Different account error', () => {
   test.beforeEach(async ({ context }) => {
     await injectMockWallet(context)
