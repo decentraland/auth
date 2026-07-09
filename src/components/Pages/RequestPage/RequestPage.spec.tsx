@@ -78,7 +78,7 @@ jest.mock('../../../shared/auth', () => {
 jest.mock('../../../shared/locations', () => ({
   extractReferrerFromSearchParameters: jest.fn().mockReturnValue(null),
   isBridgeOnlyEnabled: jest.fn().mockReturnValue(false),
-  LOGIN_REQUEST_ID: 'login'
+  CLIENT_LOGIN_REQUEST_ID: 'client-login'
 }))
 jest.mock('../../../shared/utils/analytics', () => ({
   identifyUser: jest.fn()
@@ -189,7 +189,7 @@ jest.mock('@dcl/hooks', () => ({
 }))
 
 const REQUEST_ID = 'test-request-123'
-const LOGIN_REQUEST_PATH = '/auth/requests/login?targetConfigId=default'
+const CLIENT_LOGIN_REQUEST_PATH = '/auth/requests/client-login?targetConfigId=default'
 
 let mockFlags: Partial<Record<string, boolean>>
 let mockFlagsInitialized: boolean
@@ -476,7 +476,7 @@ describe('RequestPage', () => {
       })
     })
 
-    describe('and the request id is the login pseudo request id', () => {
+    describe('and the request id is the client-login pseudo request id', () => {
       beforeEach(() => {
         mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'User' }] })
       })
@@ -487,7 +487,7 @@ describe('RequestPage', () => {
         })
 
         it('should post the identity to the auth server and show the continue in app view', async () => {
-          renderRequestPage(LOGIN_REQUEST_PATH)
+          renderRequestPage(CLIENT_LOGIN_REQUEST_PATH)
           await waitFor(() => {
             expect(screen.getByTestId('continue-in-app')).toBeInTheDocument()
           })
@@ -495,7 +495,7 @@ describe('RequestPage', () => {
         })
 
         it('should not recover any request from the auth server', async () => {
-          renderRequestPage(LOGIN_REQUEST_PATH)
+          renderRequestPage(CLIENT_LOGIN_REQUEST_PATH)
           await waitFor(() => {
             expect(screen.getByTestId('continue-in-app')).toBeInTheDocument()
           })
@@ -509,7 +509,7 @@ describe('RequestPage', () => {
         })
 
         it('should navigate to the login page without posting an identity', async () => {
-          renderRequestPage(LOGIN_REQUEST_PATH)
+          renderRequestPage(CLIENT_LOGIN_REQUEST_PATH)
           await waitFor(() => {
             expect(mockNavigate).toHaveBeenCalledWith(expect.stringContaining('/login?redirectTo='))
           })
@@ -523,7 +523,7 @@ describe('RequestPage', () => {
         })
 
         it('should show the recover error view', async () => {
-          renderRequestPage(LOGIN_REQUEST_PATH)
+          renderRequestPage(CLIENT_LOGIN_REQUEST_PATH)
           await waitFor(() => {
             expect(screen.getByTestId('recover-error')).toBeInTheDocument()
           })

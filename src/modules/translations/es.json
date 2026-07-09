@@ -131,6 +131,7 @@
     "continue_in_app": {
       "sign_in_successful": "Inicio de sesión exitoso",
       "redirect_countdown": "Serás redirigido a {explorerText} en {countdown}...",
+      "redirecting": "Redirigiendo a {explorerText}...",
       "return_to": "Regresar a {explorerText}",
       "could_not_open": "No se pudo abrir {explorerText}",
       "app_not_launched": "La aplicación no pudo ser iniciada. Por favor, asegúrate de que {explorerText} esté instalado e inténtalo de nuevo.",

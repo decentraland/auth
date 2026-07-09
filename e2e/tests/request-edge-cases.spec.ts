@@ -84,19 +84,19 @@ test.describe('Deep link flow (flow=deeplink)', () => {
   })
 })
 
-test.describe('Login pseudo request id (/auth/requests/login)', () => {
+test.describe('Client-login pseudo request id (/auth/requests/client-login)', () => {
   /**
-   * `/auth/requests/login` runs the deep-link login handoff without a backing
+   * `/auth/requests/client-login` runs the deep-link login handoff without a backing
    * auth-server request: the user logs in, the signed identity is posted to the
-   * auth server, and the client retrieves it via the open?signin=<identityId>
-   * deep link — same handoff as the standalone mobile flow.
+   * auth server, and the client is opened immediately via the open?signin=<identityId>
+   * deep link — same handoff as the standalone mobile flow, without any countdown.
    */
 
   test.beforeEach(async ({ context }) => {
     await injectMockWallet(context)
   })
 
-  test('login id: auto-connect → posts identity → shows ContinueInApp without recovering a request', async ({ page }) => {
+  test('client-login id: auto-connect → posts identity → fires the deep link without recovering a request', async ({ page }) => {
     await mockApiRoutes(page, { hasProfile: true, onboardingToExplorer: true })
 
     // Track auth-server request recoveries — the pseudo id must never trigger one.
@@ -123,15 +123,19 @@ test.describe('Login pseudo request id (/auth/requests/login)', () => {
       return route.continue()
     })
 
-    await page.goto('/auth/requests/login?loginMethod=METAMASK')
+    await page.goto('/auth/requests/client-login?loginMethod=METAMASK')
 
     // AutoLoginRedirect connects the mock wallet, generates the identity and returns
-    // here; the identity is posted and ContinueInApp shows with the countdown.
-    await expect(page.getByText(/Sign In Successful/i)).toBeVisible({ timeout: 20_000 })
-    await expect(page.locator('[data-testid="continue-in-app-return-button"]')).toBeVisible({ timeout: 10_000 })
+    // here; the identity is posted and the deep link fires immediately. Headless
+    // Chromium cannot launch the client, so the flow deterministically lands on the
+    // retry fallback — which proves the immediate attempt ran and that the fallback
+    // retries the deep link instead of redirecting back to login.
+    await expect(page.locator('[data-testid="continue-in-app-try-again-button"]')).toBeVisible({ timeout: 20_000 })
+    await expect(page.locator('[data-testid="continue-in-app-go-back-button"]')).not.toBeVisible()
 
     expect(postedIdentity).toBe(true)
     expect(recoverCalled).toBe(false)
+    expect(page.url()).toContain('/auth/requests/client-login')
   })
 })
 

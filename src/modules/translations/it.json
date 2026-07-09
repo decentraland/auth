@@ -131,6 +131,7 @@
     "continue_in_app": {
       "sign_in_successful": "Accesso riuscito",
       "redirect_countdown": "Sarai reindirizzato a {explorerText} tra {countdown}...",
+      "redirecting": "Reindirizzamento a {explorerText}...",
       "return_to": "Torna a {explorerText}",
       "could_not_open": "Impossibile aprire {explorerText}",
       "app_not_launched": "L'applicazione non è stata avviata. Assicurati che {explorerText} sia installato e riprova.",

@@ -27,7 +27,7 @@ import {
 } from '../../../shared/auth'
 import { useCurrentConnectionData } from '../../../shared/connection'
 import { isErrorWithMessage, isRpcError, isUserRejectedTransaction } from '../../../shared/errors'
-import { LOGIN_REQUEST_ID, extractReferrerFromSearchParameters, isBridgeOnlyEnabled } from '../../../shared/locations'
+import { CLIENT_LOGIN_REQUEST_ID, extractReferrerFromSearchParameters, isBridgeOnlyEnabled } from '../../../shared/locations'
 import { sendTipNotification } from '../../../shared/notifications'
 import { isProfileComplete } from '../../../shared/profile'
 import { identifyUser } from '../../../shared/utils/analytics'
@@ -188,10 +188,10 @@ export const RequestPage = () => {
   const authServerClient = useRef(createAuthServerHttpClient())
   const isDeepLinkFlow = searchParams.get('flow') === 'deeplink'
   const flowParam = isDeepLinkFlow ? '&flow=deeplink' : ''
-  // The `login` pseudo request id has no backing auth-server request: skip the whole
-  // recover/verify flow and hand the signed identity to the client via the deep link,
-  // the same way the standalone mobile flow does.
-  const isLoginFlow = requestId === LOGIN_REQUEST_ID
+  // The `client-login` pseudo request id has no backing auth-server request: skip the
+  // whole recover/verify flow and hand the signed identity to the client via the deep
+  // link, the same way the standalone mobile flow does.
+  const isClientLoginFlow = requestId === CLIENT_LOGIN_REQUEST_ID
   // The bridge-only flag rides inside redirectTo so it survives logins/callbacks and can be
   // appended to the client deep link once the flow completes.
   const isBridgeOnly = isBridgeOnlyEnabled(searchParams)
@@ -296,9 +296,10 @@ export const RequestPage = () => {
 
     let cancelled = false
 
-    // Login flow: no request to recover. Post the identity generated during login to the
-    // auth server and let the client retrieve it through the `open?signin=<id>` deep link.
-    const completeLoginFlow = async () => {
+    // Client-login flow: no request to recover. Post the identity generated during login
+    // to the auth server and let the client retrieve it through the `open?signin=<id>`
+    // deep link, which ContinueInApp fires immediately for this flow.
+    const completeClientLoginFlow = async () => {
       identifyUser(account)
 
       const currentIdentity = identityRef.current
@@ -533,8 +534,8 @@ export const RequestPage = () => {
       }
     }
 
-    if (isLoginFlow) {
-      completeLoginFlow()
+    if (isClientLoginFlow) {
+      completeClientLoginFlow()
     } else {
       loadRequest()
     }
@@ -554,7 +555,7 @@ export const RequestPage = () => {
     isProfileReady,
     requestId,
     isDeepLinkFlow,
-    isLoginFlow,
+    isClientLoginFlow,
     skipSetup
   ])
 
@@ -844,11 +845,15 @@ export const RequestPage = () => {
 
     trackClick(ClickEvents.IDENTITY_DEEP_LINK_OPENED)
 
+    // Client-login flow: the client was opened via the deep link and there is nothing to
+    // navigate to — stay on the ContinueInApp view, which doubles as the retry fallback.
+    if (isClientLoginFlow) return
+
     // The deep link already fired in ContinueInApp — skip the auto-redirect in SignInCompletePage
     setSkipDeepLinkRedirect(true)
     // Show completion view
     setView(View.VERIFY_SIGN_IN_COMPLETE)
-  }, [identityId, trackClick])
+  }, [identityId, trackClick, isClientLoginFlow])
 
   switch (view) {
     case View.TIMEOUT:
