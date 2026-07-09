@@ -27,7 +27,7 @@ import {
 } from '../../../shared/auth'
 import { useCurrentConnectionData } from '../../../shared/connection'
 import { isErrorWithMessage, isRpcError, isUserRejectedTransaction } from '../../../shared/errors'
-import { extractReferrerFromSearchParameters } from '../../../shared/locations'
+import { extractReferrerFromSearchParameters, isBridgeOnlyEnabled } from '../../../shared/locations'
 import { sendTipNotification } from '../../../shared/notifications'
 import { isProfileComplete } from '../../../shared/profile'
 import { identifyUser } from '../../../shared/utils/analytics'
@@ -182,16 +182,20 @@ export const RequestPage = () => {
   const authServerClient = useRef(createAuthServerHttpClient())
   const isDeepLinkFlow = searchParams.get('flow') === 'deeplink'
   const flowParam = isDeepLinkFlow ? '&flow=deeplink' : ''
+  // The bridge-only flag rides inside redirectTo so it survives logins/callbacks and can be
+  // appended to the client deep link once the flow completes.
+  const isBridgeOnly = isBridgeOnlyEnabled(searchParams)
+  const bridgeOnlyParam = isBridgeOnly ? '&bridge-only=true' : ''
   // Goes to the login page where the user will have to connect a wallet.
   // Preserve loginMethod from current URL if present for auto-login functionality
   const loginMethodParam = searchParams.get('loginMethod')
 
   const toLoginPage = useCallback(() => {
-    const redirectToUrl = `/auth/requests/${requestId}?targetConfigId=${targetConfigId}${flowParam}`
+    const redirectToUrl = `/auth/requests/${requestId}?targetConfigId=${targetConfigId}${flowParam}${bridgeOnlyParam}`
     const loginMethodQuery = loginMethodParam ? `&loginMethod=${encodeURIComponent(loginMethodParam)}` : ''
     const finalUrl = `/login?redirectTo=${encodeURIComponent(redirectToUrl)}${loginMethodQuery}`
     navigate(finalUrl)
-  }, [requestId, targetConfigId, isDeepLinkFlow, loginMethodParam])
+  }, [requestId, targetConfigId, flowParam, bridgeOnlyParam, loginMethodParam, navigate])
 
   // Effect 1: Ensure profile consistency before allowing request loading.
   // Navigates to setup if the profile is incomplete or missing.
@@ -212,7 +216,7 @@ export const RequestPage = () => {
     let cancelled = false
 
     const checkProfile = async () => {
-      const redirectTo = `/auth/requests/${requestId}?targetConfigId=${targetConfigId}${flowParam}`
+      const redirectTo = `/auth/requests/${requestId}?targetConfigId=${targetConfigId}${flowParam}${bridgeOnlyParam}`
       const referrer = extractReferrerFromSearchParameters(searchParams)
       const profile = await ensureProfile(account, identityRef.current, { redirectTo, referrer })
 
@@ -236,6 +240,7 @@ export const RequestPage = () => {
     requestId,
     targetConfigId,
     flowParam,
+    bridgeOnlyParam,
     searchParams,
     skipSetup
   ])
@@ -569,8 +574,10 @@ export const RequestPage = () => {
         setView(View.VERIFY_SIGN_IN_COMPLETE)
         // For mobile deep-link flow, auto-redirect. For Explorer (skipSetup),
         // the SignInCompletePage shows a Continue button that triggers the deeplink.
+        // Route through getExplorerDeeplink so this bare redirect carries the same
+        // query params (dclenv, bridge-only) as the other deep-link generation sites.
         if (targetConfig.deepLink) {
-          window.location.href = targetConfig.deepLink
+          window.location.href = getExplorerDeeplink(targetConfig.deepLink, isBridgeOnly)
         }
       }
     } catch (e) {
@@ -792,7 +799,7 @@ export const RequestPage = () => {
       return (
         <RecoverError
           onTryAgain={() => {
-            window.location.href = getExplorerDeeplink(targetConfig.deepLink)
+            window.location.href = getExplorerDeeplink(targetConfig.deepLink, isBridgeOnly)
           }}
         />
       )
@@ -803,12 +810,18 @@ export const RequestPage = () => {
       // From Explorer (skipSetup enabled): show full-page success with Continue button
       // From web (has redirectTo): show minimal success view
       return skipSetup ? (
-        <SignInCompletePage skipRedirect={skipDeepLinkRedirect} deepLink={targetConfig.deepLink} />
+        <SignInCompletePage skipRedirect={skipDeepLinkRedirect} deepLink={targetConfig.deepLink} bridgeOnly={isBridgeOnly} />
       ) : (
         <SignInComplete />
       )
     case View.DEEP_LINK_CONTINUE_IN_APP:
-      return <ContinueInApp onContinue={onContinueInApp} requestId={requestId} deepLinkUrl={`${targetConfig.deepLink || 'decentraland://'}open?signin=${identityId}`} />
+      return (
+        <ContinueInApp
+          onContinue={onContinueInApp}
+          requestId={requestId}
+          deepLinkUrl={`${targetConfig.deepLink || 'decentraland://'}open?signin=${identityId}${bridgeOnlyParam}`}
+        />
+      )
     case View.VERIFY_SIGN_IN_DENIED:
       return <DeniedSignIn requestId={requestId} />
     case View.WALLET_INTERACTION_COMPLETE:

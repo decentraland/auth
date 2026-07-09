@@ -148,5 +148,13 @@ const extractReferrerFromSearchParameters = (searchParams: URLSearchParams): str
   return referrerSearchParam
 }
 
+// The `bridge-only` query param is a boolean flag the auth site can be opened with.
+// It's preserved across logins/callbacks by riding inside `redirectTo`, and when enabled
+// it's forwarded onto the client deep link. Only a truthy value ("true", case-insensitive)
+// enables it — "false" or an empty value are treated as not set.
+const BRIDGE_ONLY_PARAM = 'bridge-only'
+
+const isBridgeOnlyEnabled = (searchParams: URLSearchParams): boolean => (searchParams.get(BRIDGE_ONLY_PARAM) ?? '').toLowerCase() === 'true'
+
 export type { LoginMethod }
-export { locations, extractRedirectToFromSearchParameters, extractReferrerFromSearchParameters }
+export { locations, extractRedirectToFromSearchParameters, extractReferrerFromSearchParameters, isBridgeOnlyEnabled, BRIDGE_ONLY_PARAM }

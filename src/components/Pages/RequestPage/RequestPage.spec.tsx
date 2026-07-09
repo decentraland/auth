@@ -76,7 +76,8 @@ jest.mock('../../../shared/auth', () => {
 
 // --- Shared modules ---
 jest.mock('../../../shared/locations', () => ({
-  extractReferrerFromSearchParameters: jest.fn().mockReturnValue(null)
+  extractReferrerFromSearchParameters: jest.fn().mockReturnValue(null),
+  isBridgeOnlyEnabled: jest.fn().mockReturnValue(false)
 }))
 jest.mock('../../../shared/utils/analytics', () => ({
   identifyUser: jest.fn()
