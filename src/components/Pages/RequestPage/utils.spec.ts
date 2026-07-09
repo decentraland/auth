@@ -395,12 +395,15 @@ describe('when testing decodeNftTransferData', () => {
 
 describe('when testing decodeManaTransferData', () => {
   let transactionData: string
+  let manaContractAddress: string
   let mockContract: any
 
   beforeEach(() => {
     jest.mocked(config.get).mockReturnValue('production')
+    manaContractAddress = '0x0f5d2fb29fb7d3cfee444a200298f468908cc942'
     mockContract = {
-      abi: [{ type: 'function', name: 'transfer' }]
+      abi: [{ type: 'function', name: 'transfer' }],
+      address: manaContractAddress
     }
     jest.mocked(getContract).mockReturnValue(mockContract)
   })
@@ -409,7 +412,7 @@ describe('when testing decodeManaTransferData', () => {
     jest.resetAllMocks()
   })
 
-  describe('and the transaction data is a valid ERC20 transfer', () => {
+  describe('and the transaction data is a valid MANA transfer', () => {
     beforeEach(() => {
       transactionData =
         '0xa9059cbb000000000000000000000000abcdef1234567890abcdef1234567890abcdef12000000000000000000000000000000000000000000000000016345785d8a0000'
@@ -421,11 +424,55 @@ describe('when testing decodeManaTransferData', () => {
     })
 
     it('should return the manaAmount and toAddress', () => {
-      const result = decodeManaTransferData(transactionData)
+      const result = decodeManaTransferData(transactionData, manaContractAddress)
       expect(result).toEqual({
         manaAmount: '0.1',
         toAddress: '0xabcdef1234567890abcdef1234567890abcdef12'
       })
+    })
+  })
+
+  describe('and the transaction targets the MANA contract with a differently-cased address', () => {
+    beforeEach(() => {
+      transactionData =
+        '0xa9059cbb000000000000000000000000abcdef1234567890abcdef1234567890abcdef12000000000000000000000000000000000000000000000000016345785d8a0000'
+      jest.mocked(decodeFunctionData).mockReturnValueOnce({
+        functionName: 'transfer',
+        args: ['0xabcdef1234567890abcdef1234567890abcdef12', BigInt('100000000000000000')]
+      })
+      jest.mocked(formatEther).mockReturnValueOnce('0.1')
+    })
+
+    it('should decode the transfer regardless of address casing', () => {
+      const result = decodeManaTransferData(transactionData, manaContractAddress.toUpperCase())
+      expect(result).toEqual({
+        manaAmount: '0.1',
+        toAddress: '0xabcdef1234567890abcdef1234567890abcdef12'
+      })
+    })
+  })
+
+  describe('and the transaction targets a non-MANA token contract', () => {
+    beforeEach(() => {
+      transactionData =
+        '0xa9059cbb000000000000000000000000abcdef1234567890abcdef1234567890abcdef12000000000000000000000000000000000000000000000000016345785d8a0000'
+    })
+
+    it('should return null without decoding the transfer', () => {
+      const result = decodeManaTransferData(transactionData, '0x1111111111111111111111111111111111111111')
+      expect(result).toBeNull()
+    })
+  })
+
+  describe('and the contract address is empty', () => {
+    beforeEach(() => {
+      transactionData =
+        '0xa9059cbb000000000000000000000000abcdef1234567890abcdef1234567890abcdef12000000000000000000000000000000000000000000000000016345785d8a0000'
+    })
+
+    it('should return null', () => {
+      const result = decodeManaTransferData(transactionData, '')
+      expect(result).toBeNull()
     })
   })
 
@@ -435,7 +482,7 @@ describe('when testing decodeManaTransferData', () => {
     })
 
     it('should return null', () => {
-      const result = decodeManaTransferData(transactionData)
+      const result = decodeManaTransferData(transactionData, manaContractAddress)
       expect(result).toBeNull()
     })
   })
@@ -446,7 +493,7 @@ describe('when testing decodeManaTransferData', () => {
     })
 
     it('should return null', () => {
-      const result = decodeManaTransferData(transactionData)
+      const result = decodeManaTransferData(transactionData, manaContractAddress)
       expect(result).toBeNull()
     })
   })
@@ -457,7 +504,7 @@ describe('when testing decodeManaTransferData', () => {
     })
 
     it('should return null', () => {
-      const result = decodeManaTransferData(transactionData)
+      const result = decodeManaTransferData(transactionData, manaContractAddress)
       expect(result).toBeNull()
     })
   })
@@ -472,7 +519,7 @@ describe('when testing decodeManaTransferData', () => {
     })
 
     it('should return null', () => {
-      const result = decodeManaTransferData(transactionData)
+      const result = decodeManaTransferData(transactionData, manaContractAddress)
       expect(result).toBeNull()
     })
   })
@@ -486,7 +533,7 @@ describe('when testing decodeManaTransferData', () => {
     })
 
     it('should return null', () => {
-      const result = decodeManaTransferData(transactionData)
+      const result = decodeManaTransferData(transactionData, manaContractAddress)
       expect(result).toBeNull()
     })
   })
@@ -503,7 +550,7 @@ describe('when testing decodeManaTransferData', () => {
     })
 
     it('should correctly convert large amounts from wei to MANA', () => {
-      const result = decodeManaTransferData(transactionData)
+      const result = decodeManaTransferData(transactionData, manaContractAddress)
       expect(result).toEqual({
         manaAmount: '1000.0',
         toAddress: '0xabcdef1234567890abcdef1234567890abcdef12'
@@ -709,6 +756,21 @@ describe('when testing fetchNftMetadata', () => {
       await expect(fetchNftMetadata(contractAddress, contractABI, tokenId)).rejects.toThrow(
         `Failed to fetch metadata from ${tokenUri}: 404 Not Found`
       )
+    })
+  })
+
+  describe('and the tokenURI uses a non-http scheme', () => {
+    beforeEach(() => {
+      mockPublicClient = {
+        getChainId: jest.fn().mockResolvedValue(1),
+        readContract: jest.fn().mockResolvedValueOnce('javascript:alert(1)')
+      }
+      jest.mocked(createPublicClient).mockReturnValue(mockPublicClient)
+    })
+
+    it('should throw an unsupported-scheme error without fetching', async () => {
+      await expect(fetchNftMetadata(contractAddress, contractABI, tokenId)).rejects.toThrow('Unsupported tokenURI scheme')
+      expect(fetch).not.toHaveBeenCalled()
     })
   })
 })

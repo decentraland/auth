@@ -136,7 +136,7 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
         await extractError(response, requestId)
       }
 
-      const recoverResponse = await response.json()
+      recoverResponse = (await response.json()) as RecoverResponse
 
       // If the sender defined in the request is different than the one that is connected, show an error.
       if (recoverResponse.sender && recoverResponse.sender !== signerAddress.toLowerCase()) {

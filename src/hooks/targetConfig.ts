@@ -105,8 +105,10 @@ const getTargetConfigId = (location: Location): TargetConfigId => {
   const targetConfigIdParam = search.get('targetConfigId') as TargetConfigId
   const redirectTo = extractRedirectToFromSearchParameters(search)
 
-  // If explicit targetConfigId is provided, use it
-  if (targetConfigIdParam in targetConfigs) {
+  // If explicit targetConfigId is provided, use it. Use hasOwnProperty rather than `in`
+  // so inherited Object.prototype keys (e.g. ?targetConfigId=constructor) can't select a
+  // non-config value.
+  if (Object.prototype.hasOwnProperty.call(targetConfigs, targetConfigIdParam)) {
     return targetConfigIdParam
   }
 
@@ -121,7 +123,7 @@ const getTargetConfigId = (location: Location): TargetConfigId => {
         searchParams = new URL(redirectTo).searchParams
       }
       const targetConfigIdFromRedirectTo = searchParams.get('targetConfigId') as TargetConfigId
-      if (targetConfigIdFromRedirectTo in targetConfigs) {
+      if (Object.prototype.hasOwnProperty.call(targetConfigs, targetConfigIdFromRedirectTo)) {
         return targetConfigIdFromRedirectTo
       }
     } catch {

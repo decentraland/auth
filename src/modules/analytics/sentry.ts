@@ -10,7 +10,9 @@ init({
   environment: config.get('ENVIRONMENT'),
   release: `${config.get('SENTRY_RELEASE_PREFIX', 'auth')}@${import.meta.env.VITE_REACT_APP_WEBSITE_VERSION}`,
   dsn,
-  integrations: [browserTracingIntegration(), replayIntegration()],
+  // Explicitly mask all text and media in Session Replay. This surface renders email/OTP
+  // inputs and sign-in verification codes, so we never want replays to capture their values.
+  integrations: [browserTracingIntegration(), replayIntegration({ maskAllText: true, blockAllMedia: true })],
   // Performance Monitoring
   tracesSampleRate: 0.001,
   // Session Replay

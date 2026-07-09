@@ -157,6 +157,26 @@ describe('createAuthServerClient', () => {
         await expect(client.recover(mockRequestId, mockSignerAddress)).rejects.toBeInstanceOf(ImpersonatedSignInError)
       })
     })
+
+    describe('when the socket connection fails', () => {
+      beforeEach(() => {
+        mockOn.mockReset()
+        mockOn.mockImplementation((event, callback) => {
+          if (event === 'connect_error') {
+            callback(new Error('Connection refused'))
+          }
+        })
+      })
+
+      it('should reject with the connection error instead of hanging', async () => {
+        await expect(client.recover(mockRequestId, mockSignerAddress)).rejects.toThrow('Connection refused')
+      })
+
+      it('should close the socket', async () => {
+        await expect(client.recover(mockRequestId, mockSignerAddress)).rejects.toThrow('Connection refused')
+        expect(mockClose).toHaveBeenCalled()
+      })
+    })
   })
 
   describe('when sending a successful outcome', () => {
