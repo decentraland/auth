@@ -81,7 +81,28 @@
     "transaction_dialog": {
       "title": "确认交易",
       "transaction_cost": "交易费用：{cost} ETH",
-      "your_balance": "您的余额：{balance} ETH"
+      "your_balance": "您的余额：{balance} ETH",
+      "simulation_loading": "正在检查此交易将执行的操作…",
+      "details_unavailable": "我们无法预览此交易。只有在您信任此场景时才继续。",
+      "you_send": "您发送",
+      "you_receive": "您接收",
+      "approvals_title": "已授予的权限",
+      "approval_description": "允许 {spender} 使用 {amount} {symbol}",
+      "approval_unlimited": "无限",
+      "approval_for_all": "允许 {spender} 完全访问您的 {name}",
+      "revert_title": "此交易可能会失败",
+      "revert_description": "如果提交，预计会回滚{reason}",
+      "unknown_token": "未知代币 ({address})"
+    },
+    "signature": {
+      "title": "确认签名",
+      "description": "请查看您即将签名的内容。",
+      "message_label": "消息",
+      "typed_data_label": "数据",
+      "network": "网络",
+      "contract": "合约",
+      "view_raw": "查看原始数据",
+      "hide_raw": "隐藏原始数据"
     }
   },
   "request_views": {

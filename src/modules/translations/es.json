@@ -81,7 +81,28 @@
     "transaction_dialog": {
       "title": "Confirmar transacción",
       "transaction_cost": "Costo de transacción: {cost} ETH",
-      "your_balance": "Tu saldo: {balance} ETH"
+      "your_balance": "Tu saldo: {balance} ETH",
+      "simulation_loading": "Comprobando qué hará esta transacción…",
+      "details_unavailable": "No pudimos previsualizar esta transacción. Continúa solo si confías en esta escena.",
+      "you_send": "Envías",
+      "you_receive": "Recibes",
+      "approvals_title": "Permisos otorgados",
+      "approval_description": "Permitir que {spender} gaste {amount} {symbol}",
+      "approval_unlimited": "ilimitado",
+      "approval_for_all": "Permitir que {spender} tenga acceso total a tu {name}",
+      "revert_title": "Es probable que esta transacción falle",
+      "revert_description": "Se espera que se revierta si se envía{reason}",
+      "unknown_token": "Token desconocido ({address})"
+    },
+    "signature": {
+      "title": "Confirmar firma",
+      "description": "Revisa lo que estás a punto de firmar.",
+      "message_label": "Mensaje",
+      "typed_data_label": "Datos",
+      "network": "Red",
+      "contract": "Contrato",
+      "view_raw": "Ver datos sin procesar",
+      "hide_raw": "Ocultar datos sin procesar"
     }
   },
   "request_views": {

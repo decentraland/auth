@@ -81,7 +81,28 @@
     "transaction_dialog": {
       "title": "Confirm Transaction",
       "transaction_cost": "Transaction cost: {cost} ETH",
-      "your_balance": "Your balance: {balance} ETH"
+      "your_balance": "Your balance: {balance} ETH",
+      "simulation_loading": "Checking what this transaction will do…",
+      "details_unavailable": "We couldn't preview this transaction. Only continue if you trust this scene.",
+      "you_send": "You send",
+      "you_receive": "You receive",
+      "approvals_title": "Permissions granted",
+      "approval_description": "Allow {spender} to spend {amount} {symbol}",
+      "approval_unlimited": "unlimited",
+      "approval_for_all": "Allow {spender} full access to your {name}",
+      "revert_title": "This transaction is likely to fail",
+      "revert_description": "It is expected to revert if submitted{reason}",
+      "unknown_token": "Unknown token ({address})"
+    },
+    "signature": {
+      "title": "Confirm signature",
+      "description": "Review what you are about to sign.",
+      "message_label": "Message",
+      "typed_data_label": "Data",
+      "network": "Network",
+      "contract": "Contract",
+      "view_raw": "View raw data",
+      "hide_raw": "Hide raw data"
     }
   },
   "request_views": {

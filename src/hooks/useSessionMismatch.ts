@@ -1,6 +1,4 @@
-import { ProviderType } from '@dcl/schemas'
-
-const SOCIAL_PROVIDER_TYPES = new Set<string>([ProviderType.MAGIC, ProviderType.MAGIC_TEST, ProviderType.THIRDWEB])
+import { SOCIAL_PROVIDER_TYPES } from '../shared/connection/socialProviders'
 
 const WALLET_LOGIN_METHODS = new Set(['METAMASK', 'WALLETCONNECT', 'COINBASE', 'FORTMATIC'])
 

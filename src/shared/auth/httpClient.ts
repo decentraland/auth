@@ -2,11 +2,21 @@ import { AuthIdentity } from '@dcl/crypto'
 import signedFetch from 'decentraland-crypto-fetch'
 import { RequestInteractionType, TrackingEvents } from '../../modules/analytics/types'
 import { config } from '../../modules/config'
+import { isErrorWithMessage } from '../errors'
 import { trackEvent } from '../utils/analytics'
 import { handleError } from '../utils/errorHandler'
-import { DifferentSenderError, ExpiredRequestError, IpValidationError, RequestFulfilledError, RequestNotFoundError } from './errors'
+import {
+  DifferentSenderError,
+  ExpiredRequestError,
+  IpValidationError,
+  RequestFulfilledError,
+  RequestNotFoundError,
+  SimulationUnavailableError
+} from './errors'
 import { assertRequestIsNotImpersonatingSignIn } from './signMethodGuard'
-import { IdentityResponse, OutcomeError, OutcomeResponse, RecoverResponse } from './types'
+import { IdentityResponse, OutcomeError, OutcomeResponse, RecoverResponse, SimulationRequestBody, SimulationResponseBody } from './types'
+
+const SIMULATION_TIMEOUT_MS = 10_000
 export const createAuthServerHttpClient = (authServerUrl?: string) => {
   const baseUrl = authServerUrl ?? config.get('AUTH_SERVER_URL')
 
@@ -200,6 +210,42 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
     }
   }
 
+  /**
+   * Asks the auth server to simulate a transaction (or meta-transaction inner call) and
+   * return a normalized summary of asset transfers and approvals. This is best-effort and
+   * fails open: any non-200 response, timeout, or network error throws
+   * SimulationUnavailableError, which the UI renders as "details unavailable" rather than
+   * blocking the approval. Deliberately not routed through handleError/Sentry.
+   */
+  const simulateTransaction = async (body: SimulationRequestBody): Promise<SimulationResponseBody> => {
+    let response: Response
+    try {
+      response = await fetch(baseUrl + '/simulations', {
+        method: 'POST',
+        headers: {
+          // eslint-disable-next-line @typescript-eslint/naming-convention
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(SIMULATION_TIMEOUT_MS)
+      })
+    } catch (e) {
+      throw new SimulationUnavailableError(isErrorWithMessage(e) ? e.message : undefined)
+    }
+
+    if (!response.ok) {
+      // Drain the body so the connection can be reused; ignore parse failures.
+      await response.body?.cancel().catch(() => undefined)
+      throw new SimulationUnavailableError(`status ${response.status}`)
+    }
+
+    try {
+      return (await response.json()) as SimulationResponseBody
+    } catch (e) {
+      throw new SimulationUnavailableError(isErrorWithMessage(e) ? e.message : 'invalid response')
+    }
+  }
+
   const checkHealth = async (): Promise<{ timestamp: number }> => {
     try {
       const response = await fetch(baseUrl + '/health/live', {
@@ -218,5 +264,5 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
     }
   }
 
-  return { recover, sendSuccessfulOutcome, sendFailedOutcome, notifyRequestNeedsValidation, checkHealth, postIdentity }
+  return { recover, sendSuccessfulOutcome, sendFailedOutcome, notifyRequestNeedsValidation, checkHealth, postIdentity, simulateTransaction }
 }

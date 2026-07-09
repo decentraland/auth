@@ -19,5 +19,11 @@ export default class CustomJSDOMEnvironment extends JSDOMEnvironment {
       this.global.Headers = Headers
       this.global.fetch = fetch
     }
+
+    // jsdom's AbortSignal lacks static helpers like AbortSignal.timeout; use Node's superset.
+    if (typeof (this.global.AbortSignal as typeof AbortSignal | undefined)?.timeout !== 'function') {
+      this.global.AbortController = AbortController
+      this.global.AbortSignal = AbortSignal
+    }
   }
 }

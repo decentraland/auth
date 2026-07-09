@@ -1,10 +1,8 @@
 import { useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { createPublicClient, createWalletClient, custom, formatEther } from 'viem'
+import { createPublicClient, createWalletClient, custom } from 'viem'
 import { mainnet } from 'viem/chains'
-import { useTranslation } from '@dcl/hooks'
 import { ContractName, getContract, sendMetaTransaction } from 'decentraland-transactions'
-import { Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle } from 'decentraland-ui2'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import { useAnalytics } from '../../../hooks/useAnalytics'
@@ -23,10 +21,11 @@ import {
   IpValidationError,
   RecoverResponse,
   RequestFulfilledError,
+  SimulationRequestBody,
   TimedOutError,
   createAuthServerHttpClient
 } from '../../../shared/auth'
-import { useCurrentConnectionData } from '../../../shared/connection'
+import { isSocialProviderType, useCurrentConnectionData } from '../../../shared/connection'
 import { isErrorWithMessage, isRpcError, isUserRejectedTransaction } from '../../../shared/errors'
 import {
   CLIENT_LOGIN_REQUEST_ID,
@@ -39,18 +38,22 @@ import { isProfileComplete } from '../../../shared/profile'
 import { identifyUser } from '../../../shared/utils/analytics'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
-import { MANATransferData, NFTTransferData, TransferType } from './types'
+import { MANATransferData, NFTTransferData, SignaturePayload, SimulationState, TransferType } from './types'
 import {
+  buildSendTransactionSimulationPayload,
   checkMetaTransactionSupport,
   decodeManaTransferData,
+  decodeMetaTransactionTypedData,
   decodeNftTransferData,
+  extractSignaturePayload,
   fetchNftMetadata,
   fetchPlaceByCreatorAddress,
   getConnectedProvider,
   getExplorerDeeplink,
   getMetaTransactionChainId,
   getNetworkProvider,
-  getSigninDeeplink
+  getSigninDeeplink,
+  isSignatureMethod
 } from './utils'
 import {
   ClientLoginError,
@@ -63,8 +66,10 @@ import {
   RecoverError,
   SignInComplete,
   SignInCompletePage,
+  SignatureRequestView,
   SigningError,
   TimeoutError,
+  TransactionConfirmDialog,
   TransferCanceledView,
   TransferCompletedView,
   TransferConfirmView,
@@ -91,6 +96,7 @@ enum View {
   CLIENT_LOGIN_ERROR,
   // Wallet Interaction
   WALLET_INTERACTION,
+  WALLET_SIGNATURE_INTERACTION,
   WALLET_NFT_INTERACTION,
   WALLET_MANA_INTERACTION,
   WALLET_INTERACTION_DENIED,
@@ -100,36 +106,6 @@ enum View {
   WALLET_INTERACTION_COMPLETE,
   WALLET_NFT_INTERACTION_COMPLETE,
   WALLET_MANA_INTERACTION_COMPLETE
-}
-
-interface TransactionConfirmDialogProps {
-  open: boolean
-  transactionCost: bigint
-  balance: bigint
-  isLoading?: boolean
-  onCancel: () => void
-  onConfirm: () => void
-}
-
-const TransactionConfirmDialog = ({ open, transactionCost, balance, isLoading, onCancel, onConfirm }: TransactionConfirmDialogProps) => {
-  const { t } = useTranslation()
-  return (
-    <Dialog open={open} maxWidth="xs" fullWidth>
-      <DialogTitle>{t('request.transaction_dialog.title')}</DialogTitle>
-      <DialogContent>
-        <p>{t('request.transaction_dialog.transaction_cost', { cost: formatEther(transactionCost) })}</p>
-        <p>{t('request.transaction_dialog.your_balance', { balance: formatEther(balance) })}</p>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onCancel} disabled={isLoading}>
-          {t('common.cancel')}
-        </Button>
-        <Button variant="contained" onClick={onConfirm} disabled={isLoading}>
-          {isLoading ? <CircularProgress size={20} color="inherit" /> : t('common.confirm')}
-        </Button>
-      </DialogActions>
-    </Dialog>
-  )
 }
 
 // Terminal views that should not trigger a re-fetch of the request
@@ -174,6 +150,9 @@ export const RequestPage = () => {
   const [nftTransferData, setNftTransferData] = useState<NFTTransferData | null>(null)
   const [manaTransferData, setManaTransferData] = useState<MANATransferData | null>(null)
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false)
+  const [simulationState, setSimulationState] = useState<SimulationState>({ status: 'idle' })
+  const [signaturePayload, setSignaturePayload] = useState<SignaturePayload | null>(null)
+  const [isSignatureMetaTx, setIsSignatureMetaTx] = useState(false)
   const requestRef = useRef<RecoverResponse>()
   const viewRef = useRef(view)
   viewRef.current = view
@@ -201,7 +180,12 @@ export const RequestPage = () => {
   const requestId = params.requestId ?? ''
   const [targetConfig, targetConfigId] = useTargetConfig()
   const skipSetup = useSkipSetup()
-  const isUserUsingWeb2Wallet = !!provider?.isMagic
+  // Social / web2 wallets (Magic and Thirdweb) sign without their own confirmation UI, so the
+  // auth site must show what is being approved. `provider.isMagic` alone misses Thirdweb.
+  const isUserUsingWeb2Wallet = isSocialProviderType(providerType)
+  // The informative simulation/signature UI is only shown to web2 users and gated behind a
+  // feature flag for rollout. External wallets keep their own confirmation UI unchanged.
+  const canShowSimulation = isUserUsingWeb2Wallet && !!flags[FeatureFlagsKeys.TRANSACTION_SIMULATION]
   const authServerClient = useRef(createAuthServerHttpClient())
   const isDeepLinkFlow = searchParams.get('flow') === 'deeplink'
   // The `client-login` pseudo request id has no backing auth-server request: skip the
@@ -376,6 +360,20 @@ export const RequestPage = () => {
           }, expirationDelay)
         }
 
+        // Best-effort transaction simulation for web2 users. Fires without blocking the view
+        // render and never throws to the caller — failures surface as "details unavailable".
+        const fetchSimulation = async (body: SimulationRequestBody) => {
+          try {
+            const result = await authServerClient.current.simulateTransaction(body)
+            if (cancelled) return
+            setSimulationState({ status: 'ready', result })
+          } catch (e) {
+            if (cancelled) return
+            console.info('Transaction simulation unavailable:', e instanceof Error ? e.message : String(e))
+            setSimulationState({ status: 'unavailable' })
+          }
+        }
+
         // Show different views depending on the request method.
         switch (request.method) {
           case 'dcl_personal_sign': {
@@ -446,6 +444,23 @@ export const RequestPage = () => {
               const txParams = request.params?.[0] as Record<string, unknown> | undefined
               const transactionData = txParams?.data as string | undefined
               const contractAddress = txParams?.to as string | undefined
+
+              // Prefetch the asset-change simulation (non-blocking) so the confirm dialog can
+              // show it instantly. Applies to all eth_sendTransaction sub-views for web2 users.
+              if (canShowSimulation && txParams) {
+                setSimulationState({ status: 'loading' })
+                buildSendTransactionSimulationPayload(txParams, signerAddress, currentChainId)
+                  .then(body => {
+                    if (cancelled) return undefined
+                    if (body) return fetchSimulation(body)
+                    setSimulationState({ status: 'unavailable' })
+                    return undefined
+                  })
+                  .catch(() => {
+                    if (!cancelled) setSimulationState({ status: 'unavailable' })
+                  })
+              }
+
               if (transactionData && contractAddress) {
                 const manaData = decodeManaTransferData(transactionData, contractAddress)
                 if (manaData) {
@@ -521,8 +536,32 @@ export const RequestPage = () => {
             }
             break
           }
-          default:
-            setView(View.WALLET_INTERACTION)
+          default: {
+            // For web2 users (behind the flag), plain signature requests get an informative
+            // preview of what they are signing. Meta-transaction typed data additionally gets
+            // the asset-change summary by simulating the inner call.
+            if (canShowSimulation && isSignatureMethod(request.method)) {
+              const payload = extractSignaturePayload(request.method, request.params)
+              setSignaturePayload(payload)
+              if (payload?.kind === 'typedData') {
+                const metaTx = decodeMetaTransactionTypedData(payload.typedData)
+                if (metaTx) {
+                  setIsSignatureMetaTx(true)
+                  setSimulationState({ status: 'loading' })
+                  void fetchSimulation({
+                    chainId: metaTx.chainId,
+                    from: metaTx.from,
+                    to: metaTx.verifyingContract,
+                    data: metaTx.functionSignature,
+                    value: '0'
+                  })
+                }
+              }
+              setView(View.WALLET_SIGNATURE_INTERACTION)
+            } else {
+              setView(View.WALLET_INTERACTION)
+            }
+          }
         }
       } catch (e) {
         if (cancelled) return
@@ -587,6 +626,7 @@ export const RequestPage = () => {
     if (
       view !== View.VERIFY_SIGN_IN &&
       view !== View.WALLET_INTERACTION &&
+      view !== View.WALLET_SIGNATURE_INTERACTION &&
       view !== View.WALLET_NFT_INTERACTION &&
       view !== View.WALLET_MANA_INTERACTION
     ) {
@@ -744,42 +784,55 @@ export const RequestPage = () => {
       }
 
       const [signerAddress] = await walletClient.getAddresses()
-      const chainId = getMetaTransactionChainId()
-      const txParams = requestRef.current?.params?.[0] as Record<string, unknown> | undefined
-      const toAddress = txParams?.to as string | undefined
-
-      if (!toAddress) {
-        throw new Error(`Contract address not found in transaction parameters. Received params: ${JSON.stringify(txParams ?? null)}`)
-      }
+      const method = requestRef.current.method
 
       let result: string | null = null
 
-      // Check if this contract will use meta transactions
-      const { willUseMetaTransaction, contractName } = await checkMetaTransactionSupport(toAddress)
-      if (willUseMetaTransaction && contractName) {
-        const connectedProvider = await getConnectedProvider()
-        if (!connectedProvider) {
-          throw new Error('Provider not connected')
-        }
-
-        const networkProvider = await getNetworkProvider(chainId)
-        const contract = getContract(contractName, chainId)
-        contract.address = toAddress
-
-        result = await sendMetaTransaction(
-          connectedProvider,
-          networkProvider,
-          (requestRef.current?.params?.[0] as Record<string, unknown>).data as string,
-          contract,
-          {
-            serverURL: `${config.get('META_TRANSACTION_SERVER_URL')}/v1`
-          }
-        )
-      } else {
+      if (method !== 'eth_sendTransaction') {
+        // Non-transaction methods (e.g. personal_sign, eth_signTypedData_v4) carry no `to`
+        // address and are never relayed as meta-transactions — forward them straight to the
+        // wallet. The `as` casts satisfy viem's typed request signature; the real method and
+        // params are passed through unchanged at runtime.
         result = await walletClient.request({
-          method: requestRef.current?.method as 'eth_sendTransaction',
+          method: method as 'eth_sendTransaction',
           params: requestRef.current?.params as [Record<string, unknown>]
         })
+      } else {
+        const chainId = getMetaTransactionChainId()
+        const txParams = requestRef.current?.params?.[0] as Record<string, unknown> | undefined
+        const toAddress = txParams?.to as string | undefined
+
+        if (!toAddress) {
+          throw new Error(`Contract address not found in transaction parameters. Received params: ${JSON.stringify(txParams ?? null)}`)
+        }
+
+        // Check if this contract will use meta transactions
+        const { willUseMetaTransaction, contractName } = await checkMetaTransactionSupport(toAddress)
+        if (willUseMetaTransaction && contractName) {
+          const connectedProvider = await getConnectedProvider()
+          if (!connectedProvider) {
+            throw new Error('Provider not connected')
+          }
+
+          const networkProvider = await getNetworkProvider(chainId)
+          const contract = getContract(contractName, chainId)
+          contract.address = toAddress
+
+          result = await sendMetaTransaction(
+            connectedProvider,
+            networkProvider,
+            (requestRef.current?.params?.[0] as Record<string, unknown>).data as string,
+            contract,
+            {
+              serverURL: `${config.get('META_TRANSACTION_SERVER_URL')}/v1`
+            }
+          )
+        } else {
+          result = await walletClient.request({
+            method: 'eth_sendTransaction',
+            params: requestRef.current?.params as [Record<string, unknown>]
+          })
+        }
       }
 
       trackClick(ClickEvents.APPROVE_WALLET_INTERACTION, {
@@ -962,6 +1015,8 @@ export const RequestPage = () => {
             open={isTransactionModalOpen}
             transactionCost={transactionGasCost ?? BigInt(0)}
             balance={walletInfo?.balance ?? BigInt(0)}
+            simulation={simulationState}
+            userAddress={account ?? ''}
             isLoading={isLoading}
             onCancel={onDenyWalletInteraction}
             onConfirm={onApproveWalletInteraction}
@@ -982,6 +1037,8 @@ export const RequestPage = () => {
             open={isTransactionModalOpen}
             transactionCost={transactionGasCost ?? BigInt(0)}
             balance={walletInfo?.balance ?? BigInt(0)}
+            simulation={simulationState}
+            userAddress={account ?? ''}
             isLoading={isLoading}
             onCancel={onDenyWalletInteraction}
             onConfirm={onApproveWalletInteraction}
@@ -1002,6 +1059,8 @@ export const RequestPage = () => {
             open={isTransactionModalOpen}
             transactionCost={transactionGasCost ?? BigInt(0)}
             balance={walletInfo?.balance ?? BigInt(0)}
+            simulation={simulationState}
+            userAddress={account ?? ''}
             isLoading={isLoading}
             onCancel={onDenyWalletInteraction}
             onConfirm={onApproveWalletInteraction}
@@ -1015,6 +1074,20 @@ export const RequestPage = () => {
             onApprove={handleApproveWalletInteraction}
           />
         </>
+      )
+    case View.WALLET_SIGNATURE_INTERACTION:
+      return (
+        <SignatureRequestView
+          requestId={requestId}
+          method={requestRef.current?.method ?? ''}
+          payload={signaturePayload}
+          simulation={simulationState}
+          userAddress={account ?? ''}
+          isMetaTransaction={isSignatureMetaTx}
+          isLoading={isLoading}
+          onDeny={onDenyWalletInteraction}
+          onApprove={onApproveWalletInteraction}
+        />
       )
     default:
       return null

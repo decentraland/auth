@@ -12,7 +12,9 @@ import {
   featureFlagsResponse,
   explorerFeatureFlagsResponse,
   emptyProfileResponse,
-  existingProfileResponse
+  existingProfileResponse,
+  simulationSuccessResponse,
+  simulationRevertedResponse
 } from '../fixtures/mock-responses'
 
 type SetupOptions = {
@@ -24,6 +26,10 @@ type SetupOptions = {
   showVerificationCode?: boolean
   /** Whether LOGIN_ON_SETUP FF is enabled (default: false) */
   loginOnSetup?: boolean
+  /** Whether TRANSACTION_SIMULATION FF is enabled (default: false) */
+  transactionSimulation?: boolean
+  /** How the mocked POST /simulations endpoint responds (default: 'success') */
+  simulation?: 'success' | 'reverted' | 'error'
 }
 
 /**
@@ -46,7 +52,14 @@ export async function injectMockWallet(context: BrowserContext) {
  * Intercepts auth-server, feature-flags, and profile endpoints.
  */
 export async function mockApiRoutes(page: Page, options: SetupOptions = {}) {
-  const { hasProfile = true, onboardingToExplorer = true, showVerificationCode = true, loginOnSetup = false } = options
+  const {
+    hasProfile = true,
+    onboardingToExplorer = true,
+    showVerificationCode = true,
+    loginOnSetup = false,
+    transactionSimulation = false,
+    simulation = 'success'
+  } = options
 
   // Auth server: recover request
   await page.route('**/v2/requests/**', async (route, request) => {
@@ -83,6 +96,18 @@ export async function mockApiRoutes(page: Page, options: SetupOptions = {}) {
     return route.continue()
   })
 
+  // Auth server: transaction simulation
+  await page.route('**/simulations', async route => {
+    if (simulation === 'error') {
+      return route.fulfill({ status: 502, contentType: 'application/json', body: JSON.stringify({ error: 'Simulation unavailable' }) })
+    }
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(simulation === 'reverted' ? simulationRevertedResponse : simulationSuccessResponse)
+    })
+  })
+
   // Auth server: health (for clock sync)
   await page.route('**/health', async route => {
     return route.fulfill({
@@ -98,7 +123,8 @@ export async function mockApiRoutes(page: Page, options: SetupOptions = {}) {
     flags: {
       ...featureFlagsResponse.flags,
       'dapps-onboarding-to-explorer': onboardingToExplorer,
-      'dapps-login-on-setup': loginOnSetup
+      'dapps-login-on-setup': loginOnSetup,
+      'dapps-transaction-simulation': transactionSimulation
     }
   }
   await page.route('**/feature-flags**/dapps.json', async route => {

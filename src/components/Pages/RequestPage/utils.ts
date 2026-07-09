@@ -1,11 +1,140 @@
-import { createPublicClient, custom, decodeFunctionData, formatEther } from 'viem'
+import { createPublicClient, custom, decodeFunctionData, formatEther, hexToString } from 'viem'
 import { Rarity } from '@dcl/schemas'
 import { ChainId } from '@dcl/schemas/dist/dapps/chain-id'
 import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
 import { Provider, connection } from 'decentraland-connect'
 import { ContractName, getContract, getContractName } from 'decentraland-transactions'
 import { config } from '../../../modules/config'
+import { SimulationRequestBody } from '../../../shared/auth'
 import { isMobile } from '../LoginPage/utils'
+import { SignaturePayload, TypedDataPayload } from './types'
+
+const ADDRESS_REGEX = /^0x[a-fA-F0-9]{40}$/
+const HEX_STRING_REGEX = /^0x([0-9a-fA-F]{2})*$/
+
+/** Wallet-RPC methods that request a signature rather than a transaction. */
+const SIGNATURE_METHODS = new Set(['personal_sign', 'eth_sign', 'eth_signtypeddata', 'eth_signtypeddata_v3', 'eth_signtypeddata_v4'])
+
+/**
+ * Returns true when the method is a plain signature request (not a transaction and not the
+ * dedicated dcl_personal_sign sign-in flow).
+ */
+function isSignatureMethod(method: string): boolean {
+  return SIGNATURE_METHODS.has(method.toLowerCase())
+}
+
+/**
+ * Extracts what a signature request asks the user to sign: a plain message (decoding
+ * hex-encoded UTF-8 when possible) or an EIP-712 typed-data structure. Returns null when the
+ * payload can't be interpreted.
+ */
+function extractSignaturePayload(method: string, params: unknown[] | undefined): SignaturePayload | null {
+  if (!params || params.length === 0) return null
+  const normalizedMethod = method.toLowerCase()
+
+  if (normalizedMethod === 'personal_sign' || normalizedMethod === 'eth_sign') {
+    // personal_sign is [message, address]; eth_sign is [address, message]. Pick the element
+    // that is not a bare address as the message.
+    const [first, second] = params
+    let message: unknown = first
+    if (typeof first === 'string' && ADDRESS_REGEX.test(first) && typeof second === 'string') {
+      message = second
+    }
+    if (typeof message !== 'string') return null
+
+    let text = message
+    if (HEX_STRING_REGEX.test(message) && message.length > 2) {
+      try {
+        text = hexToString(message as `0x${string}`)
+      } catch {
+        text = message
+      }
+    }
+    return { kind: 'message', message: text }
+  }
+
+  // eth_signTypedData variants. v3/v4 pass [address, jsonString]; some providers pass an object.
+  const jsonCandidate = params.find(param => typeof param === 'string' && !ADDRESS_REGEX.test(param))
+  if (typeof jsonCandidate === 'string') {
+    try {
+      const parsed = JSON.parse(jsonCandidate) as TypedDataPayload
+      return { kind: 'typedData', typedData: parsed, raw: jsonCandidate }
+    } catch {
+      return { kind: 'message', message: jsonCandidate }
+    }
+  }
+  const objectCandidate = params.find(param => typeof param === 'object' && param !== null)
+  if (objectCandidate) {
+    return { kind: 'typedData', typedData: objectCandidate as TypedDataPayload, raw: JSON.stringify(objectCandidate, null, 2) }
+  }
+  return null
+}
+
+/**
+ * Detects a Decentraland meta-transaction typed-data payload and returns the inner call so it
+ * can be simulated (from = message.from, to = domain.verifyingContract, data =
+ * message.functionSignature). Returns null when the typed data isn't a MetaTransaction.
+ */
+function decodeMetaTransactionTypedData(
+  typedData: TypedDataPayload | undefined
+): { from: string; verifyingContract: string; functionSignature: string; chainId: number } | null {
+  try {
+    if (!typedData || typedData.primaryType !== 'MetaTransaction') return null
+    const message = typedData.message
+    const domain = typedData.domain
+    if (!message || !domain) return null
+
+    const from = message.from
+    const functionSignature = message.functionSignature
+    const verifyingContract = domain.verifyingContract
+    if (typeof from !== 'string' || typeof functionSignature !== 'string' || typeof verifyingContract !== 'string') {
+      return null
+    }
+
+    let chainId: number | undefined
+    if (typeof domain.salt === 'string') {
+      try {
+        chainId = Number(BigInt(domain.salt))
+      } catch {
+        chainId = undefined
+      }
+    }
+    if ((chainId === undefined || Number.isNaN(chainId)) && domain.chainId !== undefined) {
+      chainId = Number(domain.chainId)
+    }
+    if (chainId === undefined || Number.isNaN(chainId)) return null
+
+    return { from, verifyingContract, functionSignature, chainId }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Builds the simulation request body for an eth_sendTransaction request. When the target is a
+ * Decentraland contract the transaction is relayed as a meta-transaction, so it must be
+ * simulated on the meta-transaction chain (Polygon/Amoy) rather than the connected chain —
+ * simulating a meta-tx on mainnet would revert spuriously.
+ */
+async function buildSendTransactionSimulationPayload(
+  txParams: Record<string, unknown>,
+  signerAddress: string,
+  connectedChainId: number
+): Promise<SimulationRequestBody | null> {
+  const to = txParams.to as string | undefined
+  if (!to) return null
+
+  const { willUseMetaTransaction } = await checkMetaTransactionSupport(to)
+  const chainId = willUseMetaTransaction ? Number(getMetaTransactionChainId()) : connectedChainId
+
+  return {
+    chainId,
+    from: (txParams.from as string | undefined) ?? signerAddress,
+    to,
+    data: (txParams.data as string | undefined) ?? '0x',
+    value: (txParams.value as string | undefined) ?? '0'
+  }
+}
 
 const DEEPLINK_DETECTION_TIMEOUT = 500
 
@@ -410,5 +539,9 @@ export {
   decodeNftTransferData,
   decodeManaTransferData,
   fetchNftMetadata,
-  fetchPlaceByCreatorAddress
+  fetchPlaceByCreatorAddress,
+  isSignatureMethod,
+  extractSignaturePayload,
+  decodeMetaTransactionTypedData,
+  buildSendTransactionSimulationPayload
 }

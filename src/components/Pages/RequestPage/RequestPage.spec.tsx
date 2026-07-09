@@ -2,6 +2,7 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { ProviderType } from '@dcl/schemas'
 import { fetchProfile } from '../../../modules/profile'
 import {
@@ -14,6 +15,7 @@ import {
 import { isBridgeOnlyEnabled } from '../../../shared/locations'
 import { isProfileComplete } from '../../../shared/profile'
 import { FeatureFlagsContext } from '../../FeatureFlagsProvider'
+import { FeatureFlagsKeys } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
 import { RequestPage } from './RequestPage'
 import { getSigninDeeplink } from './utils'
 
@@ -31,7 +33,8 @@ jest.mock('../../../hooks/useSkipSetup', () => ({
 // --- Connection ---
 let mockConnectionData: Record<string, any>
 jest.mock('../../../shared/connection', () => ({
-  useCurrentConnectionData: () => mockConnectionData
+  useCurrentConnectionData: () => mockConnectionData,
+  isSocialProviderType: jest.requireActual('../../../shared/connection/socialProviders').isSocialProviderType
 }))
 
 // --- Ensure Profile ---
@@ -62,6 +65,7 @@ const mockSendSuccessfulOutcome = jest.fn()
 const mockSendFailedOutcome = jest.fn()
 const mockNotifyRequestNeedsValidation = jest.fn()
 const mockPostIdentity = jest.fn()
+const mockSimulateTransaction = jest.fn()
 jest.mock('../../../shared/auth', () => {
   const actual = jest.requireActual('../../../shared/auth')
   return {
@@ -71,7 +75,8 @@ jest.mock('../../../shared/auth', () => {
       sendSuccessfulOutcome: mockSendSuccessfulOutcome,
       sendFailedOutcome: mockSendFailedOutcome,
       notifyRequestNeedsValidation: mockNotifyRequestNeedsValidation,
-      postIdentity: mockPostIdentity
+      postIdentity: mockPostIdentity,
+      simulateTransaction: mockSimulateTransaction
     })
   }
 })
@@ -149,17 +154,48 @@ jest.mock('./Views', () => ({
   IpValidationError: (props: any) => <div data-testid="ip-validation-error">IP Error: {props.reason}</div>,
   RecoverError: () => <div data-testid="recover-error">Recover Error</div>,
   SigningError: (props: any) => <div data-testid="signing-error">Signing Error: {props.error}</div>,
-  WalletInteraction: () => <div data-testid="wallet-interaction">Wallet Interaction</div>,
+  WalletInteraction: (props: any) => (
+    <div data-testid="wallet-interaction">
+      <button data-testid="wallet-interaction-approve" onClick={props.onApprove}>
+        approve
+      </button>
+      <button data-testid="wallet-interaction-deny" onClick={props.onDeny}>
+        deny
+      </button>
+    </div>
+  ),
   WalletInteractionComplete: () => <div data-testid="wallet-interaction-complete">Wallet Complete</div>,
   DeniedWalletInteraction: () => <div data-testid="denied-wallet-interaction">Denied Wallet</div>,
   ContinueInApp: () => <div data-testid="continue-in-app">Continue in App</div>,
   ClientLoginError: (props: any) => <div data-testid="client-login-error">Client Login Error: {props.error}</div>,
   TransferConfirmView: () => <div data-testid="transfer-confirm">Transfer Confirm</div>,
   TransferCompletedView: () => <div data-testid="transfer-completed">Transfer Completed</div>,
-  TransferCanceledView: () => <div data-testid="transfer-canceled">Transfer Canceled</div>
+  TransferCanceledView: () => <div data-testid="transfer-canceled">Transfer Canceled</div>,
+  TransactionConfirmDialog: (props: any) =>
+    props.open ? (
+      <div data-testid="transaction-confirm-dialog" data-sim={props.simulation?.status}>
+        Transaction Dialog
+      </div>
+    ) : null,
+  SignatureRequestView: (props: any) => (
+    <div
+      data-testid="signature-request"
+      data-method={props.method}
+      data-meta={String(props.isMetaTransaction)}
+      data-sim={props.simulation?.status}
+    >
+      <button data-testid="signature-approve" onClick={props.onApprove}>
+        approve
+      </button>
+    </div>
+  )
 }))
 
 // --- Utils ---
+const mockIsSignatureMethod = jest.fn()
+const mockExtractSignaturePayload = jest.fn()
+const mockDecodeMetaTransactionTypedData = jest.fn()
+const mockBuildSendTransactionSimulationPayload = jest.fn()
 jest.mock('./utils', () => ({
   checkMetaTransactionSupport: jest.fn().mockResolvedValue({ willUseMetaTransaction: false, contractName: null }),
   decodeManaTransferData: jest.fn().mockReturnValue(null),
@@ -170,7 +206,11 @@ jest.mock('./utils', () => ({
   getExplorerDeeplink: jest.fn().mockReturnValue('decentraland://open'),
   getSigninDeeplink: jest.fn().mockReturnValue('decentraland://open?signin=anIdentityId'),
   getMetaTransactionChainId: jest.fn().mockReturnValue(137),
-  getNetworkProvider: jest.fn()
+  getNetworkProvider: jest.fn(),
+  isSignatureMethod: (...args: any[]) => mockIsSignatureMethod(...args),
+  extractSignaturePayload: (...args: any[]) => mockExtractSignaturePayload(...args),
+  decodeMetaTransactionTypedData: (...args: any[]) => mockDecodeMetaTransactionTypedData(...args),
+  buildSendTransactionSimulationPayload: (...args: any[]) => mockBuildSendTransactionSimulationPayload(...args)
 }))
 
 // Mock decentraland-transactions
@@ -225,6 +265,19 @@ describe('RequestPage', () => {
       providerType: ProviderType.INJECTED,
       identity: { ephemeralIdentity: {}, expiration: new Date(), authChain: [] }
     }
+    mockIsSignatureMethod.mockImplementation((method: string) =>
+      ['personal_sign', 'eth_sign', 'eth_signtypeddata', 'eth_signtypeddata_v3', 'eth_signtypeddata_v4'].includes(method.toLowerCase())
+    )
+    mockExtractSignaturePayload.mockReturnValue({ kind: 'message', message: 'hello' })
+    mockDecodeMetaTransactionTypedData.mockReturnValue(null)
+    mockBuildSendTransactionSimulationPayload.mockResolvedValue({
+      chainId: 137,
+      from: '0xabc123',
+      to: '0xcontract',
+      data: '0x',
+      value: '0'
+    })
+    mockSimulateTransaction.mockResolvedValue({ status: 'success', assetChanges: [], approvalChanges: [] })
   })
 
   afterEach(() => {
@@ -618,6 +671,146 @@ describe('RequestPage', () => {
           expect(mockEnsureProfile).toHaveBeenCalledWith('0xnewwallet', expect.anything(), expect.anything())
         })
       })
+    })
+  })
+
+  describe('when approving a plain signature request', () => {
+    beforeEach(() => {
+      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.INJECTED }
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockRecover.mockResolvedValue({
+        method: 'personal_sign',
+        params: ['hello', '0xabc123'],
+        sender: '0xabc123',
+        expiration: new Date(Date.now() + 3600000).toISOString()
+      })
+      mockGetAddresses.mockResolvedValue(['0xabc123'])
+      mockWalletRequest.mockResolvedValue('0xsignature')
+      mockSendSuccessfulOutcome.mockResolvedValue({})
+    })
+
+    it('should forward the request to the wallet without requiring a contract address', async () => {
+      renderRequestPage()
+      await userEvent.click(await screen.findByTestId('wallet-interaction-approve'))
+      await waitFor(() => {
+        expect(mockWalletRequest).toHaveBeenCalledWith({ method: 'personal_sign', params: ['hello', '0xabc123'] })
+      })
+    })
+
+    it('should complete the interaction after a successful signature', async () => {
+      renderRequestPage()
+      await userEvent.click(await screen.findByTestId('wallet-interaction-approve'))
+      expect(await screen.findByTestId('wallet-interaction-complete')).toBeInTheDocument()
+    })
+  })
+
+  describe('when a Thirdweb user approves a transaction', () => {
+    beforeEach(() => {
+      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.THIRDWEB }
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockRecover.mockResolvedValue({
+        method: 'eth_sendTransaction',
+        params: [{ to: '0xcontract', data: '0xabcd', value: '0x0' }],
+        sender: '0xabc123',
+        expiration: new Date(Date.now() + 3600000).toISOString()
+      })
+      mockGetAddresses.mockResolvedValue(['0xabc123'])
+      mockGetBalance.mockResolvedValue(BigInt(1))
+      mockGetChainId.mockResolvedValue(1)
+      mockEstimateFeesPerGas.mockResolvedValue({ gasPrice: BigInt(1) })
+      mockEstimateGas.mockResolvedValue(BigInt(1))
+    })
+
+    it('should open the confirmation dialog instead of sending immediately', async () => {
+      renderRequestPage()
+      await userEvent.click(await screen.findByTestId('wallet-interaction-approve'))
+      expect(await screen.findByTestId('transaction-confirm-dialog')).toBeInTheDocument()
+    })
+  })
+
+  describe('when a web2 user receives a signature request and simulation is enabled', () => {
+    beforeEach(() => {
+      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.MAGIC }
+      mockFlags = { [FeatureFlagsKeys.TRANSACTION_SIMULATION]: true }
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockRecover.mockResolvedValue({
+        method: 'personal_sign',
+        params: ['hello', '0xabc123'],
+        sender: '0xabc123',
+        expiration: new Date(Date.now() + 3600000).toISOString()
+      })
+      mockGetAddresses.mockResolvedValue(['0xabc123'])
+    })
+
+    it('should render the signature preview view', async () => {
+      renderRequestPage()
+      expect(await screen.findByTestId('signature-request')).toBeInTheDocument()
+    })
+
+    it('should not fall back to the generic wallet interaction view', async () => {
+      renderRequestPage()
+      await screen.findByTestId('signature-request')
+      expect(screen.queryByTestId('wallet-interaction')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('when a web2 user receives a transaction and simulation is enabled', () => {
+    beforeEach(() => {
+      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.MAGIC }
+      mockFlags = { [FeatureFlagsKeys.TRANSACTION_SIMULATION]: true }
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockRecover.mockResolvedValue({
+        method: 'eth_sendTransaction',
+        params: [{ to: '0xcontract', data: '0xabcd', value: '0x0' }],
+        sender: '0xabc123',
+        expiration: new Date(Date.now() + 3600000).toISOString()
+      })
+      mockGetAddresses.mockResolvedValue(['0xabc123'])
+      mockGetBalance.mockResolvedValue(BigInt(1))
+      mockGetChainId.mockResolvedValue(1)
+      mockEstimateFeesPerGas.mockResolvedValue({ gasPrice: BigInt(1) })
+      mockEstimateGas.mockResolvedValue(BigInt(1))
+    })
+
+    it('should prefetch the transaction simulation', async () => {
+      renderRequestPage()
+      await waitFor(() => expect(mockSimulateTransaction).toHaveBeenCalled())
+    })
+
+    describe('and the simulation request fails', () => {
+      beforeEach(() => {
+        mockSimulateTransaction.mockRejectedValue(new Error('tenderly down'))
+      })
+
+      it('should still render the wallet interaction view (fail open)', async () => {
+        renderRequestPage()
+        expect(await screen.findByTestId('wallet-interaction')).toBeInTheDocument()
+      })
+    })
+  })
+
+  describe('when a web2 user receives a transaction and simulation is disabled', () => {
+    beforeEach(() => {
+      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.MAGIC }
+      mockFlags = {}
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockRecover.mockResolvedValue({
+        method: 'eth_sendTransaction',
+        params: [{ to: '0xcontract', data: '0xabcd', value: '0x0' }],
+        sender: '0xabc123',
+        expiration: new Date(Date.now() + 3600000).toISOString()
+      })
+      mockGetAddresses.mockResolvedValue(['0xabc123'])
+      mockGetBalance.mockResolvedValue(BigInt(1))
+      mockGetChainId.mockResolvedValue(1)
+      mockEstimateFeesPerGas.mockResolvedValue({ gasPrice: BigInt(1) })
+      mockEstimateGas.mockResolvedValue(BigInt(1))
+    })
+
+    it('should not call the simulation endpoint', async () => {
+      renderRequestPage()
+      await screen.findByTestId('wallet-interaction')
+      expect(mockSimulateTransaction).not.toHaveBeenCalled()
     })
   })
 })

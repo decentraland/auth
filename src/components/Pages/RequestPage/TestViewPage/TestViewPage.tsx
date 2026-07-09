@@ -12,7 +12,9 @@ import {
   LoadingRequest,
   RecoverError,
   SignInComplete,
+  SignatureRequestView,
   SigningError,
+  SimulationSummary,
   TimeoutError,
   TransferCanceledView,
   TransferCompletedView,
@@ -21,7 +23,16 @@ import {
   WalletInteraction,
   WalletInteractionComplete
 } from '../Views'
-import { manaData, nftData } from './__data__'
+import {
+  USER_ADDRESS,
+  manaData,
+  messageSignaturePayload,
+  metaTxSignaturePayload,
+  nftData,
+  simulationReverted,
+  simulationSuccess,
+  typedDataSignaturePayload
+} from './__data__'
 import { FloatingBar, ViewSelect } from './TestViewPage.styled'
 
 type ViewIdParam = {
@@ -100,9 +111,66 @@ export const TestViewPage = () => {
         element: (
           <TransferConfirmView type={TransferType.TIP} transferData={manaData} isLoading={false} onDeny={noop} onApprove={asyncNoop} />
         )
+      },
+      simulationSummarySuccess: {
+        label: 'SimulationSummary (Success)',
+        element: <SimulationSummary simulation={{ status: 'ready', result: simulationSuccess }} userAddress={USER_ADDRESS} />
+      },
+      simulationSummaryReverted: {
+        label: 'SimulationSummary (Reverted)',
+        element: <SimulationSummary simulation={{ status: 'ready', result: simulationReverted }} userAddress={USER_ADDRESS} />
+      },
+      simulationSummaryUnavailable: {
+        label: 'SimulationSummary (Unavailable)',
+        element: <SimulationSummary simulation={{ status: 'unavailable' }} userAddress={USER_ADDRESS} />
+      },
+      signatureMessage: {
+        label: 'SignatureRequest (Message)',
+        element: (
+          <SignatureRequestView
+            requestId={DEFAULT_REQUEST_ID}
+            method="personal_sign"
+            payload={messageSignaturePayload}
+            simulation={{ status: 'idle' }}
+            userAddress={USER_ADDRESS}
+            isMetaTransaction={false}
+            onDeny={noop}
+            onApprove={asyncNoop}
+          />
+        )
+      },
+      signatureTypedData: {
+        label: 'SignatureRequest (Typed Data)',
+        element: (
+          <SignatureRequestView
+            requestId={DEFAULT_REQUEST_ID}
+            method="eth_signTypedData_v4"
+            payload={typedDataSignaturePayload}
+            simulation={{ status: 'idle' }}
+            userAddress={USER_ADDRESS}
+            isMetaTransaction={false}
+            onDeny={noop}
+            onApprove={asyncNoop}
+          />
+        )
+      },
+      signatureMetaTx: {
+        label: 'SignatureRequest (Meta-tx)',
+        element: (
+          <SignatureRequestView
+            requestId={DEFAULT_REQUEST_ID}
+            method="eth_signTypedData_v4"
+            payload={metaTxSignaturePayload}
+            simulation={{ status: 'ready', result: simulationSuccess }}
+            userAddress={USER_ADDRESS}
+            isMetaTransaction={true}
+            onDeny={noop}
+            onApprove={asyncNoop}
+          />
+        )
       }
     } as const
-  }, [manaData, nftData])
+  }, [])
 
   const selected = viewId ? (views as Record<string, { label: string; element: JSX.Element }>)[viewId] : undefined
 

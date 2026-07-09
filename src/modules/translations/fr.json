@@ -81,7 +81,28 @@
     "transaction_dialog": {
       "title": "Confirmer la transaction",
       "transaction_cost": "Coût de la transaction : {cost} ETH",
-      "your_balance": "Votre solde : {balance} ETH"
+      "your_balance": "Votre solde : {balance} ETH",
+      "simulation_loading": "Vérification de ce que fera cette transaction…",
+      "details_unavailable": "Nous n'avons pas pu prévisualiser cette transaction. Ne continuez que si vous faites confiance à cette scène.",
+      "you_send": "Vous envoyez",
+      "you_receive": "Vous recevez",
+      "approvals_title": "Autorisations accordées",
+      "approval_description": "Autoriser {spender} à dépenser {amount} {symbol}",
+      "approval_unlimited": "illimité",
+      "approval_for_all": "Autoriser {spender} à accéder entièrement à votre {name}",
+      "revert_title": "Cette transaction risque d'échouer",
+      "revert_description": "Elle devrait échouer si elle est envoyée{reason}",
+      "unknown_token": "Jeton inconnu ({address})"
+    },
+    "signature": {
+      "title": "Confirmer la signature",
+      "description": "Vérifiez ce que vous êtes sur le point de signer.",
+      "message_label": "Message",
+      "typed_data_label": "Données",
+      "network": "Réseau",
+      "contract": "Contrat",
+      "view_raw": "Afficher les données brutes",
+      "hide_raw": "Masquer les données brutes"
     }
   },
   "request_views": {

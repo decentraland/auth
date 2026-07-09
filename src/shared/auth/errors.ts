@@ -62,6 +62,20 @@ class ImpersonatedSignInError extends Error {
   }
 }
 
+/**
+ * Thrown when the transaction-simulation endpoint is unreachable, times out, or
+ * returns a non-200 response. The approval UI treats this as "details unavailable"
+ * and falls back to the default confirmation — simulation is never allowed to block
+ * or fail an approval.
+ */
+class SimulationUnavailableError extends Error {
+  readonly skipReporting = true
+  constructor(reason?: string) {
+    super(`Transaction simulation unavailable${reason ? `: ${reason}` : ''}`)
+    this.name = 'SimulationUnavailableError'
+  }
+}
+
 export {
   DifferentSenderError,
   ExpiredRequestError,
@@ -69,5 +83,6 @@ export {
   RequestFulfilledError,
   IpValidationError,
   TimedOutError,
-  ImpersonatedSignInError
+  ImpersonatedSignInError,
+  SimulationUnavailableError
 }
