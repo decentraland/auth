@@ -15,7 +15,12 @@ jest.mock('../../../../hooks/targetConfig', () => ({
 }))
 
 jest.mock('../Container', () => ({
-  Container: (props: { children: ReactNode }) => <div>{props.children}</div>
+  Container: (props: { children: ReactNode; canChangeAccount?: boolean }) => (
+    <div>
+      {props.canChangeAccount ? <div data-testid="change-account-link" /> : null}
+      {props.children}
+    </div>
+  )
 }))
 
 jest.mock('@dcl/hooks', () => ({
@@ -39,8 +44,8 @@ describe('ContinueInApp', () => {
   let originalLocation: Location
   let mockOnContinue: jest.Mock
 
-  const renderContinueInApp = (options: { immediate?: boolean; autoStart?: boolean } = {}) => {
-    const { immediate = false, autoStart = true } = options
+  const renderContinueInApp = (options: { isClientLogin?: boolean; autoStart?: boolean } = {}) => {
+    const { isClientLogin = false, autoStart = true } = options
     return render(
       <MemoryRouter initialEntries={['/auth/requests/aRequestId?targetConfigId=default&flow=deeplink']}>
         <ContinueInApp
@@ -48,7 +53,7 @@ describe('ContinueInApp', () => {
           requestId="aRequestId"
           deepLinkUrl={DEEP_LINK_URL}
           autoStart={autoStart}
-          immediate={immediate}
+          isClientLogin={isClientLogin}
         />
       </MemoryRouter>
     )
@@ -71,21 +76,52 @@ describe('ContinueInApp', () => {
     jest.resetAllMocks()
   })
 
-  describe('when using the countdown flow', () => {
-    describe('and the view has just mounted', () => {
-      beforeEach(() => {
-        renderContinueInApp()
+  describe('when the view has just mounted', () => {
+    beforeEach(() => {
+      renderContinueInApp()
+    })
+
+    it('should not attempt the deep link before the countdown finishes', () => {
+      expect(mockedLaunchDeepLink).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('when opening the client from the return button', () => {
+    describe('and the deep link launches successfully', () => {
+      beforeEach(async () => {
+        mockedLaunchDeepLink.mockResolvedValueOnce(true)
+        renderContinueInApp({ autoStart: false })
+        await userEvent.click(screen.getByTestId('continue-in-app-return-button'))
+        await waitFor(() => {
+          expect(mockOnContinue).toHaveBeenCalled()
+        })
       })
 
-      it('should not attempt the deep link before the countdown finishes', () => {
-        expect(mockedLaunchDeepLink).not.toHaveBeenCalled()
+      it('should attempt to launch the deep link', () => {
+        expect(mockedLaunchDeepLink).toHaveBeenCalledWith(DEEP_LINK_URL)
+      })
+
+      it('should notify the continue callback', () => {
+        expect(mockOnContinue).toHaveBeenCalled()
+      })
+    })
+  })
+
+  describe('when it is a regular deep-link flow', () => {
+    describe('and the view has just mounted', () => {
+      beforeEach(() => {
+        renderContinueInApp({ isClientLogin: false })
+      })
+
+      it('should not offer the change-account link', () => {
+        expect(screen.queryByTestId('change-account-link')).not.toBeInTheDocument()
       })
     })
 
     describe('and the deep link fails to launch', () => {
       beforeEach(async () => {
         mockedLaunchDeepLink.mockResolvedValueOnce(false)
-        renderContinueInApp({ autoStart: false })
+        renderContinueInApp({ isClientLogin: false, autoStart: false })
         await userEvent.click(screen.getByTestId('continue-in-app-return-button'))
         await waitFor(() => {
           expect(screen.getByTestId('continue-in-app-go-back-button')).toBeInTheDocument()
@@ -101,30 +137,22 @@ describe('ContinueInApp', () => {
     })
   })
 
-  describe('when using the immediate flow', () => {
-    describe('and the deep link launches successfully', () => {
+  describe('when it is the client-login flow', () => {
+    describe('and the view has just mounted', () => {
       beforeEach(() => {
-        mockedLaunchDeepLink.mockResolvedValueOnce(true)
-        renderContinueInApp({ immediate: true })
+        renderContinueInApp({ isClientLogin: true })
       })
 
-      it('should attempt the deep link immediately without a countdown', async () => {
-        await waitFor(() => {
-          expect(mockedLaunchDeepLink).toHaveBeenCalledWith(DEEP_LINK_URL)
-        })
-      })
-
-      it('should notify the continue callback', async () => {
-        await waitFor(() => {
-          expect(mockOnContinue).toHaveBeenCalled()
-        })
+      it('should offer the change-account link so the user can switch wallets', () => {
+        expect(screen.getByTestId('change-account-link')).toBeInTheDocument()
       })
     })
 
     describe('and the deep link fails to launch', () => {
       beforeEach(async () => {
         mockedLaunchDeepLink.mockResolvedValueOnce(false)
-        renderContinueInApp({ immediate: true })
+        renderContinueInApp({ isClientLogin: true, autoStart: false })
+        await userEvent.click(screen.getByTestId('continue-in-app-return-button'))
         await waitFor(() => {
           expect(screen.getByTestId('continue-in-app-try-again-button')).toBeInTheDocument()
         })
@@ -134,21 +162,17 @@ describe('ContinueInApp', () => {
         expect(screen.queryByTestId('continue-in-app-go-back-button')).not.toBeInTheDocument()
       })
 
+      it('should still offer the change-account link so the user can switch wallets', () => {
+        expect(screen.getByTestId('change-account-link')).toBeInTheDocument()
+      })
+
       describe('and trying again', () => {
         beforeEach(async () => {
-          mockedLaunchDeepLink.mockResolvedValueOnce(true)
           await userEvent.click(screen.getByTestId('continue-in-app-try-again-button'))
-          await waitFor(() => {
-            expect(mockedLaunchDeepLink).toHaveBeenCalledTimes(2)
-          })
         })
 
-        it('should re-attempt the deep link', () => {
-          expect(mockedLaunchDeepLink).toHaveBeenCalledTimes(2)
-        })
-
-        it('should not navigate anywhere', () => {
-          expect(window.location.href).toBe('')
+        it('should return to the redirecting view', () => {
+          expect(screen.getByTestId('continue-in-app-return-button')).toBeInTheDocument()
         })
       })
     })
