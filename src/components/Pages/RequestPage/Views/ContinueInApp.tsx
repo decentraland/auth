@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from '@dcl/hooks'
 import { muiIcons } from 'decentraland-ui2'
 import { useTargetConfig } from '../../../../hooks/targetConfig'
-import { CLIENT_LOGIN_REQUEST_ID } from '../../../../shared/locations'
 import { Container } from '../Container'
 import { launchDeepLink } from '../utils'
 import { ActionButton } from './ContinueInApp.styled'
@@ -17,20 +16,23 @@ type Props = {
   requestId: string
   deepLinkUrl: string
   autoStart?: boolean
+  // When true (client-login flow), open the client immediately with no countdown and, since
+  // there is no traditional request flow to fall back to, offer a plain retry of the deep
+  // link on failure instead of the go-back-to-login fallback.
+  immediate?: boolean
 }
 
 const COUNTDOWN_SECONDS = 5
 
-export const ContinueInApp = ({ onContinue, requestId, deepLinkUrl, autoStart = true }: Props) => {
+export const ContinueInApp = ({ onContinue, requestId, deepLinkUrl, autoStart = true, immediate = false }: Props) => {
   const { t } = useTranslation()
   const [targetConfig] = useTargetConfig()
   const [searchParams] = useSearchParams()
   const [countdown, setCountdown] = useState(COUNTDOWN_SECONDS)
   const [deepLinkFailed, setDeepLinkFailed] = useState(false)
-  // The client-login pseudo request opens the client right away — no countdown — and,
-  // since it has no traditional request flow to fall back to, failures offer a plain
-  // retry of the deep link instead of going back to login.
-  const isClientLoginFlow = requestId === CLIENT_LOGIN_REQUEST_ID
+  // Guards the immediate auto-launch so it fires once even though React StrictMode
+  // double-invokes effects in dev; handleRetry resets it so a retry can launch again.
+  const hasAutoLaunchedRef = useRef(false)
 
   const attemptDeepLink = useCallback(async () => {
     const wasLaunched = await launchDeepLink(deepLinkUrl)
@@ -50,9 +52,10 @@ export const ContinueInApp = ({ onContinue, requestId, deepLinkUrl, autoStart = 
     window.location.href = loginUrl
   }, [requestId, searchParams])
 
-  // Clearing the failed flag re-runs the launch effect, which re-attempts the deep link
-  // immediately for the client-login flow.
+  // Clearing the failed flag re-runs the launch effect; resetting the guard lets the
+  // immediate flow re-attempt the deep link.
   const handleRetry = useCallback(() => {
+    hasAutoLaunchedRef.current = false
     setDeepLinkFailed(false)
   }, [])
 
@@ -60,8 +63,10 @@ export const ContinueInApp = ({ onContinue, requestId, deepLinkUrl, autoStart = 
     if (!autoStart) return
     if (deepLinkFailed) return
 
-    // Client-login flow: open the client immediately, without the countdown
-    if (isClientLoginFlow) {
+    // Immediate flow (client-login): open the client right away, without the countdown.
+    if (immediate) {
+      if (hasAutoLaunchedRef.current) return
+      hasAutoLaunchedRef.current = true
       attemptDeepLink()
       return
     }
@@ -80,7 +85,7 @@ export const ContinueInApp = ({ onContinue, requestId, deepLinkUrl, autoStart = 
     }, 1000)
 
     return () => clearInterval(interval)
-  }, [attemptDeepLink, autoStart, deepLinkFailed, isClientLoginFlow])
+  }, [attemptDeepLink, autoStart, deepLinkFailed, immediate])
 
   if (deepLinkFailed) {
     return (
@@ -91,7 +96,7 @@ export const ContinueInApp = ({ onContinue, requestId, deepLinkUrl, autoStart = 
           {t('request_views.continue_in_app.app_not_launched', { explorerText: targetConfig.explorerText })}
         </div>
 
-        {isClientLoginFlow ? (
+        {immediate ? (
           <ActionButton variant="contained" onClick={handleRetry} startIcon={<LoginIcon />} data-testid="continue-in-app-try-again-button">
             {t('common.try_again')}
           </ActionButton>
@@ -114,7 +119,7 @@ export const ContinueInApp = ({ onContinue, requestId, deepLinkUrl, autoStart = 
       <div className={styles.logo}></div>
       <div className={styles.title}>{t('request_views.continue_in_app.sign_in_successful')}</div>
       <div className={styles.description}>
-        {isClientLoginFlow
+        {immediate
           ? t('request_views.continue_in_app.redirecting', { explorerText: targetConfig.explorerText })
           : t('request_views.continue_in_app.redirect_countdown', { explorerText: targetConfig.explorerText, countdown })}
       </div>

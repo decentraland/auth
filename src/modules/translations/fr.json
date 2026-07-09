@@ -122,6 +122,10 @@
       "description": "La demande n'est plus disponible. N'hésitez pas à en créer une nouvelle et réessayer. Si le temps d'expiration est toujours en cours dans l'application Explorer, vérifiez que l'heure de votre ordinateur est correctement réglée.",
       "try_again": "TRY AGAIN"
     },
+    "client_login_error": {
+      "title": "Nous n'avons pas pu finaliser votre connexion",
+      "description": "Une erreur s'est produite lors de la finalisation de votre connexion. Veuillez réessayer."
+    },
     "ip_validation_error": {
       "title": "Échec de la validation de sécurité",
       "description": "Cette demande de confirmation a été créée depuis un appareil ou un réseau différent. Pour des raisons de sécurité, vous ne pouvez compléter cette demande que depuis l'appareil où elle a été initiée.",

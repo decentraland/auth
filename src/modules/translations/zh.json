@@ -122,6 +122,10 @@
       "description": "该请求已不可用。请随时创建新请求并重试。如果 Explorer 应用中的过期时间仍在运行，请检查您的计算机时间是否设置正确。",
       "try_again": "TRY AGAIN"
     },
+    "client_login_error": {
+      "title": "我们无法完成您的登录",
+      "description": "完成登录时出现问题。请重试。"
+    },
     "ip_validation_error": {
       "title": "安全验证失败",
       "description": "此确认请求是从不同的设备或网络创建的。出于安全原因，您只能从最初发起请求的同一设备完成此请求。",

@@ -39,10 +39,17 @@ describe('ContinueInApp', () => {
   let originalLocation: Location
   let mockOnContinue: jest.Mock
 
-  const renderContinueInApp = (requestId: string, initialEntry: string, autoStart = true) => {
+  const renderContinueInApp = (options: { immediate?: boolean; autoStart?: boolean } = {}) => {
+    const { immediate = false, autoStart = true } = options
     return render(
-      <MemoryRouter initialEntries={[initialEntry]}>
-        <ContinueInApp onContinue={mockOnContinue} requestId={requestId} deepLinkUrl={DEEP_LINK_URL} autoStart={autoStart} />
+      <MemoryRouter initialEntries={['/auth/requests/aRequestId?targetConfigId=default&flow=deeplink']}>
+        <ContinueInApp
+          onContinue={mockOnContinue}
+          requestId="aRequestId"
+          deepLinkUrl={DEEP_LINK_URL}
+          autoStart={autoStart}
+          immediate={immediate}
+        />
       </MemoryRouter>
     )
   }
@@ -64,10 +71,10 @@ describe('ContinueInApp', () => {
     jest.resetAllMocks()
   })
 
-  describe('when the request id is a regular request id', () => {
+  describe('when using the countdown flow', () => {
     describe('and the view has just mounted', () => {
       beforeEach(() => {
-        renderContinueInApp('aRequestId', '/auth/requests/aRequestId?targetConfigId=default&flow=deeplink')
+        renderContinueInApp()
       })
 
       it('should not attempt the deep link before the countdown finishes', () => {
@@ -78,25 +85,27 @@ describe('ContinueInApp', () => {
     describe('and the deep link fails to launch', () => {
       beforeEach(async () => {
         mockedLaunchDeepLink.mockResolvedValueOnce(false)
-        renderContinueInApp('aRequestId', '/auth/requests/aRequestId?targetConfigId=default&flow=deeplink', false)
+        renderContinueInApp({ autoStart: false })
         await userEvent.click(screen.getByTestId('continue-in-app-return-button'))
         await waitFor(() => {
           expect(screen.getByTestId('continue-in-app-go-back-button')).toBeInTheDocument()
         })
       })
 
-      it('should redirect back to the request page without the flow param when going back to login', async () => {
-        await userEvent.click(screen.getByTestId('continue-in-app-go-back-button'))
-        expect(window.location.href).toBe('/auth/requests/aRequestId?targetConfigId=default')
+      describe('and going back to login', () => {
+        it('should redirect back to the request page without the flow param', async () => {
+          await userEvent.click(screen.getByTestId('continue-in-app-go-back-button'))
+          expect(window.location.href).toBe('/auth/requests/aRequestId?targetConfigId=default')
+        })
       })
     })
   })
 
-  describe('when the request id is the client-login pseudo request id', () => {
+  describe('when using the immediate flow', () => {
     describe('and the deep link launches successfully', () => {
       beforeEach(() => {
         mockedLaunchDeepLink.mockResolvedValueOnce(true)
-        renderContinueInApp('client-login', '/auth/requests/client-login?targetConfigId=default')
+        renderContinueInApp({ immediate: true })
       })
 
       it('should attempt the deep link immediately without a countdown', async () => {
@@ -115,7 +124,7 @@ describe('ContinueInApp', () => {
     describe('and the deep link fails to launch', () => {
       beforeEach(async () => {
         mockedLaunchDeepLink.mockResolvedValueOnce(false)
-        renderContinueInApp('client-login', '/auth/requests/client-login?targetConfigId=default')
+        renderContinueInApp({ immediate: true })
         await waitFor(() => {
           expect(screen.getByTestId('continue-in-app-try-again-button')).toBeInTheDocument()
         })
@@ -125,13 +134,22 @@ describe('ContinueInApp', () => {
         expect(screen.queryByTestId('continue-in-app-go-back-button')).not.toBeInTheDocument()
       })
 
-      it('should re-attempt the deep link without navigating anywhere when trying again', async () => {
-        mockedLaunchDeepLink.mockResolvedValueOnce(true)
-        await userEvent.click(screen.getByTestId('continue-in-app-try-again-button'))
-        await waitFor(() => {
+      describe('and trying again', () => {
+        beforeEach(async () => {
+          mockedLaunchDeepLink.mockResolvedValueOnce(true)
+          await userEvent.click(screen.getByTestId('continue-in-app-try-again-button'))
+          await waitFor(() => {
+            expect(mockedLaunchDeepLink).toHaveBeenCalledTimes(2)
+          })
+        })
+
+        it('should re-attempt the deep link', () => {
           expect(mockedLaunchDeepLink).toHaveBeenCalledTimes(2)
         })
-        expect(window.location.href).toBe('')
+
+        it('should not navigate anywhere', () => {
+          expect(window.location.href).toBe('')
+        })
       })
     })
   })

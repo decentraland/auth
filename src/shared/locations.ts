@@ -168,6 +168,19 @@ const isBridgeOnlyEnabled = (searchParams: URLSearchParams): boolean => {
 // the `open?signin=<identityId>` deep link, mirroring the standalone mobile flow.
 const CLIENT_LOGIN_REQUEST_ID = 'client-login'
 
+// Builds the request-page URL preserving the flags that must survive a login round-trip
+// (they ride inside `redirectTo`). Shared by RequestPage and the change-account link so
+// the preserved params stay in sync across call sites.
+const buildRequestPageUrl = (
+  requestId: string,
+  targetConfigId: string,
+  options: { isDeepLinkFlow?: boolean; isBridgeOnly?: boolean } = {}
+): string => {
+  const flowParam = options.isDeepLinkFlow ? '&flow=deeplink' : ''
+  const bridgeOnlyParam = options.isBridgeOnly ? '&bridge-only=true' : ''
+  return `/auth/requests/${requestId}?targetConfigId=${targetConfigId}${flowParam}${bridgeOnlyParam}`
+}
+
 export type { LoginMethod }
 export {
   locations,
@@ -175,5 +188,6 @@ export {
   extractReferrerFromSearchParameters,
   isBridgeOnlyEnabled,
   BRIDGE_ONLY_PARAM,
-  CLIENT_LOGIN_REQUEST_ID
+  CLIENT_LOGIN_REQUEST_ID,
+  buildRequestPageUrl
 }

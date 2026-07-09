@@ -15,7 +15,7 @@ import { isBridgeOnlyEnabled } from '../../../shared/locations'
 import { isProfileComplete } from '../../../shared/profile'
 import { FeatureFlagsContext } from '../../FeatureFlagsProvider'
 import { RequestPage } from './RequestPage'
-import { getSigninDeeplink } from './Views'
+import { getSigninDeeplink } from './utils'
 
 // --- Navigation ---
 const mockNavigate = jest.fn()
@@ -80,7 +80,8 @@ jest.mock('../../../shared/auth', () => {
 jest.mock('../../../shared/locations', () => ({
   extractReferrerFromSearchParameters: jest.fn().mockReturnValue(null),
   isBridgeOnlyEnabled: jest.fn().mockReturnValue(false),
-  CLIENT_LOGIN_REQUEST_ID: 'client-login'
+  CLIENT_LOGIN_REQUEST_ID: 'client-login',
+  buildRequestPageUrl: (requestId: string, targetConfigId: string) => `/auth/requests/${requestId}?targetConfigId=${targetConfigId}`
 }))
 jest.mock('../../../shared/utils/analytics', () => ({
   identifyUser: jest.fn()
@@ -152,8 +153,7 @@ jest.mock('./Views', () => ({
   WalletInteractionComplete: () => <div data-testid="wallet-interaction-complete">Wallet Complete</div>,
   DeniedWalletInteraction: () => <div data-testid="denied-wallet-interaction">Denied Wallet</div>,
   ContinueInApp: () => <div data-testid="continue-in-app">Continue in App</div>,
-  getExplorerDeeplink: jest.fn().mockReturnValue('decentraland://open'),
-  getSigninDeeplink: jest.fn().mockReturnValue('decentraland://open?signin=anIdentityId'),
+  ClientLoginError: (props: any) => <div data-testid="client-login-error">Client Login Error: {props.error}</div>,
   TransferConfirmView: () => <div data-testid="transfer-confirm">Transfer Confirm</div>,
   TransferCompletedView: () => <div data-testid="transfer-completed">Transfer Completed</div>,
   TransferCanceledView: () => <div data-testid="transfer-canceled">Transfer Canceled</div>
@@ -167,6 +167,8 @@ jest.mock('./utils', () => ({
   fetchNftMetadata: jest.fn(),
   fetchPlaceByCreatorAddress: jest.fn(),
   getConnectedProvider: jest.fn(),
+  getExplorerDeeplink: jest.fn().mockReturnValue('decentraland://open'),
+  getSigninDeeplink: jest.fn().mockReturnValue('decentraland://open?signin=anIdentityId'),
   getMetaTransactionChainId: jest.fn().mockReturnValue(137),
   getNetworkProvider: jest.fn()
 }))
@@ -552,10 +554,10 @@ describe('RequestPage', () => {
           mockPostIdentity.mockRejectedValueOnce(new Error('Failed to create identity'))
         })
 
-        it('should show the recover error view', async () => {
+        it('should show the client login error view', async () => {
           renderRequestPage(CLIENT_LOGIN_REQUEST_PATH)
           await waitFor(() => {
-            expect(screen.getByTestId('recover-error')).toBeInTheDocument()
+            expect(screen.getByTestId('client-login-error')).toBeInTheDocument()
           })
         })
       })
