@@ -310,6 +310,8 @@ export const RequestPage = () => {
         // Initialize the timeout to display the timeout view when the request expires.
         // Guard against an unparseable expiration: `new Date(...).getTime()` would be NaN,
         // which setTimeout coerces to 0 and fires the timeout view immediately.
+        // A negative delay (a request that is already past its expiration) is intentional:
+        // setTimeout coerces it to 0 so the timeout view shows right away.
         const expirationDelay = new Date(request.expiration).getTime() - Date.now()
         if (!Number.isNaN(expirationDelay)) {
           timeoutRef.current = setTimeout(() => {

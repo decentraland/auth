@@ -773,4 +773,32 @@ describe('when testing fetchNftMetadata', () => {
       expect(fetch).not.toHaveBeenCalled()
     })
   })
+
+  describe('and the metadata image uses a non-http scheme', () => {
+    let tokenUri: string
+    let metadata: any
+
+    beforeEach(() => {
+      tokenUri = 'https://example.com/token/123'
+      metadata = {
+        name: 'Test NFT',
+        description: 'A test NFT',
+        image: 'data:image/svg+xml,<svg onload="alert(1)"></svg>'
+      }
+      mockPublicClient = {
+        getChainId: jest.fn().mockResolvedValue(1),
+        readContract: jest.fn().mockResolvedValueOnce(tokenUri)
+      }
+      jest.mocked(createPublicClient).mockReturnValue(mockPublicClient)
+      jest.mocked(fetch).mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValueOnce(metadata)
+      } as any)
+    })
+
+    it('should drop the image URL and return an empty imageUrl', async () => {
+      const result = await fetchNftMetadata(contractAddress, contractABI, tokenId)
+      expect(result.imageUrl).toBe('')
+    })
+  })
 })

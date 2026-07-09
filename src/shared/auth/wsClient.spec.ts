@@ -26,8 +26,10 @@ describe('createAuthServerClient', () => {
   const mockEmitWithAck = jest.fn()
   const mockClose = jest.fn()
   const mockOn = jest.fn()
+  const mockOff = jest.fn()
   const mockSocket = {
     on: mockOn,
+    off: mockOff,
     emitWithAck: mockEmitWithAck,
     close: mockClose
   }
@@ -175,6 +177,57 @@ describe('createAuthServerClient', () => {
       it('should close the socket', async () => {
         await expect(client.recover(mockRequestId, mockSignerAddress)).rejects.toThrow('Connection refused')
         expect(mockClose).toHaveBeenCalled()
+      })
+    })
+
+    describe('when the socket never connects', () => {
+      beforeEach(() => {
+        jest.useFakeTimers()
+        mockOn.mockReset()
+        // Never fire connect or connect_error so the connection promise stays pending.
+        mockOn.mockImplementation(() => undefined)
+      })
+
+      afterEach(() => {
+        jest.useRealTimers()
+      })
+
+      it('should reject with a connection timeout after CONNECT_TIMEOUT_MS', async () => {
+        const assertion = expect(client.recover(mockRequestId, mockSignerAddress)).rejects.toThrow(
+          'Timed out connecting to the auth server'
+        )
+        await jest.advanceTimersByTimeAsync(15000)
+        await assertion
+      })
+
+      it('should close the socket after the connection times out', async () => {
+        const assertion = expect(client.recover(mockRequestId, mockSignerAddress)).rejects.toThrow(
+          'Timed out connecting to the auth server'
+        )
+        await jest.advanceTimersByTimeAsync(15000)
+        await assertion
+        expect(mockClose).toHaveBeenCalled()
+      })
+    })
+
+    describe('when the server never acknowledges the request', () => {
+      beforeEach(() => {
+        jest.useFakeTimers()
+        mockEmitWithAck.mockReset()
+        // Connect succeeds (via the default mockOn), but the ack never resolves.
+        mockEmitWithAck.mockReturnValue(new Promise(() => undefined))
+      })
+
+      afterEach(() => {
+        jest.useRealTimers()
+      })
+
+      it('should reject with an ack timeout after ACK_TIMEOUT_MS', async () => {
+        const assertion = expect(client.recover(mockRequestId, mockSignerAddress)).rejects.toThrow(
+          'Timed out waiting for the auth server response'
+        )
+        await jest.advanceTimersByTimeAsync(30000)
+        await assertion
       })
     })
   })

@@ -39,7 +39,12 @@ export const createAuthServerWsClient = (authServerUrl?: string) => {
       // Reject (rather than hang) if the connection can't be established or times out.
       await withTimeout(
         new Promise<void>((resolve, reject) => {
-          socket.on('connect', resolve)
+          socket.on('connect', () => {
+            // Detach the error handler once connected so a later reconnection error
+            // (before socket.close) can't call reject on an already-settled promise.
+            socket.off('connect_error', reject)
+            resolve()
+          })
           socket.on('connect_error', reject)
         }),
         CONNECT_TIMEOUT_MS,

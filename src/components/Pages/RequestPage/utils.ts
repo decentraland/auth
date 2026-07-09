@@ -266,7 +266,22 @@ async function fetchNftMetadata(
 
   const metadata = await metadataResponse.json()
 
-  const imageUrl = metadata.image || metadata.image_url
+  // The metadata comes from an attacker-controllable contract/URL, so only surface http(s)
+  // image URLs. This drops data:/other-scheme values as defense-in-depth (the actual transfer
+  // token/recipient come from the decoded tx, not this cosmetic field); a dropped image just
+  // falls back to the view's placeholder rather than breaking it.
+  const rawImageUrl = metadata.image || metadata.image_url
+  let imageUrl = ''
+  if (typeof rawImageUrl === 'string') {
+    try {
+      const imageProtocol = new URL(rawImageUrl).protocol
+      if (imageProtocol === 'https:' || imageProtocol === 'http:') {
+        imageUrl = rawImageUrl
+      }
+    } catch {
+      // Ignore malformed image URLs — leave imageUrl empty.
+    }
+  }
 
   // Extract rarity from attributes
   let rarity: Rarity = Rarity.COMMON
