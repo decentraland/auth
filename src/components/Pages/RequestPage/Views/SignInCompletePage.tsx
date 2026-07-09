@@ -5,9 +5,10 @@ import { config } from '../../../../modules/config'
 import { AnimatedBackground } from '../../../AnimatedBackground'
 import { CenteredContainer, Description, SuccessAnimation, TextBlock, Title, TitleCheckIcon, TitleRow } from './SignInCompletePage.styled'
 
-function getExplorerDeeplink(deepLink?: string, bridgeOnly?: boolean): string {
+// Query params every client deep link carries: dclenv on non-production environments and
+// the bridge-only flag when the auth site was opened with it.
+function getDeeplinkQueryParams(bridgeOnly?: boolean): URLSearchParams {
   const env = config.get('ENVIRONMENT').toLowerCase()
-  const base = deepLink || 'decentraland://'
   const params = new URLSearchParams()
   if (env !== 'production') {
     params.set('dclenv', env === 'development' ? 'zone' : env)
@@ -15,8 +16,21 @@ function getExplorerDeeplink(deepLink?: string, bridgeOnly?: boolean): string {
   if (bridgeOnly) {
     params.set('bridge-only', 'true')
   }
-  const query = params.toString()
+  return params
+}
+
+function getExplorerDeeplink(deepLink?: string, bridgeOnly?: boolean): string {
+  const base = deepLink || 'decentraland://'
+  const query = getDeeplinkQueryParams(bridgeOnly).toString()
   return query ? `${base}?${query}` : base
+}
+
+// Builds the `open?signin=<identityId>` deep link that hands a posted identity to the
+// client, carrying the same query params (dclenv, bridge-only) as the bare deep link.
+function getSigninDeeplink(deepLink: string | undefined, identityId: string, bridgeOnly?: boolean): string {
+  const base = `${deepLink || 'decentraland://'}open?signin=${identityId}`
+  const query = getDeeplinkQueryParams(bridgeOnly).toString()
+  return query ? `${base}&${query}` : base
 }
 
 type Props = {
@@ -54,4 +68,4 @@ const SignInCompletePage = ({ onContinue, deepLink, skipRedirect, bridgeOnly }: 
   )
 }
 
-export { SignInCompletePage, getExplorerDeeplink }
+export { SignInCompletePage, getExplorerDeeplink, getSigninDeeplink }

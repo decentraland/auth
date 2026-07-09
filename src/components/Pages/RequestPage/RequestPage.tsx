@@ -62,7 +62,8 @@ import {
   VerifySignIn,
   WalletInteraction,
   WalletInteractionComplete,
-  getExplorerDeeplink
+  getExplorerDeeplink,
+  getSigninDeeplink
 } from './Views'
 
 enum View {
@@ -886,7 +887,7 @@ export const RequestPage = () => {
         <ContinueInApp
           onContinue={onContinueInApp}
           requestId={requestId}
-          deepLinkUrl={`${targetConfig.deepLink || 'decentraland://'}open?signin=${identityId}${bridgeOnlyParam}`}
+          deepLinkUrl={getSigninDeeplink(targetConfig.deepLink, identityId ?? '', isBridgeOnly)}
         />
       )
     case View.VERIFY_SIGN_IN_DENIED:

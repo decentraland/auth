@@ -11,9 +11,11 @@ import {
   IpValidationError,
   RequestFulfilledError
 } from '../../../shared/auth'
+import { isBridgeOnlyEnabled } from '../../../shared/locations'
 import { isProfileComplete } from '../../../shared/profile'
 import { FeatureFlagsContext } from '../../FeatureFlagsProvider'
 import { RequestPage } from './RequestPage'
+import { getSigninDeeplink } from './Views'
 
 // --- Navigation ---
 const mockNavigate = jest.fn()
@@ -151,6 +153,7 @@ jest.mock('./Views', () => ({
   DeniedWalletInteraction: () => <div data-testid="denied-wallet-interaction">Denied Wallet</div>,
   ContinueInApp: () => <div data-testid="continue-in-app">Continue in App</div>,
   getExplorerDeeplink: jest.fn().mockReturnValue('decentraland://open'),
+  getSigninDeeplink: jest.fn().mockReturnValue('decentraland://open?signin=anIdentityId'),
   TransferConfirmView: () => <div data-testid="transfer-confirm">Transfer Confirm</div>,
   TransferCompletedView: () => <div data-testid="transfer-completed">Transfer Completed</div>,
   TransferCanceledView: () => <div data-testid="transfer-canceled">Transfer Canceled</div>
@@ -500,6 +503,33 @@ describe('RequestPage', () => {
             expect(screen.getByTestId('continue-in-app')).toBeInTheDocument()
           })
           expect(mockRecover).not.toHaveBeenCalled()
+        })
+
+        it('should build the signin deep link without the bridge-only flag', async () => {
+          renderRequestPage(CLIENT_LOGIN_REQUEST_PATH)
+          await waitFor(() => {
+            expect(screen.getByTestId('continue-in-app')).toBeInTheDocument()
+          })
+          expect(jest.mocked(getSigninDeeplink)).toHaveBeenCalledWith(undefined, 'anIdentityId', false)
+        })
+      })
+
+      describe('and the bridge-only flag is enabled', () => {
+        beforeEach(() => {
+          jest.mocked(isBridgeOnlyEnabled).mockReturnValue(true)
+          mockPostIdentity.mockResolvedValueOnce({ identityId: 'anIdentityId' })
+        })
+
+        afterEach(() => {
+          jest.mocked(isBridgeOnlyEnabled).mockReturnValue(false)
+        })
+
+        it('should build the signin deep link with the bridge-only flag', async () => {
+          renderRequestPage(CLIENT_LOGIN_REQUEST_PATH)
+          await waitFor(() => {
+            expect(screen.getByTestId('continue-in-app')).toBeInTheDocument()
+          })
+          expect(jest.mocked(getSigninDeeplink)).toHaveBeenCalledWith(undefined, 'anIdentityId', true)
         })
       })
 
