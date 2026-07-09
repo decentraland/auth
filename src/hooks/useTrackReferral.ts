@@ -21,7 +21,8 @@ export const useTrackReferral = () => {
         await fetch(`${REFERRAL_SERVER_URL}/referral-progress`, {
           method,
           headers: {
-            contentType: 'application/json'
+            // eslint-disable-next-line @typescript-eslint/naming-convention
+            'Content-Type': 'application/json'
           },
           ...(body && { body }),
           identity
