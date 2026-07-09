@@ -1,4 +1,4 @@
-import { extractRedirectToFromSearchParameters, extractReferrerFromSearchParameters, locations } from './locations'
+import { extractRedirectToFromSearchParameters, extractReferrerFromSearchParameters, isBridgeOnlyEnabled, locations } from './locations'
 
 describe('locations', () => {
   describe('login', () => {
@@ -216,6 +216,80 @@ describe('locations', () => {
         encodedState = btoa(JSON.stringify(stateData))
         searchParams = new URLSearchParams(`state=${encodedState}`)
         expect(extractReferrerFromSearchParameters(searchParams)).toBeNull()
+      })
+    })
+  })
+
+  describe('when checking if bridge-only is enabled', () => {
+    let searchParams: URLSearchParams
+
+    describe('and the bridge-only param is set to "true"', () => {
+      beforeEach(() => {
+        searchParams = new URLSearchParams('bridge-only=true')
+      })
+
+      it('should return true', () => {
+        expect(isBridgeOnlyEnabled(searchParams)).toBe(true)
+      })
+    })
+
+    describe('and the bridge-only param is set to "true" with different casing', () => {
+      beforeEach(() => {
+        searchParams = new URLSearchParams('bridge-only=TRUE')
+      })
+
+      it('should return true', () => {
+        expect(isBridgeOnlyEnabled(searchParams)).toBe(true)
+      })
+    })
+
+    describe('and the bridge-only param is set to "false"', () => {
+      beforeEach(() => {
+        searchParams = new URLSearchParams('bridge-only=false')
+      })
+
+      it('should return false', () => {
+        expect(isBridgeOnlyEnabled(searchParams)).toBe(false)
+      })
+    })
+
+    describe('and the bridge-only param is set to a non-boolean value', () => {
+      beforeEach(() => {
+        searchParams = new URLSearchParams('bridge-only=1')
+      })
+
+      it('should return false', () => {
+        expect(isBridgeOnlyEnabled(searchParams)).toBe(false)
+      })
+    })
+
+    describe('and the bridge-only param is present as a bare flag without an equals sign', () => {
+      beforeEach(() => {
+        searchParams = new URLSearchParams('bridge-only')
+      })
+
+      it('should return true', () => {
+        expect(isBridgeOnlyEnabled(searchParams)).toBe(true)
+      })
+    })
+
+    describe('and the bridge-only param is present with an empty value', () => {
+      beforeEach(() => {
+        searchParams = new URLSearchParams('bridge-only=')
+      })
+
+      it('should return true', () => {
+        expect(isBridgeOnlyEnabled(searchParams)).toBe(true)
+      })
+    })
+
+    describe('and the bridge-only param is not present', () => {
+      beforeEach(() => {
+        searchParams = new URLSearchParams('targetConfigId=default')
+      })
+
+      it('should return false', () => {
+        expect(isBridgeOnlyEnabled(searchParams)).toBe(false)
       })
     })
   })
