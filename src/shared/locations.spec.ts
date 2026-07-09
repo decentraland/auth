@@ -263,13 +263,23 @@ describe('locations', () => {
       })
     })
 
-    describe('and the bridge-only param is present without a value', () => {
+    describe('and the bridge-only param is present as a bare flag without an equals sign', () => {
+      beforeEach(() => {
+        searchParams = new URLSearchParams('bridge-only')
+      })
+
+      it('should return true', () => {
+        expect(isBridgeOnlyEnabled(searchParams)).toBe(true)
+      })
+    })
+
+    describe('and the bridge-only param is present with an empty value', () => {
       beforeEach(() => {
         searchParams = new URLSearchParams('bridge-only=')
       })
 
-      it('should return false', () => {
-        expect(isBridgeOnlyEnabled(searchParams)).toBe(false)
+      it('should return true', () => {
+        expect(isBridgeOnlyEnabled(searchParams)).toBe(true)
       })
     })
 
