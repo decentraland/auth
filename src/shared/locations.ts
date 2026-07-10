@@ -163,6 +163,13 @@ const isBridgeOnlyEnabled = (searchParams: URLSearchParams): boolean => {
   return value === '' || value === 'true'
 }
 
+// The `authRequestId` query param is an opaque value the auth site can be opened with.
+// Like `bridge-only`, it rides inside `redirectTo` to survive logins/callbacks and is
+// forwarded verbatim onto the client deep link. Returns the raw value, or null when absent.
+const AUTH_REQUEST_ID_PARAM = 'authRequestId'
+
+const getAuthRequestId = (searchParams: URLSearchParams): string | null => searchParams.get(AUTH_REQUEST_ID_PARAM)
+
 // Pseudo request id for `/auth/requests/client-login`. It has no backing auth-server
 // request: the user just logs in and the signed identity is handed to the client through
 // the `open?signin=<identityId>` deep link, mirroring the standalone mobile flow.
@@ -174,11 +181,12 @@ const CLIENT_LOGIN_REQUEST_ID = 'client-login'
 const buildRequestPageUrl = (
   requestId: string,
   targetConfigId: string,
-  options: { isDeepLinkFlow?: boolean; isBridgeOnly?: boolean } = {}
+  options: { isDeepLinkFlow?: boolean; isBridgeOnly?: boolean; authRequestId?: string | null } = {}
 ): string => {
   const flowParam = options.isDeepLinkFlow ? '&flow=deeplink' : ''
   const bridgeOnlyParam = options.isBridgeOnly ? '&bridge-only=true' : ''
-  return `/auth/requests/${requestId}?targetConfigId=${targetConfigId}${flowParam}${bridgeOnlyParam}`
+  const authRequestIdParam = options.authRequestId ? `&${AUTH_REQUEST_ID_PARAM}=${encodeURIComponent(options.authRequestId)}` : ''
+  return `/auth/requests/${requestId}?targetConfigId=${targetConfigId}${flowParam}${bridgeOnlyParam}${authRequestIdParam}`
 }
 
 export type { LoginMethod }
@@ -188,6 +196,8 @@ export {
   extractReferrerFromSearchParameters,
   isBridgeOnlyEnabled,
   BRIDGE_ONLY_PARAM,
+  getAuthRequestId,
+  AUTH_REQUEST_ID_PARAM,
   CLIENT_LOGIN_REQUEST_ID,
   buildRequestPageUrl
 }

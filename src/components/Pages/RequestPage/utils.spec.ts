@@ -829,6 +829,18 @@ describe('when building the explorer deep link', () => {
         expect(getExplorerDeeplink(deepLink, true)).toBe('decentraland://?bridge-only=true')
       })
     })
+
+    describe('and an authRequestId is provided', () => {
+      it('should append it verbatim alongside the bridge-only flag', () => {
+        expect(getExplorerDeeplink(deepLink, true, 'abc-123')).toBe('decentraland://?bridge-only=true&authRequestId=abc-123')
+      })
+    })
+
+    describe('and the authRequestId contains url-significant characters', () => {
+      it('should url-encode the authRequestId value', () => {
+        expect(getExplorerDeeplink(deepLink, false, 'a/b c')).toBe('decentraland://?authRequestId=a%2Fb+c')
+      })
+    })
   })
 
   describe('and the environment is development', () => {
@@ -904,6 +916,14 @@ describe('when building the signin deep link', () => {
     describe('and bridge-only is enabled', () => {
       it('should append the canonical bridge-only flag after the signin param', () => {
         expect(getSigninDeeplink(deepLink, identityId, true)).toBe('decentraland://open?signin=anIdentityId&bridge-only=true')
+      })
+    })
+
+    describe('and an authRequestId is provided', () => {
+      it('should append it verbatim after the signin and bridge-only params', () => {
+        expect(getSigninDeeplink(deepLink, identityId, true, 'abc-123')).toBe(
+          'decentraland://open?signin=anIdentityId&bridge-only=true&authRequestId=abc-123'
+        )
       })
     })
   })

@@ -11,7 +11,7 @@ import {
   IpValidationError,
   RequestFulfilledError
 } from '../../../shared/auth'
-import { isBridgeOnlyEnabled } from '../../../shared/locations'
+import { getAuthRequestId, isBridgeOnlyEnabled } from '../../../shared/locations'
 import { isProfileComplete } from '../../../shared/profile'
 import { FeatureFlagsContext } from '../../FeatureFlagsProvider'
 import { RequestPage } from './RequestPage'
@@ -80,6 +80,7 @@ jest.mock('../../../shared/auth', () => {
 jest.mock('../../../shared/locations', () => ({
   extractReferrerFromSearchParameters: jest.fn().mockReturnValue(null),
   isBridgeOnlyEnabled: jest.fn().mockReturnValue(false),
+  getAuthRequestId: jest.fn().mockReturnValue(null),
   CLIENT_LOGIN_REQUEST_ID: 'client-login',
   buildRequestPageUrl: (requestId: string, targetConfigId: string) => `/auth/requests/${requestId}?targetConfigId=${targetConfigId}`
 }))
@@ -507,12 +508,12 @@ describe('RequestPage', () => {
           expect(mockRecover).not.toHaveBeenCalled()
         })
 
-        it('should build the signin deep link without the bridge-only flag', async () => {
+        it('should build the signin deep link without the bridge-only flag or an authRequestId', async () => {
           renderRequestPage(CLIENT_LOGIN_REQUEST_PATH)
           await waitFor(() => {
             expect(screen.getByTestId('continue-in-app')).toBeInTheDocument()
           })
-          expect(jest.mocked(getSigninDeeplink)).toHaveBeenCalledWith(undefined, 'anIdentityId', false)
+          expect(jest.mocked(getSigninDeeplink)).toHaveBeenCalledWith(undefined, 'anIdentityId', false, null)
         })
       })
 
@@ -531,7 +532,26 @@ describe('RequestPage', () => {
           await waitFor(() => {
             expect(screen.getByTestId('continue-in-app')).toBeInTheDocument()
           })
-          expect(jest.mocked(getSigninDeeplink)).toHaveBeenCalledWith(undefined, 'anIdentityId', true)
+          expect(jest.mocked(getSigninDeeplink)).toHaveBeenCalledWith(undefined, 'anIdentityId', true, null)
+        })
+      })
+
+      describe('and an authRequestId is provided', () => {
+        beforeEach(() => {
+          jest.mocked(getAuthRequestId).mockReturnValue('auth-req-abc')
+          mockPostIdentity.mockResolvedValueOnce({ identityId: 'anIdentityId' })
+        })
+
+        afterEach(() => {
+          jest.mocked(getAuthRequestId).mockReturnValue(null)
+        })
+
+        it('should build the signin deep link forwarding the authRequestId verbatim', async () => {
+          renderRequestPage(CLIENT_LOGIN_REQUEST_PATH)
+          await waitFor(() => {
+            expect(screen.getByTestId('continue-in-app')).toBeInTheDocument()
+          })
+          expect(jest.mocked(getSigninDeeplink)).toHaveBeenCalledWith(undefined, 'anIdentityId', false, 'auth-req-abc')
         })
       })
 

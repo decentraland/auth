@@ -1,4 +1,11 @@
-import { extractRedirectToFromSearchParameters, extractReferrerFromSearchParameters, isBridgeOnlyEnabled, locations } from './locations'
+import {
+  buildRequestPageUrl,
+  extractRedirectToFromSearchParameters,
+  extractReferrerFromSearchParameters,
+  getAuthRequestId,
+  isBridgeOnlyEnabled,
+  locations
+} from './locations'
 
 describe('locations', () => {
   describe('login', () => {
@@ -290,6 +297,56 @@ describe('locations', () => {
 
       it('should return false', () => {
         expect(isBridgeOnlyEnabled(searchParams)).toBe(false)
+      })
+    })
+  })
+
+  describe('when getting the authRequestId', () => {
+    let searchParams: URLSearchParams
+
+    describe('and the authRequestId param is present', () => {
+      beforeEach(() => {
+        searchParams = new URLSearchParams('authRequestId=abc-123')
+      })
+
+      it('should return its value verbatim', () => {
+        expect(getAuthRequestId(searchParams)).toBe('abc-123')
+      })
+    })
+
+    describe('and the authRequestId param is present with a value needing decoding', () => {
+      beforeEach(() => {
+        searchParams = new URLSearchParams('authRequestId=a%2Fb%20c')
+      })
+
+      it('should return the decoded value', () => {
+        expect(getAuthRequestId(searchParams)).toBe('a/b c')
+      })
+    })
+
+    describe('and the authRequestId param is not present', () => {
+      beforeEach(() => {
+        searchParams = new URLSearchParams('targetConfigId=default')
+      })
+
+      it('should return null', () => {
+        expect(getAuthRequestId(searchParams)).toBeNull()
+      })
+    })
+  })
+
+  describe('when building the request page url', () => {
+    describe('and an authRequestId is provided', () => {
+      it('should append it url-encoded alongside the other preserved params', () => {
+        expect(buildRequestPageUrl('request-id', 'default', { isDeepLinkFlow: true, isBridgeOnly: true, authRequestId: 'a/b c' })).toBe(
+          '/auth/requests/request-id?targetConfigId=default&flow=deeplink&bridge-only=true&authRequestId=a%2Fb%20c'
+        )
+      })
+    })
+
+    describe('and no authRequestId is provided', () => {
+      it('should not append the authRequestId param', () => {
+        expect(buildRequestPageUrl('request-id', 'default')).toBe('/auth/requests/request-id?targetConfigId=default')
       })
     })
   })
