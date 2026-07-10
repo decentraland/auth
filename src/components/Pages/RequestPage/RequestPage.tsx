@@ -209,10 +209,10 @@ export const RequestPage = () => {
   // whole recover/verify flow and hand the signed identity to the client via the deep
   // link, the same way the standalone mobile flow does.
   const isClientLoginFlow = requestId === CLIENT_LOGIN_REQUEST_ID
-  // The bridge-only flag rides inside redirectTo so it survives logins/callbacks and can be
+  // The bridgeOnly flag rides inside redirectTo so it survives logins/callbacks and can be
   // appended to the client deep link once the flow completes.
   const isBridgeOnly = isBridgeOnlyEnabled(searchParams)
-  // Like bridge-only: rides inside redirectTo across logins/callbacks and is forwarded
+  // Like bridgeOnly: rides inside redirectTo across logins/callbacks and is forwarded
   // verbatim onto the client deep link.
   const authRequestId = getAuthRequestId(searchParams)
   // Goes to the login page where the user will have to connect a wallet.
@@ -660,7 +660,7 @@ export const RequestPage = () => {
         // For mobile deep-link flow, auto-redirect. For Explorer (skipSetup),
         // the SignInCompletePage shows a Continue button that triggers the deeplink.
         // Route through getExplorerDeeplink so this bare redirect carries the same
-        // query params (dclenv, bridge-only) as the other deep-link generation sites.
+        // query params (dclenv, bridgeOnly) as the other deep-link generation sites.
         if (targetConfig.deepLink) {
           window.location.href = getExplorerDeeplink(targetConfig.deepLink, isBridgeOnly, authRequestId)
         }

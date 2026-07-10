@@ -818,21 +818,21 @@ describe('when building the explorer deep link', () => {
       deepLink = 'decentraland://'
     })
 
-    describe('and bridge-only is disabled', () => {
+    describe('and bridgeOnly is disabled', () => {
       it('should return the bare deep link without query params', () => {
         expect(getExplorerDeeplink(deepLink, false)).toBe('decentraland://')
       })
     })
 
-    describe('and bridge-only is enabled', () => {
-      it('should append the canonical bridge-only flag', () => {
-        expect(getExplorerDeeplink(deepLink, true)).toBe('decentraland://?bridge-only=true')
+    describe('and bridgeOnly is enabled', () => {
+      it('should append the canonical bridgeOnly flag', () => {
+        expect(getExplorerDeeplink(deepLink, true)).toBe('decentraland://?bridgeOnly=true')
       })
     })
 
     describe('and an authRequestId is provided', () => {
-      it('should append it verbatim alongside the bridge-only flag', () => {
-        expect(getExplorerDeeplink(deepLink, true, 'abc-123')).toBe('decentraland://?bridge-only=true&authRequestId=abc-123')
+      it('should append it verbatim alongside the bridgeOnly flag', () => {
+        expect(getExplorerDeeplink(deepLink, true, 'abc-123')).toBe('decentraland://?bridgeOnly=true&authRequestId=abc-123')
       })
     })
 
@@ -849,15 +849,15 @@ describe('when building the explorer deep link', () => {
       deepLink = 'decentraland://'
     })
 
-    describe('and bridge-only is disabled', () => {
+    describe('and bridgeOnly is disabled', () => {
       it('should append only the dclenv zone param', () => {
         expect(getExplorerDeeplink(deepLink, false)).toBe('decentraland://?dclenv=zone')
       })
     })
 
-    describe('and bridge-only is enabled', () => {
-      it('should append both the dclenv zone param and the bridge-only flag', () => {
-        expect(getExplorerDeeplink(deepLink, true)).toBe('decentraland://?dclenv=zone&bridge-only=true')
+    describe('and bridgeOnly is enabled', () => {
+      it('should append both the dclenv zone param and the bridgeOnly flag', () => {
+        expect(getExplorerDeeplink(deepLink, true)).toBe('decentraland://?dclenv=zone&bridgeOnly=true')
       })
     })
   })
@@ -868,9 +868,9 @@ describe('when building the explorer deep link', () => {
       deepLink = 'dcl-creator-hub://'
     })
 
-    describe('and bridge-only is enabled', () => {
-      it('should append the raw env as dclenv alongside the bridge-only flag', () => {
-        expect(getExplorerDeeplink(deepLink, true)).toBe('dcl-creator-hub://?dclenv=staging&bridge-only=true')
+    describe('and bridgeOnly is enabled', () => {
+      it('should append the raw env as dclenv alongside the bridgeOnly flag', () => {
+        expect(getExplorerDeeplink(deepLink, true)).toBe('dcl-creator-hub://?dclenv=staging&bridgeOnly=true')
       })
     })
   })
@@ -881,9 +881,9 @@ describe('when building the explorer deep link', () => {
       deepLink = undefined
     })
 
-    describe('and bridge-only is enabled', () => {
-      it('should fall back to the decentraland scheme with the bridge-only flag', () => {
-        expect(getExplorerDeeplink(deepLink, true)).toBe('decentraland://?bridge-only=true')
+    describe('and bridgeOnly is enabled', () => {
+      it('should fall back to the decentraland scheme with the bridgeOnly flag', () => {
+        expect(getExplorerDeeplink(deepLink, true)).toBe('decentraland://?bridgeOnly=true')
       })
     })
   })
@@ -907,22 +907,22 @@ describe('when building the signin deep link', () => {
       deepLink = 'decentraland://'
     })
 
-    describe('and bridge-only is disabled', () => {
+    describe('and bridgeOnly is disabled', () => {
       it('should return the signin deep link without extra query params', () => {
         expect(getSigninDeeplink(deepLink, identityId, false)).toBe('decentraland://open?signin=anIdentityId')
       })
     })
 
-    describe('and bridge-only is enabled', () => {
-      it('should append the canonical bridge-only flag after the signin param', () => {
-        expect(getSigninDeeplink(deepLink, identityId, true)).toBe('decentraland://open?signin=anIdentityId&bridge-only=true')
+    describe('and bridgeOnly is enabled', () => {
+      it('should append the canonical bridgeOnly flag after the signin param', () => {
+        expect(getSigninDeeplink(deepLink, identityId, true)).toBe('decentraland://open?signin=anIdentityId&bridgeOnly=true')
       })
     })
 
     describe('and an authRequestId is provided', () => {
-      it('should append it verbatim after the signin and bridge-only params', () => {
+      it('should append it verbatim after the signin and bridgeOnly params', () => {
         expect(getSigninDeeplink(deepLink, identityId, true, 'abc-123')).toBe(
-          'decentraland://open?signin=anIdentityId&bridge-only=true&authRequestId=abc-123'
+          'decentraland://open?signin=anIdentityId&bridgeOnly=true&authRequestId=abc-123'
         )
       })
     })
@@ -934,15 +934,15 @@ describe('when building the signin deep link', () => {
       deepLink = 'decentraland://'
     })
 
-    describe('and bridge-only is disabled', () => {
+    describe('and bridgeOnly is disabled', () => {
       it('should append only the dclenv zone param after the signin param', () => {
         expect(getSigninDeeplink(deepLink, identityId, false)).toBe('decentraland://open?signin=anIdentityId&dclenv=zone')
       })
     })
 
-    describe('and bridge-only is enabled', () => {
-      it('should append both the dclenv zone param and the bridge-only flag after the signin param', () => {
-        expect(getSigninDeeplink(deepLink, identityId, true)).toBe('decentraland://open?signin=anIdentityId&dclenv=zone&bridge-only=true')
+    describe('and bridgeOnly is enabled', () => {
+      it('should append both the dclenv zone param and the bridgeOnly flag after the signin param', () => {
+        expect(getSigninDeeplink(deepLink, identityId, true)).toBe('decentraland://open?signin=anIdentityId&dclenv=zone&bridgeOnly=true')
       })
     })
   })

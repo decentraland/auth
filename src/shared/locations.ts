@@ -148,12 +148,12 @@ const extractReferrerFromSearchParameters = (searchParams: URLSearchParams): str
   return referrerSearchParam
 }
 
-// The `bridge-only` query param is a boolean flag the auth site can be opened with.
+// The `bridgeOnly` query param is a boolean flag the auth site can be opened with.
 // It's preserved across logins/callbacks by riding inside `redirectTo`, and when enabled
-// it's forwarded onto the client deep link. A bare flag (`?bridge-only`) or an explicit
-// `?bridge-only=true` (case-insensitive) enable it; an explicit non-true value
-// (e.g. `?bridge-only=false`) or the param being absent leave it disabled.
-const BRIDGE_ONLY_PARAM = 'bridge-only'
+// it's forwarded onto the client deep link. A bare flag (`?bridgeOnly`) or an explicit
+// `?bridgeOnly=true` (case-insensitive) enable it; an explicit non-true value
+// (e.g. `?bridgeOnly=false`) or the param being absent leave it disabled.
+const BRIDGE_ONLY_PARAM = 'bridgeOnly'
 
 const isBridgeOnlyEnabled = (searchParams: URLSearchParams): boolean => {
   if (!searchParams.has(BRIDGE_ONLY_PARAM)) {
@@ -164,7 +164,7 @@ const isBridgeOnlyEnabled = (searchParams: URLSearchParams): boolean => {
 }
 
 // The `authRequestId` query param is an opaque value the auth site can be opened with.
-// Like `bridge-only`, it rides inside `redirectTo` to survive logins/callbacks and is
+// Like `bridgeOnly`, it rides inside `redirectTo` to survive logins/callbacks and is
 // forwarded verbatim onto the client deep link. Returns the raw value, or null when absent.
 const AUTH_REQUEST_ID_PARAM = 'authRequestId'
 
@@ -184,7 +184,7 @@ const buildRequestPageUrl = (
   options: { isDeepLinkFlow?: boolean; isBridgeOnly?: boolean; authRequestId?: string | null } = {}
 ): string => {
   const flowParam = options.isDeepLinkFlow ? '&flow=deeplink' : ''
-  const bridgeOnlyParam = options.isBridgeOnly ? '&bridge-only=true' : ''
+  const bridgeOnlyParam = options.isBridgeOnly ? '&bridgeOnly=true' : ''
   const authRequestIdParam = options.authRequestId ? `&${AUTH_REQUEST_ID_PARAM}=${encodeURIComponent(options.authRequestId)}` : ''
   return `/auth/requests/${requestId}?targetConfigId=${targetConfigId}${flowParam}${bridgeOnlyParam}${authRequestIdParam}`
 }

@@ -29,7 +29,7 @@ export const Container = (props: { children: ReactNode; requestId?: string; canC
       evt.preventDefault()
       await connection.disconnect()
       const flowParam = isDeepLinkFlow ? '&flow=deeplink' : ''
-      const bridgeOnlyParam = isBridgeOnly ? '&bridge-only=true' : ''
+      const bridgeOnlyParam = isBridgeOnly ? '&bridgeOnly=true' : ''
       const authRequestIdParam = authRequestId ? `&authRequestId=${encodeURIComponent(authRequestId)}` : ''
       // Don't preserve loginMethod — the user explicitly wants to choose a different method
       const redirectToUrl = `/auth/requests/${requestId ?? ''}?targetConfigId=${targetConfigId}${flowParam}${bridgeOnlyParam}${authRequestIdParam}`

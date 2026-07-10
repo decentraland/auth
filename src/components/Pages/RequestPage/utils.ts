@@ -46,7 +46,7 @@ const launchDeepLink = (url: string): Promise<boolean> => {
 }
 
 // Query params every client deep link carries: dclenv on non-production environments, the
-// bridge-only flag, and the authRequestId value when the auth site was opened with them.
+// bridgeOnly flag, and the authRequestId value when the auth site was opened with them.
 function getDeeplinkQueryParams(bridgeOnly?: boolean, authRequestId?: string | null): URLSearchParams {
   const env = config.get('ENVIRONMENT').toLowerCase()
   const params = new URLSearchParams()
@@ -54,7 +54,7 @@ function getDeeplinkQueryParams(bridgeOnly?: boolean, authRequestId?: string | n
     params.set('dclenv', env === 'development' ? 'zone' : env)
   }
   if (bridgeOnly) {
-    params.set('bridge-only', 'true')
+    params.set('bridgeOnly', 'true')
   }
   if (authRequestId) {
     params.set('authRequestId', authRequestId)
@@ -70,7 +70,7 @@ function getExplorerDeeplink(deepLink?: string, bridgeOnly?: boolean, authReques
 }
 
 // Builds the `open?signin=<identityId>` deep link that hands a posted identity to the
-// client, carrying the same query params (dclenv, bridge-only, authRequestId) as the bare
+// client, carrying the same query params (dclenv, bridgeOnly, authRequestId) as the bare
 // deep link. Seeding signin into the URLSearchParams encodes the id and keeps a single
 // `?`-joined query.
 function getSigninDeeplink(deepLink: string | undefined, identityId: string, bridgeOnly?: boolean, authRequestId?: string | null): string {
