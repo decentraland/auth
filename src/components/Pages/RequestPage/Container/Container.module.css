@@ -28,9 +28,9 @@
   right: 8%;
 }
 
-/* The preview auto-fits the avatar to fill its box, so shrinking the box just shrinks the
-   whole panel. Keep the box full-size and scale the rendered avatar to half instead. */
-.right :global(.CustomWearablePreview .WearablePreview) {
+/* Scale the rendered avatar to half. Target the iframe directly: WearablePreview renders a
+   bare styled iframe with an emotion-generated class, so there is no .WearablePreview hook. */
+.right :global(.CustomWearablePreview iframe) {
   transform: scale(0.5);
 }
 
