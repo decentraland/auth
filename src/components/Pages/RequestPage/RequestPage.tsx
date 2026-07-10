@@ -313,7 +313,7 @@ export const RequestPage = () => {
 
     // Client-login flow: no request to recover. Post the identity generated during login
     // to the auth server and let the client retrieve it through the `open?signin=<id>`
-    // deep link, which ContinueInApp fires immediately for this flow.
+    // deep link, which ContinueInApp opens automatically once its countdown ends.
     const completeClientLoginFlow = async () => {
       identifyUser(account)
 
@@ -922,7 +922,7 @@ export const RequestPage = () => {
           onContinue={onContinueInApp}
           requestId={requestId}
           deepLinkUrl={getSigninDeeplink(targetConfig.deepLink, identityId ?? '', isBridgeOnly)}
-          immediate={isClientLoginFlow}
+          isClientLogin={isClientLoginFlow}
         />
       )
     case View.VERIFY_SIGN_IN_DENIED:

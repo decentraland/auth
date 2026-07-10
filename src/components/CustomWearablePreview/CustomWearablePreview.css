@@ -7,3 +7,12 @@
 .CustomWearablePreview .WearablePreview {
   background-color: unset;
 }
+
+/* Overlay the loading spinner on the center of the preview instead of letting it sit in
+   normal flow, which pushes it off-center. */
+.CustomWearablePreview .MuiCircularProgress-root {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
