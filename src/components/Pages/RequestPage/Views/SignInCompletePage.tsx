@@ -10,17 +10,18 @@ type Props = {
   deepLink?: string
   skipRedirect?: boolean
   bridgeOnly?: boolean
+  authRequestId?: string | null
 }
 
-const SignInCompletePage = ({ onContinue, deepLink, skipRedirect, bridgeOnly }: Props) => {
+const SignInCompletePage = ({ onContinue, deepLink, skipRedirect, bridgeOnly, authRequestId }: Props) => {
   const { t } = useTranslation()
 
   useEffect(() => {
     onContinue?.()
     if (!skipRedirect) {
-      window.location.href = getExplorerDeeplink(deepLink, bridgeOnly)
+      window.location.href = getExplorerDeeplink(deepLink, bridgeOnly, authRequestId)
     }
-  }, [onContinue, deepLink, skipRedirect, bridgeOnly])
+  }, [onContinue, deepLink, skipRedirect, bridgeOnly, authRequestId])
 
   return (
     <CenteredContainer>

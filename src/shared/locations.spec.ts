@@ -1,4 +1,11 @@
-import { extractRedirectToFromSearchParameters, extractReferrerFromSearchParameters, isBridgeOnlyEnabled, locations } from './locations'
+import {
+  buildRequestPageUrl,
+  extractRedirectToFromSearchParameters,
+  extractReferrerFromSearchParameters,
+  getAuthRequestId,
+  isBridgeOnlyEnabled,
+  locations
+} from './locations'
 
 describe('locations', () => {
   describe('login', () => {
@@ -220,12 +227,12 @@ describe('locations', () => {
     })
   })
 
-  describe('when checking if bridge-only is enabled', () => {
+  describe('when checking if bridgeOnly is enabled', () => {
     let searchParams: URLSearchParams
 
-    describe('and the bridge-only param is set to "true"', () => {
+    describe('and the bridgeOnly param is set to "true"', () => {
       beforeEach(() => {
-        searchParams = new URLSearchParams('bridge-only=true')
+        searchParams = new URLSearchParams('bridgeOnly=true')
       })
 
       it('should return true', () => {
@@ -233,9 +240,9 @@ describe('locations', () => {
       })
     })
 
-    describe('and the bridge-only param is set to "true" with different casing', () => {
+    describe('and the bridgeOnly param is set to "true" with different casing', () => {
       beforeEach(() => {
-        searchParams = new URLSearchParams('bridge-only=TRUE')
+        searchParams = new URLSearchParams('bridgeOnly=TRUE')
       })
 
       it('should return true', () => {
@@ -243,9 +250,9 @@ describe('locations', () => {
       })
     })
 
-    describe('and the bridge-only param is set to "false"', () => {
+    describe('and the bridgeOnly param is set to "false"', () => {
       beforeEach(() => {
-        searchParams = new URLSearchParams('bridge-only=false')
+        searchParams = new URLSearchParams('bridgeOnly=false')
       })
 
       it('should return false', () => {
@@ -253,9 +260,9 @@ describe('locations', () => {
       })
     })
 
-    describe('and the bridge-only param is set to a non-boolean value', () => {
+    describe('and the bridgeOnly param is set to a non-boolean value', () => {
       beforeEach(() => {
-        searchParams = new URLSearchParams('bridge-only=1')
+        searchParams = new URLSearchParams('bridgeOnly=1')
       })
 
       it('should return false', () => {
@@ -263,9 +270,9 @@ describe('locations', () => {
       })
     })
 
-    describe('and the bridge-only param is present as a bare flag without an equals sign', () => {
+    describe('and the bridgeOnly param is present as a bare flag without an equals sign', () => {
       beforeEach(() => {
-        searchParams = new URLSearchParams('bridge-only')
+        searchParams = new URLSearchParams('bridgeOnly')
       })
 
       it('should return true', () => {
@@ -273,9 +280,9 @@ describe('locations', () => {
       })
     })
 
-    describe('and the bridge-only param is present with an empty value', () => {
+    describe('and the bridgeOnly param is present with an empty value', () => {
       beforeEach(() => {
-        searchParams = new URLSearchParams('bridge-only=')
+        searchParams = new URLSearchParams('bridgeOnly=')
       })
 
       it('should return true', () => {
@@ -283,13 +290,63 @@ describe('locations', () => {
       })
     })
 
-    describe('and the bridge-only param is not present', () => {
+    describe('and the bridgeOnly param is not present', () => {
       beforeEach(() => {
         searchParams = new URLSearchParams('targetConfigId=default')
       })
 
       it('should return false', () => {
         expect(isBridgeOnlyEnabled(searchParams)).toBe(false)
+      })
+    })
+  })
+
+  describe('when getting the authRequestId', () => {
+    let searchParams: URLSearchParams
+
+    describe('and the authRequestId param is present', () => {
+      beforeEach(() => {
+        searchParams = new URLSearchParams('authRequestId=abc-123')
+      })
+
+      it('should return its value verbatim', () => {
+        expect(getAuthRequestId(searchParams)).toBe('abc-123')
+      })
+    })
+
+    describe('and the authRequestId param is present with a value needing decoding', () => {
+      beforeEach(() => {
+        searchParams = new URLSearchParams('authRequestId=a%2Fb%20c')
+      })
+
+      it('should return the decoded value', () => {
+        expect(getAuthRequestId(searchParams)).toBe('a/b c')
+      })
+    })
+
+    describe('and the authRequestId param is not present', () => {
+      beforeEach(() => {
+        searchParams = new URLSearchParams('targetConfigId=default')
+      })
+
+      it('should return null', () => {
+        expect(getAuthRequestId(searchParams)).toBeNull()
+      })
+    })
+  })
+
+  describe('when building the request page url', () => {
+    describe('and an authRequestId is provided', () => {
+      it('should append it url-encoded alongside the other preserved params', () => {
+        expect(buildRequestPageUrl('request-id', 'default', { isDeepLinkFlow: true, isBridgeOnly: true, authRequestId: 'a/b c' })).toBe(
+          '/auth/requests/request-id?targetConfigId=default&flow=deeplink&bridgeOnly=true&authRequestId=a%2Fb%20c'
+        )
+      })
+    })
+
+    describe('and no authRequestId is provided', () => {
+      it('should not append the authRequestId param', () => {
+        expect(buildRequestPageUrl('request-id', 'default')).toBe('/auth/requests/request-id?targetConfigId=default')
       })
     })
   })

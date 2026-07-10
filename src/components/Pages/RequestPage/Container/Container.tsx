@@ -6,7 +6,7 @@ import { useMobileMediaQuery } from 'decentraland-ui2'
 import { useNavigateWithSearchParams } from '../../../../hooks/navigation'
 import { useTargetConfig } from '../../../../hooks/targetConfig'
 import { useCurrentConnectionData } from '../../../../shared/connection'
-import { isBridgeOnlyEnabled } from '../../../../shared/locations'
+import { buildRequestPageUrl, getAuthRequestId, isBridgeOnlyEnabled } from '../../../../shared/locations'
 import { AnimatedBackground } from '../../../AnimatedBackground'
 import { CustomWearablePreview } from '../../../CustomWearablePreview'
 import styles from './Container.module.css'
@@ -22,18 +22,17 @@ export const Container = (props: { children: ReactNode; requestId?: string; canC
   const { account } = useCurrentConnectionData()
   const isDeepLinkFlow = searchParams.get('flow') === 'deeplink'
   const isBridgeOnly = isBridgeOnlyEnabled(searchParams)
+  const authRequestId = getAuthRequestId(searchParams)
 
   const onChangeAccount = useCallback(
     async (evt: React.MouseEvent<HTMLAnchorElement>) => {
       evt.preventDefault()
       await connection.disconnect()
-      const flowParam = isDeepLinkFlow ? '&flow=deeplink' : ''
-      const bridgeOnlyParam = isBridgeOnly ? '&bridge-only=true' : ''
       // Don't preserve loginMethod — the user explicitly wants to choose a different method
-      const redirectToUrl = `/auth/requests/${requestId ?? ''}?targetConfigId=${targetConfigId}${flowParam}${bridgeOnlyParam}`
+      const redirectToUrl = buildRequestPageUrl(requestId ?? '', targetConfigId, { isDeepLinkFlow, isBridgeOnly, authRequestId })
       navigate(`/login?redirectTo=${encodeURIComponent(redirectToUrl)}`)
     },
-    [requestId, targetConfigId, isDeepLinkFlow, isBridgeOnly, navigate]
+    [requestId, targetConfigId, isDeepLinkFlow, isBridgeOnly, authRequestId, navigate]
   )
 
   return (
