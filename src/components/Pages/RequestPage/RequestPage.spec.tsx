@@ -507,7 +507,7 @@ describe('RequestPage', () => {
           expect(mockRecover).not.toHaveBeenCalled()
         })
 
-        it('should build the signin deep link without the bridge-only flag', async () => {
+        it('should build the signin deep link without the bridgeOnly flag', async () => {
           renderRequestPage(CLIENT_LOGIN_REQUEST_PATH)
           await waitFor(() => {
             expect(screen.getByTestId('continue-in-app')).toBeInTheDocument()
@@ -516,7 +516,7 @@ describe('RequestPage', () => {
         })
       })
 
-      describe('and the bridge-only flag is enabled', () => {
+      describe('and the bridgeOnly flag is enabled', () => {
         beforeEach(() => {
           jest.mocked(isBridgeOnlyEnabled).mockReturnValue(true)
           mockPostIdentity.mockResolvedValueOnce({ identityId: 'anIdentityId' })
@@ -526,7 +526,7 @@ describe('RequestPage', () => {
           jest.mocked(isBridgeOnlyEnabled).mockReturnValue(false)
         })
 
-        it('should build the signin deep link with the bridge-only flag', async () => {
+        it('should build the signin deep link with the bridgeOnly flag', async () => {
           renderRequestPage(CLIENT_LOGIN_REQUEST_PATH)
           await waitFor(() => {
             expect(screen.getByTestId('continue-in-app')).toBeInTheDocument()
