@@ -22,16 +22,16 @@
 
 .right {
   height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
-/* Half the previous size (was 100% x 100% of the right column): the fixed-camera
-   preview scales with its container, so the avatar renders half as big. */
 .right :global(.CustomWearablePreview) {
-  width: 50%;
-  height: 50%;
+  right: 8%;
+}
+
+/* The preview auto-fits the avatar to fill its box, so shrinking the box just shrinks the
+   whole panel. Keep the box full-size and scale the rendered avatar to half instead. */
+.right :global(.CustomWearablePreview .WearablePreview) {
+  transform: scale(0.5);
 }
 
 .changeAccount {
