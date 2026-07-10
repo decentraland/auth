@@ -173,7 +173,7 @@ jest.mock('./Views', () => ({
   TransferCanceledView: () => <div data-testid="transfer-canceled">Transfer Canceled</div>,
   TransactionConfirmDialog: (props: any) =>
     props.open ? (
-      <div data-testid="transaction-confirm-dialog" data-sim={props.simulation?.status}>
+      <div data-testid="transaction-confirm-dialog" data-sim={props.simulation?.status} data-gas-covered={String(props.gasCovered)}>
         Transaction Dialog
       </div>
     ) : null,
@@ -196,8 +196,9 @@ const mockIsSignatureMethod = jest.fn()
 const mockExtractSignaturePayload = jest.fn()
 const mockDecodeMetaTransactionTypedData = jest.fn()
 const mockBuildSendTransactionSimulationPayload = jest.fn()
+const mockCheckMetaTransactionSupport = jest.fn()
 jest.mock('./utils', () => ({
-  checkMetaTransactionSupport: jest.fn().mockResolvedValue({ willUseMetaTransaction: false, contractName: null }),
+  checkMetaTransactionSupport: (...args: any[]) => mockCheckMetaTransactionSupport(...args),
   decodeManaTransferData: jest.fn().mockReturnValue(null),
   decodeNftTransferData: jest.fn().mockReturnValue(null),
   fetchNftMetadata: jest.fn(),
@@ -270,7 +271,8 @@ describe('RequestPage', () => {
     )
     mockExtractSignaturePayload.mockReturnValue({ kind: 'message', message: 'hello' })
     mockDecodeMetaTransactionTypedData.mockReturnValue(null)
-    mockBuildSendTransactionSimulationPayload.mockResolvedValue({
+    mockCheckMetaTransactionSupport.mockResolvedValue({ willUseMetaTransaction: false, contractName: null })
+    mockBuildSendTransactionSimulationPayload.mockReturnValue({
       chainId: 137,
       from: '0xabc123',
       to: '0xcontract',
@@ -725,6 +727,32 @@ describe('RequestPage', () => {
       renderRequestPage()
       await userEvent.click(await screen.findByTestId('wallet-interaction-approve'))
       expect(await screen.findByTestId('transaction-confirm-dialog')).toBeInTheDocument()
+    })
+  })
+
+  describe('when a web2 transaction is relayed as a meta-transaction', () => {
+    beforeEach(() => {
+      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.MAGIC }
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockCheckMetaTransactionSupport.mockResolvedValue({ willUseMetaTransaction: true, contractName: 'ERC721CollectionV2' })
+      mockRecover.mockResolvedValue({
+        method: 'eth_sendTransaction',
+        params: [{ to: '0xcontract', data: '0xabcd', value: '0x0' }],
+        sender: '0xabc123',
+        expiration: new Date(Date.now() + 3600000).toISOString()
+      })
+      mockGetAddresses.mockResolvedValue(['0xabc123'])
+      mockGetBalance.mockResolvedValue(BigInt(1))
+      mockGetChainId.mockResolvedValue(1)
+      mockEstimateFeesPerGas.mockResolvedValue({ gasPrice: BigInt(1) })
+      mockEstimateGas.mockResolvedValue(BigInt(1))
+    })
+
+    it('should mark the confirmation dialog as gas-covered', async () => {
+      renderRequestPage()
+      await userEvent.click(await screen.findByTestId('wallet-interaction-approve'))
+      const dialog = await screen.findByTestId('transaction-confirm-dialog')
+      await waitFor(() => expect(dialog).toHaveAttribute('data-gas-covered', 'true'))
     })
   })
 

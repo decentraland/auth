@@ -111,20 +111,21 @@ function decodeMetaTransactionTypedData(
 }
 
 /**
- * Builds the simulation request body for an eth_sendTransaction request. When the target is a
- * Decentraland contract the transaction is relayed as a meta-transaction, so it must be
- * simulated on the meta-transaction chain (Polygon/Amoy) rather than the connected chain —
- * simulating a meta-tx on mainnet would revert spuriously.
+ * Builds the simulation request body for an eth_sendTransaction request. When the transaction
+ * will be relayed as a meta-transaction it must be simulated on the meta-transaction chain
+ * (Polygon/Amoy) rather than the connected chain — simulating a meta-tx on mainnet would
+ * revert spuriously. The caller passes `willUseMetaTransaction` (from checkMetaTransactionSupport)
+ * so the meta-tx decision is made once and reused for the gas-coverage UI.
  */
-async function buildSendTransactionSimulationPayload(
+function buildSendTransactionSimulationPayload(
   txParams: Record<string, unknown>,
   signerAddress: string,
-  connectedChainId: number
-): Promise<SimulationRequestBody | null> {
+  connectedChainId: number,
+  willUseMetaTransaction: boolean
+): SimulationRequestBody | null {
   const to = txParams.to as string | undefined
   if (!to) return null
 
-  const { willUseMetaTransaction } = await checkMetaTransactionSupport(to)
   const chainId = willUseMetaTransaction ? Number(getMetaTransactionChainId()) : connectedChainId
 
   return {

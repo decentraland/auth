@@ -83,7 +83,7 @@
       "transaction_cost": "Costo della transazione: {cost} ETH",
       "your_balance": "Il tuo saldo: {balance} ETH",
       "simulation_loading": "Verifica di cosa farà questa transazione…",
-      "details_unavailable": "Non è stato possibile visualizzare l'anteprima di questa transazione. Continua solo se ti fidi di questa scena.",
+      "details_unavailable": "Non è disponibile un'anteprima per questa transazione. Continua solo se ti fidi della scena.",
       "you_send": "Invii",
       "you_receive": "Ricevi",
       "approvals_title": "Autorizzazioni concesse",
@@ -92,7 +92,8 @@
       "approval_for_all": "Consenti a {spender} l'accesso completo al tuo {name}",
       "revert_title": "È probabile che questa transazione fallisca",
       "revert_description": "Si prevede che venga annullata se inviata{reason}",
-      "unknown_token": "Token sconosciuto ({address})"
+      "unknown_token": "Token sconosciuto ({address})",
+      "gas_covered": "Le commissioni di gas sono coperte da Decentraland."
     },
     "signature": {
       "title": "Conferma firma",

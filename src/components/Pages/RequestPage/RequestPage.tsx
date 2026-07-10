@@ -151,6 +151,9 @@ export const RequestPage = () => {
   const [manaTransferData, setManaTransferData] = useState<MANATransferData | null>(null)
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false)
   const [simulationState, setSimulationState] = useState<SimulationState>({ status: 'idle' })
+  // Whether the pending eth_sendTransaction will be relayed as a meta-transaction (gas covered
+  // by Decentraland's gas tank), so the confirm dialog can hide the user-facing gas cost.
+  const [isMetaTransaction, setIsMetaTransaction] = useState(false)
   const [signaturePayload, setSignaturePayload] = useState<SignaturePayload | null>(null)
   const [isSignatureMetaTx, setIsSignatureMetaTx] = useState(false)
   const requestRef = useRef<RecoverResponse>()
@@ -445,19 +448,28 @@ export const RequestPage = () => {
               const transactionData = txParams?.data as string | undefined
               const contractAddress = txParams?.to as string | undefined
 
-              // Prefetch the asset-change simulation (non-blocking) so the confirm dialog can
-              // show it instantly. Applies to all eth_sendTransaction sub-views for web2 users.
-              if (canShowSimulation && txParams) {
-                setSimulationState({ status: 'loading' })
-                buildSendTransactionSimulationPayload(txParams, signerAddress, currentChainId)
-                  .then(body => {
+              // For web2 users, determine whether this transaction will be relayed as a
+              // meta-transaction (gas covered by the gas tank) so the confirm dialog can hide
+              // the user-gas lines, and — when the flag is on — prefetch the asset-change
+              // simulation so it shows instantly. Non-blocking; the meta-tx decision is made
+              // once here and reused for the simulation chain. Applies to all three tx sub-views.
+              if (isUserUsingWeb2Wallet && contractAddress) {
+                if (canShowSimulation) {
+                  setSimulationState({ status: 'loading' })
+                }
+                checkMetaTransactionSupport(contractAddress)
+                  .then(({ willUseMetaTransaction }) => {
                     if (cancelled) return undefined
-                    if (body) return fetchSimulation(body)
-                    setSimulationState({ status: 'unavailable' })
+                    setIsMetaTransaction(willUseMetaTransaction)
+                    if (canShowSimulation && txParams) {
+                      const body = buildSendTransactionSimulationPayload(txParams, signerAddress, currentChainId, willUseMetaTransaction)
+                      if (body) return fetchSimulation(body)
+                      setSimulationState({ status: 'unavailable' })
+                    }
                     return undefined
                   })
                   .catch(() => {
-                    if (!cancelled) setSimulationState({ status: 'unavailable' })
+                    if (!cancelled && canShowSimulation) setSimulationState({ status: 'unavailable' })
                   })
               }
 
@@ -1017,6 +1029,7 @@ export const RequestPage = () => {
             balance={walletInfo?.balance ?? BigInt(0)}
             simulation={simulationState}
             userAddress={account ?? ''}
+            gasCovered={isMetaTransaction}
             isLoading={isLoading}
             onCancel={onDenyWalletInteraction}
             onConfirm={onApproveWalletInteraction}
@@ -1039,6 +1052,7 @@ export const RequestPage = () => {
             balance={walletInfo?.balance ?? BigInt(0)}
             simulation={simulationState}
             userAddress={account ?? ''}
+            gasCovered={isMetaTransaction}
             isLoading={isLoading}
             onCancel={onDenyWalletInteraction}
             onConfirm={onApproveWalletInteraction}
@@ -1061,6 +1075,7 @@ export const RequestPage = () => {
             balance={walletInfo?.balance ?? BigInt(0)}
             simulation={simulationState}
             userAddress={account ?? ''}
+            gasCovered={isMetaTransaction}
             isLoading={isLoading}
             onCancel={onDenyWalletInteraction}
             onConfirm={onApproveWalletInteraction}

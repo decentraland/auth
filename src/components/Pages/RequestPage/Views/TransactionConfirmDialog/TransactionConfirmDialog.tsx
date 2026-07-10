@@ -11,6 +11,7 @@ export const TransactionConfirmDialog = ({
   balance,
   simulation,
   userAddress,
+  gasCovered = false,
   isLoading,
   onCancel,
   onConfirm
@@ -25,8 +26,14 @@ export const TransactionConfirmDialog = ({
         <DialogBody>
           <SimulationSummary simulation={simulation} userAddress={userAddress} />
           <GasInfo>
-            <GasLine>{t('request.transaction_dialog.transaction_cost', { cost: formatEther(transactionCost) })}</GasLine>
-            <GasLine>{t('request.transaction_dialog.your_balance', { balance: formatEther(balance) })}</GasLine>
+            {gasCovered ? (
+              <GasLine>{t('request.transaction_dialog.gas_covered')}</GasLine>
+            ) : (
+              <>
+                <GasLine>{t('request.transaction_dialog.transaction_cost', { cost: formatEther(transactionCost) })}</GasLine>
+                <GasLine>{t('request.transaction_dialog.your_balance', { balance: formatEther(balance) })}</GasLine>
+              </>
+            )}
           </GasInfo>
         </DialogBody>
       </DialogContent>

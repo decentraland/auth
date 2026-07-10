@@ -1104,41 +1104,41 @@ describe('when testing buildSendTransactionSimulationPayload', () => {
     jest.resetAllMocks()
   })
 
-  describe('and the target is a Decentraland contract relayed as a meta-transaction', () => {
+  describe('and the transaction will be relayed as a meta-transaction', () => {
     let txParams: Record<string, unknown>
 
     beforeEach(() => {
-      jest.mocked(getContractName).mockReturnValue(ContractName.ERC721CollectionV2)
       ;(config.get as jest.Mock).mockReturnValue('production')
       txParams = { to: '0xfef5c99885c3036e591b6e6db52482891834a5f4', data: '0xa9059cbb', value: '0x0' }
     })
 
-    it('should simulate on the meta-transaction chain', async () => {
-      const result = await buildSendTransactionSimulationPayload(txParams, signerAddress, 1)
+    it('should simulate on the meta-transaction chain', () => {
+      const result = buildSendTransactionSimulationPayload(txParams, signerAddress, 1, true)
       expect(result?.chainId).toBe(ChainId.MATIC_MAINNET)
     })
 
-    it('should default the from address to the signer when not present in the params', async () => {
-      const result = await buildSendTransactionSimulationPayload(txParams, signerAddress, 1)
+    it('should default the from address to the signer when not present in the params', () => {
+      const result = buildSendTransactionSimulationPayload(txParams, signerAddress, 1, true)
       expect(result?.from).toBe(signerAddress)
     })
   })
 
-  describe('and the target is not a Decentraland contract', () => {
+  describe('and the transaction will not be relayed as a meta-transaction', () => {
     let txParams: Record<string, unknown>
 
     beforeEach(() => {
-      jest.mocked(getContractName).mockImplementation(() => {
-        throw new Error('unknown contract')
-      })
-      ;(config.get as jest.Mock).mockReturnValue('development')
-      global.fetch = jest.fn().mockResolvedValue({ status: 200, json: () => Promise.resolve({ ok: false }) }) as any
       txParams = { to: '0x1111111111111111111111111111111111111111', data: '0x', value: '0x0' }
     })
 
-    it('should simulate on the connected chain', async () => {
-      const result = await buildSendTransactionSimulationPayload(txParams, signerAddress, 1)
+    it('should simulate on the connected chain', () => {
+      const result = buildSendTransactionSimulationPayload(txParams, signerAddress, 1, false)
       expect(result?.chainId).toBe(1)
+    })
+  })
+
+  describe('and the transaction has no to address', () => {
+    it('should return null', () => {
+      expect(buildSendTransactionSimulationPayload({ data: '0x' }, signerAddress, 1, false)).toBeNull()
     })
   })
 })

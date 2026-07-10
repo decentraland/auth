@@ -46,6 +46,11 @@ const TokenLogo = styled('img')(({ theme }) => ({
   width: theme.spacing(5)
 }))
 
+const UnavailableNote = styled(Typography)(({ theme }) => ({
+  color: theme.palette.text.secondary,
+  fontSize: theme.typography.pxToRem(13)
+}))
+
 const TokenLogoFallback = styled(Box)(({ theme }) => ({
   alignItems: 'center',
   backgroundColor: theme.palette.action.selected,
@@ -105,5 +110,6 @@ export {
   Section,
   SectionTitle,
   TokenLogo,
-  TokenLogoFallback
+  TokenLogoFallback,
+  UnavailableNote
 }

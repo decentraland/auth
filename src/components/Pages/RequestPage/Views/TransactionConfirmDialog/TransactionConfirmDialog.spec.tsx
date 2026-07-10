@@ -99,4 +99,23 @@ describe('when rendering the TransactionConfirmDialog', () => {
       expect(screen.getByText('common.confirm').closest('button')).not.toBeDisabled()
     })
   })
+
+  describe('and gas is covered by a meta-transaction', () => {
+    it('should show the gas-covered note instead of the user gas cost', () => {
+      render(
+        <TransactionConfirmDialog
+          open
+          transactionCost={BigInt(1000)}
+          balance={BigInt(2000)}
+          simulation={{ status: 'idle' }}
+          userAddress={USER}
+          gasCovered
+          onCancel={onCancel}
+          onConfirm={onConfirm}
+        />
+      )
+      expect(screen.getByText('request.transaction_dialog.gas_covered')).toBeInTheDocument()
+      expect(screen.queryByText('request.transaction_dialog.transaction_cost')).not.toBeInTheDocument()
+    })
+  })
 })

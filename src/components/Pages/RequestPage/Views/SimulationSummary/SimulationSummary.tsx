@@ -14,7 +14,8 @@ import {
   Section,
   SectionTitle,
   TokenLogo,
-  TokenLogoFallback
+  TokenLogoFallback,
+  UnavailableNote
 } from './SimulationSummary.styled'
 
 const shortenAddress = (address: string | null): string => {
@@ -89,9 +90,11 @@ export const SimulationSummary = ({ simulation, userAddress }: SimulationSummary
   }
 
   if (simulation.status === 'unavailable') {
+    // Not an error state: a transaction can be unpreviewable for benign reasons (an
+    // unverifiable contract, provider limits). Show a neutral note, never an error.
     return (
       <Root>
-        <Alert severity="info">{t('request.transaction_dialog.details_unavailable')}</Alert>
+        <UnavailableNote>{t('request.transaction_dialog.details_unavailable')}</UnavailableNote>
       </Root>
     )
   }

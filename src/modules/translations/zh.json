@@ -83,7 +83,7 @@
       "transaction_cost": "交易费用：{cost} ETH",
       "your_balance": "您的余额：{balance} ETH",
       "simulation_loading": "正在检查此交易将执行的操作…",
-      "details_unavailable": "我们无法预览此交易。只有在您信任此场景时才继续。",
+      "details_unavailable": "此交易暂无预览。只有在您信任该场景时才继续。",
       "you_send": "您发送",
       "you_receive": "您接收",
       "approvals_title": "已授予的权限",
@@ -92,7 +92,8 @@
       "approval_for_all": "允许 {spender} 完全访问您的 {name}",
       "revert_title": "此交易可能会失败",
       "revert_description": "如果提交，预计会回滚{reason}",
-      "unknown_token": "未知代币 ({address})"
+      "unknown_token": "未知代币 ({address})",
+      "gas_covered": "Gas 费用由 Decentraland 承担。"
     },
     "signature": {
       "title": "确认签名",
