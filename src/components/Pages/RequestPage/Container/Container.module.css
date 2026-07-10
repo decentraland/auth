@@ -32,6 +32,7 @@
    bare styled iframe with an emotion-generated class, so there is no .WearablePreview hook. */
 .right :global(.CustomWearablePreview iframe) {
   transform: scale(0.5);
+  transform-origin: center;
 }
 
 .changeAccount {

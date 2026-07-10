@@ -73,24 +73,24 @@ export const ContinueInApp = ({ onContinue, requestId, deepLinkUrl, autoStart = 
     setDeepLinkFailed(false)
   }, [])
 
+  // Tick the countdown down once per second. The updater stays pure — the launch is
+  // triggered by the effect below when the countdown reaches zero — so a StrictMode
+  // double-invoke of the updater can't fire the deep link twice.
   useEffect(() => {
-    if (!autoStart) return
-    if (deepLinkFailed || hasLaunched) return
+    if (!autoStart || deepLinkFailed || hasLaunched) return
 
-    // Count down, then open the client automatically when it reaches zero.
     const interval = setInterval(() => {
-      setCountdown(prev => {
-        if (prev <= 1) {
-          clearInterval(interval)
-          attemptDeepLink()
-          return 0
-        }
-        return prev - 1
-      })
+      setCountdown(prev => (prev <= 0 ? 0 : prev - 1))
     }, 1000)
 
     return () => clearInterval(interval)
-  }, [attemptDeepLink, autoStart, deepLinkFailed, hasLaunched])
+  }, [autoStart, deepLinkFailed, hasLaunched])
+
+  // Open the client automatically once the countdown reaches zero.
+  useEffect(() => {
+    if (!autoStart || deepLinkFailed || hasLaunched) return
+    if (countdown === 0) attemptDeepLink()
+  }, [attemptDeepLink, autoStart, countdown, deepLinkFailed, hasLaunched])
 
   if (deepLinkFailed) {
     return (
