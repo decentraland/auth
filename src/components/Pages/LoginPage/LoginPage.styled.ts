@@ -16,7 +16,10 @@ const Main = styled('main')(({ theme }) => ({
   width: '100%',
   maxWidth: '100vw',
   position: 'relative',
-  overflow: 'hidden',
+  // Keep the animated background from causing horizontal scroll, but let the box scroll
+  // vertically so short viewports can reach the bottom of the form instead of clipping it.
+  overflowX: 'hidden',
+  overflowY: 'auto',
   minWidth: 0,
   boxSizing: 'border-box',
   ['&::before']: {
