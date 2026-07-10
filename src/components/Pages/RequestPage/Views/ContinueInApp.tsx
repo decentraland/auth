@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from '@dcl/hooks'
 import { muiIcons } from 'decentraland-ui2'
@@ -33,17 +33,28 @@ export const ContinueInApp = ({ onContinue, requestId, deepLinkUrl, autoStart = 
   const [countdown, setCountdown] = useState(COUNTDOWN_SECONDS)
   const [deepLinkFailed, setDeepLinkFailed] = useState(false)
   // The client-login view stays mounted after a successful launch (there is nothing to
-  // navigate to), so track the launch to stop the countdown from opening the client twice
-  // — e.g. if the user hits "Return to <Explorer>" before the countdown reaches zero.
+  // navigate to), so track the launch to swap the copy to "redirecting" and keep the
+  // countdown effect from starting a new interval.
   const [hasLaunched, setHasLaunched] = useState(false)
+  // Set synchronously before the async launch to drop any overlapping call: the manual
+  // "Return to <Explorer>" button and the countdown's zero-tick can both fire while a
+  // launch is still in flight (hasLaunched only flips once it resolves), which would open
+  // the client and call onContinue twice.
+  const isLaunchingRef = useRef(false)
 
   const attemptDeepLink = useCallback(async () => {
-    const wasLaunched = await launchDeepLink(deepLinkUrl)
-    if (wasLaunched) {
-      setHasLaunched(true)
-      onContinue()
-    } else {
-      setDeepLinkFailed(true)
+    if (isLaunchingRef.current) return
+    isLaunchingRef.current = true
+    try {
+      const wasLaunched = await launchDeepLink(deepLinkUrl)
+      if (wasLaunched) {
+        setHasLaunched(true)
+        onContinue()
+      } else {
+        setDeepLinkFailed(true)
+      }
+    } finally {
+      isLaunchingRef.current = false
     }
   }, [deepLinkUrl, onContinue])
 

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { ReactNode } from 'react'
 import { MemoryRouter } from 'react-router-dom'
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { launchDeepLink } from '../utils'
 import { ContinueInApp } from './ContinueInApp'
@@ -39,6 +39,8 @@ jest.mock('decentraland-ui2', () => ({
 const mockedLaunchDeepLink = launchDeepLink as jest.MockedFunction<typeof launchDeepLink>
 
 const DEEP_LINK_URL = 'decentraland://open?signin=anIdentityId'
+// Matches COUNTDOWN_SECONDS (5) in the component: the interval decrements once per second.
+const COUNTDOWN_MS = 5000
 
 describe('ContinueInApp', () => {
   let originalLocation: Location
@@ -83,6 +85,69 @@ describe('ContinueInApp', () => {
 
     it('should not attempt the deep link before the countdown finishes', () => {
       expect(mockedLaunchDeepLink).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('when the countdown runs to completion', () => {
+    beforeEach(() => {
+      jest.useFakeTimers()
+      mockedLaunchDeepLink.mockResolvedValue(true)
+      renderContinueInApp({ isClientLogin: true })
+    })
+
+    afterEach(() => {
+      jest.useRealTimers()
+    })
+
+    it('should launch the deep link automatically when it reaches zero', async () => {
+      await act(async () => {
+        jest.advanceTimersByTime(COUNTDOWN_MS)
+      })
+      expect(mockedLaunchDeepLink).toHaveBeenCalledWith(DEEP_LINK_URL)
+    })
+
+    it('should launch the deep link only once', async () => {
+      await act(async () => {
+        jest.advanceTimersByTime(COUNTDOWN_MS * 2)
+      })
+      expect(mockedLaunchDeepLink).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('when the return button is pressed while the countdown is finishing', () => {
+    let resolveLaunch: (value: boolean) => void
+
+    beforeEach(() => {
+      jest.useFakeTimers()
+      // Keep the launch in flight so the countdown's zero-tick fires before it resolves.
+      mockedLaunchDeepLink.mockReturnValue(
+        new Promise<boolean>(resolve => {
+          resolveLaunch = resolve
+        })
+      )
+      renderContinueInApp({ isClientLogin: true })
+      fireEvent.click(screen.getByTestId('continue-in-app-return-button'))
+      act(() => {
+        jest.advanceTimersByTime(COUNTDOWN_MS)
+      })
+    })
+
+    afterEach(() => {
+      jest.useRealTimers()
+    })
+
+    it('should open the client only once', async () => {
+      await act(async () => {
+        resolveLaunch(true)
+      })
+      expect(mockedLaunchDeepLink).toHaveBeenCalledTimes(1)
+    })
+
+    it('should notify the continue callback only once', async () => {
+      await act(async () => {
+        resolveLaunch(true)
+      })
+      expect(mockOnContinue).toHaveBeenCalledTimes(1)
     })
   })
 
@@ -173,6 +238,14 @@ describe('ContinueInApp', () => {
 
         it('should return to the redirecting view', () => {
           expect(screen.getByTestId('continue-in-app-return-button')).toBeInTheDocument()
+        })
+
+        it('should re-attempt the deep link when the client is reopened', async () => {
+          mockedLaunchDeepLink.mockResolvedValueOnce(true)
+          await userEvent.click(screen.getByTestId('continue-in-app-return-button'))
+          await waitFor(() => {
+            expect(mockedLaunchDeepLink).toHaveBeenCalledTimes(2)
+          })
         })
       })
     })
