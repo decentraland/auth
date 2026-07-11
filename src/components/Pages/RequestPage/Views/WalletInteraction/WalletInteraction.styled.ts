@@ -18,7 +18,7 @@ const SummaryBody = styled(Box)({
 
 const AckRow = styled(Box)(({ theme }) => ({
   alignSelf: 'flex-start',
-  color: theme.palette.text.secondary,
+  color: theme.palette.text.primary,
   fontSize: theme.typography.pxToRem(13),
   textAlign: 'left'
 }))

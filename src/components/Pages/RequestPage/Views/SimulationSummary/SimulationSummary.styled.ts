@@ -10,7 +10,7 @@ const Root = styled(Box)(({ theme }) => ({
 
 const LoadingRow = styled(Box)(({ theme }) => ({
   alignItems: 'center',
-  color: theme.palette.text.secondary,
+  color: theme.palette.text.primary,
   display: 'flex',
   fontSize: theme.typography.pxToRem(14),
   gap: theme.spacing(1.5)
@@ -23,7 +23,7 @@ const Section = styled(Box)(({ theme }) => ({
 }))
 
 const SectionTitle = styled(Typography)(({ theme }) => ({
-  color: theme.palette.text.secondary,
+  color: theme.palette.text.primary,
   fontSize: theme.typography.pxToRem(12),
   fontWeight: 600,
   letterSpacing: '0.06em',
@@ -47,7 +47,7 @@ const TokenLogo = styled('img')(({ theme }) => ({
 }))
 
 const UnavailableNote = styled(Typography)(({ theme }) => ({
-  color: theme.palette.text.secondary,
+  color: theme.palette.text.primary,
   fontSize: theme.typography.pxToRem(13)
 }))
 
@@ -78,7 +78,7 @@ const DirectionIndicator = styled('span')<{ outgoing?: boolean }>(({ theme, outg
 }))
 
 const AmountUsd = styled('span')(({ theme }) => ({
-  color: theme.palette.text.secondary,
+  color: theme.palette.text.primary,
   flexShrink: 0,
   fontSize: theme.typography.pxToRem(13),
   paddingLeft: theme.spacing(1),
@@ -102,7 +102,7 @@ const NetworkChip = styled('span')(({ theme }) => ({
   alignSelf: 'flex-start',
   backgroundColor: theme.palette.action.selected,
   borderRadius: theme.shape.borderRadius,
-  color: theme.palette.text.secondary,
+  color: theme.palette.text.primary,
   fontSize: theme.typography.pxToRem(12),
   padding: theme.spacing(0.25, 1)
 }))
@@ -137,7 +137,7 @@ const ChangeAmount = styled(Typography)(({ theme }) => ({
 }))
 
 const ChangeMeta = styled(Typography)(({ theme }) => ({
-  color: theme.palette.text.secondary,
+  color: theme.palette.text.primary,
   fontSize: theme.typography.pxToRem(12),
   overflow: 'hidden',
   textOverflow: 'ellipsis'
@@ -145,7 +145,7 @@ const ChangeMeta = styled(Typography)(({ theme }) => ({
 
 const RevertAlert = styled(Alert)(({ theme }) => ({
   alignItems: 'flex-start',
-  backgroundColor: dclColors.blackTransparent.blurry,
+  backgroundColor: dclColors.blackTransparent.backdrop,
   border: `1px solid ${theme.palette.error.main}`,
   borderRadius: theme.shape.borderRadius,
   color: theme.palette.text.primary,
@@ -164,7 +164,7 @@ const RevertAlert = styled(Alert)(({ theme }) => ({
 
 const ApprovalsAlert = styled(Alert)(({ theme }) => ({
   alignItems: 'flex-start',
-  backgroundColor: dclColors.blackTransparent.blurry,
+  backgroundColor: dclColors.blackTransparent.backdrop,
   border: `1px solid ${theme.palette.warning.main}`,
   borderRadius: theme.shape.borderRadius,
   color: theme.palette.text.primary,
@@ -188,7 +188,7 @@ const ApprovalLine = styled('span')<{ emphasized?: boolean }>(({ theme, emphasiz
 
 const NetLine = styled(Typography)(({ theme }) => ({
   borderTop: `1px solid ${theme.palette.divider}`,
-  color: theme.palette.text.secondary,
+  color: theme.palette.text.primary,
   display: 'flex',
   fontSize: theme.typography.pxToRem(13),
   justifyContent: 'space-between',
@@ -222,7 +222,7 @@ const EventList = styled(Box)(({ theme }) => ({
 }))
 
 const EventRow = styled(Typography)(({ theme }) => ({
-  color: theme.palette.text.secondary,
+  color: theme.palette.text.primary,
   fontFamily: 'monospace',
   fontSize: theme.typography.pxToRem(12),
   overflow: 'hidden',
