@@ -145,7 +145,9 @@ describe('when rendering the SignatureRequestView', () => {
             dollarValue: null
           }
         ],
-        approvalChanges: []
+        approvalChanges: [],
+        balanceChanges: [],
+        events: []
       }
       simulation = { status: 'ready', result }
     })

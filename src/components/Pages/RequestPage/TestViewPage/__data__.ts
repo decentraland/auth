@@ -126,6 +126,10 @@ const manaData: MANATransferData = {
 
 const USER_ADDRESS = '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd'
 
+const MARKETPLACE_ADDRESS = '0x1234567890abcdef1234567890abcdef12345678'
+const USDC_ADDRESS = '0x2791bca1f2de4661ed88a30c99a7a9449aa84174'
+const COLLECTION_ADDRESS = '0xfef5c99885c3036e591b6e6db52482891834a5f4'
+
 const simulationSuccess: SimulationResponseBody = {
   status: 'success',
   assetChanges: [
@@ -133,7 +137,7 @@ const simulationSuccess: SimulationResponseBody = {
       type: 'transfer',
       standard: 'erc20',
       from: USER_ADDRESS,
-      to: '0x1234567890abcdef1234567890abcdef12345678',
+      to: MARKETPLACE_ADDRESS,
       amount: '100',
       rawAmount: '100000000000000000000',
       tokenId: null,
@@ -146,13 +150,58 @@ const simulationSuccess: SimulationResponseBody = {
     },
     {
       type: 'transfer',
+      standard: 'erc20',
+      from: USER_ADDRESS,
+      to: MARKETPLACE_ADDRESS,
+      amount: '250.5',
+      rawAmount: '250500000',
+      tokenId: null,
+      contractAddress: USDC_ADDRESS,
+      symbol: 'USDC',
+      name: 'USD Coin',
+      decimals: 6,
+      logoUrl: null,
+      dollarValue: '250.50'
+    },
+    {
+      type: 'transfer',
+      standard: 'native',
+      from: USER_ADDRESS,
+      to: MARKETPLACE_ADDRESS,
+      amount: '1.5',
+      rawAmount: '1500000000000000000',
+      tokenId: null,
+      contractAddress: null,
+      symbol: 'MATIC',
+      name: null,
+      decimals: 18,
+      logoUrl: null,
+      dollarValue: '1.05'
+    },
+    {
+      type: 'transfer',
+      standard: 'erc20',
+      from: MARKETPLACE_ADDRESS,
+      to: USER_ADDRESS,
+      amount: '0.05',
+      rawAmount: '50000000000000000',
+      tokenId: null,
+      contractAddress: '0x7ceb23fd6bc0add59e62ac25578270cff1b9f619',
+      symbol: 'WETH',
+      name: 'Wrapped Ether',
+      decimals: 18,
+      logoUrl: null,
+      dollarValue: '160.00'
+    },
+    {
+      type: 'mint',
       standard: 'erc721',
-      from: '0x1234567890abcdef1234567890abcdef12345678',
+      from: null,
       to: USER_ADDRESS,
       amount: null,
       rawAmount: null,
       tokenId: '512',
-      contractAddress: '0xfef5c99885c3036e591b6e6db52482891834a5f4',
+      contractAddress: COLLECTION_ADDRESS,
       symbol: 'WEAR',
       name: 'Fancy Hat',
       decimals: null,
@@ -161,6 +210,20 @@ const simulationSuccess: SimulationResponseBody = {
     }
   ],
   approvalChanges: [
+    {
+      kind: 'approval',
+      standard: 'erc20',
+      owner: USER_ADDRESS,
+      spender: MARKETPLACE_ADDRESS,
+      amount: '500',
+      rawAmount: '500000000',
+      isUnlimited: false,
+      tokenId: null,
+      approved: null,
+      contractAddress: USDC_ADDRESS,
+      symbol: 'USDC',
+      name: 'USD Coin'
+    },
     {
       kind: 'approval',
       standard: 'erc20',
@@ -174,7 +237,55 @@ const simulationSuccess: SimulationResponseBody = {
       contractAddress: '0x0f5d2fb29fb7d3cfee444a200298f468908cc942',
       symbol: 'MANA',
       name: 'Decentraland MANA'
+    },
+    {
+      kind: 'approvalForAll',
+      standard: 'erc721',
+      owner: USER_ADDRESS,
+      spender: MARKETPLACE_ADDRESS,
+      amount: null,
+      rawAmount: null,
+      isUnlimited: true,
+      tokenId: null,
+      approved: true,
+      contractAddress: COLLECTION_ADDRESS,
+      symbol: null,
+      name: 'Fancy Wearables'
+    },
+    {
+      kind: 'approvalForAll',
+      standard: 'erc721',
+      owner: USER_ADDRESS,
+      spender: '0x9999999999999999999999999999999999999999',
+      amount: null,
+      rawAmount: null,
+      isUnlimited: false,
+      tokenId: null,
+      approved: false,
+      contractAddress: '0x1111111111111111111111111111111111111111',
+      symbol: null,
+      name: 'Old Collection'
+    },
+    {
+      kind: 'approval',
+      standard: 'erc721',
+      owner: USER_ADDRESS,
+      spender: MARKETPLACE_ADDRESS,
+      amount: null,
+      rawAmount: null,
+      isUnlimited: false,
+      tokenId: '7',
+      approved: null,
+      contractAddress: COLLECTION_ADDRESS,
+      symbol: null,
+      name: 'Fancy Wearables'
     }
+  ],
+  balanceChanges: [{ address: USER_ADDRESS, dollarValue: '-133.55' }],
+  events: [
+    { name: 'Transfer', address: '0x0f5d2fb29fb7d3cfee444a200298f468908cc942' },
+    { name: 'Approval', address: USDC_ADDRESS },
+    { name: null, address: MARKETPLACE_ADDRESS }
   ]
 }
 
@@ -182,7 +293,17 @@ const simulationReverted: SimulationResponseBody = {
   status: 'reverted',
   error: 'ERC20: transfer amount exceeds balance',
   assetChanges: [],
-  approvalChanges: []
+  approvalChanges: [],
+  balanceChanges: [],
+  events: []
+}
+
+const simulationNoChanges: SimulationResponseBody = {
+  status: 'success',
+  assetChanges: [],
+  approvalChanges: [],
+  balanceChanges: [],
+  events: [{ name: 'ConfigUpdated', address: MARKETPLACE_ADDRESS }]
 }
 
 const messageSignaturePayload: SignaturePayload = {
@@ -221,6 +342,7 @@ export {
   metaTxSignaturePayload,
   messageSignaturePayload,
   nftData,
+  simulationNoChanges,
   simulationReverted,
   simulationSuccess,
   typedDataSignaturePayload,

@@ -93,7 +93,18 @@
       "revert_title": "This transaction is likely to fail",
       "revert_description": "It is expected to revert if submitted{reason}",
       "unknown_token": "Unknown token ({address})",
-      "gas_covered": "Gas fees are covered by Decentraland."
+      "gas_covered": "Gas fees are covered by Decentraland.",
+      "minted": "Minted to you",
+      "burned": "Burned",
+      "to_recipient": "to {recipient}",
+      "from_sender": "from {sender}",
+      "net_change": "Net change",
+      "no_changes": "This transaction doesn't move any of your assets.",
+      "approval_erc721": "Allow {spender} to transfer {token} #{tokenId}",
+      "approval_for_all_revoked": "Revoke {spender}'s access to your {name}",
+      "technical_details": "Technical details",
+      "hide_technical_details": "Hide technical details",
+      "event_unknown": "Unknown event"
     },
     "signature": {
       "title": "Confirm signature",

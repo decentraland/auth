@@ -93,7 +93,18 @@
       "revert_title": "È probabile che questa transazione fallisca",
       "revert_description": "Si prevede che venga annullata se inviata{reason}",
       "unknown_token": "Token sconosciuto ({address})",
-      "gas_covered": "Le commissioni di gas sono coperte da Decentraland."
+      "gas_covered": "Le commissioni di gas sono coperte da Decentraland.",
+      "minted": "Coniato per te",
+      "burned": "Bruciato",
+      "to_recipient": "a {recipient}",
+      "from_sender": "da {sender}",
+      "net_change": "Variazione netta",
+      "no_changes": "Questa transazione non muove nessuno dei tuoi asset.",
+      "approval_erc721": "Consenti a {spender} di trasferire {token} #{tokenId}",
+      "approval_for_all_revoked": "Revoca l'accesso di {spender} al tuo {name}",
+      "technical_details": "Dettagli tecnici",
+      "hide_technical_details": "Nascondi dettagli tecnici",
+      "event_unknown": "Evento sconosciuto"
     },
     "signature": {
       "title": "Conferma firma",

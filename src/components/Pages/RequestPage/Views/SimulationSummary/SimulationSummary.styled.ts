@@ -98,6 +98,55 @@ const ApprovalLine = styled('span')<{ emphasized?: boolean }>(({ theme, emphasiz
   fontWeight: emphasized ? 700 : 400
 }))
 
+const DollarValue = styled('span')(({ theme }) => ({
+  color: theme.palette.text.secondary,
+  fontWeight: 400,
+  marginLeft: theme.spacing(0.75)
+}))
+
+const NetLine = styled(Typography)(({ theme }) => ({
+  borderTop: `1px solid ${theme.palette.divider}`,
+  color: theme.palette.text.secondary,
+  display: 'flex',
+  fontSize: theme.typography.pxToRem(13),
+  justifyContent: 'space-between',
+  paddingTop: theme.spacing(1)
+}))
+
+const NetValue = styled('span')<{ negative?: boolean }>(({ theme, negative }) => ({
+  color: negative ? theme.palette.error.main : theme.palette.success.main,
+  fontWeight: 600
+}))
+
+const Toggle = styled('button')(({ theme }) => ({
+  alignSelf: 'flex-start',
+  background: 'none',
+  border: 'none',
+  color: theme.palette.primary.main,
+  cursor: 'pointer',
+  fontSize: theme.typography.pxToRem(13),
+  padding: 0,
+  textDecoration: 'underline',
+  ['&:focus-visible']: {
+    outline: `2px solid ${theme.palette.primary.main}`,
+    outlineOffset: 2
+  }
+}))
+
+const EventList = styled(Box)(({ theme }) => ({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: theme.spacing(0.5)
+}))
+
+const EventRow = styled(Typography)(({ theme }) => ({
+  color: theme.palette.text.secondary,
+  fontFamily: 'monospace',
+  fontSize: theme.typography.pxToRem(12),
+  overflow: 'hidden',
+  textOverflow: 'ellipsis'
+}))
+
 export {
   ApprovalLine,
   ApprovalsAlert,
@@ -105,10 +154,16 @@ export {
   ChangeMeta,
   ChangeRow,
   ChangeText,
+  DollarValue,
+  EventList,
+  EventRow,
   LoadingRow,
+  NetLine,
+  NetValue,
   Root,
   Section,
   SectionTitle,
+  Toggle,
   TokenLogo,
   TokenLogoFallback,
   UnavailableNote

@@ -79,7 +79,7 @@ describe('when rendering the TransactionConfirmDialog', () => {
     beforeEach(() => {
       simulation = {
         status: 'ready',
-        result: { status: 'reverted', error: 'out of gas', assetChanges: [], approvalChanges: [] }
+        result: { status: 'reverted', error: 'out of gas', assetChanges: [], approvalChanges: [], balanceChanges: [], events: [] }
       }
     })
 

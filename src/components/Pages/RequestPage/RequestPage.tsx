@@ -22,6 +22,7 @@ import {
   RecoverResponse,
   RequestFulfilledError,
   SimulationRequestBody,
+  SimulationResponseBody,
   TimedOutError,
   createAuthServerHttpClient
 } from '../../../shared/auth'
@@ -151,6 +152,8 @@ export const RequestPage = () => {
   const [manaTransferData, setManaTransferData] = useState<MANATransferData | null>(null)
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false)
   const [simulationState, setSimulationState] = useState<SimulationState>({ status: 'idle' })
+  // Resolved counterparty display names (lowercased address → name), filled in progressively.
+  const [simulationProfiles, setSimulationProfiles] = useState<Record<string, string>>({})
   // Whether the pending eth_sendTransaction will be relayed as a meta-transaction (gas covered
   // by Decentraland's gas tank), so the confirm dialog can hide the user-facing gas cost.
   const [isMetaTransaction, setIsMetaTransaction] = useState(false)
@@ -363,6 +366,39 @@ export const RequestPage = () => {
           }, expirationDelay)
         }
 
+        // Resolves Decentraland profile names for the transaction's counterparties as a
+        // progressive enhancement — the summary renders immediately with addresses and names
+        // fill in when (and if) they resolve. Never blocks or fails the summary.
+        const resolveSimulationProfiles = async (result: SimulationResponseBody) => {
+          const addresses = new Set<string>()
+          for (const change of result.assetChanges) {
+            if (change.from) addresses.add(change.from.toLowerCase())
+            if (change.to) addresses.add(change.to.toLowerCase())
+          }
+          for (const approval of result.approvalChanges) {
+            if (approval.spender) addresses.add(approval.spender.toLowerCase())
+          }
+          addresses.delete(signerAddress.toLowerCase())
+          addresses.delete('0x0000000000000000000000000000000000000000')
+
+          const entries = await Promise.all(
+            [...addresses].map(async address => {
+              try {
+                const profile = await fetchProfile(address)
+                const name = profile?.avatars?.[0]?.name
+                return name ? ([address, name] as const) : null
+              } catch {
+                return null
+              }
+            })
+          )
+          if (cancelled) return
+          const resolved = Object.fromEntries(entries.filter((entry): entry is readonly [string, string] => entry !== null))
+          if (Object.keys(resolved).length > 0) {
+            setSimulationProfiles(resolved)
+          }
+        }
+
         // Best-effort transaction simulation for web2 users. Fires without blocking the view
         // render and never throws to the caller — failures surface as "details unavailable".
         const fetchSimulation = async (body: SimulationRequestBody) => {
@@ -370,6 +406,7 @@ export const RequestPage = () => {
             const result = await authServerClient.current.simulateTransaction(body)
             if (cancelled) return
             setSimulationState({ status: 'ready', result })
+            void resolveSimulationProfiles(result)
           } catch (e) {
             if (cancelled) return
             console.info('Transaction simulation unavailable:', e instanceof Error ? e.message : String(e))
@@ -1029,6 +1066,7 @@ export const RequestPage = () => {
             balance={walletInfo?.balance ?? BigInt(0)}
             simulation={simulationState}
             userAddress={account ?? ''}
+            profiles={simulationProfiles}
             gasCovered={isMetaTransaction}
             isLoading={isLoading}
             onCancel={onDenyWalletInteraction}
@@ -1052,6 +1090,7 @@ export const RequestPage = () => {
             balance={walletInfo?.balance ?? BigInt(0)}
             simulation={simulationState}
             userAddress={account ?? ''}
+            profiles={simulationProfiles}
             gasCovered={isMetaTransaction}
             isLoading={isLoading}
             onCancel={onDenyWalletInteraction}
@@ -1075,6 +1114,7 @@ export const RequestPage = () => {
             balance={walletInfo?.balance ?? BigInt(0)}
             simulation={simulationState}
             userAddress={account ?? ''}
+            profiles={simulationProfiles}
             gasCovered={isMetaTransaction}
             isLoading={isLoading}
             onCancel={onDenyWalletInteraction}
@@ -1098,6 +1138,7 @@ export const RequestPage = () => {
           payload={signaturePayload}
           simulation={simulationState}
           userAddress={account ?? ''}
+          profiles={simulationProfiles}
           isMetaTransaction={isSignatureMetaTx}
           isLoading={isLoading}
           onDeny={onDenyWalletInteraction}

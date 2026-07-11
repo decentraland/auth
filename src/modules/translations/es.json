@@ -93,7 +93,18 @@
       "revert_title": "Es probable que esta transacción falle",
       "revert_description": "Se espera que se revierta si se envía{reason}",
       "unknown_token": "Token desconocido ({address})",
-      "gas_covered": "Las tarifas de gas están cubiertas por Decentraland."
+      "gas_covered": "Las tarifas de gas están cubiertas por Decentraland.",
+      "minted": "Acuñado para ti",
+      "burned": "Quemado",
+      "to_recipient": "a {recipient}",
+      "from_sender": "de {sender}",
+      "net_change": "Cambio neto",
+      "no_changes": "Esta transacción no mueve ninguno de tus activos.",
+      "approval_erc721": "Permitir que {spender} transfiera {token} #{tokenId}",
+      "approval_for_all_revoked": "Revocar el acceso de {spender} a tu {name}",
+      "technical_details": "Detalles técnicos",
+      "hide_technical_details": "Ocultar detalles técnicos",
+      "event_unknown": "Evento desconocido"
     },
     "signature": {
       "title": "Confirmar firma",

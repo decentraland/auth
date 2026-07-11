@@ -93,7 +93,18 @@
       "revert_title": "此交易可能会失败",
       "revert_description": "如果提交，预计会回滚{reason}",
       "unknown_token": "未知代币 ({address})",
-      "gas_covered": "Gas 费用由 Decentraland 承担。"
+      "gas_covered": "Gas 费用由 Decentraland 承担。",
+      "minted": "已铸造给你",
+      "burned": "已销毁",
+      "to_recipient": "给 {recipient}",
+      "from_sender": "来自 {sender}",
+      "net_change": "净变化",
+      "no_changes": "此交易不会转移你的任何资产。",
+      "approval_erc721": "允许 {spender} 转移 {token} #{tokenId}",
+      "approval_for_all_revoked": "撤销 {spender} 对你的 {name} 的访问权限",
+      "technical_details": "技术细节",
+      "hide_technical_details": "隐藏技术细节",
+      "event_unknown": "未知事件"
     },
     "signature": {
       "title": "确认签名",

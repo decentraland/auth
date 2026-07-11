@@ -30,6 +30,7 @@ import {
   messageSignaturePayload,
   metaTxSignaturePayload,
   nftData,
+  simulationNoChanges,
   simulationReverted,
   simulationSuccess,
   typedDataSignaturePayload
@@ -134,6 +135,14 @@ export const TestViewPage = () => {
         element: (
           <PreviewSurface>
             <SimulationSummary simulation={{ status: 'unavailable' }} userAddress={USER_ADDRESS} />
+          </PreviewSurface>
+        )
+      },
+      simulationSummaryNoChanges: {
+        label: 'SimulationSummary (No asset changes)',
+        element: (
+          <PreviewSurface>
+            <SimulationSummary simulation={{ status: 'ready', result: simulationNoChanges }} userAddress={USER_ADDRESS} />
           </PreviewSurface>
         )
       },

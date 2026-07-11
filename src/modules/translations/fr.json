@@ -93,7 +93,18 @@
       "revert_title": "Cette transaction risque d'échouer",
       "revert_description": "Elle devrait échouer si elle est envoyée{reason}",
       "unknown_token": "Jeton inconnu ({address})",
-      "gas_covered": "Les frais de gas sont pris en charge par Decentraland."
+      "gas_covered": "Les frais de gas sont pris en charge par Decentraland.",
+      "minted": "Frappé pour vous",
+      "burned": "Brûlé",
+      "to_recipient": "à {recipient}",
+      "from_sender": "de {sender}",
+      "net_change": "Variation nette",
+      "no_changes": "Cette transaction ne déplace aucun de vos actifs.",
+      "approval_erc721": "Autoriser {spender} à transférer {token} #{tokenId}",
+      "approval_for_all_revoked": "Révoquer l'accès de {spender} à votre {name}",
+      "technical_details": "Détails techniques",
+      "hide_technical_details": "Masquer les détails techniques",
+      "event_unknown": "Événement inconnu"
     },
     "signature": {
       "title": "Confirmer la signature",

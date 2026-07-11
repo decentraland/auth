@@ -493,7 +493,7 @@ describe('createAuthServerClient', () => {
       let response: SimulationResponseBody
 
       beforeEach(() => {
-        response = { status: 'success', assetChanges: [], approvalChanges: [] }
+        response = { status: 'success', assetChanges: [], approvalChanges: [], balanceChanges: [], events: [] }
         mockFetch.mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve(response)

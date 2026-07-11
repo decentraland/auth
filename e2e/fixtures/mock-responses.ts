@@ -69,10 +69,12 @@ export const simulationSuccessResponse = {
       name: 'Decentraland MANA',
       decimals: 18,
       logoUrl: null,
-      dollarValue: null
+      dollarValue: '42.00'
     }
   ],
-  approvalChanges: []
+  approvalChanges: [],
+  balanceChanges: [{ address: MOCK_WALLET, dollarValue: '-42.00' }],
+  events: [{ name: 'Transfer', address: '0x0f5d2fb29fb7d3cfee444a200298f468908cc942' }]
 }
 
 /** Auth server: POST /simulations — transaction expected to revert */
@@ -80,7 +82,9 @@ export const simulationRevertedResponse = {
   status: 'reverted',
   error: 'ERC20: transfer amount exceeds balance',
   assetChanges: [],
-  approvalChanges: []
+  approvalChanges: [],
+  balanceChanges: [],
+  events: []
 }
 
 /** Feature flags: dapps.json */

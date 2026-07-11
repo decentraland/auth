@@ -71,6 +71,21 @@ type ApprovalChange = {
   name: string | null
 }
 
+/** Net dollar balance change for an address across the whole transaction. */
+type BalanceChange = {
+  address: string
+  /** Signed net USD delta for this address, or null when price data is unavailable. */
+  dollarValue: string | null
+}
+
+/** A decoded event log emitted by the transaction (advanced/technical detail). */
+type SimulationEvent = {
+  /** Decoded event name (e.g. "Transfer"), or null when the log couldn't be decoded. */
+  name: string | null
+  /** Emitting contract address (lowercased). */
+  address: string
+}
+
 /** Normalized response from `POST /simulations`. */
 type SimulationResponseBody = {
   status: 'success' | 'reverted'
@@ -78,6 +93,8 @@ type SimulationResponseBody = {
   error?: string
   assetChanges: AssetChange[]
   approvalChanges: ApprovalChange[]
+  balanceChanges: BalanceChange[]
+  events: SimulationEvent[]
 }
 
 export type {
@@ -89,5 +106,7 @@ export type {
   SimulationRequestBody,
   SimulationResponseBody,
   AssetChange,
-  ApprovalChange
+  ApprovalChange,
+  BalanceChange,
+  SimulationEvent
 }

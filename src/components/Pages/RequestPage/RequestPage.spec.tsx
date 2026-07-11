@@ -279,7 +279,7 @@ describe('RequestPage', () => {
       data: '0x',
       value: '0'
     })
-    mockSimulateTransaction.mockResolvedValue({ status: 'success', assetChanges: [], approvalChanges: [] })
+    mockSimulateTransaction.mockResolvedValue({ status: 'success', assetChanges: [], approvalChanges: [], balanceChanges: [], events: [] })
   })
 
   afterEach(() => {
