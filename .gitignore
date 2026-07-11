@@ -142,3 +142,10 @@ dist
 
 .cursor
 .claude
+
+# Playwright artifacts
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+e2e/.storage/

@@ -73,6 +73,35 @@ export const emptyProfileResponse = {
   avatars: []
 }
 
+/**
+ * Active-entities response for a `default<N>` profile pointer.
+ * Used by `SetupPage`'s `deployProfileFromDefault` flow when it calls
+ * `client.fetchEntitiesByPointers(['defaultN'])` to seed the deployed entity.
+ */
+export const defaultProfileEntityResponse = {
+  id: 'default-entity',
+  type: 'profile',
+  pointers: ['default1'],
+  timestamp: Date.now(),
+  content: [],
+  metadata: {
+    avatars: [
+      {
+        name: 'default1',
+        description: '',
+        avatar: {
+          bodyShape: 'urn:decentraland:off-chain:base-avatars:BaseMale',
+          eyes: { color: { r: 0.125, g: 0.703, b: 0.964 } },
+          hair: { color: { r: 0.234, g: 0.128, b: 0.065 } },
+          skin: { color: { r: 0.8, g: 0.608, b: 0.465 } },
+          wearables: [],
+          snapshots: {}
+        }
+      }
+    ]
+  }
+}
+
 /** Profile: returns existing user */
 export const existingProfileResponse = {
   avatars: [

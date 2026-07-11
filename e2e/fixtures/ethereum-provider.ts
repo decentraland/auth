@@ -92,6 +92,16 @@ export function createMockProviderScript(walletAddress: string): string {
               return '0xDE0B6B3A7640000'; // 1 ETH
             case 'eth_estimateGas':
               return '0x5208';
+            case 'eth_sendTransaction':
+            case 'eth_sendRawTransaction': {
+              // Journal the submission so tests can assert that the dapp
+              // forwarded the same tx params it received from the auth-server,
+              // without ever broadcasting. Returns a deterministic fake hash.
+              if (typeof window.__e2eRecordTx === 'function') {
+                try { await window.__e2eRecordTx(method, params); } catch (_) { /* non-fatal */ }
+              }
+              return '0x' + 'ab'.repeat(32);
+            }
             default:
               return null;
           }
