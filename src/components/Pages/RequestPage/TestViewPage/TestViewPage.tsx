@@ -16,6 +16,7 @@ import {
   SigningError,
   SimulationSummary,
   TimeoutError,
+  TransactionConfirmDialog,
   TransferCanceledView,
   TransferCompletedView,
   TransferConfirmView,
@@ -33,7 +34,7 @@ import {
   simulationSuccess,
   typedDataSignaturePayload
 } from './__data__'
-import { FloatingBar, ViewSelect } from './TestViewPage.styled'
+import { FloatingBar, PreviewSurface, ViewSelect } from './TestViewPage.styled'
 
 type ViewIdParam = {
   viewId?: string
@@ -114,15 +115,84 @@ export const TestViewPage = () => {
       },
       simulationSummarySuccess: {
         label: 'SimulationSummary (Success)',
-        element: <SimulationSummary simulation={{ status: 'ready', result: simulationSuccess }} userAddress={USER_ADDRESS} />
+        element: (
+          <PreviewSurface>
+            <SimulationSummary simulation={{ status: 'ready', result: simulationSuccess }} userAddress={USER_ADDRESS} />
+          </PreviewSurface>
+        )
       },
       simulationSummaryReverted: {
         label: 'SimulationSummary (Reverted)',
-        element: <SimulationSummary simulation={{ status: 'ready', result: simulationReverted }} userAddress={USER_ADDRESS} />
+        element: (
+          <PreviewSurface>
+            <SimulationSummary simulation={{ status: 'ready', result: simulationReverted }} userAddress={USER_ADDRESS} />
+          </PreviewSurface>
+        )
       },
       simulationSummaryUnavailable: {
         label: 'SimulationSummary (Unavailable)',
-        element: <SimulationSummary simulation={{ status: 'unavailable' }} userAddress={USER_ADDRESS} />
+        element: (
+          <PreviewSurface>
+            <SimulationSummary simulation={{ status: 'unavailable' }} userAddress={USER_ADDRESS} />
+          </PreviewSurface>
+        )
+      },
+      transactionDialogGasCovered: {
+        label: 'TransactionConfirmDialog (Gas covered)',
+        element: (
+          <TransactionConfirmDialog
+            open
+            transactionCost={BigInt(0)}
+            balance={BigInt(0)}
+            simulation={{ status: 'ready', result: simulationSuccess }}
+            userAddress={USER_ADDRESS}
+            gasCovered
+            onCancel={noop}
+            onConfirm={noop}
+          />
+        )
+      },
+      transactionDialogWithGas: {
+        label: 'TransactionConfirmDialog (User pays gas)',
+        element: (
+          <TransactionConfirmDialog
+            open
+            transactionCost={BigInt('2500000000000000')}
+            balance={BigInt('1500000000000000000')}
+            simulation={{ status: 'ready', result: simulationSuccess }}
+            userAddress={USER_ADDRESS}
+            onCancel={noop}
+            onConfirm={noop}
+          />
+        )
+      },
+      transactionDialogReverted: {
+        label: 'TransactionConfirmDialog (Reverted)',
+        element: (
+          <TransactionConfirmDialog
+            open
+            transactionCost={BigInt('2500000000000000')}
+            balance={BigInt('1500000000000000000')}
+            simulation={{ status: 'ready', result: simulationReverted }}
+            userAddress={USER_ADDRESS}
+            onCancel={noop}
+            onConfirm={noop}
+          />
+        )
+      },
+      transactionDialogUnavailable: {
+        label: 'TransactionConfirmDialog (Preview unavailable)',
+        element: (
+          <TransactionConfirmDialog
+            open
+            transactionCost={BigInt('2500000000000000')}
+            balance={BigInt('1500000000000000000')}
+            simulation={{ status: 'unavailable' }}
+            userAddress={USER_ADDRESS}
+            onCancel={noop}
+            onConfirm={noop}
+          />
+        )
       },
       signatureMessage: {
         label: 'SignatureRequest (Message)',
