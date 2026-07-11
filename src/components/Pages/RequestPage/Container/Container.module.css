@@ -28,6 +28,13 @@
   right: 8%;
 }
 
+/* Scale the rendered avatar to half. Target the iframe directly: WearablePreview renders a
+   bare styled iframe with an emotion-generated class, so there is no .WearablePreview hook. */
+.right :global(.CustomWearablePreview iframe) {
+  transform: scale(0.5);
+  transform-origin: center;
+}
+
 .changeAccount {
   margin-top: 150px;
   border-top: 1px solid white;
