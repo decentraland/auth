@@ -13,6 +13,18 @@ const EXPLORER_NAMES = new Map<number, string>([
   [80002, 'Polygonscan']
 ])
 
+const NETWORK_NAMES = new Map<number, string>([
+  [1, 'Ethereum'],
+  [11155111, 'Ethereum Sepolia'],
+  [137, 'Polygon'],
+  [80002, 'Polygon Amoy']
+])
+
+/** Human-readable network name for a chain (e.g. "Polygon"), or empty when unsupported. */
+function getNetworkName(chainId: number | undefined): string {
+  return chainId ? (NETWORK_NAMES.get(chainId) ?? '') : ''
+}
+
 /** Human-readable explorer name for a chain (e.g. "Polygonscan"), or empty when unsupported. */
 function getExplorerName(chainId: number | undefined): string {
   return chainId ? (EXPLORER_NAMES.get(chainId) ?? '') : ''
@@ -28,4 +40,4 @@ function getExplorerAddressUrl(chainId: number | undefined, address: string | nu
   return base ? `${base}/address/${address}` : null
 }
 
-export { getExplorerAddressUrl, getExplorerName }
+export { getExplorerAddressUrl, getExplorerName, getNetworkName }

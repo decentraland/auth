@@ -2,7 +2,14 @@ import { useTranslation } from '@dcl/hooks'
 import { TransferActionButtonsProps } from './TransferActionButtons.types'
 import { ButtonsContainer, CancelButton, ConfirmButton } from './TransferActionButtons.styled'
 
-const TransferActionButtons = ({ cancelText, confirmText, isLoading, onCancel, onConfirm }: TransferActionButtonsProps) => {
+const TransferActionButtons = ({
+  cancelText,
+  confirmText,
+  isLoading,
+  confirmDisabled,
+  onCancel,
+  onConfirm
+}: TransferActionButtonsProps) => {
   const { t } = useTranslation()
   return (
     <ButtonsContainer>
@@ -20,7 +27,7 @@ const TransferActionButtons = ({ cancelText, confirmText, isLoading, onCancel, o
       <ConfirmButton
         variant="contained"
         size="large"
-        disabled={isLoading}
+        disabled={isLoading || confirmDisabled}
         onClick={onConfirm}
         fullWidth
         data-testid="transfer-confirm-button"

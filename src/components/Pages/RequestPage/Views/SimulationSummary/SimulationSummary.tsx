@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useTranslation } from '@dcl/hooks'
-import { Alert, CircularProgress } from 'decentraland-ui2'
+import { Alert, Skeleton } from 'decentraland-ui2'
 import { ApprovalChange, AssetChange, SimulationResponseBody } from '../../../../../shared/auth'
-import { getExplorerAddressUrl, getExplorerName } from '../../../../../shared/explorer'
+import { getExplorerAddressUrl, getExplorerName, getNetworkName } from '../../../../../shared/explorer'
 import { SimulationSummaryProps } from './SimulationSummary.types'
 import {
   AmountUsd,
@@ -16,13 +16,14 @@ import {
   EventList,
   EventRow,
   ExplorerLink,
-  LoadingRow,
   NetLine,
   NetValue,
+  NetworkChip,
   RiskIcon,
   Root,
   Section,
   SectionTitle,
+  SkeletonRow,
   Toggle,
   TokenLogo,
   TokenLogoFallback,
@@ -42,11 +43,26 @@ const counterpartyLabel = (address: string | null, profiles: Record<string, stri
   return profiles[address.toLowerCase()] || shortenAddress(address)
 }
 
+// Groups the integer part of a numeric string with thousands separators, e.g. "1000000" → "1,000,000".
+const groupThousands = (intPart: string): string => intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+
+// Formats a decimal token amount for display: thousands separators, trailing zeros trimmed, and
+// lossless (works on the string, never through Number, so big/precise amounts aren't rounded).
+const formatTokenAmount = (raw: string): string => {
+  if (!/^\d+(\.\d+)?$/.test(raw)) return raw
+  const [intPart, decPart] = raw.split('.')
+  const grouped = groupThousands(intPart)
+  if (!decPart) return grouped
+  const trimmed = decPart.replace(/0+$/, '')
+  return trimmed ? `${grouped}.${trimmed}` : grouped
+}
+
 const formatUsd = (dollarValue: string | null, signed = false): string | null => {
   if (dollarValue === null) return null
   const value = Number(dollarValue)
   if (!Number.isFinite(value)) return null
-  const magnitude = `$${Math.abs(value).toFixed(2)}`
+  const [intPart, decPart] = Math.abs(value).toFixed(2).split('.')
+  const magnitude = `$${groupThousands(intPart)}.${decPart}`
   if (!signed) return magnitude
   return `${value < 0 ? '-' : '+'}${magnitude}`
 }
@@ -63,8 +79,9 @@ const assetTitle = (change: AssetChange, t: Translate): string => {
   }
   const symbol = change.symbol || (change.standard === 'native' ? 'ETH' : '')
   const amount = change.amount ?? change.rawAmount
-  if (amount && symbol) return `${amount} ${symbol}`
-  if (amount) return amount
+  const displayAmount = amount ? formatTokenAmount(amount) : null
+  if (displayAmount && symbol) return `${displayAmount} ${symbol}`
+  if (displayAmount) return displayAmount
   return symbol || t('request.transaction_dialog.unknown_token', { address: shortenAddress(change.contractAddress) })
 }
 
@@ -275,11 +292,16 @@ export const SimulationSummary = ({ simulation, userAddress, profiles = {}, veri
 
   if (simulation.status === 'loading') {
     return (
-      <Root>
-        <LoadingRow>
-          <CircularProgress size={16} color="inherit" />
-          {t('request.transaction_dialog.simulation_loading')}
-        </LoadingRow>
+      <Root aria-busy="true" aria-label={t('request.transaction_dialog.simulation_loading')}>
+        {[0, 1].map(index => (
+          <SkeletonRow key={`skeleton-${index}`}>
+            <Skeleton variant="circular" width={40} height={40} />
+            <ChangeText>
+              <Skeleton variant="text" width="60%" />
+              <Skeleton variant="text" width="40%" />
+            </ChangeText>
+          </SkeletonRow>
+        ))}
       </Root>
     )
   }
@@ -302,9 +324,12 @@ export const SimulationSummary = ({ simulation, userAddress, profiles = {}, veri
   const sends = result.assetChanges.filter(change => change.from?.toLowerCase() === user)
   const receives = result.assetChanges.filter(change => change.from?.toLowerCase() !== user)
   const hasNoChanges = sends.length === 0 && receives.length === 0 && result.approvalChanges.length === 0
+  const networkName = getNetworkName(chainId)
 
   return (
     <Root>
+      {networkName ? <NetworkChip>{t('request.transaction_dialog.on_network', { network: networkName })}</NetworkChip> : null}
+
       {result.status === 'reverted' ? (
         <Alert severity="error" role="alert">
           <strong>{t('request.transaction_dialog.revert_title')}</strong>

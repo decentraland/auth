@@ -12,6 +12,8 @@ export interface SignatureRequestViewProps {
   verifiedContracts?: string[]
   /** Chain used for block-explorer links (falls back to the typed-data domain chainId). */
   chainId?: number
+  /** When true, gates approval behind a high-risk acknowledgment checkbox. */
+  requiresAcknowledgment?: boolean
   isMetaTransaction: boolean
   isLoading?: boolean
   onDeny: () => void

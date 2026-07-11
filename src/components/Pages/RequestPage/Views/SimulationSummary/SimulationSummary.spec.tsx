@@ -45,9 +45,9 @@ describe('when rendering the SimulationSummary', () => {
       simulation = { status: 'loading' }
     })
 
-    it('should render the loading message', () => {
+    it('should render a busy skeleton placeholder', () => {
       render(<SimulationSummary simulation={simulation} userAddress={USER} />)
-      expect(screen.getByText('request.transaction_dialog.simulation_loading')).toBeInTheDocument()
+      expect(screen.getByLabelText('request.transaction_dialog.simulation_loading')).toHaveAttribute('aria-busy', 'true')
     })
   })
 
@@ -430,6 +430,49 @@ describe('when rendering the SimulationSummary', () => {
     it('should flag the high-risk approval with a warning icon', () => {
       render(<SimulationSummary simulation={simulation} userAddress={USER} />)
       expect(screen.getByText('⚠')).toBeInTheDocument()
+    })
+  })
+
+  describe('and a supported chain id is provided', () => {
+    beforeEach(() => {
+      simulation = { status: 'ready', result: emptyResult({ balanceChanges: [{ address: USER, dollarValue: '-1' }] }) }
+    })
+
+    it('should show the human-readable network name', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} chainId={137} />)
+      expect(screen.getByText(/Polygon/)).toBeInTheDocument()
+    })
+  })
+
+  describe('and a large token amount is transferred', () => {
+    beforeEach(() => {
+      simulation = {
+        status: 'ready',
+        result: emptyResult({
+          assetChanges: [
+            {
+              type: 'transfer',
+              standard: 'erc20',
+              from: USER,
+              to: '0x1234567890abcdef1234567890abcdef12345678',
+              amount: '1000000.5',
+              rawAmount: '1000000500000000000000000',
+              tokenId: null,
+              contractAddress: '0x0f5d2fb29fb7d3cfee444a200298f468908cc942',
+              symbol: 'MANA',
+              name: 'MANA',
+              decimals: 18,
+              logoUrl: null,
+              dollarValue: null
+            }
+          ]
+        })
+      }
+    })
+
+    it('should group the amount with thousands separators', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} />)
+      expect(screen.getByText('1,000,000.5 MANA')).toBeInTheDocument()
     })
   })
 })

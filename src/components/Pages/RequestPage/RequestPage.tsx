@@ -1020,6 +1020,15 @@ export const RequestPage = () => {
   }, [])
 
   const isSimulationReverted = simulationState.status === 'ready' && simulationState.result.status === 'reverted'
+  // Require an explicit acknowledgment before approving when the simulation shows a high-risk
+  // permission: an unlimited ERC-20 allowance or a full-collection ApprovalForAll grant.
+  const requiresApprovalAcknowledgment =
+    simulationState.status === 'ready' &&
+    simulationState.result.approvalChanges.some(
+      approval =>
+        (approval.kind === 'approvalForAll' && approval.approved !== false) ||
+        (approval.kind === 'approval' && !approval.tokenId && approval.isUnlimited)
+    )
 
   switch (view) {
     case View.TIMEOUT:
@@ -1155,6 +1164,7 @@ export const RequestPage = () => {
             profiles={simulationProfiles}
             verifiedContracts={simulationVerified}
             chainId={simulationChainId}
+            requiresAcknowledgment={requiresApprovalAcknowledgment}
             onDeny={onDenyWalletInteraction}
             onApprove={handleApproveWalletInteraction}
           />
@@ -1171,6 +1181,7 @@ export const RequestPage = () => {
           profiles={simulationProfiles}
           verifiedContracts={simulationVerified}
           chainId={simulationChainId}
+          requiresAcknowledgment={requiresApprovalAcknowledgment}
           isMetaTransaction={isSignatureMetaTx}
           isLoading={isLoading}
           onDeny={onDenyWalletInteraction}

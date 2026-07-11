@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from '@dcl/hooks'
-import { Box, Button, CircularProgress } from 'decentraland-ui2'
-import { getExplorerAddressUrl, getExplorerName } from '../../../../../shared/explorer'
+import { Box, Button, Checkbox, CircularProgress, FormControlLabel } from 'decentraland-ui2'
+import { getExplorerAddressUrl, getExplorerName, getNetworkName } from '../../../../../shared/explorer'
 import { Container } from '../../Container'
 import { ButtonsContainer } from '../../RequestPage.styled'
 import { SimulationSummary } from '../SimulationSummary'
@@ -32,6 +32,7 @@ export const SignatureRequestView = ({
   profiles,
   verifiedContracts,
   chainId,
+  requiresAcknowledgment = false,
   isMetaTransaction,
   isLoading = false,
   onDeny,
@@ -39,6 +40,7 @@ export const SignatureRequestView = ({
 }: SignatureRequestViewProps) => {
   const { t } = useTranslation()
   const [showRaw, setShowRaw] = useState(false)
+  const [acknowledged, setAcknowledged] = useState(false)
 
   const domain = payload?.kind === 'typedData' ? payload.typedData.domain : undefined
   const domainChainId = chainId ?? (domain?.chainId !== undefined ? Number(domain.chainId) : undefined)
@@ -87,7 +89,7 @@ export const SignatureRequestView = ({
                 {domain.chainId !== undefined ? (
                   <DomainRow>
                     <DomainKey>{t('request.signature.network')}</DomainKey>
-                    <DomainValue>{String(domain.chainId)}</DomainValue>
+                    <DomainValue>{getNetworkName(Number(domain.chainId)) || String(domain.chainId)}</DomainValue>
                   </DomainRow>
                 ) : null}
                 {typeof domain.verifyingContract === 'string' ? (
@@ -117,13 +119,31 @@ export const SignatureRequestView = ({
         ) : null}
 
         {!payload ? <MessageBlock>{t('request.signature.description')}</MessageBlock> : null}
+
+        {requiresAcknowledgment ? (
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={acknowledged}
+                onChange={event => setAcknowledged(event.target.checked)}
+                data-testid="risk-acknowledgment"
+              />
+            }
+            label={t('request.transaction_dialog.acknowledge_risk')}
+          />
+        ) : null}
       </Content>
 
       <ButtonsContainer>
         <Button variant="outlined" disabled={isLoading} onClick={onDeny} data-testid="signature-deny-button">
           {t('common.deny')}
         </Button>
-        <Button variant="contained" disabled={isLoading} onClick={onApprove} data-testid="signature-approve-button">
+        <Button
+          variant="contained"
+          disabled={isLoading || (requiresAcknowledgment && !acknowledged)}
+          onClick={onApprove}
+          data-testid="signature-approve-button"
+        >
           {isLoading ? <CircularProgress size={20} color="inherit" /> : t('common.allow')}
         </Button>
       </ButtonsContainer>

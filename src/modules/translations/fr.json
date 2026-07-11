@@ -76,7 +76,8 @@
     "wallet_interaction": {
       "title_web2": "Une scène souhaite accéder aux actifs de votre compte Decentraland",
       "title_web3": "Le {explorerText} souhaite interagir avec votre portefeuille",
-      "description": "Ne continuez que si vous êtes au courant de tous les détails de la transaction et faites confiance à cette scène."
+      "description": "Ne continuez que si vous êtes au courant de tous les détails de la transaction et faites confiance à cette scène.",
+      "review_title": "Vérifiez cette transaction"
     },
     "transaction_dialog": {
       "title": "Confirmer la transaction",
@@ -94,7 +95,7 @@
       "gas_covered": "Les frais de gas sont pris en charge par Decentraland.",
       "minted": "Frappé pour vous",
       "burned": "Brûlé",
-      "net_change": "Variation nette",
+      "net_change": "Variation de valeur estimée",
       "no_changes": "Cette transaction ne déplace aucun de vos actifs.",
       "technical_details": "Détails techniques",
       "hide_technical_details": "Masquer les détails techniques",
@@ -106,7 +107,9 @@
       "approval_can_access_all": "peut accéder à toute votre collection {name}",
       "approval_access_revoked": "ne peut plus accéder à votre collection {name}",
       "view_on_explorer": "Voir sur {explorer}",
-      "verified_contract": "Contrat Decentraland vérifié"
+      "verified_contract": "Contrat Decentraland vérifié",
+      "on_network": "sur {network}",
+      "acknowledge_risk": "Je comprends que cela donne accès à mes actifs"
     },
     "signature": {
       "title": "Confirmer la signature",

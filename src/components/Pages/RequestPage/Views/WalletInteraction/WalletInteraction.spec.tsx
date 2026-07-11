@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { SimulationResponseBody } from '../../../../../shared/auth'
 import { WalletInteraction } from './WalletInteraction'
 
@@ -8,6 +9,12 @@ jest.mock('@dcl/hooks', () => ({
 
 jest.mock('../../Container', () => ({
   Container: ({ children }: { children: React.ReactNode }) => <div>{children}</div>
+}))
+
+// TransferLayout renders the WebGL AnimatedBackground, which jsdom can't run.
+jest.mock('../../../../Transfer', () => ({
+  ...jest.requireActual('../../../../Transfer'),
+  TransferLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>
 }))
 
 const USER = '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd'
@@ -71,6 +78,25 @@ describe('when rendering the WalletInteraction view', () => {
       render(<WalletInteraction requestId="r1" onDeny={onDeny} onApprove={onApprove} />)
       expect(screen.getByText('request.wallet_interaction.description')).toBeInTheDocument()
       expect(screen.queryByText('request.transaction_dialog.you_send')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('and a high-risk acknowledgment is required', () => {
+    it('should keep approval disabled until the acknowledgment is checked', async () => {
+      render(
+        <WalletInteraction
+          requestId="r1"
+          isWeb2Wallet
+          simulation={{ status: 'ready', result: successResult }}
+          userAddress={USER}
+          requiresAcknowledgment
+          onDeny={onDeny}
+          onApprove={onApprove}
+        />
+      )
+      expect(screen.getByTestId('transfer-confirm-button')).toBeDisabled()
+      await userEvent.click(screen.getByRole('checkbox'))
+      expect(screen.getByTestId('transfer-confirm-button')).not.toBeDisabled()
     })
   })
 })

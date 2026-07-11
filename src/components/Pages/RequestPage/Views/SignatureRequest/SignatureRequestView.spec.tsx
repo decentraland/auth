@@ -66,6 +66,25 @@ describe('when rendering the SignatureRequestView', () => {
       await userEvent.click(screen.getByTestId('signature-approve-button'))
       expect(onApprove).toHaveBeenCalledTimes(1)
     })
+
+    it('should gate approval behind the acknowledgment when required', async () => {
+      render(
+        <SignatureRequestView
+          requestId="r1"
+          method="personal_sign"
+          payload={payload}
+          simulation={{ status: 'idle' }}
+          userAddress={USER}
+          isMetaTransaction={false}
+          requiresAcknowledgment
+          onDeny={onDeny}
+          onApprove={onApprove}
+        />
+      )
+      expect(screen.getByTestId('signature-approve-button')).toBeDisabled()
+      await userEvent.click(screen.getByRole('checkbox'))
+      expect(screen.getByTestId('signature-approve-button')).not.toBeDisabled()
+    })
   })
 
   describe('and the payload is typed data that is not a meta-transaction', () => {

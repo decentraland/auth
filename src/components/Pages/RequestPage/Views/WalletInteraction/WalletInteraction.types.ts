@@ -14,6 +14,8 @@ export interface WalletInteractionProps {
   verifiedContracts?: string[]
   /** Chain used for block-explorer links. */
   chainId?: number
+  /** When true, the approve button is gated behind a high-risk acknowledgment checkbox. */
+  requiresAcknowledgment?: boolean
   onDeny: () => void
   onApprove: () => void
 }

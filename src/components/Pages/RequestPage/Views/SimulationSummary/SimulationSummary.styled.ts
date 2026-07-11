@@ -98,11 +98,27 @@ const RiskIcon = styled('span')(({ theme }) => ({
   marginRight: theme.spacing(0.5)
 }))
 
+const NetworkChip = styled('span')(({ theme }) => ({
+  alignSelf: 'flex-start',
+  backgroundColor: theme.palette.action.selected,
+  borderRadius: theme.shape.borderRadius,
+  color: theme.palette.text.secondary,
+  fontSize: theme.typography.pxToRem(12),
+  padding: theme.spacing(0.25, 1)
+}))
+
+const SkeletonRow = styled(Box)(({ theme }) => ({
+  alignItems: 'center',
+  display: 'flex',
+  gap: theme.spacing(1.5)
+}))
+
 const ExplorerLink = styled('a')(({ theme }) => ({
   color: 'inherit',
   textDecoration: 'underline',
   textDecorationStyle: 'dotted',
   textUnderlineOffset: 2,
+  whiteSpace: 'nowrap',
   ['&:hover']: {
     color: theme.palette.primary.main,
     textDecorationStyle: 'solid'
@@ -199,10 +215,12 @@ export {
   LoadingRow,
   NetLine,
   NetValue,
+  NetworkChip,
   RiskIcon,
   Root,
   Section,
   SectionTitle,
+  SkeletonRow,
   Toggle,
   TokenLogo,
   TokenLogoFallback,

@@ -156,6 +156,7 @@ export const TestViewPage = () => {
             userAddress={USER_ADDRESS}
             verifiedContracts={['0x1234567890abcdef1234567890abcdef12345678', '0x0f5d2fb29fb7d3cfee444a200298f468908cc942']}
             chainId={137}
+            requiresAcknowledgment
             onDeny={noop}
             onApprove={noop}
           />

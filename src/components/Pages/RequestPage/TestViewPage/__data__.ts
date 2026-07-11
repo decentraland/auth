@@ -264,7 +264,7 @@ const simulationSuccess: SimulationResponseBody = {
       approved: false,
       contractAddress: '0x1111111111111111111111111111111111111111',
       symbol: null,
-      name: 'Old Collection'
+      name: 'Old Wearables'
     },
     {
       kind: 'approval',
