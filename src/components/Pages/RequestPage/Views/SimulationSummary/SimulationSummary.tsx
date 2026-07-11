@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from '@dcl/hooks'
-import { Alert, Skeleton } from 'decentraland-ui2'
+import { Skeleton } from 'decentraland-ui2'
 import { ApprovalChange, AssetChange, SimulationResponseBody } from '../../../../../shared/auth'
 import { getExplorerAddressUrl, getExplorerName, getNetworkName } from '../../../../../shared/explorer'
 import { SimulationSummaryProps } from './SimulationSummary.types'
@@ -19,6 +19,7 @@ import {
   NetLine,
   NetValue,
   NetworkChip,
+  RevertAlert,
   RiskIcon,
   Root,
   Section,
@@ -345,10 +346,10 @@ export const SimulationSummary = ({ simulation, userAddress, profiles = {}, veri
       {networkName ? <NetworkChip>{t('request.transaction_dialog.on_network', { network: networkName })}</NetworkChip> : null}
 
       {result.status === 'reverted' ? (
-        <Alert severity="error" role="alert">
+        <RevertAlert severity="error" role="alert">
           <strong>{t('request.transaction_dialog.revert_title')}</strong>
           <div>{t('request.transaction_dialog.revert_description', { reason: result.error ? `: ${result.error}` : '' })}</div>
-        </Alert>
+        </RevertAlert>
       ) : null}
 
       {sends.length > 0 ? (

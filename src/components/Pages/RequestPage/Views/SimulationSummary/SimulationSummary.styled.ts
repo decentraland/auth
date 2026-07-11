@@ -1,4 +1,4 @@
-import { Alert, Box, Typography, styled } from 'decentraland-ui2'
+import { Alert, Box, Typography, dclColors, styled } from 'decentraland-ui2'
 
 const Root = styled(Box)(({ theme }) => ({
   display: 'flex',
@@ -94,7 +94,7 @@ const VerifiedBadge = styled('span')(({ theme }) => ({
 }))
 
 const RiskIcon = styled('span')(({ theme }) => ({
-  color: theme.palette.error.main,
+  color: theme.palette.error.light,
   marginRight: theme.spacing(0.5)
 }))
 
@@ -143,17 +143,46 @@ const ChangeMeta = styled(Typography)(({ theme }) => ({
   textOverflow: 'ellipsis'
 }))
 
-const ApprovalsAlert = styled(Alert)(({ theme }) => ({
+const RevertAlert = styled(Alert)(({ theme }) => ({
+  alignItems: 'flex-start',
+  backgroundColor: dclColors.blackTransparent.blurry,
+  border: `1px solid ${theme.palette.error.main}`,
+  borderRadius: theme.shape.borderRadius,
+  color: theme.palette.text.primary,
   textAlign: 'left',
+  ['& .MuiAlert-icon']: {
+    alignItems: 'center',
+    color: theme.palette.error.light
+  },
   ['& .MuiAlert-message']: {
     display: 'flex',
     flexDirection: 'column',
-    gap: theme.spacing(0.5)
+    gap: theme.spacing(0.5),
+    width: '100%'
+  }
+}))
+
+const ApprovalsAlert = styled(Alert)(({ theme }) => ({
+  alignItems: 'flex-start',
+  backgroundColor: dclColors.blackTransparent.blurry,
+  border: `1px solid ${theme.palette.warning.main}`,
+  borderRadius: theme.shape.borderRadius,
+  color: theme.palette.text.primary,
+  textAlign: 'left',
+  ['& .MuiAlert-icon']: {
+    alignItems: 'center',
+    color: theme.palette.warning.light
+  },
+  ['& .MuiAlert-message']: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: theme.spacing(0.5),
+    width: '100%'
   }
 }))
 
 const ApprovalLine = styled('span')<{ emphasized?: boolean }>(({ theme, emphasized }) => ({
-  color: emphasized ? theme.palette.error.main : 'inherit',
+  color: emphasized ? theme.palette.error.light : 'inherit',
   fontWeight: emphasized ? 700 : 400
 }))
 
@@ -216,6 +245,7 @@ export {
   NetLine,
   NetValue,
   NetworkChip,
+  RevertAlert,
   RiskIcon,
   Root,
   Section,
