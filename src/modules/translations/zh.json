@@ -105,7 +105,8 @@
       "approval_can_transfer_token": "可以转移 {token} #{tokenId}",
       "approval_can_access_all": "可以访问你的整个 {name} 收藏",
       "approval_access_revoked": "无法再访问你的 {name} 收藏",
-      "view_on_explorer": "在 {explorer} 上查看"
+      "view_on_explorer": "在 {explorer} 上查看",
+      "verified_contract": "已验证的 Decentraland 合约"
     },
     "signature": {
       "title": "确认签名",

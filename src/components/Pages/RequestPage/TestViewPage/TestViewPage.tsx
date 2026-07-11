@@ -146,20 +146,25 @@ export const TestViewPage = () => {
           </PreviewSurface>
         )
       },
+      walletInteractionSimulation: {
+        label: 'Wallet Interaction (with summary)',
+        element: (
+          <WalletInteraction
+            requestId={DEFAULT_REQUEST_ID}
+            isWeb2Wallet
+            simulation={{ status: 'ready', result: simulationSuccess }}
+            userAddress={USER_ADDRESS}
+            verifiedContracts={['0x1234567890abcdef1234567890abcdef12345678', '0x0f5d2fb29fb7d3cfee444a200298f468908cc942']}
+            chainId={137}
+            onDeny={noop}
+            onApprove={noop}
+          />
+        )
+      },
       transactionDialogGasCovered: {
         label: 'TransactionConfirmDialog (Gas covered)',
         element: (
-          <TransactionConfirmDialog
-            open
-            transactionCost={BigInt(0)}
-            balance={BigInt(0)}
-            simulation={{ status: 'ready', result: simulationSuccess }}
-            userAddress={USER_ADDRESS}
-            chainId={137}
-            gasCovered
-            onCancel={noop}
-            onConfirm={noop}
-          />
+          <TransactionConfirmDialog open transactionCost={BigInt(0)} balance={BigInt(0)} gasCovered onCancel={noop} onConfirm={noop} />
         )
       },
       transactionDialogWithGas: {
@@ -169,9 +174,6 @@ export const TestViewPage = () => {
             open
             transactionCost={BigInt('2500000000000000')}
             balance={BigInt('1500000000000000000')}
-            simulation={{ status: 'ready', result: simulationSuccess }}
-            userAddress={USER_ADDRESS}
-            chainId={137}
             onCancel={noop}
             onConfirm={noop}
           />
@@ -184,24 +186,7 @@ export const TestViewPage = () => {
             open
             transactionCost={BigInt('2500000000000000')}
             balance={BigInt('1500000000000000000')}
-            simulation={{ status: 'ready', result: simulationReverted }}
-            userAddress={USER_ADDRESS}
-            chainId={137}
-            onCancel={noop}
-            onConfirm={noop}
-          />
-        )
-      },
-      transactionDialogUnavailable: {
-        label: 'TransactionConfirmDialog (Preview unavailable)',
-        element: (
-          <TransactionConfirmDialog
-            open
-            transactionCost={BigInt('2500000000000000')}
-            balance={BigInt('1500000000000000000')}
-            simulation={{ status: 'unavailable' }}
-            userAddress={USER_ADDRESS}
-            chainId={137}
+            isReverted
             onCancel={noop}
             onConfirm={noop}
           />

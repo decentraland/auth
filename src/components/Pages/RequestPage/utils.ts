@@ -24,6 +24,20 @@ function isSignatureMethod(method: string): boolean {
 }
 
 /**
+ * Returns true when the address is a recognized Decentraland contract (present in the
+ * decentraland-transactions registry), used to show a "verified" trust badge. This only
+ * covers the static registry (MANA, marketplace, etc.), not dynamic collection contracts.
+ */
+function isKnownDecentralandContract(address: string): boolean {
+  try {
+    getContractName(address)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
  * Extracts what a signature request asks the user to sign: a plain message (decoding
  * hex-encoded UTF-8 when possible) or an EIP-712 typed-data structure. Returns null when the
  * payload can't be interpreted.
@@ -542,6 +556,7 @@ export {
   fetchNftMetadata,
   fetchPlaceByCreatorAddress,
   isSignatureMethod,
+  isKnownDecentralandContract,
   extractSignaturePayload,
   decodeMetaTransactionTypedData,
   buildSendTransactionSimulationPayload

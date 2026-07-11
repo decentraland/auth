@@ -19,13 +19,15 @@ import {
   LoadingRow,
   NetLine,
   NetValue,
+  RiskIcon,
   Root,
   Section,
   SectionTitle,
   Toggle,
   TokenLogo,
   TokenLogoFallback,
-  UnavailableNote
+  UnavailableNote,
+  VerifiedBadge
 } from './SimulationSummary.styled'
 
 type Translate = (key: string, opts?: Record<string, string | number>) => string
@@ -66,20 +68,44 @@ const assetTitle = (change: AssetChange, t: Translate): string => {
   return symbol || t('request.transaction_dialog.unknown_token', { address: shortenAddress(change.contractAddress) })
 }
 
-/** Renders `label` as a block-explorer link for `address`, or plain text when unlinkable. */
-const AddressLink = ({ address, chainId, label }: { address: string | null; chainId?: number; label: string }) => {
+/** Renders `label` as a block-explorer link (or plain text), with a verified badge when the
+ *  address is a recognized Decentraland contract. */
+const AddressLink = ({
+  address,
+  chainId,
+  label,
+  verified
+}: {
+  address: string | null
+  chainId?: number
+  label: string
+  verified?: boolean
+}) => {
   const { t } = useTranslation()
   const url = getExplorerAddressUrl(chainId, address)
-  if (!url) return <>{label}</>
+  const badge = verified ? (
+    <VerifiedBadge aria-label={t('request.transaction_dialog.verified_contract')}>✓ Decentraland</VerifiedBadge>
+  ) : null
+  if (!url) {
+    return (
+      <>
+        {label}
+        {badge}
+      </>
+    )
+  }
   return (
-    <ExplorerLink
-      href={url}
-      target="_blank"
-      rel="noopener noreferrer"
-      title={t('request.transaction_dialog.view_on_explorer', { explorer: getExplorerName(chainId) })}
-    >
-      {label}
-    </ExplorerLink>
+    <>
+      <ExplorerLink
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        title={t('request.transaction_dialog.view_on_explorer', { explorer: getExplorerName(chainId) })}
+      >
+        {label}
+      </ExplorerLink>
+      {badge}
+    </>
   )
 }
 
@@ -87,11 +113,13 @@ const AssetRow = ({
   change,
   direction,
   profiles,
+  verified,
   chainId
 }: {
   change: AssetChange
   direction: 'send' | 'receive'
   profiles: Record<string, string>
+  verified: Set<string>
   chainId?: number
 }) => {
   const { t } = useTranslation()
@@ -99,6 +127,7 @@ const AssetRow = ({
   const dollar = formatUsd(change.dollarValue)
   const fallbackInitial = (change.symbol || change.name || '?').charAt(0)
   const outgoing = direction === 'send'
+  const isVerified = (address: string | null) => !!address && verified.has(address.toLowerCase())
 
   let meta: React.ReactNode
   if (change.type === 'mint') {
@@ -110,18 +139,29 @@ const AssetRow = ({
     meta = (
       <>
         {outgoing ? t('request.transaction_dialog.to_prefix') : t('request.transaction_dialog.from_prefix')}{' '}
-        <AddressLink address={counterparty} chainId={chainId} label={counterpartyLabel(counterparty, profiles)} />
+        <AddressLink
+          address={counterparty}
+          chainId={chainId}
+          label={counterpartyLabel(counterparty, profiles)}
+          verified={isVerified(counterparty)}
+        />
       </>
     )
   }
 
   return (
     <ChangeRow>
-      <DirectionIndicator outgoing={outgoing}>{outgoing ? '↑' : '↓'}</DirectionIndicator>
-      {change.logoUrl ? <TokenLogo src={change.logoUrl} alt={title} /> : <TokenLogoFallback>{fallbackInitial}</TokenLogoFallback>}
+      <DirectionIndicator outgoing={outgoing} aria-hidden="true">
+        {outgoing ? '↑' : '↓'}
+      </DirectionIndicator>
+      {change.logoUrl ? (
+        <TokenLogo src={change.logoUrl} alt={title} />
+      ) : (
+        <TokenLogoFallback aria-hidden="true">{fallbackInitial}</TokenLogoFallback>
+      )}
       <ChangeText>
         <ChangeAmount>
-          <AddressLink address={change.contractAddress} chainId={chainId} label={title} />
+          <AddressLink address={change.contractAddress} chainId={chainId} label={title} verified={isVerified(change.contractAddress)} />
         </ChangeAmount>
         <ChangeMeta>{meta}</ChangeMeta>
       </ChangeText>
@@ -133,35 +173,46 @@ const AssetRow = ({
 const ApprovalItem = ({
   approval,
   profiles,
+  verified,
   chainId
 }: {
   approval: ApprovalChange
   profiles: Record<string, string>
+  verified: Set<string>
   chainId?: number
 }) => {
   const { t } = useTranslation()
   const token = approval.name || approval.symbol || shortenAddress(approval.contractAddress)
-  const spender = <AddressLink address={approval.spender} chainId={chainId} label={counterpartyLabel(approval.spender, profiles)} />
+  const spenderVerified = !!approval.spender && verified.has(approval.spender.toLowerCase())
+  const spender = (
+    <AddressLink
+      address={approval.spender}
+      chainId={chainId}
+      label={counterpartyLabel(approval.spender, profiles)}
+      verified={spenderVerified}
+    />
+  )
 
   let predicate: string
-  let emphasized = false
+  let highRisk = false
   if (approval.kind === 'approvalForAll') {
     if (approval.approved === false) {
       predicate = t('request.transaction_dialog.approval_access_revoked', { name: token })
     } else {
       predicate = t('request.transaction_dialog.approval_can_access_all', { name: token })
-      emphasized = true
+      highRisk = true
     }
   } else if (approval.tokenId) {
     predicate = t('request.transaction_dialog.approval_can_transfer_token', { token, tokenId: approval.tokenId })
   } else {
     const amount = approval.isUnlimited ? t('request.transaction_dialog.approval_unlimited') : (approval.amount ?? approval.rawAmount ?? '')
     predicate = t('request.transaction_dialog.approval_can_spend', { amount, symbol: approval.symbol || token })
-    emphasized = approval.isUnlimited
+    highRisk = approval.isUnlimited
   }
 
   return (
-    <ApprovalLine emphasized={emphasized}>
+    <ApprovalLine emphasized={highRisk}>
+      {highRisk ? <RiskIcon aria-hidden="true">⚠</RiskIcon> : null}
       {spender} {predicate}
     </ApprovalLine>
   )
@@ -179,7 +230,17 @@ const NetChange = ({ result, userAddress, t }: { result: SimulationResponseBody;
   )
 }
 
-const TechnicalDetails = ({ events, chainId, t }: { events: SimulationResponseBody['events']; chainId?: number; t: Translate }) => {
+const TechnicalDetails = ({
+  events,
+  verified,
+  chainId,
+  t
+}: {
+  events: SimulationResponseBody['events']
+  verified: Set<string>
+  chainId?: number
+  t: Translate
+}) => {
   const [open, setOpen] = useState(false)
   if (events.length === 0) return null
   return (
@@ -192,7 +253,12 @@ const TechnicalDetails = ({ events, chainId, t }: { events: SimulationResponseBo
           {events.map((event, index) => (
             <EventRow key={`event-${index}`}>
               {event.name || t('request.transaction_dialog.event_unknown')} ·{' '}
-              <AddressLink address={event.address} chainId={chainId} label={shortenAddress(event.address)} />
+              <AddressLink
+                address={event.address}
+                chainId={chainId}
+                label={shortenAddress(event.address)}
+                verified={verified.has(event.address.toLowerCase())}
+              />
             </EventRow>
           ))}
         </EventList>
@@ -201,8 +267,9 @@ const TechnicalDetails = ({ events, chainId, t }: { events: SimulationResponseBo
   )
 }
 
-export const SimulationSummary = ({ simulation, userAddress, profiles = {}, chainId }: SimulationSummaryProps) => {
+export const SimulationSummary = ({ simulation, userAddress, profiles = {}, verifiedContracts = [], chainId }: SimulationSummaryProps) => {
   const { t } = useTranslation()
+  const verified = new Set(verifiedContracts.map(address => address.toLowerCase()))
 
   if (simulation.status === 'idle') return null
 
@@ -239,7 +306,7 @@ export const SimulationSummary = ({ simulation, userAddress, profiles = {}, chai
   return (
     <Root>
       {result.status === 'reverted' ? (
-        <Alert severity="error">
+        <Alert severity="error" role="alert">
           <strong>{t('request.transaction_dialog.revert_title')}</strong>
           <div>{t('request.transaction_dialog.revert_description', { reason: result.error ? `: ${result.error}` : '' })}</div>
         </Alert>
@@ -247,18 +314,29 @@ export const SimulationSummary = ({ simulation, userAddress, profiles = {}, chai
 
       {sends.length > 0 ? (
         <Section>
-          <SectionTitle>{t('request.transaction_dialog.you_send')}</SectionTitle>
+          <SectionTitle role="heading" aria-level={3}>
+            {t('request.transaction_dialog.you_send')}
+          </SectionTitle>
           {sends.map((change, index) => (
-            <AssetRow key={`send-${index}`} change={change} direction="send" profiles={profiles} chainId={chainId} />
+            <AssetRow key={`send-${index}`} change={change} direction="send" profiles={profiles} verified={verified} chainId={chainId} />
           ))}
         </Section>
       ) : null}
 
       {receives.length > 0 ? (
         <Section>
-          <SectionTitle>{t('request.transaction_dialog.you_receive')}</SectionTitle>
+          <SectionTitle role="heading" aria-level={3}>
+            {t('request.transaction_dialog.you_receive')}
+          </SectionTitle>
           {receives.map((change, index) => (
-            <AssetRow key={`receive-${index}`} change={change} direction="receive" profiles={profiles} chainId={chainId} />
+            <AssetRow
+              key={`receive-${index}`}
+              change={change}
+              direction="receive"
+              profiles={profiles}
+              verified={verified}
+              chainId={chainId}
+            />
           ))}
         </Section>
       ) : null}
@@ -266,10 +344,12 @@ export const SimulationSummary = ({ simulation, userAddress, profiles = {}, chai
       <NetChange result={result} userAddress={user} t={t} />
 
       {result.approvalChanges.length > 0 ? (
-        <ApprovalsAlert severity="warning">
-          <SectionTitle>{t('request.transaction_dialog.approvals_title')}</SectionTitle>
+        <ApprovalsAlert severity="warning" role="alert">
+          <SectionTitle role="heading" aria-level={3}>
+            {t('request.transaction_dialog.approvals_title')}
+          </SectionTitle>
           {result.approvalChanges.map((approval, index) => (
-            <ApprovalItem key={`approval-${index}`} approval={approval} profiles={profiles} chainId={chainId} />
+            <ApprovalItem key={`approval-${index}`} approval={approval} profiles={profiles} verified={verified} chainId={chainId} />
           ))}
         </ApprovalsAlert>
       ) : null}
@@ -278,7 +358,7 @@ export const SimulationSummary = ({ simulation, userAddress, profiles = {}, chai
         <UnavailableNote>{t('request.transaction_dialog.no_changes')}</UnavailableNote>
       ) : null}
 
-      <TechnicalDetails events={result.events ?? []} chainId={chainId} t={t} />
+      <TechnicalDetails events={result.events ?? []} verified={verified} chainId={chainId} t={t} />
     </Root>
   )
 }

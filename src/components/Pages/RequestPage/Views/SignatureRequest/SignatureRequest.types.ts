@@ -8,6 +8,8 @@ export interface SignatureRequestViewProps {
   userAddress: string
   /** Resolved counterparty display names keyed by lowercased address. */
   profiles?: Record<string, string>
+  /** Lowercased addresses recognized as verified Decentraland contracts. */
+  verifiedContracts?: string[]
   /** Chain used for block-explorer links (falls back to the typed-data domain chainId). */
   chainId?: number
   isMetaTransaction: boolean

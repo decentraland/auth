@@ -54,6 +54,7 @@ import {
   getMetaTransactionChainId,
   getNetworkProvider,
   getSigninDeeplink,
+  isKnownDecentralandContract,
   isSignatureMethod
 } from './utils'
 import {
@@ -156,6 +157,8 @@ export const RequestPage = () => {
   const [simulationProfiles, setSimulationProfiles] = useState<Record<string, string>>({})
   // Chain the pending transaction/meta-tx was simulated on, for block-explorer links.
   const [simulationChainId, setSimulationChainId] = useState<number>()
+  // Lowercased addresses in the simulation that are recognized Decentraland contracts.
+  const [simulationVerified, setSimulationVerified] = useState<string[]>([])
   // Whether the pending eth_sendTransaction will be relayed as a meta-transaction (gas covered
   // by Decentraland's gas tank), so the confirm dialog can hide the user-facing gas cost.
   const [isMetaTransaction, setIsMetaTransaction] = useState(false)
@@ -401,6 +404,25 @@ export const RequestPage = () => {
           }
         }
 
+        // Collects the addresses in the simulation that are recognized Decentraland contracts,
+        // so the summary can show a "verified" badge next to them.
+        const collectVerifiedContracts = (result: SimulationResponseBody): string[] => {
+          const verified = new Set<string>()
+          const consider = (address: string | null) => {
+            if (address && isKnownDecentralandContract(address)) verified.add(address.toLowerCase())
+          }
+          for (const change of result.assetChanges) {
+            consider(change.from)
+            consider(change.to)
+            consider(change.contractAddress)
+          }
+          for (const approval of result.approvalChanges) {
+            consider(approval.spender)
+            consider(approval.contractAddress)
+          }
+          return [...verified]
+        }
+
         // Best-effort transaction simulation for web2 users. Fires without blocking the view
         // render and never throws to the caller — failures surface as "details unavailable".
         const fetchSimulation = async (body: SimulationRequestBody) => {
@@ -408,6 +430,7 @@ export const RequestPage = () => {
             const result = await authServerClient.current.simulateTransaction(body)
             if (cancelled) return
             setSimulationState({ status: 'ready', result })
+            setSimulationVerified(collectVerifiedContracts(result))
             void resolveSimulationProfiles(result)
           } catch (e) {
             if (cancelled) return
@@ -996,6 +1019,8 @@ export const RequestPage = () => {
     window.location.reload()
   }, [])
 
+  const isSimulationReverted = simulationState.status === 'ready' && simulationState.result.status === 'reverted'
+
   switch (view) {
     case View.TIMEOUT:
       return <TimeoutError requestId={requestId} />
@@ -1070,11 +1095,8 @@ export const RequestPage = () => {
             open={isTransactionModalOpen}
             transactionCost={transactionGasCost ?? BigInt(0)}
             balance={walletInfo?.balance ?? BigInt(0)}
-            simulation={simulationState}
-            userAddress={account ?? ''}
-            profiles={simulationProfiles}
-            chainId={simulationChainId}
             gasCovered={isMetaTransaction}
+            isReverted={isSimulationReverted}
             isLoading={isLoading}
             onCancel={onDenyWalletInteraction}
             onConfirm={onApproveWalletInteraction}
@@ -1095,11 +1117,8 @@ export const RequestPage = () => {
             open={isTransactionModalOpen}
             transactionCost={transactionGasCost ?? BigInt(0)}
             balance={walletInfo?.balance ?? BigInt(0)}
-            simulation={simulationState}
-            userAddress={account ?? ''}
-            profiles={simulationProfiles}
-            chainId={simulationChainId}
             gasCovered={isMetaTransaction}
+            isReverted={isSimulationReverted}
             isLoading={isLoading}
             onCancel={onDenyWalletInteraction}
             onConfirm={onApproveWalletInteraction}
@@ -1120,11 +1139,8 @@ export const RequestPage = () => {
             open={isTransactionModalOpen}
             transactionCost={transactionGasCost ?? BigInt(0)}
             balance={walletInfo?.balance ?? BigInt(0)}
-            simulation={simulationState}
-            userAddress={account ?? ''}
-            profiles={simulationProfiles}
-            chainId={simulationChainId}
             gasCovered={isMetaTransaction}
+            isReverted={isSimulationReverted}
             isLoading={isLoading}
             onCancel={onDenyWalletInteraction}
             onConfirm={onApproveWalletInteraction}
@@ -1134,6 +1150,11 @@ export const RequestPage = () => {
             isWeb2Wallet={isUserUsingWeb2Wallet}
             explorerText={targetConfig.explorerText}
             isLoading={isLoading}
+            simulation={simulationState}
+            userAddress={account ?? ''}
+            profiles={simulationProfiles}
+            verifiedContracts={simulationVerified}
+            chainId={simulationChainId}
             onDeny={onDenyWalletInteraction}
             onApprove={handleApproveWalletInteraction}
           />
@@ -1148,6 +1169,7 @@ export const RequestPage = () => {
           simulation={simulationState}
           userAddress={account ?? ''}
           profiles={simulationProfiles}
+          verifiedContracts={simulationVerified}
           chainId={simulationChainId}
           isMetaTransaction={isSignatureMetaTx}
           isLoading={isLoading}

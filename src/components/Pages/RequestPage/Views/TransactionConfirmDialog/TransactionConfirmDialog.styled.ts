@@ -1,11 +1,5 @@
 import { Box, Typography, styled } from 'decentraland-ui2'
 
-const DialogBody = styled(Box)(({ theme }) => ({
-  display: 'flex',
-  flexDirection: 'column',
-  gap: theme.spacing(2)
-}))
-
 const GasInfo = styled(Box)(({ theme }) => ({
   color: theme.palette.text.secondary,
   display: 'flex',
@@ -19,4 +13,4 @@ const GasLine = styled(Typography)(({ theme }) => ({
   fontSize: theme.typography.pxToRem(13)
 }))
 
-export { DialogBody, GasInfo, GasLine }
+export { GasInfo, GasLine }

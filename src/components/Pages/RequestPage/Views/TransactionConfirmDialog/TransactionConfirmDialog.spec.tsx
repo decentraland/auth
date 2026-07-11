@@ -1,13 +1,10 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { SimulationState } from '../../types'
 import { TransactionConfirmDialog } from './TransactionConfirmDialog'
 
 jest.mock('@dcl/hooks', () => ({
   useTranslation: () => ({ t: (key: string) => key })
 }))
-
-const USER = '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd'
 
 describe('when rendering the TransactionConfirmDialog', () => {
   let onCancel: jest.Mock
@@ -25,15 +22,7 @@ describe('when rendering the TransactionConfirmDialog', () => {
   describe('and the dialog is closed', () => {
     it('should not render the gas information', () => {
       render(
-        <TransactionConfirmDialog
-          open={false}
-          transactionCost={BigInt(0)}
-          balance={BigInt(0)}
-          simulation={{ status: 'idle' }}
-          userAddress={USER}
-          onCancel={onCancel}
-          onConfirm={onConfirm}
-        />
+        <TransactionConfirmDialog open={false} transactionCost={BigInt(0)} balance={BigInt(0)} onCancel={onCancel} onConfirm={onConfirm} />
       )
       expect(screen.queryByText('request.transaction_dialog.transaction_cost')).not.toBeInTheDocument()
     })
@@ -41,61 +30,35 @@ describe('when rendering the TransactionConfirmDialog', () => {
 
   describe('and the dialog is open', () => {
     it('should render the gas cost and balance lines', () => {
-      render(
-        <TransactionConfirmDialog
-          open
-          transactionCost={BigInt(1)}
-          balance={BigInt(2)}
-          simulation={{ status: 'idle' }}
-          userAddress={USER}
-          onCancel={onCancel}
-          onConfirm={onConfirm}
-        />
-      )
+      render(<TransactionConfirmDialog open transactionCost={BigInt(1)} balance={BigInt(2)} onCancel={onCancel} onConfirm={onConfirm} />)
       expect(screen.getByText('request.transaction_dialog.transaction_cost')).toBeInTheDocument()
       expect(screen.getByText('request.transaction_dialog.your_balance')).toBeInTheDocument()
     })
 
+    it('should not render the asset-change summary (it lives on the interaction screen)', () => {
+      render(<TransactionConfirmDialog open transactionCost={BigInt(1)} balance={BigInt(2)} onCancel={onCancel} onConfirm={onConfirm} />)
+      expect(screen.queryByText('request.transaction_dialog.you_send')).not.toBeInTheDocument()
+    })
+
     it('should call onConfirm when the confirm button is clicked', async () => {
-      render(
-        <TransactionConfirmDialog
-          open
-          transactionCost={BigInt(1)}
-          balance={BigInt(2)}
-          simulation={{ status: 'idle' }}
-          userAddress={USER}
-          onCancel={onCancel}
-          onConfirm={onConfirm}
-        />
-      )
+      render(<TransactionConfirmDialog open transactionCost={BigInt(1)} balance={BigInt(2)} onCancel={onCancel} onConfirm={onConfirm} />)
       await userEvent.click(screen.getByText('common.confirm'))
       expect(onConfirm).toHaveBeenCalledTimes(1)
     })
   })
 
-  describe('and the simulation reports the transaction would revert', () => {
-    let simulation: SimulationState
-
-    beforeEach(() => {
-      simulation = {
-        status: 'ready',
-        result: { status: 'reverted', error: 'out of gas', assetChanges: [], approvalChanges: [], balanceChanges: [], events: [] }
-      }
-    })
-
-    it('should surface the revert warning while still allowing confirmation', () => {
+  describe('and the transaction is expected to revert', () => {
+    it('should keep the confirm button enabled but visually flagged', () => {
       render(
         <TransactionConfirmDialog
           open
           transactionCost={BigInt(1)}
           balance={BigInt(2)}
-          simulation={simulation}
-          userAddress={USER}
+          isReverted
           onCancel={onCancel}
           onConfirm={onConfirm}
         />
       )
-      expect(screen.getByText('request.transaction_dialog.revert_title')).toBeInTheDocument()
       expect(screen.getByText('common.confirm').closest('button')).not.toBeDisabled()
     })
   })
@@ -107,8 +70,6 @@ describe('when rendering the TransactionConfirmDialog', () => {
           open
           transactionCost={BigInt(1000)}
           balance={BigInt(2000)}
-          simulation={{ status: 'idle' }}
-          userAddress={USER}
           gasCovered
           onCancel={onCancel}
           onConfirm={onConfirm}

@@ -105,7 +105,8 @@
       "approval_can_transfer_token": "can transfer {token} #{tokenId}",
       "approval_can_access_all": "can access your entire {name} collection",
       "approval_access_revoked": "can no longer access your {name} collection",
-      "view_on_explorer": "View on {explorer}"
+      "view_on_explorer": "View on {explorer}",
+      "verified_contract": "Verified Decentraland contract"
     },
     "signature": {
       "title": "Confirm signature",

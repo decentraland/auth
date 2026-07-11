@@ -1,43 +1,38 @@
 import { formatEther } from 'viem'
 import { useTranslation } from '@dcl/hooks'
 import { Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle } from 'decentraland-ui2'
-import { SimulationSummary } from '../SimulationSummary'
 import { TransactionConfirmDialogProps } from './TransactionConfirmDialog.types'
-import { DialogBody, GasInfo, GasLine } from './TransactionConfirmDialog.styled'
+import { GasInfo, GasLine } from './TransactionConfirmDialog.styled'
 
+// A deliberately simple final-confirm step: the asset-change summary is shown earlier, on the
+// interaction screen, so this dialog only surfaces the gas cost (or that gas is covered) and
+// asks for a last confirmation.
 export const TransactionConfirmDialog = ({
   open,
   transactionCost,
   balance,
-  simulation,
-  userAddress,
-  profiles,
-  chainId,
   gasCovered = false,
+  isReverted = false,
   isLoading,
   onCancel,
   onConfirm
 }: TransactionConfirmDialogProps) => {
   const { t } = useTranslation()
-  const isReverted = simulation.status === 'ready' && simulation.result.status === 'reverted'
 
   return (
     <Dialog open={open} maxWidth="xs" fullWidth>
       <DialogTitle>{t('request.transaction_dialog.title')}</DialogTitle>
       <DialogContent>
-        <DialogBody>
-          <SimulationSummary simulation={simulation} userAddress={userAddress} profiles={profiles} chainId={chainId} />
-          <GasInfo>
-            {gasCovered ? (
-              <GasLine>{t('request.transaction_dialog.gas_covered')}</GasLine>
-            ) : (
-              <>
-                <GasLine>{t('request.transaction_dialog.transaction_cost', { cost: formatEther(transactionCost) })}</GasLine>
-                <GasLine>{t('request.transaction_dialog.your_balance', { balance: formatEther(balance) })}</GasLine>
-              </>
-            )}
-          </GasInfo>
-        </DialogBody>
+        <GasInfo>
+          {gasCovered ? (
+            <GasLine>{t('request.transaction_dialog.gas_covered')}</GasLine>
+          ) : (
+            <>
+              <GasLine>{t('request.transaction_dialog.transaction_cost', { cost: formatEther(transactionCost) })}</GasLine>
+              <GasLine>{t('request.transaction_dialog.your_balance', { balance: formatEther(balance) })}</GasLine>
+            </>
+          )}
+        </GasInfo>
       </DialogContent>
       <DialogActions>
         <Button onClick={onCancel} disabled={isLoading}>

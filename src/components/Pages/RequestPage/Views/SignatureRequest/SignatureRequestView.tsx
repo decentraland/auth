@@ -30,6 +30,7 @@ export const SignatureRequestView = ({
   simulation,
   userAddress,
   profiles,
+  verifiedContracts,
   chainId,
   isMetaTransaction,
   isLoading = false,
@@ -60,7 +61,13 @@ export const SignatureRequestView = ({
 
         {payload?.kind === 'typedData' && isMetaTransaction ? (
           <>
-            <SimulationSummary simulation={simulation} userAddress={userAddress} profiles={profiles} chainId={chainId} />
+            <SimulationSummary
+              simulation={simulation}
+              userAddress={userAddress}
+              profiles={profiles}
+              verifiedContracts={verifiedContracts}
+              chainId={chainId}
+            />
             <RawToggle type="button" onClick={() => setShowRaw(show => !show)}>
               {showRaw ? t('request.signature.hide_raw') : t('request.signature.view_raw')}
             </RawToggle>

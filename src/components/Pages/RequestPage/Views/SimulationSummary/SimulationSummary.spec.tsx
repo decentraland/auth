@@ -394,5 +394,42 @@ describe('when rendering the SimulationSummary', () => {
       render(<SimulationSummary simulation={simulation} userAddress={USER} chainId={999999} />)
       expect(screen.queryByRole('link')).not.toBeInTheDocument()
     })
+
+    it('should show a verified badge for recognized Decentraland contracts', () => {
+      const recipient = '0x1234567890abcdef1234567890abcdef12345678'
+      render(<SimulationSummary simulation={simulation} userAddress={USER} chainId={137} verifiedContracts={[recipient]} />)
+      expect(screen.getByText('✓ Decentraland')).toBeInTheDocument()
+    })
+  })
+
+  describe('and an unlimited approval is granted', () => {
+    beforeEach(() => {
+      simulation = {
+        status: 'ready',
+        result: emptyResult({
+          approvalChanges: [
+            {
+              kind: 'approval',
+              standard: 'erc20',
+              owner: USER,
+              spender: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd',
+              amount: null,
+              rawAmount: '115792089237316195423570985008687907853269984665640564039457584007913129639935',
+              isUnlimited: true,
+              tokenId: null,
+              approved: null,
+              contractAddress: '0x0f5d2fb29fb7d3cfee444a200298f468908cc942',
+              symbol: 'MANA',
+              name: 'MANA'
+            }
+          ]
+        })
+      }
+    })
+
+    it('should flag the high-risk approval with a warning icon', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} />)
+      expect(screen.getByText('⚠')).toBeInTheDocument()
+    })
   })
 })

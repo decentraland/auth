@@ -85,6 +85,19 @@ const AmountUsd = styled('span')(({ theme }) => ({
   whiteSpace: 'nowrap'
 }))
 
+const VerifiedBadge = styled('span')(({ theme }) => ({
+  color: theme.palette.success.main,
+  fontSize: theme.typography.pxToRem(11),
+  fontWeight: 600,
+  marginLeft: theme.spacing(0.5),
+  whiteSpace: 'nowrap'
+}))
+
+const RiskIcon = styled('span')(({ theme }) => ({
+  color: theme.palette.error.main,
+  marginRight: theme.spacing(0.5)
+}))
+
 const ExplorerLink = styled('a')(({ theme }) => ({
   color: 'inherit',
   textDecoration: 'underline',
@@ -186,11 +199,13 @@ export {
   LoadingRow,
   NetLine,
   NetValue,
+  RiskIcon,
   Root,
   Section,
   SectionTitle,
   Toggle,
   TokenLogo,
   TokenLogoFallback,
-  UnavailableNote
+  UnavailableNote,
+  VerifiedBadge
 }
