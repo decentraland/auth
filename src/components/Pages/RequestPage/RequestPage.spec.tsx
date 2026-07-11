@@ -17,7 +17,7 @@ import { isProfileComplete } from '../../../shared/profile'
 import { FeatureFlagsContext } from '../../FeatureFlagsProvider'
 import { FeatureFlagsKeys } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
 import { RequestPage } from './RequestPage'
-import { getSigninDeeplink } from './utils'
+import { decodeManaTransferData, getSigninDeeplink } from './utils'
 
 // --- Navigation ---
 const mockNavigate = jest.fn()
@@ -753,6 +753,30 @@ describe('RequestPage', () => {
       await userEvent.click(await screen.findByTestId('wallet-interaction-approve'))
       const dialog = await screen.findByTestId('transaction-confirm-dialog')
       await waitFor(() => expect(dialog).toHaveAttribute('data-gas-covered', 'true'))
+    })
+  })
+
+  describe('when a web2 transaction is a MANA tip (donation)', () => {
+    beforeEach(() => {
+      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.MAGIC }
+      mockFlags = { [FeatureFlagsKeys.TRANSACTION_SIMULATION]: true }
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      jest.mocked(decodeManaTransferData).mockReturnValueOnce({ manaAmount: '10', toAddress: '0xrecipient' })
+      mockRecover.mockResolvedValue({
+        method: 'eth_sendTransaction',
+        params: [{ to: '0xmanacontract', data: '0xa9059cbb', value: '0x0' }],
+        sender: '0xabc123',
+        expiration: new Date(Date.now() + 3600000).toISOString()
+      })
+      mockGetAddresses.mockResolvedValue(['0xabc123'])
+      mockGetBalance.mockResolvedValue(BigInt(1))
+      mockGetChainId.mockResolvedValue(137)
+    })
+
+    it('should show the donation transfer view and NOT run a simulation', async () => {
+      renderRequestPage()
+      expect(await screen.findByTestId('transfer-confirm')).toBeInTheDocument()
+      expect(mockSimulateTransaction).not.toHaveBeenCalled()
     })
   })
 

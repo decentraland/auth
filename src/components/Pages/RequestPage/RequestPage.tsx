@@ -510,34 +510,6 @@ export const RequestPage = () => {
               const transactionData = txParams?.data as string | undefined
               const contractAddress = txParams?.to as string | undefined
 
-              // For web2 users, determine whether this transaction will be relayed as a
-              // meta-transaction (gas covered by the gas tank) so the confirm dialog can hide
-              // the user-gas lines, and — when the flag is on — prefetch the asset-change
-              // simulation so it shows instantly. Non-blocking; the meta-tx decision is made
-              // once here and reused for the simulation chain. Applies to all three tx sub-views.
-              if (isUserUsingWeb2Wallet && contractAddress) {
-                if (canShowSimulation) {
-                  setSimulationState({ status: 'loading' })
-                }
-                checkMetaTransactionSupport(contractAddress)
-                  .then(({ willUseMetaTransaction }) => {
-                    if (cancelled) return undefined
-                    setIsMetaTransaction(willUseMetaTransaction)
-                    if (canShowSimulation && txParams) {
-                      const body = buildSendTransactionSimulationPayload(txParams, signerAddress, currentChainId, willUseMetaTransaction)
-                      if (body) {
-                        setSimulationChainId(body.chainId)
-                        return fetchSimulation(body)
-                      }
-                      setSimulationState({ status: 'unavailable' })
-                    }
-                    return undefined
-                  })
-                  .catch(() => {
-                    if (!cancelled && canShowSimulation) setSimulationState({ status: 'unavailable' })
-                  })
-              }
-
               if (transactionData && contractAddress) {
                 const manaData = decodeManaTransferData(transactionData, contractAddress)
                 if (manaData) {
@@ -590,6 +562,35 @@ export const RequestPage = () => {
                   setView(View.WALLET_NFT_INTERACTION)
                   break
                 }
+              }
+
+              // Generic transaction only — MANA tips and NFT gifts have their own views and
+              // returned above, so they are left untouched. For web2 users, decide whether this
+              // will be relayed as a meta-transaction (a Decentraland contract call, relayed on
+              // Polygon where the gas tank pays) so the dialog can say "gas covered"; other
+              // contracts/networks show the gas. When the flag is on, also prefetch the
+              // asset-change simulation of the original transaction. Non-blocking.
+              if (isUserUsingWeb2Wallet && contractAddress) {
+                if (canShowSimulation) {
+                  setSimulationState({ status: 'loading' })
+                }
+                checkMetaTransactionSupport(contractAddress)
+                  .then(({ willUseMetaTransaction }) => {
+                    if (cancelled) return undefined
+                    setIsMetaTransaction(willUseMetaTransaction)
+                    if (canShowSimulation && txParams) {
+                      const body = buildSendTransactionSimulationPayload(txParams, signerAddress, currentChainId, willUseMetaTransaction)
+                      if (body) {
+                        setSimulationChainId(body.chainId)
+                        return fetchSimulation(body)
+                      }
+                      setSimulationState({ status: 'unavailable' })
+                    }
+                    return undefined
+                  })
+                  .catch(() => {
+                    if (!cancelled && canShowSimulation) setSimulationState({ status: 'unavailable' })
+                  })
               }
 
               const feeData = await publicClientRef.current.estimateFeesPerGas()
