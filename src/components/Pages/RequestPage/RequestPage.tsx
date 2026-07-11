@@ -1021,6 +1021,10 @@ export const RequestPage = () => {
   }, [])
 
   const isSimulationReverted = simulationState.status === 'ready' && simulationState.result.status === 'reverted'
+  // The generic transaction view shows the asset summary whenever a simulation is in flight or
+  // resolved. In that case approval is a single step (gas shown inline, no confirm modal); without
+  // a summary it keeps the classic two-step confirm dialog for the gas check.
+  const hasSimulationSummary = simulationState.status !== 'idle'
   // Require an explicit acknowledgment before approving when the simulation shows a high-risk
   // permission: an unlimited ERC-20 allowance or a full-collection ApprovalForAll grant.
   const requiresApprovalAcknowledgment =
@@ -1145,16 +1149,20 @@ export const RequestPage = () => {
     case View.WALLET_INTERACTION:
       return (
         <>
-          <TransactionConfirmDialog
-            open={isTransactionModalOpen}
-            transactionCost={transactionGasCost ?? BigInt(0)}
-            balance={walletInfo?.balance ?? BigInt(0)}
-            gasCovered={isMetaTransaction}
-            isReverted={isSimulationReverted}
-            isLoading={isLoading}
-            onCancel={onDenyWalletInteraction}
-            onConfirm={onApproveWalletInteraction}
-          />
+          {/* With a simulation summary the gas line is shown inline and approval is a single step,
+              so the confirm dialog is only needed for the classic (no-summary) gas check. */}
+          {hasSimulationSummary ? null : (
+            <TransactionConfirmDialog
+              open={isTransactionModalOpen}
+              transactionCost={transactionGasCost ?? BigInt(0)}
+              balance={walletInfo?.balance ?? BigInt(0)}
+              gasCovered={isMetaTransaction}
+              isReverted={isSimulationReverted}
+              isLoading={isLoading}
+              onCancel={onDenyWalletInteraction}
+              onConfirm={onApproveWalletInteraction}
+            />
+          )}
           <WalletInteraction
             requestId={requestId}
             isWeb2Wallet={isUserUsingWeb2Wallet}
@@ -1166,8 +1174,12 @@ export const RequestPage = () => {
             verifiedContracts={simulationVerified}
             chainId={simulationChainId}
             requiresAcknowledgment={requiresApprovalAcknowledgment}
+            gasCovered={isMetaTransaction}
+            transactionCost={transactionGasCost ?? BigInt(0)}
+            balance={walletInfo?.balance ?? BigInt(0)}
+            isReverted={isSimulationReverted}
             onDeny={onDenyWalletInteraction}
-            onApprove={handleApproveWalletInteraction}
+            onApprove={hasSimulationSummary ? onApproveWalletInteraction : handleApproveWalletInteraction}
           />
         </>
       )

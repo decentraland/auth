@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { formatEther } from 'viem'
 import { useTranslation } from '@dcl/hooks'
 import { Box, Button, Checkbox, CircularProgress, FormControlLabel } from 'decentraland-ui2'
 import { Container } from '../../Container'
@@ -6,7 +7,7 @@ import { ButtonsContainer } from '../../RequestPage.styled'
 import { SimulationSummary } from '../SimulationSummary'
 import styles from '../Views.module.css'
 import { WalletInteractionProps } from './WalletInteraction.types'
-import { SummaryBody } from './WalletInteraction.styled'
+import { GasInfo, GasLine, SummaryBody } from './WalletInteraction.styled'
 
 export const WalletInteraction = ({
   requestId,
@@ -19,6 +20,10 @@ export const WalletInteraction = ({
   verifiedContracts,
   chainId,
   requiresAcknowledgment = false,
+  gasCovered = false,
+  transactionCost = BigInt(0),
+  balance = BigInt(0),
+  isReverted = false,
   onDeny,
   onApprove
 }: WalletInteractionProps) => {
@@ -47,6 +52,16 @@ export const WalletInteraction = ({
             chainId={chainId}
           />
         </SummaryBody>
+        <GasInfo>
+          {gasCovered ? (
+            <GasLine>{t('request.transaction_dialog.gas_covered')}</GasLine>
+          ) : (
+            <>
+              <GasLine>{t('request.transaction_dialog.transaction_cost', { cost: formatEther(transactionCost) })}</GasLine>
+              <GasLine>{t('request.transaction_dialog.your_balance', { balance: formatEther(balance) })}</GasLine>
+            </>
+          )}
+        </GasInfo>
         {requiresAcknowledgment ? (
           <FormControlLabel
             control={
@@ -63,7 +78,13 @@ export const WalletInteraction = ({
           <Button variant="outlined" disabled={isLoading} onClick={onDeny} data-testid="transfer-cancel-button">
             {t('common.deny')}
           </Button>
-          <Button variant="contained" disabled={approveBlocked} onClick={onApprove} data-testid="transfer-confirm-button">
+          <Button
+            variant="contained"
+            color={isReverted ? 'error' : 'primary'}
+            disabled={approveBlocked}
+            onClick={onApprove}
+            data-testid="transfer-confirm-button"
+          >
             {isLoading ? <CircularProgress size={20} color="inherit" /> : t('common.allow')}
           </Button>
         </ButtonsContainer>

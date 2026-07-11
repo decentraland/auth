@@ -16,6 +16,14 @@ export interface WalletInteractionProps {
   chainId?: number
   /** When true, the approve button is gated behind a high-risk acknowledgment checkbox. */
   requiresAcknowledgment?: boolean
+  /** True when the transaction is relayed as a meta-transaction (gas paid by the gas tank). */
+  gasCovered?: boolean
+  /** Estimated gas cost in wei, shown inline when the user pays their own gas. */
+  transactionCost?: bigint
+  /** User's native balance in wei, shown next to the gas cost. */
+  balance?: bigint
+  /** True when the simulation predicts the transaction would revert. */
+  isReverted?: boolean
   onDeny: () => void
   onApprove: () => void
 }

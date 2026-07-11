@@ -110,4 +110,58 @@ describe('when rendering the WalletInteraction view', () => {
       expect(screen.getByTestId('transfer-confirm-button')).not.toBeDisabled()
     })
   })
+
+  describe('and the transaction is relayed as a meta-transaction', () => {
+    it('should show the gas-covered note inline instead of a separate confirm dialog', () => {
+      render(
+        <WalletInteraction
+          requestId="r1"
+          isWeb2Wallet
+          simulation={{ status: 'ready', result: successResult }}
+          userAddress={USER}
+          gasCovered
+          onDeny={onDeny}
+          onApprove={onApprove}
+        />
+      )
+      expect(screen.getByText('request.transaction_dialog.gas_covered')).toBeInTheDocument()
+    })
+  })
+
+  describe('and the user pays their own gas', () => {
+    it('should show the transaction cost and balance inline', () => {
+      render(
+        <WalletInteraction
+          requestId="r1"
+          isWeb2Wallet
+          simulation={{ status: 'ready', result: successResult }}
+          userAddress={USER}
+          transactionCost={BigInt('2500000000000000')}
+          balance={BigInt('1500000000000000000')}
+          onDeny={onDeny}
+          onApprove={onApprove}
+        />
+      )
+      expect(screen.getByText(/request.transaction_dialog.transaction_cost/)).toBeInTheDocument()
+      expect(screen.getByText(/request.transaction_dialog.your_balance/)).toBeInTheDocument()
+    })
+  })
+
+  describe('and clicking allow with a summary present', () => {
+    it('should approve directly without opening a confirm dialog', async () => {
+      render(
+        <WalletInteraction
+          requestId="r1"
+          isWeb2Wallet
+          simulation={{ status: 'ready', result: successResult }}
+          userAddress={USER}
+          gasCovered
+          onDeny={onDeny}
+          onApprove={onApprove}
+        />
+      )
+      await userEvent.click(screen.getByTestId('transfer-confirm-button'))
+      expect(onApprove).toHaveBeenCalledTimes(1)
+    })
+  })
 })
