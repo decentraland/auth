@@ -475,4 +475,83 @@ describe('when rendering the SimulationSummary', () => {
       expect(screen.getByText('1,000,000.5 MANA')).toBeInTheDocument()
     })
   })
+
+  describe('and a transfer has no decimals-applied amount', () => {
+    beforeEach(() => {
+      simulation = {
+        status: 'ready',
+        result: emptyResult({
+          assetChanges: [
+            {
+              type: 'transfer',
+              standard: 'erc20',
+              from: USER,
+              to: '0x1234567890abcdef1234567890abcdef12345678',
+              amount: null,
+              rawAmount: '1000000000000000000',
+              tokenId: null,
+              contractAddress: '0x0f5d2fb29fb7d3cfee444a200298f468908cc942',
+              symbol: 'TKN',
+              name: 'Token',
+              decimals: 18,
+              logoUrl: null,
+              dollarValue: null
+            }
+          ]
+        })
+      }
+    })
+
+    it('should show the symbol without the base-unit rawAmount', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} />)
+      expect(screen.getByText('TKN')).toBeInTheDocument()
+      expect(screen.queryByText(/1000000000000000000|1,000,000,000,000,000,000/)).not.toBeInTheDocument()
+    })
+  })
+
+  describe('and a finite approval has no decimals-applied amount', () => {
+    beforeEach(() => {
+      simulation = {
+        status: 'ready',
+        result: emptyResult({
+          approvalChanges: [
+            {
+              kind: 'approval',
+              standard: 'erc20',
+              owner: USER,
+              spender: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd',
+              amount: null,
+              rawAmount: '5000000',
+              isUnlimited: false,
+              tokenId: null,
+              approved: null,
+              contractAddress: '0x0f5d2fb29fb7d3cfee444a200298f468908cc942',
+              symbol: 'USDC',
+              name: 'USD Coin'
+            }
+          ]
+        })
+      }
+    })
+
+    it('should state the permission without a base-unit figure', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} />)
+      expect(screen.getByText(/approval_can_spend_symbol/)).toBeInTheDocument()
+      expect(screen.queryByText(/5000000/)).not.toBeInTheDocument()
+    })
+  })
+
+  describe('and the net balance-change address is checksummed', () => {
+    beforeEach(() => {
+      simulation = {
+        status: 'ready',
+        result: emptyResult({ balanceChanges: [{ address: USER.toUpperCase().replace('0X', '0x'), dollarValue: '-10' }] })
+      }
+    })
+
+    it('should still render the net change (address compared case-insensitively)', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} />)
+      expect(screen.getByText('-$10.00')).toBeInTheDocument()
+    })
+  })
 })

@@ -204,5 +204,21 @@ describe('when rendering the SignatureRequestView', () => {
       await userEvent.click(screen.getByText('request.signature.view_raw'))
       expect(screen.getByTestId('signature-raw')).toBeInTheDocument()
     })
+
+    it('should keep approval disabled while the meta-transaction simulation is loading', () => {
+      render(
+        <SignatureRequestView
+          requestId="r1"
+          method="eth_signTypedData_v4"
+          payload={payload}
+          simulation={{ status: 'loading' }}
+          userAddress={USER}
+          isMetaTransaction={true}
+          onDeny={onDeny}
+          onApprove={onApprove}
+        />
+      )
+      expect(screen.getByTestId('signature-approve-button')).toBeDisabled()
+    })
   })
 })

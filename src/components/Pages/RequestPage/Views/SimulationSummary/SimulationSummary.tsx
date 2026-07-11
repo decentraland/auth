@@ -78,11 +78,16 @@ const assetTitle = (change: AssetChange, t: Translate): string => {
     )
   }
   const symbol = change.symbol || (change.standard === 'native' ? 'ETH' : '')
-  const amount = change.amount ?? change.rawAmount
-  const displayAmount = amount ? formatTokenAmount(amount) : null
+  // `rawAmount` is in base units (e.g. wei), so it's only a valid display amount when the token
+  // has 0 decimals. Otherwise, without a decimals-applied `amount`, we show the symbol alone
+  // rather than a base-unit number inflated by ~18 orders of magnitude.
+  let displayAmount: string | null = null
+  if (change.amount) displayAmount = formatTokenAmount(change.amount)
+  else if (change.rawAmount && change.decimals === 0) displayAmount = formatTokenAmount(change.rawAmount)
   if (displayAmount && symbol) return `${displayAmount} ${symbol}`
   if (displayAmount) return displayAmount
-  return symbol || t('request.transaction_dialog.unknown_token', { address: shortenAddress(change.contractAddress) })
+  if (symbol) return symbol
+  return t('request.transaction_dialog.unknown_token', { address: shortenAddress(change.contractAddress) })
 }
 
 /** Renders `label` as a block-explorer link (or plain text), with a verified badge when the
@@ -222,8 +227,17 @@ const ApprovalItem = ({
   } else if (approval.tokenId) {
     predicate = t('request.transaction_dialog.approval_can_transfer_token', { token, tokenId: approval.tokenId })
   } else {
-    const amount = approval.isUnlimited ? t('request.transaction_dialog.approval_unlimited') : (approval.amount ?? approval.rawAmount ?? '')
-    predicate = t('request.transaction_dialog.approval_can_spend', { amount, symbol: approval.symbol || token })
+    const symbol = approval.symbol || token
+    // Never show `rawAmount` (base units) here — approvals carry no decimals, so an unformatted
+    // finite allowance would render as a huge misleading number. Show the decimals-applied
+    // `amount` when the server provides it; otherwise state the permission without a figure.
+    if (approval.isUnlimited) {
+      predicate = t('request.transaction_dialog.approval_can_spend', { amount: t('request.transaction_dialog.approval_unlimited'), symbol })
+    } else if (approval.amount) {
+      predicate = t('request.transaction_dialog.approval_can_spend', { amount: formatTokenAmount(approval.amount), symbol })
+    } else {
+      predicate = t('request.transaction_dialog.approval_can_spend_symbol', { symbol })
+    }
     highRisk = approval.isUnlimited
   }
 
@@ -236,7 +250,7 @@ const ApprovalItem = ({
 }
 
 const NetChange = ({ result, userAddress, t }: { result: SimulationResponseBody; userAddress: string; t: Translate }) => {
-  const net = (result.balanceChanges ?? []).find(change => change.address === userAddress && change.dollarValue !== null)
+  const net = (result.balanceChanges ?? []).find(change => change.address.toLowerCase() === userAddress && change.dollarValue !== null)
   const formatted = net ? formatUsd(net.dollarValue, true) : null
   if (!formatted) return null
   return (

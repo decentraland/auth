@@ -109,7 +109,8 @@
       "view_on_explorer": "在 {explorer} 上查看",
       "verified_contract": "已验证的 Decentraland 合约",
       "on_network": "在 {network} 上",
-      "acknowledge_risk": "我了解这会授予对我资产的访问权限"
+      "acknowledge_risk": "我了解这会授予对我资产的访问权限",
+      "approval_can_spend_symbol": "可以使用 {symbol}"
     },
     "signature": {
       "title": "确认签名",

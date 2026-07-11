@@ -109,7 +109,8 @@
       "view_on_explorer": "Visualizza su {explorer}",
       "verified_contract": "Contratto Decentraland verificato",
       "on_network": "su {network}",
-      "acknowledge_risk": "Capisco che questo concede l'accesso ai miei asset"
+      "acknowledge_risk": "Capisco che questo concede l'accesso ai miei asset",
+      "approval_can_spend_symbol": "può spendere {symbol}"
     },
     "signature": {
       "title": "Conferma firma",

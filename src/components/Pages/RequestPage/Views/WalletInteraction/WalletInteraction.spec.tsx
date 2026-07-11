@@ -81,6 +81,22 @@ describe('when rendering the WalletInteraction view', () => {
     })
   })
 
+  describe('and the simulation is still loading', () => {
+    it('should keep the approve button disabled until it resolves', () => {
+      render(
+        <WalletInteraction
+          requestId="r1"
+          isWeb2Wallet
+          simulation={{ status: 'loading' }}
+          userAddress={USER}
+          onDeny={onDeny}
+          onApprove={onApprove}
+        />
+      )
+      expect(screen.getByTestId('transfer-confirm-button')).toBeDisabled()
+    })
+  })
+
   describe('and a high-risk acknowledgment is required', () => {
     it('should keep approval disabled until the acknowledgment is checked', async () => {
       render(
