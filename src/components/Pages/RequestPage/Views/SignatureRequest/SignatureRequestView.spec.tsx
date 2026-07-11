@@ -201,8 +201,11 @@ describe('when rendering the SignatureRequestView', () => {
           onApprove={onApprove}
         />
       )
-      await userEvent.click(screen.getByText('request.signature.view_raw'))
+      const toggle = screen.getByText('request.signature.view_raw')
+      expect(toggle).toHaveAttribute('aria-expanded', 'false')
+      await userEvent.click(toggle)
       expect(screen.getByTestId('signature-raw')).toBeInTheDocument()
+      expect(screen.getByText('request.signature.hide_raw')).toHaveAttribute('aria-expanded', 'true')
     })
 
     it('should keep approval disabled while the meta-transaction simulation is loading', () => {
