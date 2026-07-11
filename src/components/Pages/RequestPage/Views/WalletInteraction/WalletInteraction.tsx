@@ -1,13 +1,12 @@
 import { useState } from 'react'
 import { useTranslation } from '@dcl/hooks'
 import { Box, Button, Checkbox, CircularProgress, FormControlLabel } from 'decentraland-ui2'
-import { Title, TransferActionButtons, TransferLayout } from '../../../../Transfer'
 import { Container } from '../../Container'
 import { ButtonsContainer } from '../../RequestPage.styled'
 import { SimulationSummary } from '../SimulationSummary'
 import styles from '../Views.module.css'
 import { WalletInteractionProps } from './WalletInteraction.types'
-import { AckRow, SummaryBody, SummaryCard } from './WalletInteraction.styled'
+import { SummaryBody } from './WalletInteraction.styled'
 
 export const WalletInteraction = ({
   requestId,
@@ -30,47 +29,45 @@ export const WalletInteraction = ({
   // summary (and any high-risk warnings) render, and until any required acknowledgment is given.
   const approveBlocked = simulation?.status === 'loading' || (requiresAcknowledgment && !acknowledged)
 
-  // When a simulation is available, present the branded, full-page review layout with the
-  // asset-change summary front and centre (matching the tip/gift flows), gating approval behind
-  // a high-risk acknowledgment when the transaction grants broad permissions.
+  // When a simulation is available, present the asset-change summary in the classic left-aligned
+  // Container layout (matching the signature and generic interaction views, including the
+  // change-profile footer), gating approval behind a high-risk acknowledgment when the transaction
+  // grants broad permissions.
   if (hasSummary) {
     return (
-      <TransferLayout>
-        <SummaryCard>
-          <Title>{t('request.wallet_interaction.review_title')}</Title>
-          <SummaryBody>
-            <SimulationSummary
-              simulation={simulation}
-              userAddress={userAddress}
-              profiles={profiles}
-              verifiedContracts={verifiedContracts}
-              chainId={chainId}
-            />
-          </SummaryBody>
-          {requiresAcknowledgment ? (
-            <AckRow>
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={acknowledged}
-                    onChange={event => setAcknowledged(event.target.checked)}
-                    data-testid="risk-acknowledgment"
-                  />
-                }
-                label={t('request.transaction_dialog.acknowledge_risk')}
-              />
-            </AckRow>
-          ) : null}
-          <TransferActionButtons
-            cancelText={t('common.deny')}
-            confirmText={t('common.allow')}
-            isLoading={isLoading}
-            confirmDisabled={approveBlocked}
-            onCancel={onDeny}
-            onConfirm={onApprove}
+      <Container canChangeAccount requestId={requestId}>
+        <Box className={styles.logo}></Box>
+        <Box className={styles.title}>{t('request.wallet_interaction.review_title')}</Box>
+        <SummaryBody>
+          <SimulationSummary
+            simulation={simulation}
+            userAddress={userAddress}
+            profiles={profiles}
+            verifiedContracts={verifiedContracts}
+            chainId={chainId}
           />
-        </SummaryCard>
-      </TransferLayout>
+        </SummaryBody>
+        {requiresAcknowledgment ? (
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={acknowledged}
+                onChange={event => setAcknowledged(event.target.checked)}
+                data-testid="risk-acknowledgment"
+              />
+            }
+            label={t('request.transaction_dialog.acknowledge_risk')}
+          />
+        ) : null}
+        <ButtonsContainer>
+          <Button variant="outlined" disabled={isLoading} onClick={onDeny} data-testid="transfer-cancel-button">
+            {t('common.deny')}
+          </Button>
+          <Button variant="contained" disabled={approveBlocked} onClick={onApprove} data-testid="transfer-confirm-button">
+            {isLoading ? <CircularProgress size={20} color="inherit" /> : t('common.allow')}
+          </Button>
+        </ButtonsContainer>
+      </Container>
     )
   }
 

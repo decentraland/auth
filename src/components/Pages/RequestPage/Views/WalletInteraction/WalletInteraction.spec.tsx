@@ -7,14 +7,9 @@ jest.mock('@dcl/hooks', () => ({
   useTranslation: () => ({ t: (key: string) => key })
 }))
 
+// Container renders the WebGL AnimatedBackground, which jsdom can't run.
 jest.mock('../../Container', () => ({
   Container: ({ children }: { children: React.ReactNode }) => <div>{children}</div>
-}))
-
-// TransferLayout renders the WebGL AnimatedBackground, which jsdom can't run.
-jest.mock('../../../../Transfer', () => ({
-  ...jest.requireActual('../../../../Transfer'),
-  TransferLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>
 }))
 
 const USER = '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd'
