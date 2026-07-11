@@ -200,6 +200,19 @@ const NetValue = styled('span')<{ negative?: boolean }>(({ theme, negative }) =>
   fontWeight: 600
 }))
 
+const GasFooter = styled(Box)(({ theme }) => ({
+  borderTop: `1px solid ${theme.palette.divider}`,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: theme.spacing(0.5),
+  paddingTop: theme.spacing(1)
+}))
+
+const GasNote = styled(Typography)(({ theme }) => ({
+  color: theme.palette.text.primary,
+  fontSize: theme.typography.pxToRem(13)
+}))
+
 const Toggle = styled('button')(({ theme }) => ({
   alignSelf: 'flex-start',
   background: 'none',
@@ -241,6 +254,8 @@ export {
   EventList,
   EventRow,
   ExplorerLink,
+  GasFooter,
+  GasNote,
   LoadingRow,
   NetLine,
   NetValue,

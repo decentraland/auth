@@ -9,4 +9,13 @@ export interface SimulationSummaryProps {
   verifiedContracts?: string[]
   /** Chain the transaction was simulated on, used to build block-explorer links. */
   chainId?: number
+  /**
+   * Optional gas footer, grouped inside the summary. Only transaction reviews pass it; signature
+   * previews (which are gasless) omit it. `cost`/`balance` are pre-formatted ETH strings.
+   */
+  gas?: {
+    covered: boolean
+    cost: string
+    balance: string
+  }
 }

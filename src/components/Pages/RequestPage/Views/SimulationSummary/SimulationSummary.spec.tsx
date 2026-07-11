@@ -541,6 +541,33 @@ describe('when rendering the SimulationSummary', () => {
     })
   })
 
+  describe('and a gas footer is provided', () => {
+    beforeEach(() => {
+      simulation = { status: 'ready', result: emptyResult({}) }
+    })
+
+    it('should render the gas-covered note grouped inside the summary', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} gas={{ covered: true, cost: '0', balance: '0' }} />)
+      expect(screen.getByText(/gas_covered/)).toBeInTheDocument()
+    })
+
+    it('should render the transaction cost when the user pays gas', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} gas={{ covered: false, cost: '0.0025', balance: '1.5' }} />)
+      expect(screen.getByText(/transaction_cost 0.0025/)).toBeInTheDocument()
+    })
+  })
+
+  describe('and no gas footer is provided', () => {
+    beforeEach(() => {
+      simulation = { status: 'ready', result: emptyResult({}) }
+    })
+
+    it('should not render any gas note (signature previews are gasless)', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} />)
+      expect(screen.queryByText(/gas_covered|transaction_cost/)).not.toBeInTheDocument()
+    })
+  })
+
   describe('and the net balance-change address is checksummed', () => {
     beforeEach(() => {
       simulation = {

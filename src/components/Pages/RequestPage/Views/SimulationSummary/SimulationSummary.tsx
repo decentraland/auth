@@ -16,6 +16,8 @@ import {
   EventList,
   EventRow,
   ExplorerLink,
+  GasFooter,
+  GasNote,
   NetLine,
   NetValue,
   NetworkChip,
@@ -299,7 +301,14 @@ const TechnicalDetails = ({
   )
 }
 
-export const SimulationSummary = ({ simulation, userAddress, profiles = {}, verifiedContracts = [], chainId }: SimulationSummaryProps) => {
+export const SimulationSummary = ({
+  simulation,
+  userAddress,
+  profiles = {},
+  verifiedContracts = [],
+  chainId,
+  gas
+}: SimulationSummaryProps) => {
   const { t } = useTranslation()
   const verified = new Set(verifiedContracts.map(address => address.toLowerCase()))
 
@@ -396,6 +405,19 @@ export const SimulationSummary = ({ simulation, userAddress, profiles = {}, veri
 
       {hasNoChanges && result.status !== 'reverted' ? (
         <UnavailableNote>{t('request.transaction_dialog.no_changes')}</UnavailableNote>
+      ) : null}
+
+      {gas ? (
+        <GasFooter>
+          {gas.covered ? (
+            <GasNote>{t('request.transaction_dialog.gas_covered')}</GasNote>
+          ) : (
+            <>
+              <GasNote>{t('request.transaction_dialog.transaction_cost', { cost: gas.cost })}</GasNote>
+              <GasNote>{t('request.transaction_dialog.your_balance', { balance: gas.balance })}</GasNote>
+            </>
+          )}
+        </GasFooter>
       ) : null}
 
       <TechnicalDetails events={result.events ?? []} verified={verified} chainId={chainId} t={t} />

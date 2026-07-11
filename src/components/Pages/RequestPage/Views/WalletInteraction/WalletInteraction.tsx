@@ -7,7 +7,7 @@ import { ButtonsContainer } from '../../RequestPage.styled'
 import { SimulationSummary } from '../SimulationSummary'
 import styles from '../Views.module.css'
 import { WalletInteractionProps } from './WalletInteraction.types'
-import { GasInfo, GasLine, SummaryBody } from './WalletInteraction.styled'
+import { SummaryBody } from './WalletInteraction.styled'
 
 export const WalletInteraction = ({
   requestId,
@@ -50,18 +50,9 @@ export const WalletInteraction = ({
             profiles={profiles}
             verifiedContracts={verifiedContracts}
             chainId={chainId}
+            gas={{ covered: gasCovered, cost: formatEther(transactionCost), balance: formatEther(balance) }}
           />
         </SummaryBody>
-        <GasInfo>
-          {gasCovered ? (
-            <GasLine>{t('request.transaction_dialog.gas_covered')}</GasLine>
-          ) : (
-            <>
-              <GasLine>{t('request.transaction_dialog.transaction_cost', { cost: formatEther(transactionCost) })}</GasLine>
-              <GasLine>{t('request.transaction_dialog.your_balance', { balance: formatEther(balance) })}</GasLine>
-            </>
-          )}
-        </GasInfo>
         {requiresAcknowledgment ? (
           <FormControlLabel
             control={
