@@ -12,6 +12,7 @@ export const TransactionConfirmDialog = ({
   simulation,
   userAddress,
   profiles,
+  chainId,
   gasCovered = false,
   isLoading,
   onCancel,
@@ -25,7 +26,7 @@ export const TransactionConfirmDialog = ({
       <DialogTitle>{t('request.transaction_dialog.title')}</DialogTitle>
       <DialogContent>
         <DialogBody>
-          <SimulationSummary simulation={simulation} userAddress={userAddress} profiles={profiles} />
+          <SimulationSummary simulation={simulation} userAddress={userAddress} profiles={profiles} chainId={chainId} />
           <GasInfo>
             {gasCovered ? (
               <GasLine>{t('request.transaction_dialog.gas_covered')}</GasLine>

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from '@dcl/hooks'
 import { Box, Button, CircularProgress } from 'decentraland-ui2'
+import { getExplorerAddressUrl, getExplorerName } from '../../../../../shared/explorer'
 import { Container } from '../../Container'
 import { ButtonsContainer } from '../../RequestPage.styled'
 import { SimulationSummary } from '../SimulationSummary'
@@ -9,6 +10,7 @@ import { TypedDataTree } from './TypedDataTree'
 import { SignatureRequestViewProps } from './SignatureRequest.types'
 import {
   Content,
+  ContractLink,
   DomainKey,
   DomainRow,
   DomainValue,
@@ -28,6 +30,7 @@ export const SignatureRequestView = ({
   simulation,
   userAddress,
   profiles,
+  chainId,
   isMetaTransaction,
   isLoading = false,
   onDeny,
@@ -37,6 +40,8 @@ export const SignatureRequestView = ({
   const [showRaw, setShowRaw] = useState(false)
 
   const domain = payload?.kind === 'typedData' ? payload.typedData.domain : undefined
+  const domainChainId = chainId ?? (domain?.chainId !== undefined ? Number(domain.chainId) : undefined)
+  const contractUrl = typeof domain?.verifyingContract === 'string' ? getExplorerAddressUrl(domainChainId, domain.verifyingContract) : null
 
   return (
     <Container canChangeAccount requestId={requestId}>
@@ -55,7 +60,7 @@ export const SignatureRequestView = ({
 
         {payload?.kind === 'typedData' && isMetaTransaction ? (
           <>
-            <SimulationSummary simulation={simulation} userAddress={userAddress} profiles={profiles} />
+            <SimulationSummary simulation={simulation} userAddress={userAddress} profiles={profiles} chainId={chainId} />
             <RawToggle type="button" onClick={() => setShowRaw(show => !show)}>
               {showRaw ? t('request.signature.hide_raw') : t('request.signature.view_raw')}
             </RawToggle>
@@ -81,7 +86,18 @@ export const SignatureRequestView = ({
                 {typeof domain.verifyingContract === 'string' ? (
                   <DomainRow>
                     <DomainKey>{t('request.signature.contract')}</DomainKey>
-                    <DomainValue>{shortenAddress(domain.verifyingContract)}</DomainValue>
+                    {contractUrl ? (
+                      <ContractLink
+                        href={contractUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={t('request.transaction_dialog.view_on_explorer', { explorer: getExplorerName(domainChainId) })}
+                      >
+                        {shortenAddress(domain.verifyingContract)}
+                      </ContractLink>
+                    ) : (
+                      <DomainValue>{shortenAddress(domain.verifyingContract)}</DomainValue>
+                    )}
                   </DomainRow>
                 ) : null}
               </Section>

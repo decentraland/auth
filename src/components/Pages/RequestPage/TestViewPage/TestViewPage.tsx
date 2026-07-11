@@ -118,7 +118,7 @@ export const TestViewPage = () => {
         label: 'SimulationSummary (Success)',
         element: (
           <PreviewSurface>
-            <SimulationSummary simulation={{ status: 'ready', result: simulationSuccess }} userAddress={USER_ADDRESS} />
+            <SimulationSummary simulation={{ status: 'ready', result: simulationSuccess }} userAddress={USER_ADDRESS} chainId={137} />
           </PreviewSurface>
         )
       },
@@ -126,7 +126,7 @@ export const TestViewPage = () => {
         label: 'SimulationSummary (Reverted)',
         element: (
           <PreviewSurface>
-            <SimulationSummary simulation={{ status: 'ready', result: simulationReverted }} userAddress={USER_ADDRESS} />
+            <SimulationSummary simulation={{ status: 'ready', result: simulationReverted }} userAddress={USER_ADDRESS} chainId={137} />
           </PreviewSurface>
         )
       },
@@ -134,7 +134,7 @@ export const TestViewPage = () => {
         label: 'SimulationSummary (Unavailable)',
         element: (
           <PreviewSurface>
-            <SimulationSummary simulation={{ status: 'unavailable' }} userAddress={USER_ADDRESS} />
+            <SimulationSummary simulation={{ status: 'unavailable' }} userAddress={USER_ADDRESS} chainId={137} />
           </PreviewSurface>
         )
       },
@@ -142,7 +142,7 @@ export const TestViewPage = () => {
         label: 'SimulationSummary (No asset changes)',
         element: (
           <PreviewSurface>
-            <SimulationSummary simulation={{ status: 'ready', result: simulationNoChanges }} userAddress={USER_ADDRESS} />
+            <SimulationSummary simulation={{ status: 'ready', result: simulationNoChanges }} userAddress={USER_ADDRESS} chainId={137} />
           </PreviewSurface>
         )
       },
@@ -155,6 +155,7 @@ export const TestViewPage = () => {
             balance={BigInt(0)}
             simulation={{ status: 'ready', result: simulationSuccess }}
             userAddress={USER_ADDRESS}
+            chainId={137}
             gasCovered
             onCancel={noop}
             onConfirm={noop}
@@ -170,6 +171,7 @@ export const TestViewPage = () => {
             balance={BigInt('1500000000000000000')}
             simulation={{ status: 'ready', result: simulationSuccess }}
             userAddress={USER_ADDRESS}
+            chainId={137}
             onCancel={noop}
             onConfirm={noop}
           />
@@ -184,6 +186,7 @@ export const TestViewPage = () => {
             balance={BigInt('1500000000000000000')}
             simulation={{ status: 'ready', result: simulationReverted }}
             userAddress={USER_ADDRESS}
+            chainId={137}
             onCancel={noop}
             onConfirm={noop}
           />
@@ -198,6 +201,7 @@ export const TestViewPage = () => {
             balance={BigInt('1500000000000000000')}
             simulation={{ status: 'unavailable' }}
             userAddress={USER_ADDRESS}
+            chainId={137}
             onCancel={noop}
             onConfirm={noop}
           />

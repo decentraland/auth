@@ -66,9 +66,39 @@ const TokenLogoFallback = styled(Box)(({ theme }) => ({
 
 const ChangeText = styled(Box)({
   display: 'flex',
+  flex: 1,
   flexDirection: 'column',
   minWidth: 0
 })
+
+const DirectionIndicator = styled('span')<{ outgoing?: boolean }>(({ theme, outgoing }) => ({
+  color: outgoing ? theme.palette.warning.main : theme.palette.success.main,
+  flexShrink: 0,
+  fontWeight: 700
+}))
+
+const AmountUsd = styled('span')(({ theme }) => ({
+  color: theme.palette.text.secondary,
+  flexShrink: 0,
+  fontSize: theme.typography.pxToRem(13),
+  paddingLeft: theme.spacing(1),
+  whiteSpace: 'nowrap'
+}))
+
+const ExplorerLink = styled('a')(({ theme }) => ({
+  color: 'inherit',
+  textDecoration: 'underline',
+  textDecorationStyle: 'dotted',
+  textUnderlineOffset: 2,
+  ['&:hover']: {
+    color: theme.palette.primary.main,
+    textDecorationStyle: 'solid'
+  },
+  ['&:focus-visible']: {
+    outline: `2px solid ${theme.palette.primary.main}`,
+    outlineOffset: 2
+  }
+}))
 
 const ChangeAmount = styled(Typography)(({ theme }) => ({
   color: theme.palette.text.primary,
@@ -96,12 +126,6 @@ const ApprovalsAlert = styled(Alert)(({ theme }) => ({
 const ApprovalLine = styled('span')<{ emphasized?: boolean }>(({ theme, emphasized }) => ({
   color: emphasized ? theme.palette.error.main : 'inherit',
   fontWeight: emphasized ? 700 : 400
-}))
-
-const DollarValue = styled('span')(({ theme }) => ({
-  color: theme.palette.text.secondary,
-  fontWeight: 400,
-  marginLeft: theme.spacing(0.75)
 }))
 
 const NetLine = styled(Typography)(({ theme }) => ({
@@ -148,15 +172,17 @@ const EventRow = styled(Typography)(({ theme }) => ({
 }))
 
 export {
+  AmountUsd,
   ApprovalLine,
   ApprovalsAlert,
   ChangeAmount,
   ChangeMeta,
   ChangeRow,
   ChangeText,
-  DollarValue,
+  DirectionIndicator,
   EventList,
   EventRow,
+  ExplorerLink,
   LoadingRow,
   NetLine,
   NetValue,

@@ -2,17 +2,20 @@ import { useState } from 'react'
 import { useTranslation } from '@dcl/hooks'
 import { Alert, CircularProgress } from 'decentraland-ui2'
 import { ApprovalChange, AssetChange, SimulationResponseBody } from '../../../../../shared/auth'
+import { getExplorerAddressUrl, getExplorerName } from '../../../../../shared/explorer'
 import { SimulationSummaryProps } from './SimulationSummary.types'
 import {
+  AmountUsd,
   ApprovalLine,
   ApprovalsAlert,
   ChangeAmount,
   ChangeMeta,
   ChangeRow,
   ChangeText,
-  DollarValue,
+  DirectionIndicator,
   EventList,
   EventRow,
+  ExplorerLink,
   LoadingRow,
   NetLine,
   NetValue,
@@ -32,13 +35,11 @@ const shortenAddress = (address: string | null): string => {
   return address.length > 12 ? `${address.slice(0, 6)}…${address.slice(-4)}` : address
 }
 
-/** Display name for a counterparty: resolved profile name if known, else a shortened address. */
 const counterpartyLabel = (address: string | null, profiles: Record<string, string>): string => {
   if (!address) return ''
   return profiles[address.toLowerCase()] || shortenAddress(address)
 }
 
-/** Formats a USD string. `signed` keeps the +/- sign (for net changes); otherwise magnitude. */
 const formatUsd = (dollarValue: string | null, signed = false): string | null => {
   if (dollarValue === null) return null
   const value = Number(dollarValue)
@@ -65,66 +66,103 @@ const assetTitle = (change: AssetChange, t: Translate): string => {
   return symbol || t('request.transaction_dialog.unknown_token', { address: shortenAddress(change.contractAddress) })
 }
 
+/** Renders `label` as a block-explorer link for `address`, or plain text when unlinkable. */
+const AddressLink = ({ address, chainId, label }: { address: string | null; chainId?: number; label: string }) => {
+  const { t } = useTranslation()
+  const url = getExplorerAddressUrl(chainId, address)
+  if (!url) return <>{label}</>
+  return (
+    <ExplorerLink
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={t('request.transaction_dialog.view_on_explorer', { explorer: getExplorerName(chainId) })}
+    >
+      {label}
+    </ExplorerLink>
+  )
+}
+
 const AssetRow = ({
   change,
   direction,
-  profiles
+  profiles,
+  chainId
 }: {
   change: AssetChange
   direction: 'send' | 'receive'
   profiles: Record<string, string>
+  chainId?: number
 }) => {
   const { t } = useTranslation()
   const title = assetTitle(change, t)
   const dollar = formatUsd(change.dollarValue)
   const fallbackInitial = (change.symbol || change.name || '?').charAt(0)
+  const outgoing = direction === 'send'
 
-  let meta: string
+  let meta: React.ReactNode
   if (change.type === 'mint') {
     meta = t('request.transaction_dialog.minted')
   } else if (change.type === 'burn') {
     meta = t('request.transaction_dialog.burned')
-  } else if (direction === 'send') {
-    meta = t('request.transaction_dialog.to_recipient', { recipient: counterpartyLabel(change.to, profiles) })
   } else {
-    meta = t('request.transaction_dialog.from_sender', { sender: counterpartyLabel(change.from, profiles) })
+    const counterparty = outgoing ? change.to : change.from
+    meta = (
+      <>
+        {outgoing ? t('request.transaction_dialog.to_prefix') : t('request.transaction_dialog.from_prefix')}{' '}
+        <AddressLink address={counterparty} chainId={chainId} label={counterpartyLabel(counterparty, profiles)} />
+      </>
+    )
   }
 
   return (
     <ChangeRow>
+      <DirectionIndicator outgoing={outgoing}>{outgoing ? '↑' : '↓'}</DirectionIndicator>
       {change.logoUrl ? <TokenLogo src={change.logoUrl} alt={title} /> : <TokenLogoFallback>{fallbackInitial}</TokenLogoFallback>}
       <ChangeText>
         <ChangeAmount>
-          {title}
-          {dollar ? <DollarValue>≈ {dollar}</DollarValue> : null}
+          <AddressLink address={change.contractAddress} chainId={chainId} label={title} />
         </ChangeAmount>
         <ChangeMeta>{meta}</ChangeMeta>
       </ChangeText>
+      {dollar ? <AmountUsd>≈ {dollar}</AmountUsd> : null}
     </ChangeRow>
   )
 }
 
-const ApprovalItem = ({ approval, profiles }: { approval: ApprovalChange; profiles: Record<string, string> }) => {
+const ApprovalItem = ({
+  approval,
+  profiles,
+  chainId
+}: {
+  approval: ApprovalChange
+  profiles: Record<string, string>
+  chainId?: number
+}) => {
   const { t } = useTranslation()
   const token = approval.name || approval.symbol || shortenAddress(approval.contractAddress)
-  const spender = counterpartyLabel(approval.spender, profiles)
+  const spender = <AddressLink address={approval.spender} chainId={chainId} label={counterpartyLabel(approval.spender, profiles)} />
 
+  let predicate: string
+  let emphasized = false
   if (approval.kind === 'approvalForAll') {
     if (approval.approved === false) {
-      return <ApprovalLine>{t('request.transaction_dialog.approval_for_all_revoked', { spender, name: token })}</ApprovalLine>
+      predicate = t('request.transaction_dialog.approval_access_revoked', { name: token })
+    } else {
+      predicate = t('request.transaction_dialog.approval_can_access_all', { name: token })
+      emphasized = true
     }
-    return <ApprovalLine emphasized>{t('request.transaction_dialog.approval_for_all', { spender, name: token })}</ApprovalLine>
+  } else if (approval.tokenId) {
+    predicate = t('request.transaction_dialog.approval_can_transfer_token', { token, tokenId: approval.tokenId })
+  } else {
+    const amount = approval.isUnlimited ? t('request.transaction_dialog.approval_unlimited') : (approval.amount ?? approval.rawAmount ?? '')
+    predicate = t('request.transaction_dialog.approval_can_spend', { amount, symbol: approval.symbol || token })
+    emphasized = approval.isUnlimited
   }
 
-  if (approval.tokenId) {
-    return <ApprovalLine>{t('request.transaction_dialog.approval_erc721', { spender, token, tokenId: approval.tokenId })}</ApprovalLine>
-  }
-
-  const symbol = approval.symbol || token
-  const amount = approval.isUnlimited ? t('request.transaction_dialog.approval_unlimited') : (approval.amount ?? approval.rawAmount ?? '')
   return (
-    <ApprovalLine emphasized={approval.isUnlimited}>
-      {t('request.transaction_dialog.approval_description', { spender, amount, symbol })}
+    <ApprovalLine emphasized={emphasized}>
+      {spender} {predicate}
     </ApprovalLine>
   )
 }
@@ -141,7 +179,7 @@ const NetChange = ({ result, userAddress, t }: { result: SimulationResponseBody;
   )
 }
 
-const TechnicalDetails = ({ events, t }: { events: SimulationResponseBody['events']; t: Translate }) => {
+const TechnicalDetails = ({ events, chainId, t }: { events: SimulationResponseBody['events']; chainId?: number; t: Translate }) => {
   const [open, setOpen] = useState(false)
   if (events.length === 0) return null
   return (
@@ -153,7 +191,8 @@ const TechnicalDetails = ({ events, t }: { events: SimulationResponseBody['event
         <EventList data-testid="simulation-events">
           {events.map((event, index) => (
             <EventRow key={`event-${index}`}>
-              {(event.name || t('request.transaction_dialog.event_unknown')) + ` · ${shortenAddress(event.address)}`}
+              {event.name || t('request.transaction_dialog.event_unknown')} ·{' '}
+              <AddressLink address={event.address} chainId={chainId} label={shortenAddress(event.address)} />
             </EventRow>
           ))}
         </EventList>
@@ -162,7 +201,7 @@ const TechnicalDetails = ({ events, t }: { events: SimulationResponseBody['event
   )
 }
 
-export const SimulationSummary = ({ simulation, userAddress, profiles = {} }: SimulationSummaryProps) => {
+export const SimulationSummary = ({ simulation, userAddress, profiles = {}, chainId }: SimulationSummaryProps) => {
   const { t } = useTranslation()
 
   if (simulation.status === 'idle') return null
@@ -210,7 +249,7 @@ export const SimulationSummary = ({ simulation, userAddress, profiles = {} }: Si
         <Section>
           <SectionTitle>{t('request.transaction_dialog.you_send')}</SectionTitle>
           {sends.map((change, index) => (
-            <AssetRow key={`send-${index}`} change={change} direction="send" profiles={profiles} />
+            <AssetRow key={`send-${index}`} change={change} direction="send" profiles={profiles} chainId={chainId} />
           ))}
         </Section>
       ) : null}
@@ -219,7 +258,7 @@ export const SimulationSummary = ({ simulation, userAddress, profiles = {} }: Si
         <Section>
           <SectionTitle>{t('request.transaction_dialog.you_receive')}</SectionTitle>
           {receives.map((change, index) => (
-            <AssetRow key={`receive-${index}`} change={change} direction="receive" profiles={profiles} />
+            <AssetRow key={`receive-${index}`} change={change} direction="receive" profiles={profiles} chainId={chainId} />
           ))}
         </Section>
       ) : null}
@@ -230,7 +269,7 @@ export const SimulationSummary = ({ simulation, userAddress, profiles = {} }: Si
         <ApprovalsAlert severity="warning">
           <SectionTitle>{t('request.transaction_dialog.approvals_title')}</SectionTitle>
           {result.approvalChanges.map((approval, index) => (
-            <ApprovalItem key={`approval-${index}`} approval={approval} profiles={profiles} />
+            <ApprovalItem key={`approval-${index}`} approval={approval} profiles={profiles} chainId={chainId} />
           ))}
         </ApprovalsAlert>
       ) : null}
@@ -239,7 +278,7 @@ export const SimulationSummary = ({ simulation, userAddress, profiles = {} }: Si
         <UnavailableNote>{t('request.transaction_dialog.no_changes')}</UnavailableNote>
       ) : null}
 
-      <TechnicalDetails events={result.events ?? []} t={t} />
+      <TechnicalDetails events={result.events ?? []} chainId={chainId} t={t} />
     </Root>
   )
 }

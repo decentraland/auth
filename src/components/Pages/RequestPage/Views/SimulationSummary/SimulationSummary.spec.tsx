@@ -247,7 +247,7 @@ describe('when rendering the SimulationSummary', () => {
 
     it('should render the revoke copy rather than a grant', () => {
       render(<SimulationSummary simulation={simulation} userAddress={USER} />)
-      expect(screen.getByText(/approval_for_all_revoked/)).toBeInTheDocument()
+      expect(screen.getByText(/approval_access_revoked/)).toBeInTheDocument()
     })
   })
 
@@ -276,7 +276,7 @@ describe('when rendering the SimulationSummary', () => {
 
     it('should render the single-token approval copy', () => {
       render(<SimulationSummary simulation={simulation} userAddress={USER} />)
-      expect(screen.getByText(/approval_erc721/)).toBeInTheDocument()
+      expect(screen.getByText(/approval_can_transfer_token/)).toBeInTheDocument()
     })
   })
 
@@ -348,6 +348,51 @@ describe('when rendering the SimulationSummary', () => {
       const recipient = '0x1234567890abcdef1234567890abcdef12345678'
       render(<SimulationSummary simulation={simulation} userAddress={USER} profiles={{ [recipient]: 'CoolCreator' }} />)
       expect(screen.getByText(/CoolCreator/)).toBeInTheDocument()
+    })
+  })
+
+  describe('and a chain id is provided for explorer links', () => {
+    beforeEach(() => {
+      simulation = {
+        status: 'ready',
+        result: emptyResult({
+          assetChanges: [
+            {
+              type: 'transfer',
+              standard: 'erc20',
+              from: USER,
+              to: '0x1234567890abcdef1234567890abcdef12345678',
+              amount: '1',
+              rawAmount: '1',
+              tokenId: null,
+              contractAddress: '0x0f5d2fb29fb7d3cfee444a200298f468908cc942',
+              symbol: 'MANA',
+              name: 'MANA',
+              decimals: 18,
+              logoUrl: null,
+              dollarValue: null
+            }
+          ]
+        })
+      }
+    })
+
+    it('should link the counterparty address to the correct block explorer', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} chainId={137} />)
+      const link = screen.getByRole('link', { name: /0x1234/ })
+      expect(link).toHaveAttribute('href', 'https://polygonscan.com/address/0x1234567890abcdef1234567890abcdef12345678')
+    })
+
+    it('should open explorer links in a new tab safely', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} chainId={137} />)
+      const link = screen.getByRole('link', { name: /0x1234/ })
+      expect(link).toHaveAttribute('target', '_blank')
+      expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+    })
+
+    it('should render plain text when the chain is unknown', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} chainId={999999} />)
+      expect(screen.queryByRole('link')).not.toBeInTheDocument()
     })
   })
 })

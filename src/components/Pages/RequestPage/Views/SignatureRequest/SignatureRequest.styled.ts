@@ -29,6 +29,23 @@ const DomainValue = styled(Typography)(({ theme }) => ({
   textOverflow: 'ellipsis'
 }))
 
+const ContractLink = styled('a')(({ theme }) => ({
+  color: theme.palette.text.primary,
+  fontFamily: 'monospace',
+  fontSize: theme.typography.pxToRem(13),
+  textDecoration: 'underline',
+  textDecorationStyle: 'dotted',
+  textUnderlineOffset: 2,
+  ['&:hover']: {
+    color: theme.palette.primary.main,
+    textDecorationStyle: 'solid'
+  },
+  ['&:focus-visible']: {
+    outline: `2px solid ${theme.palette.primary.main}`,
+    outlineOffset: 2
+  }
+}))
+
 const FieldLabel = styled(Typography)(({ theme }) => ({
   color: theme.palette.text.secondary,
   fontSize: theme.typography.pxToRem(12),
@@ -99,6 +116,7 @@ const TreeValue = styled('span')(({ theme }) => ({
 }))
 
 export {
+  ContractLink,
   Content,
   DomainKey,
   DomainRow,

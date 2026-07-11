@@ -154,6 +154,8 @@ export const RequestPage = () => {
   const [simulationState, setSimulationState] = useState<SimulationState>({ status: 'idle' })
   // Resolved counterparty display names (lowercased address → name), filled in progressively.
   const [simulationProfiles, setSimulationProfiles] = useState<Record<string, string>>({})
+  // Chain the pending transaction/meta-tx was simulated on, for block-explorer links.
+  const [simulationChainId, setSimulationChainId] = useState<number>()
   // Whether the pending eth_sendTransaction will be relayed as a meta-transaction (gas covered
   // by Decentraland's gas tank), so the confirm dialog can hide the user-facing gas cost.
   const [isMetaTransaction, setIsMetaTransaction] = useState(false)
@@ -500,7 +502,10 @@ export const RequestPage = () => {
                     setIsMetaTransaction(willUseMetaTransaction)
                     if (canShowSimulation && txParams) {
                       const body = buildSendTransactionSimulationPayload(txParams, signerAddress, currentChainId, willUseMetaTransaction)
-                      if (body) return fetchSimulation(body)
+                      if (body) {
+                        setSimulationChainId(body.chainId)
+                        return fetchSimulation(body)
+                      }
                       setSimulationState({ status: 'unavailable' })
                     }
                     return undefined
@@ -596,6 +601,7 @@ export const RequestPage = () => {
                 const metaTx = decodeMetaTransactionTypedData(payload.typedData)
                 if (metaTx) {
                   setIsSignatureMetaTx(true)
+                  setSimulationChainId(metaTx.chainId)
                   setSimulationState({ status: 'loading' })
                   void fetchSimulation({
                     chainId: metaTx.chainId,
@@ -1067,6 +1073,7 @@ export const RequestPage = () => {
             simulation={simulationState}
             userAddress={account ?? ''}
             profiles={simulationProfiles}
+            chainId={simulationChainId}
             gasCovered={isMetaTransaction}
             isLoading={isLoading}
             onCancel={onDenyWalletInteraction}
@@ -1091,6 +1098,7 @@ export const RequestPage = () => {
             simulation={simulationState}
             userAddress={account ?? ''}
             profiles={simulationProfiles}
+            chainId={simulationChainId}
             gasCovered={isMetaTransaction}
             isLoading={isLoading}
             onCancel={onDenyWalletInteraction}
@@ -1115,6 +1123,7 @@ export const RequestPage = () => {
             simulation={simulationState}
             userAddress={account ?? ''}
             profiles={simulationProfiles}
+            chainId={simulationChainId}
             gasCovered={isMetaTransaction}
             isLoading={isLoading}
             onCancel={onDenyWalletInteraction}
@@ -1139,6 +1148,7 @@ export const RequestPage = () => {
           simulation={simulationState}
           userAddress={account ?? ''}
           profiles={simulationProfiles}
+          chainId={simulationChainId}
           isMetaTransaction={isSignatureMetaTx}
           isLoading={isLoading}
           onDeny={onDenyWalletInteraction}
