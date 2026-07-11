@@ -849,6 +849,20 @@ describe('RequestPage', () => {
       await waitFor(() => expect(mockSimulateTransaction).toHaveBeenCalled())
     })
 
+    it('should reuse the prefetched meta-transaction check on approve instead of re-checking', async () => {
+      mockWalletRequest.mockResolvedValue('0xhash')
+      mockSendSuccessfulOutcome.mockResolvedValue({})
+      renderRequestPage()
+      await screen.findByTestId('wallet-interaction')
+      await waitFor(() => expect(mockCheckMetaTransactionSupport).toHaveBeenCalled())
+      const callsAfterPrefetch = mockCheckMetaTransactionSupport.mock.calls.length
+
+      await userEvent.click(screen.getByTestId('wallet-interaction-approve'))
+      await screen.findByTestId('wallet-interaction-complete')
+
+      expect(mockCheckMetaTransactionSupport.mock.calls.length).toBe(callsAfterPrefetch)
+    })
+
     describe('and the simulation request fails', () => {
       beforeEach(() => {
         mockSimulateTransaction.mockRejectedValue(new Error('tenderly down'))

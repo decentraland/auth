@@ -238,6 +238,38 @@ describe('when rendering the SimulationSummary', () => {
     })
   })
 
+  describe('and an asset change involves neither the user as sender nor recipient', () => {
+    beforeEach(() => {
+      const result = emptyResult({
+        assetChanges: [
+          {
+            type: 'transfer',
+            standard: 'erc20',
+            from: '0x1111111111111111111111111111111111111111',
+            to: '0x2222222222222222222222222222222222222222',
+            amount: '5',
+            rawAmount: '5000000000000000000',
+            tokenId: null,
+            contractAddress: '0x0f5d2fb29fb7d3cfee444a200298f468908cc942',
+            symbol: 'MANA',
+            name: 'Decentraland MANA',
+            decimals: 18,
+            logoUrl: null,
+            dollarValue: null
+          }
+        ]
+      })
+      simulation = { status: 'ready', result }
+    })
+
+    it('should not present the third-party movement as sent or received', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} />)
+      expect(screen.queryByText('request.transaction_dialog.you_send')).not.toBeInTheDocument()
+      expect(screen.queryByText('request.transaction_dialog.you_receive')).not.toBeInTheDocument()
+      expect(screen.getByText('request.transaction_dialog.no_changes')).toBeInTheDocument()
+    })
+  })
+
   describe('and an ApprovalForAll is revoked', () => {
     beforeEach(() => {
       const result = emptyResult({

@@ -360,11 +360,12 @@ export const SimulationSummary = ({
 
   const { result } = simulation
   const user = userAddress.toLowerCase()
-  // "Sends" are assets leaving the user's account (transfers out, and burns whose `from` is
-  // the user). Everything else (assets received, mints to the user, and effects where the
-  // user is neither party) is grouped under "receives".
+  // "Sends" are assets leaving the user's account (transfers out, and burns whose `from` is the
+  // user). "Receives" are assets arriving to the user (transfers in and mints whose `to` is the
+  // user). A change where the user is neither party isn't shown as either, so an unrelated
+  // third-party movement is never mislabelled as something the user receives.
   const sends = result.assetChanges.filter(change => change.from?.toLowerCase() === user)
-  const receives = result.assetChanges.filter(change => change.from?.toLowerCase() !== user)
+  const receives = result.assetChanges.filter(change => change.from?.toLowerCase() !== user && change.to?.toLowerCase() === user)
   const hasNoChanges = sends.length === 0 && receives.length === 0 && result.approvalChanges.length === 0
   const networkName = getNetworkName(chainId)
 

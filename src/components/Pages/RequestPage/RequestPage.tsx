@@ -172,6 +172,9 @@ export const RequestPage = () => {
   // Guards against re-entrant approvals (e.g. a fast double-click on the confirm dialog),
   // which would otherwise fire two transactions before `isLoading` re-renders the buttons.
   const isApprovingRef = useRef(false)
+  // Caches the meta-transaction support check from the prefetch so the approve path can reuse it
+  // for the same contract instead of repeating the (potentially networked) lookup.
+  const metaTxCheckRef = useRef<{ address: string; willUseMetaTransaction: boolean; contractName: ContractName | null } | null>(null)
   // Shares the in-flight identity POST across effect re-runs so the client-login flow
   // creates the identity exactly once; cleared on failure so a retry can re-post.
   const clientLoginPromiseRef = useRef<Promise<IdentityResponse> | null>(null)
@@ -580,7 +583,9 @@ export const RequestPage = () => {
                   setSimulationState({ status: 'loading' })
                 }
                 checkMetaTransactionSupport(contractAddress)
-                  .then(({ willUseMetaTransaction }) => {
+                  .then(({ willUseMetaTransaction, contractName }) => {
+                    // Cache the result so the approve path doesn't repeat the lookup for this tx.
+                    metaTxCheckRef.current = { address: contractAddress.toLowerCase(), willUseMetaTransaction, contractName }
                     if (cancelled) return undefined
                     setIsMetaTransaction(willUseMetaTransaction)
                     if (canShowSimulation && txParams) {
@@ -624,7 +629,7 @@ export const RequestPage = () => {
             // preview of what they are signing. Meta-transaction typed data additionally gets
             // the asset-change summary by simulating the inner call.
             if (canShowSimulation && isSignatureMethod(request.method)) {
-              const payload = extractSignaturePayload(request.method, request.params)
+              const payload = extractSignaturePayload(request.method, request.params, signerAddress)
               setSignaturePayload(payload)
               if (payload?.kind === 'typedData') {
                 const metaTx = decodeMetaTransactionTypedData(payload.typedData)
@@ -890,8 +895,11 @@ export const RequestPage = () => {
           throw new Error(`Contract address not found in transaction parameters. Received params: ${JSON.stringify(txParams ?? null)}`)
         }
 
-        // Check if this contract will use meta transactions
-        const { willUseMetaTransaction, contractName } = await checkMetaTransactionSupport(toAddress)
+        // Check if this contract will use meta transactions, reusing the prefetch result for the
+        // same contract when available to avoid repeating the lookup.
+        const cachedCheck = metaTxCheckRef.current
+        const { willUseMetaTransaction, contractName } =
+          cachedCheck && cachedCheck.address === toAddress.toLowerCase() ? cachedCheck : await checkMetaTransactionSupport(toAddress)
         if (willUseMetaTransaction && contractName) {
           const connectedProvider = await getConnectedProvider()
           if (!connectedProvider) {
