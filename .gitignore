@@ -142,3 +142,10 @@ dist
 
 .cursor
 .claude
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+.playwright-mcp/

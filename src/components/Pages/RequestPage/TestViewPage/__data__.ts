@@ -1,6 +1,7 @@
 import { Rarity } from '@dcl/schemas'
 import { Avatar } from '@dcl/schemas/dist/platform/profile/avatar'
-import { MANATransferData, NFTTransferData } from '../types'
+import { SimulationResponseBody } from '../../../../shared/auth'
+import { MANATransferData, NFTTransferData, SignaturePayload } from '../types'
 
 const avatar: Avatar = {
   hasClaimedName: true,
@@ -123,4 +124,227 @@ const manaData: MANATransferData = {
   }
 }
 
-export { avatar, manaData, nftData }
+const USER_ADDRESS = '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd'
+
+const MARKETPLACE_ADDRESS = '0x1234567890abcdef1234567890abcdef12345678'
+const USDC_ADDRESS = '0x2791bca1f2de4661ed88a30c99a7a9449aa84174'
+const COLLECTION_ADDRESS = '0xfef5c99885c3036e591b6e6db52482891834a5f4'
+
+const simulationSuccess: SimulationResponseBody = {
+  status: 'success',
+  assetChanges: [
+    {
+      type: 'transfer',
+      standard: 'erc20',
+      from: USER_ADDRESS,
+      to: MARKETPLACE_ADDRESS,
+      amount: '100',
+      rawAmount: '100000000000000000000',
+      tokenId: null,
+      contractAddress: '0x0f5d2fb29fb7d3cfee444a200298f468908cc942',
+      symbol: 'MANA',
+      name: 'Decentraland MANA',
+      decimals: 18,
+      logoUrl: null,
+      dollarValue: '42.00'
+    },
+    {
+      type: 'transfer',
+      standard: 'erc20',
+      from: USER_ADDRESS,
+      to: MARKETPLACE_ADDRESS,
+      amount: '250.5',
+      rawAmount: '250500000',
+      tokenId: null,
+      contractAddress: USDC_ADDRESS,
+      symbol: 'USDC',
+      name: 'USD Coin',
+      decimals: 6,
+      logoUrl: null,
+      dollarValue: '250.50'
+    },
+    {
+      type: 'transfer',
+      standard: 'native',
+      from: USER_ADDRESS,
+      to: MARKETPLACE_ADDRESS,
+      amount: '1.5',
+      rawAmount: '1500000000000000000',
+      tokenId: null,
+      contractAddress: null,
+      symbol: 'MATIC',
+      name: null,
+      decimals: 18,
+      logoUrl: null,
+      dollarValue: '1.05'
+    },
+    {
+      type: 'transfer',
+      standard: 'erc20',
+      from: MARKETPLACE_ADDRESS,
+      to: USER_ADDRESS,
+      amount: '0.05',
+      rawAmount: '50000000000000000',
+      tokenId: null,
+      contractAddress: '0x7ceb23fd6bc0add59e62ac25578270cff1b9f619',
+      symbol: 'WETH',
+      name: 'Wrapped Ether',
+      decimals: 18,
+      logoUrl: null,
+      dollarValue: '160.00'
+    },
+    {
+      type: 'mint',
+      standard: 'erc721',
+      from: null,
+      to: USER_ADDRESS,
+      amount: null,
+      rawAmount: null,
+      tokenId: '512',
+      contractAddress: COLLECTION_ADDRESS,
+      symbol: 'WEAR',
+      name: 'Fancy Hat',
+      decimals: null,
+      logoUrl: null,
+      dollarValue: null
+    }
+  ],
+  approvalChanges: [
+    {
+      kind: 'approval',
+      standard: 'erc20',
+      owner: USER_ADDRESS,
+      spender: MARKETPLACE_ADDRESS,
+      amount: '500',
+      rawAmount: '500000000',
+      isUnlimited: false,
+      tokenId: null,
+      approved: null,
+      contractAddress: USDC_ADDRESS,
+      symbol: 'USDC',
+      name: 'USD Coin'
+    },
+    {
+      kind: 'approval',
+      standard: 'erc20',
+      owner: USER_ADDRESS,
+      spender: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd',
+      amount: null,
+      rawAmount: '115792089237316195423570985008687907853269984665640564039457584007913129639935',
+      isUnlimited: true,
+      tokenId: null,
+      approved: null,
+      contractAddress: '0x0f5d2fb29fb7d3cfee444a200298f468908cc942',
+      symbol: 'MANA',
+      name: 'Decentraland MANA'
+    },
+    {
+      kind: 'approvalForAll',
+      standard: 'erc721',
+      owner: USER_ADDRESS,
+      spender: MARKETPLACE_ADDRESS,
+      amount: null,
+      rawAmount: null,
+      isUnlimited: true,
+      tokenId: null,
+      approved: true,
+      contractAddress: COLLECTION_ADDRESS,
+      symbol: null,
+      name: 'Fancy Wearables'
+    },
+    {
+      kind: 'approvalForAll',
+      standard: 'erc721',
+      owner: USER_ADDRESS,
+      spender: '0x9999999999999999999999999999999999999999',
+      amount: null,
+      rawAmount: null,
+      isUnlimited: false,
+      tokenId: null,
+      approved: false,
+      contractAddress: '0x1111111111111111111111111111111111111111',
+      symbol: null,
+      name: 'Old Wearables'
+    },
+    {
+      kind: 'approval',
+      standard: 'erc721',
+      owner: USER_ADDRESS,
+      spender: MARKETPLACE_ADDRESS,
+      amount: null,
+      rawAmount: null,
+      isUnlimited: false,
+      tokenId: '7',
+      approved: null,
+      contractAddress: COLLECTION_ADDRESS,
+      symbol: null,
+      name: 'Fancy Wearables'
+    }
+  ],
+  balanceChanges: [{ address: USER_ADDRESS, dollarValue: '-133.55' }],
+  events: [
+    { name: 'Transfer', address: '0x0f5d2fb29fb7d3cfee444a200298f468908cc942' },
+    { name: 'Approval', address: USDC_ADDRESS },
+    { name: null, address: MARKETPLACE_ADDRESS }
+  ]
+}
+
+const simulationReverted: SimulationResponseBody = {
+  status: 'reverted',
+  error: 'ERC20: transfer amount exceeds balance',
+  assetChanges: [],
+  approvalChanges: [],
+  balanceChanges: [],
+  events: []
+}
+
+const simulationNoChanges: SimulationResponseBody = {
+  status: 'success',
+  assetChanges: [],
+  approvalChanges: [],
+  balanceChanges: [],
+  events: [{ name: 'ConfigUpdated', address: MARKETPLACE_ADDRESS }]
+}
+
+const messageSignaturePayload: SignaturePayload = {
+  kind: 'message',
+  message: 'Sign this message to prove you own this wallet.\nNonce: 12345'
+}
+
+const typedDataSignaturePayload: SignaturePayload = {
+  kind: 'typedData',
+  raw: '{"types":{},"primaryType":"Order","domain":{"name":"Decentraland Marketplace","chainId":137,"verifyingContract":"0x480a0f4e360e8964e68858dd231c2922f1df45ef"},"message":{"price":"1000000000000000000","expiration":"1700000000"}}',
+  typedData: {
+    types: {},
+    primaryType: 'Order',
+    domain: { name: 'Decentraland Marketplace', chainId: 137, verifyingContract: '0x480a0f4e360e8964e68858dd231c2922f1df45ef' },
+    message: { price: '1000000000000000000', expiration: '1700000000' }
+  }
+}
+
+const metaTxSignaturePayload: SignaturePayload = {
+  kind: 'typedData',
+  raw: '{"primaryType":"MetaTransaction","domain":{"name":"Decentraland Collection","verifyingContract":"0xfef5c99885c3036e591b6e6db52482891834a5f4","salt":"0x0000000000000000000000000000000000000000000000000000000000000089"},"message":{"nonce":0,"from":"0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd","functionSignature":"0xa9059cbb"}}',
+  typedData: {
+    primaryType: 'MetaTransaction',
+    domain: {
+      name: 'Decentraland Collection',
+      verifyingContract: '0xfef5c99885c3036e591b6e6db52482891834a5f4',
+      salt: '0x0000000000000000000000000000000000000000000000000000000000000089'
+    },
+    message: { nonce: 0, from: USER_ADDRESS, functionSignature: '0xa9059cbb' }
+  }
+}
+
+export {
+  avatar,
+  manaData,
+  metaTxSignaturePayload,
+  messageSignaturePayload,
+  nftData,
+  simulationNoChanges,
+  simulationReverted,
+  simulationSuccess,
+  typedDataSignaturePayload,
+  USER_ADDRESS
+}

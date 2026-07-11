@@ -76,12 +76,51 @@
     "wallet_interaction": {
       "title_web2": "Una escena quiere acceder a los activos de tu cuenta de Decentraland",
       "title_web3": "El {explorerText} quiere interactuar con tu billetera",
-      "description": "Solo procede si estás al tanto de todos los detalles de la transacción y confías en esta escena."
+      "description": "Solo procede si estás al tanto de todos los detalles de la transacción y confías en esta escena.",
+      "review_title": "Revisa esta transacción"
     },
     "transaction_dialog": {
       "title": "Confirmar transacción",
       "transaction_cost": "Costo de transacción: {cost} ETH",
-      "your_balance": "Tu saldo: {balance} ETH"
+      "your_balance": "Tu saldo: {balance} ETH",
+      "simulation_loading": "Comprobando qué hará esta transacción…",
+      "details_unavailable": "No hay una vista previa disponible para esta transacción. Continúa solo si confías en la escena.",
+      "you_send": "Envías",
+      "you_receive": "Recibes",
+      "approvals_title": "Permisos otorgados",
+      "approval_unlimited": "ilimitado",
+      "revert_title": "Es probable que esta transacción falle",
+      "revert_description": "Se espera que se revierta si se envía{reason}",
+      "unknown_token": "Token desconocido ({address})",
+      "gas_covered": "Las tarifas de gas están cubiertas por Decentraland.",
+      "minted": "Acuñado para ti",
+      "burned": "Quemado",
+      "net_change": "Cambio de valor estimado",
+      "no_changes": "Esta transacción no mueve ninguno de tus activos.",
+      "technical_details": "Detalles técnicos",
+      "hide_technical_details": "Ocultar detalles técnicos",
+      "event_unknown": "Evento desconocido",
+      "to_prefix": "a",
+      "from_prefix": "de",
+      "approval_can_spend": "puede gastar {amount} {symbol}",
+      "approval_can_transfer_token": "puede transferir {token} #{tokenId}",
+      "approval_can_access_all": "puede acceder a toda tu colección {name}",
+      "approval_access_revoked": "ya no puede acceder a tu colección {name}",
+      "view_on_explorer": "Ver en {explorer}",
+      "verified_contract": "Contrato de Decentraland verificado",
+      "on_network": "en {network}",
+      "acknowledge_risk": "Entiendo que esto otorga acceso a mis activos",
+      "approval_can_spend_symbol": "puede gastar {symbol}"
+    },
+    "signature": {
+      "title": "Confirmar firma",
+      "description": "Revisa lo que estás a punto de firmar.",
+      "message_label": "Mensaje",
+      "typed_data_label": "Datos",
+      "network": "Red",
+      "contract": "Contrato",
+      "view_raw": "Ver datos sin procesar",
+      "hide_raw": "Ocultar datos sin procesar"
     }
   },
   "request_views": {

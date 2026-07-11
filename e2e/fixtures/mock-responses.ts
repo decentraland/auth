@@ -52,6 +52,41 @@ export const healthResponse = {
   timestamp: Date.now()
 }
 
+/** Auth server: POST /simulations — successful asset-change summary */
+export const simulationSuccessResponse = {
+  status: 'success',
+  assetChanges: [
+    {
+      type: 'transfer',
+      standard: 'erc20',
+      from: MOCK_WALLET,
+      to: '0x1234567890abcdef1234567890abcdef12345678',
+      amount: '100',
+      rawAmount: '100000000000000000000',
+      tokenId: null,
+      contractAddress: '0x0f5d2fb29fb7d3cfee444a200298f468908cc942',
+      symbol: 'MANA',
+      name: 'Decentraland MANA',
+      decimals: 18,
+      logoUrl: null,
+      dollarValue: '42.00'
+    }
+  ],
+  approvalChanges: [],
+  balanceChanges: [{ address: MOCK_WALLET, dollarValue: '-42.00' }],
+  events: [{ name: 'Transfer', address: '0x0f5d2fb29fb7d3cfee444a200298f468908cc942' }]
+}
+
+/** Auth server: POST /simulations — transaction expected to revert */
+export const simulationRevertedResponse = {
+  status: 'reverted',
+  error: 'ERC20: transfer amount exceeds balance',
+  assetChanges: [],
+  approvalChanges: [],
+  balanceChanges: [],
+  events: []
+}
+
 /** Feature flags: dapps.json */
 export const featureFlagsResponse = {
   flags: {

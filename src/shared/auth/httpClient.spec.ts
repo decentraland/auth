@@ -2,9 +2,15 @@ import { AuthIdentity } from '@dcl/crypto'
 import signedFetchMock from 'decentraland-crypto-fetch'
 import { getAnalytics } from '../../modules/analytics/segment'
 import { config } from '../../modules/config'
-import { DifferentSenderError, ExpiredRequestError, ImpersonatedSignInError, RequestNotFoundError } from './errors'
+import {
+  DifferentSenderError,
+  ExpiredRequestError,
+  ImpersonatedSignInError,
+  RequestNotFoundError,
+  SimulationUnavailableError
+} from './errors'
 import { createAuthServerHttpClient } from './httpClient'
-import { RecoverResponse } from './types'
+import { RecoverResponse, SimulationRequestBody, SimulationResponseBody } from './types'
 // Mock dependencies
 jest.mock('@sentry/react')
 jest.mock('../../modules/analytics/segment')
@@ -464,6 +470,66 @@ describe('createAuthServerClient', () => {
 
       it('should handle and rethrow the error', async () => {
         await expect(client.postIdentity(mockIdentity)).rejects.toThrow('Network error')
+      })
+    })
+  })
+
+  describe('when simulating a transaction', () => {
+    let client: ReturnType<typeof createAuthServerHttpClient>
+    let body: SimulationRequestBody
+
+    beforeEach(() => {
+      client = createAuthServerHttpClient()
+      body = {
+        chainId: 137,
+        from: '0x1111111111111111111111111111111111111111',
+        to: '0x2222222222222222222222222222222222222222',
+        data: '0x',
+        value: '0'
+      }
+    })
+
+    describe('and the server responds with a summary', () => {
+      let response: SimulationResponseBody
+
+      beforeEach(() => {
+        response = { status: 'success', assetChanges: [], approvalChanges: [], balanceChanges: [], events: [] }
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(response)
+        })
+      })
+
+      it('should POST the body to the /simulations endpoint', async () => {
+        await client.simulateTransaction(body)
+        expect(mockFetch).toHaveBeenCalledWith(
+          mockUrl + '/simulations',
+          expect.objectContaining({ method: 'POST', body: JSON.stringify(body) })
+        )
+      })
+
+      it('should resolve with the normalized summary', async () => {
+        await expect(client.simulateTransaction(body)).resolves.toEqual(response)
+      })
+    })
+
+    describe('and the server responds with a non-200 status', () => {
+      beforeEach(() => {
+        mockFetch.mockResolvedValueOnce({ ok: false, status: 502, body: undefined })
+      })
+
+      it('should throw a SimulationUnavailableError', async () => {
+        await expect(client.simulateTransaction(body)).rejects.toBeInstanceOf(SimulationUnavailableError)
+      })
+    })
+
+    describe('and the request fails or times out', () => {
+      beforeEach(() => {
+        mockFetch.mockRejectedValueOnce(new Error('The operation was aborted due to timeout'))
+      })
+
+      it('should throw a SimulationUnavailableError', async () => {
+        await expect(client.simulateTransaction(body)).rejects.toBeInstanceOf(SimulationUnavailableError)
       })
     })
   })

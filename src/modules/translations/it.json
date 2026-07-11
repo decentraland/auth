@@ -76,12 +76,51 @@
     "wallet_interaction": {
       "title_web2": "Una scena vuole accedere alle risorse del tuo account Decentraland",
       "title_web3": "Il {explorerText} vuole interagire con il tuo portafoglio",
-      "description": "Procedi solo se sei a conoscenza di tutti i dettagli della transazione e ti fidi di questa scena."
+      "description": "Procedi solo se sei a conoscenza di tutti i dettagli della transazione e ti fidi di questa scena.",
+      "review_title": "Rivedi questa transazione"
     },
     "transaction_dialog": {
       "title": "Conferma transazione",
       "transaction_cost": "Costo della transazione: {cost} ETH",
-      "your_balance": "Il tuo saldo: {balance} ETH"
+      "your_balance": "Il tuo saldo: {balance} ETH",
+      "simulation_loading": "Verifica di cosa farà questa transazione…",
+      "details_unavailable": "Non è disponibile un'anteprima per questa transazione. Continua solo se ti fidi della scena.",
+      "you_send": "Invii",
+      "you_receive": "Ricevi",
+      "approvals_title": "Autorizzazioni concesse",
+      "approval_unlimited": "illimitato",
+      "revert_title": "È probabile che questa transazione fallisca",
+      "revert_description": "Si prevede che venga annullata se inviata{reason}",
+      "unknown_token": "Token sconosciuto ({address})",
+      "gas_covered": "Le commissioni di gas sono coperte da Decentraland.",
+      "minted": "Coniato per te",
+      "burned": "Bruciato",
+      "net_change": "Variazione di valore stimata",
+      "no_changes": "Questa transazione non muove nessuno dei tuoi asset.",
+      "technical_details": "Dettagli tecnici",
+      "hide_technical_details": "Nascondi dettagli tecnici",
+      "event_unknown": "Evento sconosciuto",
+      "to_prefix": "a",
+      "from_prefix": "da",
+      "approval_can_spend": "può spendere {amount} {symbol}",
+      "approval_can_transfer_token": "può trasferire {token} #{tokenId}",
+      "approval_can_access_all": "può accedere a tutta la tua collezione {name}",
+      "approval_access_revoked": "non può più accedere alla tua collezione {name}",
+      "view_on_explorer": "Visualizza su {explorer}",
+      "verified_contract": "Contratto Decentraland verificato",
+      "on_network": "su {network}",
+      "acknowledge_risk": "Capisco che questo concede l'accesso ai miei asset",
+      "approval_can_spend_symbol": "può spendere {symbol}"
+    },
+    "signature": {
+      "title": "Conferma firma",
+      "description": "Controlla cosa stai per firmare.",
+      "message_label": "Messaggio",
+      "typed_data_label": "Dati",
+      "network": "Rete",
+      "contract": "Contratto",
+      "view_raw": "Mostra dati grezzi",
+      "hide_raw": "Nascondi dati grezzi"
     }
   },
   "request_views": {

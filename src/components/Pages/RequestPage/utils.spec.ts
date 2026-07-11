@@ -9,16 +9,20 @@ import { connection } from 'decentraland-connect'
 import { ContractName, getContract, getContractName } from 'decentraland-transactions'
 import { config } from '../../../modules/config'
 import {
+  buildSendTransactionSimulationPayload,
   checkMetaTransactionSupport,
   decodeManaTransferData,
+  decodeMetaTransactionTypedData,
   decodeNftTransferData,
+  extractSignaturePayload,
   fetchNftMetadata,
   getConnectedProvider,
   getExplorerDeeplink,
   getMetaTransactionChainId,
   getNetworkProvider,
   getSigninDeeplink,
-  isDecentralandContractAddress
+  isDecentralandContractAddress,
+  isSignatureMethod
 } from './utils'
 
 jest.mock('decentraland-connect')
@@ -28,7 +32,9 @@ jest.mock('viem', () => ({
   createPublicClient: jest.fn(),
   custom: jest.fn((provider: any) => provider),
   decodeFunctionData: jest.fn(),
-  formatEther: jest.fn()
+  formatEther: jest.fn(),
+  // Use the real hexToString so signature-message decoding can be exercised.
+  hexToString: jest.requireActual('viem').hexToString
 }))
 
 describe('when testing getConnectedProvider', () => {
@@ -165,7 +171,10 @@ describe('when testing isDecentralandContractAddress', () => {
     it('should return true', async () => {
       const result = await isDecentralandContractAddress(contractAddress)
       expect(result).toBe(true)
-      expect(fetch).toHaveBeenCalledWith(`${metaTransactionServerUrl}/v1/contracts/${contractAddress}`)
+      expect(fetch).toHaveBeenCalledWith(
+        `${metaTransactionServerUrl}/v1/contracts/${contractAddress}`,
+        expect.objectContaining({ signal: expect.any(AbortSignal) })
+      )
     })
   })
 
@@ -978,6 +987,181 @@ describe('when building the signin deep link', () => {
 
     it('should url-encode the identity id in the signin param', () => {
       expect(getSigninDeeplink(deepLink, identityId, false)).toBe('decentraland://open?signin=a%26b%3Dc')
+    })
+  })
+})
+
+describe('when testing isSignatureMethod', () => {
+  describe.each(['personal_sign', 'eth_sign', 'eth_signTypedData', 'eth_signTypedData_v3', 'eth_signTypedData_v4'])(
+    'and the method is a signature method (%s)',
+    method => {
+      it('should return true', () => {
+        expect(isSignatureMethod(method)).toBe(true)
+      })
+    }
+  )
+
+  describe.each(['eth_sendTransaction', 'dcl_personal_sign', 'wallet_switchEthereumChain'])(
+    'and the method is not a signature method (%s)',
+    method => {
+      it('should return false', () => {
+        expect(isSignatureMethod(method)).toBe(false)
+      })
+    }
+  )
+})
+
+describe('when testing extractSignaturePayload', () => {
+  const userAddress = '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd'
+
+  describe('and the method is personal_sign with a hex-encoded message', () => {
+    it('should decode the hex message to its UTF-8 text', () => {
+      const result = extractSignaturePayload('personal_sign', ['0x48656c6c6f', userAddress])
+      expect(result).toEqual({ kind: 'message', message: 'Hello' })
+    })
+  })
+
+  describe('and the method is personal_sign with a plain-text message', () => {
+    it('should return the message unchanged', () => {
+      const result = extractSignaturePayload('personal_sign', ['just text', userAddress])
+      expect(result).toEqual({ kind: 'message', message: 'just text' })
+    })
+  })
+
+  describe('and the method is eth_sign with the address first', () => {
+    it('should pick the non-address element as the message', () => {
+      const result = extractSignaturePayload('eth_sign', [userAddress, 'sign me'])
+      expect(result).toEqual({ kind: 'message', message: 'sign me' })
+    })
+  })
+
+  describe('and the method is eth_signTypedData_v4 with a JSON string', () => {
+    let json: string
+
+    beforeEach(() => {
+      json = '{"primaryType":"Order","domain":{"chainId":137},"message":{"price":"1"}}'
+    })
+
+    it('should parse the typed data and keep the raw string', () => {
+      const result = extractSignaturePayload('eth_signTypedData_v4', [userAddress, json])
+      expect(result).toEqual({
+        kind: 'typedData',
+        raw: json,
+        typedData: { primaryType: 'Order', domain: { chainId: 137 }, message: { price: '1' } }
+      })
+    })
+  })
+
+  describe('and the typed-data JSON cannot be parsed', () => {
+    it('should fall back to a plain message payload', () => {
+      const result = extractSignaturePayload('eth_signTypedData_v4', [userAddress, 'not-json'])
+      expect(result).toEqual({ kind: 'message', message: 'not-json' })
+    })
+  })
+
+  describe('and no params are provided', () => {
+    it('should return null', () => {
+      expect(extractSignaturePayload('personal_sign', undefined)).toBeNull()
+    })
+  })
+})
+
+describe('when testing decodeMetaTransactionTypedData', () => {
+  describe('and the typed data is a meta-transaction with a salt-encoded chain id', () => {
+    let typedData: any
+
+    beforeEach(() => {
+      typedData = {
+        primaryType: 'MetaTransaction',
+        domain: {
+          verifyingContract: '0xfef5c99885c3036e591b6e6db52482891834a5f4',
+          salt: '0x0000000000000000000000000000000000000000000000000000000000000089'
+        },
+        message: { nonce: 0, from: '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd', functionSignature: '0xa9059cbb' }
+      }
+    })
+
+    it('should return the inner call with the chain id decoded from the salt', () => {
+      expect(decodeMetaTransactionTypedData(typedData)).toEqual({
+        from: '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd',
+        verifyingContract: '0xfef5c99885c3036e591b6e6db52482891834a5f4',
+        functionSignature: '0xa9059cbb',
+        chainId: 137
+      })
+    })
+  })
+
+  describe('and the meta-transaction has no salt but a chainId domain field', () => {
+    let typedData: any
+
+    beforeEach(() => {
+      typedData = {
+        primaryType: 'MetaTransaction',
+        domain: { verifyingContract: '0xfef5c99885c3036e591b6e6db52482891834a5f4', chainId: 80002 },
+        message: { from: '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd', functionSignature: '0xa9059cbb' }
+      }
+    })
+
+    it('should fall back to the chainId domain field', () => {
+      expect(decodeMetaTransactionTypedData(typedData)?.chainId).toBe(80002)
+    })
+  })
+
+  describe('and the typed data is not a meta-transaction', () => {
+    it('should return null', () => {
+      expect(decodeMetaTransactionTypedData({ primaryType: 'Order', domain: {}, message: {} })).toBeNull()
+    })
+  })
+
+  describe('and the typed data is undefined', () => {
+    it('should return null', () => {
+      expect(decodeMetaTransactionTypedData(undefined)).toBeNull()
+    })
+  })
+})
+
+describe('when testing buildSendTransactionSimulationPayload', () => {
+  const signerAddress = '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd'
+
+  afterEach(() => {
+    jest.resetAllMocks()
+  })
+
+  describe('and the transaction will be relayed as a meta-transaction', () => {
+    let txParams: Record<string, unknown>
+
+    beforeEach(() => {
+      ;(config.get as jest.Mock).mockReturnValue('production')
+      txParams = { to: '0xfef5c99885c3036e591b6e6db52482891834a5f4', data: '0xa9059cbb', value: '0x0' }
+    })
+
+    it('should simulate on the meta-transaction chain', () => {
+      const result = buildSendTransactionSimulationPayload(txParams, signerAddress, 1, true)
+      expect(result?.chainId).toBe(ChainId.MATIC_MAINNET)
+    })
+
+    it('should default the from address to the signer when not present in the params', () => {
+      const result = buildSendTransactionSimulationPayload(txParams, signerAddress, 1, true)
+      expect(result?.from).toBe(signerAddress)
+    })
+  })
+
+  describe('and the transaction will not be relayed as a meta-transaction', () => {
+    let txParams: Record<string, unknown>
+
+    beforeEach(() => {
+      txParams = { to: '0x1111111111111111111111111111111111111111', data: '0x', value: '0x0' }
+    })
+
+    it('should simulate on the connected chain', () => {
+      const result = buildSendTransactionSimulationPayload(txParams, signerAddress, 1, false)
+      expect(result?.chainId).toBe(1)
+    })
+  })
+
+  describe('and the transaction has no to address', () => {
+    it('should return null', () => {
+      expect(buildSendTransactionSimulationPayload({ data: '0x' }, signerAddress, 1, false)).toBeNull()
     })
   })
 })

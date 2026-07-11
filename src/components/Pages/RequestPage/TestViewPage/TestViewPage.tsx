@@ -12,8 +12,11 @@ import {
   LoadingRequest,
   RecoverError,
   SignInComplete,
+  SignatureRequestView,
   SigningError,
+  SimulationSummary,
   TimeoutError,
+  TransactionConfirmDialog,
   TransferCanceledView,
   TransferCompletedView,
   TransferConfirmView,
@@ -21,8 +24,18 @@ import {
   WalletInteraction,
   WalletInteractionComplete
 } from '../Views'
-import { manaData, nftData } from './__data__'
-import { FloatingBar, ViewSelect } from './TestViewPage.styled'
+import {
+  USER_ADDRESS,
+  manaData,
+  messageSignaturePayload,
+  metaTxSignaturePayload,
+  nftData,
+  simulationNoChanges,
+  simulationReverted,
+  simulationSuccess,
+  typedDataSignaturePayload
+} from './__data__'
+import { FloatingBar, PreviewSurface, ViewSelect } from './TestViewPage.styled'
 
 type ViewIdParam = {
   viewId?: string
@@ -100,9 +113,134 @@ export const TestViewPage = () => {
         element: (
           <TransferConfirmView type={TransferType.TIP} transferData={manaData} isLoading={false} onDeny={noop} onApprove={asyncNoop} />
         )
+      },
+      simulationSummarySuccess: {
+        label: 'SimulationSummary (Success)',
+        element: (
+          <PreviewSurface>
+            <SimulationSummary simulation={{ status: 'ready', result: simulationSuccess }} userAddress={USER_ADDRESS} chainId={137} />
+          </PreviewSurface>
+        )
+      },
+      simulationSummaryReverted: {
+        label: 'SimulationSummary (Reverted)',
+        element: (
+          <PreviewSurface>
+            <SimulationSummary simulation={{ status: 'ready', result: simulationReverted }} userAddress={USER_ADDRESS} chainId={137} />
+          </PreviewSurface>
+        )
+      },
+      simulationSummaryUnavailable: {
+        label: 'SimulationSummary (Unavailable)',
+        element: (
+          <PreviewSurface>
+            <SimulationSummary simulation={{ status: 'unavailable' }} userAddress={USER_ADDRESS} chainId={137} />
+          </PreviewSurface>
+        )
+      },
+      simulationSummaryNoChanges: {
+        label: 'SimulationSummary (No asset changes)',
+        element: (
+          <PreviewSurface>
+            <SimulationSummary simulation={{ status: 'ready', result: simulationNoChanges }} userAddress={USER_ADDRESS} chainId={137} />
+          </PreviewSurface>
+        )
+      },
+      walletInteractionSimulation: {
+        label: 'Wallet Interaction (with summary)',
+        element: (
+          <WalletInteraction
+            requestId={DEFAULT_REQUEST_ID}
+            isWeb2Wallet
+            simulation={{ status: 'ready', result: simulationSuccess }}
+            userAddress={USER_ADDRESS}
+            verifiedContracts={['0x1234567890abcdef1234567890abcdef12345678', '0x0f5d2fb29fb7d3cfee444a200298f468908cc942']}
+            chainId={137}
+            requiresAcknowledgment
+            gasCovered
+            onDeny={noop}
+            onApprove={noop}
+          />
+        )
+      },
+      transactionDialogGasCovered: {
+        label: 'TransactionConfirmDialog (Gas covered)',
+        element: (
+          <TransactionConfirmDialog open transactionCost={BigInt(0)} balance={BigInt(0)} gasCovered onCancel={noop} onConfirm={noop} />
+        )
+      },
+      transactionDialogWithGas: {
+        label: 'TransactionConfirmDialog (User pays gas)',
+        element: (
+          <TransactionConfirmDialog
+            open
+            transactionCost={BigInt('2500000000000000')}
+            balance={BigInt('1500000000000000000')}
+            onCancel={noop}
+            onConfirm={noop}
+          />
+        )
+      },
+      transactionDialogReverted: {
+        label: 'TransactionConfirmDialog (Reverted)',
+        element: (
+          <TransactionConfirmDialog
+            open
+            transactionCost={BigInt('2500000000000000')}
+            balance={BigInt('1500000000000000000')}
+            isReverted
+            onCancel={noop}
+            onConfirm={noop}
+          />
+        )
+      },
+      signatureMessage: {
+        label: 'SignatureRequest (Message)',
+        element: (
+          <SignatureRequestView
+            requestId={DEFAULT_REQUEST_ID}
+            method="personal_sign"
+            payload={messageSignaturePayload}
+            simulation={{ status: 'idle' }}
+            userAddress={USER_ADDRESS}
+            isMetaTransaction={false}
+            onDeny={noop}
+            onApprove={asyncNoop}
+          />
+        )
+      },
+      signatureTypedData: {
+        label: 'SignatureRequest (Typed Data)',
+        element: (
+          <SignatureRequestView
+            requestId={DEFAULT_REQUEST_ID}
+            method="eth_signTypedData_v4"
+            payload={typedDataSignaturePayload}
+            simulation={{ status: 'idle' }}
+            userAddress={USER_ADDRESS}
+            isMetaTransaction={false}
+            onDeny={noop}
+            onApprove={asyncNoop}
+          />
+        )
+      },
+      signatureMetaTx: {
+        label: 'SignatureRequest (Meta-tx)',
+        element: (
+          <SignatureRequestView
+            requestId={DEFAULT_REQUEST_ID}
+            method="eth_signTypedData_v4"
+            payload={metaTxSignaturePayload}
+            simulation={{ status: 'ready', result: simulationSuccess }}
+            userAddress={USER_ADDRESS}
+            isMetaTransaction={true}
+            onDeny={noop}
+            onApprove={asyncNoop}
+          />
+        )
       }
     } as const
-  }, [manaData, nftData])
+  }, [])
 
   const selected = viewId ? (views as Record<string, { label: string; element: JSX.Element }>)[viewId] : undefined
 

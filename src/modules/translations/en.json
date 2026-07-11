@@ -76,12 +76,51 @@
     "wallet_interaction": {
       "title_web2": "A scene wants to access your Decentraland account assets",
       "title_web3": "The {explorerText} wants to interact with your wallet",
-      "description": "Only proceed if you are aware of all transaction details and trust this scene."
+      "description": "Only proceed if you are aware of all transaction details and trust this scene.",
+      "review_title": "Review this transaction"
     },
     "transaction_dialog": {
       "title": "Confirm Transaction",
       "transaction_cost": "Transaction cost: {cost} ETH",
-      "your_balance": "Your balance: {balance} ETH"
+      "your_balance": "Your balance: {balance} ETH",
+      "simulation_loading": "Checking what this transaction will do…",
+      "details_unavailable": "A preview of this transaction isn't available. Only continue if you trust the scene.",
+      "you_send": "You send",
+      "you_receive": "You receive",
+      "approvals_title": "Permissions granted",
+      "approval_unlimited": "unlimited",
+      "revert_title": "This transaction is likely to fail",
+      "revert_description": "It is expected to revert if submitted{reason}",
+      "unknown_token": "Unknown token ({address})",
+      "gas_covered": "Gas fees are covered by Decentraland.",
+      "minted": "Minted to you",
+      "burned": "Burned",
+      "net_change": "Estimated value change",
+      "no_changes": "This transaction doesn't move any of your assets.",
+      "technical_details": "Technical details",
+      "hide_technical_details": "Hide technical details",
+      "event_unknown": "Unknown event",
+      "to_prefix": "to",
+      "from_prefix": "from",
+      "approval_can_spend": "can spend {amount} {symbol}",
+      "approval_can_transfer_token": "can transfer {token} #{tokenId}",
+      "approval_can_access_all": "can access your entire {name} collection",
+      "approval_access_revoked": "can no longer access your {name} collection",
+      "view_on_explorer": "View on {explorer}",
+      "verified_contract": "Verified Decentraland contract",
+      "on_network": "on {network}",
+      "acknowledge_risk": "I understand this grants access to my assets",
+      "approval_can_spend_symbol": "can spend {symbol}"
+    },
+    "signature": {
+      "title": "Confirm signature",
+      "description": "Review what you are about to sign.",
+      "message_label": "Message",
+      "typed_data_label": "Data",
+      "network": "Network",
+      "contract": "Contract",
+      "view_raw": "View raw data",
+      "hide_raw": "Hide raw data"
     }
   },
   "request_views": {

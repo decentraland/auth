@@ -1,10 +1,8 @@
 import { useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { createPublicClient, createWalletClient, custom, formatEther } from 'viem'
+import { createPublicClient, createWalletClient, custom } from 'viem'
 import { mainnet } from 'viem/chains'
-import { useTranslation } from '@dcl/hooks'
 import { ContractName, getContract, sendMetaTransaction } from 'decentraland-transactions'
-import { Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle } from 'decentraland-ui2'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import { useAnalytics } from '../../../hooks/useAnalytics'
@@ -23,10 +21,12 @@ import {
   IpValidationError,
   RecoverResponse,
   RequestFulfilledError,
+  SimulationRequestBody,
+  SimulationResponseBody,
   TimedOutError,
   createAuthServerHttpClient
 } from '../../../shared/auth'
-import { useCurrentConnectionData } from '../../../shared/connection'
+import { isSocialProviderType, useCurrentConnectionData } from '../../../shared/connection'
 import { isErrorWithMessage, isRpcError, isUserRejectedTransaction } from '../../../shared/errors'
 import {
   CLIENT_LOGIN_REQUEST_ID,
@@ -40,18 +40,23 @@ import { isProfileComplete } from '../../../shared/profile'
 import { identifyUser } from '../../../shared/utils/analytics'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
-import { MANATransferData, NFTTransferData, TransferType } from './types'
+import { MANATransferData, NFTTransferData, SignaturePayload, SimulationState, TransferType } from './types'
 import {
+  buildSendTransactionSimulationPayload,
   checkMetaTransactionSupport,
   decodeManaTransferData,
+  decodeMetaTransactionTypedData,
   decodeNftTransferData,
+  extractSignaturePayload,
   fetchNftMetadata,
   fetchPlaceByCreatorAddress,
   getConnectedProvider,
   getExplorerDeeplink,
   getMetaTransactionChainId,
   getNetworkProvider,
-  getSigninDeeplink
+  getSigninDeeplink,
+  isKnownDecentralandContract,
+  isSignatureMethod
 } from './utils'
 import {
   ClientLoginError,
@@ -64,8 +69,10 @@ import {
   RecoverError,
   SignInComplete,
   SignInCompletePage,
+  SignatureRequestView,
   SigningError,
   TimeoutError,
+  TransactionConfirmDialog,
   TransferCanceledView,
   TransferCompletedView,
   TransferConfirmView,
@@ -92,6 +99,7 @@ enum View {
   CLIENT_LOGIN_ERROR,
   // Wallet Interaction
   WALLET_INTERACTION,
+  WALLET_SIGNATURE_INTERACTION,
   WALLET_NFT_INTERACTION,
   WALLET_MANA_INTERACTION,
   WALLET_INTERACTION_DENIED,
@@ -101,36 +109,6 @@ enum View {
   WALLET_INTERACTION_COMPLETE,
   WALLET_NFT_INTERACTION_COMPLETE,
   WALLET_MANA_INTERACTION_COMPLETE
-}
-
-interface TransactionConfirmDialogProps {
-  open: boolean
-  transactionCost: bigint
-  balance: bigint
-  isLoading?: boolean
-  onCancel: () => void
-  onConfirm: () => void
-}
-
-const TransactionConfirmDialog = ({ open, transactionCost, balance, isLoading, onCancel, onConfirm }: TransactionConfirmDialogProps) => {
-  const { t } = useTranslation()
-  return (
-    <Dialog open={open} maxWidth="xs" fullWidth>
-      <DialogTitle>{t('request.transaction_dialog.title')}</DialogTitle>
-      <DialogContent>
-        <p>{t('request.transaction_dialog.transaction_cost', { cost: formatEther(transactionCost) })}</p>
-        <p>{t('request.transaction_dialog.your_balance', { balance: formatEther(balance) })}</p>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onCancel} disabled={isLoading}>
-          {t('common.cancel')}
-        </Button>
-        <Button variant="contained" onClick={onConfirm} disabled={isLoading}>
-          {isLoading ? <CircularProgress size={20} color="inherit" /> : t('common.confirm')}
-        </Button>
-      </DialogActions>
-    </Dialog>
-  )
 }
 
 // Terminal views that should not trigger a re-fetch of the request
@@ -175,6 +153,18 @@ export const RequestPage = () => {
   const [nftTransferData, setNftTransferData] = useState<NFTTransferData | null>(null)
   const [manaTransferData, setManaTransferData] = useState<MANATransferData | null>(null)
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false)
+  const [simulationState, setSimulationState] = useState<SimulationState>({ status: 'idle' })
+  // Resolved counterparty display names (lowercased address → name), filled in progressively.
+  const [simulationProfiles, setSimulationProfiles] = useState<Record<string, string>>({})
+  // Chain the pending transaction/meta-tx was simulated on, for block-explorer links.
+  const [simulationChainId, setSimulationChainId] = useState<number>()
+  // Lowercased addresses in the simulation that are recognized Decentraland contracts.
+  const [simulationVerified, setSimulationVerified] = useState<string[]>([])
+  // Whether the pending eth_sendTransaction will be relayed as a meta-transaction (gas covered
+  // by Decentraland's gas tank), so the confirm dialog can hide the user-facing gas cost.
+  const [isMetaTransaction, setIsMetaTransaction] = useState(false)
+  const [signaturePayload, setSignaturePayload] = useState<SignaturePayload | null>(null)
+  const [isSignatureMetaTx, setIsSignatureMetaTx] = useState(false)
   const requestRef = useRef<RecoverResponse>()
   const viewRef = useRef(view)
   viewRef.current = view
@@ -202,7 +192,12 @@ export const RequestPage = () => {
   const requestId = params.requestId ?? ''
   const [targetConfig, targetConfigId] = useTargetConfig()
   const skipSetup = useSkipSetup()
-  const isUserUsingWeb2Wallet = !!provider?.isMagic
+  // Social / web2 wallets (Magic and Thirdweb) sign without their own confirmation UI, so the
+  // auth site must show what is being approved. `provider.isMagic` alone misses Thirdweb.
+  const isUserUsingWeb2Wallet = isSocialProviderType(providerType)
+  // The informative simulation/signature UI is only shown to web2 users and gated behind a
+  // feature flag for rollout. External wallets keep their own confirmation UI unchanged.
+  const canShowSimulation = isUserUsingWeb2Wallet && !!flags[FeatureFlagsKeys.TRANSACTION_SIMULATION]
   const authServerClient = useRef(createAuthServerHttpClient())
   const isDeepLinkFlow = searchParams.get('flow') === 'deeplink'
   // The `client-login` pseudo request id has no backing auth-server request: skip the
@@ -381,6 +376,74 @@ export const RequestPage = () => {
           }, expirationDelay)
         }
 
+        // Resolves Decentraland profile names for the transaction's counterparties as a
+        // progressive enhancement — the summary renders immediately with addresses and names
+        // fill in when (and if) they resolve. Never blocks or fails the summary.
+        const resolveSimulationProfiles = async (result: SimulationResponseBody) => {
+          const addresses = new Set<string>()
+          for (const change of result.assetChanges) {
+            if (change.from) addresses.add(change.from.toLowerCase())
+            if (change.to) addresses.add(change.to.toLowerCase())
+          }
+          for (const approval of result.approvalChanges) {
+            if (approval.spender) addresses.add(approval.spender.toLowerCase())
+          }
+          addresses.delete(signerAddress.toLowerCase())
+          addresses.delete('0x0000000000000000000000000000000000000000')
+
+          const entries = await Promise.all(
+            [...addresses].map(async address => {
+              try {
+                const profile = await fetchProfile(address)
+                const name = profile?.avatars?.[0]?.name
+                return name ? ([address, name] as const) : null
+              } catch {
+                return null
+              }
+            })
+          )
+          if (cancelled) return
+          const resolved = Object.fromEntries(entries.filter((entry): entry is readonly [string, string] => entry !== null))
+          if (Object.keys(resolved).length > 0) {
+            setSimulationProfiles(resolved)
+          }
+        }
+
+        // Collects the addresses in the simulation that are recognized Decentraland contracts,
+        // so the summary can show a "verified" badge next to them.
+        const collectVerifiedContracts = (result: SimulationResponseBody): string[] => {
+          const verified = new Set<string>()
+          const consider = (address: string | null) => {
+            if (address && isKnownDecentralandContract(address)) verified.add(address.toLowerCase())
+          }
+          for (const change of result.assetChanges) {
+            consider(change.from)
+            consider(change.to)
+            consider(change.contractAddress)
+          }
+          for (const approval of result.approvalChanges) {
+            consider(approval.spender)
+            consider(approval.contractAddress)
+          }
+          return [...verified]
+        }
+
+        // Best-effort transaction simulation for web2 users. Fires without blocking the view
+        // render and never throws to the caller — failures surface as "details unavailable".
+        const fetchSimulation = async (body: SimulationRequestBody) => {
+          try {
+            const result = await authServerClient.current.simulateTransaction(body)
+            if (cancelled) return
+            setSimulationState({ status: 'ready', result })
+            setSimulationVerified(collectVerifiedContracts(result))
+            void resolveSimulationProfiles(result)
+          } catch (e) {
+            if (cancelled) return
+            console.info('Transaction simulation unavailable:', e instanceof Error ? e.message : String(e))
+            setSimulationState({ status: 'unavailable' })
+          }
+        }
+
         // Show different views depending on the request method.
         switch (request.method) {
           case 'dcl_personal_sign': {
@@ -451,6 +514,7 @@ export const RequestPage = () => {
               const txParams = request.params?.[0] as Record<string, unknown> | undefined
               const transactionData = txParams?.data as string | undefined
               const contractAddress = txParams?.to as string | undefined
+
               if (transactionData && contractAddress) {
                 const manaData = decodeManaTransferData(transactionData, contractAddress)
                 if (manaData) {
@@ -505,6 +569,35 @@ export const RequestPage = () => {
                 }
               }
 
+              // Generic transaction only — MANA tips and NFT gifts have their own views and
+              // returned above, so they are left untouched. For web2 users, decide whether this
+              // will be relayed as a meta-transaction (a Decentraland contract call, relayed on
+              // Polygon where the gas tank pays) so the dialog can say "gas covered"; other
+              // contracts/networks show the gas. When the flag is on, also prefetch the
+              // asset-change simulation of the original transaction. Non-blocking.
+              if (isUserUsingWeb2Wallet && contractAddress) {
+                if (canShowSimulation) {
+                  setSimulationState({ status: 'loading' })
+                }
+                checkMetaTransactionSupport(contractAddress)
+                  .then(({ willUseMetaTransaction }) => {
+                    if (cancelled) return undefined
+                    setIsMetaTransaction(willUseMetaTransaction)
+                    if (canShowSimulation && txParams) {
+                      const body = buildSendTransactionSimulationPayload(txParams, signerAddress, currentChainId, willUseMetaTransaction)
+                      if (body) {
+                        setSimulationChainId(body.chainId)
+                        return fetchSimulation(body)
+                      }
+                      setSimulationState({ status: 'unavailable' })
+                    }
+                    return undefined
+                  })
+                  .catch(() => {
+                    if (!cancelled && canShowSimulation) setSimulationState({ status: 'unavailable' })
+                  })
+              }
+
               const feeData = await publicClientRef.current.estimateFeesPerGas()
               const gasPrice = feeData.gasPrice ?? feeData.maxFeePerGas ?? BigInt(0)
               const gasEstimateTxParams = request.params?.[0] as Record<string, unknown> | undefined
@@ -526,8 +619,33 @@ export const RequestPage = () => {
             }
             break
           }
-          default:
-            setView(View.WALLET_INTERACTION)
+          default: {
+            // For web2 users (behind the flag), plain signature requests get an informative
+            // preview of what they are signing. Meta-transaction typed data additionally gets
+            // the asset-change summary by simulating the inner call.
+            if (canShowSimulation && isSignatureMethod(request.method)) {
+              const payload = extractSignaturePayload(request.method, request.params)
+              setSignaturePayload(payload)
+              if (payload?.kind === 'typedData') {
+                const metaTx = decodeMetaTransactionTypedData(payload.typedData)
+                if (metaTx) {
+                  setIsSignatureMetaTx(true)
+                  setSimulationChainId(metaTx.chainId)
+                  setSimulationState({ status: 'loading' })
+                  void fetchSimulation({
+                    chainId: metaTx.chainId,
+                    from: metaTx.from,
+                    to: metaTx.verifyingContract,
+                    data: metaTx.functionSignature,
+                    value: '0'
+                  })
+                }
+              }
+              setView(View.WALLET_SIGNATURE_INTERACTION)
+            } else {
+              setView(View.WALLET_INTERACTION)
+            }
+          }
         }
       } catch (e) {
         if (cancelled) return
@@ -592,6 +710,7 @@ export const RequestPage = () => {
     if (
       view !== View.VERIFY_SIGN_IN &&
       view !== View.WALLET_INTERACTION &&
+      view !== View.WALLET_SIGNATURE_INTERACTION &&
       view !== View.WALLET_NFT_INTERACTION &&
       view !== View.WALLET_MANA_INTERACTION
     ) {
@@ -749,42 +868,55 @@ export const RequestPage = () => {
       }
 
       const [signerAddress] = await walletClient.getAddresses()
-      const chainId = getMetaTransactionChainId()
-      const txParams = requestRef.current?.params?.[0] as Record<string, unknown> | undefined
-      const toAddress = txParams?.to as string | undefined
-
-      if (!toAddress) {
-        throw new Error(`Contract address not found in transaction parameters. Received params: ${JSON.stringify(txParams ?? null)}`)
-      }
+      const method = requestRef.current.method
 
       let result: string | null = null
 
-      // Check if this contract will use meta transactions
-      const { willUseMetaTransaction, contractName } = await checkMetaTransactionSupport(toAddress)
-      if (willUseMetaTransaction && contractName) {
-        const connectedProvider = await getConnectedProvider()
-        if (!connectedProvider) {
-          throw new Error('Provider not connected')
-        }
-
-        const networkProvider = await getNetworkProvider(chainId)
-        const contract = getContract(contractName, chainId)
-        contract.address = toAddress
-
-        result = await sendMetaTransaction(
-          connectedProvider,
-          networkProvider,
-          (requestRef.current?.params?.[0] as Record<string, unknown>).data as string,
-          contract,
-          {
-            serverURL: `${config.get('META_TRANSACTION_SERVER_URL')}/v1`
-          }
-        )
-      } else {
+      if (method !== 'eth_sendTransaction') {
+        // Non-transaction methods (e.g. personal_sign, eth_signTypedData_v4) carry no `to`
+        // address and are never relayed as meta-transactions — forward them straight to the
+        // wallet. The `as` casts satisfy viem's typed request signature; the real method and
+        // params are passed through unchanged at runtime.
         result = await walletClient.request({
-          method: requestRef.current?.method as 'eth_sendTransaction',
+          method: method as 'eth_sendTransaction',
           params: requestRef.current?.params as [Record<string, unknown>]
         })
+      } else {
+        const chainId = getMetaTransactionChainId()
+        const txParams = requestRef.current?.params?.[0] as Record<string, unknown> | undefined
+        const toAddress = txParams?.to as string | undefined
+
+        if (!toAddress) {
+          throw new Error(`Contract address not found in transaction parameters. Received params: ${JSON.stringify(txParams ?? null)}`)
+        }
+
+        // Check if this contract will use meta transactions
+        const { willUseMetaTransaction, contractName } = await checkMetaTransactionSupport(toAddress)
+        if (willUseMetaTransaction && contractName) {
+          const connectedProvider = await getConnectedProvider()
+          if (!connectedProvider) {
+            throw new Error('Provider not connected')
+          }
+
+          const networkProvider = await getNetworkProvider(chainId)
+          const contract = getContract(contractName, chainId)
+          contract.address = toAddress
+
+          result = await sendMetaTransaction(
+            connectedProvider,
+            networkProvider,
+            (requestRef.current?.params?.[0] as Record<string, unknown>).data as string,
+            contract,
+            {
+              serverURL: `${config.get('META_TRANSACTION_SERVER_URL')}/v1`
+            }
+          )
+        } else {
+          result = await walletClient.request({
+            method: 'eth_sendTransaction',
+            params: requestRef.current?.params as [Record<string, unknown>]
+          })
+        }
       }
 
       trackClick(ClickEvents.APPROVE_WALLET_INTERACTION, {
@@ -893,6 +1025,21 @@ export const RequestPage = () => {
     window.location.reload()
   }, [])
 
+  const isSimulationReverted = simulationState.status === 'ready' && simulationState.result.status === 'reverted'
+  // The generic transaction view shows the asset summary whenever a simulation is in flight or
+  // resolved. In that case approval is a single step (gas shown inline, no confirm modal); without
+  // a summary it keeps the classic two-step confirm dialog for the gas check.
+  const hasSimulationSummary = simulationState.status !== 'idle'
+  // Require an explicit acknowledgment before approving when the simulation shows a high-risk
+  // permission: an unlimited ERC-20 allowance or a full-collection ApprovalForAll grant.
+  const requiresApprovalAcknowledgment =
+    simulationState.status === 'ready' &&
+    simulationState.result.approvalChanges.some(
+      approval =>
+        (approval.kind === 'approvalForAll' && approval.approved !== false) ||
+        (approval.kind === 'approval' && !approval.tokenId && approval.isUnlimited)
+    )
+
   switch (view) {
     case View.TIMEOUT:
       return <TimeoutError requestId={requestId} />
@@ -972,6 +1119,8 @@ export const RequestPage = () => {
             open={isTransactionModalOpen}
             transactionCost={transactionGasCost ?? BigInt(0)}
             balance={walletInfo?.balance ?? BigInt(0)}
+            gasCovered={isMetaTransaction}
+            isReverted={isSimulationReverted}
             isLoading={isLoading}
             onCancel={onDenyWalletInteraction}
             onConfirm={onApproveWalletInteraction}
@@ -992,6 +1141,8 @@ export const RequestPage = () => {
             open={isTransactionModalOpen}
             transactionCost={transactionGasCost ?? BigInt(0)}
             balance={walletInfo?.balance ?? BigInt(0)}
+            gasCovered={isMetaTransaction}
+            isReverted={isSimulationReverted}
             isLoading={isLoading}
             onCancel={onDenyWalletInteraction}
             onConfirm={onApproveWalletInteraction}
@@ -1008,23 +1159,57 @@ export const RequestPage = () => {
     case View.WALLET_INTERACTION:
       return (
         <>
-          <TransactionConfirmDialog
-            open={isTransactionModalOpen}
-            transactionCost={transactionGasCost ?? BigInt(0)}
-            balance={walletInfo?.balance ?? BigInt(0)}
-            isLoading={isLoading}
-            onCancel={onDenyWalletInteraction}
-            onConfirm={onApproveWalletInteraction}
-          />
+          {/* With a simulation summary the gas line is shown inline and approval is a single step,
+              so the confirm dialog is only needed for the classic (no-summary) gas check. */}
+          {hasSimulationSummary ? null : (
+            <TransactionConfirmDialog
+              open={isTransactionModalOpen}
+              transactionCost={transactionGasCost ?? BigInt(0)}
+              balance={walletInfo?.balance ?? BigInt(0)}
+              gasCovered={isMetaTransaction}
+              isReverted={isSimulationReverted}
+              isLoading={isLoading}
+              onCancel={onDenyWalletInteraction}
+              onConfirm={onApproveWalletInteraction}
+            />
+          )}
           <WalletInteraction
             requestId={requestId}
             isWeb2Wallet={isUserUsingWeb2Wallet}
             explorerText={targetConfig.explorerText}
             isLoading={isLoading}
+            simulation={simulationState}
+            userAddress={account ?? ''}
+            profiles={simulationProfiles}
+            verifiedContracts={simulationVerified}
+            chainId={simulationChainId}
+            requiresAcknowledgment={requiresApprovalAcknowledgment}
+            gasCovered={isMetaTransaction}
+            transactionCost={transactionGasCost ?? BigInt(0)}
+            balance={walletInfo?.balance ?? BigInt(0)}
+            isReverted={isSimulationReverted}
             onDeny={onDenyWalletInteraction}
-            onApprove={handleApproveWalletInteraction}
+            onApprove={hasSimulationSummary ? onApproveWalletInteraction : handleApproveWalletInteraction}
           />
         </>
+      )
+    case View.WALLET_SIGNATURE_INTERACTION:
+      return (
+        <SignatureRequestView
+          requestId={requestId}
+          method={requestRef.current?.method ?? ''}
+          payload={signaturePayload}
+          simulation={simulationState}
+          userAddress={account ?? ''}
+          profiles={simulationProfiles}
+          verifiedContracts={simulationVerified}
+          chainId={simulationChainId}
+          requiresAcknowledgment={requiresApprovalAcknowledgment}
+          isMetaTransaction={isSignatureMetaTx}
+          isLoading={isLoading}
+          onDeny={onDenyWalletInteraction}
+          onApprove={onApproveWalletInteraction}
+        />
       )
     default:
       return null
