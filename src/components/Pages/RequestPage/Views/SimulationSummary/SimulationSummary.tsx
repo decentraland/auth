@@ -312,6 +312,22 @@ export const SimulationSummary = ({
   const { t } = useTranslation()
   const verified = new Set(verifiedContracts.map(address => address.toLowerCase()))
 
+  // The gas footer comes from the wallet/meta-transaction check, not the Tenderly result, so it is
+  // shown in every non-idle state — including when the preview is still loading or unavailable — so
+  // the user always sees the gas cost (or that gas is covered) before approving.
+  const gasFooter = gas ? (
+    <GasFooter>
+      {gas.covered ? (
+        <GasNote>{t('request.transaction_dialog.gas_covered')}</GasNote>
+      ) : (
+        <>
+          <GasNote>{t('request.transaction_dialog.transaction_cost', { cost: gas.cost })}</GasNote>
+          <GasNote>{t('request.transaction_dialog.your_balance', { balance: gas.balance })}</GasNote>
+        </>
+      )}
+    </GasFooter>
+  ) : null
+
   if (simulation.status === 'idle') return null
 
   if (simulation.status === 'loading') {
@@ -326,6 +342,7 @@ export const SimulationSummary = ({
             </ChangeText>
           </SkeletonRow>
         ))}
+        {gasFooter}
       </Root>
     )
   }
@@ -336,6 +353,7 @@ export const SimulationSummary = ({
     return (
       <Root>
         <UnavailableNote>{t('request.transaction_dialog.details_unavailable')}</UnavailableNote>
+        {gasFooter}
       </Root>
     )
   }
@@ -407,18 +425,7 @@ export const SimulationSummary = ({
         <UnavailableNote>{t('request.transaction_dialog.no_changes')}</UnavailableNote>
       ) : null}
 
-      {gas ? (
-        <GasFooter>
-          {gas.covered ? (
-            <GasNote>{t('request.transaction_dialog.gas_covered')}</GasNote>
-          ) : (
-            <>
-              <GasNote>{t('request.transaction_dialog.transaction_cost', { cost: gas.cost })}</GasNote>
-              <GasNote>{t('request.transaction_dialog.your_balance', { balance: gas.balance })}</GasNote>
-            </>
-          )}
-        </GasFooter>
-      ) : null}
+      {gasFooter}
 
       <TechnicalDetails events={result.events ?? []} verified={verified} chainId={chainId} t={t} />
     </Root>

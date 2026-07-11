@@ -256,7 +256,10 @@ async function getNetworkProvider(chainId: ChainId): Promise<Provider> {
 async function isDecentralandContractAddress(address: string): Promise<boolean> {
   try {
     const transactionApiUrl = `${config.get('META_TRANSACTION_SERVER_URL')}/v1`
-    const response = await fetch(`${transactionApiUrl}/contracts/${address}`)
+    // Bound the request: this gates the simulation loading state (which disables Approve) and also
+    // runs on the approve path, so a hung meta-transaction server must not block the user forever.
+    // A timeout rejects into the catch below and degrades to `false`, exactly like any fetch error.
+    const response = await fetch(`${transactionApiUrl}/contracts/${address}`, { signal: AbortSignal.timeout(10_000) })
 
     if (response.status === 200) {
       const data = await response.json()

@@ -30,9 +30,10 @@ export const WalletInteraction = ({
   const { t } = useTranslation()
   const [acknowledged, setAcknowledged] = useState(false)
   const hasSummary = simulation !== undefined && simulation.status !== 'idle'
-  // Block approval while the simulation is still resolving so a user can't approve before the
-  // summary (and any high-risk warnings) render, and until any required acknowledgment is given.
-  const approveBlocked = simulation?.status === 'loading' || (requiresAcknowledgment && !acknowledged)
+  // Block approval while the request is submitting, while the simulation is still resolving (so a
+  // user can't approve before the summary and any high-risk warnings render), and until any
+  // required acknowledgment is given.
+  const approveBlocked = isLoading || simulation?.status === 'loading' || (requiresAcknowledgment && !acknowledged)
 
   // When a simulation is available, present the asset-change summary in the classic left-aligned
   // Container layout (matching the signature and generic interaction views, including the

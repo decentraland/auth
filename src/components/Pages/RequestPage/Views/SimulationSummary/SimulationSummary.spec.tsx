@@ -60,6 +60,22 @@ describe('when rendering the SimulationSummary', () => {
       render(<SimulationSummary simulation={simulation} userAddress={USER} />)
       expect(screen.getByText('request.transaction_dialog.details_unavailable')).toBeInTheDocument()
     })
+
+    it('should still render the gas footer so the user sees gas before approving', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} gas={{ covered: true, cost: '0', balance: '0' }} />)
+      expect(screen.getByText('request.transaction_dialog.gas_covered')).toBeInTheDocument()
+    })
+  })
+
+  describe('and the simulation is loading with a gas footer', () => {
+    beforeEach(() => {
+      simulation = { status: 'loading' }
+    })
+
+    it('should render the gas footer alongside the skeleton', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} gas={{ covered: false, cost: '0.0025', balance: '1.5' }} />)
+      expect(screen.getByText(/transaction_cost 0.0025/)).toBeInTheDocument()
+    })
   })
 
   describe('and the simulation succeeded with transfers and an unlimited approval', () => {

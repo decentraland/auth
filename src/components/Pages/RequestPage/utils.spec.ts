@@ -171,7 +171,10 @@ describe('when testing isDecentralandContractAddress', () => {
     it('should return true', async () => {
       const result = await isDecentralandContractAddress(contractAddress)
       expect(result).toBe(true)
-      expect(fetch).toHaveBeenCalledWith(`${metaTransactionServerUrl}/v1/contracts/${contractAddress}`)
+      expect(fetch).toHaveBeenCalledWith(
+        `${metaTransactionServerUrl}/v1/contracts/${contractAddress}`,
+        expect.objectContaining({ signal: expect.any(AbortSignal) })
+      )
     })
   })
 
