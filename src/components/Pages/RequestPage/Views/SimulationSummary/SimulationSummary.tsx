@@ -90,13 +90,14 @@ const formatUsd = (dollarValue: string | null, signed = false): string | null =>
   const value = Number(dollarValue)
   if (!Number.isFinite(value)) return null
   const fixed = Math.abs(value).toFixed(2)
-  // toFixed switches to exponential for |value| >= 1e21, which can't be grouped cleanly; skip it
-  // rather than render a malformed amount.
-  if (!fixed.includes('.')) return null
+  // toFixed switches to exponential notation for very large magnitudes (e.g. "1.5e+21"), which
+  // can't be grouped cleanly; skip those rather than render a malformed amount.
+  if (/e/i.test(fixed)) return null
   const [intPart, decPart] = fixed.split('.')
   const magnitude = `$${groupThousands(intPart)}.${decPart}`
   if (!signed) return magnitude
-  return `${value < 0 ? '-' : '+'}${magnitude}`
+  // Only mark as negative when the rounded value is actually non-zero (mirrors the decimal path).
+  return `${value < 0 && Number(fixed) !== 0 ? '-' : '+'}${magnitude}`
 }
 
 const assetTitle = (change: AssetChange, t: Translate): string => {

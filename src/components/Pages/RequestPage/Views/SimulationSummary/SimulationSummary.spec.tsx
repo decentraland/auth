@@ -374,6 +374,30 @@ describe('when rendering the SimulationSummary', () => {
     })
   })
 
+  describe('and the net value is a large exponential the numeric fallback cannot group', () => {
+    beforeEach(() => {
+      simulation = { status: 'ready', result: emptyResult({ balanceChanges: [{ address: USER, dollarValue: '1.5e+21' }] }) }
+    })
+
+    it('should omit the net change rather than render a malformed amount', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} />)
+      expect(screen.queryByText('request.transaction_dialog.net_change')).not.toBeInTheDocument()
+      expect(screen.queryByText(/e\+21/)).not.toBeInTheDocument()
+    })
+  })
+
+  describe('and a tiny negative net value in scientific notation rounds to zero', () => {
+    beforeEach(() => {
+      simulation = { status: 'ready', result: emptyResult({ balanceChanges: [{ address: USER, dollarValue: '-1e-9' }] }) }
+    })
+
+    it('should not render it as a negative amount', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} />)
+      expect(screen.getByText('+$0.00')).toBeInTheDocument()
+      expect(screen.queryByText('-$0.00')).not.toBeInTheDocument()
+    })
+  })
+
   describe('and the transaction moves no assets and grants no approvals', () => {
     beforeEach(() => {
       simulation = { status: 'ready', result: emptyResult() }
