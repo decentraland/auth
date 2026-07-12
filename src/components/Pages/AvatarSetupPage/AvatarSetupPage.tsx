@@ -449,7 +449,8 @@ const AvatarSetupPage: React.FC = () => {
 
     if (!account || !identity) {
       console.warn('No previous connection found')
-      return navigate(locations.login(redirectTo, referrer))
+      navigate(locations.login(redirectTo, referrer))
+      return
     }
 
     // Run the one-time initialization once per connected account. `initializeAvatarSetup` depends

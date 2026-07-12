@@ -12,7 +12,10 @@ import { SignaturePayload, TypedDataPayload } from './types'
 const ADDRESS_REGEX = /^0x[a-fA-F0-9]{40}$/
 const HEX_STRING_REGEX = /^0x([0-9a-fA-F]{2})*$/
 
-/** Wallet-RPC methods that request a signature rather than a transaction. */
+// Wallet-RPC methods that request a signature rather than a transaction. `eth_sign` is kept here
+// (and in extractSignaturePayload) for parser completeness and symmetry only — it is rejected
+// upstream at recover by the method allowlist (assertMethodIsAllowed in signMethodGuard), so it
+// never actually reaches this view-selection logic.
 const SIGNATURE_METHODS = new Set(['personal_sign', 'eth_sign', 'eth_signtypeddata', 'eth_signtypeddata_v3', 'eth_signtypeddata_v4'])
 
 /**

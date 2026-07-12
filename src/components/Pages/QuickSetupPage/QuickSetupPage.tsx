@@ -124,7 +124,8 @@ export const QuickSetupPage = () => {
 
     if (!account || !identity) {
       console.warn('No previous connection found')
-      return navigate(locations.login(redirectTo, referrer))
+      navigate(locations.login(redirectTo, referrer))
+      return
     }
 
     if (initializedAccountRef.current === account) return

@@ -370,7 +370,8 @@ export const SetupPage = () => {
 
     if (!account || !identity) {
       console.warn('No previous connection found')
-      return navigate(locations.login(redirectTo))
+      navigate(locations.login(redirectTo))
+      return
     }
 
     // Run the one-time initialization once per connected account. The feature-flags provider
