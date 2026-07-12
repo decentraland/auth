@@ -36,6 +36,10 @@ import {
 
 type Translate = (key: string, opts?: Record<string, string | number>) => string
 
+// Defensive ceiling on decoded events rendered in the technical-details section. The server already
+// caps events at 50; this guards the UI against an unexpectedly large or malformed response.
+const MAX_DISPLAYED_EVENTS = 100
+
 const shortenAddress = (address: string | null): string => {
   if (!address) return ''
   return address.length > 12 ? `${address.slice(0, 6)}…${address.slice(-4)}` : address
@@ -62,12 +66,38 @@ const formatTokenAmount = (raw: string): string => {
 
 const formatUsd = (dollarValue: string | null, signed = false): string | null => {
   if (dollarValue === null) return null
+  // Parse and round from the plain-decimal string (rather than through Number) so a very large
+  // integer part is never rounded away. Round half-up to cents, carrying with BigInt. Inputs that
+  // aren't plain decimals (e.g. scientific notation) fall back to the Number-based path below.
+  const match = /^(-?)(\d+)(?:\.(\d+))?$/.exec(dollarValue.trim())
+  if (match) {
+    const [, sign, intPart, fracPart = ''] = match
+    let cents = Number((fracPart + '00').slice(0, 2))
+    if ((fracPart[2] ?? '0') >= '5') cents += 1
+    let intValue = BigInt(intPart)
+    if (cents === 100) {
+      cents = 0
+      intValue += 1n
+    }
+    const magnitude = `$${groupThousands(intValue.toString())}.${String(cents).padStart(2, '0')}`
+    if (!signed) return magnitude
+    // Only mark as negative when the rounded value is actually non-zero, so a tiny negative that
+    // rounds to zero doesn't render as a misleading "-$0.00".
+    const isNegative = sign === '-' && !(intValue === 0n && cents === 0)
+    return `${isNegative ? '-' : '+'}${magnitude}`
+  }
+
   const value = Number(dollarValue)
   if (!Number.isFinite(value)) return null
-  const [intPart, decPart] = Math.abs(value).toFixed(2).split('.')
+  const fixed = Math.abs(value).toFixed(2)
+  // toFixed switches to exponential notation for very large magnitudes (e.g. "1.5e+21"), which
+  // can't be grouped cleanly; skip those rather than render a malformed amount.
+  if (/e/i.test(fixed)) return null
+  const [intPart, decPart] = fixed.split('.')
   const magnitude = `$${groupThousands(intPart)}.${decPart}`
   if (!signed) return magnitude
-  return `${value < 0 ? '-' : '+'}${magnitude}`
+  // Only mark as negative when the rounded value is actually non-zero (mirrors the decimal path).
+  return `${value < 0 && Number(fixed) !== 0 ? '-' : '+'}${magnitude}`
 }
 
 const assetTitle = (change: AssetChange, t: Translate): string => {
@@ -277,14 +307,15 @@ const TechnicalDetails = ({
 }) => {
   const [open, setOpen] = useState(false)
   if (events.length === 0) return null
+  const displayedEvents = events.slice(0, MAX_DISPLAYED_EVENTS)
   return (
     <>
-      <Toggle type="button" onClick={() => setOpen(show => !show)}>
+      <Toggle type="button" aria-expanded={open} onClick={() => setOpen(show => !show)}>
         {open ? t('request.transaction_dialog.hide_technical_details') : t('request.transaction_dialog.technical_details')}
       </Toggle>
       {open ? (
         <EventList data-testid="simulation-events">
-          {events.map((event, index) => (
+          {displayedEvents.map((event, index) => (
             <EventRow key={`event-${index}`}>
               {event.name || t('request.transaction_dialog.event_unknown')} ·{' '}
               <AddressLink
@@ -313,8 +344,10 @@ export const SimulationSummary = ({
   const verified = new Set(verifiedContracts.map(address => address.toLowerCase()))
 
   // The gas footer comes from the wallet/meta-transaction check, not the Tenderly result, so it is
-  // shown in every non-idle state — including when the preview is still loading or unavailable — so
-  // the user always sees the gas cost (or that gas is covered) before approving.
+  // shown once the preview resolves (ready or unavailable) so the user always sees the gas cost (or
+  // that gas is covered) before approving. It is intentionally omitted while loading, because the
+  // meta-transaction check that determines "gas covered" may not have resolved yet — and approval
+  // is disabled during loading regardless.
   const gasFooter = gas ? (
     <GasFooter>
       {gas.covered ? (
@@ -342,7 +375,6 @@ export const SimulationSummary = ({
             </ChangeText>
           </SkeletonRow>
         ))}
-        {gasFooter}
       </Root>
     )
   }
@@ -360,11 +392,12 @@ export const SimulationSummary = ({
 
   const { result } = simulation
   const user = userAddress.toLowerCase()
-  // "Sends" are assets leaving the user's account (transfers out, and burns whose `from` is
-  // the user). Everything else (assets received, mints to the user, and effects where the
-  // user is neither party) is grouped under "receives".
+  // "Sends" are assets leaving the user's account (transfers out, and burns whose `from` is the
+  // user). "Receives" are assets arriving to the user (transfers in and mints whose `to` is the
+  // user). A change where the user is neither party isn't shown as either, so an unrelated
+  // third-party movement is never mislabelled as something the user receives.
   const sends = result.assetChanges.filter(change => change.from?.toLowerCase() === user)
-  const receives = result.assetChanges.filter(change => change.from?.toLowerCase() !== user)
+  const receives = result.assetChanges.filter(change => change.from?.toLowerCase() !== user && change.to?.toLowerCase() === user)
   const hasNoChanges = sends.length === 0 && receives.length === 0 && result.approvalChanges.length === 0
   const networkName = getNetworkName(chainId)
 

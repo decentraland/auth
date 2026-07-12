@@ -70,7 +70,7 @@ export const SignatureRequestView = ({
               verifiedContracts={verifiedContracts}
               chainId={chainId}
             />
-            <RawToggle type="button" onClick={() => setShowRaw(show => !show)}>
+            <RawToggle type="button" aria-expanded={showRaw} onClick={() => setShowRaw(show => !show)}>
               {showRaw ? t('request.signature.hide_raw') : t('request.signature.view_raw')}
             </RawToggle>
             {showRaw ? <MessageBlock data-testid="signature-raw">{payload.raw}</MessageBlock> : null}

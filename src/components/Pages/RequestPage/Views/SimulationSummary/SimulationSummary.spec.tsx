@@ -72,9 +72,9 @@ describe('when rendering the SimulationSummary', () => {
       simulation = { status: 'loading' }
     })
 
-    it('should render the gas footer alongside the skeleton', () => {
+    it('should not render the gas footer yet (the gas-covered state may be unresolved while loading)', () => {
       render(<SimulationSummary simulation={simulation} userAddress={USER} gas={{ covered: false, cost: '0.0025', balance: '1.5' }} />)
-      expect(screen.getByText(/transaction_cost 0.0025/)).toBeInTheDocument()
+      expect(screen.queryByText(/transaction_cost/)).not.toBeInTheDocument()
     })
   })
 
@@ -238,6 +238,38 @@ describe('when rendering the SimulationSummary', () => {
     })
   })
 
+  describe('and an asset change involves neither the user as sender nor recipient', () => {
+    beforeEach(() => {
+      const result = emptyResult({
+        assetChanges: [
+          {
+            type: 'transfer',
+            standard: 'erc20',
+            from: '0x1111111111111111111111111111111111111111',
+            to: '0x2222222222222222222222222222222222222222',
+            amount: '5',
+            rawAmount: '5000000000000000000',
+            tokenId: null,
+            contractAddress: '0x0f5d2fb29fb7d3cfee444a200298f468908cc942',
+            symbol: 'MANA',
+            name: 'Decentraland MANA',
+            decimals: 18,
+            logoUrl: null,
+            dollarValue: null
+          }
+        ]
+      })
+      simulation = { status: 'ready', result }
+    })
+
+    it('should not present the third-party movement as sent or received', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} />)
+      expect(screen.queryByText('request.transaction_dialog.you_send')).not.toBeInTheDocument()
+      expect(screen.queryByText('request.transaction_dialog.you_receive')).not.toBeInTheDocument()
+      expect(screen.getByText('request.transaction_dialog.no_changes')).toBeInTheDocument()
+    })
+  })
+
   describe('and an ApprovalForAll is revoked', () => {
     beforeEach(() => {
       const result = emptyResult({
@@ -307,6 +339,65 @@ describe('when rendering the SimulationSummary', () => {
     })
   })
 
+  describe('and the net dollar value has a very large integer part', () => {
+    beforeEach(() => {
+      // Number(...) would round this past ~15 significant digits; the string-based formatter must not.
+      simulation = { status: 'ready', result: emptyResult({ balanceChanges: [{ address: USER, dollarValue: '1234567890123456.789' }] }) }
+    })
+
+    it('should render the exact grouped amount without precision loss', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} />)
+      expect(screen.getByText('+$1,234,567,890,123,456.79')).toBeInTheDocument()
+    })
+  })
+
+  describe('and the net dollar value is in scientific notation', () => {
+    beforeEach(() => {
+      simulation = { status: 'ready', result: emptyResult({ balanceChanges: [{ address: USER, dollarValue: '1e-8' }] }) }
+    })
+
+    it('should still render it via the numeric fallback rather than dropping it', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} />)
+      expect(screen.getByText('+$0.00')).toBeInTheDocument()
+    })
+  })
+
+  describe('and a tiny negative net value rounds to zero', () => {
+    beforeEach(() => {
+      simulation = { status: 'ready', result: emptyResult({ balanceChanges: [{ address: USER, dollarValue: '-0.001' }] }) }
+    })
+
+    it('should not render it as a negative amount', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} />)
+      expect(screen.getByText('+$0.00')).toBeInTheDocument()
+      expect(screen.queryByText('-$0.00')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('and the net value is a large exponential the numeric fallback cannot group', () => {
+    beforeEach(() => {
+      simulation = { status: 'ready', result: emptyResult({ balanceChanges: [{ address: USER, dollarValue: '1.5e+21' }] }) }
+    })
+
+    it('should omit the net change rather than render a malformed amount', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} />)
+      expect(screen.queryByText('request.transaction_dialog.net_change')).not.toBeInTheDocument()
+      expect(screen.queryByText(/e\+21/)).not.toBeInTheDocument()
+    })
+  })
+
+  describe('and a tiny negative net value in scientific notation rounds to zero', () => {
+    beforeEach(() => {
+      simulation = { status: 'ready', result: emptyResult({ balanceChanges: [{ address: USER, dollarValue: '-1e-9' }] }) }
+    })
+
+    it('should not render it as a negative amount', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} />)
+      expect(screen.getByText('+$0.00')).toBeInTheDocument()
+      expect(screen.queryByText('-$0.00')).not.toBeInTheDocument()
+    })
+  })
+
   describe('and the transaction moves no assets and grants no approvals', () => {
     beforeEach(() => {
       simulation = { status: 'ready', result: emptyResult() }
@@ -331,6 +422,30 @@ describe('when rendering the SimulationSummary', () => {
       expect(screen.queryByTestId('simulation-events')).not.toBeInTheDocument()
       await userEvent.click(screen.getByText('request.transaction_dialog.technical_details'))
       expect(screen.getByTestId('simulation-events')).toBeInTheDocument()
+    })
+
+    it('should reflect the open state on the toggle for assistive tech', async () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} />)
+      const toggle = screen.getByRole('button')
+      expect(toggle).toHaveAttribute('aria-expanded', 'false')
+      await userEvent.click(toggle)
+      expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    })
+  })
+
+  describe('and there are more events than the display cap', () => {
+    beforeEach(() => {
+      const events = Array.from({ length: 150 }, (_, index) => ({
+        name: `Event${index}`,
+        address: '0x0f5d2fb29fb7d3cfee444a200298f468908cc942'
+      }))
+      simulation = { status: 'ready', result: emptyResult({ events }) }
+    })
+
+    it('should cap the rendered event rows at the defensive maximum', async () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} />)
+      await userEvent.click(screen.getByText('request.transaction_dialog.technical_details'))
+      expect(screen.getByTestId('simulation-events').children).toHaveLength(100)
     })
   })
 

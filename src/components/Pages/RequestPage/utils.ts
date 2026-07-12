@@ -41,18 +41,29 @@ function isKnownDecentralandContract(address: string): boolean {
  * Extracts what a signature request asks the user to sign: a plain message (decoding
  * hex-encoded UTF-8 when possible) or an EIP-712 typed-data structure. Returns null when the
  * payload can't be interpreted.
+ *
+ * `signerAddress` (the connected account) is used to tell the message apart from the address
+ * parameter: personal_sign is [message, address] and eth_sign is [address, message], but the
+ * ordering isn't consistent across providers. Matching the known signer is robust even when the
+ * message itself happens to look like an address; when no signer is available we fall back to a
+ * shape heuristic (treat a leading address-shaped value as the address).
  */
-function extractSignaturePayload(method: string, params: unknown[] | undefined): SignaturePayload | null {
+function extractSignaturePayload(method: string, params: unknown[] | undefined, signerAddress?: string): SignaturePayload | null {
   if (!params || params.length === 0) return null
   const normalizedMethod = method.toLowerCase()
 
   if (normalizedMethod === 'personal_sign' || normalizedMethod === 'eth_sign') {
-    // personal_sign is [message, address]; eth_sign is [address, message]. Pick the element
-    // that is not a bare address as the message.
     const [first, second] = params
+    const signer = signerAddress?.toLowerCase()
     let message: unknown = first
-    if (typeof first === 'string' && ADDRESS_REGEX.test(first) && typeof second === 'string') {
-      message = second
+    if (typeof first === 'string' && typeof second === 'string') {
+      if (signer && first.toLowerCase() === signer) {
+        message = second
+      } else if (signer && second.toLowerCase() === signer) {
+        message = first
+      } else if (ADDRESS_REGEX.test(first)) {
+        message = second
+      }
     }
     if (typeof message !== 'string') return null
 

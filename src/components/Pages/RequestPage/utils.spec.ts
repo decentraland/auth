@@ -1059,6 +1059,32 @@ describe('when testing extractSignaturePayload', () => {
     })
   })
 
+  describe('and the signer address is provided to disambiguate', () => {
+    describe('and personal_sign passes the message first and the signer second', () => {
+      it('should treat the first element as the message', () => {
+        const result = extractSignaturePayload('personal_sign', ['gm', userAddress], userAddress)
+        expect(result).toEqual({ kind: 'message', message: 'gm' })
+      })
+    })
+
+    describe('and eth_sign passes the signer first and the message second', () => {
+      it('should treat the second element as the message', () => {
+        const result = extractSignaturePayload('eth_sign', [userAddress, 'sign me'], userAddress)
+        expect(result).toEqual({ kind: 'message', message: 'sign me' })
+      })
+    })
+
+    describe('and the hex-encoded message is itself address-shaped', () => {
+      it('should decode the message rather than mistaking it for the signer address', () => {
+        // A 20-byte message hex-encodes to `0x` + 40 hex chars, which matches the address shape;
+        // matching the known signer keeps it correctly classified as the message.
+        const hexMessage = '0x' + '61'.repeat(20) // 20 bytes of 'a'
+        const result = extractSignaturePayload('personal_sign', [hexMessage, userAddress], userAddress)
+        expect(result).toEqual({ kind: 'message', message: 'a'.repeat(20) })
+      })
+    })
+  })
+
   describe('and no params are provided', () => {
     it('should return null', () => {
       expect(extractSignaturePayload('personal_sign', undefined)).toBeNull()
