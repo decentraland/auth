@@ -51,14 +51,15 @@ analytics?.load(config.get('SEGMENT_API_KEY'))
 
 setupMobileAnalytics(analytics, getMobileSession())
 
-// Gate on the build-time `import.meta.env.DEV` constant (true only under the local `vite` dev
-// server) rather than a runtime env check. All deployed environments share one `vite build`
-// artifact whose environment is resolved at runtime from the domain/`?env` param, so a runtime
-// check (config.is) is bypassable — e.g. `decentraland.org/auth/testView/...?env=dev` would open
-// the gate and render a realistic but fake approval dialog on the production origin. The build-time
-// constant lets the bundler dead-code-eliminate this dev harness (and its chunk) from every
-// deployed build entirely.
-const DevTestViewPage = import.meta.env.DEV
+// Gate the dev-only TestViewPage on the serving HOSTNAME, not on the runtime config env. The
+// config environment (@dcl/ui-env) honors a `?env=` query param, so a config check is bypassable —
+// e.g. `decentraland.org/auth/testView/...?env=dev` would open the gate and render a realistic but
+// fake approval dialog on the production origin. A query param cannot change the hostname, so this
+// blocks every production Decentraland origin (`decentraland.org` and its subdomains) while still
+// exposing the harness where it's legitimately used: the local dev server and E2E preview (both on
+// localhost) and the non-production `.zone`/`.today` deploys.
+const isProductionHost = /(^|\.)decentraland\.org$/i.test(window.location.hostname)
+const DevTestViewPage = !isProductionHost
   ? React.lazy(async () => {
       const mod = await import('./components/Pages/RequestPage/TestViewPage')
       return { default: mod.TestViewPage }
