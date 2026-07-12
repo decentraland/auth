@@ -17,10 +17,10 @@ jobs:
       contents: read
 
     steps:
-      - uses: actions/checkout@main
+      - uses: actions/checkout@v6
 
       - name: Use Node.js 24.x
-        uses: actions/setup-node@v4.0.2
+        uses: actions/setup-node@v6
         with:
           node-version: 24.x
           cache: 'npm'
@@ -57,7 +57,6 @@ jobs:
 
       - name: Publish
         # Auth via npm Trusted Publishers (OIDC) — `id-token: write` is granted on
-        # this job and no `NODE_AUTH_TOKEN` is provided, so the OIDC-aware oddish
         # skips writing `_authToken` to `.npmrc` and lets npm 11 do the handshake.
         # Requires a Trusted Publisher entry for `build-release.yaml` at
         # https://www.npmjs.com/package/@dcl/auth-site/access
