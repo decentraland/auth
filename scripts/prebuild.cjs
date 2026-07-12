@@ -32,8 +32,8 @@ if (packageJson.homepage) {
   console.log('::set-output name=public_path::' + pathname)
 }
 
-// log stuff
-console.log('VERSIONS: ', Object.entries(ENV_CONTENT), '\n')
+// log stuff (keys only — never print env values so future secrets aren't leaked into build logs)
+console.log('VERSIONS: ', Object.keys(ENV_CONTENT), '\n')
 
 // save files
 fs.writeFileSync(

@@ -1,8 +1,37 @@
-import { ImpersonatedSignInError } from './errors'
+import { ImpersonatedSignInError, UnsupportedMethodError } from './errors'
 
 // The Decentraland-specific signing method used by the sign-in flow. It is the only
 // method allowed to produce a signature over an identity-authorization payload.
 const DCL_SIGN_IN_METHOD = 'dcl_personal_sign'
+
+// The only methods the auth site is willing to forward to the connected wallet. Anything
+// outside this set is rejected at recover time (see {@link assertMethodIsAllowed}).
+//
+// `eth_sign` is deliberately excluded: unlike `personal_sign`, it signs a raw 32-byte digest
+// with no EIP-191 (`\x19Ethereum Signed Message:\n`) prefix. That lets a request blind-sign an
+// arbitrary hash — including a transaction hash, or the pre-computed digest of a Decentraland
+// sign-in message. The latter would bypass `assertRequestIsNotImpersonatingSignIn`, which can
+// only recognize a *plaintext* sign-in payload, not its hash. Major wallets deprecated
+// `eth_sign` for the same reason.
+const ALLOWED_METHODS = new Set([
+  'dcl_personal_sign',
+  'personal_sign',
+  'eth_signtypeddata',
+  'eth_signtypeddata_v3',
+  'eth_signtypeddata_v4',
+  'eth_sendtransaction'
+])
+
+/**
+ * Rejects any recovered request whose method is not on the {@link ALLOWED_METHODS} allowlist.
+ * This is the primary defense against dangerous methods (e.g. `eth_sign`) reaching the wallet;
+ * forwarding arbitrary provider methods is never safe on a signing surface.
+ */
+function assertMethodIsAllowed(method: string): void {
+  if (!ALLOWED_METHODS.has(method.toLowerCase())) {
+    throw new UnsupportedMethodError(method)
+  }
+}
 
 // A Decentraland identity-authorization message (built by @dcl/crypto's
 // `Authenticator.getEphemeralMessage`) looks like:
@@ -54,4 +83,4 @@ function assertRequestIsNotImpersonatingSignIn(method: string, params: unknown[]
   }
 }
 
-export { DCL_SIGN_IN_METHOD, isDecentralandIdentityAuthMessage, assertRequestIsNotImpersonatingSignIn }
+export { DCL_SIGN_IN_METHOD, isDecentralandIdentityAuthMessage, assertRequestIsNotImpersonatingSignIn, assertMethodIsAllowed }

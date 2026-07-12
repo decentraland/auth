@@ -320,7 +320,9 @@
     "randomize": "随机",
     "customize_later": "您可以稍后自定义您的头像。",
     "ready_to_jump_in": "{name} 已准备好进入！",
-    "success": "成功"
+    "success": "成功",
+    "account_ready": "您的账户已就绪！",
+    "start_exploring": "开始探索"
   },
   "wallet_error_modal": {
     "title": "钱包错误",

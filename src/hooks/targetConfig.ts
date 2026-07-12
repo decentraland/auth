@@ -81,6 +81,7 @@ const targetConfigs: Record<TargetConfigId, TargetConfig> = {
       extraOptions: [ConnectionOptionType.METAMASK, ConnectionOptionType.WALLET_CONNECT]
     }
   },
+  // eslint-disable-next-line @typescript-eslint/naming-convention
   'creator-hub': {
     ...defaultConfig,
     skipSetup: true,
@@ -116,9 +117,12 @@ const getTargetConfigId = (location: Location): TargetConfigId => {
   if (redirectTo) {
     try {
       let searchParams: URLSearchParams
-      // If the redirectTo is a relative URL, we need to parse it as a search params
+      // If the redirectTo is a relative URL, resolve it against the current origin so
+      // its query string is parsed correctly. Using new URLSearchParams(redirectTo)
+      // directly would fold the leading path into the first key, missing targetConfigId
+      // when it is the first query parameter (e.g. '/quick-setup?targetConfigId=ios').
       if (redirectTo.startsWith('/')) {
-        searchParams = new URLSearchParams(redirectTo)
+        searchParams = new URL(redirectTo, window.location.origin).searchParams
       } else {
         searchParams = new URL(redirectTo).searchParams
       }

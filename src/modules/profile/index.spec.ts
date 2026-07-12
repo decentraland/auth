@@ -297,6 +297,35 @@ describe('profile module', () => {
       it('should not return a profile', () => {
         expect(result.profile).toBeUndefined()
       })
+
+      it('should not flag the result as indeterminate because the not-found was authoritative', () => {
+        expect(result.couldNotDetermine).toBeFalsy()
+      })
+    })
+
+    describe('and every catalyst fails transiently without any authoritative not-found response', () => {
+      beforeEach(async () => {
+        const mockCatalysts = [{ address: 'https://catalyst1.zone' }, { address: 'https://catalyst2.zone' }]
+
+        ;(getCatalystServersFromCache as jest.Mock).mockReturnValue(mockCatalysts)
+        ;(createLambdasClient as jest.Mock).mockReturnValue({
+          getAvatarDetails: jest.fn().mockRejectedValue(new Error('network error'))
+        })
+
+        result = await fetchProfileWithConsistencyCheck(mockAddress, [])
+      })
+
+      it('should return isConsistent as false', () => {
+        expect(result.isConsistent).toBe(false)
+      })
+
+      it('should flag the result as indeterminate rather than "no profile"', () => {
+        expect(result.couldNotDetermine).toBe(true)
+      })
+
+      it('should not return a profile', () => {
+        expect(result.profile).toBeUndefined()
+      })
     })
 
     describe('and an unexpected error occurs', () => {

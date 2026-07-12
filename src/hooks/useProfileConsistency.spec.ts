@@ -42,7 +42,7 @@ describe('useProfileConsistency', () => {
       it('should return the profile and consistent status', async () => {
         const { result } = renderHook(() => useProfileConsistency())
         const outcome = await result.current.checkProfileConsistency(account, identity)
-        expect(outcome).toEqual({ profile: mockProfile, isConsistent: true })
+        expect(outcome).toEqual({ profile: mockProfile, isConsistent: true, couldNotDetermine: false })
       })
 
       it('should not attempt to redeploy', async () => {
@@ -73,7 +73,7 @@ describe('useProfileConsistency', () => {
       it('should return the profile with inconsistent status', async () => {
         const { result } = renderHook(() => useProfileConsistency())
         const outcome = await result.current.checkProfileConsistency(account, identity)
-        expect(outcome).toEqual({ profile: mockProfile, isConsistent: false })
+        expect(outcome).toEqual({ profile: mockProfile, isConsistent: false, couldNotDetermine: false })
       })
     })
 
@@ -142,7 +142,7 @@ describe('useProfileConsistency', () => {
         it('should still return the profile', async () => {
           const { result } = renderHook(() => useProfileConsistency())
           const outcome = await result.current.checkProfileConsistency(account, identity)
-          expect(outcome).toEqual({ profile: mockProfile, isConsistent: false })
+          expect(outcome).toEqual({ profile: mockProfile, isConsistent: false, couldNotDetermine: false })
         })
       })
 
@@ -162,7 +162,7 @@ describe('useProfileConsistency', () => {
         it('should still return the profile without throwing', async () => {
           const { result } = renderHook(() => useProfileConsistency())
           const outcome = await result.current.checkProfileConsistency(account, identity)
-          expect(outcome).toEqual({ profile: mockProfile, isConsistent: false })
+          expect(outcome).toEqual({ profile: mockProfile, isConsistent: false, couldNotDetermine: false })
         })
       })
     })
@@ -178,7 +178,24 @@ describe('useProfileConsistency', () => {
       it('should return undefined profile without attempting redeployment', async () => {
         const { result } = renderHook(() => useProfileConsistency())
         const outcome = await result.current.checkProfileConsistency(account, identity)
-        expect(outcome).toEqual({ profile: undefined, isConsistent: true })
+        expect(outcome).toEqual({ profile: undefined, isConsistent: true, couldNotDetermine: false })
+        expect(redeployExistingProfile).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and the consistency check could not reach any catalyst', () => {
+      beforeEach(() => {
+        jest.mocked(fetchProfileWithConsistencyCheck).mockResolvedValueOnce({
+          isConsistent: false,
+          couldNotDetermine: true,
+          error: 'Profile consistency check could not reach any catalyst'
+        })
+      })
+
+      it('should propagate the indeterminate state without attempting redeployment', async () => {
+        const { result } = renderHook(() => useProfileConsistency())
+        const outcome = await result.current.checkProfileConsistency(account, identity)
+        expect(outcome).toEqual({ profile: undefined, isConsistent: false, couldNotDetermine: true })
         expect(redeployExistingProfile).not.toHaveBeenCalled()
       })
     })

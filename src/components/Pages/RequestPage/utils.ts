@@ -12,7 +12,10 @@ import { SignaturePayload, TypedDataPayload } from './types'
 const ADDRESS_REGEX = /^0x[a-fA-F0-9]{40}$/
 const HEX_STRING_REGEX = /^0x([0-9a-fA-F]{2})*$/
 
-/** Wallet-RPC methods that request a signature rather than a transaction. */
+// Wallet-RPC methods that request a signature rather than a transaction. `eth_sign` is kept here
+// (and in extractSignaturePayload) for parser completeness and symmetry only — it is rejected
+// upstream at recover by the method allowlist (assertMethodIsAllowed in signMethodGuard), so it
+// never actually reaches this view-selection logic.
 const SIGNATURE_METHODS = new Set(['personal_sign', 'eth_sign', 'eth_signtypeddata', 'eth_signtypeddata_v3', 'eth_signtypeddata_v4'])
 
 /**
@@ -95,6 +98,31 @@ function extractSignaturePayload(method: string, params: unknown[] | undefined, 
   return null
 }
 
+// EIP-712 primaryTypes that grant a third party the ability to move the user's assets off-chain
+// (token allowances and marketplace order listings). These carry the same risk as an on-chain
+// `approve`/`setApprovalForAll` but are invisible to a transaction simulation because no
+// transaction is sent — so signing them must be gated behind an explicit acknowledgment.
+const APPROVAL_GRANTING_PRIMARY_TYPES = new Set([
+  'permit', // EIP-2612
+  'permitsingle', // Uniswap Permit2 (AllowanceTransfer)
+  'permitbatch',
+  'permittransferfrom', // Uniswap Permit2 (SignatureTransfer)
+  'permitbatchtransferfrom',
+  'permitforall',
+  'ordercomponents', // Seaport order
+  'bulkorder' // Seaport bulk order
+])
+
+/**
+ * Returns true when a typed-data signature grants a third party control over the user's assets
+ * (an off-chain allowance/permit or a marketplace order). Such signatures are not simulated, so
+ * the approval UI must surface them as high-risk and require acknowledgment before signing.
+ */
+function isApprovalGrantingTypedData(typedData: TypedDataPayload | undefined | null): boolean {
+  const primaryType = typedData?.primaryType
+  return typeof primaryType === 'string' && APPROVAL_GRANTING_PRIMARY_TYPES.has(primaryType.toLowerCase())
+}
+
 /**
  * Detects a Decentraland meta-transaction typed-data payload and returns the inner call so it
  * can be simulated (from = message.from, to = domain.verifyingContract, data =
@@ -155,7 +183,13 @@ function buildSendTransactionSimulationPayload(
 
   return {
     chainId,
-    from: (txParams.from as string | undefined) ?? signerAddress,
+    // Always simulate as the connected signer, never the request-supplied `from`. Web2 wallets
+    // (Magic/Thirdweb) execute the transaction as the logged-in account regardless of
+    // `params.from`, so honoring an attacker-chosen `from` would decouple the preview from what
+    // actually executes: asset movements would be attributed to the other address (rendering the
+    // "You send / You receive" summary empty and benign) while the connected account is what
+    // really pays — and it would suppress approvalChanges, bypassing the high-risk approval gate.
+    from: signerAddress,
     to,
     data: (txParams.data as string | undefined) ?? '0x',
     value: (txParams.value as string | undefined) ?? '0'
@@ -567,6 +601,7 @@ export {
   getConnectedProvider,
   getNetworkProvider,
   isDecentralandContractAddress,
+  isApprovalGrantingTypedData,
   getMetaTransactionChainId,
   checkMetaTransactionSupport,
   decodeNftTransferData,

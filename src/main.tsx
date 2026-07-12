@@ -7,7 +7,6 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { DclThemeProvider, darkTheme } from 'decentraland-ui2'
 import { TranslationProvider } from '@dcl/hooks'
-import { Env } from '@dcl/ui-env'
 import { RequestPage } from './components/Pages/RequestPage'
 import { SetupPage } from './components/Pages/SetupPage'
 import { DefaultPage } from './components/Pages/DefaultPage'
@@ -52,7 +51,15 @@ analytics?.load(config.get('SEGMENT_API_KEY'))
 
 setupMobileAnalytics(analytics, getMobileSession())
 
-const DevTestViewPage = !config.is(Env.PRODUCTION)
+// Gate the dev-only TestViewPage on the serving HOSTNAME, not on the runtime config env. The
+// config environment (@dcl/ui-env) honors a `?env=` query param, so a config check is bypassable —
+// e.g. `decentraland.org/auth/testView/...?env=dev` would open the gate and render a realistic but
+// fake approval dialog on the production origin. A query param cannot change the hostname, so this
+// blocks every production Decentraland origin (`decentraland.org` and its subdomains) while still
+// exposing the harness where it's legitimately used: the local dev server and E2E preview (both on
+// localhost) and the non-production `.zone`/`.today` deploys.
+const isProductionHost = /(^|\.)decentraland\.org$/i.test(window.location.hostname)
+const DevTestViewPage = !isProductionHost
   ? React.lazy(async () => {
       const mod = await import('./components/Pages/RequestPage/TestViewPage')
       return { default: mod.TestViewPage }
@@ -61,11 +68,14 @@ const DevTestViewPage = !config.is(Env.PRODUCTION)
 
 const SiteRoutes = () => {
   const location = useLocation()
-  const analytics = getAnalytics()
 
   useEffect(() => {
+    // Capture the analytics handle inside the effect and depend on `location` only.
+    // getAnalytics() returns a new reference once analytics.js replaces the stub, so
+    // depending on it would fire a duplicate page view on initial load.
+    const analytics = getAnalytics()
     analytics?.page()
-  }, [location, analytics])
+  }, [location])
 
   return (
     <Routes>

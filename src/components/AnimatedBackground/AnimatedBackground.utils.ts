@@ -25,9 +25,16 @@ function createProgram(gl: WebGLRenderingContext, vs: WebGLShader, fs: WebGLShad
   return program
 }
 
-function loadTexture(gl: WebGLRenderingContext, url: string): WebGLTexture | null {
+interface LoadedTexture {
+  texture: WebGLTexture | null
+  // Cancels the pending async image load so its onload can no longer run GL
+  // against a texture that may have been deleted (e.g. after unmount).
+  cancel: () => void
+}
+
+function loadTexture(gl: WebGLRenderingContext, url: string): LoadedTexture {
   const texture = gl.createTexture()
-  if (!texture) return null
+  if (!texture) return { texture: null, cancel: () => undefined }
   gl.bindTexture(gl.TEXTURE_2D, texture)
 
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([128, 128, 128, 255]))
@@ -46,7 +53,14 @@ function loadTexture(gl: WebGLRenderingContext, url: string): WebGLTexture | nul
   }
   image.src = url
 
-  return texture
+  return {
+    texture,
+    cancel: () => {
+      image.onload = null
+      image.src = ''
+    }
+  }
 }
 
 export { createProgram, createShader, loadTexture }
+export type { LoadedTexture }

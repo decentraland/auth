@@ -312,7 +312,9 @@
     "randomize": "RANDOMIZE",
     "customize_later": "You can customize your avatar later.",
     "ready_to_jump_in": "{name} is Ready to Jump In!",
-    "success": "SUCCESS"
+    "success": "SUCCESS",
+    "account_ready": "Your account is Ready!",
+    "start_exploring": "Start Exploring"
   },
   "wallet_error_modal": {
     "title": "Wallet Error",

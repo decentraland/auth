@@ -320,7 +320,9 @@
     "randomize": "ALEATORIZAR",
     "customize_later": "Puedes personalizar tu avatar más tarde.",
     "ready_to_jump_in": "¡{name} está listo para entrar!",
-    "success": "ÉXITO"
+    "success": "ÉXITO",
+    "account_ready": "¡Tu cuenta está lista!",
+    "start_exploring": "Comenzar a explorar"
   },
   "wallet_error_modal": {
     "title": "Error de billetera",

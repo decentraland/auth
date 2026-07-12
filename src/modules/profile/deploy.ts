@@ -1,6 +1,7 @@
 import { createContentClient } from 'dcl-catalyst-client'
 import { AuthChain } from '@dcl/schemas'
 import { createFetcher } from '../../shared/fetcher'
+import { config } from '../config'
 import { DeploymentError } from './errors'
 import { getCatalystUrlsForRotation } from './utils'
 
@@ -17,7 +18,9 @@ interface DeployWithCatalystRotationOptions {
 
 async function deployWithCatalystRotation({ entity, disabledCatalysts }: DeployWithCatalystRotationOptions): Promise<void> {
   const catalystUrls = getCatalystUrlsForRotation(disabledCatalysts)
-  const fetcher = createFetcher()
+  // Give each request a timeout so a stalled catalyst aborts (a retryable error) instead of
+  // hanging the whole rotation forever, letting it advance to the next catalyst.
+  const fetcher = createFetcher({ timeout: Number(config.get('PROFILE_CONSISTENCY_CHECK_TIMEOUT')) || 10000 })
 
   for (let attempt = 0; attempt < catalystUrls.length; attempt++) {
     const catalystUrl = catalystUrls[attempt]

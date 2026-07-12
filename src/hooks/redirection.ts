@@ -1,7 +1,20 @@
 import { useCallback } from 'react'
 import { useLocation } from 'react-router-dom'
 import { validateUrlInstance } from '@dcl/schemas'
+import { config } from '../modules/config'
 import { extractRedirectToFromSearchParameters, locations } from '../shared/locations'
+
+// Hosts an explicit `overrideUrl` may target even though they differ from the auth site's own
+// origin. Only the configured download handoff qualifies; any other override — including any
+// attacker-supplied one — is held to the same-origin rule below. Returned as a list so more
+// trusted handoffs can be added if needed.
+const getOverrideAllowedHostnames = (): string[] => {
+  try {
+    return [new URL(config.get('DOWNLOAD_URL')).hostname]
+  } catch {
+    return []
+  }
+}
 
 // Magic OAuth round-trip encodes the original redirectTo inside the `state` query param
 // (as JSON.stringify({ customData: JSON.stringify({ redirectTo, ... }) }) then base64).
@@ -123,9 +136,13 @@ export const useAfterLoginRedirection = () => {
       // Final security check - ensure the URL is still safe
       try {
         const finalUrlObj = new URL(finalUrl)
-        const hasOverrideUrl = !!overrideUrl
         const isUrlValid = validateUrlInstance(finalUrlObj, { allowLocalhost: true, allowedPorts })
-        const isHostnameValid = hasOverrideUrl || finalUrlObj.hostname === window.location.hostname
+        // The target must be same-origin. An override URL may additionally point at a configured
+        // trusted host (the download handoff) — but an override is NOT a blanket bypass of the
+        // hostname check, so an arbitrary off-origin override still falls back to home.
+        const isHostnameValid =
+          finalUrlObj.hostname === window.location.hostname ||
+          (!!overrideUrl && getOverrideAllowedHostnames().includes(finalUrlObj.hostname))
 
         if (!isUrlValid || !isHostnameValid) {
           console.error('Invalid final URL, redirecting to home')

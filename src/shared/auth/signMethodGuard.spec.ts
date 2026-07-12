@@ -1,5 +1,5 @@
-import { ImpersonatedSignInError } from './errors'
-import { assertRequestIsNotImpersonatingSignIn, isDecentralandIdentityAuthMessage } from './signMethodGuard'
+import { ImpersonatedSignInError, UnsupportedMethodError } from './errors'
+import { assertMethodIsAllowed, assertRequestIsNotImpersonatingSignIn, isDecentralandIdentityAuthMessage } from './signMethodGuard'
 
 describe('isDecentralandIdentityAuthMessage', () => {
   describe('when the message is a canonical Decentraland sign-in payload', () => {
@@ -170,6 +170,39 @@ describe('assertRequestIsNotImpersonatingSignIn', () => {
   describe('when the request has no params', () => {
     it('should not throw', () => {
       expect(() => assertRequestIsNotImpersonatingSignIn('personal_sign', undefined)).not.toThrow()
+    })
+  })
+})
+
+describe('assertMethodIsAllowed', () => {
+  describe.each([
+    'dcl_personal_sign',
+    'personal_sign',
+    'eth_signTypedData',
+    'eth_signTypedData_v3',
+    'eth_signTypedData_v4',
+    'eth_sendTransaction'
+  ])('when the method is the allowed method %s', method => {
+    it('should not throw', () => {
+      expect(() => assertMethodIsAllowed(method)).not.toThrow()
+    })
+  })
+
+  describe('when the method casing differs from the canonical allowlist entry', () => {
+    it('should not throw because the check is case-insensitive', () => {
+      expect(() => assertMethodIsAllowed('PERSONAL_SIGN')).not.toThrow()
+    })
+  })
+
+  describe('when the method is the dangerous legacy eth_sign', () => {
+    it('should throw an UnsupportedMethodError', () => {
+      expect(() => assertMethodIsAllowed('eth_sign')).toThrow(UnsupportedMethodError)
+    })
+  })
+
+  describe('when the method is an unknown method', () => {
+    it('should throw an UnsupportedMethodError', () => {
+      expect(() => assertMethodIsAllowed('eth_doSomethingWeird')).toThrow(UnsupportedMethodError)
     })
   })
 })

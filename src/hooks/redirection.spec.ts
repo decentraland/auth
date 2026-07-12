@@ -1,10 +1,32 @@
 import { Location, useLocation } from 'react-router-dom'
 import { renderHook } from '@testing-library/react'
+import { locations } from '../shared/locations'
 import { useAfterLoginRedirection } from './redirection'
 
 jest.mock('react-router-dom')
+// Only DOWNLOAD_URL is read by the hook (for the trusted-override allowlist); return a known
+// value so the override tests are deterministic regardless of the ambient environment config.
+jest.mock('../modules/config', () => ({
+  config: {
+    get: jest.fn((key: string) => (key === 'DOWNLOAD_URL' ? 'https://decentraland.org/download' : ''))
+  }
+}))
 type MockedUseLocation = jest.Mock<ReturnType<typeof useLocation>, Parameters<typeof useLocation>>
 const mockedUseLocation = useLocation as MockedUseLocation
+
+// jsdom does not implement navigation, so replace window.location with a plain object whose
+// href assignment can be read back to assert where a redirect actually went.
+const stubWindowLocation = () => {
+  const original = window.location
+  Object.defineProperty(window, 'location', {
+    configurable: true,
+    writable: true,
+    value: { origin: 'http://localhost', hostname: 'localhost', port: '', href: 'http://localhost/' }
+  })
+  return () => {
+    Object.defineProperty(window, 'location', { configurable: true, writable: true, value: original })
+  }
+}
 
 describe('when using the redirection hook', () => {
   afterEach(() => {
@@ -403,22 +425,47 @@ describe('when using the redirection hook', () => {
       })
     })
 
-    describe('and the overrideUrl points to another domain', () => {
+    describe('and the overrideUrl points to another (untrusted) domain', () => {
       let overrideUrl: string
+      let restoreWindowLocation: () => void
 
       beforeEach(() => {
         overrideUrl = 'https://malicious.com/path'
+        restoreWindowLocation = stubWindowLocation()
       })
 
-      it('should fallback to default redirect', () => {
+      afterEach(() => {
+        restoreWindowLocation()
+      })
+
+      it('should fall back to the default home redirect instead of following the override', () => {
         const { result } = renderHook(() => useAfterLoginRedirection())
-        const originalLocation = window.location.href
 
-        expect(() => {
-          result.current.redirect(undefined, overrideUrl)
-        }).not.toThrow()
+        result.current.redirect(undefined, overrideUrl)
 
-        window.location.href = originalLocation
+        expect(window.location.href).toBe(locations.home())
+      })
+    })
+
+    describe('and the overrideUrl points to the configured trusted download URL', () => {
+      let overrideUrl: string
+      let restoreWindowLocation: () => void
+
+      beforeEach(() => {
+        overrideUrl = 'https://decentraland.org/download'
+        restoreWindowLocation = stubWindowLocation()
+      })
+
+      afterEach(() => {
+        restoreWindowLocation()
+      })
+
+      it('should follow the override to the allowlisted trusted host', () => {
+        const { result } = renderHook(() => useAfterLoginRedirection())
+
+        result.current.redirect(undefined, overrideUrl)
+
+        expect(window.location.href).toBe(overrideUrl)
       })
     })
 

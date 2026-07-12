@@ -1,17 +1,48 @@
 import { fireEvent, render, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { fetchProfile } from '../../../modules/profile'
+import { isProfileComplete } from '../../../shared/profile'
 import { subscribeToNewsletter } from '../SetupPage/utils'
 import { QuickSetupPage } from './QuickSetupPage'
 
 // --- Mocks ---
 
 const mockRedirect = jest.fn()
+const mockNavigate = jest.fn()
+const mockTrackReferral = jest.fn()
+
 jest.mock('../../../hooks/redirection', () => ({
   useAfterLoginRedirection: () => ({ url: 'https://decentraland.org/', redirect: mockRedirect, hasExplicitRedirect: true })
 }))
 
+jest.mock('../../../hooks/navigation', () => ({
+  useNavigateWithSearchParams: () => mockNavigate
+}))
+
 jest.mock('../../../hooks/useSkipSetup', () => ({
   useSkipSetup: () => false
+}))
+
+jest.mock('../../../hooks/useTrackReferral', () => ({
+  useTrackReferral: () => ({ track: mockTrackReferral, isReady: true })
+}))
+
+jest.mock('react-router-dom', () => ({
+  useSearchParams: () => [new URLSearchParams(), jest.fn()]
+}))
+
+jest.mock('../../../modules/profile', () => ({
+  fetchProfile: jest.fn()
+}))
+
+jest.mock('../../../shared/profile', () => ({
+  isProfileComplete: jest.fn()
+}))
+
+jest.mock('../../../shared/locations', () => ({
+  locations: {
+    login: jest.fn().mockReturnValue('/login')
+  }
 }))
 
 let mockAccount: string | undefined = '0xTestAccount'
@@ -90,7 +121,9 @@ jest.mock('@dcl/hooks', () => ({
         'quick_setup.randomize': 'RANDOMIZE',
         'quick_setup.customize_later': 'You can customize your avatar later.',
         'quick_setup.ready_to_jump_in': `${params?.name} is Ready to Jump In!`,
-        'quick_setup.success': 'SUCCESS'
+        'quick_setup.success': 'SUCCESS',
+        'quick_setup.account_ready': 'Your account is Ready!',
+        'quick_setup.start_exploring': 'Start Exploring'
       }
       /* eslint-enable @typescript-eslint/naming-convention */
       return translations[key] ?? key
@@ -105,15 +138,30 @@ jest.mock('../../../modules/config', () => ({
   }
 }))
 
+// Renders the page and waits for the one-time initialization guard to resolve, at which point the
+// form (rather than the loading spinner) is shown. Every test drives the form, so it must wait first.
+async function renderQuickSetupPage() {
+  const result = render(<QuickSetupPage />)
+  // The form renders only after the async one-time init gate resolves. Use a generous timeout so
+  // this isn't flaky when the full suite saturates the machine (the default 1000ms can lapse
+  // before the init microtask settles under parallel load).
+  await result.findByText('Welcome to', {}, { timeout: 5000 })
+  return result
+}
+
 describe('QuickSetupPage', () => {
   beforeEach(() => {
     mockAccount = '0xTestAccount'
     mockIdentity = { authChain: [] }
     mockRedirect.mockClear()
+    mockNavigate.mockClear()
+    mockTrackReferral.mockClear()
+    ;(fetchProfile as jest.Mock).mockResolvedValue(null)
+    ;(isProfileComplete as jest.Mock).mockReturnValue(false)
   })
 
-  it('should render the welcome title and form', () => {
-    const { getByText, getByPlaceholderText } = render(<QuickSetupPage />)
+  it('should render the welcome title and form', async () => {
+    const { getByText, getByPlaceholderText } = await renderQuickSetupPage()
     expect(getByText('Welcome to')).toBeInTheDocument()
     expect(getByText('Decentraland!')).toBeInTheDocument()
     expect(getByText('Username*')).toBeInTheDocument()
@@ -121,33 +169,70 @@ describe('QuickSetupPage', () => {
     expect(getByPlaceholderText('Enter your email')).toBeInTheDocument()
   })
 
-  it('should render the DCL logo', () => {
-    const { getByTestId } = render(<QuickSetupPage />)
+  it('should render the DCL logo', async () => {
+    const { getByTestId } = await renderQuickSetupPage()
     expect(getByTestId('dcl-logo')).toBeInTheDocument()
   })
 
-  it('should render the avatar preview on desktop', () => {
-    const { getByTestId } = render(<QuickSetupPage />)
+  it('should render the avatar preview on desktop', async () => {
+    const { getByTestId } = await renderQuickSetupPage()
     expect(getByTestId('wearable-preview')).toBeInTheDocument()
   })
 
-  it('should render randomize and body type buttons', () => {
-    const { getByText } = render(<QuickSetupPage />)
+  it('should render randomize and body type buttons', async () => {
+    const { getByText } = await renderQuickSetupPage()
     expect(getByText('RANDOMIZE')).toBeInTheDocument()
     expect(getByText('BODY TYPE A')).toBeInTheDocument()
   })
 
+  describe('when the user is not connected', () => {
+    beforeEach(() => {
+      mockAccount = undefined
+      mockIdentity = undefined
+    })
+
+    it('should navigate to the login page', async () => {
+      render(<QuickSetupPage />)
+      await waitFor(() => {
+        expect(mockNavigate).toHaveBeenCalledWith('/login')
+      })
+    })
+  })
+
+  describe('when the connected account already has a complete profile', () => {
+    beforeEach(() => {
+      ;(fetchProfile as jest.Mock).mockResolvedValue({ avatars: [{ name: 'ExistingUser' }] })
+      ;(isProfileComplete as jest.Mock).mockReturnValue(true)
+    })
+
+    it('should redirect away instead of rendering the form', async () => {
+      render(<QuickSetupPage />)
+      await waitFor(() => {
+        expect(mockRedirect).toHaveBeenCalled()
+      })
+    })
+  })
+
   describe("when Let's Go button is disabled", () => {
-    it('should be disabled when username is empty', () => {
-      const { getByText } = render(<QuickSetupPage />)
+    it('should be disabled when username is empty', async () => {
+      const { getByText } = await renderQuickSetupPage()
       const button = getByText("LET'S GO").closest('button')
       expect(button).toBeDisabled()
     })
 
     it('should be disabled when TOS is not accepted', async () => {
       const user = userEvent.setup()
-      const { getByText, getByPlaceholderText } = render(<QuickSetupPage />)
+      const { getByText, getByPlaceholderText } = await renderQuickSetupPage()
       await user.type(getByPlaceholderText('Enter your username'), 'TestUser')
+      const button = getByText("LET'S GO").closest('button')
+      expect(button).toBeDisabled()
+    })
+
+    it('should be disabled when the username contains non-alphanumeric characters', async () => {
+      const user = userEvent.setup()
+      const { getByText, getByPlaceholderText, getByRole } = await renderQuickSetupPage()
+      await user.type(getByPlaceholderText('Enter your username'), 'Test User')
+      await user.click(getByRole('checkbox'))
       const button = getByText("LET'S GO").closest('button')
       expect(button).toBeDisabled()
     })
@@ -156,7 +241,7 @@ describe('QuickSetupPage', () => {
   describe('when username is entered and TOS accepted', () => {
     it("should enable the Let's Go button", async () => {
       const user = userEvent.setup()
-      const { getByText, getByPlaceholderText, getByRole } = render(<QuickSetupPage />)
+      const { getByText, getByPlaceholderText, getByRole } = await renderQuickSetupPage()
       await user.type(getByPlaceholderText('Enter your username'), 'TestUser')
       const checkbox = getByRole('checkbox')
       await user.click(checkbox)
@@ -168,7 +253,7 @@ describe('QuickSetupPage', () => {
   describe('body type dropdown', () => {
     it('should toggle dropdown on click', async () => {
       const user = userEvent.setup()
-      const { getByText, queryByText } = render(<QuickSetupPage />)
+      const { getByText, queryByText } = await renderQuickSetupPage()
       expect(queryByText('BODY TYPE B')).not.toBeInTheDocument()
       await user.click(getByText('BODY TYPE A'))
       expect(getByText('BODY TYPE B')).toBeInTheDocument()
@@ -176,7 +261,7 @@ describe('QuickSetupPage', () => {
 
     it('should close dropdown when clicking outside', async () => {
       const user = userEvent.setup()
-      const { getByText, queryAllByText } = render(<QuickSetupPage />)
+      const { getByText, queryAllByText } = await renderQuickSetupPage()
       await user.click(getByText('BODY TYPE A'))
       // Both A and B should be in the dropdown
       expect(queryAllByText(/BODY TYPE/)).toHaveLength(3) // button + 2 dropdown items
@@ -189,7 +274,7 @@ describe('QuickSetupPage', () => {
 
     it('should change body type when selecting from dropdown', async () => {
       const user = userEvent.setup()
-      const { getByText } = render(<QuickSetupPage />)
+      const { getByText } = await renderQuickSetupPage()
       await user.click(getByText('BODY TYPE A'))
       // Click Body Type B in dropdown
       const items = document.querySelectorAll('[class*="BodyTypeDropdownItem"]')
@@ -210,8 +295,8 @@ describe('QuickSetupPage', () => {
         return match ? Number(match[1]) : NaN
       }
 
-      it('should use a default in the BaseMale range (81-160) when Body Type A is active', () => {
-        const { getByTestId } = render(<QuickSetupPage />)
+      it('should use a default in the BaseMale range (81-160) when Body Type A is active', async () => {
+        const { getByTestId } = await renderQuickSetupPage()
         const profile = getByTestId('wearable-preview').getAttribute('data-profile') ?? ''
         const n = extractDefaultNumber(profile)
         expect(n).toBeGreaterThanOrEqual(81)
@@ -220,7 +305,7 @@ describe('QuickSetupPage', () => {
 
       it('should use a default in the BaseFemale range (1-80) when Body Type B is selected', async () => {
         const user = userEvent.setup()
-        const { getByText, getByTestId } = render(<QuickSetupPage />)
+        const { getByText, getByTestId } = await renderQuickSetupPage()
         // Open the dropdown (clicking the button that currently reads "BODY TYPE A")
         await user.click(getByText('BODY TYPE A'))
         // After opening, the dropdown contains two "BODY TYPE B" occurrences are NOT expected —
@@ -239,7 +324,7 @@ describe('QuickSetupPage', () => {
   describe('celebration screen', () => {
     it('should show celebration screen after submitting', async () => {
       const user = userEvent.setup()
-      const { getByText, getByPlaceholderText, getByRole } = render(<QuickSetupPage />)
+      const { getByText, getByPlaceholderText, getByRole } = await renderQuickSetupPage()
 
       await user.type(getByPlaceholderText('Enter your username'), 'TestUser')
       const checkbox = getByRole('checkbox')
@@ -254,9 +339,9 @@ describe('QuickSetupPage', () => {
       expect(getByText('Start Exploring')).toBeInTheDocument()
     })
 
-    it('should call redirect when clicking SUCCESS', async () => {
+    it('should call redirect when clicking Start Exploring', async () => {
       const user = userEvent.setup()
-      const { getByText, getByPlaceholderText, getByRole } = render(<QuickSetupPage />)
+      const { getByText, getByPlaceholderText, getByRole } = await renderQuickSetupPage()
 
       await user.type(getByPlaceholderText('Enter your username'), 'TestUser')
       await user.click(getByRole('checkbox'))
@@ -274,7 +359,7 @@ describe('QuickSetupPage', () => {
   describe('username validation', () => {
     it('should show character counter', async () => {
       const user = userEvent.setup()
-      const { getByText, getByPlaceholderText } = render(<QuickSetupPage />)
+      const { getByText, getByPlaceholderText } = await renderQuickSetupPage()
       expect(getByText('0/15')).toBeInTheDocument()
       await user.type(getByPlaceholderText('Enter your username'), 'Hello')
       expect(getByText('5/15')).toBeInTheDocument()
@@ -294,19 +379,19 @@ describe('QuickSetupPage', () => {
       localStorage.removeItem('dcl_magic_user_email')
     })
 
-    it('should not render the email input field', () => {
-      const { queryByPlaceholderText } = render(<QuickSetupPage />)
+    it('should not render the email input field', async () => {
+      const { queryByPlaceholderText } = await renderQuickSetupPage()
       expect(queryByPlaceholderText('Enter your email')).not.toBeInTheDocument()
     })
 
-    it('should render the newsletter subscription checkbox', () => {
-      const { getByText } = render(<QuickSetupPage />)
+    it('should render the newsletter subscription checkbox', async () => {
+      const { getByText } = await renderQuickSetupPage()
       expect(getByText('Subscribe to newsletter for updates on features, events, contests, and more.')).toBeInTheDocument()
     })
 
     it('should subscribe with the inherited email when the newsletter checkbox is checked', async () => {
       const user = userEvent.setup()
-      const { getByText, getByPlaceholderText, getAllByRole } = render(<QuickSetupPage />)
+      const { getByText, getByPlaceholderText, getAllByRole } = await renderQuickSetupPage()
 
       await user.type(getByPlaceholderText('Enter your username'), 'TestUser')
       // Checkboxes order: [newsletter, terms]
@@ -323,7 +408,7 @@ describe('QuickSetupPage', () => {
 
     it('should not subscribe when the newsletter checkbox is left unchecked', async () => {
       const user = userEvent.setup()
-      const { getByText, getByPlaceholderText, getAllByRole } = render(<QuickSetupPage />)
+      const { getByText, getByPlaceholderText, getAllByRole } = await renderQuickSetupPage()
 
       await user.type(getByPlaceholderText('Enter your username'), 'TestUser')
       // Only check the terms checkbox (index 1)
@@ -354,7 +439,7 @@ describe('QuickSetupPage', () => {
 
     it('should hide the email input and use the Magic email when subscribing', async () => {
       const user = userEvent.setup()
-      const { getByText, getByPlaceholderText, queryByPlaceholderText, getAllByRole } = render(<QuickSetupPage />)
+      const { getByText, getByPlaceholderText, queryByPlaceholderText, getAllByRole } = await renderQuickSetupPage()
 
       expect(queryByPlaceholderText('Enter your email')).not.toBeInTheDocument()
 

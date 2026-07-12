@@ -18,6 +18,7 @@ import { ClickEvents } from '../../../modules/analytics/types'
 import { fetchProfile } from '../../../modules/profile'
 import { createAuthServerHttpClient, createAuthServerWsClient } from '../../../shared/auth'
 import { useCurrentConnectionData } from '../../../shared/connection'
+import { isEmailValid } from '../../../shared/email'
 import { locations } from '../../../shared/locations'
 import { getStoredEmail } from '../../../shared/onboarding/getStoredEmail'
 import { trackCheckpoint } from '../../../shared/onboarding/trackCheckpoint'
@@ -35,6 +36,8 @@ import { SigningError } from '../RequestPage/Views/SigningError'
 import { TimeoutError } from '../RequestPage/Views/TimeoutError'
 import { deployProfileFromDefault, subscribeToNewsletter } from './utils'
 import styles from './SetupPage.module.css'
+
+const MAX_CHARACTERS = 15
 
 enum View {
   RANDOMIZE,
@@ -74,6 +77,7 @@ export const SetupPage = () => {
   const hasStartedToWriteSomethingInEmail = useRef(false)
   const hasCheckedAgree = useRef(false)
   const hasTrackedReferral = useRef(false)
+  const initializedAccountRef = useRef<string | null>(null)
   const [urlSearchParams] = useSearchParams()
   const [isConnectionModalOpen, setIsConnectionModalOpen] = useState(false)
   const { flags, initialized: initializedFlags } = useContext(FeatureFlagsContext)
@@ -123,7 +127,7 @@ export const SetupPage = () => {
     if (!name.length) {
       return t('setup.validation.username_empty')
     }
-    if (name.length >= 15) {
+    if (name.length > MAX_CHARACTERS) {
       return t('setup.validation.username_max_length')
     }
 
@@ -140,7 +144,7 @@ export const SetupPage = () => {
 
   // Validate the email.
   const emailError = useMemo(() => {
-    if (email && !email.includes('@')) {
+    if (email && !isEmailValid(email)) {
       return t('setup.validation.email_invalid')
     }
 
@@ -366,9 +370,17 @@ export const SetupPage = () => {
 
     if (!account || !identity) {
       console.warn('No previous connection found')
-      return navigate(locations.login(redirectTo))
+      navigate(locations.login(redirectTo))
+      return
     }
 
+    // Run the one-time initialization once per connected account. The feature-flags provider
+    // rebuilds the `flags` object on every poll (~60s), which would otherwise re-run this effect
+    // and re-fetch the profile, re-fire the CP3 "reached" checkpoint, overwrite an email the user
+    // is editing with the stored one, and — worst — redirect() mid-signing if a poll landed
+    // between deploy and signRequest.
+    if (initializedAccountRef.current === account) return
+    initializedAccountRef.current = account
     ;(async () => {
       // Check if the wallet is connected.
       const profile = await fetchProfile(account)

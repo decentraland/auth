@@ -20,6 +20,13 @@ export const FeatureFlagsProvider = (props: PropsWithChildren<unknown>) => {
 
           const fetchJson = async (path: string) => {
             const response = await fetch(`${baseUrl}/${path}`, { signal: controller.signal })
+            // A 5xx (or any non-OK) response can still carry a JSON body. Without this check
+            // it would parse fine and REPLACE the previously-loaded flags with `{}`, wiping
+            // them mid-session. Throwing here routes into the catch below, which preserves
+            // the last-known-good flags once we've initialized.
+            if (!response.ok) {
+              throw new Error(`Failed to fetch feature flags from ${path}: ${response.status}`)
+            }
             return response.json()
           }
 

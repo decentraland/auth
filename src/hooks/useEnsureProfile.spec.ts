@@ -1,6 +1,7 @@
 import { renderHook } from '@testing-library/react'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/catalyst.schemas'
 import { AuthIdentity } from '@dcl/crypto'
+import { ProfileFetchError } from '../modules/profile'
 import { isProfileComplete } from '../shared/profile'
 import { useEnsureProfile } from './useEnsureProfile'
 
@@ -97,6 +98,23 @@ describe('useEnsureProfile', () => {
         const { result } = renderHook(() => useEnsureProfile())
         const profile = await result.current.ensureProfile(account, identity, options)
         expect(profile).toBeNull()
+      })
+    })
+
+    describe('and the profile could not be determined because the catalysts were unreachable', () => {
+      beforeEach(() => {
+        mockCheckProfileConsistency.mockResolvedValue({ profile: undefined, isConsistent: false, couldNotDetermine: true })
+      })
+
+      it('should throw a ProfileFetchError instead of resolving', async () => {
+        const { result } = renderHook(() => useEnsureProfile())
+        await expect(result.current.ensureProfile(account, identity, options)).rejects.toThrow(ProfileFetchError)
+      })
+
+      it('should not navigate to setup (which would overwrite an existing profile)', async () => {
+        const { result } = renderHook(() => useEnsureProfile())
+        await expect(result.current.ensureProfile(account, identity, options)).rejects.toThrow()
+        expect(mockNavigateToSetup).not.toHaveBeenCalled()
       })
     })
 

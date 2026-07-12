@@ -2,6 +2,7 @@ import { useCallback } from 'react'
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/catalyst.schemas'
 import { AuthIdentity } from '@dcl/crypto'
 import { config } from '../modules/config'
+import { ProfileFetchError } from '../modules/profile'
 import { createFetcher } from '../shared/fetcher'
 import { isProfileComplete } from '../shared/profile'
 import { useProfileConsistency } from './useProfileConsistency'
@@ -32,7 +33,15 @@ export const useEnsureProfile = () => {
         timeout: Number(config.get('PROFILE_CONSISTENCY_CHECK_TIMEOUT')) || 10000
       })
 
-      const { profile } = await checkProfileConsistency(account, identity, fetcherWithTimeout)
+      const { profile, couldNotDetermine } = await checkProfileConsistency(account, identity, fetcherWithTimeout)
+
+      // The catalysts couldn't be reached, so we don't know whether a profile exists. Throw
+      // instead of navigating to setup: routing an existing user into onboarding here would let
+      // them overwrite their real profile with a default one. Callers already handle errors by
+      // showing a retry / error state (they never fall through to onboarding on a throw).
+      if (couldNotDetermine) {
+        throw new ProfileFetchError(account)
+      }
 
       const complete = profile ? isProfileComplete(profile) : false
 

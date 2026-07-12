@@ -24,6 +24,7 @@ import {
   SimulationRequestBody,
   SimulationResponseBody,
   TimedOutError,
+  UnsupportedMethodError,
   createAuthServerHttpClient
 } from '../../../shared/auth'
 import { isSocialProviderType, useCurrentConnectionData } from '../../../shared/connection'
@@ -55,6 +56,7 @@ import {
   getMetaTransactionChainId,
   getNetworkProvider,
   getSigninDeeplink,
+  isApprovalGrantingTypedData,
   isKnownDecentralandContract,
   isSignatureMethod
 } from './utils'
@@ -165,6 +167,14 @@ export const RequestPage = () => {
   const [isMetaTransaction, setIsMetaTransaction] = useState(false)
   const [signaturePayload, setSignaturePayload] = useState<SignaturePayload | null>(null)
   const [isSignatureMetaTx, setIsSignatureMetaTx] = useState(false)
+  // Whether the signature meta-transaction's verifyingContract was verified to be a Decentraland
+  // contract. A request can self-declare `primaryType: "MetaTransaction"` for ANY contract, so the
+  // decoded meta-tx is only *trusted* (exempt from the simulation-unavailable acknowledgment) once
+  // this async verification confirms it. Defaults to false so an unverified contract is never trusted.
+  const [isSignatureMetaTxTrusted, setIsSignatureMetaTxTrusted] = useState(false)
+  // Whether the typed-data signature grants an off-chain asset approval (EIP-2612 Permit, Permit2,
+  // Seaport order). These aren't simulated, so they must always require an explicit acknowledgment.
+  const [isHighRiskSignature, setIsHighRiskSignature] = useState(false)
   const requestRef = useRef<RecoverResponse>()
   const viewRef = useRef(view)
   viewRef.current = view
@@ -245,10 +255,19 @@ export const RequestPage = () => {
     const checkProfile = async () => {
       const redirectTo = buildRequestPageUrl(requestId, targetConfigId, { isDeepLinkFlow, isBridgeOnly, authRequestId })
       const referrer = extractReferrerFromSearchParameters(searchParams)
-      const profile = await ensureProfile(account, identityRef.current, { redirectTo, referrer })
+      try {
+        const profile = await ensureProfile(account, identityRef.current, { redirectTo, referrer })
 
-      if (!cancelled && profile) {
-        setIsProfileReady(true)
+        if (!cancelled && profile) {
+          setIsProfileReady(true)
+        }
+      } catch (e) {
+        // ensureProfile throws when the catalysts couldn't be reached (profile state unknown).
+        // Don't proceed to load/sign the request on an indeterminate profile — show the
+        // recoverable error view instead of silently hanging on the loading spinner.
+        if (cancelled) return
+        setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
+        setView(View.LOADING_ERROR)
       }
     }
 
@@ -463,28 +482,32 @@ export const RequestPage = () => {
                 // Do NOT call notifyRequestNeedsValidation — the Explorer should
                 // not show the verification code screen for new users.
                 const autoSignMessage = request.params?.[0]
-                if (typeof autoSignMessage !== 'string') break
-                try {
-                  const signature = await walletClientRef.current.signMessage({
-                    account: signerAddress,
-                    message: autoSignMessage
-                  })
-                  if (cancelled) return
-                  await authServerClient.current.sendSuccessfulOutcome(requestId, signerAddress, signature)
-                  hasCompletedRef.current = true
-                  setView(View.VERIFY_SIGN_IN_COMPLETE)
-                  break
-                } catch (e) {
-                  if (cancelled) return
-                  console.info('Auto-sign failed for new user:', e instanceof Error ? e.message : String(e))
-                  if (isUserRejectedTransaction(e)) {
+                // Only auto-sign a well-formed string message. If the payload is malformed, fall
+                // through to the normal verification flow below rather than `break`ing out of the
+                // switch with no view set (which strands the user on the loading spinner forever).
+                if (typeof autoSignMessage === 'string') {
+                  try {
+                    const signature = await walletClientRef.current.signMessage({
+                      account: signerAddress,
+                      message: autoSignMessage
+                    })
+                    if (cancelled) return
+                    await authServerClient.current.sendSuccessfulOutcome(requestId, signerAddress, signature)
                     hasCompletedRef.current = true
-                    setView(View.VERIFY_SIGN_IN_DENIED)
+                    setView(View.VERIFY_SIGN_IN_COMPLETE)
+                    break
+                  } catch (e) {
+                    if (cancelled) return
+                    console.info('Auto-sign failed for new user:', e instanceof Error ? e.message : String(e))
+                    if (isUserRejectedTransaction(e)) {
+                      hasCompletedRef.current = true
+                      setView(View.VERIFY_SIGN_IN_DENIED)
+                      break
+                    }
+                    setError(e instanceof Error ? e.message : 'Auto-sign failed')
+                    setView(View.VERIFY_SIGN_IN_ERROR)
                     break
                   }
-                  setError(e instanceof Error ? e.message : 'Auto-sign failed')
-                  setView(View.VERIFY_SIGN_IN_ERROR)
-                  break
                 }
               }
             }
@@ -550,25 +573,43 @@ export const RequestPage = () => {
                 const transferData = decodeNftTransferData(transactionData, contract.abi)
 
                 if (transferData) {
-                  const [metadata, recipientProfile] = await Promise.all([
-                    fetchNftMetadata(contractAddress, contract.abi, transferData.tokenId),
-                    fetchProfile(transferData.toAddress)
-                  ])
+                  // For web2 wallets (whose only confirmation is this site), only show the branded
+                  // Decentraland "gift" view when the target is a verified DCL collection. Otherwise an
+                  // arbitrary contract could impersonate a DCL wearable (spoofed name/image/rarity from
+                  // its own tokenURI) to socially-engineer the transfer of the user's own NFT — so fall
+                  // through to the generic simulation + acknowledgment path instead. Web3 wallets keep
+                  // the instant branded view since the wallet itself shows the authoritative transaction.
+                  // The verification result is cached in metaTxCheckRef so the generic fall-through and
+                  // the approve path don't repeat the (networked) lookup for the same contract.
+                  let isDclCollection = true
+                  if (isUserUsingWeb2Wallet) {
+                    const nftContractCheck = await checkMetaTransactionSupport(contractAddress)
+                    if (cancelled) return
+                    metaTxCheckRef.current = { address: contractAddress.toLowerCase(), ...nftContractCheck }
+                    isDclCollection = nftContractCheck.willUseMetaTransaction
+                  }
 
-                  if (cancelled) return
+                  if (isDclCollection) {
+                    const [metadata, recipientProfile] = await Promise.all([
+                      fetchNftMetadata(contractAddress, contract.abi, transferData.tokenId),
+                      fetchProfile(transferData.toAddress)
+                    ])
 
-                  setNftTransferData({
-                    imageUrl: metadata.imageUrl,
-                    tokenId: transferData.tokenId,
-                    toAddress: transferData.toAddress,
-                    contractAddress,
-                    name: metadata.name,
-                    description: metadata.description,
-                    rarity: metadata.rarity,
-                    recipientProfile: recipientProfile || undefined
-                  })
-                  setView(View.WALLET_NFT_INTERACTION)
-                  break
+                    if (cancelled) return
+
+                    setNftTransferData({
+                      imageUrl: metadata.imageUrl,
+                      tokenId: transferData.tokenId,
+                      toAddress: transferData.toAddress,
+                      contractAddress,
+                      name: metadata.name,
+                      description: metadata.description,
+                      rarity: metadata.rarity,
+                      recipientProfile: recipientProfile || undefined
+                    })
+                    setView(View.WALLET_NFT_INTERACTION)
+                    break
+                  }
                 }
               }
 
@@ -582,7 +623,15 @@ export const RequestPage = () => {
                 if (canShowSimulation) {
                   setSimulationState({ status: 'loading' })
                 }
-                checkMetaTransactionSupport(contractAddress)
+                // Reuse the meta-transaction check if the NFT-gift gate already resolved it for this
+                // same contract (it falls through to here for non-DCL contracts), so we don't repeat
+                // the networked lookup.
+                const cachedCheck = metaTxCheckRef.current
+                const metaTxCheck =
+                  cachedCheck && cachedCheck.address === contractAddress.toLowerCase()
+                    ? Promise.resolve(cachedCheck)
+                    : checkMetaTransactionSupport(contractAddress)
+                metaTxCheck
                   .then(({ willUseMetaTransaction, contractName }) => {
                     // Cache the result so the approve path doesn't repeat the lookup for this tx.
                     metaTxCheckRef.current = { address: contractAddress.toLowerCase(), willUseMetaTransaction, contractName }
@@ -632,14 +681,34 @@ export const RequestPage = () => {
               const payload = extractSignaturePayload(request.method, request.params, signerAddress)
               setSignaturePayload(payload)
               if (payload?.kind === 'typedData') {
+                // Off-chain approval permits/orders (EIP-2612, Permit2, Seaport) hand control of the
+                // user's assets to a third party but are never simulated — always require an explicit
+                // acknowledgment before signing them.
+                if (isApprovalGrantingTypedData(payload.typedData)) {
+                  setIsHighRiskSignature(true)
+                }
                 const metaTx = decodeMetaTransactionTypedData(payload.typedData)
                 if (metaTx) {
                   setIsSignatureMetaTx(true)
                   setSimulationChainId(metaTx.chainId)
                   setSimulationState({ status: 'loading' })
+                  // A request can self-declare `primaryType: "MetaTransaction"` for ANY contract.
+                  // Verify the verifyingContract really is a Decentraland contract before treating
+                  // this as a *trusted* meta-tx; until confirmed it stays untrusted, so a
+                  // MetaTransaction pointed at an arbitrary contract still requires acknowledgment
+                  // when the simulation is unavailable (matching the eth_sendTransaction path).
+                  checkMetaTransactionSupport(metaTx.verifyingContract)
+                    .then(({ willUseMetaTransaction }) => {
+                      if (!cancelled && willUseMetaTransaction) setIsSignatureMetaTxTrusted(true)
+                    })
+                    .catch(() => undefined)
                   void fetchSimulation({
                     chainId: metaTx.chainId,
-                    from: metaTx.from,
+                    // Simulate as the connected signer, not the `from` carried in the typed data.
+                    // A valid Decentraland meta-transaction is authorized by (and executed on behalf
+                    // of) the signer, so a differing `from` is only ever an attempt to make the
+                    // asset-change preview attribute movements to another address.
+                    from: signerAddress,
                     to: metaTx.verifyingContract,
                     data: metaTx.functionSignature,
                     value: '0'
@@ -676,6 +745,13 @@ export const RequestPage = () => {
           hasCompletedRef.current = true
           setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
           setView(View.VERIFY_SIGN_IN_ERROR)
+          return
+        } else if (e instanceof UnsupportedMethodError) {
+          // The request used a method that is not on the allowlist (e.g. the dangerous legacy
+          // eth_sign). Block it outright — a retry would re-trigger the same rejection.
+          hasCompletedRef.current = true
+          setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
+          setView(View.LOADING_ERROR)
           return
         }
 
@@ -742,6 +818,11 @@ export const RequestPage = () => {
   }, [])
 
   const onApproveSignInVerification = useCallback(async () => {
+    // Guard against a re-entrant approval (e.g. a fast double-click before the button disables),
+    // mirroring onApproveWalletInteraction. The two handlers run on mutually exclusive views, so
+    // sharing the ref is safe.
+    if (isApprovingRef.current) return
+    isApprovingRef.current = true
     trackClick(ClickEvents.APPROVE_SING_IN)
     setIsLoading(true)
     setHasTimedOut(false)
@@ -749,6 +830,7 @@ export const RequestPage = () => {
     let hasTimeouted = false
 
     if (!walletClient) {
+      isApprovingRef.current = false
       setIsLoading(false)
       throw new Error('Provider not created')
     }
@@ -823,6 +905,7 @@ export const RequestPage = () => {
       if (!hasTimeouted) {
         setIsLoading(false)
       }
+      isApprovingRef.current = false
     }
   }, [setIsLoading, isUserUsingWeb2Wallet, isLoading, identity, isBridgeOnly, authRequestId])
 
@@ -1038,15 +1121,26 @@ export const RequestPage = () => {
   // resolved. In that case approval is a single step (gas shown inline, no confirm modal); without
   // a summary it keeps the classic two-step confirm dialog for the gas check.
   const hasSimulationSummary = simulationState.status !== 'idle'
-  // Require an explicit acknowledgment before approving when the simulation shows a high-risk
-  // permission: an unlimited ERC-20 allowance or a full-collection ApprovalForAll grant.
+  // A trusted Decentraland meta-transaction is exempt from the "simulation unavailable"
+  // acknowledgment below: either an eth_sendTransaction relayed through the gas tank to a known
+  // DCL contract, or a typed-data meta-tx whose verifyingContract was VERIFIED to be a DCL
+  // contract (isSignatureMetaTxTrusted). A self-declared MetaTransaction to an arbitrary contract
+  // is NOT trusted.
+  const isTrustedMetaTransaction = isMetaTransaction || (isSignatureMetaTx && isSignatureMetaTxTrusted)
+  // Require an explicit acknowledgment before approving when: (a) the simulation resolved and shows
+  // a high-risk permission (unlimited ERC-20 allowance or full-collection ApprovalForAll); (b) the
+  // simulation could NOT be produced for a transaction we can't otherwise vouch for (prevents the
+  // fail-open where an unpreviewable payload degrades to a single-click approve); or (c) the request
+  // is an off-chain approval signature (permit/order), which grants asset control but is never simulated.
   const requiresApprovalAcknowledgment =
-    simulationState.status === 'ready' &&
-    simulationState.result.approvalChanges.some(
-      approval =>
-        (approval.kind === 'approvalForAll' && approval.approved !== false) ||
-        (approval.kind === 'approval' && !approval.tokenId && approval.isUnlimited)
-    )
+    (simulationState.status === 'ready' &&
+      simulationState.result.approvalChanges.some(
+        approval =>
+          (approval.kind === 'approvalForAll' && approval.approved !== false) ||
+          (approval.kind === 'approval' && !approval.tokenId && approval.isUnlimited)
+      )) ||
+    (simulationState.status === 'unavailable' && !isTrustedMetaTransaction) ||
+    isHighRiskSignature
 
   switch (view) {
     case View.TIMEOUT:

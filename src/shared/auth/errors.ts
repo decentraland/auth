@@ -63,6 +63,19 @@ class ImpersonatedSignInError extends Error {
 }
 
 /**
+ * Thrown when a recovered request uses a signing/transaction method the auth site does not
+ * support. The method allowlist (see {@link assertMethodIsAllowed}) deliberately excludes
+ * dangerous legacy methods such as `eth_sign`, which signs a raw digest with no EIP-191 prefix
+ * and could therefore be used to blind-sign a transaction hash or a pre-computed sign-in payload.
+ */
+class UnsupportedMethodError extends Error {
+  constructor(public readonly method: string) {
+    super(`The "${method}" method is not supported`)
+    this.name = 'UnsupportedMethodError'
+  }
+}
+
+/**
  * Thrown when the transaction-simulation endpoint is unreachable, times out, or
  * returns a non-200 response. The approval UI treats this as "details unavailable"
  * and falls back to the default confirmation — simulation is never allowed to block
@@ -84,5 +97,6 @@ export {
   IpValidationError,
   TimedOutError,
   ImpersonatedSignInError,
+  UnsupportedMethodError,
   SimulationUnavailableError
 }

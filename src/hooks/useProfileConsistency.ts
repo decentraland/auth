@@ -8,6 +8,9 @@ import { useDisabledCatalysts } from './useDisabledCatalysts'
 interface CheckProfileConsistencyResult {
   profile: Profile | undefined
   isConsistent: boolean
+  // Propagated from the consistency check: true when no catalyst could be reached, so the
+  // absence of a profile is inconclusive rather than authoritative.
+  couldNotDetermine: boolean
 }
 
 /**
@@ -24,6 +27,16 @@ export const useProfileConsistency = () => {
       fetcher?: IFetchComponent
     ): Promise<CheckProfileConsistencyResult> => {
       const consistencyResult = await fetchProfileWithConsistencyCheck(account, disabledCatalysts, fetcher)
+
+      // Propagate the indeterminate state without attempting any redeploy — there is no profile
+      // to redeploy and the caller must not treat this as "no profile".
+      if (consistencyResult.couldNotDetermine) {
+        return {
+          profile: undefined,
+          isConsistent: false,
+          couldNotDetermine: true
+        }
+      }
 
       if (!consistencyResult.isConsistent && consistencyResult.profile && identity) {
         try {
@@ -44,7 +57,8 @@ export const useProfileConsistency = () => {
 
       return {
         profile: consistencyResult.profile,
-        isConsistent: consistencyResult.isConsistent
+        isConsistent: consistencyResult.isConsistent,
+        couldNotDetermine: false
       }
     },
     [disabledCatalysts]

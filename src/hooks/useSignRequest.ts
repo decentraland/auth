@@ -32,7 +32,14 @@ export const useSignRequest = (redirect: () => void, errorHandlers?: SignRequest
         }
       } catch (e) {
         if (e instanceof RequestFulfilledError) {
-          // Request was already consumed successfully — not an error, silently ignore
+          // Request was already consumed successfully (e.g. a second tab or an auto-login race
+          // signed it first). Treat it as success so the caller proceeds instead of hanging on a
+          // spinner — mirror the normal success path (onSuccess, else redirect).
+          if (errorHandlers?.onSuccess) {
+            errorHandlers.onSuccess()
+          } else {
+            redirect()
+          }
           return
         } else if (e instanceof ExpiredRequestError) {
           if (errorHandlers?.onExpiredRequest) {
@@ -67,8 +74,12 @@ export const useSignRequest = (redirect: () => void, errorHandlers?: SignRequest
           chain: mainnet,
           transport: custom(provider)
         })
-        const [address] = await walletClient.getAddresses()
-        signature = await walletClient.signMessage({ account: address, message: request.params?.[0] as string })
+        // Sign with the connected `account` (the same address recover validated and the outcome is
+        // sent for), not getAddresses()[0]. If the wallet's active account changed after connect,
+        // signing with the wallet's current first address would produce a signature from a
+        // different key that the server would reject with an opaque error; using `account` makes
+        // the wallet sign for the expected key (or throw, surfacing a real signing error).
+        signature = await walletClient.signMessage({ account: account as `0x${string}`, message: request.params?.[0] as string })
 
         if (errorHandlers?.onConnectionModalClose) {
           errorHandlers.onConnectionModalClose()
