@@ -2,6 +2,10 @@ import { IntercomSettings, IntercomWindow } from './Intercom.types'
 
 const intercomWindow = window as unknown as IntercomWindow
 
+// How long to wait for the Intercom widget script before giving up, so a blocked
+// or offline script surfaces an error to the caller instead of hanging forever.
+const INJECT_TIMEOUT_MS = 10000
+
 class IntercomWidget {
   private _appId: string | undefined
   private _settings: IntercomSettings | undefined
@@ -45,7 +49,7 @@ class IntercomWidget {
   }
 
   inject() {
-    return new Promise<void>(resolve => {
+    return new Promise<void>((resolve, reject) => {
       if (this.isInjected()) {
         return resolve()
       }
@@ -53,7 +57,27 @@ class IntercomWidget {
       const script = insertScript({
         src: `https://widget.intercom.io/widget/${this._appId}`
       })
-      script.addEventListener('load', () => resolve(), true)
+
+      // Ensure the promise always settles so a blocked/offline script rejects
+      // (surfacing to the caller's catch) instead of hanging forever.
+      const timeoutId = setTimeout(() => reject(new Error('Timed out loading the Intercom widget script')), INJECT_TIMEOUT_MS)
+
+      script.addEventListener(
+        'load',
+        () => {
+          clearTimeout(timeoutId)
+          resolve()
+        },
+        true
+      )
+      script.addEventListener(
+        'error',
+        () => {
+          clearTimeout(timeoutId)
+          reject(new Error('Failed to load the Intercom widget script'))
+        },
+        true
+      )
     }).then(() => {
       this.client = getWindowClient(this._appId)
     })

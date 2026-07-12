@@ -13,7 +13,7 @@ import {
   RequestNotFoundError,
   SimulationUnavailableError
 } from './errors'
-import { assertRequestIsNotImpersonatingSignIn } from './signMethodGuard'
+import { assertMethodIsAllowed, assertRequestIsNotImpersonatingSignIn } from './signMethodGuard'
 import { IdentityResponse, OutcomeError, OutcomeResponse, RecoverResponse, SimulationRequestBody, SimulationResponseBody } from './types'
 
 const SIMULATION_TIMEOUT_MS = 10_000
@@ -156,6 +156,10 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
       if (recoverResponse.expiration && new Date(recoverResponse.expiration) < new Date()) {
         throw new ExpiredRequestError(requestId, recoverResponse.expiration)
       }
+
+      // Reject methods the auth site does not support (e.g. the dangerous legacy `eth_sign`)
+      // before anything is forwarded to the wallet.
+      assertMethodIsAllowed(recoverResponse.method)
 
       // Reject requests that try to replicate the dcl_personal_sign sign-in through a
       // generic signing method (e.g. personal_sign), which would bypass its protections.

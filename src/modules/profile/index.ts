@@ -14,6 +14,11 @@ interface ConsistencyResult {
   profile?: Profile
   profileFetchedFrom?: string
   error?: string
+  // True when the check could not reach a conclusion because every catalyst request failed
+  // transiently (network error / timeout / 5xx) — as opposed to authoritatively reporting the
+  // profile is missing. Callers must NOT treat this as "no profile" (which would route an
+  // existing user into onboarding and overwrite their real profile with a default one).
+  couldNotDetermine?: boolean
 }
 
 interface ProfileResult {
@@ -85,6 +90,19 @@ async function fetchProfileWithConsistencyCheck(
     const notFoundErrors = profileErrors.filter(error => error.isNotFound)
 
     if (profilesWithUrls.length === 0) {
+      // No catalyst returned a profile. Only conclude "the user has no profile" when at least
+      // one catalyst authoritatively said so (a 404 / not-found body). If every request failed
+      // transiently (no not-found responses at all), we cannot tell whether the profile exists —
+      // surfacing this as "no profile" during a catalyst outage would send an existing user to
+      // onboarding and overwrite their profile. Signal the indeterminate state instead.
+      if (notFoundErrors.length === 0) {
+        return {
+          isConsistent: false,
+          couldNotDetermine: true,
+          error: 'Profile consistency check could not reach any catalyst'
+        }
+      }
+
       return {
         isConsistent: false,
         error: 'No profiles found'
@@ -107,9 +125,12 @@ async function fetchProfileWithConsistencyCheck(
     }
   } catch (error) {
     console.error('Profile consistency check failed:', error)
-    // If consistency check fails, we can't determine consistency, so redirect to onboarding
+    // The whole check threw (e.g. catalyst discovery failed). We can't determine whether the
+    // user has a profile, so mark it indeterminate rather than treating it as "no profile" —
+    // callers must not onboard/overwrite an existing user on the basis of an infrastructure error.
     return {
       isConsistent: false,
+      couldNotDetermine: true,
       error: `Consistency check failed: ${error instanceof Error ? error.message : 'Unknown error'}`
     }
   }
@@ -261,5 +282,5 @@ export {
   redeployExistingProfileWithContentServerData
 }
 export { deployWithCatalystRotation } from './deploy'
-export { DeploymentError } from './errors'
+export { DeploymentError, ProfileFetchError } from './errors'
 export type { ConsistencyResult }

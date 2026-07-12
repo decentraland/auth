@@ -69,6 +69,7 @@ const MAX_CHARACTERS = 15
 const AvatarSetupPage: React.FC = () => {
   const { t } = useTranslation()
   const hasTrackedReferral = useRef(false)
+  const initializedAccountRef = useRef<string | null>(null)
   const [urlSearchParams] = useSearchParams()
   const { flags, initialized: initializedFlags } = useContext(FeatureFlagsContext)
   const [initialized, setInitialized] = useState(false)
@@ -250,8 +251,10 @@ const AvatarSetupPage: React.FC = () => {
 
       const avatarShape = event.data.payload.result as AvatarShape
 
-      // If any of the fields has an error, don't submit
-      if (emailError || agreeError || !isUsernameValid) {
+      // If any of the fields has an error, don't submit. Mirror the button-disable logic: besides the
+      // charset check, the username must be non-empty and within the character limit. Otherwise a name
+      // over the max restored from sessionStorage on reload would auto-continue and deploy.
+      if (emailError || agreeError || hasUsernameError || !state.username) {
         return
       }
 
@@ -350,6 +353,7 @@ const AvatarSetupPage: React.FC = () => {
     [
       emailError,
       agreeError,
+      hasUsernameError,
       state.username,
       state.email,
       account,
@@ -411,8 +415,14 @@ const AvatarSetupPage: React.FC = () => {
     })
 
     if (referrer && EthAddress.validate(referrer) && !hasTrackedReferral.current) {
-      await trackReferral(referrer, 'POST')
-      hasTrackedReferral.current = true
+      try {
+        await trackReferral(referrer, 'POST')
+        hasTrackedReferral.current = true
+      } catch {
+        // Error is already handled in trackReferral. Don't let a transient referral failure
+        // abort initialization — the one-shot init guard means this runs once per account, so a
+        // throw here would otherwise leave the user stuck on the loading spinner with no retry.
+      }
     }
 
     setInitialized(true)
@@ -426,7 +436,10 @@ const AvatarSetupPage: React.FC = () => {
   }, [handleMessage, handleContinueClick])
 
   useEffect(() => {
-    if (state.username !== '' && state.isTermsChecked && state.hasWearablePreviewLoaded && !state.hasEmailError) {
+    // Mirror the button-disable logic: the username must be present, valid charset and within the
+    // character limit (hasUsernameError covers both). This stops an over-limit name restored from
+    // sessionStorage on reload from auto-continuing into a deploy once the preview loads.
+    if (state.username !== '' && !hasUsernameError && state.isTermsChecked && state.hasWearablePreviewLoaded && !state.hasEmailError) {
       handleContinueClick()
     }
   }, [state.hasWearablePreviewLoaded])
@@ -438,6 +451,13 @@ const AvatarSetupPage: React.FC = () => {
       console.warn('No previous connection found')
       return navigate(locations.login(redirectTo, referrer))
     }
+
+    // Run the one-time initialization once per connected account. `initializeAvatarSetup` depends
+    // on the `flags` object, which the feature-flags provider rebuilds on every poll (~60s). Without
+    // this guard the effect would re-run each poll and re-check WebGPU, re-fetch the profile, re-fire
+    // the CP3 "reached" checkpoint, and overwrite an inherited email that had just been resolved.
+    if (initializedAccountRef.current === account) return
+    initializedAccountRef.current = account
 
     checkWebGpuSupport().then(hasWebGPU => {
       if (!hasWebGPU) {

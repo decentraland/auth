@@ -46,6 +46,23 @@ describe('useTargetConfig', () => {
     })
   })
 
+  describe('when a targetConfigId is the first query param of a relative redirectTo', () => {
+    beforeEach(() => {
+      ;(useLocation as jest.Mock).mockReturnValue({
+        search: `state=${btoa(JSON.stringify({ customData: JSON.stringify({ redirectTo: '/quick-setup?targetConfigId=ios' }) }))}`
+      })
+      ;(isMobile as jest.Mock).mockReturnValue(false)
+    })
+
+    it('should return the ios config', () => {
+      const { result } = renderHook(() => useTargetConfig())
+      const [config, targetConfigId] = result.current
+
+      expect(targetConfigId).toBe('ios')
+      expect(config).toEqual(_targetConfigs.ios)
+    })
+  })
+
   describe('when a targetConfigId is provided as ios', () => {
     beforeEach(() => {
       ;(useLocation as jest.Mock).mockReturnValue({ search: '?targetConfigId=ios' })

@@ -7,7 +7,6 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { DclThemeProvider, darkTheme } from 'decentraland-ui2'
 import { TranslationProvider } from '@dcl/hooks'
-import { Env } from '@dcl/ui-env'
 import { RequestPage } from './components/Pages/RequestPage'
 import { SetupPage } from './components/Pages/SetupPage'
 import { DefaultPage } from './components/Pages/DefaultPage'
@@ -52,7 +51,14 @@ analytics?.load(config.get('SEGMENT_API_KEY'))
 
 setupMobileAnalytics(analytics, getMobileSession())
 
-const DevTestViewPage = !config.is(Env.PRODUCTION)
+// Gate on the build-time `import.meta.env.DEV` constant (true only under the local `vite` dev
+// server) rather than a runtime env check. All deployed environments share one `vite build`
+// artifact whose environment is resolved at runtime from the domain/`?env` param, so a runtime
+// check (config.is) is bypassable — e.g. `decentraland.org/auth/testView/...?env=dev` would open
+// the gate and render a realistic but fake approval dialog on the production origin. The build-time
+// constant lets the bundler dead-code-eliminate this dev harness (and its chunk) from every
+// deployed build entirely.
+const DevTestViewPage = import.meta.env.DEV
   ? React.lazy(async () => {
       const mod = await import('./components/Pages/RequestPage/TestViewPage')
       return { default: mod.TestViewPage }
@@ -61,11 +67,14 @@ const DevTestViewPage = !config.is(Env.PRODUCTION)
 
 const SiteRoutes = () => {
   const location = useLocation()
-  const analytics = getAnalytics()
 
   useEffect(() => {
+    // Capture the analytics handle inside the effect and depend on `location` only.
+    // getAnalytics() returns a new reference once analytics.js replaces the stub, so
+    // depending on it would fire a duplicate page view on initial load.
+    const analytics = getAnalytics()
     analytics?.page()
-  }, [location, analytics])
+  }, [location])
 
   return (
     <Routes>

@@ -77,6 +77,12 @@ const DesktopCallbackPage = () => {
       try {
         const connectionData = await connectAndGenerateSignature()
         if (!connectionData) {
+          // connection.connect() resolved without a connection (returned falsy instead
+          // of throwing). Surface a recoverable error so the user gets the Try Again
+          // button instead of being stranded on the validating spinner. Mirrors the
+          // ERROR_GENERIC handling in logInAndRedirect's catch block below.
+          setErrorDetail('Could not connect to your account. Please try again.')
+          setLayoutState(ConnectionLayoutState.ERROR_GENERIC)
           return
         }
 

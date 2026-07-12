@@ -761,5 +761,30 @@ describe('AvatarSetupPage', () => {
         })
       })
     })
+
+    describe('and the restored username from sessionStorage exceeds the character limit', () => {
+      beforeEach(() => {
+        sessionStorage.setItem('dcl_avatar_setup_username', 'ThisUsernameIsWayTooLong')
+        sessionStorage.setItem('dcl_avatar_setup_is_terms_checked', 'true')
+        ;(WearablePreview.createController as jest.Mock).mockReturnValue({
+          scene: { setUsername: jest.fn().mockResolvedValue(undefined) }
+        })
+      })
+
+      it('should not auto-continue into the avatar preview when the wearable preview loads', async () => {
+        const { getByPlaceholderText } = renderAvatarSetupPage()
+
+        await waitFor(() => {
+          expect(getByPlaceholderText('Enter your username')).toBeInTheDocument()
+        })
+
+        const triggerOnload = document.querySelector('[data-testid="trigger-onload"]') as HTMLElement
+        await act(async () => {
+          fireEvent.click(triggerOnload)
+        })
+
+        expect(WearablePreview.createController).not.toHaveBeenCalled()
+      })
+    })
   })
 })

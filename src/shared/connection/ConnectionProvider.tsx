@@ -46,9 +46,10 @@ const ConnectionContext = createContext<ConnectionContextValue>(defaultValue)
 
 const ConnectionProvider = ({ children }: PropsWithChildren) => {
   const [state, setState] = useState<ConnectionState>(defaultState)
-  // Tracks an in-flight identity generation promise so that concurrent callers
-  // share a single wallet signature prompt instead of triggering duplicates.
-  const inflightIdentityRef = useRef<Promise<AuthIdentity> | null>(null)
+  // Tracks in-flight identity generation promises keyed by account so that
+  // concurrent callers for the SAME account share a single wallet signature prompt,
+  // while callers for DIFFERENT accounts never receive the wrong account's identity.
+  const inflightIdentityRef = useRef<Map<string, Promise<AuthIdentity>>>(new Map())
 
   /**
    * Fetches the current connection data (account, identity, provider, etc.)
@@ -68,10 +69,16 @@ const ConnectionProvider = ({ children }: PropsWithChildren) => {
   }, [])
 
   const getIdentitySignature = useCallback(async (existingConnection?: ConnectionResponse): Promise<AuthIdentity> => {
-    // If an identity generation is already in progress, return the same promise
-    // to avoid prompting the user for a duplicate wallet signature.
-    if (inflightIdentityRef.current) {
-      return inflightIdentityRef.current
+    // Key the in-flight dedup by account. When no existing connection is provided we
+    // fall back to a shared key, since that path always resolves to the single
+    // "previous" connection (preserving "create identity once per login").
+    const inflightKey = existingConnection?.account?.toLowerCase() ?? '__previous__'
+
+    // If an identity generation for this account is already in progress, return the
+    // same promise to avoid prompting the user for a duplicate wallet signature.
+    const inflight = inflightIdentityRef.current.get(inflightKey)
+    if (inflight) {
+      return inflight
     }
 
     const promise = (async () => {
@@ -97,12 +104,12 @@ const ConnectionProvider = ({ children }: PropsWithChildren) => {
       return identity
     })()
 
-    inflightIdentityRef.current = promise
+    inflightIdentityRef.current.set(inflightKey, promise)
 
     try {
       return await promise
     } finally {
-      inflightIdentityRef.current = null
+      inflightIdentityRef.current.delete(inflightKey)
     }
   }, [])
 

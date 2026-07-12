@@ -21,6 +21,7 @@ import {
   getMetaTransactionChainId,
   getNetworkProvider,
   getSigninDeeplink,
+  isApprovalGrantingTypedData,
   isDecentralandContractAddress,
   isSignatureMethod
 } from './utils'
@@ -1146,6 +1147,41 @@ describe('when testing decodeMetaTransactionTypedData', () => {
   })
 })
 
+describe('when testing isApprovalGrantingTypedData', () => {
+  describe.each(['Permit', 'PermitSingle', 'PermitBatch', 'PermitTransferFrom', 'PermitBatchTransferFrom', 'OrderComponents', 'BulkOrder'])(
+    'and the typed data primaryType is the approval-granting type %s',
+    primaryType => {
+      it('should return true', () => {
+        expect(isApprovalGrantingTypedData({ primaryType } as any)).toBe(true)
+      })
+    }
+  )
+
+  describe('and the primaryType casing differs', () => {
+    it('should still match case-insensitively', () => {
+      expect(isApprovalGrantingTypedData({ primaryType: 'PERMIT' } as any)).toBe(true)
+    })
+  })
+
+  describe('and the typed data is a benign primaryType', () => {
+    it('should return false', () => {
+      expect(isApprovalGrantingTypedData({ primaryType: 'Mail' } as any)).toBe(false)
+    })
+  })
+
+  describe('and the typed data is a Decentraland MetaTransaction', () => {
+    it('should return false because meta-transactions are handled separately', () => {
+      expect(isApprovalGrantingTypedData({ primaryType: 'MetaTransaction' } as any)).toBe(false)
+    })
+  })
+
+  describe('and the typed data is undefined', () => {
+    it('should return false', () => {
+      expect(isApprovalGrantingTypedData(undefined)).toBe(false)
+    })
+  })
+})
+
 describe('when testing buildSendTransactionSimulationPayload', () => {
   const signerAddress = '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd'
 
@@ -1168,6 +1204,12 @@ describe('when testing buildSendTransactionSimulationPayload', () => {
 
     it('should default the from address to the signer when not present in the params', () => {
       const result = buildSendTransactionSimulationPayload(txParams, signerAddress, 1, true)
+      expect(result?.from).toBe(signerAddress)
+    })
+
+    it('should ignore a request-supplied from address and always simulate as the connected signer', () => {
+      const attackerControlledFrom = '0x000000000000000000000000000000000000dead'
+      const result = buildSendTransactionSimulationPayload({ ...txParams, from: attackerControlledFrom }, signerAddress, 1, true)
       expect(result?.from).toBe(signerAddress)
     })
   })

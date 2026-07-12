@@ -320,7 +320,9 @@
     "randomize": "ALÉATOIRE",
     "customize_later": "Vous pourrez personnaliser votre avatar plus tard.",
     "ready_to_jump_in": "{name} est prêt à se lancer !",
-    "success": "SUCCÈS"
+    "success": "SUCCÈS",
+    "account_ready": "Votre compte est prêt !",
+    "start_exploring": "Commencer à explorer"
   },
   "wallet_error_modal": {
     "title": "Erreur de portefeuille",

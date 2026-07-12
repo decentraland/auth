@@ -4,7 +4,7 @@ import { config } from '../../modules/config'
 import { trackEvent } from '../utils/analytics'
 import { handleError } from '../utils/errorHandler'
 import { DifferentSenderError, ExpiredRequestError, IpValidationError, RequestFulfilledError, RequestNotFoundError } from './errors'
-import { assertRequestIsNotImpersonatingSignIn } from './signMethodGuard'
+import { assertMethodIsAllowed, assertRequestIsNotImpersonatingSignIn } from './signMethodGuard'
 import { OutcomeError, OutcomeResponse, RecoverResponse, ValidationResponse } from './types'
 
 // Fail fast instead of hanging forever if the auth server is unreachable or never acks.
@@ -124,6 +124,10 @@ export const createAuthServerWsClient = (authServerUrl?: string) => {
       if (response.expiration && new Date(response.expiration) < new Date()) {
         throw new ExpiredRequestError(requestId, response.expiration)
       }
+
+      // Reject methods the auth site does not support (e.g. the dangerous legacy `eth_sign`)
+      // before anything is forwarded to the wallet.
+      assertMethodIsAllowed(response.method)
 
       // Reject requests that try to replicate the dcl_personal_sign sign-in through a
       // generic signing method (e.g. personal_sign), which would bypass its protections.

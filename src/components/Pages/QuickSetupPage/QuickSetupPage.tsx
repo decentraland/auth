@@ -1,14 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from '@dcl/hooks'
-import { useMobileMediaQuery } from 'decentraland-ui2'
+import { EthAddress } from '@dcl/schemas'
+import { CircularProgress, useMobileMediaQuery } from 'decentraland-ui2'
 import bodyTypeIconWomanSvg from '../../../assets/images/body-type-icon-woman.svg'
 import bodyTypeIconManSvg from '../../../assets/images/body-type-icon.svg'
 import randomizeIconSvg from '../../../assets/images/randomize-icon.svg'
+import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { useDisabledCatalysts } from '../../../hooks/useDisabledCatalysts'
+import { useTrackReferral } from '../../../hooks/useTrackReferral'
+import { fetchProfile } from '../../../modules/profile'
 import { useCurrentConnectionData } from '../../../shared/connection'
+import { locations } from '../../../shared/locations'
 import { getStoredEmail } from '../../../shared/onboarding/getStoredEmail'
 import { trackCheckpoint } from '../../../shared/onboarding/trackCheckpoint'
+import { isProfileComplete } from '../../../shared/profile'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { AnimatedBackground } from '../../AnimatedBackground'
 import { CustomWearablePreview } from '../../CustomWearablePreview'
@@ -63,9 +70,16 @@ function getRandomDefaultProfile(bodyType: BodyType) {
 
 export const QuickSetupPage = () => {
   const { t } = useTranslation()
-  const { redirect } = useAfterLoginRedirection()
-  const { account, identity } = useCurrentConnectionData()
+  const { url: redirectTo, redirect } = useAfterLoginRedirection()
+  const { account, identity, isLoading: isConnecting } = useCurrentConnectionData()
+  const navigate = useNavigateWithSearchParams()
   const isMobile = useMobileMediaQuery()
+  const [urlSearchParams] = useSearchParams()
+  const referrer = urlSearchParams.get('referrer')
+  const { track: trackReferral } = useTrackReferral()
+  const hasTrackedReferral = useRef(false)
+  const initializedAccountRef = useRef<string | null>(null)
+  const [initialized, setInitialized] = useState(false)
 
   const [inheritedEmail] = useState<string | null>(() => getStoredEmail())
   const [name, setName] = useState('')
@@ -101,7 +115,55 @@ export const QuickSetupPage = () => {
 
   const disabledCatalysts = useDisabledCatalysts()
 
-  const nameError = name.length > MAX_NAME_LENGTH
+  // This route is otherwise unguarded. Mirror the SetupPage/AvatarSetupPage guards: send a
+  // disconnected user to login and — critically — bail out for a user who ALREADY has a complete
+  // profile so we never overwrite it with a default one. Also emit the CP3 "reached" checkpoint and
+  // track the referral (POST) like the sibling flows. Runs once per connected account.
+  useEffect(() => {
+    if (isConnecting) return
+
+    if (!account || !identity) {
+      console.warn('No previous connection found')
+      return navigate(locations.login(redirectTo, referrer))
+    }
+
+    if (initializedAccountRef.current === account) return
+    initializedAccountRef.current = account
+    ;(async () => {
+      const profile = await fetchProfile(account)
+
+      if (profile && isProfileComplete(profile)) {
+        console.warn('Profile already exists')
+        return redirect()
+      }
+
+      trackCheckpoint({
+        checkpointId: 3,
+        action: 'reached',
+        source: 'auth',
+        userIdentifier: inheritedEmail || account.toLowerCase(),
+        identifierType: inheritedEmail ? 'email' : 'wallet',
+        email: inheritedEmail || undefined,
+        wallet: account.toLowerCase()
+      })
+
+      if (referrer && EthAddress.validate(referrer) && !hasTrackedReferral.current) {
+        try {
+          await trackReferral(referrer, 'POST')
+          hasTrackedReferral.current = true
+        } catch {
+          // Error is already handled in trackReferral
+        }
+      }
+
+      setInitialized(true)
+    })()
+  }, [account, identity, isConnecting, navigate, redirect, redirectTo, referrer, trackReferral, inheritedEmail])
+
+  // Enforce the alphanumeric charset rule the other flows use (SetupPage uses /^[a-zA-Z0-9]+$/), in
+  // addition to the existing length limit. Empty names are handled by the non-empty check in canSubmit.
+  const isNameValid = /^[a-zA-Z0-9]+$/.test(name)
+  const nameError = name.length > MAX_NAME_LENGTH || (name.length > 0 && !isNameValid)
   const canSubmit = name.trim().length > 0 && agree && !nameError && !deploying
 
   const handleRandomize = useCallback(() => {
@@ -130,6 +192,14 @@ export const QuickSetupPage = () => {
           deploymentProfileName: name.trim(),
           disabledCatalysts
         })
+
+        if (referrer && EthAddress.validate(referrer)) {
+          try {
+            await trackReferral(referrer, 'PATCH')
+          } catch {
+            // Error is already handled in trackReferral
+          }
+        }
 
         let newsletterEmail = ''
         if (inheritedEmail && subscribeNewsletter) {
@@ -166,8 +236,17 @@ export const QuickSetupPage = () => {
         setDeploying(false)
       }
     },
-    [canSubmit, account, identity, profile, name, email, inheritedEmail, subscribeNewsletter, disabledCatalysts]
+    [canSubmit, account, identity, profile, name, email, inheritedEmail, subscribeNewsletter, disabledCatalysts, referrer, trackReferral]
   )
+
+  if (!initialized) {
+    return (
+      <PageContainer>
+        <AnimatedBackground variant="absolute" />
+        <CircularProgress size={60} />
+      </PageContainer>
+    )
+  }
 
   if (showCelebration) {
     return (
@@ -175,10 +254,10 @@ export const QuickSetupPage = () => {
         <AnimatedBackground variant="absolute" />
         <CelebrationBackground />
         <CelebrationOverlay>
-          <CelebrationTitle>Your account is Ready!</CelebrationTitle>
+          <CelebrationTitle>{t('quick_setup.account_ready')}</CelebrationTitle>
           {celebrationAnimData ? <CelebrateAnimation animationData={celebrationAnimData} loop={false} /> : null}
           <SuccessButton variant="contained" onClick={() => redirect()}>
-            Start Exploring
+            {t('quick_setup.start_exploring')}
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M3 8H13M13 8L9 4M13 8L9 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>

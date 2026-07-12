@@ -20,15 +20,23 @@ export const CustomWearablePreview = (props: Props) => {
   useEffect(() => setIsLoading(true), [props.profile])
 
   useEffect(() => {
+    let cancelled = false
+
     async function initializeWebGpu() {
       setIsCheckingWebGPU(true)
       const webGPUSupported = await checkWebGpuSupport()
+      // The component may have unmounted while awaiting; don't touch state if so.
+      if (cancelled) return
       trackWebGPUSupportCheck({ supported: webGPUSupported })
       setHasWebGPU(webGPUSupported)
       setIsCheckingWebGPU(false)
     }
 
     initializeWebGpu()
+
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const isUnityWearablePreviewEnabled = flags[FeatureFlagsKeys.UNITY_WEARABLE_PREVIEW]
