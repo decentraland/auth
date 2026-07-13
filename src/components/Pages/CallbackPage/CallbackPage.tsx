@@ -124,7 +124,9 @@ const DesktopCallbackPage = () => {
         redirect()
       } catch (error) {
         handleError(error, 'Error in callback continue flow')
-        navigate(locations.login(), { replace: true })
+        // Preserve the user's destination so they land back where they intended after
+        // re-authenticating, mirroring the access-denied / MISSING_PKCE branches.
+        navigate(locations.login({ redirectTo }), { replace: true })
       }
     },
     [navigate, connectAndGenerateSignature, redirect, trackLoginSuccess, initialized, skipSetup, redirectTo, ensureProfile]

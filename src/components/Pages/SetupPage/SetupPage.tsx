@@ -15,7 +15,7 @@ import { useDisabledCatalysts } from '../../../hooks/useDisabledCatalysts'
 import { useSignRequest } from '../../../hooks/useSignRequest'
 import { useTrackReferral } from '../../../hooks/useTrackReferral'
 import { ClickEvents } from '../../../modules/analytics/types'
-import { fetchProfile } from '../../../modules/profile'
+import { fetchProfileWithStatus } from '../../../modules/profile'
 import { createAuthServerHttpClient, createAuthServerWsClient } from '../../../shared/auth'
 import { useCurrentConnectionData } from '../../../shared/connection'
 import { isEmailValid } from '../../../shared/email'
@@ -28,7 +28,6 @@ import { ConnectionModal } from '../../ConnectionModal'
 import { ConnectionLayoutState } from '../../ConnectionModal/ConnectionLayout.type'
 import { CustomWearablePreview } from '../../CustomWearablePreview'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
-import { DifferentAccountError } from '../RequestPage/Views/DifferentAccountError'
 import { IpValidationError as IpValidationErrorView } from '../RequestPage/Views/IpValidationError'
 import { RecoverError } from '../RequestPage/Views/RecoverError'
 import { SignInComplete } from '../RequestPage/Views/SignInComplete'
@@ -42,7 +41,6 @@ const MAX_CHARACTERS = 15
 enum View {
   RANDOMIZE,
   FORM,
-  DIFFERENT_ACCOUNT,
   RECOVER_ERROR,
   SIGN_IN_COMPLETE,
   SIGNING_ERROR,
@@ -383,7 +381,14 @@ export const SetupPage = () => {
     initializedAccountRef.current = account
     ;(async () => {
       // Check if the wallet is connected.
-      const profile = await fetchProfile(account)
+      const { profile, couldNotDetermine } = await fetchProfileWithStatus(account)
+
+      // If we couldn't determine whether a profile exists (catalyst outage), bail out rather than
+      // risk overwriting an existing profile with a default one — the whole point of this guard.
+      if (couldNotDetermine) {
+        console.warn('Could not determine whether a profile exists; skipping setup to avoid overwrite')
+        return redirect()
+      }
 
       // Check that the connected account does not have a profile already.
       if (profile && isProfileComplete(profile)) {
@@ -432,8 +437,6 @@ export const SetupPage = () => {
   }
 
   switch (view) {
-    case View.DIFFERENT_ACCOUNT:
-      return <DifferentAccountError requestId={requestId ?? ''} />
     case View.RECOVER_ERROR:
       return <RecoverError onTryAgain={() => navigate(locations.login())} />
     case View.SIGN_IN_COMPLETE:

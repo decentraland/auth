@@ -226,4 +226,42 @@ describe('useAutoLogin', () => {
       expect(result.current.resolvedConnectionOption).toBe(ConnectionOptionType.METAMASK)
     })
   })
+
+  describe('when the effect re-runs after cleanup but before the scheduled timer fires', () => {
+    let firstOnConnect: jest.Mock
+    let secondOnConnect: jest.Mock
+
+    beforeEach(() => {
+      mockSearchParams('?loginMethod=email')
+      firstOnConnect = jest.fn()
+      secondOnConnect = jest.fn()
+    })
+
+    it('should still trigger auto-login exactly once with the latest onConnect', async () => {
+      const { rerender } = renderHook(
+        ({ onConnect }: { onConnect: jest.Mock }) =>
+          useAutoLogin({
+            isReady: true,
+            onConnect
+          }),
+        { wrapper, initialProps: { onConnect: firstOnConnect } }
+      )
+
+      // Advance less than the 100ms delay so the scheduled timer has not fired yet
+      jest.advanceTimersByTime(50)
+
+      // Re-run the effect with a new onConnect reference (simulates onConnect being
+      // recreated when the connection provider resolves identity). The cleanup cancels
+      // the pending timer before it fires.
+      rerender({ onConnect: secondOnConnect })
+
+      jest.advanceTimersByTime(200)
+
+      await waitFor(() => {
+        expect(secondOnConnect).toHaveBeenCalledWith(ConnectionOptionType.EMAIL)
+      })
+      expect(secondOnConnect).toHaveBeenCalledTimes(1)
+      expect(firstOnConnect).not.toHaveBeenCalled()
+    })
+  })
 })

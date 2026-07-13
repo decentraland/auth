@@ -19,7 +19,7 @@ const testView = (id: string) => `/auth/testView/${id}`
 test.describe('Web2 transaction simulation & signature preview views', () => {
   test.beforeEach(async ({ context, page }) => {
     await injectMockWallet(context)
-    await mockApiRoutes(page, { transactionSimulation: true })
+    await mockApiRoutes(page)
   })
 
   test.describe('when reviewing a simulated transaction', () => {

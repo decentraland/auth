@@ -6,6 +6,7 @@ import { useTargetConfig } from '../../../hooks/targetConfig'
 import { useAnalytics } from '../../../hooks/useAnalytics'
 import { ConnectionType } from '../../../modules/analytics/types'
 import { createAuthServerHttpClient } from '../../../shared/auth'
+import { ONE_MONTH_IN_MINUTES, getIdentitySignature } from '../../../shared/connection/identity'
 import { TRACKING_DELAY } from '../../../shared/constants'
 import { isErrorWithName } from '../../../shared/errors'
 import { disconnectWallet, sendEmailOTP } from '../../../shared/thirdweb'
@@ -23,7 +24,6 @@ import {
   isEmailLogin,
   isSocialLogin
 } from '../LoginPage/utils'
-import { getIdentitySignature } from './identityUtils'
 import { MobileAuthSuccess } from './MobileAuthSuccess'
 import { MobileEmailLoginModal } from './MobileEmailLoginModal'
 import { EmailLoginResult } from './MobileEmailLoginModal/MobileEmailLoginModal.types'
@@ -33,6 +33,9 @@ import { parseConnectionOptionType } from './utils'
 import { Main } from './MobileAuthPage.styled'
 
 type MobileAuthView = 'selection' | 'connecting' | 'success' | 'error'
+
+// Mobile identities use a longer (3-month) ephemeral expiration than the 1-month desktop default.
+const MOBILE_IDENTITY_EXPIRATION_IN_MINUTES = ONE_MONTH_IN_MINUTES * 3
 
 export const MobileAuthPage = () => {
   const { t } = useTranslation()
@@ -98,7 +101,7 @@ export const MobileAuthPage = () => {
 
           setLoadingState(ConnectionLayoutState.WAITING_FOR_SIGNATURE)
           const ethAddress = connectionData.account?.toLowerCase() ?? ''
-          const identity = await getIdentitySignature(ethAddress, connectionData.provider)
+          const identity = await getIdentitySignature(ethAddress, connectionData.provider, MOBILE_IDENTITY_EXPIRATION_IN_MINUTES)
 
           setLoadingState(ConnectionLayoutState.VALIDATING_SIGN_IN)
 
@@ -180,13 +183,25 @@ export const MobileAuthPage = () => {
   }, [flagInitialized, isMagicTest, provider, initiateAuth])
 
   const handleTryAgain = useCallback(() => {
-    if (connectionType) {
+    if (!connectionType) {
       setView('selection')
-      setLoadingState(ConnectionLayoutState.CONNECTING_WALLET)
-      initiateAuth(connectionType)
-    } else {
-      setView('selection')
+      return
     }
+
+    // Email has its own OTP flow and can't be re-run via initiateAuth (it would fall
+    // into the wallet branch and call connectToProvider(EMAIL), looping). Route back to
+    // the email UI instead: return to the selection view and reopen the email modal so
+    // the user can retry with the email they already entered.
+    if (isEmailLogin(connectionType)) {
+      setView('selection')
+      setEmailError(null)
+      setShowEmailLoginModal(true)
+      return
+    }
+
+    setView('selection')
+    setLoadingState(ConnectionLayoutState.CONNECTING_WALLET)
+    initiateAuth(connectionType)
   }, [connectionType, initiateAuth])
 
   const handleEmailInputChange = useCallback(() => {
@@ -268,7 +283,7 @@ export const MobileAuthPage = () => {
           // Normal Thirdweb flow: restore the EIP-1193 provider that
           // verifyEmailOTPAndConnect persisted via storeConnectionData(THIRDWEB, MAINNET).
           const connectionData = await connection.tryPreviousConnection()
-          identity = await getIdentitySignature(address, connectionData.provider)
+          identity = await getIdentitySignature(address, connectionData.provider, MOBILE_IDENTITY_EXPIRATION_IN_MINUTES)
         }
 
         setLoadingState(ConnectionLayoutState.VALIDATING_SIGN_IN)

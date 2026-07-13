@@ -1,5 +1,5 @@
 import { ProviderType } from '@dcl/schemas'
-import { isSessionMismatch } from './useSessionMismatch'
+import { isSessionMismatch } from './sessionMismatch'
 
 describe('isSessionMismatch', () => {
   describe('when loginMethod is null', () => {

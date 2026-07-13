@@ -262,15 +262,21 @@ describe('when testing checkMetaTransactionSupport', () => {
 
   beforeEach(() => {
     contractAddress = '0x1234567890abcdef'
+    // getMetaTransactionChainId() reads ENVIRONMENT and isDecentralandContractAddress() reads the
+    // meta-transaction server URL; resolve both deterministically by key regardless of call order.
+    jest
+      .mocked(config.get)
+      .mockImplementation((key: string) => (key === 'ENVIRONMENT' ? 'dev' : 'https://meta-transactions.decentraland.org'))
   })
 
   afterEach(() => {
     jest.resetAllMocks()
   })
 
-  describe('and the contract is a known Decentraland contract', () => {
+  describe('and the contract is a known Decentraland contract on the meta-transaction chain', () => {
     beforeEach(() => {
       jest.mocked(getContractName).mockReturnValueOnce(ContractName.MANAToken)
+      jest.mocked(getContract).mockReturnValueOnce({ address: contractAddress } as any)
     })
 
     it('should return willUseMetaTransaction as true with the contract name', async () => {
@@ -282,12 +288,32 @@ describe('when testing checkMetaTransactionSupport', () => {
     })
   })
 
+  describe('and the address matches a Decentraland contract but on a different chain', () => {
+    beforeEach(() => {
+      // getContractName matches an address on ANY chain, but the deployment on the meta-tx chain
+      // has a different address — so this must NOT be relayed as a meta-transaction.
+      jest.mocked(getContractName).mockReturnValueOnce(ContractName.MANAToken)
+      jest.mocked(getContract).mockReturnValueOnce({ address: '0xdifferentchainaddress' } as any)
+      global.fetch = jest.fn().mockResolvedValueOnce({
+        status: 200,
+        json: jest.fn().mockResolvedValueOnce({ ok: false })
+      } as any)
+    })
+
+    it('should return willUseMetaTransaction as false with null contract name', async () => {
+      const result = await checkMetaTransactionSupport(contractAddress)
+      expect(result).toEqual({
+        willUseMetaTransaction: false,
+        contractName: null
+      })
+    })
+  })
+
   describe('and the contract is not known but is a valid Decentraland collection contract', () => {
     beforeEach(() => {
       jest.mocked(getContractName).mockImplementationOnce(() => {
         throw new Error('Unknown contract')
       })
-      jest.mocked(config.get).mockReturnValueOnce('https://meta-transactions.decentraland.org')
       global.fetch = jest.fn().mockResolvedValueOnce({
         status: 200,
         json: jest.fn().mockResolvedValueOnce({ ok: true })
@@ -308,7 +334,6 @@ describe('when testing checkMetaTransactionSupport', () => {
       jest.mocked(getContractName).mockImplementationOnce(() => {
         throw new Error('Unknown contract')
       })
-      jest.mocked(config.get).mockReturnValueOnce('https://meta-transactions.decentraland.org')
       global.fetch = jest.fn().mockResolvedValueOnce({
         status: 200,
         json: jest.fn().mockResolvedValueOnce({ ok: false })

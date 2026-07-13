@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from '@dcl/hooks'
 import { Button, muiIcons } from 'decentraland-ui2'
 import logoImg from '../../../assets/images/logo.svg'
@@ -25,30 +25,37 @@ export const MobileAuthSuccess = ({ identityId, explorerText, onTryAgain }: Prop
   // like the desktop/client-login deep links, instead of a bare signin URL.
   const deepLinkUrl = getSigninDeeplink(undefined, identityId)
 
+  const hasLaunchedRef = useRef(false)
+
   const attemptDeepLink = useCallback(async () => {
+    if (hasLaunchedRef.current) return
+    hasLaunchedRef.current = true
     const wasLaunched = await launchDeepLink(deepLinkUrl)
     if (!wasLaunched) {
+      // Allow the countdown/retry to re-attempt.
+      hasLaunchedRef.current = false
       setDeepLinkFailed(true)
     }
   }, [deepLinkUrl])
 
-  // Countdown and auto-launch deep link
+  // Tick the countdown down once per second. The updater stays pure — the launch is triggered by
+  // the effect below when the countdown reaches zero — so a StrictMode double-invoke of the updater
+  // can't fire the deep link twice (mirrors ContinueInApp).
   useEffect(() => {
     if (deepLinkFailed) return
 
     const interval = setInterval(() => {
-      setCountdown(prev => {
-        if (prev <= 1) {
-          clearInterval(interval)
-          attemptDeepLink()
-          return 0
-        }
-        return prev - 1
-      })
+      setCountdown(prev => (prev <= 0 ? 0 : prev - 1))
     }, 1000)
 
     return () => clearInterval(interval)
-  }, [deepLinkFailed, attemptDeepLink])
+  }, [deepLinkFailed])
+
+  // Launch the deep link once the countdown reaches zero (guarded against double-fire by the ref).
+  useEffect(() => {
+    if (deepLinkFailed) return
+    if (countdown === 0) attemptDeepLink()
+  }, [attemptDeepLink, countdown, deepLinkFailed])
 
   if (deepLinkFailed) {
     return (

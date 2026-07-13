@@ -109,23 +109,20 @@ test.describe('Web → MetaMask: new user — full happy path', () => {
     // Step 8: Let's Go should be enabled
     await expect(letsGo).toBeEnabled()
 
-    // Step 9: Submit — the deploy may fail in e2e (requires real crypto signatures)
-    // We verify the form interaction works; the deploy itself is tested via unit tests
+    // Step 9: Clicking "Let's go" MUST kick off the profile deploy (a POST to the content
+    // server), even though the deploy itself fails in e2e (real crypto/catalyst is out of scope
+    // and covered by unit tests). Asserting the deploy was ATTEMPTED is the deterministic "the
+    // click did something" signal that guards against the button being a no-op — unlike the
+    // transient "DEPLOYING..." button, which can flip back to "LET'S GO" on a fast failure.
+    let deployAttempted = false
+    await page.route('**/content/entities**', async (route, request) => {
+      if (request.method() === 'POST') deployAttempted = true
+      return route.fallback()
+    })
+
     await letsGo.click()
 
-    // Step 10: Should either show celebration OR deploying state OR an error
-    // (deploy requires real catalyst interaction which can't be fully mocked in e2e)
-    await page.waitForTimeout(3000)
-    const celebration = page.getByText('E2ETestPlayer is Ready to Jump In!')
-    const deployError = page.getByText(/error|went wrong/i)
-    const deploying = page.getByText(/deploying/i)
-
-    // At minimum, the button should have transitioned from "LET'S GO"
-    const isStillLetsGo = await page.getByRole('button', { name: /^let's go$/i }).isVisible().catch(() => false)
-    const isCelebration = await celebration.isVisible().catch(() => false)
-
-    // Either we reached celebration (deploy mocked successfully) or the form submitted
-    expect(isStillLetsGo || isCelebration).toBe(true)
+    await expect.poll(() => deployAttempted, { timeout: 15_000 }).toBe(true)
   })
 })
 

@@ -24,7 +24,7 @@ type Props = {
   connectionType: ConnectionOptionType
 }
 
-type Phase = 'redirecting' | 'verifying' | 'failed' | 'error'
+type Phase = 'redirecting' | 'verifying' | 'error'
 
 export const AutoLoginRedirect = ({ connectionType }: Props) => {
   const { t } = useTranslation()
@@ -168,7 +168,10 @@ export const AutoLoginRedirect = ({ connectionType }: Props) => {
 
   const handleErrorTryAgain = useCallback(() => {
     setPhase('redirecting')
-    hasStarted.current = false
+    // Keep hasStarted true so the mount effect can't fire a second concurrent
+    // startLogin() if startLogin's identity deps change (e.g. a feature-flag poll
+    // flips skipSetup). We invoke startLogin() directly here for the retry.
+    hasStarted.current = true
     startLogin()
   }, [startLogin])
 
@@ -177,9 +180,6 @@ export const AutoLoginRedirect = ({ connectionType }: Props) => {
   }
 
   const statusMessage = (() => {
-    if (phase === 'failed') {
-      return t('auto_login.error')
-    }
     if (phase === 'verifying') {
       return isSocial ? t('auto_login.verifying_credentials') : t('auto_login.confirming_login')
     }

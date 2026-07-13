@@ -15,7 +15,7 @@ import { useDisabledCatalysts } from '../../../hooks/useDisabledCatalysts'
 import { useSignRequest } from '../../../hooks/useSignRequest'
 import { useTrackReferral } from '../../../hooks/useTrackReferral'
 import { config } from '../../../modules/config'
-import { fetchProfile } from '../../../modules/profile'
+import { fetchProfileWithStatus } from '../../../modules/profile'
 import { IpValidationError, createAuthServerHttpClient, createAuthServerWsClient } from '../../../shared/auth'
 import { useCurrentConnectionData } from '../../../shared/connection'
 import { isEmailValid } from '../../../shared/email'
@@ -75,7 +75,6 @@ const AvatarSetupPage: React.FC = () => {
   const [initialized, setInitialized] = useState(false)
   const { url: redirectTo, redirect } = useAfterLoginRedirection()
   const { isLoading: isConnecting, account, identity, provider } = useCurrentConnectionData()
-  const { signRequest, authServerClient } = useSignRequest(redirect)
   const navigate = useNavigateWithSearchParams()
   const referrer = urlSearchParams.get('referrer')
   const { track: trackReferral } = useTrackReferral()
@@ -99,6 +98,29 @@ const AvatarSetupPage: React.FC = () => {
   const isProcessingMessageRef = useRef(false)
 
   const [isAvatarParticlesAnimationEnded, setIsAvatarParticlesAnimationEnded] = useState(false)
+
+  // Wire error handlers so a failed sign step surfaces instead of leaving the button stuck on
+  // "Deploying" forever: useSignRequest swallows recover/expired/IP errors when no handler is
+  // provided (it only console.errors and returns), so without these the deploy flow would complete
+  // its try block with `deploying` still true and no view change. Mirrors SetupPage.
+  const { signRequest, authServerClient } = useSignRequest(redirect, {
+    onExpiredRequest: () => {
+      setError(t('connection_layout.error_generic'))
+      setDeploying(false)
+    },
+    onRecoverError: message => {
+      setError(message)
+      setDeploying(false)
+    },
+    onSigningError: message => {
+      setError(message)
+      setDeploying(false)
+    },
+    onIpValidationError: message => {
+      setError(message)
+      setDeploying(false)
+    }
+  })
 
   const requestId = useMemo(() => {
     const redirectTo = urlSearchParams.get('redirectTo')
@@ -389,7 +411,14 @@ const AvatarSetupPage: React.FC = () => {
       return redirect()
     }
 
-    const profile = await fetchProfile(account)
+    const { profile, couldNotDetermine } = await fetchProfileWithStatus(account)
+
+    // If we couldn't determine whether a profile exists (catalyst outage), bail out rather than
+    // risk overwriting an existing profile with a default one — the whole point of this guard.
+    if (couldNotDetermine) {
+      console.warn('Could not determine whether a profile exists; skipping setup to avoid overwrite')
+      return redirect()
+    }
 
     if (profile && isProfileComplete(profile)) {
       console.warn('Profile already exists')

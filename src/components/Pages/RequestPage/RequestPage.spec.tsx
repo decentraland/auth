@@ -15,7 +15,6 @@ import {
 import { getAuthRequestId, isBridgeOnlyEnabled } from '../../../shared/locations'
 import { isProfileComplete } from '../../../shared/profile'
 import { FeatureFlagsContext } from '../../FeatureFlagsProvider'
-import { FeatureFlagsKeys } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
 import { RequestPage } from './RequestPage'
 import { decodeManaTransferData, decodeNftTransferData, fetchNftMetadata, getSigninDeeplink } from './utils'
 
@@ -146,7 +145,17 @@ jest.mock('viem', () => ({
 // --- Views (mock them to be simple identifiable components) ---
 jest.mock('./Views', () => ({
   LoadingRequest: () => <div data-testid="loading-request">Loading...</div>,
-  VerifySignIn: (props: any) => <div data-testid="verify-sign-in">Verify Sign In - Code: {props.code}</div>,
+  VerifySignIn: (props: any) => (
+    <div data-testid="verify-sign-in">
+      Verify Sign In - Code: {props.code}
+      <button data-testid="verify-sign-in-approve" onClick={props.onApprove}>
+        approve
+      </button>
+      <button data-testid="verify-sign-in-deny" onClick={props.onDeny}>
+        deny
+      </button>
+    </div>
+  ),
   DeniedSignIn: () => <div data-testid="denied-sign-in">Denied</div>,
   SignInComplete: () => <div data-testid="sign-in-complete">Complete</div>,
   SignInCompletePage: () => <div data-testid="sign-in-complete-page">Login Successful!</div>,
@@ -160,6 +169,7 @@ jest.mock('./Views', () => ({
       data-testid="wallet-interaction"
       data-sim={props.simulation?.status}
       data-requires-acknowledgment={String(props.requiresAcknowledgment)}
+      data-gas-covered={String(props.gasCovered)}
     >
       <button data-testid="wallet-interaction-approve" onClick={props.onApprove}>
         approve
@@ -730,6 +740,49 @@ describe('RequestPage', () => {
     })
   })
 
+  describe('when approving a sign-in verification (dcl_personal_sign)', () => {
+    beforeEach(() => {
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'User' }] })
+      mockRecover.mockResolvedValue({
+        method: 'dcl_personal_sign',
+        code: '1234',
+        params: ['Sign this message'],
+        sender: '0xabc123',
+        expiration: new Date(Date.now() + 3600000).toISOString()
+      })
+      mockGetAddresses.mockResolvedValue(['0xabc123'])
+      mockSignMessage.mockResolvedValue('0xsignature')
+      mockSendSuccessfulOutcome.mockResolvedValue({})
+    })
+
+    it('should sign the message and send the signature as the outcome', async () => {
+      renderRequestPage()
+      await userEvent.click(await screen.findByTestId('verify-sign-in-approve'))
+      await waitFor(() => {
+        expect(mockSendSuccessfulOutcome).toHaveBeenCalledWith(REQUEST_ID, '0xabc123', '0xsignature')
+      })
+      expect(await screen.findByTestId('sign-in-complete')).toBeInTheDocument()
+    })
+
+    it('should not post the identity (that mechanism is only for the client-login flow)', async () => {
+      renderRequestPage()
+      await userEvent.click(await screen.findByTestId('verify-sign-in-approve'))
+      await waitFor(() => expect(mockSendSuccessfulOutcome).toHaveBeenCalled())
+      expect(mockPostIdentity).not.toHaveBeenCalled()
+    })
+
+    describe('and the flow is a deep-link flow', () => {
+      it('should still send the outcome and not post the identity', async () => {
+        renderRequestPage(`/auth/requests/${REQUEST_ID}?targetConfigId=default&flow=deeplink`)
+        await userEvent.click(await screen.findByTestId('verify-sign-in-approve'))
+        await waitFor(() => {
+          expect(mockSendSuccessfulOutcome).toHaveBeenCalledWith(REQUEST_ID, '0xabc123', '0xsignature')
+        })
+        expect(mockPostIdentity).not.toHaveBeenCalled()
+      })
+    })
+  })
+
   describe('when approving a plain signature request', () => {
     beforeEach(() => {
       mockConnectionData = { ...mockConnectionData, providerType: ProviderType.INJECTED }
@@ -777,10 +830,14 @@ describe('RequestPage', () => {
       mockEstimateGas.mockResolvedValue(BigInt(1))
     })
 
-    it('should open the confirmation dialog instead of sending immediately', async () => {
+    it('should show the informative simulation-based confirmation instead of sending immediately', async () => {
+      // Simulation is always on for web2 wallets, so the transaction is previewed in the
+      // informative wallet-interaction view (single-step approval) rather than the classic
+      // no-summary confirm dialog.
       renderRequestPage()
-      await userEvent.click(await screen.findByTestId('wallet-interaction-approve'))
-      expect(await screen.findByTestId('transaction-confirm-dialog')).toBeInTheDocument()
+      const view = await screen.findByTestId('wallet-interaction')
+      await waitFor(() => expect(mockSimulateTransaction).toHaveBeenCalled())
+      expect(view).toBeInTheDocument()
     })
   })
 
@@ -802,18 +859,18 @@ describe('RequestPage', () => {
       mockEstimateGas.mockResolvedValue(BigInt(1))
     })
 
-    it('should mark the confirmation dialog as gas-covered', async () => {
+    it('should mark the wallet interaction as gas-covered', async () => {
+      // With always-on simulation the gas-covered signal is shown inline in the informative
+      // wallet-interaction view rather than in the classic confirm dialog.
       renderRequestPage()
-      await userEvent.click(await screen.findByTestId('wallet-interaction-approve'))
-      const dialog = await screen.findByTestId('transaction-confirm-dialog')
-      await waitFor(() => expect(dialog).toHaveAttribute('data-gas-covered', 'true'))
+      const view = await screen.findByTestId('wallet-interaction')
+      await waitFor(() => expect(view).toHaveAttribute('data-gas-covered', 'true'))
     })
   })
 
   describe('when a web2 transaction is a MANA tip (donation)', () => {
     beforeEach(() => {
       mockConnectionData = { ...mockConnectionData, providerType: ProviderType.MAGIC }
-      mockFlags = { [FeatureFlagsKeys.TRANSACTION_SIMULATION]: true }
       mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
       jest.mocked(decodeManaTransferData).mockReturnValueOnce({ manaAmount: '10', toAddress: '0xrecipient' })
       mockRecover.mockResolvedValue({
@@ -834,10 +891,9 @@ describe('RequestPage', () => {
     })
   })
 
-  describe('when a web2 user receives a signature request and simulation is enabled', () => {
+  describe('when a web2 user receives a signature request (simulation always on for web2)', () => {
     beforeEach(() => {
       mockConnectionData = { ...mockConnectionData, providerType: ProviderType.MAGIC }
-      mockFlags = { [FeatureFlagsKeys.TRANSACTION_SIMULATION]: true }
       mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
       mockRecover.mockResolvedValue({
         method: 'personal_sign',
@@ -863,7 +919,6 @@ describe('RequestPage', () => {
   describe('when a web2 user receives an off-chain approval signature (permit/order)', () => {
     beforeEach(() => {
       mockConnectionData = { ...mockConnectionData, providerType: ProviderType.MAGIC }
-      mockFlags = { [FeatureFlagsKeys.TRANSACTION_SIMULATION]: true }
       mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
       mockRecover.mockResolvedValue({
         method: 'eth_signTypedData_v4',
@@ -887,7 +942,6 @@ describe('RequestPage', () => {
   describe('when a web2 user receives a MetaTransaction signature and the simulation is unavailable', () => {
     beforeEach(() => {
       mockConnectionData = { ...mockConnectionData, providerType: ProviderType.MAGIC }
-      mockFlags = { [FeatureFlagsKeys.TRANSACTION_SIMULATION]: true }
       mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
       mockRecover.mockResolvedValue({
         method: 'eth_signTypedData_v4',
@@ -926,7 +980,6 @@ describe('RequestPage', () => {
   describe('when a web2 user receives an NFT transfer', () => {
     beforeEach(() => {
       mockConnectionData = { ...mockConnectionData, providerType: ProviderType.MAGIC }
-      mockFlags = { [FeatureFlagsKeys.TRANSACTION_SIMULATION]: true }
       mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
       mockRecover.mockResolvedValue({
         method: 'eth_sendTransaction',
@@ -970,10 +1023,9 @@ describe('RequestPage', () => {
     })
   })
 
-  describe('when a web2 user receives a transaction and simulation is enabled', () => {
+  describe('when a web2 user receives a transaction (simulation always on for web2)', () => {
     beforeEach(() => {
       mockConnectionData = { ...mockConnectionData, providerType: ProviderType.MAGIC }
-      mockFlags = { [FeatureFlagsKeys.TRANSACTION_SIMULATION]: true }
       mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
       mockRecover.mockResolvedValue({
         method: 'eth_sendTransaction',
@@ -1026,10 +1078,13 @@ describe('RequestPage', () => {
     })
   })
 
-  describe('when a web2 user receives a transaction and simulation is disabled', () => {
+  describe('when an external (web3) wallet receives a transaction', () => {
     beforeEach(() => {
-      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.MAGIC }
-      mockFlags = {}
+      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.INJECTED }
+      // A generic transaction (not a decoded MANA/NFT transfer) so it takes the WALLET_INTERACTION
+      // path. Reset the decoders explicitly — a prior test sets a persistent NFT return value.
+      jest.mocked(decodeManaTransferData).mockReturnValue(null)
+      jest.mocked(decodeNftTransferData).mockReturnValue(null)
       mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
       mockRecover.mockResolvedValue({
         method: 'eth_sendTransaction',
@@ -1044,7 +1099,7 @@ describe('RequestPage', () => {
       mockEstimateGas.mockResolvedValue(BigInt(1))
     })
 
-    it('should not call the simulation endpoint', async () => {
+    it('should not call the simulation endpoint (external wallets keep their own confirmation UI)', async () => {
       renderRequestPage()
       await screen.findByTestId('wallet-interaction')
       expect(mockSimulateTransaction).not.toHaveBeenCalled()

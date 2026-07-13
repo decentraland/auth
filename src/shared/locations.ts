@@ -1,6 +1,26 @@
 import { EthAddress } from '@dcl/schemas'
 
 /**
+ * Decodes the base64 OAuth `state` query param and returns its parsed `customData` object, or null
+ * if the state is missing/malformed. The social-login redirect encodes state as
+ * `btoa(JSON.stringify({ customData: JSON.stringify({ redirectTo, referrer, ... }) }))`, so
+ * recovering a field requires a base64 decode plus two JSON parses. Centralized here so the
+ * redirectTo/referrer extractors and the redirection hook decode it the same way.
+ */
+const parseStateCustomData = (state: string | null | undefined): Record<string, unknown> | null => {
+  if (!state) {
+    return null
+  }
+  try {
+    const decoded = JSON.parse(atob(state))
+    const customData = JSON.parse(decoded.customData)
+    return typeof customData === 'object' && customData !== null ? customData : null
+  } catch {
+    return null
+  }
+}
+
+/**
  * Login method types for direct login via URL parameters
  */
 type LoginMethod = 'email' | 'metamask' | 'google' | 'discord' | 'apple' | 'x' | 'fortmatic' | 'coinbase' | 'walletconnect'
@@ -97,30 +117,22 @@ const locations = {
 const extractRedirectToFromSearchParameters = (searchParams: URLSearchParams): string => {
   // Extract 'redirectTo' from current search parameters
   let redirectToSearchParam = searchParams.get('redirectTo')
-  try {
-    const state = searchParams.get('state')
-    // Decode the state parameter to get the original 'redirectTo'
-    if (state) {
-      const stateRedirectToParam = atob(state)
-      const parsedRedirectTo = JSON.parse(JSON.parse(stateRedirectToParam).customData).redirectTo
-      if (parsedRedirectTo) {
-        redirectToSearchParam = parsedRedirectTo ?? null
-      }
-    }
-  } catch {
-    console.error("Can't decode state parameter")
+  // The OAuth round-trip carries the original redirectTo inside the `state` param's customData.
+  const parsedRedirectTo = parseStateCustomData(searchParams.get('state'))?.redirectTo
+  if (typeof parsedRedirectTo === 'string' && parsedRedirectTo) {
+    redirectToSearchParam = parsedRedirectTo
   }
 
   // Initialize redirectTo with a default value
   let redirectTo = locations.home()
 
-  // Decode 'redirectTo' if it exists
+  // Use the value as-is: URLSearchParams.get already percent-decoded it once, and the value pulled
+  // from the OAuth state's customData is a raw (already-decoded) string too. A second
+  // decodeURIComponent here would double-decode — corrupting nested percent-encoded values in the
+  // target (e.g. realm=foo%2Fbar → foo/bar) and throwing on a literal '%' (e.g. "50% off"),
+  // silently falling back to home. Downstream hostname validation still guards the final URL.
   if (redirectToSearchParam) {
-    try {
-      redirectTo = decodeURIComponent(redirectToSearchParam)
-    } catch {
-      console.error("Can't decode redirectTo parameter")
-    }
+    redirectTo = redirectToSearchParam
   }
 
   return redirectTo
@@ -128,17 +140,9 @@ const extractRedirectToFromSearchParameters = (searchParams: URLSearchParams): s
 
 const extractReferrerFromSearchParameters = (searchParams: URLSearchParams): string | null => {
   let referrerSearchParam = searchParams.get('referrer')
-  try {
-    const state = searchParams.get('state')
-    if (state) {
-      const stateReferrerParam = atob(state)
-      const parsedReferrer = JSON.parse(JSON.parse(stateReferrerParam).customData).referrer
-      if (parsedReferrer) {
-        referrerSearchParam = parsedReferrer ?? null
-      }
-    }
-  } catch {
-    console.error("Can't decode state parameter")
+  const parsedReferrer = parseStateCustomData(searchParams.get('state'))?.referrer
+  if (typeof parsedReferrer === 'string' && parsedReferrer) {
+    referrerSearchParam = parsedReferrer
   }
 
   if (referrerSearchParam && !EthAddress.validate(referrerSearchParam)) {
@@ -192,6 +196,7 @@ const buildRequestPageUrl = (
 export type { LoginMethod }
 export {
   locations,
+  parseStateCustomData,
   extractRedirectToFromSearchParameters,
   extractReferrerFromSearchParameters,
   isBridgeOnlyEnabled,

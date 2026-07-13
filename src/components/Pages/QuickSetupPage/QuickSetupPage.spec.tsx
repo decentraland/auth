@@ -1,6 +1,6 @@
 import { fireEvent, render, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { fetchProfile } from '../../../modules/profile'
+import { fetchProfileWithStatus } from '../../../modules/profile'
 import { isProfileComplete } from '../../../shared/profile'
 import { subscribeToNewsletter } from '../SetupPage/utils'
 import { QuickSetupPage } from './QuickSetupPage'
@@ -32,7 +32,7 @@ jest.mock('react-router-dom', () => ({
 }))
 
 jest.mock('../../../modules/profile', () => ({
-  fetchProfile: jest.fn()
+  fetchProfileWithStatus: jest.fn()
 }))
 
 jest.mock('../../../shared/profile', () => ({
@@ -101,7 +101,7 @@ jest.mock('decentraland-ui2', () => ({
 
 jest.mock('@dcl/hooks', () => ({
   useTranslation: () => ({
-    t: (key: string, params?: Record<string, string>) => {
+    t: (key: string) => {
       /* eslint-disable @typescript-eslint/naming-convention */
       const translations: Record<string, string> = {
         'quick_setup.welcome': 'Welcome to',
@@ -120,8 +120,6 @@ jest.mock('@dcl/hooks', () => ({
         'quick_setup.body_type_b': 'BODY TYPE B',
         'quick_setup.randomize': 'RANDOMIZE',
         'quick_setup.customize_later': 'You can customize your avatar later.',
-        'quick_setup.ready_to_jump_in': `${params?.name} is Ready to Jump In!`,
-        'quick_setup.success': 'SUCCESS',
         'quick_setup.account_ready': 'Your account is Ready!',
         'quick_setup.start_exploring': 'Start Exploring'
       }
@@ -156,7 +154,7 @@ describe('QuickSetupPage', () => {
     mockRedirect.mockClear()
     mockNavigate.mockClear()
     mockTrackReferral.mockClear()
-    ;(fetchProfile as jest.Mock).mockResolvedValue(null)
+    ;(fetchProfileWithStatus as jest.Mock).mockResolvedValue({ profile: null, couldNotDetermine: false })
     ;(isProfileComplete as jest.Mock).mockReturnValue(false)
   })
 
@@ -201,7 +199,10 @@ describe('QuickSetupPage', () => {
 
   describe('when the connected account already has a complete profile', () => {
     beforeEach(() => {
-      ;(fetchProfile as jest.Mock).mockResolvedValue({ avatars: [{ name: 'ExistingUser' }] })
+      ;(fetchProfileWithStatus as jest.Mock).mockResolvedValue({
+        profile: { avatars: [{ name: 'ExistingUser' }] },
+        couldNotDetermine: false
+      })
       ;(isProfileComplete as jest.Mock).mockReturnValue(true)
     })
 

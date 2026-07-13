@@ -37,9 +37,7 @@ init({
     // Filter out "JS idle timeout exceeded" errors from third-party scripts
     if (
       event.exception?.values?.some(
-        exception =>
-          exception.value?.includes('idle timeout exceeded') &&
-          exception.stacktrace?.frames?.every(frame => !frame.in_app)
+        exception => exception.value?.includes('idle timeout exceeded') && exception.stacktrace?.frames?.every(frame => !frame.in_app)
       )
     ) {
       return null

@@ -112,12 +112,17 @@ export const createAuthServerWsClient = (authServerUrl?: string) => {
     try {
       response = await request<RecoverResponse>('recover', { requestId })
 
-      if (response.error) {
-        throw new Error(response.error)
-      }
+      // NOTE: do NOT normalize `response.method` casing here. It is dispatched downstream on its
+      // EIP-1193 canonical form (RequestPage switches on `case 'eth_sendTransaction'` and forwards
+      // the method verbatim to the wallet), so lowercasing it would break the normal transaction
+      // path. The allowlist guard and isSignatureMethod already compare case-insensitively, so a
+      // non-canonical-cased method still fails safe (the wallet rejects an unknown-cased method)
+      // without corrupting the canonical case.
 
-      // If the sender defined in the request is different than the one that is connected, show an error.
-      if (response.sender && response.sender !== signerAddress.toLowerCase()) {
+      // If the sender defined in the request is different than the one that is connected, show an
+      // error. Compare both sides case-insensitively — the server is not guaranteed to lowercase
+      // `sender`, and a checksummed address must still match the connected (lowercased) account.
+      if (response.sender && response.sender.toLowerCase() !== signerAddress.toLowerCase()) {
         throw new DifferentSenderError(signerAddress, response.sender)
       }
 

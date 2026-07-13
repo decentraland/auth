@@ -13,8 +13,10 @@ import {
 test.describe('Deep link flow (flow=deeplink)', () => {
   /**
    * The deep link flow is used when Explorer opens auth with ?flow=deeplink.
-   * Instead of sending the outcome to auth-server, it posts the identity
-   * and shows ContinueInApp view with auto-redirect countdown.
+   * A dcl_personal_sign request still sends its signature as the outcome (the client is
+   * waiting on it) and lands on the sign-in completion view; the deep-link flag only changes
+   * the confirmation UX (no code, "Sign In" wording). It does NOT post an identity — that
+   * mechanism is only for the client-login pseudo-request (see the client-login suite below).
    */
 
   test.beforeEach(async ({ context }) => {
@@ -39,19 +41,23 @@ test.describe('Deep link flow (flow=deeplink)', () => {
     await expect(page.locator('[data-testid="verify-sign-in-deny-button"]')).toBeVisible()
   })
 
-  test('deeplink flow: approve → posts identity → shows ContinueInApp with countdown', async ({ page }) => {
+  test('deeplink flow: approve → sends the signature outcome → shows completion (no identity post, no ContinueInApp)', async ({ page }) => {
     await mockApiRoutes(page, { hasProfile: true, onboardingToExplorer: true })
 
-    // Mock the /identities POST endpoint for deep link flow
+    // A dcl_personal_sign request must send its signature as the OUTCOME; it must NOT post an
+    // identity (postIdentity is only for the client-login pseudo-request).
+    let postedIdentity = false
     await page.route('**/identities', async (route, request) => {
-      if (request.method() === 'POST') {
-        return route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ identityId: 'test-identity-123' })
-        })
-      }
+      if (request.method() === 'POST') postedIdentity = true
       return route.continue()
+    })
+    // Record the outcome POST, then defer to the mockApiRoutes handler that fulfills it.
+    let outcomeSent = false
+    await page.route('**/v2/requests/**', async (route, request) => {
+      if (request.method() === 'POST' && request.url().includes('/outcome')) {
+        outcomeSent = true
+      }
+      return route.fallback()
     })
 
     await page.goto(`/auth/requests/${MOCK_REQUEST_ID}?loginMethod=METAMASK&flow=deeplink`)
@@ -61,12 +67,13 @@ test.describe('Deep link flow (flow=deeplink)', () => {
     // Approve
     await page.locator('[data-testid="verify-sign-in-approve-button"]').click()
 
-    // Should show ContinueInApp view (not SignInCompletePage)
-    await expect(page.getByText(/Sign In Successful/i)).toBeVisible({ timeout: 15_000 })
+    // Shows the sign-in completion view (SignInCompletePage), NOT the ContinueInApp countdown.
+    await expect(page.getByText(/Sign In successful/i)).toBeVisible({ timeout: 15_000 })
+    await expect(page.locator('[data-testid="continue-in-app-return-button"]')).not.toBeVisible()
 
-    // Should show countdown or return button
-    const returnButton = page.locator('[data-testid="continue-in-app-return-button"]')
-    await expect(returnButton).toBeVisible({ timeout: 10_000 })
+    // The signature outcome was sent and no identity was posted.
+    expect(outcomeSent).toBe(true)
+    expect(postedIdentity).toBe(false)
   })
 
   test('deeplink flow: deny → shows denied view', async ({ page }) => {

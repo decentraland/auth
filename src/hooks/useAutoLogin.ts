@@ -122,11 +122,14 @@ const useAutoLogin = ({ isReady, onConnect }: UseAutoLoginOptions): UseAutoLogin
       return
     }
 
-    // Mark as triggered to prevent multiple auto-logins
-    autoLoginTriggeredRef.current = true
-
     // Small delay to ensure UI is ready
     const timeoutId = setTimeout(() => {
+      // Mark as triggered only once the login actually fires. Setting it before the
+      // timeout would leave the guard set even if the cleanup cancels the timer before
+      // it fires (e.g. a dep like onConnect is recreated when the connection provider
+      // resolves identity, or under StrictMode), which would then block the
+      // re-scheduled auto-login and silently skip it.
+      autoLoginTriggeredRef.current = true
       onConnect(resolvedConnectionOption)
     }, 100)
 

@@ -1,4 +1,5 @@
 import { useCallback, useContext, useEffect, useRef, useState } from 'react'
+import { useTranslation } from '@dcl/hooks'
 import { Provider } from 'decentraland-connect'
 import { Button, CircularProgress, muiIcons } from 'decentraland-ui2'
 import wrongImg from '../../../assets/images/wrong.svg'
@@ -7,6 +8,7 @@ import { useTargetConfig } from '../../../hooks/targetConfig'
 import { useAnalytics } from '../../../hooks/useAnalytics'
 import { ConnectionType } from '../../../modules/analytics/types'
 import { createAuthServerHttpClient } from '../../../shared/auth'
+import { ONE_MONTH_IN_MINUTES, getIdentitySignature } from '../../../shared/connection/identity'
 import { isMagicRpcError } from '../../../shared/errors'
 import { locations } from '../../../shared/locations'
 import { getConnectionOptionFromState } from '../../../shared/oauthState'
@@ -14,13 +16,13 @@ import { handleError } from '../../../shared/utils/errorHandler'
 import { OAUTH_ACCESS_DENIED_ERROR, createMagicInstance } from '../../../shared/utils/magicSdk'
 import { ConnectionContainer, ConnectionTitle, DecentralandLogo, ProgressContainer } from '../../ConnectionModal/ConnectionLayout.styled'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
-import { getIdentitySignature } from '../MobileAuthPage/identityUtils'
 import { ActionButton, Background, Description, Icon, Main, SuccessContainer, Title } from '../MobileAuthPage/MobileAuthPage.styled'
 import { MobileAuthSuccess } from '../MobileAuthPage/MobileAuthSuccess'
 
 const ArrowBackIosNewTwoToneIcon = muiIcons.ArrowBackIosNewTwoTone
 
 export const MobileCallbackPage = () => {
+  const { t } = useTranslation()
   const navigate = useNavigateWithSearchParams()
   const { initialized, flags } = useContext(FeatureFlagsContext)
   const isMagicTest = !!flags[FeatureFlagsKeys.MAGIC_TEST]
@@ -55,7 +57,7 @@ export const MobileCallbackPage = () => {
 
       // Generate identity
       const ethAddress = account.toLowerCase()
-      const identity = await getIdentitySignature(ethAddress, provider as unknown as Provider)
+      const identity = await getIdentitySignature(ethAddress, provider as unknown as Provider, ONE_MONTH_IN_MINUTES * 3)
 
       // Post identity to server
       const httpClient = createAuthServerHttpClient()
@@ -102,11 +104,11 @@ export const MobileCallbackPage = () => {
         <Background />
         <SuccessContainer>
           <Icon src={wrongImg} alt="Error" />
-          <Title>Authentication Failed</Title>
+          <Title>{t('login_error.title')}</Title>
           <Description>{error}</Description>
           <ActionButton>
             <Button variant="contained" onClick={handleRetry} startIcon={<ArrowBackIosNewTwoToneIcon fontSize="small" />}>
-              Try again
+              {t('common.try_again')}
             </Button>
           </ActionButton>
         </SuccessContainer>
@@ -124,7 +126,7 @@ export const MobileCallbackPage = () => {
     <Main component="main">
       <ConnectionContainer>
         <DecentralandLogo size="huge" />
-        <ConnectionTitle>Just a moment, we&apos;re verifying your login credentials...</ConnectionTitle>
+        <ConnectionTitle>{t('connection_layout.validating_sign_in')}</ConnectionTitle>
         <ProgressContainer>
           <CircularProgress color="inherit" />
         </ProgressContainer>

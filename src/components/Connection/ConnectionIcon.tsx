@@ -25,84 +25,36 @@ const createIconComponent = (src: string) => {
   return IconComponent
 }
 
-export const ConnectionIcon = ({ type }: ConnectionIconProps): JSX.Element | null => {
-  // eslint-disable-next-line @typescript-eslint/naming-convention
-  const iconProps = { role: 'img' as const, 'aria-label': type }
+// Build one icon component per asset ONCE at module load. Creating them inside the render (as
+// `createIconComponent(src)` per case) produced a fresh component type every render, so React
+// unmounted and remounted the icon's DOM on each parent re-render — e.g. LoginPage re-renders every
+// 5s for its background rotation, which was tearing down and rebuilding every visible icon.
+const ICON_BY_TYPE: Partial<Record<ConnectionOptionType, ReturnType<typeof createIconComponent>>> = {
+  [ConnectionOptionType.APPLE]: createIconComponent(appleSvg),
+  [ConnectionOptionType.COINBASE]: createIconComponent(coinbaseSvg),
+  [ConnectionOptionType.DAPPER]: createIconComponent(dapperPng),
+  [ConnectionOptionType.DISCORD]: createIconComponent(discordSvg),
+  [ConnectionOptionType.FORTMATIC]: createIconComponent(fortmaticPng),
+  [ConnectionOptionType.GOOGLE]: createIconComponent(googleSvg),
+  [ConnectionOptionType.METAMASK]: createIconComponent(metamaskSvg),
+  [ConnectionOptionType.METAMASK_MOBILE]: createIconComponent(metamaskSvg),
+  [ConnectionOptionType.SAMSUNG]: createIconComponent(samsungSvg),
+  [ConnectionOptionType.WALLET_CONNECT]: createIconComponent(walletConnectPng),
+  // WalletLink (Coinbase Wallet) reuses the Coinbase icon.
+  [ConnectionOptionType.WALLET_LINK]: createIconComponent(coinbaseSvg),
+  [ConnectionOptionType.X]: createIconComponent(xSvg)
+}
 
-  switch (type) {
-    case ConnectionOptionType.APPLE:
-      return (
-        <IconWrapper {...iconProps}>
-          <SvgIcon component={createIconComponent(appleSvg)} fontSize="large" />
-        </IconWrapper>
-      )
-    case ConnectionOptionType.COINBASE:
-      return (
-        <IconWrapper {...iconProps}>
-          <SvgIcon component={createIconComponent(coinbaseSvg)} fontSize="large" />
-        </IconWrapper>
-      )
-    case ConnectionOptionType.DAPPER:
-      return (
-        <IconWrapper {...iconProps}>
-          <SvgIcon component={createIconComponent(dapperPng)} fontSize="large" />
-        </IconWrapper>
-      )
-    case ConnectionOptionType.DISCORD:
-      return (
-        <IconWrapper {...iconProps}>
-          <SvgIcon component={createIconComponent(discordSvg)} fontSize="large" />
-        </IconWrapper>
-      )
-    case ConnectionOptionType.FORTMATIC:
-      return (
-        <IconWrapper {...iconProps}>
-          <SvgIcon component={createIconComponent(fortmaticPng)} fontSize="large" />
-        </IconWrapper>
-      )
-    case ConnectionOptionType.GOOGLE:
-      return (
-        <IconWrapper {...iconProps}>
-          <SvgIcon component={createIconComponent(googleSvg)} fontSize="large" />
-        </IconWrapper>
-      )
-    case ConnectionOptionType.METAMASK:
-      return (
-        <IconWrapper {...iconProps}>
-          <SvgIcon component={createIconComponent(metamaskSvg)} fontSize="large" />
-        </IconWrapper>
-      )
-    case ConnectionOptionType.METAMASK_MOBILE:
-      return (
-        <IconWrapper {...iconProps}>
-          <SvgIcon component={createIconComponent(metamaskSvg)} fontSize="large" />
-        </IconWrapper>
-      )
-    case ConnectionOptionType.SAMSUNG:
-      return (
-        <IconWrapper {...iconProps}>
-          <SvgIcon component={createIconComponent(samsungSvg)} fontSize="large" />
-        </IconWrapper>
-      )
-    case ConnectionOptionType.WALLET_CONNECT:
-      return (
-        <IconWrapper {...iconProps}>
-          <SvgIcon component={createIconComponent(walletConnectPng)} fontSize="large" />
-        </IconWrapper>
-      )
-    case ConnectionOptionType.WALLET_LINK:
-      return (
-        <IconWrapper {...iconProps}>
-          <SvgIcon component={createIconComponent(coinbaseSvg)} fontSize="large" />
-        </IconWrapper>
-      )
-    case ConnectionOptionType.X:
-      return (
-        <IconWrapper {...iconProps}>
-          <SvgIcon component={createIconComponent(xSvg)} fontSize="large" />
-        </IconWrapper>
-      )
-    default:
-      return null
+export const ConnectionIcon = ({ type }: ConnectionIconProps): JSX.Element | null => {
+  const IconComponent = ICON_BY_TYPE[type]
+
+  if (!IconComponent) {
+    return null
   }
+
+  return (
+    <IconWrapper role="img" aria-label={type}>
+      <SvgIcon component={IconComponent} fontSize="large" />
+    </IconWrapper>
+  )
 }

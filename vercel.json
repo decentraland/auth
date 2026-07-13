@@ -23,6 +23,10 @@
       "headers": [
         { "key": "X-Frame-Options", "value": "DENY" },
         { "key": "Content-Security-Policy", "value": "frame-ancestors 'none'" },
+        {
+          "key": "Content-Security-Policy-Report-Only",
+          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' https://cdn.segment.com https://widget.intercom.io https://js.intercomcdn.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data: https:; connect-src 'self' https: wss:; frame-src 'self' https://auth.magic.link https://widget.intercom.io https://*.thirdweb.com https://wearable-preview.decentraland.org https://wearable-preview.decentraland.zone https://wearable-preview.decentraland.today decentraland: dcl-creator-hub:; frame-ancestors 'none'"
+        },
         { "key": "X-Content-Type-Options", "value": "nosniff" },
         { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
       ]

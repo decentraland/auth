@@ -8,8 +8,7 @@
     "close_window": "您可以关闭此窗口。",
     "deny": "拒绝",
     "allow": "允许",
-    "something_went_wrong": "出了点问题",
-    "unknown_error": "未知错误"
+    "something_went_wrong": "出了点问题"
   },
   "connection": {
     "title": "登录或注册以进入",
@@ -49,8 +48,6 @@
       "something_went_wrong": "出了点问题。请重试。",
       "network_error": "无法连接。请检查您的网络连接后重试。",
       "failed_send_code": "发送验证码失败。请重试。",
-      "different_account_session": "检测到与已验证邮箱不同的账户会话。请重新登录。",
-      "no_connected_account": "Thirdweb 连接未返回已连接的账户",
       "invalid_email": "邮箱地址无效。请检查后重试。"
     }
   },
@@ -137,8 +134,7 @@
       "title": "登录成功！",
       "description": "返回 {explorerText} 开始探索！",
       "explorer_title": "登录成功！",
-      "explorer_description_line2": "请返回 Decentraland App 以完成您的账户设置！",
-      "continue": "CONTINUE"
+      "explorer_description_line2": "请返回 Decentraland App 以完成您的账户设置！"
     },
     "denied_sign_in": {
       "title": "号码不匹配，或者此操作不是由您发起的？",
@@ -288,7 +284,6 @@
     "redirecting_to": "正在重定向到 {provider}...",
     "verifying_credentials": "请稍候，我们正在验证您的登录凭证...",
     "confirming_login": "确认登录中...",
-    "error": "出错了。正在重定向到登录页面...",
     "cancel": "取消"
   },
   "mobile_auth": {
@@ -308,7 +303,6 @@
     "email_placeholder": "输入您的电子邮件",
     "email_helper": "订阅 Decentraland 通讯，获取功能、活动、比赛等更新信息。",
     "newsletter_subscribe": "订阅通讯，获取功能、活动、比赛等更新信息。",
-    "agree_tos": "我同意 Decentraland 的{termsLink}和{privacyLink}。*",
     "agree_prefix": "我同意 Decentraland 的",
     "agree_connector": "和",
     "terms_of_use": "使用条款",
@@ -319,8 +313,6 @@
     "body_type_b": "BODY TYPE B",
     "randomize": "随机",
     "customize_later": "您可以稍后自定义您的头像。",
-    "ready_to_jump_in": "{name} 已准备好进入！",
-    "success": "成功",
     "account_ready": "您的账户已就绪！",
     "start_exploring": "开始探索"
   },

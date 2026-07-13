@@ -1,7 +1,8 @@
+import { useContext } from 'react'
 import { Location, useLocation } from 'react-router-dom'
 import { renderHook } from '@testing-library/react'
 import { FeatureFlagsKeys } from '../components/FeatureFlagsProvider'
-import { _targetConfigs } from './targetConfig'
+import { _targetConfigs, useTargetConfig } from './targetConfig'
 import { useSkipSetup } from './useSkipSetup'
 
 jest.mock('react-router-dom')
@@ -16,6 +17,7 @@ jest.mock('../components/FeatureFlagsProvider', () => {
   const actual = jest.requireActual('../components/FeatureFlagsProvider')
   return {
     ...actual,
+    // eslint-disable-next-line @typescript-eslint/naming-convention -- React context, not a variable
     FeatureFlagsContext: { Consumer: () => null, Provider: () => null }
   }
 })
@@ -27,17 +29,11 @@ jest.mock('react', () => {
   }
 })
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { useTargetConfig } = require('./targetConfig')
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { useContext } = require('react')
-
 const mockedUseLocation = useLocation as jest.Mock<ReturnType<typeof useLocation>, Parameters<typeof useLocation>>
 const mockedUseTargetConfig = useTargetConfig as jest.Mock
 const mockedUseContext = useContext as jest.Mock
 
-const buildMagicState = (redirectTo: string) =>
-  btoa(JSON.stringify({ customData: JSON.stringify({ redirectTo }) }))
+const buildMagicState = (redirectTo: string) => btoa(JSON.stringify({ customData: JSON.stringify({ redirectTo }) }))
 
 describe('when using the useSkipSetup hook', () => {
   beforeEach(() => {

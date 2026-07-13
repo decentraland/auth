@@ -127,16 +127,20 @@ test.describe('Web social: new user → QuickSetup flow', () => {
     // Submit should now be enabled
     await expect(letsGo).toBeEnabled()
 
-    // Submit
+    // Clicking "Let's go" MUST kick off the profile deploy (a POST to the content server), even
+    // though the deploy itself fails in e2e (real crypto/catalyst is out of scope and covered by
+    // unit tests). Asserting the deploy was ATTEMPTED is the deterministic "the click did
+    // something" signal that guards against the button being a no-op — unlike the transient
+    // "DEPLOYING..." button, which can flip back to "LET'S GO" on a fast failure.
+    let deployAttempted = false
+    await page.route('**/content/entities**', async (route, request) => {
+      if (request.method() === 'POST') deployAttempted = true
+      return route.fallback()
+    })
+
     await letsGo.click()
 
-    // Wait for deploy/celebration
-    await page.waitForTimeout(3000)
-    const isCelebration = await page.getByText('SocialUser is Ready to Jump In!').isVisible().catch(() => false)
-    const isStillForm = await page.getByRole('button', { name: /^let's go$/i }).isVisible().catch(() => false)
-
-    // Either reached celebration or form submitted (deploy may succeed or fail)
-    expect(isCelebration || isStillForm).toBe(true)
+    await expect.poll(() => deployAttempted, { timeout: 15_000 }).toBe(true)
   })
 
   test('new user: body type and randomize work on QuickSetup', async ({ page }) => {

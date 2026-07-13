@@ -221,7 +221,11 @@ export const LoginPage = () => {
       try {
         if (isLoggingInThroughSocial) {
           // CP2 reached is tracked from CallbackPage after the OAuth redirect returns
-          // (at this point we don't have the user's email or wallet yet)
+          // (at this point we don't have the user's email or wallet yet).
+          // Show the connection layout so that if connectToSocialProvider throws, the
+          // catch's ERROR state is visible and recoverable instead of leaving the page
+          // silently disabled with currentConnectionType still set.
+          setShowConnectionLayout(true)
           setLoadingState(ConnectionLayoutState.LOADING_MAGIC)
           await connectToSocialProvider(connectionType, isMagicTestMode(flags[FeatureFlagsKeys.MAGIC_TEST]), redirectTo)
         } else {
@@ -377,10 +381,6 @@ export const LoginPage = () => {
     setEmailError(null)
   }, [])
 
-  const handleEmailLoginError = useCallback((error: string) => {
-    handleError(new Error(error), 'Email login error')
-  }, [])
-
   const handleConfirmingLoginRetry = useCallback(() => {
     setShowConfirmingLogin(false)
     setConfirmingLoginError(null)
@@ -417,6 +417,10 @@ export const LoginPage = () => {
       await runProfileRedirect(connectionData.account ?? '', referrer, null, () => setShowConnectionLayout(false))
     } catch (error) {
       handleError(error, 'Error during clock sync continue flow')
+      // Surface a visible, recoverable error instead of leaving the page silently
+      // disabled with currentConnectionType still set (mirrors the handleOnConnect catch).
+      setLoadingState(ConnectionLayoutState.ERROR)
+      setShowConnectionLayout(true)
     }
   }, [currentConnectionType, runProfileRedirect, getReferrerFromCurrentSearch])
 
@@ -493,7 +497,6 @@ export const LoginPage = () => {
         onClose={handleEmailLoginClose}
         onBack={handleEmailLoginBack}
         onSuccess={handleEmailLoginSuccess}
-        onError={handleEmailLoginError}
       />
       <Left>
         <LeftInfo>

@@ -14,7 +14,6 @@ type EmailLoginModalProps = {
   onClose: () => void
   onBack: () => void
   onSuccess: (result: EmailLoginResult) => void
-  onError?: (error: string) => void
 }
 
 export { EmailLoginStep }

@@ -7,7 +7,6 @@ import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import { useAnalytics } from '../../../hooks/useAnalytics'
 import { useEnsureProfile } from '../../../hooks/useEnsureProfile'
-import { isSessionMismatch } from '../../../hooks/useSessionMismatch'
 import { useSkipSetup } from '../../../hooks/useSkipSetup'
 import { getAnalytics } from '../../../modules/analytics/segment'
 import { ClickEvents, TrackingEvents } from '../../../modules/analytics/types'
@@ -28,6 +27,7 @@ import {
   createAuthServerHttpClient
 } from '../../../shared/auth'
 import { isSocialProviderType, useCurrentConnectionData } from '../../../shared/connection'
+import { isSessionMismatch } from '../../../shared/connection/sessionMismatch'
 import { isErrorWithMessage, isRpcError, isUserRejectedTransaction } from '../../../shared/errors'
 import {
   CLIENT_LOGIN_REQUEST_ID,
@@ -206,11 +206,11 @@ export const RequestPage = () => {
   const [targetConfig, targetConfigId] = useTargetConfig()
   const skipSetup = useSkipSetup()
   // Social / web2 wallets (Magic and Thirdweb) sign without their own confirmation UI, so the
-  // auth site must show what is being approved. `provider.isMagic` alone misses Thirdweb.
+  // auth site must show what is being approved (transaction simulation + signature preview and
+  // the associated acknowledgment gates). This is always on for web2 users — it is the only
+  // confirmation they get. External wallets keep their own confirmation UI unchanged, so the
+  // informative UI is not shown for them.
   const isUserUsingWeb2Wallet = isSocialProviderType(providerType)
-  // The informative simulation/signature UI is only shown to web2 users and gated behind a
-  // feature flag for rollout. External wallets keep their own confirmation UI unchanged.
-  const canShowSimulation = isUserUsingWeb2Wallet && !!flags[FeatureFlagsKeys.TRANSACTION_SIMULATION]
   const authServerClient = useRef(createAuthServerHttpClient())
   const isDeepLinkFlow = searchParams.get('flow') === 'deeplink'
   // The `client-login` pseudo request id has no backing auth-server request: skip the
@@ -504,6 +504,14 @@ export const RequestPage = () => {
                       setView(View.VERIFY_SIGN_IN_DENIED)
                       break
                     }
+                    if (e instanceof RequestFulfilledError) {
+                      // Auto-sign runs with no user action, so two tabs open on the same request
+                      // URL can both auto-sign; the loser's outcome is rejected as already
+                      // fulfilled. That means it succeeded — show completion, not an error.
+                      hasCompletedRef.current = true
+                      setView(View.VERIFY_SIGN_IN_COMPLETE)
+                      break
+                    }
                     setError(e instanceof Error ? e.message : 'Auto-sign failed')
                     setView(View.VERIFY_SIGN_IN_ERROR)
                     break
@@ -562,6 +570,10 @@ export const RequestPage = () => {
                       placeInfo?.sceneImageUrl ||
                       'https://peer.decentraland.org/content/contents/bafkreidj26s7aenyxfthfdibnqonzqm5ptc4iamml744gmcyuokewkr76y'
                   })
+                  // A MANA tip only decodes when it targets the canonical MANA contract, which is
+                  // always relayed as a meta-transaction (gas covered by the gas tank). Mark it so
+                  // the web2 confirm dialog says "gas covered" instead of showing a 0-ETH cost.
+                  setIsMetaTransaction(true)
                   setView(View.WALLET_MANA_INTERACTION)
                   break
                 }
@@ -607,6 +619,10 @@ export const RequestPage = () => {
                       rarity: metadata.rarity,
                       recipientProfile: recipientProfile || undefined
                     })
+                    // The branded gift view is only shown for a verified DCL collection, which is
+                    // relayed as a meta-transaction (gas covered). Mark it so the web2 confirm
+                    // dialog says "gas covered" instead of showing a 0-ETH cost.
+                    setIsMetaTransaction(true)
                     setView(View.WALLET_NFT_INTERACTION)
                     break
                   }
@@ -617,12 +633,10 @@ export const RequestPage = () => {
               // returned above, so they are left untouched. For web2 users, decide whether this
               // will be relayed as a meta-transaction (a Decentraland contract call, relayed on
               // Polygon where the gas tank pays) so the dialog can say "gas covered"; other
-              // contracts/networks show the gas. When the flag is on, also prefetch the
-              // asset-change simulation of the original transaction. Non-blocking.
+              // contracts/networks show the gas. Also prefetch the asset-change simulation of the
+              // original transaction. Non-blocking.
               if (isUserUsingWeb2Wallet && contractAddress) {
-                if (canShowSimulation) {
-                  setSimulationState({ status: 'loading' })
-                }
+                setSimulationState({ status: 'loading' })
                 // Reuse the meta-transaction check if the NFT-gift gate already resolved it for this
                 // same contract (it falls through to here for non-DCL contracts), so we don't repeat
                 // the networked lookup.
@@ -637,7 +651,7 @@ export const RequestPage = () => {
                     metaTxCheckRef.current = { address: contractAddress.toLowerCase(), willUseMetaTransaction, contractName }
                     if (cancelled) return undefined
                     setIsMetaTransaction(willUseMetaTransaction)
-                    if (canShowSimulation && txParams) {
+                    if (txParams) {
                       const body = buildSendTransactionSimulationPayload(txParams, signerAddress, currentChainId, willUseMetaTransaction)
                       if (body) {
                         setSimulationChainId(body.chainId)
@@ -648,7 +662,7 @@ export const RequestPage = () => {
                     return undefined
                   })
                   .catch(() => {
-                    if (!cancelled && canShowSimulation) setSimulationState({ status: 'unavailable' })
+                    if (!cancelled) setSimulationState({ status: 'unavailable' })
                   })
               }
 
@@ -674,10 +688,10 @@ export const RequestPage = () => {
             break
           }
           default: {
-            // For web2 users (behind the flag), plain signature requests get an informative
-            // preview of what they are signing. Meta-transaction typed data additionally gets
-            // the asset-change summary by simulating the inner call.
-            if (canShowSimulation && isSignatureMethod(request.method)) {
+            // For web2 users, plain signature requests get an informative preview of what they
+            // are signing. Meta-transaction typed data additionally gets the asset-change summary
+            // by simulating the inner call.
+            if (isUserUsingWeb2Wallet && isSignatureMethod(request.method)) {
               const payload = extractSignaturePayload(request.method, request.params, signerAddress)
               setSignaturePayload(payload)
               if (payload?.kind === 'typedData') {
@@ -810,12 +824,18 @@ export const RequestPage = () => {
           message: 'Transaction rejected'
         })
       }
+    } catch (e) {
+      // The user deliberately denied, so we always show the DENIED view. Swallow a delivery
+      // failure here (don't let it escape as an unhandled rejection / Sentry noise); if the
+      // failed outcome never reached the server the request simply expires server-side. Mirrors
+      // onDenyWalletInteraction.
+      console.error('Failed to send sign-in denial outcome:', e)
     } finally {
       hasCompletedRef.current = true
       setIsLoading(false)
       setView(View.VERIFY_SIGN_IN_DENIED)
     }
-  }, [])
+  }, [requestId])
 
   const onApproveSignInVerification = useCallback(async () => {
     // Guard against a re-entrant approval (e.g. a fast double-click before the button disables),
@@ -827,52 +847,61 @@ export const RequestPage = () => {
     setIsLoading(true)
     setHasTimedOut(false)
     const walletClient = walletClientRef.current
-    let hasTimeouted = false
 
     if (!walletClient) {
       isApprovingRef.current = false
       setIsLoading(false)
-      throw new Error('Provider not created')
+      setError('Provider not created')
+      setView(View.VERIFY_SIGN_IN_ERROR)
+      return
     }
 
-    const [address] = await walletClient.getAddresses()
-
-    signTimeoutRef.current = setTimeout(() => {
+    let hasTimeouted = false
+    // Arm the timeout BEFORE any await so a wallet that hangs on getAddresses() — not just
+    // signMessage — is covered too. On fire it releases the re-entrancy guard so the "try
+    // again" button actually works: otherwise the guard stays held until the hung call
+    // settles (which may be never) and every retry click is silently swallowed.
+    const timeoutId = setTimeout(() => {
       hasTimeouted = true
       setHasTimedOut(true)
       setIsLoading(false)
+      isApprovingRef.current = false
     }, 30000)
+    signTimeoutRef.current = timeoutId
 
+    let address = ''
     try {
+      ;[address] = await walletClient.getAddresses()
       const signMessage = requestRef.current?.params?.[0]
       if (typeof signMessage !== 'string') throw new Error('Invalid sign message in request params')
-      const signature = await walletClient.signMessage({ account: address, message: signMessage })
+      const signature = await walletClient.signMessage({ account: address as `0x${string}`, message: signMessage })
 
       if (hasTimeouted) {
         throw new TimedOutError()
       }
-      // Check if this is deep link flow
-      if (isDeepLinkFlow && identity) {
-        const httpClient = createAuthServerHttpClient()
-        const identityResponse = await httpClient.postIdentity(identity)
-
-        setIdentityId(identityResponse.identityId)
-        setView(View.DEEP_LINK_CONTINUE_IN_APP)
-      } else {
-        // Traditional flow - send outcome and complete
-        await authServerClient.current.sendSuccessfulOutcome(requestId, address, signature)
-        hasCompletedRef.current = true
-        setView(View.VERIFY_SIGN_IN_COMPLETE)
-        // For mobile deep-link flow, auto-redirect. For Explorer (skipSetup),
-        // the SignInCompletePage shows a Continue button that triggers the deeplink.
-        // Route through getExplorerDeeplink so this bare redirect carries the same
-        // query params (dclenv, bridgeOnly) as the other deep-link generation sites.
-        if (targetConfig.deepLink) {
-          window.location.href = getExplorerDeeplink(targetConfig.deepLink, isBridgeOnly, authRequestId)
-        }
+      // A dcl_personal_sign request always has a backing auth-server request, and the signature is
+      // the outcome the requesting client (Explorer) is waiting for — so always send it. The
+      // deep-link flow is NOT special here: it still needs the outcome, and it must NOT post the
+      // identity (which would leave the request without an outcome and orphan an identity on the
+      // server). postIdentity is only for the client-login pseudo-request, which has no backing
+      // request to fulfill.
+      await authServerClient.current.sendSuccessfulOutcome(requestId, address, signature)
+      hasCompletedRef.current = true
+      // Prompt the user to open the Explorer via the deep link once here (routed through
+      // getExplorerDeeplink so it carries the same dclenv/bridgeOnly/authRequestId params as the
+      // other deep-link sites). For skipSetup targets the completion view is SignInCompletePage,
+      // which ALSO auto-redirects on mount — flag it to skip so the identical deep link doesn't
+      // fire twice (which can produce duplicate "Open Decentraland?" prompts).
+      if (targetConfig.deepLink) {
+        setSkipDeepLinkRedirect(true)
+        window.location.href = getExplorerDeeplink(targetConfig.deepLink, isBridgeOnly, authRequestId)
       }
+      setView(View.VERIFY_SIGN_IN_COMPLETE)
     } catch (e) {
-      if (e instanceof TimedOutError) {
+      // Either this attempt already timed out (the UI moved on, possibly to a retry that is now
+      // in flight) or it was a deliberate timeout signal — in both cases a late error from the
+      // abandoned wallet call must not overwrite the current UI.
+      if (e instanceof TimedOutError || hasTimeouted) {
         return
       }
 
@@ -888,6 +917,11 @@ export const RequestPage = () => {
         }
         hasCompletedRef.current = true
         setView(View.VERIFY_SIGN_IN_DENIED)
+      } else if (e instanceof RequestFulfilledError) {
+        // Another tab / an auto-login race already signed this request — it succeeded, so show
+        // completion rather than reporting an expected state as a signing error.
+        hasCompletedRef.current = true
+        setView(View.VERIFY_SIGN_IN_COMPLETE)
       } else if (e instanceof IpValidationError) {
         setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
         setView(View.IP_VALIDATION_ERROR)
@@ -899,15 +933,20 @@ export const RequestPage = () => {
         setView(View.VERIFY_SIGN_IN_ERROR)
       }
     } finally {
-      if (signTimeoutRef.current) {
-        clearTimeout(signTimeoutRef.current)
+      clearTimeout(timeoutId)
+      // Only clear the shared ref if it still points at this attempt's timer — a retry started
+      // after a timeout owns the ref now and must not have its timer cancelled from here.
+      if (signTimeoutRef.current === timeoutId) {
+        signTimeoutRef.current = undefined
       }
+      // The timeout path already reset isLoading and released the guard (and a retry may now be
+      // running), so only a non-timed-out attempt resets them here.
       if (!hasTimeouted) {
         setIsLoading(false)
+        isApprovingRef.current = false
       }
-      isApprovingRef.current = false
     }
-  }, [setIsLoading, isUserUsingWeb2Wallet, isLoading, identity, isBridgeOnly, authRequestId])
+  }, [setIsLoading, isUserUsingWeb2Wallet, requestId, targetConfig, isBridgeOnly, authRequestId])
 
   const onDenyWalletInteraction = useCallback(async () => {
     setIsLoading(true)
@@ -990,8 +1029,10 @@ export const RequestPage = () => {
           }
 
           const networkProvider = await getNetworkProvider(chainId)
-          const contract = getContract(contractName, chainId)
-          contract.address = toAddress
+          // getContract returns the registry entry BY REFERENCE, so mutating .address would
+          // permanently rewrite the shared decentraland-transactions registry for the rest of the
+          // session (poisoning later getContractName/isKnownDecentralandContract lookups). Clone it.
+          const contract = { ...getContract(contractName, chainId), address: toAddress }
 
           result = await sendMetaTransaction(
             connectedProvider,
@@ -1047,6 +1088,18 @@ export const RequestPage = () => {
           setView(View.WALLET_MANA_INTERACTION_DENIED)
         } else {
           setView(View.WALLET_INTERACTION_DENIED)
+        }
+      } else if (e instanceof RequestFulfilledError) {
+        // The request was already fulfilled (e.g. another tab completed it, or it executed and the
+        // outcome delivery raced). It succeeded — show completion instead of attempting a failed
+        // outcome and reporting an expected state as an error.
+        hasCompletedRef.current = true
+        if (nftTransferData) {
+          setView(View.WALLET_NFT_INTERACTION_COMPLETE)
+        } else if (manaTransferData) {
+          setView(View.WALLET_MANA_INTERACTION_COMPLETE)
+        } else {
+          setView(View.WALLET_INTERACTION_COMPLETE)
         }
       } else if (e instanceof IpValidationError) {
         setError(isErrorWithMessage(e) ? e.message : 'Unknown error')

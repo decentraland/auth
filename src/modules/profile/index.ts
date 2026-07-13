@@ -32,20 +32,40 @@ interface ProfileResultError {
   isNotFound?: boolean
 }
 
-async function fetchProfile(address: string, fetcher?: IFetchComponent): Promise<Profile | null> {
+interface FetchProfileResult {
+  // The profile if one was authoritatively found, otherwise null.
+  profile: Profile | null
+  // True when the request failed transiently (network error / timeout / non-not-found body) so we
+  // could NOT determine whether a profile exists. Callers that guard against overwriting an
+  // existing profile must treat this as "might exist", NOT as "no profile".
+  couldNotDetermine: boolean
+}
+
+async function fetchProfileWithStatus(address: string, fetcher?: IFetchComponent): Promise<FetchProfileResult> {
   const PEER_URL = config.get('PEER_URL')
-  const client = createLambdasClient({ url: PEER_URL + '/lambdas', fetcher: fetcher ?? createFetcher() })
+  // Bound the request with a timeout by default (matching the consistency-check path) so the
+  // setup-page onboarding guard that calls this can't pin the user on a loading state for minutes
+  // when a catalyst stalls — a timeout surfaces as couldNotDetermine, which callers already handle.
+  const defaultFetcher = createFetcher({ timeout: Number(config.get('PROFILE_CONSISTENCY_CHECK_TIMEOUT')) || 10000 })
+  const client = createLambdasClient({ url: PEER_URL + '/lambdas', fetcher: fetcher ?? defaultFetcher })
   try {
     const profile: Profile = await client.getAvatarDetails(address)
-    // The catalyst client does not throw on non-OK responses (e.g. 404).
-    // Validate that the response is actually a profile.
+    // The catalyst client does not throw on non-OK responses (e.g. 404); it parses the body
+    // regardless of status. A real 404 returns a not-found body — that is an authoritative
+    // "no profile". Any other non-profile body is indeterminate (don't treat as "no profile").
     if (!profile.avatars) {
-      return null
+      return { profile: null, couldNotDetermine: !isNotFoundResponse(profile) }
     }
-    return profile
+    return { profile, couldNotDetermine: false }
   } catch {
-    return null
+    // Network error / timeout / 5xx — we cannot tell whether the profile exists.
+    return { profile: null, couldNotDetermine: true }
   }
+}
+
+async function fetchProfile(address: string, fetcher?: IFetchComponent): Promise<Profile | null> {
+  const { profile } = await fetchProfileWithStatus(address, fetcher)
+  return profile
 }
 
 async function fetchProfileWithConsistencyCheck(
@@ -58,7 +78,8 @@ async function fetchProfileWithConsistencyCheck(
     const environment = config.get('ENVIRONMENT')
     const network = environment === 'development' ? 'sepolia' : 'mainnet'
 
-    // Get all catalyst servers for the network and remove the current peer to avoid duplicated fetches
+    // Get all catalyst servers for the network (excluding any disabled ones) to cross-check the
+    // profile across catalysts.
     const catalystServers = getCatalystServers(network, disabledCatalysts)
     const catalystUrls = catalystServers.map(server => `${server.address}`)
 
@@ -276,6 +297,7 @@ function isNotFoundResponse(response: any): boolean {
 
 export {
   fetchProfile,
+  fetchProfileWithStatus,
   fetchProfileWithConsistencyCheck,
   getCatalystUrlsForRotation,
   redeployExistingProfile,
@@ -283,4 +305,4 @@ export {
 }
 export { deployWithCatalystRotation } from './deploy'
 export { DeploymentError, ProfileFetchError } from './errors'
-export type { ConsistencyResult }
+export type { ConsistencyResult, FetchProfileResult }
