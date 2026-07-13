@@ -12,6 +12,7 @@ enum TrackingEvents {
   REQUEST_OUTCOME_SUCCESS = 'Request outcome sent successfully',
   REQUEST_OUTCOME_FAILED = 'Request outcome sent with error',
   DEEP_LINK_AUTH_SUCCESS = 'Deep link auth success',
+  DEEP_LINK_AUTH_FAILED = 'Deep link auth failed',
   START_ADDING_NAME = 'Start adding name',
   START_ADDING_EMAIL = 'Start adding email',
   CHECK_TERMS_OF_SERVICE = 'Check terms of service',
@@ -24,7 +25,6 @@ enum TrackingEvents {
 
 enum RequestInteractionType {
   VERIFY_SIGN_IN = 'Verify sign in',
-  DEEP_LINK_SIGN_IN = 'Deep link sign in',
   WALLET_INTERACTION = 'Wallet interaction'
 }
 

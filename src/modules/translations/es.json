@@ -64,10 +64,8 @@
   "request": {
     "verify_sign_in": "Verificar inicio de sesión",
     "verification_match": "¿El número de verificación de abajo coincide con el del {explorerText}?",
-    "deep_link_confirm": "Por favor, confirma que deseas iniciar sesión en {explorerText}",
     "no_it_doesnt": "No, no coincide",
     "yes_same": "Sí, son iguales",
-    "sign_in": "Iniciar sesión",
     "timeout_logged_out": "Es posible que hayas cerrado sesión en la extensión de tu billetera.",
     "timeout_check_login": "Por favor, verifica que has iniciado sesión e inténtalo de nuevo.",
     "wallet_interaction": {

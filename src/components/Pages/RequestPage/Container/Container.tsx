@@ -6,7 +6,7 @@ import { useMobileMediaQuery } from 'decentraland-ui2'
 import { useNavigateWithSearchParams } from '../../../../hooks/navigation'
 import { useTargetConfig } from '../../../../hooks/targetConfig'
 import { useCurrentConnectionData } from '../../../../shared/connection'
-import { buildRequestPageUrl, getAuthRequestId, isBridgeOnlyEnabled } from '../../../../shared/locations'
+import { buildRequestPageUrl, getAuthRequestId, isBridgeOnlyEnabled, isDeepLinkFlowEnabled } from '../../../../shared/locations'
 import { AnimatedBackground } from '../../../AnimatedBackground'
 import { CustomWearablePreview } from '../../../CustomWearablePreview'
 import styles from './Container.module.css'
@@ -20,7 +20,7 @@ export const Container = (props: { children: ReactNode; requestId?: string; canC
   const navigate = useNavigateWithSearchParams()
   const isMobile = useMobileMediaQuery()
   const { account } = useCurrentConnectionData()
-  const isDeepLinkFlow = searchParams.get('flow') === 'deeplink'
+  const isDeepLinkFlow = isDeepLinkFlowEnabled(searchParams)
   const isBridgeOnly = isBridgeOnlyEnabled(searchParams)
   const authRequestId = getAuthRequestId(searchParams)
 

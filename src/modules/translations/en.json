@@ -64,10 +64,8 @@
   "request": {
     "verify_sign_in": "Verify Sign In",
     "verification_match": "Does the verification number below match the one in the {explorerText}?",
-    "deep_link_confirm": "Please confirm you want to sign in to {explorerText}",
     "no_it_doesnt": "No, it doesn't",
     "yes_same": "Yes, they are the same",
-    "sign_in": "Sign In",
     "timeout_logged_out": "You might be logged out of your wallet extension.",
     "timeout_check_login": "Please check that you're logged in and try again.",
     "wallet_interaction": {

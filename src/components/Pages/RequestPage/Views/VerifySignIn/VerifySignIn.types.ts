@@ -4,7 +4,6 @@ export interface VerifySignInProps {
   isLoading?: boolean
   hasTimedOut?: boolean
   explorerText?: string
-  isDeepLinkFlow?: boolean
   onDeny: () => void
   onApprove: () => void
 }

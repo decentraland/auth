@@ -30,15 +30,16 @@ import { isSocialProviderType, useCurrentConnectionData } from '../../../shared/
 import { isSessionMismatch } from '../../../shared/connection/sessionMismatch'
 import { isErrorWithMessage, isRpcError, isUserRejectedTransaction } from '../../../shared/errors'
 import {
-  CLIENT_LOGIN_REQUEST_ID,
   buildRequestPageUrl,
   extractReferrerFromSearchParameters,
   getAuthRequestId,
-  isBridgeOnlyEnabled
+  isBridgeOnlyEnabled,
+  isDeepLinkFlowEnabled,
+  isValidUuidV4
 } from '../../../shared/locations'
 import { sendTipNotification } from '../../../shared/notifications'
 import { isProfileComplete } from '../../../shared/profile'
-import { identifyUser } from '../../../shared/utils/analytics'
+import { identifyUser, trackEvent } from '../../../shared/utils/analytics'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
 import { MANATransferData, NFTTransferData, SignaturePayload, SimulationState, TransferType } from './types'
@@ -212,11 +213,15 @@ export const RequestPage = () => {
   // informative UI is not shown for them.
   const isUserUsingWeb2Wallet = isSocialProviderType(providerType)
   const authServerClient = useRef(createAuthServerHttpClient())
-  const isDeepLinkFlow = searchParams.get('flow') === 'deeplink'
-  // The `client-login` pseudo request id has no backing auth-server request: skip the
-  // whole recover/verify flow and hand the signed identity to the client via the deep
-  // link, the same way the standalone mobile flow does.
-  const isClientLoginFlow = requestId === CLIENT_LOGIN_REQUEST_ID
+  // The deep-link flow (opted in via `?flow=deeplink`, compared case-insensitively) has no
+  // backing auth-server request: skip the whole recover/verify flow and hand the signed identity
+  // to the client via the `open?signin=<identityId>` deep link, the same way the standalone mobile
+  // flow does. Its request id is a client-generated UUID v4 used to correlate the login with the
+  // instance that requested it — forwarded to the client as the deep link's `authRequestId`.
+  const isDeepLinkFlow = isDeepLinkFlowEnabled(searchParams)
+  // A deep-link handoff requires a valid UUID v4 id. A malformed id is a client bug, so reject it
+  // with the error view instead of posting an identity for it.
+  const isInvalidDeepLinkId = isDeepLinkFlow && !isValidUuidV4(requestId)
   // The bridgeOnly flag rides inside redirectTo so it survives logins/callbacks and can be
   // appended to the client deep link once the flow completes.
   const isBridgeOnly = isBridgeOnlyEnabled(searchParams)
@@ -238,6 +243,9 @@ export const RequestPage = () => {
   // Navigates to setup if the profile is incomplete or missing.
   // Sets isProfileReady=true once the profile is confirmed complete (or skipped).
   useEffect(() => {
+    // A deep-link handoff with a malformed id short-circuits to the error view (see the load
+    // effect below); skip the profile work so it can't navigate to setup for a request we reject.
+    if (isInvalidDeepLinkId) return
     if (isConnecting || !account || !provider || !providerType) return
     if (!initializedFlags) return
 
@@ -286,6 +294,7 @@ export const RequestPage = () => {
     requestId,
     targetConfigId,
     isDeepLinkFlow,
+    isInvalidDeepLinkId,
     isBridgeOnly,
     authRequestId,
     searchParams,
@@ -294,6 +303,16 @@ export const RequestPage = () => {
 
   // Effect 2: Load the request once the user is connected and the profile is ready.
   useEffect(() => {
+    // A deep-link handoff requires a valid UUID v4 id (the client's correlation id). Reject a
+    // malformed id up front with the error view instead of running the login handoff for it.
+    // Surface the reason (rendered as the error detail) so the copy matches the cause — a retry
+    // won't fix a bad id, but the message tells the user the link itself is the problem.
+    if (isInvalidDeepLinkId) {
+      trackEvent(TrackingEvents.DEEP_LINK_AUTH_FAILED, { authRequestId: requestId, reason: 'invalid_request_id' })
+      setError('The sign-in link is invalid.')
+      setView(View.CLIENT_LOGIN_ERROR)
+      return
+    }
     if (isConnecting) return
 
     if (!account || !provider || !providerType) {
@@ -350,8 +369,10 @@ export const RequestPage = () => {
       try {
         // Reuse an in-flight POST if the effect re-runs mid-request so the identity is
         // created exactly once instead of leaving an orphaned identity on the server.
+        // Forward the route UUID as the correlation id so the success event (fired inside
+        // postIdentity) can be tied to the instance that requested the login.
         if (!clientLoginPromiseRef.current) {
-          clientLoginPromiseRef.current = authServerClient.current.postIdentity(currentIdentity)
+          clientLoginPromiseRef.current = authServerClient.current.postIdentity(currentIdentity, { authRequestId: requestId })
         }
         const identityResponse = await clientLoginPromiseRef.current
         if (cancelled) return
@@ -361,6 +382,7 @@ export const RequestPage = () => {
         // Clear the shared promise so Try Again (a page reload) can post again.
         clientLoginPromiseRef.current = null
         if (cancelled) return
+        trackEvent(TrackingEvents.DEEP_LINK_AUTH_FAILED, { authRequestId: requestId, reason: 'post_identity_failed' })
         setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
         setView(View.CLIENT_LOGIN_ERROR)
       }
@@ -374,8 +396,9 @@ export const RequestPage = () => {
       try {
         const [signerAddress] = await walletClientRef.current.getAddresses()
         identifyUser(signerAddress)
-        // Recover the request from the auth server.
-        const request = await authServerClient.current.recover(requestId, signerAddress, isDeepLinkFlow)
+        // Recover the request from the auth server. Only the non-deep-link flow reaches here — the
+        // deep-link handoff has no backing request and never recovers.
+        const request = await authServerClient.current.recover(requestId, signerAddress)
 
         if (cancelled) return
 
@@ -473,7 +496,7 @@ export const RequestPage = () => {
             // showing the verification code screen. This matches the old behavior where
             // SetupPage signed the request automatically after profile deployment.
             // Returning users (with profile) still see the verification screen.
-            if (skipSetup && !isDeepLinkFlow) {
+            if (skipSetup) {
               const userProfile = await fetchProfile(signerAddress)
               if (cancelled) return
 
@@ -774,7 +797,7 @@ export const RequestPage = () => {
       }
     }
 
-    if (isClientLoginFlow) {
+    if (isDeepLinkFlow) {
       completeClientLoginFlow()
     } else {
       loadRequest()
@@ -795,7 +818,7 @@ export const RequestPage = () => {
     isProfileReady,
     requestId,
     isDeepLinkFlow,
-    isClientLoginFlow,
+    isInvalidDeepLinkId,
     skipSetup
   ])
 
@@ -1150,18 +1173,20 @@ export const RequestPage = () => {
     // link (return button or retry), which must not re-count the event.
     if (!hasTrackedDeepLinkRef.current) {
       hasTrackedDeepLinkRef.current = true
-      trackClick(ClickEvents.IDENTITY_DEEP_LINK_OPENED)
+      // Carry the route UUID (the client's correlation id) so the open can be tied in analytics
+      // to the instance that requested the login.
+      trackClick(ClickEvents.IDENTITY_DEEP_LINK_OPENED, { authRequestId: requestId })
     }
 
-    // Client-login flow: the client was opened via the deep link and there is nothing to
+    // Deep-link flow: the client was opened via the deep link and there is nothing to
     // navigate to — stay on the ContinueInApp view, which doubles as the retry fallback.
-    if (isClientLoginFlow) return
+    if (isDeepLinkFlow) return
 
     // The deep link already fired in ContinueInApp — skip the auto-redirect in SignInCompletePage
     setSkipDeepLinkRedirect(true)
     // Show completion view
     setView(View.VERIFY_SIGN_IN_COMPLETE)
-  }, [identityId, trackClick, isClientLoginFlow])
+  }, [identityId, trackClick, isDeepLinkFlow, requestId])
 
   const onRetryClientLogin = useCallback(() => {
     // A fresh mount re-runs completeClientLoginFlow: the view resets to LOADING_REQUEST and
@@ -1233,8 +1258,10 @@ export const RequestPage = () => {
         <ContinueInApp
           onContinue={onContinueInApp}
           requestId={requestId}
-          deepLinkUrl={getSigninDeeplink(targetConfig.deepLink, identityId ?? '', isBridgeOnly, authRequestId)}
-          isClientLogin={isClientLoginFlow}
+          // The route's UUID v4 is the client's correlation id: forward it to the client as the
+          // deep link's `authRequestId` so it can match this login to the instance that requested it.
+          deepLinkUrl={getSigninDeeplink(targetConfig.deepLink, identityId ?? '', isBridgeOnly, requestId)}
+          isClientLogin={isDeepLinkFlow}
         />
       )
     case View.VERIFY_SIGN_IN_DENIED:
@@ -1261,7 +1288,6 @@ export const RequestPage = () => {
           isLoading={isLoading}
           hasTimedOut={hasTimedOut}
           explorerText={targetConfig.explorerText}
-          isDeepLinkFlow={isDeepLinkFlow}
           onDeny={onDenyVerifySignIn}
           onApprove={onApproveSignInVerification}
         />

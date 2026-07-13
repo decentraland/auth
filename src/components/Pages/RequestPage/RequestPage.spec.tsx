@@ -14,6 +14,8 @@ import {
 } from '../../../shared/auth'
 import { getAuthRequestId, isBridgeOnlyEnabled } from '../../../shared/locations'
 import { isProfileComplete } from '../../../shared/profile'
+import { trackEvent } from '../../../shared/utils/analytics'
+import { TrackingEvents } from '../../../modules/analytics/types'
 import { FeatureFlagsContext } from '../../FeatureFlagsProvider'
 import { RequestPage } from './RequestPage'
 import { decodeManaTransferData, decodeNftTransferData, fetchNftMetadata, getSigninDeeplink } from './utils'
@@ -81,15 +83,21 @@ jest.mock('../../../shared/auth', () => {
 })
 
 // --- Shared modules ---
-jest.mock('../../../shared/locations', () => ({
-  extractReferrerFromSearchParameters: jest.fn().mockReturnValue(null),
-  isBridgeOnlyEnabled: jest.fn().mockReturnValue(false),
-  getAuthRequestId: jest.fn().mockReturnValue(null),
-  CLIENT_LOGIN_REQUEST_ID: 'client-login',
-  buildRequestPageUrl: (requestId: string, targetConfigId: string) => `/auth/requests/${requestId}?targetConfigId=${targetConfigId}`
-}))
+jest.mock('../../../shared/locations', () => {
+  // Keep the pure `flow`/UUID parsers real (tests drive the flow through the URL) and only mock the
+  // helpers a test needs to control.
+  const actual = jest.requireActual('../../../shared/locations')
+  return {
+    ...actual,
+    extractReferrerFromSearchParameters: jest.fn().mockReturnValue(null),
+    isBridgeOnlyEnabled: jest.fn().mockReturnValue(false),
+    getAuthRequestId: jest.fn().mockReturnValue(null),
+    buildRequestPageUrl: (requestId: string, targetConfigId: string) => `/auth/requests/${requestId}?targetConfigId=${targetConfigId}`
+  }
+})
 jest.mock('../../../shared/utils/analytics', () => ({
-  identifyUser: jest.fn()
+  identifyUser: jest.fn(),
+  trackEvent: jest.fn()
 }))
 jest.mock('../../../shared/utils/errorHandler', () => ({
   handleError: jest.fn().mockReturnValue('An error occurred')
@@ -257,7 +265,9 @@ jest.mock('@dcl/hooks', () => ({
 }))
 
 const REQUEST_ID = 'test-request-123'
-const CLIENT_LOGIN_REQUEST_PATH = '/auth/requests/client-login?targetConfigId=default'
+// The deep-link handoff requires a valid UUID v4 route id (the client's correlation id).
+const DEEP_LINK_REQUEST_ID = '123e4567-e89b-42d3-a456-426614174000'
+const DEEP_LINK_REQUEST_PATH = `/auth/requests/${DEEP_LINK_REQUEST_ID}?targetConfigId=default&flow=deeplink`
 
 let mockFlags: Partial<Record<string, boolean>>
 let mockFlagsInitialized: boolean
@@ -548,18 +558,6 @@ describe('RequestPage', () => {
         expect(mockEnsureProfile).not.toHaveBeenCalled()
       })
 
-      it('should skip auto-sign and show confirmation page for new user in deep link flow', async () => {
-        jest.mocked(fetchProfile).mockResolvedValue(null)
-        jest.mocked(isProfileComplete).mockReturnValue(false)
-
-        renderRequestPage(`/auth/requests/${REQUEST_ID}?targetConfigId=default&flow=deeplink`)
-        await waitFor(() => {
-          expect(screen.getByTestId('verify-sign-in')).toBeInTheDocument()
-        })
-        expect(mockSignMessage).not.toHaveBeenCalled()
-        expect(mockSendSuccessfulOutcome).not.toHaveBeenCalled()
-      })
-
       it('should fall through to the verify screen for a new user when the auto-sign message is malformed', async () => {
         // New user (no profile) but the request carries a non-string message: instead of dead-ending
         // on the loading spinner, the flow falls through to the normal verification screen.
@@ -581,7 +579,7 @@ describe('RequestPage', () => {
       })
     })
 
-    describe('and the request id is the client-login pseudo request id', () => {
+    describe('and the flow is a deep-link handoff (flow=deeplink with a UUID v4 id)', () => {
       beforeEach(() => {
         mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'User' }] })
       })
@@ -591,28 +589,36 @@ describe('RequestPage', () => {
           mockPostIdentity.mockResolvedValueOnce({ identityId: 'anIdentityId' })
         })
 
-        it('should post the identity to the auth server and show the continue in app view', async () => {
-          renderRequestPage(CLIENT_LOGIN_REQUEST_PATH)
+        it('should post the identity to the auth server (forwarding the route UUID) and show the continue in app view', async () => {
+          renderRequestPage(DEEP_LINK_REQUEST_PATH)
           await waitFor(() => {
             expect(screen.getByTestId('continue-in-app')).toBeInTheDocument()
           })
-          expect(mockPostIdentity).toHaveBeenCalledWith(mockConnectionData.identity)
+          expect(mockPostIdentity).toHaveBeenCalledWith(mockConnectionData.identity, { authRequestId: DEEP_LINK_REQUEST_ID })
         })
 
         it('should not recover any request from the auth server', async () => {
-          renderRequestPage(CLIENT_LOGIN_REQUEST_PATH)
+          renderRequestPage(DEEP_LINK_REQUEST_PATH)
           await waitFor(() => {
             expect(screen.getByTestId('continue-in-app')).toBeInTheDocument()
           })
           expect(mockRecover).not.toHaveBeenCalled()
         })
 
-        it('should build the signin deep link without the bridgeOnly flag or an authRequestId', async () => {
-          renderRequestPage(CLIENT_LOGIN_REQUEST_PATH)
+        it('should forward the route UUID to the client as the signin deep link authRequestId', async () => {
+          renderRequestPage(DEEP_LINK_REQUEST_PATH)
           await waitFor(() => {
             expect(screen.getByTestId('continue-in-app')).toBeInTheDocument()
           })
-          expect(jest.mocked(getSigninDeeplink)).toHaveBeenCalledWith(undefined, 'anIdentityId', false, null)
+          expect(jest.mocked(getSigninDeeplink)).toHaveBeenCalledWith(undefined, 'anIdentityId', false, DEEP_LINK_REQUEST_ID)
+        })
+
+        it('should accept the flow value case-insensitively', async () => {
+          renderRequestPage(`/auth/requests/${DEEP_LINK_REQUEST_ID}?targetConfigId=default&flow=DeepLink`)
+          await waitFor(() => {
+            expect(screen.getByTestId('continue-in-app')).toBeInTheDocument()
+          })
+          expect(mockPostIdentity).toHaveBeenCalled()
         })
       })
 
@@ -627,15 +633,15 @@ describe('RequestPage', () => {
         })
 
         it('should build the signin deep link with the bridgeOnly flag', async () => {
-          renderRequestPage(CLIENT_LOGIN_REQUEST_PATH)
+          renderRequestPage(DEEP_LINK_REQUEST_PATH)
           await waitFor(() => {
             expect(screen.getByTestId('continue-in-app')).toBeInTheDocument()
           })
-          expect(jest.mocked(getSigninDeeplink)).toHaveBeenCalledWith(undefined, 'anIdentityId', true, null)
+          expect(jest.mocked(getSigninDeeplink)).toHaveBeenCalledWith(undefined, 'anIdentityId', true, DEEP_LINK_REQUEST_ID)
         })
       })
 
-      describe('and an authRequestId is provided', () => {
+      describe('and a query authRequestId is also present', () => {
         beforeEach(() => {
           jest.mocked(getAuthRequestId).mockReturnValue('auth-req-abc')
           mockPostIdentity.mockResolvedValueOnce({ identityId: 'anIdentityId' })
@@ -645,12 +651,12 @@ describe('RequestPage', () => {
           jest.mocked(getAuthRequestId).mockReturnValue(null)
         })
 
-        it('should build the signin deep link forwarding the authRequestId verbatim', async () => {
-          renderRequestPage(CLIENT_LOGIN_REQUEST_PATH)
+        it('should forward the route UUID as the authRequestId, not the query value', async () => {
+          renderRequestPage(DEEP_LINK_REQUEST_PATH)
           await waitFor(() => {
             expect(screen.getByTestId('continue-in-app')).toBeInTheDocument()
           })
-          expect(jest.mocked(getSigninDeeplink)).toHaveBeenCalledWith(undefined, 'anIdentityId', false, 'auth-req-abc')
+          expect(jest.mocked(getSigninDeeplink)).toHaveBeenCalledWith(undefined, 'anIdentityId', false, DEEP_LINK_REQUEST_ID)
         })
       })
 
@@ -660,7 +666,7 @@ describe('RequestPage', () => {
         })
 
         it('should navigate to the login page without posting an identity', async () => {
-          renderRequestPage(CLIENT_LOGIN_REQUEST_PATH)
+          renderRequestPage(DEEP_LINK_REQUEST_PATH)
           await waitFor(() => {
             expect(mockNavigate).toHaveBeenCalledWith(expect.stringContaining('/login?redirectTo='))
           })
@@ -674,11 +680,82 @@ describe('RequestPage', () => {
         })
 
         it('should show the client login error view', async () => {
-          renderRequestPage(CLIENT_LOGIN_REQUEST_PATH)
+          renderRequestPage(DEEP_LINK_REQUEST_PATH)
           await waitFor(() => {
             expect(screen.getByTestId('client-login-error')).toBeInTheDocument()
           })
         })
+
+        it('should track the failure with the route UUID and a post_identity_failed reason', async () => {
+          renderRequestPage(DEEP_LINK_REQUEST_PATH)
+          await waitFor(() => {
+            expect(jest.mocked(trackEvent)).toHaveBeenCalledWith(TrackingEvents.DEEP_LINK_AUTH_FAILED, {
+              authRequestId: DEEP_LINK_REQUEST_ID,
+              reason: 'post_identity_failed'
+            })
+          })
+        })
+      })
+
+      describe('and the route id is not a valid UUID v4', () => {
+        it('should show the error view without posting an identity or recovering a request', async () => {
+          renderRequestPage('/auth/requests/not-a-uuid?targetConfigId=default&flow=deeplink')
+          await waitFor(() => {
+            expect(screen.getByTestId('client-login-error')).toBeInTheDocument()
+          })
+          expect(mockPostIdentity).not.toHaveBeenCalled()
+          expect(mockRecover).not.toHaveBeenCalled()
+        })
+
+        it('should not run the profile consistency check', async () => {
+          renderRequestPage('/auth/requests/not-a-uuid?targetConfigId=default&flow=deeplink')
+          await waitFor(() => {
+            expect(screen.getByTestId('client-login-error')).toBeInTheDocument()
+          })
+          expect(mockEnsureProfile).not.toHaveBeenCalled()
+        })
+
+        it('should explain that the sign-in link is invalid', async () => {
+          renderRequestPage('/auth/requests/not-a-uuid?targetConfigId=default&flow=deeplink')
+          await waitFor(() => {
+            expect(screen.getByTestId('client-login-error')).toHaveTextContent('The sign-in link is invalid.')
+          })
+        })
+
+        it('should track the failure with an invalid_request_id reason', async () => {
+          renderRequestPage('/auth/requests/not-a-uuid?targetConfigId=default&flow=deeplink')
+          await waitFor(() => {
+            expect(jest.mocked(trackEvent)).toHaveBeenCalledWith(TrackingEvents.DEEP_LINK_AUTH_FAILED, {
+              authRequestId: 'not-a-uuid',
+              reason: 'invalid_request_id'
+            })
+          })
+        })
+      })
+    })
+
+    describe('and the request id is a UUID v4 but the flow param is absent', () => {
+      // The handoff is gated on flow=deeplink, not on the id shape: a UUID alone must NOT trigger
+      // the identity post — it goes through the normal recover flow like any other request.
+      beforeEach(() => {
+        mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'User' }] })
+        mockGetAddresses.mockResolvedValue(['0xabc123'])
+        mockRecover.mockResolvedValue({
+          sender: '0xabc123',
+          expiration: new Date(Date.now() + 60000).toISOString(),
+          method: 'dcl_personal_sign',
+          code: '1234',
+          params: ['Sign this message']
+        })
+      })
+
+      it('should recover the request normally and not post an identity', async () => {
+        renderRequestPage(`/auth/requests/${DEEP_LINK_REQUEST_ID}?targetConfigId=default`)
+        await waitFor(() => {
+          expect(screen.getByTestId('verify-sign-in')).toBeInTheDocument()
+        })
+        expect(mockRecover).toHaveBeenCalledWith(DEEP_LINK_REQUEST_ID, '0xabc123')
+        expect(mockPostIdentity).not.toHaveBeenCalled()
       })
     })
 
@@ -764,22 +841,11 @@ describe('RequestPage', () => {
       expect(await screen.findByTestId('sign-in-complete')).toBeInTheDocument()
     })
 
-    it('should not post the identity (that mechanism is only for the client-login flow)', async () => {
+    it('should not post the identity (that mechanism is only for the deep-link handoff)', async () => {
       renderRequestPage()
       await userEvent.click(await screen.findByTestId('verify-sign-in-approve'))
       await waitFor(() => expect(mockSendSuccessfulOutcome).toHaveBeenCalled())
       expect(mockPostIdentity).not.toHaveBeenCalled()
-    })
-
-    describe('and the flow is a deep-link flow', () => {
-      it('should still send the outcome and not post the identity', async () => {
-        renderRequestPage(`/auth/requests/${REQUEST_ID}?targetConfigId=default&flow=deeplink`)
-        await userEvent.click(await screen.findByTestId('verify-sign-in-approve'))
-        await waitFor(() => {
-          expect(mockSendSuccessfulOutcome).toHaveBeenCalledWith(REQUEST_ID, '0xabc123', '0xsignature')
-        })
-        expect(mockPostIdentity).not.toHaveBeenCalled()
-      })
     })
   })
 

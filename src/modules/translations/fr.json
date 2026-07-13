@@ -64,10 +64,8 @@
   "request": {
     "verify_sign_in": "Vérifier la connexion",
     "verification_match": "Le numéro de vérification ci-dessous correspond-il à celui dans le {explorerText} ?",
-    "deep_link_confirm": "Veuillez confirmer que vous souhaitez vous connecter à {explorerText}",
     "no_it_doesnt": "Non, il ne correspond pas",
     "yes_same": "Oui, ils sont identiques",
-    "sign_in": "Se connecter",
     "timeout_logged_out": "Vous êtes peut-être déconnecté de votre extension de portefeuille.",
     "timeout_check_login": "Veuillez vérifier que vous êtes connecté et réessayer.",
     "wallet_interaction": {

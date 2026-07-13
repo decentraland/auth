@@ -4,6 +4,8 @@ import {
   extractReferrerFromSearchParameters,
   getAuthRequestId,
   isBridgeOnlyEnabled,
+  isDeepLinkFlowEnabled,
+  isValidUuidV4,
   locations
 } from './locations'
 
@@ -340,6 +342,112 @@ describe('locations', () => {
 
       it('should return null', () => {
         expect(getAuthRequestId(searchParams)).toBeNull()
+      })
+    })
+  })
+
+  describe('when checking if the deep-link flow is enabled', () => {
+    let searchParams: URLSearchParams
+
+    describe('and the flow param is set to "deeplink"', () => {
+      beforeEach(() => {
+        searchParams = new URLSearchParams('flow=deeplink')
+      })
+
+      it('should return true', () => {
+        expect(isDeepLinkFlowEnabled(searchParams)).toBe(true)
+      })
+    })
+
+    describe('and the flow param is set to "deeplink" with different casing', () => {
+      beforeEach(() => {
+        searchParams = new URLSearchParams('flow=DeepLink')
+      })
+
+      it('should return true', () => {
+        expect(isDeepLinkFlowEnabled(searchParams)).toBe(true)
+      })
+    })
+
+    describe('and the flow param is set to a different value', () => {
+      beforeEach(() => {
+        searchParams = new URLSearchParams('flow=other')
+      })
+
+      it('should return false', () => {
+        expect(isDeepLinkFlowEnabled(searchParams)).toBe(false)
+      })
+    })
+
+    describe('and the flow param is present as a bare flag without a value', () => {
+      beforeEach(() => {
+        searchParams = new URLSearchParams('flow')
+      })
+
+      it('should return false', () => {
+        expect(isDeepLinkFlowEnabled(searchParams)).toBe(false)
+      })
+    })
+
+    describe('and the flow param is not present', () => {
+      beforeEach(() => {
+        searchParams = new URLSearchParams('targetConfigId=default')
+      })
+
+      it('should return false', () => {
+        expect(isDeepLinkFlowEnabled(searchParams)).toBe(false)
+      })
+    })
+  })
+
+  describe('when validating a UUID v4', () => {
+    describe('and the value is a canonical lowercase UUID v4', () => {
+      it('should return true', () => {
+        expect(isValidUuidV4('123e4567-e89b-42d3-a456-426614174000')).toBe(true)
+      })
+    })
+
+    describe('and the value is an uppercase UUID v4', () => {
+      it('should return true (case-insensitive)', () => {
+        expect(isValidUuidV4('123E4567-E89B-42D3-A456-426614174000')).toBe(true)
+      })
+    })
+
+    describe('and the value is a non-v4 UUID (wrong version digit)', () => {
+      it('should return false', () => {
+        expect(isValidUuidV4('123e4567-e89b-12d3-a456-426614174000')).toBe(false)
+      })
+    })
+
+    describe('and the value has an invalid variant digit', () => {
+      it('should return false', () => {
+        expect(isValidUuidV4('123e4567-e89b-42d3-c456-426614174000')).toBe(false)
+      })
+    })
+
+    describe('and the value is not a UUID at all', () => {
+      it('should return false', () => {
+        expect(isValidUuidV4('client-login')).toBe(false)
+      })
+    })
+
+    describe('and a valid UUID is surrounded by whitespace', () => {
+      it('should return false', () => {
+        expect(isValidUuidV4(' 123e4567-e89b-42d3-a456-426614174000 ')).toBe(false)
+      })
+    })
+
+    describe('and a valid UUID is followed by a trailing newline', () => {
+      // Guards against a regex anchor bypass: JS `$` without the multiline flag must not match
+      // before a trailing "\n". The id is forwarded to the native client, so this must be strict.
+      it('should return false', () => {
+        expect(isValidUuidV4('123e4567-e89b-42d3-a456-426614174000\n')).toBe(false)
+      })
+    })
+
+    describe('and the value is an empty string', () => {
+      it('should return false', () => {
+        expect(isValidUuidV4('')).toBe(false)
       })
     })
   })

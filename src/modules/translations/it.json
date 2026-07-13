@@ -64,10 +64,8 @@
   "request": {
     "verify_sign_in": "Verifica l'accesso",
     "verification_match": "Il numero di verifica qui sotto corrisponde a quello nel {explorerText}?",
-    "deep_link_confirm": "Conferma di voler accedere a {explorerText}",
     "no_it_doesnt": "No, non corrisponde",
     "yes_same": "Sì, sono uguali",
-    "sign_in": "Accedi",
     "timeout_logged_out": "Potresti essere disconnesso dalla tua estensione del portafoglio.",
     "timeout_check_login": "Verifica di essere connesso e riprova.",
     "wallet_interaction": {

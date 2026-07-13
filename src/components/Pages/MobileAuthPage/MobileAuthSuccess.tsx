@@ -22,7 +22,7 @@ export const MobileAuthSuccess = ({ identityId, explorerText, onTryAgain }: Prop
   const [deepLinkFailed, setDeepLinkFailed] = useState(false)
 
   // Reuse the shared builder so the mobile handoff carries dclenv (on non-production)
-  // like the desktop/client-login deep links, instead of a bare signin URL.
+  // like the desktop deep-link login handoff, instead of a bare signin URL.
   const deepLinkUrl = getSigninDeeplink(undefined, identityId)
 
   const hasLaunchedRef = useRef(false)

@@ -73,7 +73,12 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
     }
   }
 
-  const postIdentity = async (identity: AuthIdentity, opts: { isMobile?: boolean } = { isMobile: false }): Promise<IdentityResponse> => {
+  const postIdentity = async (
+    identity: AuthIdentity,
+    // `authRequestId` is the deep-link handoff's correlation id (the route UUID); forwarded onto
+    // the success event so a login can be tied to the instance that requested it in analytics.
+    opts: { isMobile?: boolean; authRequestId?: string | null } = { isMobile: false }
+  ): Promise<IdentityResponse> => {
     try {
       const response = await signedFetch(baseUrl + '/identities', {
         method: 'POST',
@@ -93,7 +98,8 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
       const data = await response.json()
 
       trackEvent(TrackingEvents.DEEP_LINK_AUTH_SUCCESS, {
-        type: 'success'
+        type: 'success',
+        ...(opts.authRequestId ? { authRequestId: opts.authRequestId } : {})
       })
 
       return data
@@ -134,7 +140,7 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
     }
   }
 
-  const recover = async (requestId: string, signerAddress: string, isDeepLinkFlow = false): Promise<RecoverResponse> => {
+  const recover = async (requestId: string, signerAddress: string): Promise<RecoverResponse> => {
     let recoverResponse: RecoverResponse | undefined
 
     try {
@@ -177,7 +183,7 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
       switch (recoverResponse.method) {
         case 'dcl_personal_sign':
           trackEvent(TrackingEvents.REQUEST_INTERACTION, {
-            type: isDeepLinkFlow ? RequestInteractionType.DEEP_LINK_SIGN_IN : RequestInteractionType.VERIFY_SIGN_IN,
+            type: RequestInteractionType.VERIFY_SIGN_IN,
             browserTime: Date.now(),
             requestType: recoverResponse?.method
           })
