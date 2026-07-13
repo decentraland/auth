@@ -109,21 +109,20 @@ test.describe('Web → MetaMask: new user — full happy path', () => {
     // Step 8: Let's Go should be enabled
     await expect(letsGo).toBeEnabled()
 
-    // Step 9: Submit — the deploy may fail in e2e (requires real crypto signatures)
-    // We verify the form interaction works; the deploy itself is tested via unit tests
+    // Step 9: Clicking "Let's go" MUST kick off the profile deploy (a POST to the content
+    // server), even though the deploy itself fails in e2e (real crypto/catalyst is out of scope
+    // and covered by unit tests). Asserting the deploy was ATTEMPTED is the deterministic "the
+    // click did something" signal that guards against the button being a no-op — unlike the
+    // transient "DEPLOYING..." button, which can flip back to "LET'S GO" on a fast failure.
+    let deployAttempted = false
+    await page.route('**/content/entities**', async (route, request) => {
+      if (request.method() === 'POST') deployAttempted = true
+      return route.fallback()
+    })
+
     await letsGo.click()
 
-    // Step 10: Clicking "Let's go" MUST kick off the deploy. handleSubmit flips the
-    // form into its disabled "DEPLOYING..." state before the (possibly failing)
-    // deploy resolves, so that transient state is the deterministic signal that the
-    // click did something. If the button did nothing — the exact regression this
-    // test guards against — it stays on an enabled "LET'S GO" and these fail.
-    const deployingButton = page.getByRole('button', { name: /deploying/i })
-    await expect(deployingButton).toBeVisible({ timeout: 10_000 })
-    await expect(deployingButton).toBeDisabled()
-
-    // The enabled "LET'S GO" start state must be gone (it became "DEPLOYING...").
-    await expect(page.getByRole('button', { name: /^let's go$/i })).toBeHidden()
+    await expect.poll(() => deployAttempted, { timeout: 15_000 }).toBe(true)
   })
 })
 

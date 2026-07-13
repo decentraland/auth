@@ -946,7 +946,7 @@ export const RequestPage = () => {
         isApprovingRef.current = false
       }
     }
-  }, [setIsLoading, isUserUsingWeb2Wallet, isLoading, isBridgeOnly, authRequestId])
+  }, [setIsLoading, isUserUsingWeb2Wallet, requestId, targetConfig, isBridgeOnly, authRequestId])
 
   const onDenyWalletInteraction = useCallback(async () => {
     setIsLoading(true)
