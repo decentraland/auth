@@ -39,7 +39,7 @@ import {
 } from '../../../shared/locations'
 import { sendTipNotification } from '../../../shared/notifications'
 import { isProfileComplete } from '../../../shared/profile'
-import { identifyUser } from '../../../shared/utils/analytics'
+import { identifyUser, trackEvent } from '../../../shared/utils/analytics'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
 import { MANATransferData, NFTTransferData, SignaturePayload, SimulationState, TransferType } from './types'
@@ -308,6 +308,7 @@ export const RequestPage = () => {
     // Surface the reason (rendered as the error detail) so the copy matches the cause — a retry
     // won't fix a bad id, but the message tells the user the link itself is the problem.
     if (isInvalidDeepLinkId) {
+      trackEvent(TrackingEvents.DEEP_LINK_AUTH_FAILED, { authRequestId: requestId, reason: 'invalid_request_id' })
       setError('The sign-in link is invalid.')
       setView(View.CLIENT_LOGIN_ERROR)
       return
@@ -368,8 +369,10 @@ export const RequestPage = () => {
       try {
         // Reuse an in-flight POST if the effect re-runs mid-request so the identity is
         // created exactly once instead of leaving an orphaned identity on the server.
+        // Forward the route UUID as the correlation id so the success event (fired inside
+        // postIdentity) can be tied to the instance that requested the login.
         if (!clientLoginPromiseRef.current) {
-          clientLoginPromiseRef.current = authServerClient.current.postIdentity(currentIdentity)
+          clientLoginPromiseRef.current = authServerClient.current.postIdentity(currentIdentity, { authRequestId: requestId })
         }
         const identityResponse = await clientLoginPromiseRef.current
         if (cancelled) return
@@ -379,6 +382,7 @@ export const RequestPage = () => {
         // Clear the shared promise so Try Again (a page reload) can post again.
         clientLoginPromiseRef.current = null
         if (cancelled) return
+        trackEvent(TrackingEvents.DEEP_LINK_AUTH_FAILED, { authRequestId: requestId, reason: 'post_identity_failed' })
         setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
         setView(View.CLIENT_LOGIN_ERROR)
       }
@@ -1169,7 +1173,9 @@ export const RequestPage = () => {
     // link (return button or retry), which must not re-count the event.
     if (!hasTrackedDeepLinkRef.current) {
       hasTrackedDeepLinkRef.current = true
-      trackClick(ClickEvents.IDENTITY_DEEP_LINK_OPENED)
+      // Carry the route UUID (the client's correlation id) so the open can be tied in analytics
+      // to the instance that requested the login.
+      trackClick(ClickEvents.IDENTITY_DEEP_LINK_OPENED, { authRequestId: requestId })
     }
 
     // Deep-link flow: the client was opened via the deep link and there is nothing to
@@ -1180,7 +1186,7 @@ export const RequestPage = () => {
     setSkipDeepLinkRedirect(true)
     // Show completion view
     setView(View.VERIFY_SIGN_IN_COMPLETE)
-  }, [identityId, trackClick, isDeepLinkFlow])
+  }, [identityId, trackClick, isDeepLinkFlow, requestId])
 
   const onRetryClientLogin = useCallback(() => {
     // A fresh mount re-runs completeClientLoginFlow: the view resets to LOADING_REQUEST and

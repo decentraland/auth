@@ -9,6 +9,7 @@ import {
   RequestNotFoundError,
   SimulationUnavailableError
 } from './errors'
+import { TrackingEvents } from '../../modules/analytics/types'
 import { createAuthServerHttpClient } from './httpClient'
 import { RecoverResponse, SimulationRequestBody, SimulationResponseBody } from './types'
 // Mock dependencies
@@ -30,13 +31,15 @@ describe('createAuthServerClient', () => {
 
   // Mock fetch
   let mockFetch: jest.Mock
+  // Mock analytics track (module-scoped so tests can assert the events sent)
+  let mockTrack: jest.Mock
 
   beforeEach(() => {
     // Reset all mocks
     jest.clearAllMocks()
 
     // Mock analytics
-    const mockTrack = jest.fn()
+    mockTrack = jest.fn()
     mockFetch = jest.fn()
     const mockAnalytics = { track: mockTrack }
 
@@ -434,6 +437,21 @@ describe('createAuthServerClient', () => {
           identity: mockIdentity
         })
         expect(result).toEqual(mockResponse)
+      })
+
+      it('should track the success without an authRequestId when none is provided', async () => {
+        await client.postIdentity(mockIdentity)
+
+        expect(mockTrack).toHaveBeenCalledWith(TrackingEvents.DEEP_LINK_AUTH_SUCCESS, { type: 'success' })
+      })
+
+      it('should forward the authRequestId onto the success tracking event when provided', async () => {
+        await client.postIdentity(mockIdentity, { authRequestId: 'a-request-uuid' })
+
+        expect(mockTrack).toHaveBeenCalledWith(TrackingEvents.DEEP_LINK_AUTH_SUCCESS, {
+          type: 'success',
+          authRequestId: 'a-request-uuid'
+        })
       })
     })
 

@@ -14,6 +14,8 @@ import {
 } from '../../../shared/auth'
 import { getAuthRequestId, isBridgeOnlyEnabled } from '../../../shared/locations'
 import { isProfileComplete } from '../../../shared/profile'
+import { trackEvent } from '../../../shared/utils/analytics'
+import { TrackingEvents } from '../../../modules/analytics/types'
 import { FeatureFlagsContext } from '../../FeatureFlagsProvider'
 import { RequestPage } from './RequestPage'
 import { decodeManaTransferData, decodeNftTransferData, fetchNftMetadata, getSigninDeeplink } from './utils'
@@ -94,7 +96,8 @@ jest.mock('../../../shared/locations', () => {
   }
 })
 jest.mock('../../../shared/utils/analytics', () => ({
-  identifyUser: jest.fn()
+  identifyUser: jest.fn(),
+  trackEvent: jest.fn()
 }))
 jest.mock('../../../shared/utils/errorHandler', () => ({
   handleError: jest.fn().mockReturnValue('An error occurred')
@@ -586,12 +589,12 @@ describe('RequestPage', () => {
           mockPostIdentity.mockResolvedValueOnce({ identityId: 'anIdentityId' })
         })
 
-        it('should post the identity to the auth server and show the continue in app view', async () => {
+        it('should post the identity to the auth server (forwarding the route UUID) and show the continue in app view', async () => {
           renderRequestPage(DEEP_LINK_REQUEST_PATH)
           await waitFor(() => {
             expect(screen.getByTestId('continue-in-app')).toBeInTheDocument()
           })
-          expect(mockPostIdentity).toHaveBeenCalledWith(mockConnectionData.identity)
+          expect(mockPostIdentity).toHaveBeenCalledWith(mockConnectionData.identity, { authRequestId: DEEP_LINK_REQUEST_ID })
         })
 
         it('should not recover any request from the auth server', async () => {
@@ -682,6 +685,16 @@ describe('RequestPage', () => {
             expect(screen.getByTestId('client-login-error')).toBeInTheDocument()
           })
         })
+
+        it('should track the failure with the route UUID and a post_identity_failed reason', async () => {
+          renderRequestPage(DEEP_LINK_REQUEST_PATH)
+          await waitFor(() => {
+            expect(jest.mocked(trackEvent)).toHaveBeenCalledWith(TrackingEvents.DEEP_LINK_AUTH_FAILED, {
+              authRequestId: DEEP_LINK_REQUEST_ID,
+              reason: 'post_identity_failed'
+            })
+          })
+        })
       })
 
       describe('and the route id is not a valid UUID v4', () => {
@@ -706,6 +719,16 @@ describe('RequestPage', () => {
           renderRequestPage('/auth/requests/not-a-uuid?targetConfigId=default&flow=deeplink')
           await waitFor(() => {
             expect(screen.getByTestId('client-login-error')).toHaveTextContent('The sign-in link is invalid.')
+          })
+        })
+
+        it('should track the failure with an invalid_request_id reason', async () => {
+          renderRequestPage('/auth/requests/not-a-uuid?targetConfigId=default&flow=deeplink')
+          await waitFor(() => {
+            expect(jest.mocked(trackEvent)).toHaveBeenCalledWith(TrackingEvents.DEEP_LINK_AUTH_FAILED, {
+              authRequestId: 'not-a-uuid',
+              reason: 'invalid_request_id'
+            })
           })
         })
       })
