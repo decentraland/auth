@@ -6,107 +6,30 @@ import {
 } from '../helpers/setup'
 import {
   recoverRequestDifferentSenderResponse,
-  recoverRequestExpiredResponse,
-  recoverRequestResponse
+  recoverRequestExpiredResponse
 } from '../fixtures/mock-responses'
 
-test.describe('Deep link flow (flow=deeplink)', () => {
+// A valid UUID v4 route id — the client's correlation id required by the deep-link handoff.
+const DEEP_LINK_REQUEST_ID = '123e4567-e89b-42d3-a456-426614174000'
+
+test.describe('Deep link login handoff (flow=deeplink with a UUID v4 id)', () => {
   /**
-   * The deep link flow is used when Explorer opens auth with ?flow=deeplink.
-   * A dcl_personal_sign request still sends its signature as the outcome (the client is
-   * waiting on it) and lands on the sign-in completion view; the deep-link flag only changes
-   * the confirmation UX (no code, "Sign In" wording). It does NOT post an identity — that
-   * mechanism is only for the client-login pseudo-request (see the client-login suite below).
+   * Opening auth with `?flow=deeplink` and a UUID v4 route id runs the deep-link login handoff
+   * WITHOUT a backing auth-server request: the user logs in, the signed identity is posted to the
+   * auth server, and the client is opened immediately via the `open?signin=<identityId>` deep
+   * link — the same handoff as the standalone mobile flow, without any countdown. The route UUID
+   * is forwarded to the client as the deep link's `authRequestId` so it can correlate the login
+   * with the instance that requested it. It never recovers a request.
    */
 
   test.beforeEach(async ({ context }) => {
     await injectMockWallet(context)
   })
 
-  test('deeplink flow: verify screen shows different text (no code, "Confirm" language)', async ({ page }) => {
+  test('valid UUID: auto-connect → posts identity → fires the deep link without recovering a request', async ({ page }) => {
     await mockApiRoutes(page, { hasProfile: true, onboardingToExplorer: true })
 
-    await page.goto(`/auth/requests/${MOCK_REQUEST_ID}?loginMethod=METAMASK&flow=deeplink`)
-
-    await expect(page.getByText('Verify Sign In')).toBeVisible({ timeout: 15_000 })
-
-    // Deep link flow hides the verification code and shows different text
-    // Should NOT show the code number
-    await expect(page.getByText('1234')).not.toBeVisible()
-
-    // Buttons should use deep link language
-    // "Sign In" instead of "Yes, they are the same"
-    await expect(page.locator('[data-testid="verify-sign-in-approve-button"]')).toBeVisible()
-    // "Cancel" instead of "No, it doesn't"
-    await expect(page.locator('[data-testid="verify-sign-in-deny-button"]')).toBeVisible()
-  })
-
-  test('deeplink flow: approve → sends the signature outcome → shows completion (no identity post, no ContinueInApp)', async ({ page }) => {
-    await mockApiRoutes(page, { hasProfile: true, onboardingToExplorer: true })
-
-    // A dcl_personal_sign request must send its signature as the OUTCOME; it must NOT post an
-    // identity (postIdentity is only for the client-login pseudo-request).
-    let postedIdentity = false
-    await page.route('**/identities', async (route, request) => {
-      if (request.method() === 'POST') postedIdentity = true
-      return route.continue()
-    })
-    // Record the outcome POST, then defer to the mockApiRoutes handler that fulfills it.
-    let outcomeSent = false
-    await page.route('**/v2/requests/**', async (route, request) => {
-      if (request.method() === 'POST' && request.url().includes('/outcome')) {
-        outcomeSent = true
-      }
-      return route.fallback()
-    })
-
-    await page.goto(`/auth/requests/${MOCK_REQUEST_ID}?loginMethod=METAMASK&flow=deeplink`)
-
-    await expect(page.getByText('Verify Sign In')).toBeVisible({ timeout: 15_000 })
-
-    // Approve
-    await page.locator('[data-testid="verify-sign-in-approve-button"]').click()
-
-    // Shows the sign-in completion view (SignInCompletePage), NOT the ContinueInApp countdown.
-    await expect(page.getByText(/Sign In successful/i)).toBeVisible({ timeout: 15_000 })
-    await expect(page.locator('[data-testid="continue-in-app-return-button"]')).not.toBeVisible()
-
-    // The signature outcome was sent and no identity was posted.
-    expect(outcomeSent).toBe(true)
-    expect(postedIdentity).toBe(false)
-  })
-
-  test('deeplink flow: deny → shows denied view', async ({ page }) => {
-    await mockApiRoutes(page, { hasProfile: true, onboardingToExplorer: true })
-
-    await page.goto(`/auth/requests/${MOCK_REQUEST_ID}?loginMethod=METAMASK&flow=deeplink`)
-
-    await expect(page.getByText('Verify Sign In')).toBeVisible({ timeout: 15_000 })
-
-    // Click deny (Cancel in deeplink flow)
-    await page.locator('[data-testid="verify-sign-in-deny-button"]').click()
-
-    // Should show denied state
-    await expect(page.getByText(/not match|not taken by you/i)).toBeVisible({ timeout: 5_000 })
-  })
-})
-
-test.describe('Client-login pseudo request id (/auth/requests/client-login)', () => {
-  /**
-   * `/auth/requests/client-login` runs the deep-link login handoff without a backing
-   * auth-server request: the user logs in, the signed identity is posted to the
-   * auth server, and the client is opened immediately via the open?signin=<identityId>
-   * deep link — same handoff as the standalone mobile flow, without any countdown.
-   */
-
-  test.beforeEach(async ({ context }) => {
-    await injectMockWallet(context)
-  })
-
-  test('client-login id: auto-connect → posts identity → fires the deep link without recovering a request', async ({ page }) => {
-    await mockApiRoutes(page, { hasProfile: true, onboardingToExplorer: true })
-
-    // Track auth-server request recoveries — the pseudo id must never trigger one.
+    // Track auth-server request recoveries — the deep-link handoff must never trigger one.
     // Registered after mockApiRoutes so it runs first; fallback() defers to it.
     let recoverCalled = false
     await page.route('**/v2/requests/**', async (route, request) => {
@@ -130,7 +53,7 @@ test.describe('Client-login pseudo request id (/auth/requests/client-login)', ()
       return route.continue()
     })
 
-    await page.goto('/auth/requests/client-login?loginMethod=METAMASK')
+    await page.goto(`/auth/requests/${DEEP_LINK_REQUEST_ID}?loginMethod=METAMASK&flow=deeplink`)
 
     // AutoLoginRedirect connects the mock wallet, generates the identity and returns
     // here; the identity is posted and the deep link fires immediately. Headless
@@ -142,7 +65,33 @@ test.describe('Client-login pseudo request id (/auth/requests/client-login)', ()
 
     expect(postedIdentity).toBe(true)
     expect(recoverCalled).toBe(false)
-    expect(page.url()).toContain('/auth/requests/client-login')
+    expect(page.url()).toContain(`/auth/requests/${DEEP_LINK_REQUEST_ID}`)
+  })
+
+  test('invalid (non-UUID) id: shows the error view without posting an identity or recovering a request', async ({ page }) => {
+    await mockApiRoutes(page, { hasProfile: true, onboardingToExplorer: true })
+
+    let recoverCalled = false
+    await page.route('**/v2/requests/**', async (route, request) => {
+      if (request.method() === 'GET' && !request.url().includes('/outcome')) {
+        recoverCalled = true
+      }
+      return route.fallback()
+    })
+
+    let postedIdentity = false
+    await page.route('**/identities', async (route, request) => {
+      if (request.method() === 'POST') postedIdentity = true
+      return route.continue()
+    })
+
+    // MOCK_REQUEST_ID is not a UUID v4 — a malformed deep-link id is rejected up front.
+    await page.goto(`/auth/requests/${MOCK_REQUEST_ID}?loginMethod=METAMASK&flow=deeplink`)
+
+    await expect(page.locator('[data-testid="client-login-error-try-again-button"]')).toBeVisible({ timeout: 20_000 })
+
+    expect(postedIdentity).toBe(false)
+    expect(recoverCalled).toBe(false)
   })
 })
 

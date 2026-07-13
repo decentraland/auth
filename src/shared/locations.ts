@@ -174,10 +174,22 @@ const AUTH_REQUEST_ID_PARAM = 'authRequestId'
 
 const getAuthRequestId = (searchParams: URLSearchParams): string | null => searchParams.get(AUTH_REQUEST_ID_PARAM)
 
-// Pseudo request id for `/auth/requests/client-login`. It has no backing auth-server
-// request: the user just logs in and the signed identity is handed to the client through
-// the `open?signin=<identityId>` deep link, mirroring the standalone mobile flow.
-const CLIENT_LOGIN_REQUEST_ID = 'client-login'
+// The `flow` query param opts the request page into the deep-link login handoff: instead of
+// fulfilling a backing auth-server request, the user logs in and the signed identity is handed to
+// the client through the `open?signin=<identityId>` deep link, mirroring the standalone mobile
+// flow. Enabled by `?flow=deeplink`, compared case-insensitively.
+const FLOW_PARAM = 'flow'
+const DEEP_LINK_FLOW_VALUE = 'deeplink'
+
+const isDeepLinkFlowEnabled = (searchParams: URLSearchParams): boolean =>
+  (searchParams.get(FLOW_PARAM) ?? '').toLowerCase() === DEEP_LINK_FLOW_VALUE
+
+// A canonical RFC 4122 version-4 UUID (case-insensitive). The deep-link handoff requires its
+// request id to be one: it is the client-generated id that correlates the login with the instance
+// that requested it, and it is forwarded to the client as the deep link's `authRequestId`.
+const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+const isValidUuidV4 = (value: string): boolean => UUID_V4_REGEX.test(value)
 
 // Builds the request-page URL preserving the flags that must survive a login round-trip
 // (they ride inside `redirectTo`). Shared by RequestPage and the change-account link so
@@ -187,8 +199,8 @@ const buildRequestPageUrl = (
   targetConfigId: string,
   options: { isDeepLinkFlow?: boolean; isBridgeOnly?: boolean; authRequestId?: string | null } = {}
 ): string => {
-  const flowParam = options.isDeepLinkFlow ? '&flow=deeplink' : ''
-  const bridgeOnlyParam = options.isBridgeOnly ? '&bridgeOnly=true' : ''
+  const flowParam = options.isDeepLinkFlow ? `&${FLOW_PARAM}=${DEEP_LINK_FLOW_VALUE}` : ''
+  const bridgeOnlyParam = options.isBridgeOnly ? `&${BRIDGE_ONLY_PARAM}=true` : ''
   const authRequestIdParam = options.authRequestId ? `&${AUTH_REQUEST_ID_PARAM}=${encodeURIComponent(options.authRequestId)}` : ''
   return `/auth/requests/${requestId}?targetConfigId=${targetConfigId}${flowParam}${bridgeOnlyParam}${authRequestIdParam}`
 }
@@ -203,6 +215,7 @@ export {
   BRIDGE_ONLY_PARAM,
   getAuthRequestId,
   AUTH_REQUEST_ID_PARAM,
-  CLIENT_LOGIN_REQUEST_ID,
+  isDeepLinkFlowEnabled,
+  isValidUuidV4,
   buildRequestPageUrl
 }

@@ -106,7 +106,7 @@ export const createAuthServerWsClient = (authServerUrl?: string) => {
     }
   }
 
-  const recover = async (requestId: string, signerAddress: string, isDeepLinkFlow = false): Promise<RecoverResponse> => {
+  const recover = async (requestId: string, signerAddress: string): Promise<RecoverResponse> => {
     let response: RecoverResponse | undefined
 
     try {
@@ -141,7 +141,7 @@ export const createAuthServerWsClient = (authServerUrl?: string) => {
       switch (response.method) {
         case 'dcl_personal_sign':
           trackEvent(TrackingEvents.REQUEST_INTERACTION, {
-            type: isDeepLinkFlow ? RequestInteractionType.DEEP_LINK_SIGN_IN : RequestInteractionType.VERIFY_SIGN_IN,
+            type: RequestInteractionType.VERIFY_SIGN_IN,
             browserTime: Date.now(),
             requestTime: new Date(response.expiration).getTime(),
             requestType: response?.method

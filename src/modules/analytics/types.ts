@@ -24,7 +24,6 @@ enum TrackingEvents {
 
 enum RequestInteractionType {
   VERIFY_SIGN_IN = 'Verify sign in',
-  DEEP_LINK_SIGN_IN = 'Deep link sign in',
   WALLET_INTERACTION = 'Wallet interaction'
 }
 

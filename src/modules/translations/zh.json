@@ -64,10 +64,8 @@
   "request": {
     "verify_sign_in": "验证登录",
     "verification_match": "下方的验证号码是否与 {explorerText} 中的匹配？",
-    "deep_link_confirm": "请确认您要登录到 {explorerText}",
     "no_it_doesnt": "不，不匹配",
     "yes_same": "是的，它们相同",
-    "sign_in": "登录",
     "timeout_logged_out": "您可能已从钱包扩展程序中登出。",
     "timeout_check_login": "请检查您是否已登录后重试。",
     "wallet_interaction": {
