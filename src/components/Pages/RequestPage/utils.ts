@@ -221,12 +221,17 @@ const launchDeepLink = (url: string): Promise<boolean> => {
     iframe.src = url
 
     let settled = false
+    // Initialized separately so cleanup never closes over a binding in its temporal dead zone.
+    // This also keeps cleanup safe if a future refactor can settle before the timer is armed.
+    let timeoutId: ReturnType<typeof setTimeout> | undefined = undefined
 
     const cleanup = () => {
       window.removeEventListener('blur', handleAppLaunch)
       window.removeEventListener('pagehide', handleAppLaunch)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
-      clearTimeout(timeoutId)
+      if (timeoutId !== undefined) {
+        clearTimeout(timeoutId)
+      }
       iframe.remove()
     }
 
@@ -248,7 +253,7 @@ const launchDeepLink = (url: string): Promise<boolean> => {
     window.addEventListener('pagehide', handleAppLaunch)
     document.addEventListener('visibilitychange', handleVisibilityChange)
 
-    const timeoutId = setTimeout(() => settle(false), DEEPLINK_DETECTION_TIMEOUT)
+    timeoutId = setTimeout(() => settle(false), DEEPLINK_DETECTION_TIMEOUT)
     document.body.appendChild(iframe)
   })
 }

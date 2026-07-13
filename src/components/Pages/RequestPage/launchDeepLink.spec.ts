@@ -76,6 +76,65 @@ describe('when launching a deep link', () => {
     })
   })
 
+  describe('and multiple application-launch signals are received', () => {
+    let launchPromise: Promise<boolean>
+    let removeIframeSpy: jest.SpyInstance
+
+    beforeEach(() => {
+      jest.mocked(isMobile).mockReturnValueOnce(false)
+      launchPromise = launchDeepLink(deepLinkUrl)
+      const iframe = document.querySelector(`iframe[src="${deepLinkUrl}"]`) as HTMLIFrameElement
+      removeIframeSpy = jest.spyOn(iframe, 'remove')
+      window.dispatchEvent(new Event('blur'))
+      window.dispatchEvent(new Event('pagehide'))
+    })
+
+    afterEach(() => {
+      removeIframeSpy.mockRestore()
+    })
+
+    it('should report that the application was launched', async () => {
+      await expect(launchPromise).resolves.toBe(true)
+    })
+
+    it('should clean up the launch attempt only once', async () => {
+      await launchPromise
+      expect(removeIframeSpy).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('and a visibility change leaves the page visible', () => {
+    let launchPromise: Promise<boolean>
+    let onSettled: jest.Mock
+    let originalVisibilityState: PropertyDescriptor | undefined
+
+    beforeEach(() => {
+      jest.useFakeTimers()
+      originalVisibilityState = Object.getOwnPropertyDescriptor(document, 'visibilityState')
+      Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
+      jest.mocked(isMobile).mockReturnValueOnce(false)
+      onSettled = jest.fn()
+      launchPromise = launchDeepLink(deepLinkUrl)
+      void launchPromise.then(onSettled)
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+
+    afterEach(async () => {
+      jest.advanceTimersByTime(5000)
+      await launchPromise
+      if (originalVisibilityState) {
+        Object.defineProperty(document, 'visibilityState', originalVisibilityState)
+      } else {
+        delete (document as unknown as { visibilityState?: DocumentVisibilityState }).visibilityState
+      }
+    })
+
+    it('should keep waiting for an application-launch signal', async () => {
+      await Promise.resolve()
+      expect(onSettled).not.toHaveBeenCalled()
+    })
+  })
+
   describe('and no application-launch signal is received', () => {
     let launchPromise: Promise<boolean>
 
