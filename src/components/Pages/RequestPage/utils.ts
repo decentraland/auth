@@ -196,11 +196,14 @@ function buildSendTransactionSimulationPayload(
   }
 }
 
-const DEEPLINK_DETECTION_TIMEOUT = 500
+// Native-protocol confirmation dialogs need enough time for the user to react. A 500 ms window
+// produced false negatives: the timeout could render the failure view while the browser prompt
+// was still open, and the app would then launch after the user accepted it.
+const DEEPLINK_DETECTION_TIMEOUT = 5000
 
 /**
  * Attempts to launch a deep link and detects if the app handled it.
- * Uses blur detection technique - if window loses focus, app was launched.
+ * Uses browser lifecycle signals to infer that control was handed to the app.
  * Returns true if app was detected, false otherwise.
  */
 const launchDeepLink = (url: string): Promise<boolean> => {
@@ -211,26 +214,42 @@ const launchDeepLink = (url: string): Promise<boolean> => {
       return
     }
 
-    let appDetected = false
-
-    const handleBlur = () => {
-      appDetected = true
-    }
-
-    window.addEventListener('blur', handleBlur)
-
     // Create a hidden iframe to trigger the deep link
     // This avoids Safari redirecting to an invalid URL if app is not installed
     const iframe = document.createElement('iframe')
     iframe.setAttribute('style', 'display: none')
     iframe.src = url
-    document.body.appendChild(iframe)
 
-    setTimeout(() => {
-      window.removeEventListener('blur', handleBlur)
-      document.body.removeChild(iframe)
-      resolve(appDetected)
-    }, DEEPLINK_DETECTION_TIMEOUT)
+    let settled = false
+
+    const cleanup = () => {
+      window.removeEventListener('blur', handleAppLaunch)
+      window.removeEventListener('pagehide', handleAppLaunch)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      clearTimeout(timeoutId)
+      iframe.remove()
+    }
+
+    const settle = (wasLaunched: boolean) => {
+      if (settled) return
+      settled = true
+      cleanup()
+      resolve(wasLaunched)
+    }
+
+    const handleAppLaunch = () => settle(true)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        settle(true)
+      }
+    }
+
+    window.addEventListener('blur', handleAppLaunch)
+    window.addEventListener('pagehide', handleAppLaunch)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    const timeoutId = setTimeout(() => settle(false), DEEPLINK_DETECTION_TIMEOUT)
+    document.body.appendChild(iframe)
   })
 }
 
