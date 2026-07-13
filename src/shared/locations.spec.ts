@@ -379,6 +379,16 @@ describe('locations', () => {
       })
     })
 
+    describe('and the flow param is present as a bare flag without a value', () => {
+      beforeEach(() => {
+        searchParams = new URLSearchParams('flow')
+      })
+
+      it('should return false', () => {
+        expect(isDeepLinkFlowEnabled(searchParams)).toBe(false)
+      })
+    })
+
     describe('and the flow param is not present', () => {
       beforeEach(() => {
         searchParams = new URLSearchParams('targetConfigId=default')
@@ -418,6 +428,20 @@ describe('locations', () => {
     describe('and the value is not a UUID at all', () => {
       it('should return false', () => {
         expect(isValidUuidV4('client-login')).toBe(false)
+      })
+    })
+
+    describe('and a valid UUID is surrounded by whitespace', () => {
+      it('should return false', () => {
+        expect(isValidUuidV4(' 123e4567-e89b-42d3-a456-426614174000 ')).toBe(false)
+      })
+    })
+
+    describe('and a valid UUID is followed by a trailing newline', () => {
+      // Guards against a regex anchor bypass: JS `$` without the multiline flag must not match
+      // before a trailing "\n". The id is forwarded to the native client, so this must be strict.
+      it('should return false', () => {
+        expect(isValidUuidV4('123e4567-e89b-42d3-a456-426614174000\n')).toBe(false)
       })
     })
 

@@ -694,12 +694,45 @@ describe('RequestPage', () => {
           expect(mockRecover).not.toHaveBeenCalled()
         })
 
+        it('should not run the profile consistency check', async () => {
+          renderRequestPage('/auth/requests/not-a-uuid?targetConfigId=default&flow=deeplink')
+          await waitFor(() => {
+            expect(screen.getByTestId('client-login-error')).toBeInTheDocument()
+          })
+          expect(mockEnsureProfile).not.toHaveBeenCalled()
+        })
+
         it('should explain that the sign-in link is invalid', async () => {
           renderRequestPage('/auth/requests/not-a-uuid?targetConfigId=default&flow=deeplink')
           await waitFor(() => {
             expect(screen.getByTestId('client-login-error')).toHaveTextContent('The sign-in link is invalid.')
           })
         })
+      })
+    })
+
+    describe('and the request id is a UUID v4 but the flow param is absent', () => {
+      // The handoff is gated on flow=deeplink, not on the id shape: a UUID alone must NOT trigger
+      // the identity post — it goes through the normal recover flow like any other request.
+      beforeEach(() => {
+        mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'User' }] })
+        mockGetAddresses.mockResolvedValue(['0xabc123'])
+        mockRecover.mockResolvedValue({
+          sender: '0xabc123',
+          expiration: new Date(Date.now() + 60000).toISOString(),
+          method: 'dcl_personal_sign',
+          code: '1234',
+          params: ['Sign this message']
+        })
+      })
+
+      it('should recover the request normally and not post an identity', async () => {
+        renderRequestPage(`/auth/requests/${DEEP_LINK_REQUEST_ID}?targetConfigId=default`)
+        await waitFor(() => {
+          expect(screen.getByTestId('verify-sign-in')).toBeInTheDocument()
+        })
+        expect(mockRecover).toHaveBeenCalledWith(DEEP_LINK_REQUEST_ID, '0xabc123')
+        expect(mockPostIdentity).not.toHaveBeenCalled()
       })
     })
 
