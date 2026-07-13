@@ -8,8 +8,7 @@
     "close_window": "Puedes cerrar esta ventana.",
     "deny": "Denegar",
     "allow": "Permitir",
-    "something_went_wrong": "Algo salió mal",
-    "unknown_error": "Error desconocido"
+    "something_went_wrong": "Algo salió mal"
   },
   "connection": {
     "title": "Inicia sesión o regístrate para entrar",
@@ -49,8 +48,6 @@
       "something_went_wrong": "Algo salió mal. Por favor, inténtalo de nuevo.",
       "network_error": "No se puede conectar. Por favor, verifica tu conexión a internet e inténtalo de nuevo.",
       "failed_send_code": "Error al enviar el código de verificación. Por favor, inténtalo de nuevo.",
-      "different_account_session": "Se detectó una sesión de cuenta diferente a la del correo verificado. Por favor, intenta iniciar sesión de nuevo.",
-      "no_connected_account": "La conexión de Thirdweb no devolvió una cuenta conectada",
       "invalid_email": "La dirección de correo electrónico es inválida. Por favor, verifica e inténtalo de nuevo."
     }
   },
@@ -137,8 +134,7 @@
       "title": "¡Inicio de sesión exitoso!",
       "description": "¡Regresa a la {explorerText} para entrar!",
       "explorer_title": "¡Inicio de sesión exitoso!",
-      "explorer_description_line2": "¡Regresa a Decentraland App para completar tu cuenta!",
-      "continue": "CONTINUE"
+      "explorer_description_line2": "¡Regresa a Decentraland App para completar tu cuenta!"
     },
     "denied_sign_in": {
       "title": "¿El número no coincidió o esta acción no fue realizada por ti?",
@@ -288,7 +284,6 @@
     "redirecting_to": "Redirigiendo a {provider}...",
     "verifying_credentials": "Un momento, estamos verificando tus credenciales...",
     "confirming_login": "Confirmando inicio de sesión...",
-    "error": "Algo salió mal. Redirigiendo al login...",
     "cancel": "Cancelar"
   },
   "mobile_auth": {
@@ -308,7 +303,6 @@
     "email_placeholder": "Ingresa tu correo electrónico",
     "email_helper": "Suscríbete al boletín de Decentraland para recibir actualizaciones sobre funciones, eventos, concursos y más.",
     "newsletter_subscribe": "Suscríbete al boletín para recibir actualizaciones sobre funciones, eventos, concursos y más.",
-    "agree_tos": "Estoy de acuerdo con los {termsLink} y la {privacyLink} de Decentraland.*",
     "agree_prefix": "Estoy de acuerdo con los",
     "agree_connector": "y la",
     "terms_of_use": "Términos de uso",
@@ -319,8 +313,6 @@
     "body_type_b": "BODY TYPE B",
     "randomize": "ALEATORIZAR",
     "customize_later": "Puedes personalizar tu avatar más tarde.",
-    "ready_to_jump_in": "¡{name} está listo para entrar!",
-    "success": "ÉXITO",
     "account_ready": "¡Tu cuenta está lista!",
     "start_exploring": "Comenzar a explorar"
   },

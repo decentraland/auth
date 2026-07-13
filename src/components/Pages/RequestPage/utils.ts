@@ -338,16 +338,28 @@ function getMetaTransactionChainId(): ChainId {
 async function checkMetaTransactionSupport(
   contractAddress: string
 ): Promise<{ willUseMetaTransaction: boolean; contractName: ContractName | null }> {
+  const normalizedAddress = contractAddress.toLowerCase()
   try {
     const contractName = getContractName(contractAddress)
-    return { willUseMetaTransaction: true, contractName }
-  } catch {
-    const isAcceptedAddress = await isDecentralandContractAddress(contractAddress.toLowerCase())
-    if (isAcceptedAddress) {
-      return { willUseMetaTransaction: true, contractName: ContractName.ERC721CollectionV2 }
+    // getContractName matches a Decentraland contract on ANY chain, but meta-transactions are only
+    // relayed on the meta-tx chain (Polygon). Confirm the match is the deployment on that chain
+    // before routing — otherwise a Decentraland contract address from another network (e.g. the
+    // Ethereum-mainnet MANA/LAND address) would be rerouted as a Polygon meta-tx to a wrong or
+    // nonexistent address and the user's transaction could never execute. If it is not on the
+    // meta-tx chain, fall through to the tx-server collection check below.
+    const contract = getContract(contractName, getMetaTransactionChainId())
+    if (contract.address.toLowerCase() === normalizedAddress) {
+      return { willUseMetaTransaction: true, contractName }
     }
-    return { willUseMetaTransaction: false, contractName: null }
+  } catch {
+    // Not in the static registry (or not deployed on the meta-tx chain) — fall through.
   }
+
+  const isAcceptedAddress = await isDecentralandContractAddress(normalizedAddress)
+  if (isAcceptedAddress) {
+    return { willUseMetaTransaction: true, contractName: ContractName.ERC721CollectionV2 }
+  }
+  return { willUseMetaTransaction: false, contractName: null }
 }
 
 /**

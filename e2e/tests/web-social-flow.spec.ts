@@ -130,13 +130,17 @@ test.describe('Web social: new user → QuickSetup flow', () => {
     // Submit
     await letsGo.click()
 
-    // Wait for deploy/celebration
-    await page.waitForTimeout(3000)
-    const isCelebration = await page.getByText('SocialUser is Ready to Jump In!').isVisible().catch(() => false)
-    const isStillForm = await page.getByRole('button', { name: /^let's go$/i }).isVisible().catch(() => false)
+    // Clicking "Let's go" MUST kick off the deploy. handleSubmit flips the form into
+    // its disabled "DEPLOYING..." state before the (possibly failing) deploy resolves,
+    // so that transient state is the deterministic signal that the click did something.
+    // If the button did nothing — the regression this test guards against — it stays
+    // on an enabled "LET'S GO" and these fail.
+    const deployingButton = page.getByRole('button', { name: /deploying/i })
+    await expect(deployingButton).toBeVisible({ timeout: 10_000 })
+    await expect(deployingButton).toBeDisabled()
 
-    // Either reached celebration or form submitted (deploy may succeed or fail)
-    expect(isCelebration || isStillForm).toBe(true)
+    // The enabled "LET'S GO" start state must be gone (it became "DEPLOYING...").
+    await expect(page.getByRole('button', { name: /^let's go$/i })).toBeHidden()
   })
 
   test('new user: body type and randomize work on QuickSetup', async ({ page }) => {

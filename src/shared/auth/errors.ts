@@ -32,12 +32,18 @@ class RequestFulfilledError extends Error {
 }
 
 class IpValidationError extends Error {
+  public readonly reason: string
   constructor(
     public readonly requestId: string,
-    public readonly reason: string
+    reason: string
   ) {
-    super(`IP validation failed: ${reason}`)
+    // Callers pass the raw server error, which already starts with "IP validation failed:" (that
+    // is how the branch detects it). Strip any leading occurrence before composing the message so
+    // the user isn't shown a doubled "IP validation failed: IP validation failed: ..." prefix.
+    const cleanReason = reason.replace(/^IP validation failed:?\s*/i, '')
+    super(cleanReason ? `IP validation failed: ${cleanReason}` : 'IP validation failed')
     this.name = 'IpValidationError'
+    this.reason = cleanReason
   }
 }
 

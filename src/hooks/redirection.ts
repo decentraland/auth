@@ -2,7 +2,7 @@ import { useCallback } from 'react'
 import { useLocation } from 'react-router-dom'
 import { validateUrlInstance } from '@dcl/schemas'
 import { config } from '../modules/config'
-import { extractRedirectToFromSearchParameters, locations } from '../shared/locations'
+import { extractRedirectToFromSearchParameters, locations, parseStateCustomData } from '../shared/locations'
 
 // Hosts an explicit `overrideUrl` may target even though they differ from the auth site's own
 // origin. Only the configured download handoff qualifies; any other override — including any
@@ -21,14 +21,8 @@ const getOverrideAllowedHostnames = (): string[] => {
 // On /auth/callback the URL has only `state` — no `redirectTo` — so we decode it here
 // to recover the intent of the original login request.
 const extractRedirectToFromState = (search: URLSearchParams): string => {
-  const state = search.get('state')
-  if (!state) return ''
-  try {
-    const parsedRedirectTo = JSON.parse(JSON.parse(atob(state)).customData).redirectTo
-    return typeof parsedRedirectTo === 'string' ? parsedRedirectTo : ''
-  } catch {
-    return ''
-  }
+  const parsedRedirectTo = parseStateCustomData(search.get('state'))?.redirectTo
+  return typeof parsedRedirectTo === 'string' ? parsedRedirectTo : ''
 }
 
 export const useAfterLoginRedirection = () => {

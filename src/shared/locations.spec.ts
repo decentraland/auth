@@ -121,10 +121,19 @@ describe('locations', () => {
       })
     })
 
-    describe('when redirectTo decoding fails', () => {
-      it('returns home path', () => {
+    describe('when redirectTo contains a nested percent-encoded value', () => {
+      it('does not double-decode it', () => {
+        // URLSearchParams.get already decodes once; a second decode would corrupt foo%2Fbar → foo/bar.
+        const target = 'https://decentraland.org/play?realm=foo%2Fbar'
+        searchParams = new URLSearchParams(`redirectTo=${encodeURIComponent(target)}`)
+        expect(extractRedirectToFromSearchParameters(searchParams)).toBe(target)
+      })
+    })
+
+    describe('when redirectTo contains a literal percent sign', () => {
+      it('returns it as-is instead of falling back to home', () => {
         searchParams = new URLSearchParams('redirectTo=invalid%')
-        expect(extractRedirectToFromSearchParameters(searchParams)).toBe('/')
+        expect(extractRedirectToFromSearchParameters(searchParams)).toBe('invalid%')
       })
     })
 

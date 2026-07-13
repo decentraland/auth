@@ -49,7 +49,9 @@ export const useAnalytics = () => {
   const trackAvatarEditSuccess = useCallback(
     (data: { ethAddress?: string; isGuest: boolean; profile: string; avatarShape?: AvatarShape; skipped?: boolean }) => {
       trackEvent(TrackingEvents.AVATAR_EDIT_SUCCESS, {
-        ethAddress: data.ethAddress,
+        // eth_address (snake_case) to match LOGIN_SUCCESS / TERMS_OF_SERVICE_SUCCESS, so
+        // cross-event address queries in Segment include avatar-edit events.
+        eth_address: data.ethAddress,
         is_guest: data.isGuest,
         profile: data.profile,
         avatar_shape: data.avatarShape,
@@ -97,19 +99,6 @@ export const useAnalytics = () => {
     await wait(TRACKING_DELAY)
   }, [trackLoginClick])
 
-  // OTP-related tracking events
-  const trackOtpVerificationSuccess = useCallback((data: { email: string }) => {
-    trackEvent(TrackingEvents.OTP_VERIFICATION_SUCCESS, { email: data.email })
-  }, [])
-
-  const trackOtpVerificationFailure = useCallback((data: { email: string; error?: string }) => {
-    trackEvent(TrackingEvents.OTP_VERIFICATION_FAILURE, { email: data.email, error: data.error })
-  }, [])
-
-  const trackOtpResend = useCallback((data: { email: string }) => {
-    trackEvent(TrackingEvents.OTP_RESEND, { email: data.email })
-  }, [])
-
   return {
     trackAvatarCustomizationStep,
     trackAvatarEditSuccess,
@@ -118,9 +107,6 @@ export const useAnalytics = () => {
     trackGuestLogin,
     trackLoginClick,
     trackLoginSuccess,
-    trackOtpResend,
-    trackOtpVerificationFailure,
-    trackOtpVerificationSuccess,
     trackStartAddingEmail,
     trackStartAddingName,
     trackTermsOfServiceSuccess,

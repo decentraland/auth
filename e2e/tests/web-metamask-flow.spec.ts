@@ -113,19 +113,17 @@ test.describe('Web → MetaMask: new user — full happy path', () => {
     // We verify the form interaction works; the deploy itself is tested via unit tests
     await letsGo.click()
 
-    // Step 10: Should either show celebration OR deploying state OR an error
-    // (deploy requires real catalyst interaction which can't be fully mocked in e2e)
-    await page.waitForTimeout(3000)
-    const celebration = page.getByText('E2ETestPlayer is Ready to Jump In!')
-    const deployError = page.getByText(/error|went wrong/i)
-    const deploying = page.getByText(/deploying/i)
+    // Step 10: Clicking "Let's go" MUST kick off the deploy. handleSubmit flips the
+    // form into its disabled "DEPLOYING..." state before the (possibly failing)
+    // deploy resolves, so that transient state is the deterministic signal that the
+    // click did something. If the button did nothing — the exact regression this
+    // test guards against — it stays on an enabled "LET'S GO" and these fail.
+    const deployingButton = page.getByRole('button', { name: /deploying/i })
+    await expect(deployingButton).toBeVisible({ timeout: 10_000 })
+    await expect(deployingButton).toBeDisabled()
 
-    // At minimum, the button should have transitioned from "LET'S GO"
-    const isStillLetsGo = await page.getByRole('button', { name: /^let's go$/i }).isVisible().catch(() => false)
-    const isCelebration = await celebration.isVisible().catch(() => false)
-
-    // Either we reached celebration (deploy mocked successfully) or the form submitted
-    expect(isStillLetsGo || isCelebration).toBe(true)
+    // The enabled "LET'S GO" start state must be gone (it became "DEPLOYING...").
+    await expect(page.getByRole('button', { name: /^let's go$/i })).toBeHidden()
   })
 })
 

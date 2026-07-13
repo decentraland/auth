@@ -9,6 +9,7 @@ const INJECT_TIMEOUT_MS = 10000
 class IntercomWidget {
   private _appId: string | undefined
   private _settings: IntercomSettings | undefined
+  private _injectPromise: Promise<void> | undefined
   client: ((method: string, arg?: unknown) => void) | undefined
 
   static instance: IntercomWidget
@@ -49,11 +50,18 @@ class IntercomWidget {
   }
 
   inject() {
-    return new Promise<void>((resolve, reject) => {
-      if (this.isInjected()) {
-        return resolve()
-      }
+    if (this.isInjected()) {
+      return Promise.resolve()
+    }
 
+    // Reuse an in-flight injection. isInjected() only becomes true once the script loads and
+    // bootstraps window.Intercom, so without this guard a second inject() before that (e.g. a
+    // componentDidUpdate during the load window) would append a duplicate widget <script>.
+    if (this._injectPromise) {
+      return this._injectPromise
+    }
+
+    this._injectPromise = new Promise<void>((resolve, reject) => {
       const script = insertScript({
         src: `https://widget.intercom.io/widget/${this._appId}`
       })
@@ -78,9 +86,17 @@ class IntercomWidget {
         },
         true
       )
-    }).then(() => {
-      this.client = getWindowClient(this._appId)
     })
+      .then(() => {
+        this.client = getWindowClient(this._appId)
+      })
+      .catch(error => {
+        // Clear the cached promise so a later inject() can retry after a transient failure/timeout.
+        this._injectPromise = undefined
+        throw error
+      })
+
+    return this._injectPromise
   }
 
   render(data: Record<string, unknown> = {}) {

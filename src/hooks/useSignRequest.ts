@@ -97,7 +97,16 @@ export const useSignRequest = (redirect: () => void, errorHandlers?: SignRequest
           errorHandlers.onConnectionModalClose()
         }
 
-        if (e instanceof ExpiredRequestError) {
+        if (e instanceof RequestFulfilledError) {
+          // The outcome was rejected as already fulfilled — a second tab or an auto-login race
+          // signed it first. It succeeded, so proceed as success instead of reporting an expected
+          // state as a signing error (mirrors the recover-phase handling above).
+          if (errorHandlers?.onSuccess) {
+            errorHandlers.onSuccess()
+          } else {
+            redirect()
+          }
+        } else if (e instanceof ExpiredRequestError) {
           if (errorHandlers?.onExpiredRequest) {
             errorHandlers.onExpiredRequest()
           } else {

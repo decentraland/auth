@@ -13,17 +13,6 @@ const isClockSynchronized = (serverTimestamp: number, toleranceMinutes = 5): boo
 }
 
 /**
- * Gets the time difference between local and server clocks
- * @param serverTimestamp - Server timestamp in milliseconds
- * @returns Time difference in minutes (positive if local is ahead, negative if behind)
- */
-const getClockDifference = (serverTimestamp: number): number => {
-  const localTimestamp = Date.now()
-  const timeDifference = localTimestamp - serverTimestamp
-  return Math.round(timeDifference / (60 * 1000)) // Convert to minutes
-}
-
-/**
  * Checks clock synchronization against the auth server.
  * Returns true if the clock is in sync (or if the check fails — best-effort).
  */
@@ -33,6 +22,12 @@ async function checkClockSync(): Promise<boolean> {
     const { createAuthServerHttpClient } = await import('../auth')
     const httpClient = createAuthServerHttpClient()
     const healthData = await httpClient.checkHealth()
+    // A malformed/absent timestamp must fail OPEN (proceed), consistent with a network error
+    // below. Otherwise isClockSynchronized(undefined) computes NaN, NaN <= tolerance is false,
+    // and a user with a perfectly fine clock would be wrongly forced through the clock-sync gate.
+    if (typeof healthData?.timestamp !== 'number') {
+      return true
+    }
     return isClockSynchronized(healthData.timestamp)
   } catch {
     // If we can't check the clock, proceed with normal flow
@@ -40,4 +35,4 @@ async function checkClockSync(): Promise<boolean> {
   }
 }
 
-export { isClockSynchronized, getClockDifference, checkClockSync }
+export { isClockSynchronized, checkClockSync }

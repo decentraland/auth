@@ -26,8 +26,6 @@ type SetupOptions = {
   showVerificationCode?: boolean
   /** Whether LOGIN_ON_SETUP FF is enabled (default: false) */
   loginOnSetup?: boolean
-  /** Whether TRANSACTION_SIMULATION FF is enabled (default: false) */
-  transactionSimulation?: boolean
   /** How the mocked POST /simulations endpoint responds (default: 'success') */
   simulation?: 'success' | 'reverted' | 'error'
 }
@@ -57,7 +55,6 @@ export async function mockApiRoutes(page: Page, options: SetupOptions = {}) {
     onboardingToExplorer = true,
     showVerificationCode = true,
     loginOnSetup = false,
-    transactionSimulation = false,
     simulation = 'success'
   } = options
 
@@ -123,8 +120,7 @@ export async function mockApiRoutes(page: Page, options: SetupOptions = {}) {
     flags: {
       ...featureFlagsResponse.flags,
       'dapps-onboarding-to-explorer': onboardingToExplorer,
-      'dapps-login-on-setup': loginOnSetup,
-      'dapps-transaction-simulation': transactionSimulation
+      'dapps-login-on-setup': loginOnSetup
     }
   }
   await page.route('**/feature-flags**/dapps.json', async route => {

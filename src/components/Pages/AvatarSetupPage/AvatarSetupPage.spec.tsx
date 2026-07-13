@@ -8,7 +8,7 @@ import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { useAnalytics } from '../../../hooks/useAnalytics'
 import { useSignRequest } from '../../../hooks/useSignRequest'
 import { useTrackReferral } from '../../../hooks/useTrackReferral'
-import { fetchProfile } from '../../../modules/profile'
+import { fetchProfileWithStatus } from '../../../modules/profile'
 import { translations } from '../../../modules/translations'
 import { useCurrentConnectionData } from '../../../shared/connection'
 import { isEmailValid } from '../../../shared/email'
@@ -46,7 +46,7 @@ jest.mock('../../../modules/config', () => ({
 }))
 
 jest.mock('../../../modules/profile', () => ({
-  fetchProfile: jest.fn()
+  fetchProfileWithStatus: jest.fn()
 }))
 
 jest.mock('../../../shared/auth', () => ({
@@ -200,7 +200,7 @@ function setupDefaultMocks() {
     chainId: 1
   })
   ;(checkWebGpuSupport as jest.Mock).mockResolvedValue(true)
-  ;(fetchProfile as jest.Mock).mockResolvedValue(null)
+  ;(fetchProfileWithStatus as jest.Mock).mockResolvedValue({ profile: null, couldNotDetermine: false })
   ;(isProfileComplete as jest.Mock).mockReturnValue(false)
   ;(isEmailValid as jest.Mock).mockReturnValue(true)
   ;(getStoredEmail as jest.Mock).mockReturnValue(null)
@@ -317,7 +317,7 @@ describe('AvatarSetupPage', () => {
 
   describe('when the user has a complete profile', () => {
     beforeEach(() => {
-      ;(fetchProfile as jest.Mock).mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      ;(fetchProfileWithStatus as jest.Mock).mockResolvedValue({ profile: { avatars: [{ name: 'TestUser' }] }, couldNotDetermine: false })
       ;(isProfileComplete as jest.Mock).mockReturnValue(true)
     })
 

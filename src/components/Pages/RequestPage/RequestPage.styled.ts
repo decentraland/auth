@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/naming-convention -- CSS selectors, keyframes, and pseudo-elements use non-camelCase */
 import { Box, Button, styled } from 'decentraland-ui2'
 
 const VerificationCode = styled(Box)(({ theme }) => ({

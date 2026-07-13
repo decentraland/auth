@@ -139,6 +139,34 @@ describe('getIdentitySignature', () => {
     })
   })
 
+  describe('when no explicit expiration is provided', () => {
+    it('should use the default one-month ephemeral expiration', async () => {
+      mockLocalStorageGetIdentity.mockReturnValue(null)
+      setupGenerateIdentityMocks(createMockIdentity())
+
+      await getIdentitySignature(address, provider)
+
+      expect(mockAuthenticator.initializeAuthChain).toHaveBeenCalledWith(address, expect.any(Object), 60 * 24 * 30, expect.any(Function))
+    })
+  })
+
+  describe('when a custom expiration is provided (e.g. the 3-month mobile identity TTL)', () => {
+    it('should forward it to the auth chain', async () => {
+      const mobileExpiration = 60 * 24 * 30 * 3
+      mockLocalStorageGetIdentity.mockReturnValue(null)
+      setupGenerateIdentityMocks(createMockIdentity())
+
+      await getIdentitySignature(address, provider, mobileExpiration)
+
+      expect(mockAuthenticator.initializeAuthChain).toHaveBeenCalledWith(
+        address,
+        expect.any(Object),
+        mobileExpiration,
+        expect.any(Function)
+      )
+    })
+  })
+
   describe('when a valid cached identity already exists', () => {
     it('should still generate a fresh identity and overwrite SSO storage', async () => {
       const cachedIdentity = createMockIdentity()

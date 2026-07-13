@@ -10,7 +10,7 @@ import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { useDisabledCatalysts } from '../../../hooks/useDisabledCatalysts'
 import { useTrackReferral } from '../../../hooks/useTrackReferral'
-import { fetchProfile } from '../../../modules/profile'
+import { fetchProfileWithStatus } from '../../../modules/profile'
 import { useCurrentConnectionData } from '../../../shared/connection'
 import { locations } from '../../../shared/locations'
 import { getStoredEmail } from '../../../shared/onboarding/getStoredEmail'
@@ -131,7 +131,14 @@ export const QuickSetupPage = () => {
     if (initializedAccountRef.current === account) return
     initializedAccountRef.current = account
     ;(async () => {
-      const profile = await fetchProfile(account)
+      const { profile, couldNotDetermine } = await fetchProfileWithStatus(account)
+
+      // If we couldn't determine whether a profile exists (catalyst outage), bail out rather than
+      // risk overwriting an existing profile with a default one — the whole point of this guard.
+      if (couldNotDetermine) {
+        console.warn('Could not determine whether a profile exists; skipping setup to avoid overwrite')
+        return redirect()
+      }
 
       if (profile && isProfileComplete(profile)) {
         console.warn('Profile already exists')
@@ -220,8 +227,12 @@ export const QuickSetupPage = () => {
           checkpointId: 3,
           action: 'completed',
           source: 'auth',
-          userIdentifier: account.toLowerCase(),
-          identifierType: 'wallet',
+          // Mirror the CP3 "reached" attribution above (and the sibling Setup/AvatarSetup pages):
+          // key web2 users on their inherited email, not wallet-only, so the onboarding funnel can
+          // correlate reached→completed instead of seeing "reached, never completed".
+          userIdentifier: inheritedEmail || account.toLowerCase(),
+          identifierType: inheritedEmail ? 'email' : 'wallet',
+          email: inheritedEmail || undefined,
           wallet: account.toLowerCase()
         })
 

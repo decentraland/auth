@@ -1,4 +1,4 @@
-import { SOCIAL_PROVIDER_TYPES } from '../shared/connection/socialProviders'
+import { SOCIAL_PROVIDER_TYPES } from './socialProviders'
 
 const WALLET_LOGIN_METHODS = new Set(['METAMASK', 'WALLETCONNECT', 'COINBASE', 'FORTMATIC'])
 

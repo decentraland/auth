@@ -4,7 +4,9 @@ import type { AuthIdentity } from '@dcl/crypto'
 import { ConnectionResponse } from 'decentraland-connect'
 import { checkClockSync } from '../../../shared/utils/clockSync'
 import { ConnectionOptionType } from '../../Connection'
+import { ConnectionLayoutState } from '../../ConnectionModal/ConnectionLayout.type'
 import { LoginPage } from './LoginPage'
+import { connectToSocialProvider, isSocialLogin } from './utils'
 
 const mockCheckClockSync = checkClockSync as jest.Mock
 
@@ -133,11 +135,18 @@ jest.mock('../../FeatureFlagsProvider', () => {
 })
 
 jest.mock('../../ClockSyncModal', () => ({
-  ClockSyncModal: () => null
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ClockSyncModal: (props: any) =>
+    props.open ? (
+      <button data-testid="clock-sync-continue" onClick={props.onContinue}>
+        continue
+      </button>
+    ) : null
 }))
 
 jest.mock('../../ConnectionModal', () => ({
-  ConnectionModal: () => null
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ConnectionModal: (props: any) => <div data-testid="connection-modal" data-open={String(props.open)} data-state={props.state} />
 }))
 
 jest.mock('../../EmailLoginModal', () => ({
@@ -412,6 +421,79 @@ describe('LoginPage', () => {
       })
 
       expect(mockEnsureProfile).not.toHaveBeenCalledWith(expect.anything(), staleIdentity, expect.anything())
+    })
+  })
+
+  describe('when a social login fails', () => {
+    beforeEach(() => {
+      ;(isSocialLogin as jest.Mock).mockReturnValue(true)
+      ;(connectToSocialProvider as jest.Mock).mockRejectedValue(new Error('social provider failed'))
+    })
+
+    it('should keep the connection layout visible with an error state so the failure is recoverable', async () => {
+      render(<LoginPage />)
+
+      await waitFor(() => {
+        expect(capturedOnConnect).toBeDefined()
+      })
+
+      capturedOnConnect!(ConnectionOptionType.GOOGLE)
+
+      await waitFor(() => {
+        const modal = document.querySelector('[data-testid="connection-modal"]')
+        expect(modal?.getAttribute('data-open')).toBe('true')
+        expect(modal?.getAttribute('data-state')).toBe(ConnectionLayoutState.ERROR)
+      })
+    })
+  })
+
+  describe('when the clock sync continue flow fails after reconnecting', () => {
+    let connectionResponse: ConnectionResponse
+    let freshIdentity: AuthIdentity
+
+    beforeEach(() => {
+      connectionResponse = createMockConnectionResponse()
+      freshIdentity = createMockIdentity()
+
+      // First connect (in handleOnConnect) succeeds, the reconnect during clock sync
+      // continue fails.
+      mockConnectToProvider.mockResolvedValueOnce(connectionResponse).mockRejectedValueOnce(new Error('clock continue failed'))
+      mockGetIdentitySignature.mockResolvedValue(freshIdentity)
+      mockTrackLoginSuccess.mockResolvedValue(undefined)
+      // Force clock desync so the ClockSyncModal opens after the wallet connects
+      mockCheckClockSync.mockResolvedValue(false)
+
+      Object.defineProperty(window, 'ethereum', { value: {}, writable: true, configurable: true })
+    })
+
+    afterEach(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      delete (window as any).ethereum
+    })
+
+    it('should show the connection layout with an error state instead of leaving the page silently disabled', async () => {
+      const user = userEvent.setup()
+      render(<LoginPage />)
+
+      await waitFor(() => {
+        expect(capturedOnConnect).toBeDefined()
+      })
+
+      capturedOnConnect!(ConnectionOptionType.METAMASK)
+
+      const continueButton = await waitFor(() => {
+        const btn = document.querySelector('[data-testid="clock-sync-continue"]')
+        expect(btn).toBeTruthy()
+        return btn as HTMLElement
+      })
+
+      await user.click(continueButton)
+
+      await waitFor(() => {
+        const modal = document.querySelector('[data-testid="connection-modal"]')
+        expect(modal?.getAttribute('data-open')).toBe('true')
+        expect(modal?.getAttribute('data-state')).toBe(ConnectionLayoutState.ERROR)
+      })
     })
   })
 })

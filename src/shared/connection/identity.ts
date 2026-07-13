@@ -22,7 +22,11 @@ function isValidIdentity(identity: AuthIdentity): boolean {
   )
 }
 
-async function generateIdentityWithSigner(address: string, signMessage: SignMessageFn): Promise<AuthIdentity> {
+async function generateIdentityWithSigner(
+  address: string,
+  signMessage: SignMessageFn,
+  expirationInMinutes: number = ONE_MONTH_IN_MINUTES
+): Promise<AuthIdentity> {
   const privateKey = generatePrivateKey()
   const ephemeralAccount = privateKeyToAccount(privateKey)
 
@@ -32,10 +36,14 @@ async function generateIdentityWithSigner(address: string, signMessage: SignMess
     privateKey: privateKey
   }
 
-  return Authenticator.initializeAuthChain(address, payload, ONE_MONTH_IN_MINUTES, signMessage)
+  return Authenticator.initializeAuthChain(address, payload, expirationInMinutes, signMessage)
 }
 
-async function generateIdentity(address: string, provider: Provider): Promise<AuthIdentity> {
+async function generateIdentity(
+  address: string,
+  provider: Provider,
+  expirationInMinutes: number = ONE_MONTH_IN_MINUTES
+): Promise<AuthIdentity> {
   const walletClient = createWalletClient({
     chain: mainnet,
     transport: custom(provider)
@@ -46,7 +54,7 @@ async function generateIdentity(address: string, provider: Provider): Promise<Au
     throw new Error('No account found in wallet provider')
   }
 
-  return generateIdentityWithSigner(address, message => walletClient.signMessage({ account, message }))
+  return generateIdentityWithSigner(address, message => walletClient.signMessage({ account, message }), expirationInMinutes)
 }
 
 /**
@@ -67,10 +75,14 @@ function getCachedIdentity(address: string): AuthIdentity | undefined {
 // (e.g. dapps reading SSO storage) have to detect "the user just re-signed in with this
 // wallet". Short-circuiting on a cached identity makes that detection impossible because
 // storage looks identical before and after.
-async function getIdentitySignature(address: string, provider: Provider): Promise<AuthIdentity> {
-  const identity = await generateIdentity(address, provider)
+async function getIdentitySignature(
+  address: string,
+  provider: Provider,
+  expirationInMinutes: number = ONE_MONTH_IN_MINUTES
+): Promise<AuthIdentity> {
+  const identity = await generateIdentity(address, provider, expirationInMinutes)
   localStorageStoreIdentity(address, identity)
   return identity
 }
 
-export { getIdentitySignature, isValidIdentity, getCachedIdentity }
+export { getIdentitySignature, isValidIdentity, getCachedIdentity, ONE_MONTH_IN_MINUTES }

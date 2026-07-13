@@ -1,12 +1,7 @@
 import { useTranslation } from '@dcl/hooks'
 import { CircularProgress } from 'decentraland-ui2'
 import { AnimatedBackground } from '../AnimatedBackground'
-import {
-  ConnectionContainer,
-  ConnectionTitle,
-  DecentralandLogo,
-  ProgressContainer
-} from '../ConnectionModal/ConnectionLayout.styled'
+import { ConnectionContainer, ConnectionTitle, DecentralandLogo, ProgressContainer } from '../ConnectionModal/ConnectionLayout.styled'
 import { Container, Wrapper } from './VerifyingCredentialsView.styled'
 
 type Props = {

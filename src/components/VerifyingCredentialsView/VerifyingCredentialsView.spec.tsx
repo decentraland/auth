@@ -13,9 +13,9 @@ jest.mock('decentraland-ui2', () => {
   const actual = jest.requireActual('decentraland-ui2')
   return {
     ...actual,
-    // eslint-disable-next-line @typescript-eslint/naming-convention
+
     CircularProgress: () => <div data-testid="spinner" />,
-    // eslint-disable-next-line @typescript-eslint/naming-convention
+
     Logo: () => <div data-testid="logo" />
   }
 })

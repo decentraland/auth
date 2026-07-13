@@ -249,14 +249,17 @@ describe('when using the redirection hook', () => {
     })
   })
 
-  describe('and the redirectTo parameter points to a double encoded malicious path', () => {
+  describe('and the redirectTo parameter is double encoded', () => {
     beforeEach(() => {
       mockedUseLocation.mockReturnValue({ search: 'redirectTo=%252F%252Ftest.com' } as Location)
     })
 
-    it('should return the invalid redirection URL', () => {
+    it('should not decode it into a protocol-relative off-site redirect', () => {
+      // URLSearchParams already decodes once to `%2F%2Ftest.com`; we do NOT decode again, so it
+      // never becomes `//test.com`. As a non-slash-prefixed, non-absolute string it fails URL
+      // parsing and falls back to home — safe, and no open redirect to test.com.
       const { result } = renderHook(() => useAfterLoginRedirection())
-      expect(result.current.url).toBe('http://localhost/auth/invalidRedirection')
+      expect(result.current.url).toBe('/')
     })
   })
 

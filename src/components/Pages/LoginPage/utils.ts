@@ -57,9 +57,15 @@ async function connectToSocialProvider(
     const isLoggedIn = await magic.user.isLoggedIn()
     if (isLoggedIn) {
       await magic.user.logout()
-      localStorage.removeItem('dcl_magic_user_email')
       await connection.disconnect()
     }
+
+    // Clear BOTH stored emails unconditionally so a previous Thirdweb/OTP user's email can't leak
+    // into this account's setup prefill/newsletter/attribution via getStoredEmail. A stale
+    // dcl_thirdweb_user_email can be present even with no Magic session, so this must not be gated
+    // on isLoggedIn. Matches the wallet-login and mobile-init cleanup.
+    localStorage.removeItem('dcl_magic_user_email')
+    localStorage.removeItem('dcl_thirdweb_user_email')
 
     const url = new URL(window.location.href)
     const search = new URLSearchParams(window.location.search)
@@ -130,14 +136,20 @@ function isEmailLogin(connectionType: ConnectionOptionType): boolean {
   return connectionType === ConnectionOptionType.EMAIL
 }
 
+// iPadOS 13+ Safari reports a desktop "Macintosh" UA by default, so the classic UA regexes miss
+// iPads. Detect that case via touch support (a real Mac reports maxTouchPoints 0).
+function isIpadOnDesktopUserAgent(userAgent: string): boolean {
+  return /Macintosh/i.test(userAgent) && navigator.maxTouchPoints > 1
+}
+
 function isMobile() {
   const userAgent = navigator.userAgent
-  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent)
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent) || isIpadOnDesktopUserAgent(userAgent)
 }
 
 function isIos() {
   const userAgent = navigator.userAgent
-  return /iPhone|iPad|iPod/i.test(userAgent)
+  return /iPhone|iPad|iPod/i.test(userAgent) || isIpadOnDesktopUserAgent(userAgent)
 }
 
 /**
