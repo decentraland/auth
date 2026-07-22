@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ProviderType } from '@dcl/schemas'
+import { TrackingEvents } from '../../../modules/analytics/types'
 import { fetchProfile } from '../../../modules/profile'
 import {
   DifferentSenderError,
@@ -12,10 +13,9 @@ import {
   IpValidationError,
   RequestFulfilledError
 } from '../../../shared/auth'
-import { getAuthRequestId, isBridgeOnlyEnabled } from '../../../shared/locations'
+import { extractReferrerFromSearchParameters, getAuthRequestId, isBridgeOnlyEnabled } from '../../../shared/locations'
 import { isProfileComplete } from '../../../shared/profile'
 import { trackEvent } from '../../../shared/utils/analytics'
-import { TrackingEvents } from '../../../modules/analytics/types'
 import { FeatureFlagsContext } from '../../FeatureFlagsProvider'
 import { RequestPage } from './RequestPage'
 import { decodeManaTransferData, decodeNftTransferData, fetchNftMetadata, getSigninDeeplink } from './utils'
@@ -91,8 +91,8 @@ jest.mock('../../../shared/locations', () => {
     ...actual,
     extractReferrerFromSearchParameters: jest.fn().mockReturnValue(null),
     isBridgeOnlyEnabled: jest.fn().mockReturnValue(false),
-    getAuthRequestId: jest.fn().mockReturnValue(null),
-    buildRequestPageUrl: (requestId: string, targetConfigId: string) => `/auth/requests/${requestId}?targetConfigId=${targetConfigId}`
+    getAuthRequestId: jest.fn().mockReturnValue(null)
+    // buildRequestPageUrl is intentionally left real so referrer/param preservation is exercised end-to-end
   }
 })
 jest.mock('../../../shared/utils/analytics', () => ({
@@ -347,6 +347,25 @@ describe('RequestPage', () => {
       renderRequestPage()
       await waitFor(() => {
         expect(mockNavigate).toHaveBeenCalledWith(expect.stringContaining('/login?redirectTo='))
+      })
+    })
+
+    describe('and the request URL carries a referrer', () => {
+      const REFERRER = '0x24e5f44999c151f08609f8e27b2238c773c4d020'
+
+      beforeEach(() => {
+        ;(extractReferrerFromSearchParameters as jest.Mock).mockReturnValue(REFERRER)
+      })
+
+      afterEach(() => {
+        ;(extractReferrerFromSearchParameters as jest.Mock).mockReturnValue(null)
+      })
+
+      it('should preserve the referrer inside the login redirectTo so it survives the round-trip', async () => {
+        renderRequestPage(`/auth/requests/${REQUEST_ID}?targetConfigId=default&referrer=${REFERRER}`)
+        await waitFor(() => {
+          expect(mockNavigate).toHaveBeenCalledWith(expect.stringContaining(`referrer%3D${REFERRER}`))
+        })
       })
     })
   })

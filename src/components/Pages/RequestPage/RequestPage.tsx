@@ -233,11 +233,14 @@ export const RequestPage = () => {
   const loginMethodParam = searchParams.get('loginMethod')
 
   const toLoginPage = useCallback(() => {
-    const redirectToUrl = buildRequestPageUrl(requestId, targetConfigId, { isDeepLinkFlow, isBridgeOnly, authRequestId })
+    // Preserve the referrer across the login round-trip so a new wallet user that
+    // isn't connected yet still carries attribution back to this page after login.
+    const referrer = extractReferrerFromSearchParameters(searchParams)
+    const redirectToUrl = buildRequestPageUrl(requestId, targetConfigId, { isDeepLinkFlow, isBridgeOnly, authRequestId, referrer })
     const loginMethodQuery = loginMethodParam ? `&loginMethod=${encodeURIComponent(loginMethodParam)}` : ''
     const finalUrl = `/login?redirectTo=${encodeURIComponent(redirectToUrl)}${loginMethodQuery}`
     navigate(finalUrl)
-  }, [requestId, targetConfigId, isDeepLinkFlow, isBridgeOnly, authRequestId, loginMethodParam, navigate])
+  }, [requestId, targetConfigId, isDeepLinkFlow, isBridgeOnly, authRequestId, loginMethodParam, navigate, searchParams])
 
   // Effect 1: Ensure profile consistency before allowing request loading.
   // Navigates to setup if the profile is incomplete or missing.
