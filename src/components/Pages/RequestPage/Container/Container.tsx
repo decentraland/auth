@@ -6,7 +6,13 @@ import { useMobileMediaQuery } from 'decentraland-ui2'
 import { useNavigateWithSearchParams } from '../../../../hooks/navigation'
 import { useTargetConfig } from '../../../../hooks/targetConfig'
 import { useCurrentConnectionData } from '../../../../shared/connection'
-import { buildRequestPageUrl, getAuthRequestId, isBridgeOnlyEnabled, isDeepLinkFlowEnabled } from '../../../../shared/locations'
+import {
+  buildRequestPageUrl,
+  extractReferrerFromSearchParameters,
+  getAuthRequestId,
+  isBridgeOnlyEnabled,
+  isDeepLinkFlowEnabled
+} from '../../../../shared/locations'
 import { AnimatedBackground } from '../../../AnimatedBackground'
 import { CustomWearablePreview } from '../../../CustomWearablePreview'
 import styles from './Container.module.css'
@@ -28,11 +34,13 @@ export const Container = (props: { children: ReactNode; requestId?: string; canC
     async (evt: React.MouseEvent<HTMLAnchorElement>) => {
       evt.preventDefault()
       await connection.disconnect()
-      // Don't preserve loginMethod — the user explicitly wants to choose a different method
-      const redirectToUrl = buildRequestPageUrl(requestId ?? '', targetConfigId, { isDeepLinkFlow, isBridgeOnly, authRequestId })
+      // Don't preserve loginMethod — the user explicitly wants to choose a different method.
+      // Do preserve the referrer so switching accounts on the request page keeps attribution.
+      const referrer = extractReferrerFromSearchParameters(searchParams)
+      const redirectToUrl = buildRequestPageUrl(requestId ?? '', targetConfigId, { isDeepLinkFlow, isBridgeOnly, authRequestId, referrer })
       navigate(`/login?redirectTo=${encodeURIComponent(redirectToUrl)}`)
     },
-    [requestId, targetConfigId, isDeepLinkFlow, isBridgeOnly, authRequestId, navigate]
+    [requestId, targetConfigId, isDeepLinkFlow, isBridgeOnly, authRequestId, navigate, searchParams]
   )
 
   return (
