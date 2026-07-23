@@ -29,12 +29,12 @@ describe('markReturningUser', () => {
       })
     })
 
-    it('should track checkpoint for the wallet identifier', () => {
+    it('should track checkpoint for the wallet identifier lowercased so it correlates with other checkpoints', () => {
       markReturningUser(account)
       expect(trackCheckpoint).toHaveBeenCalledWith({
         checkpointId: 2,
         action: 'completed',
-        userIdentifier: account,
+        userIdentifier: '0xabc123',
         identifierType: 'wallet',
         wallet: '0xabc123'
       })

@@ -20,7 +20,7 @@ export function markReturningUser(account: string) {
   trackCheckpoint({
     checkpointId: 2,
     action: 'completed',
-    userIdentifier: account,
+    userIdentifier: account.toLowerCase(),
     identifierType: 'wallet',
     wallet: account.toLowerCase()
   })

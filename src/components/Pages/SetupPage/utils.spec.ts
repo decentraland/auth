@@ -74,7 +74,8 @@ describe('when subscribing to the newsletter', () => {
           method: 'post',
           body: JSON.stringify({ email: mockEmail, source: 'auth' }),
           // eslint-disable-next-line @typescript-eslint/naming-convention
-          headers: { 'content-type': 'application/json' }
+          headers: { 'content-type': 'application/json' },
+          signal: expect.any(AbortSignal)
         })
       })
     })

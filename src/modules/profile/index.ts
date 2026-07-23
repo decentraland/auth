@@ -189,7 +189,10 @@ async function redeployExistingProfileWithContentServerData(
   connectedAccountIdentity: AuthIdentity,
   disabledCatalysts: string[] = []
 ): Promise<void> {
-  const client = createContentClient({ url: catalystUrl + '/content', fetcher: createFetcher() })
+  // Bound the entity fetch with a timeout (matching the consistency-check path) so a stalled
+  // catalyst can't hang the login/callback flow that awaits this fallback redeploy on the spinner.
+  const fetcher = createFetcher({ timeout: Number(config.get('PROFILE_CONSISTENCY_CHECK_TIMEOUT')) || 10000 })
+  const client = createContentClient({ url: catalystUrl + '/content', fetcher })
   const entity = (await client.fetchEntitiesByPointers([connectedAccount]))?.[0]
   if (!entity) {
     throw new Error('Profile entity not found')

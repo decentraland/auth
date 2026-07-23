@@ -1,3 +1,4 @@
+import { hexToString } from 'viem'
 import { ImpersonatedSignInError, UnsupportedMethodError } from './errors'
 
 // The Decentraland-specific signing method used by the sign-in flow. It is the only
@@ -48,6 +49,10 @@ function assertMethodIsAllowed(method: string): void {
 const EPHEMERAL_ADDRESS_LINE_PREFIX = 'Ephemeral address: 0x'
 const EXPIRATION_LINE_PREFIX = 'Expiration: '
 
+// A hex-encoded byte string, the form personal_sign messages take on the wire (e.g. MetaMask
+// encodes the UTF-8 message as hex). Only even-length all-hex `0x…` values qualify.
+const HEX_STRING_REGEX = /^0x([0-9a-fA-F]{2})*$/
+
 /**
  * Returns whether a message replicates the Decentraland identity-authorization payload
  * that the `dcl_personal_sign` sign-in flow asks the user to sign. Detection mirrors how
@@ -59,7 +64,20 @@ function isDecentralandIdentityAuthMessage(message: unknown): boolean {
     return false
   }
 
-  const lines = message.replace(/\r/g, '').split('\n')
+  // personal_sign carries its message hex-encoded and the wallet decodes it to UTF-8 before
+  // signing, so a hex-wrapped sign-in payload would still yield a usable auth chain. Decode it
+  // here too (mirroring extractSignaturePayload) so the structural check below can't be bypassed
+  // by hex-encoding. A non-hex message is checked as-is; invalid hex falls back to the raw value.
+  let decoded = message
+  if (HEX_STRING_REGEX.test(message) && message.length > 2) {
+    try {
+      decoded = hexToString(message as `0x${string}`)
+    } catch {
+      decoded = message
+    }
+  }
+
+  const lines = decoded.replace(/\r/g, '').split('\n')
   if (lines.length < 3) {
     return false
   }

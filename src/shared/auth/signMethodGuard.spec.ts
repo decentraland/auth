@@ -1,3 +1,4 @@
+import { stringToHex } from 'viem'
 import { ImpersonatedSignInError, UnsupportedMethodError } from './errors'
 import { assertMethodIsAllowed, assertRequestIsNotImpersonatingSignIn, isDecentralandIdentityAuthMessage } from './signMethodGuard'
 
@@ -52,6 +53,36 @@ describe('isDecentralandIdentityAuthMessage', () => {
 
     beforeEach(() => {
       message = 'Sign this message to prove you own this wallet'
+    })
+
+    it('should return false', () => {
+      expect(isDecentralandIdentityAuthMessage(message)).toBe(false)
+    })
+  })
+
+  describe('when the message is a hex-encoded sign-in payload as personal_sign delivers it', () => {
+    let message: string
+
+    beforeEach(() => {
+      message = stringToHex(
+        [
+          'Decentraland Login',
+          'Ephemeral address: 0x1234567890123456789012345678901234567890',
+          'Expiration: 2100-01-01T00:00:00.000Z'
+        ].join('\n')
+      )
+    })
+
+    it('should return true after decoding the hex, so the plaintext check cannot be bypassed', () => {
+      expect(isDecentralandIdentityAuthMessage(message)).toBe(true)
+    })
+  })
+
+  describe('when the message is a hex-encoded regular text', () => {
+    let message: string
+
+    beforeEach(() => {
+      message = stringToHex('Sign this message to prove you own this wallet')
     })
 
     it('should return false', () => {
@@ -140,6 +171,18 @@ describe('assertRequestIsNotImpersonatingSignIn', () => {
 
     it('should throw an ImpersonatedSignInError regardless of the param order', () => {
       expect(() => assertRequestIsNotImpersonatingSignIn('eth_sign', params)).toThrow(ImpersonatedSignInError)
+    })
+  })
+
+  describe('when the method is personal_sign and the message is a hex-encoded sign-in payload', () => {
+    let params: unknown[]
+
+    beforeEach(() => {
+      params = [stringToHex(signInPayload)]
+    })
+
+    it('should throw an ImpersonatedSignInError because the hex is decoded before the check', () => {
+      expect(() => assertRequestIsNotImpersonatingSignIn('personal_sign', params)).toThrow(ImpersonatedSignInError)
     })
   })
 

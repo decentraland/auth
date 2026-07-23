@@ -10,7 +10,6 @@ import { ConnectionType } from '../../../modules/analytics/types'
 import { createAuthServerHttpClient } from '../../../shared/auth'
 import { ONE_MONTH_IN_MINUTES, getIdentitySignature } from '../../../shared/connection/identity'
 import { isMagicRpcError } from '../../../shared/errors'
-import { locations } from '../../../shared/locations'
 import { getConnectionOptionFromState } from '../../../shared/oauthState'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { OAUTH_ACCESS_DENIED_ERROR, createMagicInstance } from '../../../shared/utils/magicSdk'
@@ -33,12 +32,26 @@ export const MobileCallbackPage = () => {
   const [identityId, setIdentityId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  // Build the /mobile return path preserving the mobile session ids (`u`/`s`). connectToSocialProvider
+  // reads them from the URL to correlate the partner app's analytics/Sentry; a bare locations.mobile()
+  // would drop them and break correlation on the retried login.
+  const buildMobileReturnPath = useCallback(() => {
+    const current = new URLSearchParams(window.location.search)
+    const preserved = new URLSearchParams()
+    const userId = current.get('u')
+    const sessionId = current.get('s')
+    if (userId) preserved.set('u', userId)
+    if (sessionId) preserved.set('s', sessionId)
+    const query = preserved.toString()
+    return `/mobile${query ? `?${query}` : ''}`
+  }, [])
+
   const processOAuthCallback = useCallback(async () => {
     // Check for OAuth error in URL params before getRedirectResult() strips them
     const oauthError = new URLSearchParams(window.location.search).get('error')
     if (oauthError === OAUTH_ACCESS_DENIED_ERROR) {
       // User cancelled at the OAuth provider — not an error, go back to mobile login
-      navigate(locations.mobile())
+      navigate(buildMobileReturnPath())
       return
     }
 
@@ -84,7 +97,7 @@ export const MobileCallbackPage = () => {
       })
       setError(err instanceof Error ? err.message : 'Authentication failed')
     }
-  }, [isMagicTest, navigate, trackLoginSuccess])
+  }, [isMagicTest, navigate, trackLoginSuccess, buildMobileReturnPath])
 
   useEffect(() => {
     if (!initialized || hasStartedProcessing.current) return
@@ -94,8 +107,8 @@ export const MobileCallbackPage = () => {
   }, [initialized, processOAuthCallback])
 
   const handleRetry = useCallback(() => {
-    navigate(locations.mobile())
-  }, [navigate])
+    navigate(buildMobileReturnPath())
+  }, [navigate, buildMobileReturnPath])
 
   // Show error state
   if (error) {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from '@dcl/hooks'
 import { Button, CircularProgress } from 'decentraland-ui2'
@@ -16,6 +16,7 @@ import { handleError } from '../../../shared/utils/errorHandler'
 import { AnimatedBackground } from '../../AnimatedBackground'
 import { ConnectionOptionType, connectionOptionTitles } from '../../Connection/Connection.types'
 import { ConnectionContainer, ConnectionTitle, DecentralandLogo, ProgressContainer } from '../../ConnectionModal/ConnectionLayout.styled'
+import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import { Container, Wrapper } from '../../Pages/CallbackPage/CallbackPage.styled'
 import { LoginErrorPage } from '../../Pages/LoginErrorPage'
 import { connectToProvider, connectToSocialProvider, isMagicTestMode, isSocialLogin } from './utils'
@@ -35,15 +36,23 @@ export const AutoLoginRedirect = ({ connectionType }: Props) => {
   const navigate = useNavigate()
 
   const hasStarted = useRef(false)
+  // Set when the user cancels. startLogin checks it after each await so a wallet prompt the user
+  // approves after cancelling can't resurrect the flow (request a signature, redirect, or push the
+  // user into setup) behind their back.
+  const cancelledRef = useRef(false)
   const [phase, setPhase] = useState<Phase>('redirecting')
   // Use a ref for skipSetup so the startLogin callback always reads the latest value.
   // The callback fires once via useEffect, but skipSetup may change after FF loads.
   const skipSetupRef = useRef(skipSetup)
   skipSetupRef.current = skipSetup
 
-  // No feature flag available here (fires before flags load), so pass undefined.
-  // isMagicTestMode falls back to config.is(Env.DEVELOPMENT).
-  const isMagicTest = isMagicTestMode()
+  // Resolve Magic test-mode from the feature flag, exactly as CallbackPage does. Both halves of the
+  // OAuth round-trip MUST agree on the Magic key; if this used only the env fallback while the flag
+  // was set (e.g. dapps-magic-dev-test enabled in prod), the callback would instantiate a different
+  // Magic instance and getRedirectResult would fail. startLogin is gated on `initialized` below so
+  // the flag value is loaded before the redirect starts.
+  const { flags, initialized } = useContext(FeatureFlagsContext)
+  const isMagicTest = isMagicTestMode(flags[FeatureFlagsKeys.MAGIC_TEST])
   const isSocial = isSocialLogin(connectionType)
   const providerName = connectionOptionTitles[connectionType]
 
@@ -52,6 +61,9 @@ export const AutoLoginRedirect = ({ connectionType }: Props) => {
   const rawRedirectTo = useMemo(() => new URLSearchParams(window.location.search).get('redirectTo') ?? undefined, [])
 
   const handleCancel = useCallback(() => {
+    // Mark the flow cancelled so any in-flight startLogin continuation bails out at its next
+    // checkpoint instead of redirecting or prompting after the user has moved on.
+    cancelledRef.current = true
     // Navigate to login page without loginMethod — shows full login UI.
     // Uses navigate() to respect the basename (/auth).
     const params = new URLSearchParams(window.location.search)
@@ -82,6 +94,7 @@ export const AutoLoginRedirect = ({ connectionType }: Props) => {
       }
 
       const connectionData = await connectToProvider(connectionType)
+      if (cancelledRef.current) return
       const ethAddress = connectionData.account?.toLowerCase() ?? ''
 
       // MetaMask connected — now verify and redirect
@@ -99,6 +112,7 @@ export const AutoLoginRedirect = ({ connectionType }: Props) => {
       })
 
       const freshIdentity = await getIdentitySignature(connectionData)
+      if (cancelledRef.current) return
 
       // Clear stale social login emails since this is a wallet login
       localStorage.removeItem('dcl_thirdweb_user_email')
@@ -120,19 +134,31 @@ export const AutoLoginRedirect = ({ connectionType }: Props) => {
       // Skip ensureProfile entirely for Explorer flows (redirectTo points to /auth/requests/).
       // The RequestPage handles profile checking and auto-sign for those flows.
       // For web flows, ensureProfile navigates to QuickSetup if the user has no profile.
-      const isExplorerRedirect = rawRedirectTo?.includes('/auth/requests/') ?? false
+      // Match on the URL pathname (not a substring): a redirectTo like /play?next=/auth/requests/x
+      // must NOT be treated as an Explorer flow, or a new web user would skip setup entirely.
+      let isExplorerRedirect = false
+      if (rawRedirectTo) {
+        try {
+          const redirectUrl = rawRedirectTo.startsWith('/') ? new URL(rawRedirectTo, window.location.origin) : new URL(rawRedirectTo)
+          isExplorerRedirect = redirectUrl.hostname === window.location.hostname && redirectUrl.pathname.startsWith('/auth/requests/')
+        } catch {
+          // Malformed URL — treat as a non-Explorer (web) redirect.
+        }
+      }
       if (!isExplorerRedirect && !skipSetupRef.current && connectionData.account) {
         const profile = await ensureProfile(connectionData.account, freshIdentity, {
           redirectTo,
           referrer: null,
           navigateOptions: { replace: true }
         })
-        if (!profile) return
+        if (cancelledRef.current || !profile) return
       }
 
+      if (cancelledRef.current) return
       markReturningUser(connectionData.account ?? '')
       redirect()
     } catch (error) {
+      if (cancelledRef.current) return
       if (isUserRejectedTransaction(error)) {
         // User cancelled the signature in wallet — navigate to login with walletError param
         // so LoginPage can show the WalletErrorModal. Uses navigate() to respect basename.
@@ -161,10 +187,13 @@ export const AutoLoginRedirect = ({ connectionType }: Props) => {
   ])
 
   useEffect(() => {
-    if (hasStarted.current) return
+    // Wait for feature flags so the Magic key matches the one CallbackPage will use. `initialized`
+    // is fail-open (it flips true even when the flag fetch errors or times out), so this can only
+    // delay auto-login, never block it.
+    if (!initialized || hasStarted.current) return
     hasStarted.current = true
     startLogin()
-  }, [startLogin])
+  }, [initialized, startLogin])
 
   const handleErrorTryAgain = useCallback(() => {
     setPhase('redirecting')

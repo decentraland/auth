@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { MouseEvent, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { AuthIdentity } from '@dcl/crypto'
 import { useTranslation } from '@dcl/hooks'
 import { connection } from 'decentraland-connect'
@@ -21,7 +21,7 @@ import { useAutoLogin } from '../../../hooks/useAutoLogin'
 import { useEnsureProfile } from '../../../hooks/useEnsureProfile'
 import { usePostLoginRedirect } from '../../../hooks/usePostLoginRedirect'
 import { ConnectionType } from '../../../modules/analytics/types'
-import { useCurrentConnectionData } from '../../../shared/connection'
+import { getCurrentConnectionData, useCurrentConnectionData } from '../../../shared/connection'
 import { isErrorWithName, isUserRejectedTransaction } from '../../../shared/errors'
 import { extractReferrerFromSearchParameters } from '../../../shared/locations'
 import { markReturningUser } from '../../../shared/onboarding/markReturningUser'
@@ -80,6 +80,14 @@ export const LoginPage = () => {
   const [emailError, setEmailError] = useState<string | null>(null)
   const [showConfirmingLogin, setShowConfirmingLogin] = useState(false)
   const [confirmingLoginError, setConfirmingLoginError] = useState<string | null>(null)
+  // Set when the user closes the connection modal mid-flow. handleOnConnect checks it after each
+  // await so a wallet prompt approved after the modal is dismissed can't redirect or push the user
+  // into setup behind their back.
+  const connectCancelledRef = useRef(false)
+  // The last verified email-login result. If a post-verification step (identity, profile) fails,
+  // the OTP code is already consumed, so retrying must re-run those steps with this result rather
+  // than reopening the OTP modal (where the spent code would fail and the resend cooldown resets).
+  const lastEmailLoginResultRef = useRef<EmailLoginResult | null>(null)
 
   // TODO: remove /play from redirectTo. Build guest URL only when redirect path includes /play; use its presence to show the option.
   const guestRedirectToURL = useMemo(() => {
@@ -87,7 +95,9 @@ export const LoginPage = () => {
     try {
       const url = redirectTo.startsWith('/') ? new URL(redirectTo, window.location.origin) : new URL(redirectTo)
       if (!url.pathname.includes('/play')) return ''
-      url.searchParams.append('guest', 'true')
+      // Use set, not append: if redirectTo already carries a guest param, appending would produce
+      // `guest=false&guest=true` and a consumer reading the first value would not enter guest mode.
+      url.searchParams.set('guest', 'true')
       return url.toString()
     } catch {
       return ''
@@ -104,9 +114,24 @@ export const LoginPage = () => {
   const { identity, getIdentitySignature } = useCurrentConnectionData()
   const { trackLoginClick, trackLoginSuccess, trackGuestLogin } = useAnalytics()
 
-  const handleGuestLogin = useCallback(async () => {
-    await trackGuestLogin()
-  }, [trackGuestLogin])
+  const handleGuestLogin = useCallback(
+    (event: MouseEvent<HTMLAnchorElement>) => {
+      // Modified clicks (open in new tab/window) keep this page alive, so the event flushes on its
+      // own — fire it and let the browser handle navigation.
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) {
+        void trackGuestLogin()
+        return
+      }
+      // Normal click: block the anchor's immediate navigation so the guest-login event has time to
+      // flush to Segment (trackGuestLogin waits TRACKING_DELAY), then navigate ourselves. Navigate
+      // even if tracking rejects so the user is never stranded.
+      event.preventDefault()
+      void trackGuestLogin().finally(() => {
+        window.location.href = guestRedirectToURL
+      })
+    },
+    [trackGuestLogin, guestRedirectToURL]
+  )
 
   const getReferrerFromCurrentSearch = useCallback(() => {
     const search = new URLSearchParams(window.location.search)
@@ -212,6 +237,8 @@ export const LoginPage = () => {
       const isLoggingInThroughSocial = isSocialLogin(connectionType)
       const providerType = isLoggingInThroughSocial ? ConnectionType.WEB2 : ConnectionType.WEB3
       setCurrentConnectionType(connectionType)
+      // Fresh attempt — clear any cancellation left over from a previously dismissed modal.
+      connectCancelledRef.current = false
 
       trackLoginClick({
         method: connectionType,
@@ -235,6 +262,7 @@ export const LoginPage = () => {
           setShowConnectionLayout(true)
           setLoadingState(ConnectionLayoutState.CONNECTING_WALLET)
           const connectionData = await connectToProvider(connectionType)
+          if (connectCancelledRef.current) return
 
           // Track CP2 reached after wallet connects so we have the account address
           trackCheckpoint({
@@ -249,6 +277,7 @@ export const LoginPage = () => {
 
           setLoadingState(ConnectionLayoutState.WAITING_FOR_SIGNATURE)
           const freshIdentity = await getIdentitySignature(connectionData)
+          if (connectCancelledRef.current) return
 
           // Clear any stored social login emails since this is a wallet login
           localStorage.removeItem('dcl_thirdweb_user_email')
@@ -262,12 +291,14 @@ export const LoginPage = () => {
           const referrer = getReferrerFromCurrentSearch()
 
           const isClockSync = await checkClockSynchronization()
+          if (connectCancelledRef.current) return
 
           if (isClockSync) {
             await runProfileRedirect(connectionData.account ?? '', referrer, freshIdentity, () => setShowConnectionLayout(false))
           }
         }
       } catch (error) {
+        if (connectCancelledRef.current) return
         if (isUserRejectedTransaction(error)) {
           console.info('User rejected login signature in wallet — not reporting to Sentry')
         } else {
@@ -303,6 +334,9 @@ export const LoginPage = () => {
   )
 
   const handleOnCloseConnectionModal = useCallback(() => {
+    // Abort any in-flight connect so a signature the user approves after dismissing the modal
+    // can't redirect or push them into setup.
+    connectCancelledRef.current = true
     setShowConnectionLayout(false)
     setCurrentConnectionType(undefined)
     setLoadingState(ConnectionLayoutState.CONNECTING_WALLET)
@@ -341,6 +375,9 @@ export const LoginPage = () => {
 
   const handleEmailLoginSuccess = useCallback(
     async (result: EmailLoginResult) => {
+      // Remember the verified result so a retry after a post-verification failure can resume from
+      // here instead of asking for the (already consumed) OTP code again.
+      lastEmailLoginResultRef.current = result
       setShowEmailLoginModal(false)
       setShowConfirmingLogin(true)
       setConfirmingLoginError(null)
@@ -382,11 +419,17 @@ export const LoginPage = () => {
   }, [])
 
   const handleConfirmingLoginRetry = useCallback(() => {
-    setShowConfirmingLogin(false)
     setConfirmingLoginError(null)
-    // Go back to the email login modal with the current email
-    setShowEmailLoginModal(true)
-  }, [])
+    // The failure happened after the OTP was verified, so the wallet is already connected — re-run
+    // the post-verification steps with the stored result. Only fall back to the OTP modal if we
+    // somehow have no result to resume from.
+    if (lastEmailLoginResultRef.current) {
+      handleEmailLoginSuccess(lastEmailLoginResultRef.current)
+    } else {
+      setShowConfirmingLogin(false)
+      setShowEmailLoginModal(true)
+    }
+  }, [handleEmailLoginSuccess])
 
   // Use the auto-login hook to handle loginMethod URL parameter
   useAutoLogin({
@@ -413,8 +456,14 @@ export const LoginPage = () => {
     }
 
     try {
-      const connectionData = await connectToProvider(currentConnectionType)
-      await runProfileRedirect(connectionData.account ?? '', referrer, null, () => setShowConnectionLayout(false))
+      // Reuse the connection established moments ago instead of reconnecting. connectToProvider
+      // clears WalletConnect storage, which would tear down the active pairing and force a fresh QR
+      // scan (and could bind a different account) just to acknowledge the clock-drift warning.
+      const connectionData = await getCurrentConnectionData()
+      if (!connectionData?.account) {
+        throw new Error('No active connection found for clock sync continue')
+      }
+      await runProfileRedirect(connectionData.account, referrer, connectionData.identity ?? null, () => setShowConnectionLayout(false))
     } catch (error) {
       handleError(error, 'Error during clock sync continue flow')
       // Surface a visible, recoverable error instead of leaving the page silently

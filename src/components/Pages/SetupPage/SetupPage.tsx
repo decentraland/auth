@@ -368,7 +368,9 @@ export const SetupPage = () => {
 
     if (!account || !identity) {
       console.warn('No previous connection found')
-      navigate(locations.login(redirectTo))
+      // Carry the referrer through to login so referral attribution survives the bounce, matching
+      // AvatarSetupPage and QuickSetupPage.
+      navigate(locations.login(redirectTo, referrer))
       return
     }
 

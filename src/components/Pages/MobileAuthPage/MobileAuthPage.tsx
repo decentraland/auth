@@ -65,6 +65,10 @@ export const MobileAuthPage = () => {
   const [isTestAuthSession, setIsTestAuthSession] = useState(false)
 
   const hasStartedInit = useRef(false)
+  // The last verified email-login result and a stable handle to the post-verification runner, so a
+  // retry after a post-verify failure can resume without re-asking for the (already consumed) OTP.
+  const lastEmailLoginResultRef = useRef<EmailLoginResult | null>(null)
+  const emailLoginSuccessRef = useRef<((result: EmailLoginResult) => void) | null>(null)
 
   const initiateAuth = useCallback(
     async (selectedConnectionType: ConnectionOptionType, options: { fromClick?: boolean } = { fromClick: true }) => {
@@ -189,10 +193,16 @@ export const MobileAuthPage = () => {
     }
 
     // Email has its own OTP flow and can't be re-run via initiateAuth (it would fall
-    // into the wallet branch and call connectToProvider(EMAIL), looping). Route back to
-    // the email UI instead: return to the selection view and reopen the email modal so
-    // the user can retry with the email they already entered.
+    // into the wallet branch and call connectToProvider(EMAIL), looping).
     if (isEmailLogin(connectionType)) {
+      // If OTP was already verified, the failure was in a post-verification step (identity,
+      // postIdentity) and the code is spent — resume those steps with the stored result instead
+      // of reopening the modal to re-enter a code that would fail.
+      if (lastEmailLoginResultRef.current && emailLoginSuccessRef.current) {
+        emailLoginSuccessRef.current(lastEmailLoginResultRef.current)
+        return
+      }
+      // OTP was never verified — reopen the modal so the user can retry with the same email.
       setView('selection')
       setEmailError(null)
       setShowEmailLoginModal(true)
@@ -268,6 +278,8 @@ export const MobileAuthPage = () => {
 
   const handleEmailLoginSuccess = useCallback(
     async (result: EmailLoginResult) => {
+      // Remember the verified result so a retry can resume post-verification without a new code.
+      lastEmailLoginResultRef.current = result
       setShowEmailLoginModal(false)
       setView('connecting')
       setLoadingState(ConnectionLayoutState.WAITING_FOR_SIGNATURE)
@@ -316,6 +328,10 @@ export const MobileAuthPage = () => {
     },
     [trackLoginSuccess]
   )
+
+  // Expose the latest post-verification runner to handleTryAgain (declared earlier) without adding
+  // it to that callback's deps — the ref keeps it stable while always pointing at the current one.
+  emailLoginSuccessRef.current = handleEmailLoginSuccess
 
   // Provider selection view
   if (view === 'selection') {

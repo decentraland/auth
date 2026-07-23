@@ -7,6 +7,10 @@ interface AvatarSetupState {
   showWearablePreview: boolean
   isTermsChecked: boolean
   isEmailInherited: boolean
+  // Consent for the marketing newsletter when the email was inherited from a web2 login. Only
+  // meaningful while isEmailInherited is true; when the user types their own email, entering it in
+  // the newsletter field is itself the opt-in (mirrors QuickSetupPage).
+  subscribeNewsletter: boolean
   hasWearablePreviewLoaded: boolean
 }
 

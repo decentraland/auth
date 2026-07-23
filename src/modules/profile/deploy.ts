@@ -70,8 +70,11 @@ async function deployWithCatalystRotation({ entity, disabledCatalysts }: DeployW
 
 function isRetryableError(error: unknown): boolean {
   if (error instanceof DeploymentError && error.statusCode !== undefined) {
-    // Don't retry on 4xx client errors (bad request, auth issues, etc.)
-    return error.statusCode >= 500
+    // Retry on server errors (5xx) and on transient per-server conditions another catalyst is
+    // likely to accept: 429 (rate limited) and 408 (request timeout). Other 4xx (e.g. 400 bad
+    // request, auth) are deterministic — the same payload would fail on every catalyst, so don't
+    // waste the remaining attempts.
+    return error.statusCode >= 500 || error.statusCode === 429 || error.statusCode === 408
   }
 
   // Network errors (no response at all) are retryable

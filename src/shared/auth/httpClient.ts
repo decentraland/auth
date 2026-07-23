@@ -17,6 +17,10 @@ import { assertMethodIsAllowed, assertRequestIsNotImpersonatingSignIn } from './
 import { IdentityResponse, OutcomeError, OutcomeResponse, RecoverResponse, SimulationRequestBody, SimulationResponseBody } from './types'
 
 const SIMULATION_TIMEOUT_MS = 10_000
+// Outcome delivery is a write that follows an already-executed action, so it gets a more generous
+// budget than the read-only simulation — but it must still be bounded so a hung auth server can't
+// leave the interaction spinner up indefinitely.
+const OUTCOME_TIMEOUT_MS = 15_000
 export const createAuthServerHttpClient = (authServerUrl?: string) => {
   const baseUrl = authServerUrl ?? config.get('AUTH_SERVER_URL')
 
@@ -54,7 +58,8 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
         body: JSON.stringify({
           sender,
           result
-        })
+        }),
+        signal: AbortSignal.timeout(OUTCOME_TIMEOUT_MS)
       })
 
       if (!response.ok) {
@@ -97,10 +102,15 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
 
       const data = await response.json()
 
-      trackEvent(TrackingEvents.DEEP_LINK_AUTH_SUCCESS, {
-        type: 'success',
-        ...(opts.authRequestId ? { authRequestId: opts.authRequestId } : {})
-      })
+      // Only the deep-link handoff carries an authRequestId; the standalone mobile login callers
+      // pass none. Emit the deep-link success event solely for the former so the two flows aren't
+      // conflated in analytics ("Deep link auth success" with no request id is not a deep link).
+      if (opts.authRequestId) {
+        trackEvent(TrackingEvents.DEEP_LINK_AUTH_SUCCESS, {
+          type: 'success',
+          authRequestId: opts.authRequestId
+        })
+      }
 
       return data
     } catch (e) {
@@ -120,7 +130,8 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
         body: JSON.stringify({
           sender,
           error
-        })
+        }),
+        signal: AbortSignal.timeout(OUTCOME_TIMEOUT_MS)
       })
 
       if (!response.ok) {

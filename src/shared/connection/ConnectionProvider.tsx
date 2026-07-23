@@ -50,6 +50,12 @@ const ConnectionProvider = ({ children }: PropsWithChildren) => {
   // concurrent callers for the SAME account share a single wallet signature prompt,
   // while callers for DIFFERENT accounts never receive the wrong account's identity.
   const inflightIdentityRef = useRef<Map<string, Promise<AuthIdentity>>>(new Map())
+  // Bumped on every wallet accountsChanged/disconnect, alongside the account it reported. An
+  // in-flight getIdentitySignature captures the version at start and, on completion, publishes its
+  // result unless the active account has since switched to a DIFFERENT one — which would mean this
+  // result is for the account the user left, and publishing it would clobber the newer account.
+  const accountVersionRef = useRef(0)
+  const lastEventAccountRef = useRef<string | undefined>(undefined)
 
   /**
    * Fetches the current connection data (account, identity, provider, etc.)
@@ -82,6 +88,7 @@ const ConnectionProvider = ({ children }: PropsWithChildren) => {
     }
 
     const promise = (async () => {
+      const versionAtStart = accountVersionRef.current
       const connectionResponse = existingConnection ?? (await connection.tryPreviousConnection())
 
       // Validate that all required fields are present, including providerType,
@@ -92,14 +99,22 @@ const ConnectionProvider = ({ children }: PropsWithChildren) => {
 
       const identity = await getIdentitySignatureUtil(connectionResponse.account, connectionResponse.provider)
 
-      setState({
-        isLoading: false,
-        account: connectionResponse.account,
-        identity,
-        provider: connectionResponse.provider,
-        providerType: connectionResponse.providerType,
-        chainId: connectionResponse.chainId
-      })
+      // Publish unless the active account switched to a DIFFERENT one while the prompt was open. A
+      // same-account event (some wallets re-emit accountsChanged for the current account) must not
+      // suppress the publish; only a real switch (or disconnect) should. If it did switch away,
+      // return the identity to the caller but leave the context on the newer account.
+      const noAccountEvent = accountVersionRef.current === versionAtStart
+      const activeAccountStillOurs = lastEventAccountRef.current?.toLowerCase() === connectionResponse.account.toLowerCase()
+      if (noAccountEvent || activeAccountStillOurs) {
+        setState({
+          isLoading: false,
+          account: connectionResponse.account,
+          identity,
+          provider: connectionResponse.provider,
+          providerType: connectionResponse.providerType,
+          chainId: connectionResponse.chainId
+        })
+      }
 
       return identity
     })()
@@ -124,6 +139,11 @@ const ConnectionProvider = ({ children }: PropsWithChildren) => {
 
     const handleAccountsChanged = (accounts: string[]) => {
       const account = accounts[0]
+      // Record this event so an in-flight getIdentitySignature can tell a real account switch (its
+      // result must not clobber the new account) from a same-account re-emit (which it should still
+      // publish). undefined here means "disconnected", which is also a switch away from any account.
+      accountVersionRef.current += 1
+      lastEventAccountRef.current = account
       if (!account) {
         // Wallet disconnected — clear all connection state so downstream consumers
         // (e.g. RequestPage checking !provider || !providerType) detect the disconnect.
