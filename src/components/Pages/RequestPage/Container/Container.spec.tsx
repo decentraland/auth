@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { fireEvent, render, waitFor } from '@testing-library/react'
 import { Container } from './Container'
