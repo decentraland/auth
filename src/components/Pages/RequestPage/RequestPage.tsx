@@ -39,6 +39,7 @@ import {
 } from '../../../shared/locations'
 import { sendTipNotification } from '../../../shared/notifications'
 import { isProfileComplete } from '../../../shared/profile'
+import { wait } from '../../../shared/time'
 import { identifyUser, trackEvent } from '../../../shared/utils/analytics'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
@@ -133,6 +134,12 @@ const TERMINAL_VIEWS = new Set([
   View.DIFFERENT_ACCOUNT,
   View.IP_VALIDATION_ERROR
 ])
+
+// The successful-outcome POST is the only channel by which the requester receives an off-chain
+// signature (a broadcast tx is recoverable on-chain, a signature is not), so it is delivered with a
+// few retries before giving up, to ride out a transient failure rather than dropping the result.
+const OUTCOME_DELIVERY_ATTEMPTS = 3
+const OUTCOME_DELIVERY_RETRY_MS = 1000
 
 export const RequestPage = () => {
   const params = useParams()
@@ -1078,7 +1085,21 @@ export const RequestPage = () => {
       trackClick(ClickEvents.APPROVE_WALLET_INTERACTION, {
         method: requestRef.current?.method
       })
-      await authServerClient.current.sendSuccessfulOutcome(requestId, signerAddress, result)
+
+      // The action already executed and `result` holds its tx hash / signature. Deliver the outcome,
+      // resending the captured result on a transient failure — for an off-chain signature this POST
+      // is the only way the requester ever receives it. A RequestFulfilledError means the outcome is
+      // already recorded (e.g. another tab delivered it), so treat that as delivered.
+      for (let attempt = 1; ; attempt++) {
+        try {
+          await authServerClient.current.sendSuccessfulOutcome(requestId, signerAddress, result)
+          break
+        } catch (deliveryError) {
+          if (deliveryError instanceof RequestFulfilledError) break
+          if (attempt >= OUTCOME_DELIVERY_ATTEMPTS) throw deliveryError
+          await wait(OUTCOME_DELIVERY_RETRY_MS)
+        }
+      }
       hasCompletedRef.current = true
 
       if (nftTransferData) {
@@ -1092,12 +1113,13 @@ export const RequestPage = () => {
         setView(View.WALLET_INTERACTION_COMPLETE)
       }
     } catch (e) {
-      if (result) {
-        // The wallet already broadcast the transaction (or produced the signature) — `result` holds
-        // it. Any error past this point is a post-execution problem (outcome delivery, tip
-        // notification), NOT a transaction failure, so report success: sending a failed outcome here
-        // would tell the Explorer a confirmed tx was rejected and prompt the user to resubmit.
-        handleError(e, 'Wallet interaction succeeded but post-execution step failed', {
+      const isBroadcastTransaction = requestRef.current?.method === 'eth_sendTransaction'
+      if (result && isBroadcastTransaction) {
+        // The transaction was already broadcast and its hash is recoverable on-chain, so a
+        // post-broadcast failure (outcome delivery, tip notification) is NOT a transaction failure.
+        // Report success and never send a failed outcome — that would tell the Explorer a confirmed
+        // tx was rejected and prompt the user to resubmit (double tip / double transfer).
+        handleError(e, 'Transaction broadcast but a post-broadcast step failed', {
           sentryTags: { isWeb2Wallet: isUserUsingWeb2Wallet }
         })
         hasCompletedRef.current = true
@@ -1149,21 +1171,27 @@ export const RequestPage = () => {
           sentryTags: { isWeb2Wallet: isUserUsingWeb2Wallet }
         })
 
-        // Try to send failed outcome, but don't let it prevent showing the error view
-        try {
-          if (walletClientRef.current) {
-            const [addr] = await walletClientRef.current.getAddresses()
-            if (isRpcError(e)) {
-              await authServerClient.current.sendFailedOutcome(requestId, addr, e.error)
-            } else {
-              await authServerClient.current.sendFailedOutcome(requestId, addr, {
-                code: 999,
-                message: isErrorWithMessage(e) ? e.message : 'Unknown error'
-              })
+        // Only report a failed outcome when nothing executed. If `result` is set here, it is an
+        // off-chain signature whose delivery failed after retries: the signature itself SUCCEEDED,
+        // so a failed outcome would wrongly tell the requester it was rejected. Leave no outcome so
+        // the request can be re-initiated and the signature re-delivered.
+        if (!result) {
+          // Try to send failed outcome, but don't let it prevent showing the error view
+          try {
+            if (walletClientRef.current) {
+              const [addr] = await walletClientRef.current.getAddresses()
+              if (isRpcError(e)) {
+                await authServerClient.current.sendFailedOutcome(requestId, addr, e.error)
+              } else {
+                await authServerClient.current.sendFailedOutcome(requestId, addr, {
+                  code: 999,
+                  message: isErrorWithMessage(e) ? e.message : 'Unknown error'
+                })
+              }
             }
+          } catch (failedOutcomeError) {
+            console.error('Failed to send failed outcome:', failedOutcomeError)
           }
-        } catch (failedOutcomeError) {
-          console.error('Failed to send failed outcome:', failedOutcomeError)
         }
 
         setError(isErrorWithMessage(e) ? e.message : 'Unknown error')

@@ -80,10 +80,12 @@ export const LoginPage = () => {
   const [emailError, setEmailError] = useState<string | null>(null)
   const [showConfirmingLogin, setShowConfirmingLogin] = useState(false)
   const [confirmingLoginError, setConfirmingLoginError] = useState<string | null>(null)
-  // Set when the user closes the connection modal mid-flow. handleOnConnect checks it after each
-  // await so a wallet prompt approved after the modal is dismissed can't redirect or push the user
-  // into setup behind their back.
-  const connectCancelledRef = useRef(false)
+  // Monotonic token identifying the current connect attempt. Each handleOnConnect captures the
+  // value it bumped this ref to and, after every await, bails if the ref has since moved — because
+  // the user closed the modal (which bumps it) or started another attempt. A per-attempt token,
+  // rather than a shared boolean, is required: a boolean set on close would be reset to false by the
+  // next attempt, letting a still-pending earlier attempt resume and redirect behind the user's back.
+  const connectAttemptRef = useRef(0)
   // The last verified email-login result. If a post-verification step (identity, profile) fails,
   // the OTP code is already consumed, so retrying must re-run those steps with this result rather
   // than reopening the OTP modal (where the spent code would fail and the resend cooldown resets).
@@ -237,8 +239,9 @@ export const LoginPage = () => {
       const isLoggingInThroughSocial = isSocialLogin(connectionType)
       const providerType = isLoggingInThroughSocial ? ConnectionType.WEB2 : ConnectionType.WEB3
       setCurrentConnectionType(connectionType)
-      // Fresh attempt — clear any cancellation left over from a previously dismissed modal.
-      connectCancelledRef.current = false
+      // Start a new attempt and capture its token. Any earlier in-flight attempt now has a stale
+      // token and will bail at its next checkpoint instead of resuming.
+      const attemptId = ++connectAttemptRef.current
 
       trackLoginClick({
         method: connectionType,
@@ -262,7 +265,7 @@ export const LoginPage = () => {
           setShowConnectionLayout(true)
           setLoadingState(ConnectionLayoutState.CONNECTING_WALLET)
           const connectionData = await connectToProvider(connectionType)
-          if (connectCancelledRef.current) return
+          if (connectAttemptRef.current !== attemptId) return
 
           // Track CP2 reached after wallet connects so we have the account address
           trackCheckpoint({
@@ -277,7 +280,7 @@ export const LoginPage = () => {
 
           setLoadingState(ConnectionLayoutState.WAITING_FOR_SIGNATURE)
           const freshIdentity = await getIdentitySignature(connectionData)
-          if (connectCancelledRef.current) return
+          if (connectAttemptRef.current !== attemptId) return
 
           // Clear any stored social login emails since this is a wallet login
           localStorage.removeItem('dcl_thirdweb_user_email')
@@ -291,14 +294,14 @@ export const LoginPage = () => {
           const referrer = getReferrerFromCurrentSearch()
 
           const isClockSync = await checkClockSynchronization()
-          if (connectCancelledRef.current) return
+          if (connectAttemptRef.current !== attemptId) return
 
           if (isClockSync) {
             await runProfileRedirect(connectionData.account ?? '', referrer, freshIdentity, () => setShowConnectionLayout(false))
           }
         }
       } catch (error) {
-        if (connectCancelledRef.current) return
+        if (connectAttemptRef.current !== attemptId) return
         if (isUserRejectedTransaction(error)) {
           console.info('User rejected login signature in wallet — not reporting to Sentry')
         } else {
@@ -334,9 +337,10 @@ export const LoginPage = () => {
   )
 
   const handleOnCloseConnectionModal = useCallback(() => {
-    // Abort any in-flight connect so a signature the user approves after dismissing the modal
-    // can't redirect or push them into setup.
-    connectCancelledRef.current = true
+    // Invalidate the in-flight attempt so a signature the user approves after dismissing the modal
+    // can't redirect or push them into setup. Bumping the token (rather than setting a boolean)
+    // ensures a subsequent attempt can't accidentally un-cancel this one.
+    connectAttemptRef.current += 1
     setShowConnectionLayout(false)
     setCurrentConnectionType(undefined)
     setLoadingState(ConnectionLayoutState.CONNECTING_WALLET)

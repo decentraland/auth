@@ -60,6 +60,12 @@ jest.mock('../../../modules/analytics/segment', () => ({
   getAnalytics: () => null
 }))
 
+// Make the outcome-delivery retry backoff instant so the retry-path tests don't wait on real timers.
+jest.mock('../../../shared/time', () => ({
+  ...jest.requireActual('../../../shared/time'),
+  wait: () => Promise.resolve()
+}))
+
 // --- Auth Server Client ---
 const mockRecover = jest.fn()
 const mockSendSuccessfulOutcome = jest.fn()
@@ -877,6 +883,32 @@ describe('RequestPage', () => {
       await userEvent.click(await screen.findByTestId('wallet-interaction-approve'))
       expect(await screen.findByTestId('wallet-interaction-complete')).toBeInTheDocument()
     })
+
+    describe('and the outcome delivery fails after signing', () => {
+      beforeEach(() => {
+        mockSendSuccessfulOutcome.mockRejectedValue(new Error('network error'))
+      })
+
+      it('should retry delivering the signature before giving up', async () => {
+        renderRequestPage()
+        await userEvent.click(await screen.findByTestId('wallet-interaction-approve'))
+        await waitFor(() => expect(mockSendSuccessfulOutcome).toHaveBeenCalledTimes(3))
+      })
+
+      it('should show the signing error instead of a false completion, since the signature was never delivered', async () => {
+        renderRequestPage()
+        await userEvent.click(await screen.findByTestId('wallet-interaction-approve'))
+        expect(await screen.findByTestId('signing-error')).toBeInTheDocument()
+        expect(screen.queryByTestId('wallet-interaction-complete')).not.toBeInTheDocument()
+      })
+
+      it('should not send a failed outcome, since the signature itself succeeded', async () => {
+        renderRequestPage()
+        await userEvent.click(await screen.findByTestId('wallet-interaction-approve'))
+        await screen.findByTestId('signing-error')
+        expect(mockSendFailedOutcome).not.toHaveBeenCalled()
+      })
+    })
   })
 
   describe('when a Thirdweb user approves a transaction', () => {
@@ -1123,6 +1155,26 @@ describe('RequestPage', () => {
       await screen.findByTestId('wallet-interaction-complete')
 
       expect(mockCheckMetaTransactionSupport.mock.calls.length).toBe(callsAfterPrefetch)
+    })
+
+    describe('and the outcome delivery fails after the transaction is broadcast', () => {
+      beforeEach(() => {
+        mockWalletRequest.mockResolvedValue('0xhash')
+        mockSendSuccessfulOutcome.mockRejectedValue(new Error('network error'))
+      })
+
+      it('should show completion, since the transaction is already on-chain', async () => {
+        renderRequestPage()
+        await userEvent.click(await screen.findByTestId('wallet-interaction-approve'))
+        expect(await screen.findByTestId('wallet-interaction-complete')).toBeInTheDocument()
+      })
+
+      it('should not send a failed outcome, which would prompt the user to resubmit an executed transaction', async () => {
+        renderRequestPage()
+        await userEvent.click(await screen.findByTestId('wallet-interaction-approve'))
+        await screen.findByTestId('wallet-interaction-complete')
+        expect(mockSendFailedOutcome).not.toHaveBeenCalled()
+      })
     })
 
     describe('and the simulation request fails', () => {
