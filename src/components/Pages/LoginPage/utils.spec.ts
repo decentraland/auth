@@ -118,7 +118,7 @@ describe('connectToProvider', () => {
       removeItemSpy.mockRestore()
     })
 
-    it('should clear the legacy WalletConnect deep-link choice without wiping the session storage', async () => {
+    it('should clear the legacy WalletConnect deep-link choice', async () => {
       await connectToProvider(ConnectionOptionType.WALLET_CONNECT)
 
       expect(removeItemSpy).toHaveBeenCalledWith('WALLETCONNECT_DEEPLINK_CHOICE')

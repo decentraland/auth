@@ -99,9 +99,11 @@ function requiresInjectedProvider(connectionOption: ConnectionOptionType): boole
   return fromConnectionOptionToProviderType(connectionOption) === ProviderType.INJECTED
 }
 
-// Coalesces concurrent connect attempts for the same provider (double-click, racing retry) so two
-// overlapping connection.connect() sequences can't corrupt each other's session/pairing. A different
-// provider is allowed to supersede — that's a genuine "user switched wallet" action.
+// Coalesces concurrent connect attempts for the SAME provider (double-click, racing retry) behind a
+// single in-flight promise, so a repeated click can't spawn a second overlapping connect for that
+// provider. A different provider is allowed to supersede (a genuine "user switched wallet" action);
+// cross-provider concurrency isn't serialized here and is instead prevented at the UI layer, where
+// the wallet-selection modal is modal (the user can't pick another wallet while one is pending).
 let inFlightConnect: { providerType: ProviderType; promise: Promise<ConnectionResponse> } | null = null
 
 async function connectToProvider(connectionOption: ConnectionOptionType): Promise<ConnectionResponse> {
