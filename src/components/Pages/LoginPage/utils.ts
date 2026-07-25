@@ -1,7 +1,7 @@
 import type { OAuthProvider } from '@magic-ext/oauth2'
 import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
 import { Env } from '@dcl/ui-env'
-import { ConnectionResponse, WalletConnectV2Connector, connection, getConfiguration } from 'decentraland-connect'
+import { ConnectionResponse, connection, getConfiguration } from 'decentraland-connect'
 import { config } from '../../../modules/config'
 import { extractReferrerFromSearchParameters } from '../../../shared/locations'
 import { ConnectionOptionType, SignInOptionsMode } from '../../Connection'
@@ -99,6 +99,11 @@ function requiresInjectedProvider(connectionOption: ConnectionOptionType): boole
   return fromConnectionOptionToProviderType(connectionOption) === ProviderType.INJECTED
 }
 
+// Coalesces concurrent connect attempts for the same provider (double-click, racing retry) so two
+// overlapping connection.connect() sequences can't corrupt each other's session/pairing. A different
+// provider is allowed to supersede — that's a genuine "user switched wallet" action.
+let inFlightConnect: { providerType: ProviderType; promise: Promise<ConnectionResponse> } | null = null
+
 async function connectToProvider(connectionOption: ConnectionOptionType): Promise<ConnectionResponse> {
   const providerType = fromConnectionOptionToProviderType(connectionOption)
 
@@ -106,25 +111,39 @@ async function connectToProvider(connectionOption: ConnectionOptionType): Promis
     throw new Error('No wallet extension detected. Please install MetaMask or another Ethereum wallet.')
   }
 
-  // Clear stale WalletConnect/AppKit data to prevent session conflicts
-  if (providerType === ProviderType.WALLET_CONNECT || providerType === ProviderType.WALLET_CONNECT_V2) {
-    WalletConnectV2Connector.clearStorage()
-    localStorage.removeItem('WALLETCONNECT_DEEPLINK_CHOICE')
+  // Reuse an in-flight connect for the same provider instead of starting a second, overlapping one.
+  if (inFlightConnect && inFlightConnect.providerType === providerType) {
+    return inFlightConnect.promise
   }
 
-  let connectionData: ConnectionResponse
+  const promise = (async () => {
+    // Clear only WalletConnect v1's leftover deep-link choice, which can pin the mobile wallet
+    // chooser. WalletConnect session storage itself is owned by decentraland-connect, which
+    // validates and clears stale sessions on connect — wiping it here forced a fresh QR pairing on
+    // every attempt and prevented reusing the session established during the auth handoff.
+    if (providerType === ProviderType.WALLET_CONNECT_V2) {
+      localStorage.removeItem('WALLETCONNECT_DEEPLINK_CHOICE')
+    }
+
+    const connectionData = await connection.connect(providerType)
+    if (!connectionData.account || !connectionData.provider) {
+      throw new Error('Could not get provider')
+    }
+    return connectionData
+  })()
+
+  inFlightConnect = { providerType, promise }
   try {
-    connectionData = await connection.connect(providerType)
+    return await promise
   } catch (error) {
     console.error('Error connecting to provider', error)
     throw error
+  } finally {
+    // Only clear if this call still owns the slot (a different-provider connect may have replaced it).
+    if (inFlightConnect?.promise === promise) {
+      inFlightConnect = null
+    }
   }
-
-  if (!connectionData.account || !connectionData.provider) {
-    throw new Error('Could not get provider')
-  }
-
-  return connectionData
 }
 
 function isSocialLogin(connectionType: ConnectionOptionType): boolean {
