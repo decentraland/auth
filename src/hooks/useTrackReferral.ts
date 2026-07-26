@@ -5,6 +5,9 @@ import { useCurrentConnectionData } from '../shared/connection'
 import { handleErrorWithContext } from '../shared/utils/errorHandler'
 
 const REFERRAL_SERVER_URL = config.get('REFERRAL_SERVER_URL')
+// Referral tracking is awaited in the onboarding submit path, so bound it: a hung referral server
+// must not strand the user on the deploying spinner after their profile has already deployed.
+const REFERRAL_TIMEOUT_MS = 10_000
 
 export const useTrackReferral = () => {
   const { identity, account } = useCurrentConnectionData()
@@ -25,7 +28,8 @@ export const useTrackReferral = () => {
             'Content-Type': 'application/json'
           },
           ...(body && { body }),
-          identity
+          identity,
+          signal: AbortSignal.timeout(REFERRAL_TIMEOUT_MS)
         })
       } catch (error) {
         handleErrorWithContext(error, 'Failed to track referral progress', {

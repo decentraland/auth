@@ -39,6 +39,7 @@ import {
 } from '../../../shared/locations'
 import { sendTipNotification } from '../../../shared/notifications'
 import { isProfileComplete } from '../../../shared/profile'
+import { wait } from '../../../shared/time'
 import { identifyUser, trackEvent } from '../../../shared/utils/analytics'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
@@ -134,6 +135,12 @@ const TERMINAL_VIEWS = new Set([
   View.IP_VALIDATION_ERROR
 ])
 
+// The successful-outcome POST is the only channel by which the requester receives an off-chain
+// signature (a broadcast tx is recoverable on-chain, a signature is not), so it is delivered with a
+// few retries before giving up, to ride out a transient failure rather than dropping the result.
+const OUTCOME_DELIVERY_ATTEMPTS = 3
+const OUTCOME_DELIVERY_RETRY_MS = 1000
+
 export const RequestPage = () => {
   const params = useParams()
   const [searchParams] = useSearchParams()
@@ -150,7 +157,6 @@ export const RequestPage = () => {
   const [skipDeepLinkRedirect, setSkipDeepLinkRedirect] = useState(false)
   const [walletInfo, setWalletInfo] = useState<{
     balance: bigint
-    chainId: number
   }>()
   const [transactionGasCost, setTransactionGasCost] = useState<bigint>()
   const [nftTransferData, setNftTransferData] = useState<NFTTransferData | null>(null)
@@ -563,8 +569,7 @@ export const RequestPage = () => {
               if (cancelled) return
 
               setWalletInfo({
-                balance: userBalance,
-                chainId: currentChainId
+                balance: userBalance
               })
 
               // Check if this is an NFT transfer or MANA transfer by analyzing the transaction data
@@ -1008,6 +1013,11 @@ export const RequestPage = () => {
     setIsLoading(true)
     setIsTransactionModalOpen(false)
     const walletClient = walletClientRef.current
+    // Holds the wallet result (tx hash or signature) once the action actually executes. Declared
+    // outside the try so the catch can distinguish a broadcast/signed action whose outcome merely
+    // failed to deliver from an action that never happened — the former must never be reported as a
+    // failed outcome (that would tell the Explorer a confirmed tx was rejected, inviting a double-submit).
+    let result: string | null = null
     try {
       if (!walletClient) {
         throw new Error('Provider not created')
@@ -1019,8 +1029,6 @@ export const RequestPage = () => {
 
       const [signerAddress] = await walletClient.getAddresses()
       const method = requestRef.current.method
-
-      let result: string | null = null
 
       if (method !== 'eth_sendTransaction') {
         // Non-transaction methods (e.g. personal_sign, eth_signTypedData_v4) carry no `to`
@@ -1077,7 +1085,21 @@ export const RequestPage = () => {
       trackClick(ClickEvents.APPROVE_WALLET_INTERACTION, {
         method: requestRef.current?.method
       })
-      await authServerClient.current.sendSuccessfulOutcome(requestId, signerAddress, result)
+
+      // The action already executed and `result` holds its tx hash / signature. Deliver the outcome,
+      // resending the captured result on a transient failure — for an off-chain signature this POST
+      // is the only way the requester ever receives it. A RequestFulfilledError means the outcome is
+      // already recorded (e.g. another tab delivered it), so treat that as delivered.
+      for (let attempt = 1; ; attempt++) {
+        try {
+          await authServerClient.current.sendSuccessfulOutcome(requestId, signerAddress, result)
+          break
+        } catch (deliveryError) {
+          if (deliveryError instanceof RequestFulfilledError) break
+          if (attempt >= OUTCOME_DELIVERY_ATTEMPTS) throw deliveryError
+          await wait(OUTCOME_DELIVERY_RETRY_MS)
+        }
+      }
       hasCompletedRef.current = true
 
       if (nftTransferData) {
@@ -1091,7 +1113,24 @@ export const RequestPage = () => {
         setView(View.WALLET_INTERACTION_COMPLETE)
       }
     } catch (e) {
-      if (isUserRejectedTransaction(e)) {
+      const isBroadcastTransaction = requestRef.current?.method === 'eth_sendTransaction'
+      if (result && isBroadcastTransaction) {
+        // The transaction was already broadcast and its hash is recoverable on-chain, so a
+        // post-broadcast failure (outcome delivery, tip notification) is NOT a transaction failure.
+        // Report success and never send a failed outcome — that would tell the Explorer a confirmed
+        // tx was rejected and prompt the user to resubmit (double tip / double transfer).
+        handleError(e, 'Transaction broadcast but a post-broadcast step failed', {
+          sentryTags: { isWeb2Wallet: isUserUsingWeb2Wallet }
+        })
+        hasCompletedRef.current = true
+        if (nftTransferData) {
+          setView(View.WALLET_NFT_INTERACTION_COMPLETE)
+        } else if (manaTransferData) {
+          setView(View.WALLET_MANA_INTERACTION_COMPLETE)
+        } else {
+          setView(View.WALLET_INTERACTION_COMPLETE)
+        }
+      } else if (isUserRejectedTransaction(e)) {
         console.info('User rejected wallet interaction in wallet — not reporting to Sentry')
         try {
           if (walletClientRef.current) {
@@ -1132,21 +1171,27 @@ export const RequestPage = () => {
           sentryTags: { isWeb2Wallet: isUserUsingWeb2Wallet }
         })
 
-        // Try to send failed outcome, but don't let it prevent showing the error view
-        try {
-          if (walletClientRef.current) {
-            const [addr] = await walletClientRef.current.getAddresses()
-            if (isRpcError(e)) {
-              await authServerClient.current.sendFailedOutcome(requestId, addr, e.error)
-            } else {
-              await authServerClient.current.sendFailedOutcome(requestId, addr, {
-                code: 999,
-                message: isErrorWithMessage(e) ? e.message : 'Unknown error'
-              })
+        // Only report a failed outcome when nothing executed. If `result` is set here, it is an
+        // off-chain signature whose delivery failed after retries: the signature itself SUCCEEDED,
+        // so a failed outcome would wrongly tell the requester it was rejected. Leave no outcome so
+        // the request can be re-initiated and the signature re-delivered.
+        if (!result) {
+          // Try to send failed outcome, but don't let it prevent showing the error view
+          try {
+            if (walletClientRef.current) {
+              const [addr] = await walletClientRef.current.getAddresses()
+              if (isRpcError(e)) {
+                await authServerClient.current.sendFailedOutcome(requestId, addr, e.error)
+              } else {
+                await authServerClient.current.sendFailedOutcome(requestId, addr, {
+                  code: 999,
+                  message: isErrorWithMessage(e) ? e.message : 'Unknown error'
+                })
+              }
             }
+          } catch (failedOutcomeError) {
+            console.error('Failed to send failed outcome:', failedOutcomeError)
           }
-        } catch (failedOutcomeError) {
-          console.error('Failed to send failed outcome:', failedOutcomeError)
         }
 
         setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
@@ -1178,15 +1223,11 @@ export const RequestPage = () => {
       trackClick(ClickEvents.IDENTITY_DEEP_LINK_OPENED, { authRequestId: requestId })
     }
 
-    // Deep-link flow: the client was opened via the deep link and there is nothing to
-    // navigate to — stay on the ContinueInApp view, which doubles as the retry fallback.
-    if (isDeepLinkFlow) return
-
-    // The deep link already fired in ContinueInApp — skip the auto-redirect in SignInCompletePage
-    setSkipDeepLinkRedirect(true)
-    // Show completion view
-    setView(View.VERIFY_SIGN_IN_COMPLETE)
-  }, [identityId, trackClick, isDeepLinkFlow, requestId])
+    // The ContinueInApp view is only ever reached in the deep-link flow — completeClientLoginFlow
+    // is the sole setter of DEEP_LINK_CONTINUE_IN_APP and it runs only when isDeepLinkFlow is true.
+    // The client was opened via the deep link and there is nothing to navigate to, so stay on this
+    // view, which doubles as the retry fallback.
+  }, [identityId, trackClick, requestId])
 
   const onRetryClientLogin = useCallback(() => {
     // A fresh mount re-runs completeClientLoginFlow: the view resets to LOADING_REQUEST and

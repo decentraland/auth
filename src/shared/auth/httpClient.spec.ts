@@ -1,6 +1,7 @@
 import { AuthIdentity } from '@dcl/crypto'
 import signedFetchMock from 'decentraland-crypto-fetch'
 import { getAnalytics } from '../../modules/analytics/segment'
+import { TrackingEvents } from '../../modules/analytics/types'
 import { config } from '../../modules/config'
 import {
   DifferentSenderError,
@@ -9,7 +10,6 @@ import {
   RequestNotFoundError,
   SimulationUnavailableError
 } from './errors'
-import { TrackingEvents } from '../../modules/analytics/types'
 import { createAuthServerHttpClient } from './httpClient'
 import { RecoverResponse, SimulationRequestBody, SimulationResponseBody } from './types'
 // Mock dependencies
@@ -198,7 +198,8 @@ describe('createAuthServerClient', () => {
           body: JSON.stringify({
             sender: mockSender,
             result: mockResult
-          })
+          }),
+          signal: expect.any(AbortSignal)
         })
       })
     })
@@ -285,7 +286,8 @@ describe('createAuthServerClient', () => {
           body: JSON.stringify({
             sender: mockSender,
             error: mockError
-          })
+          }),
+          signal: expect.any(AbortSignal)
         })
       })
     })
@@ -439,10 +441,10 @@ describe('createAuthServerClient', () => {
         expect(result).toEqual(mockResponse)
       })
 
-      it('should track the success without an authRequestId when none is provided', async () => {
+      it('should not track a deep-link auth success when no authRequestId is provided', async () => {
         await client.postIdentity(mockIdentity)
 
-        expect(mockTrack).toHaveBeenCalledWith(TrackingEvents.DEEP_LINK_AUTH_SUCCESS, { type: 'success' })
+        expect(mockTrack).not.toHaveBeenCalledWith(TrackingEvents.DEEP_LINK_AUTH_SUCCESS, expect.anything())
       })
 
       it('should forward the authRequestId onto the success tracking event when provided', async () => {

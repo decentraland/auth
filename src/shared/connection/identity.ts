@@ -63,7 +63,15 @@ async function generateIdentity(
  * (e.g. double-encoded hex keys).
  */
 function getCachedIdentity(address: string): AuthIdentity | undefined {
-  const cached = localStorageGetIdentity(address)
+  let cached: AuthIdentity | null
+  try {
+    // localStorageGetIdentity throws for a malformed address (it validates the key). A caller
+    // reacting to a wallet event may hand us a bad value, so treat that as "no cached identity"
+    // rather than letting the throw escape into an event listener.
+    cached = localStorageGetIdentity(address)
+  } catch {
+    return undefined
+  }
   if (!cached || !isValidIdentity(cached)) {
     return undefined
   }

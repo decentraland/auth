@@ -88,6 +88,7 @@ const AvatarSetupPage: React.FC = () => {
     showWearablePreview: false,
     isTermsChecked: sessionStorage.getItem('dcl_avatar_setup_is_terms_checked') === 'true' || false,
     isEmailInherited: false,
+    subscribeNewsletter: false,
     hasWearablePreviewLoaded: false
   })
 
@@ -96,6 +97,10 @@ const AvatarSetupPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null)
 
   const isProcessingMessageRef = useRef(false)
+  // Guards the "reached the avatar creator" analytics (TOS success + CP3-completed / CP4-reached)
+  // so they fire exactly once. handleContinueClick runs again on every retry click after a preview
+  // error, which would otherwise inflate the onboarding funnel counts.
+  const hasTrackedAvatarCreatorRef = useRef(false)
 
   const [isAvatarParticlesAnimationEnded, setIsAvatarParticlesAnimationEnded] = useState(false)
 
@@ -184,8 +189,14 @@ const AvatarSetupPage: React.FC = () => {
         const wearablePreviewController = WearablePreview.createController('avatar-preview-configurator')
         await wearablePreviewController.scene.setUsername(state.username)
 
-        // Only track once the preview is loaded to avoid double-firing,
-        // since this function runs twice (on click + on preview load).
+        // Track once, after the preview command succeeds. This function runs twice per attempt
+        // (on click + on preview load) and again on every retry click after an error; the ref
+        // ensures the funnel events fire exactly once.
+        if (hasTrackedAvatarCreatorRef.current) {
+          return
+        }
+        hasTrackedAvatarCreatorRef.current = true
+
         trackTermsOfServiceSuccess({
           ethAddress: account,
           isGuest: false,
@@ -252,7 +263,12 @@ const AvatarSetupPage: React.FC = () => {
       }
       if (event.origin !== previewOrigin) return
 
-      if (event.data.type !== 'controller_response') return
+      // Guard against malformed messages (null data, missing payload). A different preview build
+      // could post a shape we don't expect; that must not throw an uncaught TypeError in the
+      // listener and potentially mask a real customization-done message.
+      const data = event.data
+      if (!data || typeof data !== 'object' || data.type !== 'controller_response') return
+      if (!data.payload || typeof data.payload !== 'object') return
 
       if (event.data.payload.id === 'avatar-customization-step') {
         const step = event.data.payload.result?.step as CustomizationStep
@@ -328,20 +344,28 @@ const AvatarSetupPage: React.FC = () => {
           }
         }
 
-        // Subscribe to the newsletter only if the user has provided an email
-        if (state.email) {
+        // Subscribe to the newsletter respecting consent: for an inherited email, only when the
+        // marketing checkbox is ticked; for a user-typed email, entering it in the newsletter field
+        // is itself the opt-in. Mirrors QuickSetupPage so the two onboarding paths behave the same.
+        let newsletterEmail = ''
+        if (state.isEmailInherited && state.subscribeNewsletter) {
+          newsletterEmail = state.email
+        } else if (!state.isEmailInherited) {
+          newsletterEmail = state.email
+        }
+        if (newsletterEmail) {
           try {
-            await subscribeToNewsletter(state.email)
+            await subscribeToNewsletter(newsletterEmail)
           } catch (e) {
             handleError(e, 'Error subscribing to newsletter', { skipTracking: true })
           }
         }
 
-        const storedEmail = localStorage.getItem('dcl_magic_user_email')
-        if (storedEmail) {
-          // Clear the stored email after using it
-          localStorage.removeItem('dcl_magic_user_email')
-        }
+        // Clear the stored web2 emails after using them. Both keys must go: getStoredEmail reads
+        // the Thirdweb key first, so leaving it behind would let a later in-session account switch
+        // inherit the previous user's email.
+        localStorage.removeItem('dcl_magic_user_email')
+        localStorage.removeItem('dcl_thirdweb_user_email')
         sessionStorage.removeItem('dcl_avatar_setup_username')
         sessionStorage.removeItem('dcl_avatar_setup_email')
         sessionStorage.removeItem('dcl_avatar_setup_is_terms_checked')
@@ -368,6 +392,9 @@ const AvatarSetupPage: React.FC = () => {
           setError(errorMessage)
         }
         setDeploying(false)
+        // Hide the full-screen preview overlay so the error box (and retry) is visible again —
+        // otherwise the fixed, top-of-stack preview covers the error and strands the user.
+        setState(prev => ({ ...prev, showWearablePreview: false }))
       } finally {
         isProcessingMessageRef.current = false
       }
@@ -378,6 +405,8 @@ const AvatarSetupPage: React.FC = () => {
       hasUsernameError,
       state.username,
       state.email,
+      state.isEmailInherited,
+      state.subscribeNewsletter,
       account,
       identity,
       referrer,
@@ -404,6 +433,10 @@ const AvatarSetupPage: React.FC = () => {
     },
     [trackCheckTermsOfService]
   )
+
+  const handleNewsletterChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setState(prev => ({ ...prev, subscribeNewsletter: e.target.checked }))
+  }, [])
 
   const initializeAvatarSetup = useCallback(async () => {
     if (!account || !identity) {
@@ -566,7 +599,13 @@ const AvatarSetupPage: React.FC = () => {
         )}
 
         <CheckboxContainer>
-          {state.isEmailInherited && <CheckboxRow id="marketing" label={t('avatar_setup.email_newsletter')} control={<CheckboxInput />} />}
+          {state.isEmailInherited && (
+            <CheckboxRow
+              id="marketing"
+              label={t('avatar_setup.email_newsletter')}
+              control={<CheckboxInput checked={state.subscribeNewsletter} onChange={handleNewsletterChange} />}
+            />
+          )}
           <CheckboxRow
             id="terms"
             label={

@@ -1,14 +1,14 @@
 import { useCallback, useContext, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { AuthIdentity } from '@dcl/crypto'
 import { ProviderType } from '@dcl/schemas'
-import { localStorageGetIdentity } from '@dcl/single-sign-on-client'
 import { connection } from 'decentraland-connect'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useAnalytics } from '../../../hooks/useAnalytics'
 import { useEnsureProfile } from '../../../hooks/useEnsureProfile'
 import { usePostLoginRedirect } from '../../../hooks/usePostLoginRedirect'
 import { ConnectionType } from '../../../modules/analytics/types'
-import { useCurrentConnectionData } from '../../../shared/connection'
+import { getCachedIdentity, useCurrentConnectionData } from '../../../shared/connection'
 import { isMagicExtensionError, isMagicRpcError } from '../../../shared/errors'
 import { extractReferrerFromSearchParameters, locations } from '../../../shared/locations'
 import { isMobileSession } from '../../../shared/mobile'
@@ -61,11 +61,12 @@ const DesktopCallbackPage = () => {
       throw new Error('No account returned from Magic connection')
     }
 
+    let identity: AuthIdentity | undefined
     if (connectionData.provider) {
-      await getIdentitySignature(connectionData)
+      identity = await getIdentitySignature(connectionData)
     }
 
-    return connectionData
+    return { connectionData, identity }
   }, [flags[FeatureFlagsKeys.MAGIC_TEST], initialized, getIdentitySignature])
 
   const handleContinue = useCallback(
@@ -75,8 +76,8 @@ const DesktopCallbackPage = () => {
       }
 
       try {
-        const connectionData = await connectAndGenerateSignature()
-        if (!connectionData) {
+        const result = await connectAndGenerateSignature()
+        if (!result) {
           // connection.connect() resolved without a connection (returned falsy instead
           // of throwing). Surface a recoverable error so the user gets the Try Again
           // button instead of being stranded on the validating spinner. Mirrors the
@@ -86,6 +87,7 @@ const DesktopCallbackPage = () => {
           return
         }
 
+        const { connectionData, identity: freshIdentity } = result
         const ethAddress = connectionData.account?.toLowerCase() ?? ''
 
         // CP2 reached: social login callback — now we have account + email
@@ -114,8 +116,10 @@ const DesktopCallbackPage = () => {
         // Explorer flow (skipSetup=true): skip this check entirely — the Explorer
         // handles onboarding in-app, so we just redirect back.
         if (!skipSetup && account) {
-          const freshIdentity = localStorageGetIdentity(ethAddress)
-          const profile = await ensureProfile(account, freshIdentity, { redirectTo, referrer, navigateOptions: { replace: true } })
+          // Use the identity just generated; fall back to the validated cache only if the provider
+          // path didn't produce one. Avoids the raw, unvalidated localStorage re-read.
+          const identityForProfile = freshIdentity ?? getCachedIdentity(ethAddress)
+          const profile = await ensureProfile(account, identityForProfile, { redirectTo, referrer, navigateOptions: { replace: true } })
           if (!profile) return
         }
 

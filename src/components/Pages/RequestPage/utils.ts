@@ -18,6 +18,12 @@ const HEX_STRING_REGEX = /^0x([0-9a-fA-F]{2})*$/
 // never actually reaches this view-selection logic.
 const SIGNATURE_METHODS = new Set(['personal_sign', 'eth_sign', 'eth_signtypeddata', 'eth_signtypeddata_v3', 'eth_signtypeddata_v4'])
 
+// ERC721 transfer methods that move a single token and share the (from, to, uint256 tokenId)
+// argument shape the branded gift view relies on. Batch variants (batchTransferFrom /
+// safeBatchTransferFrom) put a uint256[] in the third arg, so they are deliberately excluded —
+// decoding them as a single tokenId yields a bogus value and later throws in BigInt().
+const SINGLE_TOKEN_TRANSFER_METHODS = new Set(['transferFrom', 'safeTransferFrom'])
+
 /**
  * Returns true when the method is a plain signature request (not a transaction and not the
  * dedicated dcl_personal_sign sign-in flow).
@@ -397,24 +403,27 @@ function decodeNftTransferData(data: string, contractABI: object[]): { tokenId: 
     if (!data || data.length < 10) return null
 
     // Decode the transaction data using the ABI
-    const { args } = decodeFunctionData({
+    const { functionName, args } = decodeFunctionData({
       abi: contractABI as readonly unknown[],
       data: data as `0x${string}`
     })
 
-    if (!args || args.length < 3) {
-      console.error('Failed to decode transaction data')
+    // Only single-token transfers carry the (from, to, uint256 tokenId) shape this view expects.
+    // Anything else (batch transfers, unrelated methods) falls through to the generic simulation
+    // + acknowledgment path instead of being mis-decoded into a bogus tokenId.
+    if (!SINGLE_TOKEN_TRANSFER_METHODS.has(functionName) || !args || args.length < 3) {
       return null
     }
 
-    // All ERC721 transfer methods have these parameters:
     // transferFrom(address from, address to, uint256 tokenId)
-    // safeTransferFrom(address from, address to, uint256 tokenId)
-    // safeTransferFrom(address from, address to, uint256 tokenId, bytes data)
+    // safeTransferFrom(address from, address to, uint256 tokenId[, bytes data])
     const toAddress = args[1] as string // 'to' address is always the second parameter
-    const tokenId = (args[2] as bigint).toString() // tokenId is always the third parameter
+    const tokenId = args[2] // tokenId is always the third parameter
+    if (typeof tokenId !== 'bigint') {
+      return null
+    }
 
-    return { tokenId, toAddress }
+    return { tokenId: tokenId.toString(), toAddress }
   } catch (error) {
     console.error('Error decoding NFT transfer data:', error)
     return null
