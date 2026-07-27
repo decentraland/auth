@@ -152,12 +152,6 @@
       "title": "We couldn't complete your sign in",
       "description": "Something went wrong while finishing your sign in. Please try again."
     },
-    "ip_validation_error": {
-      "title": "Security Validation Failed",
-      "description": "This confirmation request was created from a different device or network. For security reasons, you can only complete this request from the same device where it was originally initiated.",
-      "request_id": "Request ID:",
-      "reason": "Reason:"
-    },
     "continue_in_app": {
       "sign_in_successful": "Sign In Successful",
       "redirect_countdown": "You will be redirected to {explorerText} in {countdown}...",

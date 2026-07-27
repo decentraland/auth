@@ -15,7 +15,6 @@ import { useDisabledCatalysts } from '../../../hooks/useDisabledCatalysts'
 import { useTrackReferral } from '../../../hooks/useTrackReferral'
 import { config } from '../../../modules/config'
 import { fetchProfileWithStatus } from '../../../modules/profile'
-import { IpValidationError } from '../../../shared/auth'
 import { useCurrentConnectionData } from '../../../shared/connection'
 import { isEmailValid } from '../../../shared/email'
 import { locations } from '../../../shared/locations'
@@ -339,13 +338,8 @@ const AvatarSetupPage: React.FC = () => {
           }
         }
       } catch (e) {
-        if (e instanceof IpValidationError) {
-          const errorMessage = handleError(e, 'IP validation failed')
-          setError(errorMessage)
-        } else {
-          const errorMessage = handleError(e, 'Error deploying profile')
-          setError(errorMessage)
-        }
+        const errorMessage = handleError(e, 'Error deploying profile')
+        setError(errorMessage)
         setDeploying(false)
       } finally {
         isProcessingMessageRef.current = false

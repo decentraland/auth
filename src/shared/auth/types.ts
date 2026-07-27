@@ -17,10 +17,6 @@ type IdentityResponse = {
 
 type OutcomeError = { code: number; message: string }
 
-type ValidationResponse = {
-  error?: string
-}
-
 /** Body sent to the auth-server `POST /simulations` endpoint. */
 type SimulationRequestBody = {
   chainId: number
@@ -101,7 +97,6 @@ export type {
   OutcomeResponse,
   IdentityResponse,
   OutcomeError,
-  ValidationResponse,
   SimulationRequestBody,
   SimulationResponseBody,
   AssetChange,
