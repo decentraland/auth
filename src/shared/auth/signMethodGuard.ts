@@ -1,3 +1,4 @@
+import { hexToString } from 'viem'
 import { ImpersonatedSignInError, UnsupportedMethodError } from './errors'
 
 // The only methods the auth site is willing to forward to the connected wallet. Anything
@@ -79,6 +80,39 @@ function isDecentralandIdentityAuthMessage(message: unknown): boolean {
   return lines[1].startsWith(EPHEMERAL_ADDRESS_LINE_PREFIX) && lines[2].startsWith(EXPIRATION_LINE_PREFIX)
 }
 
+// `personal_sign` params are routinely hex-encoded UTF-8 rather than plaintext — the approval UI
+// decodes them the same way (see extractSignaturePayload). The wallet signs the DECODED bytes, so a
+// hex-wrapped identity payload produces exactly the same usable auth chain as a plaintext one.
+// Detection therefore has to look through the encoding instead of only at the literal param.
+const HEX_STRING_REGEX = /^0x([0-9a-fA-F]{2})+$/i
+
+function decodeHexUtf8(value: string): string | null {
+  if (!HEX_STRING_REGEX.test(value)) {
+    return null
+  }
+  try {
+    // Normalize a `0X` prefix, which hexToString does not accept.
+    return hexToString(`0x${value.slice(2)}`)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Returns whether a single request param carries a Decentraland identity-authorization payload,
+ * either as plaintext or as hex-encoded UTF-8.
+ */
+function isIdentityAuthParam(param: unknown): boolean {
+  if (isDecentralandIdentityAuthMessage(param)) {
+    return true
+  }
+  if (typeof param !== 'string') {
+    return false
+  }
+  const decoded = decodeHexUtf8(param)
+  return decoded !== null && isDecentralandIdentityAuthMessage(decoded)
+}
+
 /**
  * Guards a recovered request against sign-in impersonation. No method may sign a
  * Decentraland identity-authorization payload: doing so would grant the requester an auth
@@ -86,7 +120,7 @@ function isDecentralandIdentityAuthMessage(message: unknown): boolean {
  * need one now hands the identity over through `POST /identities` instead of a signature.
  */
 function assertRequestIsNotImpersonatingSignIn(method: string, params: unknown[] | undefined): void {
-  if (params?.some(isDecentralandIdentityAuthMessage)) {
+  if (params?.some(isIdentityAuthParam)) {
     throw new ImpersonatedSignInError(method)
   }
 }

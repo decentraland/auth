@@ -148,6 +148,69 @@ describe('assertRequestIsNotImpersonatingSignIn', () => {
     })
   })
 
+  describe('when the method is personal_sign and the sign-in payload is hex-encoded UTF-8', () => {
+    let params: unknown[]
+
+    beforeEach(() => {
+      // How a wallet actually receives most personal_sign messages. The signature is produced over
+      // the DECODED bytes, so this yields the same usable auth chain as the plaintext form.
+      params = ['0x' + Buffer.from(signInPayload, 'utf8').toString('hex')]
+    })
+
+    it('should throw an ImpersonatedSignInError because detection looks through the encoding', () => {
+      expect(() => assertRequestIsNotImpersonatingSignIn('personal_sign', params)).toThrow(ImpersonatedSignInError)
+    })
+  })
+
+  describe('when the hex-encoded sign-in payload uses an uppercase 0X prefix', () => {
+    let params: unknown[]
+
+    beforeEach(() => {
+      params = ['0X' + Buffer.from(signInPayload, 'utf8').toString('hex').toUpperCase()]
+    })
+
+    it('should throw an ImpersonatedSignInError', () => {
+      expect(() => assertRequestIsNotImpersonatingSignIn('personal_sign', params)).toThrow(ImpersonatedSignInError)
+    })
+  })
+
+  describe('when the hex-encoded payload is not a sign-in message', () => {
+    let params: unknown[]
+
+    beforeEach(() => {
+      params = ['0x' + Buffer.from('Sign this message to prove you own this wallet', 'utf8').toString('hex')]
+    })
+
+    it('should not throw', () => {
+      expect(() => assertRequestIsNotImpersonatingSignIn('personal_sign', params)).not.toThrow()
+    })
+  })
+
+  describe('when a param is a plain hex value that is not decodable text', () => {
+    let params: unknown[]
+
+    beforeEach(() => {
+      // An address-like param must not be mistaken for an encoded payload, and must not throw.
+      params = ['0x1234567890123456789012345678901234567890']
+    })
+
+    it('should not throw', () => {
+      expect(() => assertRequestIsNotImpersonatingSignIn('personal_sign', params)).not.toThrow()
+    })
+  })
+
+  describe('when a param is malformed hex (odd length)', () => {
+    let params: unknown[]
+
+    beforeEach(() => {
+      params = ['0xabc']
+    })
+
+    it('should not throw', () => {
+      expect(() => assertRequestIsNotImpersonatingSignIn('personal_sign', params)).not.toThrow()
+    })
+  })
+
   describe('when the method is personal_sign and the message is a regular text', () => {
     let params: unknown[]
 

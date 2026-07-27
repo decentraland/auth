@@ -322,15 +322,17 @@ const AvatarSetupPage: React.FC = () => {
         sessionStorage.removeItem('dcl_avatar_setup_email')
         sessionStorage.removeItem('dcl_avatar_setup_is_terms_checked')
 
-        const hasLauncher = await launchDesktopApp({})
-
-        if (hasLauncher) {
-          navigate('/')
+        // A request-originated setup must go back to the request page, where the preserved
+        // `flow=deeplink` param resumes the identity handoff. This has to win over launching the
+        // desktop app: navigating home instead would leave the request with no identity ever
+        // posted, so the client would never receive its `signin=<identityId>` deep link.
+        if (requestId) {
+          redirect()
         } else {
-          // Came from a request page: hand control back to it, where the preserved
-          // `flow=deeplink` param resumes the identity handoff.
-          if (requestId) {
-            redirect()
+          const hasLauncher = await launchDesktopApp({})
+
+          if (hasLauncher) {
+            navigate('/')
           } else {
             const emailParam = state.email || getStoredEmail()
             redirect({ user: account, ...(emailParam ? { email: emailParam } : {}) }, config.get('DOWNLOAD_URL'))
