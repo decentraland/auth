@@ -152,12 +152,6 @@
       "title": "Nous n'avons pas pu finaliser votre connexion",
       "description": "Une erreur s'est produite lors de la finalisation de votre connexion. Veuillez réessayer."
     },
-    "ip_validation_error": {
-      "title": "Échec de la validation de sécurité",
-      "description": "Cette demande de confirmation a été créée depuis un appareil ou un réseau différent. Pour des raisons de sécurité, vous ne pouvez compléter cette demande que depuis l'appareil où elle a été initiée.",
-      "request_id": "ID de la demande :",
-      "reason": "Raison :"
-    },
     "continue_in_app": {
       "sign_in_successful": "Connexion réussie",
       "redirect_countdown": "Vous serez redirigé vers {explorerText} dans {countdown}...",

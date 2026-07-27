@@ -152,12 +152,6 @@
       "title": "我们无法完成您的登录",
       "description": "完成登录时出现问题。请重试。"
     },
-    "ip_validation_error": {
-      "title": "安全验证失败",
-      "description": "此确认请求是从不同的设备或网络创建的。出于安全原因，您只能从最初发起请求的同一设备完成此请求。",
-      "request_id": "请求 ID：",
-      "reason": "原因："
-    },
     "continue_in_app": {
       "sign_in_successful": "登录成功",
       "redirect_countdown": "您将在 {countdown} 秒后被重定向到 {explorerText}...",

@@ -17,7 +17,6 @@ import {
   ExpiredRequestError,
   IdentityResponse,
   ImpersonatedSignInError,
-  IpValidationError,
   RecoverResponse,
   RequestFulfilledError,
   SimulationRequestBody,
@@ -65,7 +64,6 @@ import {
   ContinueInApp,
   DeniedWalletInteraction,
   DifferentAccountError,
-  IpValidationError as IpValidationErrorView,
   LoadingRequest,
   OutdatedClientError,
   RecoverError,
@@ -83,7 +81,6 @@ import {
 enum View {
   TIMEOUT,
   DIFFERENT_ACCOUNT,
-  IP_VALIDATION_ERROR,
   // Loading
   LOADING_REQUEST,
   LOADING_ERROR,
@@ -121,8 +118,7 @@ const TERMINAL_VIEWS = new Set([
   View.WALLET_INTERACTION_ERROR,
   View.TIMEOUT,
   View.LOADING_ERROR,
-  View.DIFFERENT_ACCOUNT,
-  View.IP_VALIDATION_ERROR
+  View.DIFFERENT_ACCOUNT
 ])
 
 export const RequestPage = () => {
@@ -191,7 +187,6 @@ export const RequestPage = () => {
   const [error, setError] = useState<string>()
   const [identityId, setIdentityId] = useState<string>()
   const timeoutRef = useRef<NodeJS.Timeout>()
-  const signTimeoutRef = useRef<NodeJS.Timeout>()
   const requestId = params.requestId ?? ''
   const [targetConfig, targetConfigId] = useTargetConfig()
   const skipSetup = useSkipSetup()
@@ -693,10 +688,6 @@ export const RequestPage = () => {
         } else if (e instanceof ExpiredRequestError) {
           setView(View.TIMEOUT)
           return
-        } else if (e instanceof IpValidationError) {
-          setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
-          setView(View.IP_VALIDATION_ERROR)
-          return
         } else if (e instanceof RequestFulfilledError) {
           // Request was already consumed successfully — not an error, stop re-fetching
           hasCompletedRef.current = true
@@ -733,7 +724,6 @@ export const RequestPage = () => {
     return () => {
       cancelled = true
       clearTimeout(timeoutRef.current)
-      clearTimeout(signTimeoutRef.current)
     }
   }, [
     toLoginPage,
@@ -761,6 +751,17 @@ export const RequestPage = () => {
       clearTimeout(timeoutRef.current)
     }
   }, [view])
+
+  // Which completion view applies depends on the branded flow the request turned out to be.
+  const showInteractionCompleteView = useCallback(() => {
+    if (nftTransferData) {
+      setView(View.WALLET_NFT_INTERACTION_COMPLETE)
+    } else if (manaTransferData) {
+      setView(View.WALLET_MANA_INTERACTION_COMPLETE)
+    } else {
+      setView(View.WALLET_INTERACTION_COMPLETE)
+    }
+  }, [nftTransferData, manaTransferData])
 
   const onDenyWalletInteraction = useCallback(async () => {
     setIsLoading(true)
@@ -799,6 +800,10 @@ export const RequestPage = () => {
     setIsLoading(true)
     setIsTransactionModalOpen(false)
     const walletClient = walletClientRef.current
+    // Flips once the wallet has executed the request. Past that point the action is irreversible —
+    // the transaction is broadcast, or the payload is signed — so any later failure is a delivery
+    // problem, never a rejection. See the catch below.
+    let hasWalletResult = false
     try {
       if (!walletClient) {
         throw new Error('Provider not created')
@@ -865,24 +870,39 @@ export const RequestPage = () => {
         }
       }
 
+      hasWalletResult = true
+
       trackClick(ClickEvents.APPROVE_WALLET_INTERACTION, {
         method: requestRef.current?.method
       })
       await authServerClient.current.sendSuccessfulOutcome(requestId, signerAddress, result)
       hasCompletedRef.current = true
 
-      if (nftTransferData) {
-        setView(View.WALLET_NFT_INTERACTION_COMPLETE)
-      } else if (manaTransferData) {
-        if (result && identity) {
+      // A side effect of an outcome the server has already accepted, so its failure is its own
+      // concern: report it under its own context rather than as an outcome-delivery problem, and
+      // complete either way.
+      if (manaTransferData && result && identity) {
+        try {
           await sendTipNotification(identity, result)
+        } catch (notificationError) {
+          handleError(notificationError, 'Error sending the tip notification')
         }
-        setView(View.WALLET_MANA_INTERACTION_COMPLETE)
-      } else {
-        setView(View.WALLET_INTERACTION_COMPLETE)
       }
+      showInteractionCompleteView()
     } catch (e) {
-      if (isUserRejectedTransaction(e)) {
+      if (hasWalletResult) {
+        // The wallet already executed the request; only the delivery of its outcome failed.
+        // Reporting a failed outcome here would tell the client the user rejected a transaction
+        // that is already on-chain, and the error view would invite them to send it a second time.
+        // Neither is true, so surface completion and leave the request for the server to expire.
+        // An expected race (RequestFulfilledError, which carries skipReporting) is swallowed by
+        // handleError, so it lands on the same completion view without Sentry noise.
+        handleError(e, 'Error delivering the outcome of an executed wallet interaction', {
+          sentryTags: { isWeb2Wallet: isUserUsingWeb2Wallet }
+        })
+        hasCompletedRef.current = true
+        showInteractionCompleteView()
+      } else if (isUserRejectedTransaction(e)) {
         console.info('User rejected wallet interaction in wallet — not reporting to Sentry')
         try {
           if (walletClientRef.current) {
@@ -908,16 +928,7 @@ export const RequestPage = () => {
         // outcome delivery raced). It succeeded — show completion instead of attempting a failed
         // outcome and reporting an expected state as an error.
         hasCompletedRef.current = true
-        if (nftTransferData) {
-          setView(View.WALLET_NFT_INTERACTION_COMPLETE)
-        } else if (manaTransferData) {
-          setView(View.WALLET_MANA_INTERACTION_COMPLETE)
-        } else {
-          setView(View.WALLET_INTERACTION_COMPLETE)
-        }
-      } else if (e instanceof IpValidationError) {
-        setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
-        setView(View.IP_VALIDATION_ERROR)
+        showInteractionCompleteView()
       } else {
         handleError(e, 'Wallet interaction error', {
           sentryTags: { isWeb2Wallet: isUserUsingWeb2Wallet }
@@ -947,7 +958,7 @@ export const RequestPage = () => {
       setIsLoading(false)
       isApprovingRef.current = false
     }
-  }, [isUserUsingWeb2Wallet, nftTransferData, manaTransferData, requestId, identity])
+  }, [isUserUsingWeb2Wallet, nftTransferData, manaTransferData, requestId, identity, showInteractionCompleteView])
 
   const handleApproveWalletInteraction = useCallback(async () => {
     if (isUserUsingWeb2Wallet) {
@@ -1009,8 +1020,6 @@ export const RequestPage = () => {
       return <TimeoutError requestId={requestId} />
     case View.DIFFERENT_ACCOUNT:
       return <DifferentAccountError requestId={requestId} />
-    case View.IP_VALIDATION_ERROR:
-      return <IpValidationErrorView requestId={requestId} reason={error || 'Unknown error'} />
     case View.LOADING_ERROR:
       return (
         <RecoverError

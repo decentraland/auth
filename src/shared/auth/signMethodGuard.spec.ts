@@ -246,8 +246,8 @@ describe('assertMethodIsAllowed', () => {
   describe.each(['personal_sign', 'eth_signTypedData', 'eth_signTypedData_v3', 'eth_signTypedData_v4', 'eth_sendTransaction'])(
     'when the method is the allowed method %s',
     method => {
-      it('should not throw', () => {
-        expect(() => assertMethodIsAllowed(method)).not.toThrow()
+      it('should return it unchanged', () => {
+        expect(assertMethodIsAllowed(method)).toBe(method)
       })
     }
   )
@@ -255,6 +255,10 @@ describe('assertMethodIsAllowed', () => {
   describe('when the method casing differs from the canonical allowlist entry', () => {
     it('should not throw because the check is case-insensitive', () => {
       expect(() => assertMethodIsAllowed('PERSONAL_SIGN')).not.toThrow()
+    })
+
+    it('should return the canonical spelling so the case-sensitive dispatch downstream still matches', () => {
+      expect(assertMethodIsAllowed('eth_sendtransaction')).toBe('eth_sendTransaction')
     })
   })
 

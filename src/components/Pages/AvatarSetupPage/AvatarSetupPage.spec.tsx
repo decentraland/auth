@@ -45,19 +45,7 @@ jest.mock('../../../modules/profile', () => ({
 }))
 
 jest.mock('../../../shared/auth', () => ({
-  // eslint-disable-next-line @typescript-eslint/naming-convention
-  IpValidationError: class IpValidationError extends Error {
-    requestId: string
-    reason: string
-    constructor(requestId: string, reason: string) {
-      super(reason)
-      this.name = 'IpValidationError'
-      this.requestId = requestId
-      this.reason = reason
-    }
-  },
-  createAuthServerHttpClient: jest.fn().mockReturnValue({}),
-  createAuthServerWsClient: jest.fn().mockReturnValue({})
+  createAuthServerHttpClient: jest.fn().mockReturnValue({})
 }))
 
 jest.mock('../../../shared/connection', () => ({

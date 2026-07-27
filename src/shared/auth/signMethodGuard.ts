@@ -14,13 +14,11 @@ import { ImpersonatedSignInError, UnsupportedMethodError } from './errors'
 // sign-in message. The latter would bypass `assertRequestIsNotImpersonatingSignIn`, which can
 // only recognize a *plaintext* sign-in payload, not its hash. Major wallets deprecated
 // `eth_sign` for the same reason.
-const ALLOWED_METHODS = new Set([
-  'personal_sign',
-  'eth_signtypeddata',
-  'eth_signtypeddata_v3',
-  'eth_signtypeddata_v4',
-  'eth_sendtransaction'
-])
+const ALLOWED_METHODS = ['personal_sign', 'eth_signTypedData', 'eth_signTypedData_v3', 'eth_signTypedData_v4', 'eth_sendTransaction']
+
+// Lowercased method → its canonical EIP-1193 spelling, so the allowlist can stay forgiving about
+// casing while everything downstream only ever sees the canonical form (see assertMethodIsAllowed).
+const CANONICAL_METHODS_BY_LOWERCASE = new Map(ALLOWED_METHODS.map(method => [method.toLowerCase(), method]))
 
 // The retired sign-in method. Named here only so a rejected request can be recognized as coming
 // from a client that has not migrated to the identity handoff — it is NOT allowed, and this must
@@ -37,14 +35,24 @@ function isRetiredSignInMethod(method: string): boolean {
 }
 
 /**
- * Rejects any recovered request whose method is not on the {@link ALLOWED_METHODS} allowlist.
- * This is the primary defense against dangerous methods (e.g. `eth_sign`) reaching the wallet;
- * forwarding arbitrary provider methods is never safe on a signing surface.
+ * Rejects any recovered request whose method is not on the {@link ALLOWED_METHODS} allowlist and
+ * returns it in its canonical EIP-1193 spelling. This is the primary defense against dangerous
+ * methods (e.g. `eth_sign`) reaching the wallet; forwarding arbitrary provider methods is never
+ * safe on a signing surface.
+ *
+ * Matching stays case-insensitive so a client with a casing quirk isn't turned away, but the
+ * canonical spelling is what callers must dispatch on. Dispatch downstream is case-SENSITIVE
+ * (RequestPage switches on `eth_sendTransaction` exactly and forwards the method verbatim to the
+ * wallet), so an oddly-cased method that only passed the gate would otherwise skip the whole
+ * transaction path — simulation, meta-transaction relay, gas estimate — and then dead-end at a
+ * wallet that doesn't recognize it.
  */
-function assertMethodIsAllowed(method: string): void {
-  if (!ALLOWED_METHODS.has(method.toLowerCase())) {
+function assertMethodIsAllowed(method: string): string {
+  const canonicalMethod = CANONICAL_METHODS_BY_LOWERCASE.get(method.toLowerCase())
+  if (!canonicalMethod) {
     throw new UnsupportedMethodError(method)
   }
+  return canonicalMethod
 }
 
 // A Decentraland identity-authorization message (built by @dcl/crypto's

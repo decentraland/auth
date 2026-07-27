@@ -7,7 +7,6 @@ import {
   ContinueInApp,
   DeniedWalletInteraction,
   DifferentAccountError,
-  IpValidationError,
   LoadingRequest,
   OutdatedClientError,
   RecoverError,
@@ -56,7 +55,6 @@ export const TestViewPage = () => {
       },
       deniedWalletInteraction: { label: 'DeniedWalletInteraction', element: <DeniedWalletInteraction /> },
       differentAccountError: { label: 'DifferentAccountError', element: <DifferentAccountError requestId={DEFAULT_REQUEST_ID} /> },
-      ipValidationError: { label: 'IpValidationError', element: <IpValidationError requestId={DEFAULT_REQUEST_ID} reason="Test reason" /> },
       loadingRequest: { label: 'LoadingRequest', element: <LoadingRequest /> },
       manaTransfer: {
         label: 'TransferConfirmView (Tip)',

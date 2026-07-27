@@ -7,6 +7,7 @@ import {
   DifferentSenderError,
   ExpiredRequestError,
   ImpersonatedSignInError,
+  RequestFulfilledError,
   RequestNotFoundError,
   SimulationUnavailableError
 } from './errors'
@@ -90,6 +91,22 @@ describe('createAuthServerClient', () => {
         const result = await client.recover(mockRequestId, mockSignerAddress)
 
         expect(result).toEqual(mockResponse)
+      })
+    })
+
+    describe('and the method casing differs from the canonical EIP-1193 spelling', () => {
+      beforeEach(() => {
+        mockResponse.method = 'ETH_SENDTRANSACTION'
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockResponse)
+        })
+      })
+
+      it('should return the method pinned to its canonical spelling so the transaction path still matches', async () => {
+        const result = await client.recover(mockRequestId, mockSignerAddress)
+
+        expect(result.method).toBe('eth_sendTransaction')
       })
     })
 
@@ -233,6 +250,26 @@ describe('createAuthServerClient', () => {
         })
       })
 
+      describe('when the error is an already fulfilled error', () => {
+        beforeEach(() => {
+          message.error = 'Request with id "mock-request-id" has already been fulfilled'
+        })
+
+        it('should propagate a RequestFulfilledError', async () => {
+          await expect(client.sendSuccessfulOutcome(mockRequestId, mockSender, {})).rejects.toBeInstanceOf(RequestFulfilledError)
+        })
+      })
+
+      describe('when the error is an already has a response error', () => {
+        beforeEach(() => {
+          message.error = 'Request with id "mock-request-id" already has a response'
+        })
+
+        it('should propagate a RequestFulfilledError because the request was already answered', async () => {
+          await expect(client.sendSuccessfulOutcome(mockRequestId, mockSender, {})).rejects.toBeInstanceOf(RequestFulfilledError)
+        })
+      })
+
       describe('when the error is a different error', () => {
         beforeEach(() => {
           message.error = 'Unknown error'
@@ -307,7 +344,7 @@ describe('createAuthServerClient', () => {
         })
 
         it('should propagate the expiration error', async () => {
-          await expect(client.sendSuccessfulOutcome(mockRequestId, mockSender, {})).rejects.toBeInstanceOf(ExpiredRequestError)
+          await expect(client.sendFailedOutcome(mockRequestId, mockSender, mockError)).rejects.toBeInstanceOf(ExpiredRequestError)
         })
       })
 
@@ -317,7 +354,17 @@ describe('createAuthServerClient', () => {
         })
 
         it('should propagate the not found error', async () => {
-          await expect(client.sendSuccessfulOutcome(mockRequestId, mockSender, {})).rejects.toBeInstanceOf(RequestNotFoundError)
+          await expect(client.sendFailedOutcome(mockRequestId, mockSender, mockError)).rejects.toBeInstanceOf(RequestNotFoundError)
+        })
+      })
+
+      describe('when the error is an already has a response error', () => {
+        beforeEach(() => {
+          message.error = 'Request with id "mock-request-id" already has a response'
+        })
+
+        it('should propagate a RequestFulfilledError because the request was already answered', async () => {
+          await expect(client.sendFailedOutcome(mockRequestId, mockSender, mockError)).rejects.toBeInstanceOf(RequestFulfilledError)
         })
       })
 
@@ -327,7 +374,7 @@ describe('createAuthServerClient', () => {
         })
 
         it('should propagate the error', async () => {
-          await expect(client.sendSuccessfulOutcome(mockRequestId, mockSender, {})).rejects.toThrow(message.error)
+          await expect(client.sendFailedOutcome(mockRequestId, mockSender, mockError)).rejects.toThrow(message.error)
         })
       })
     })
@@ -341,53 +388,6 @@ describe('createAuthServerClient', () => {
 
       it('should handle and rethrow the error', async () => {
         await expect(client.sendFailedOutcome(mockRequestId, mockSender, mockError)).rejects.toThrow('Network error')
-      })
-    })
-  })
-
-  describe('when notifying that a request needs validation', () => {
-    let client: ReturnType<typeof createAuthServerHttpClient>
-
-    beforeEach(() => {
-      client = createAuthServerHttpClient()
-    })
-
-    describe('when the request is successful', () => {
-      beforeEach(() => {
-        mockFetch.mockResolvedValueOnce({
-          ok: true
-        })
-      })
-
-      it('should notify the request needs validation and resolve', async () => {
-        await client.notifyRequestNeedsValidation(mockRequestId)
-
-        expect(mockFetch).toHaveBeenCalledWith(mockUrl + '/v2/requests/' + mockRequestId + '/validation', { method: 'POST' })
-      })
-    })
-
-    describe('when the request fails due to network error', () => {
-      const error = new Error('Network error')
-
-      beforeEach(() => {
-        mockFetch.mockRejectedValueOnce(error)
-      })
-
-      it('should handle and rethrow the error', async () => {
-        await expect(client.notifyRequestNeedsValidation(mockRequestId)).rejects.toThrow('Network error')
-      })
-    })
-
-    describe('when the response contains an error', () => {
-      beforeEach(() => {
-        mockFetch.mockResolvedValueOnce({
-          ok: false,
-          json: () => Promise.resolve({ error: 'an error' })
-        })
-      })
-
-      it('should handle and rethrow the error', async () => {
-        await expect(client.notifyRequestNeedsValidation(mockRequestId)).rejects.toThrow('an error')
       })
     })
   })

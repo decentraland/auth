@@ -10,7 +10,6 @@ import {
   DifferentSenderError,
   ExpiredRequestError,
   ImpersonatedSignInError,
-  IpValidationError,
   RequestFulfilledError,
   UnsupportedMethodError
 } from '../../../shared/auth'
@@ -64,7 +63,6 @@ jest.mock('../../../modules/analytics/segment', () => ({
 const mockRecover = jest.fn()
 const mockSendSuccessfulOutcome = jest.fn()
 const mockSendFailedOutcome = jest.fn()
-const mockNotifyRequestNeedsValidation = jest.fn()
 const mockPostIdentity = jest.fn()
 const mockSimulateTransaction = jest.fn()
 jest.mock('../../../shared/auth', () => {
@@ -75,7 +73,6 @@ jest.mock('../../../shared/auth', () => {
       recover: mockRecover,
       sendSuccessfulOutcome: mockSendSuccessfulOutcome,
       sendFailedOutcome: mockSendFailedOutcome,
-      notifyRequestNeedsValidation: mockNotifyRequestNeedsValidation,
       postIdentity: mockPostIdentity,
       simulateTransaction: mockSimulateTransaction
     })
@@ -152,7 +149,6 @@ jest.mock('./Views', () => ({
   LoadingRequest: () => <div data-testid="loading-request">Loading...</div>,
   TimeoutError: () => <div data-testid="timeout-error">Timeout</div>,
   DifferentAccountError: () => <div data-testid="different-account">Different Account</div>,
-  IpValidationError: (props: any) => <div data-testid="ip-validation-error">IP Error: {props.reason}</div>,
   OutdatedClientError: () => <div data-testid="outdated-client-error">Outdated Client</div>,
   RecoverError: () => <div data-testid="recover-error">Recover Error</div>,
   SigningError: (props: any) => <div data-testid="signing-error">Signing Error: {props.error}</div>,
@@ -431,21 +427,6 @@ describe('RequestPage', () => {
         renderRequestPage()
         await waitFor(() => {
           expect(screen.getByTestId('timeout-error')).toBeInTheDocument()
-        })
-      })
-    })
-
-    describe('and recovery fails with an IpValidationError', () => {
-      beforeEach(() => {
-        mockGetAddresses.mockResolvedValue(['0xabc123'])
-        mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'User' }] })
-        mockRecover.mockRejectedValue(new IpValidationError(REQUEST_ID, 'IP mismatch'))
-      })
-
-      it('should show the IP validation error view', async () => {
-        renderRequestPage()
-        await waitFor(() => {
-          expect(screen.getByTestId('ip-validation-error')).toBeInTheDocument()
         })
       })
     })
@@ -798,6 +779,53 @@ describe('RequestPage', () => {
       renderRequestPage()
       await userEvent.click(await screen.findByTestId('wallet-interaction-approve'))
       expect(await screen.findByTestId('wallet-interaction-complete')).toBeInTheDocument()
+    })
+  })
+
+  describe('when the wallet executed the request but delivering its outcome fails', () => {
+    beforeEach(() => {
+      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.INJECTED }
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockRecover.mockResolvedValue({
+        method: 'personal_sign',
+        params: ['hello', '0xabc123'],
+        sender: '0xabc123',
+        expiration: new Date(Date.now() + 3600000).toISOString()
+      })
+      mockGetAddresses.mockResolvedValue(['0xabc123'])
+      mockWalletRequest.mockResolvedValue('0xsignature')
+      mockSendSuccessfulOutcome.mockRejectedValue(new Error('Network error'))
+      mockSendFailedOutcome.mockResolvedValue({})
+    })
+
+    it('should not report a failed outcome for an action the wallet already performed', async () => {
+      renderRequestPage()
+      await userEvent.click(await screen.findByTestId('wallet-interaction-approve'))
+      await waitFor(() => {
+        expect(screen.getByTestId('wallet-interaction-complete')).toBeInTheDocument()
+      })
+      expect(mockSendFailedOutcome).not.toHaveBeenCalled()
+    })
+
+    it('should show the completion view instead of an error that would invite a second signature', async () => {
+      renderRequestPage()
+      await userEvent.click(await screen.findByTestId('wallet-interaction-approve'))
+      expect(await screen.findByTestId('wallet-interaction-complete')).toBeInTheDocument()
+    })
+
+    describe('and the failure is an expected already-fulfilled race', () => {
+      beforeEach(() => {
+        mockSendSuccessfulOutcome.mockRejectedValue(new RequestFulfilledError(REQUEST_ID))
+      })
+
+      it('should show the completion view without reporting a failed outcome', async () => {
+        renderRequestPage()
+        await userEvent.click(await screen.findByTestId('wallet-interaction-approve'))
+        await waitFor(() => {
+          expect(screen.getByTestId('wallet-interaction-complete')).toBeInTheDocument()
+        })
+        expect(mockSendFailedOutcome).not.toHaveBeenCalled()
+      })
     })
   })
 
