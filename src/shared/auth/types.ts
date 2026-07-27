@@ -2,7 +2,6 @@ type RecoverResponse = {
   sender: string
   expiration: string
   method: string
-  code?: string
   error?: string
   params?: unknown[]
 }

@@ -110,9 +110,6 @@ jest.mock('../../../shared/errors', () => ({
 jest.mock('../../../modules/profile', () => ({
   fetchProfile: jest.fn()
 }))
-jest.mock('../../../shared/profile', () => ({
-  isProfileComplete: jest.fn().mockReturnValue(true)
-}))
 jest.mock('../../../modules/config', () => ({
   config: { get: jest.fn().mockReturnValue('10000') }
 }))
@@ -156,6 +153,7 @@ jest.mock('./Views', () => ({
   TimeoutError: () => <div data-testid="timeout-error">Timeout</div>,
   DifferentAccountError: () => <div data-testid="different-account">Different Account</div>,
   IpValidationError: (props: any) => <div data-testid="ip-validation-error">IP Error: {props.reason}</div>,
+  OutdatedClientError: () => <div data-testid="outdated-client-error">Outdated Client</div>,
   RecoverError: () => <div data-testid="recover-error">Recover Error</div>,
   SigningError: (props: any) => <div data-testid="signing-error">Signing Error: {props.error}</div>,
   WalletInteraction: (props: any) => (
@@ -357,12 +355,29 @@ describe('RequestPage', () => {
         mockRecover.mockRejectedValue(new UnsupportedMethodError('dcl_personal_sign'))
       })
 
-      it('should show the recover error view instead of signing anything', async () => {
+      it('should tell the user to update instead of offering a retry that cannot succeed', async () => {
+        renderRequestPage()
+        await waitFor(() => {
+          expect(screen.getByTestId('outdated-client-error')).toBeInTheDocument()
+        })
+        expect(screen.queryByTestId('recover-error')).not.toBeInTheDocument()
+        expect(mockSignMessage).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and recovery fails with an UnsupportedMethodError for any other method', () => {
+      beforeEach(() => {
+        mockGetAddresses.mockResolvedValue(['0xabc123'])
+        mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'User' }] })
+        mockRecover.mockRejectedValue(new UnsupportedMethodError('eth_sign'))
+      })
+
+      it('should show the generic recover error view, not the outdated client one', async () => {
         renderRequestPage()
         await waitFor(() => {
           expect(screen.getByTestId('recover-error')).toBeInTheDocument()
         })
-        expect(mockSignMessage).not.toHaveBeenCalled()
+        expect(screen.queryByTestId('outdated-client-error')).not.toBeInTheDocument()
       })
     })
 
@@ -714,9 +729,8 @@ describe('RequestPage', () => {
         mockRecover.mockResolvedValue({
           sender: '0xnewwallet',
           expiration: new Date(Date.now() + 60000).toISOString(),
-          method: 'dcl_personal_sign',
-          code: '9999',
-          params: ['Sign this']
+          method: 'personal_sign',
+          params: ['Sign this', '0xnewwallet']
         })
       })
 

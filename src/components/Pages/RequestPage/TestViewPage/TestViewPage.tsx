@@ -9,6 +9,7 @@ import {
   DifferentAccountError,
   IpValidationError,
   LoadingRequest,
+  OutdatedClientError,
   RecoverError,
   SignatureRequestView,
   SigningError,
@@ -85,6 +86,7 @@ export const TestViewPage = () => {
         label: 'TransferCompletedView (Gift)',
         element: <TransferCompletedView type={TransferType.GIFT} transferData={nftData} />
       },
+      outdatedClientError: { label: 'OutdatedClientError', element: <OutdatedClientError explorerText="Explorer" /> },
       recoverError: { label: 'RecoverError', element: <RecoverError onTryAgain={() => alert('try again')} /> },
       signingError: { label: 'SigningError', element: <SigningError error="Test error" /> },
       timeoutError: { label: 'TimeoutError', element: <TimeoutError requestId={DEFAULT_REQUEST_ID} /> },

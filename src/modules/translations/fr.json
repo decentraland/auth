@@ -62,7 +62,6 @@
     "error_contact_support": "Ou contactez le support avec le message d'erreur suivant :"
   },
   "request": {
-    "verify_sign_in": "Vérifier la connexion",
     "verification_match": "Le numéro de vérification ci-dessous correspond-il à celui dans le {explorerText} ?",
     "no_it_doesnt": "Non, il ne correspond pas",
     "yes_same": "Oui, ils sont identiques",
@@ -128,15 +127,9 @@
       "title": "Il semble que vous êtes connecté avec un compte différent.",
       "description": "Veuillez changer le compte de votre portefeuille pour celui connecté au {explorerText}."
     },
-    "sign_in_complete": {
-      "title": "Connexion réussie !",
-      "description": "Retournez au {explorerText} pour entrer !",
-      "explorer_title": "Connexion réussie!",
-      "explorer_description_line2": "Retournez à Decentraland App pour finaliser votre compte !"
-    },
-    "denied_sign_in": {
-      "title": "Le numéro ne correspondait pas, ou cette action n'a pas été effectuée par vous ?",
-      "description": "Si vous essayez de vous connecter, réessayez l'action. Si cette action n'a pas été initiée par vous, ignorez ce message."
+    "outdated_client_error": {
+      "title": "Votre application doit être mise à jour",
+      "description": "Cette version de {explorerText} utilise une méthode de connexion qui n'est plus prise en charge. Veuillez installer la dernière version, puis vous reconnecter."
     },
     "wallet_interaction_complete": {
       "title": "Interaction avec le portefeuille terminée",

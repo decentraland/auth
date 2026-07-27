@@ -19,8 +19,7 @@ const HEX_STRING_REGEX = /^0x([0-9a-fA-F]{2})*$/
 const SIGNATURE_METHODS = new Set(['personal_sign', 'eth_sign', 'eth_signtypeddata', 'eth_signtypeddata_v3', 'eth_signtypeddata_v4'])
 
 /**
- * Returns true when the method is a plain signature request (not a transaction and not the
- * dedicated dcl_personal_sign sign-in flow).
+ * Returns true when the method is a plain signature request rather than a transaction.
  */
 function isSignatureMethod(method: string): boolean {
   return SIGNATURE_METHODS.has(method.toLowerCase())

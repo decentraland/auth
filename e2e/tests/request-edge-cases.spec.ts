@@ -95,6 +95,52 @@ test.describe('Deep link login handoff (flow=deeplink with a UUID v4 id)', () =>
   })
 })
 
+test.describe('Retired dcl_personal_sign sign-in (unmigrated client)', () => {
+  /**
+   * The auth site no longer serves the dcl_personal_sign sign-in. A client that still sends it is
+   * rejected at recover time, and the user is told to update rather than shown a generic recover
+   * error whose "try again" would re-create the same rejected request.
+   */
+
+  test.beforeEach(async ({ context }) => {
+    await injectMockWallet(context)
+  })
+
+  test('shows the update-your-app view and never signs anything', async ({ page }) => {
+    await mockApiRoutes(page, { hasProfile: true, onboardingToExplorer: true })
+
+    // Registered after mockApiRoutes so it wins: the recover returns the retired method.
+    await page.route('**/v2/requests/**', async (route, request) => {
+      if (request.method() === 'GET' && !request.url().includes('/outcome')) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            requestId: MOCK_REQUEST_ID,
+            expiration: new Date(Date.now() + 600_000).toISOString(),
+            method: 'dcl_personal_sign',
+            params: ['Sign this message to verify your identity']
+          })
+        })
+      }
+      return route.fallback()
+    })
+
+    let outcomeSent = false
+    await page.route('**/v2/requests/**/outcome', async route => {
+      outcomeSent = true
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) })
+    })
+
+    await page.goto(`/auth/requests/${MOCK_REQUEST_ID}?loginMethod=METAMASK`)
+
+    await expect(page.locator('[data-testid="outdated-client-error"]')).toBeVisible({ timeout: 20_000 })
+    // No retry is offered, and nothing was signed or reported back to the client.
+    await expect(page.locator('[data-testid="client-login-error-try-again-button"]')).not.toBeVisible()
+    expect(outcomeSent).toBe(false)
+  })
+})
+
 test.describe('Different account error', () => {
   test.beforeEach(async ({ context }) => {
     await injectMockWallet(context)

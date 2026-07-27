@@ -1,5 +1,10 @@
 import { ImpersonatedSignInError, UnsupportedMethodError } from './errors'
-import { assertMethodIsAllowed, assertRequestIsNotImpersonatingSignIn, isDecentralandIdentityAuthMessage } from './signMethodGuard'
+import {
+  assertMethodIsAllowed,
+  assertRequestIsNotImpersonatingSignIn,
+  isDecentralandIdentityAuthMessage,
+  isRetiredSignInMethod
+} from './signMethodGuard'
 
 describe('isDecentralandIdentityAuthMessage', () => {
   describe('when the message is a canonical Decentraland sign-in payload', () => {
@@ -205,6 +210,26 @@ describe('assertMethodIsAllowed', () => {
   describe('when the method is an unknown method', () => {
     it('should throw an UnsupportedMethodError', () => {
       expect(() => assertMethodIsAllowed('eth_doSomethingWeird')).toThrow(UnsupportedMethodError)
+    })
+  })
+})
+
+describe('isRetiredSignInMethod', () => {
+  describe('when the method is the retired sign-in', () => {
+    it('should return true', () => {
+      expect(isRetiredSignInMethod('dcl_personal_sign')).toBe(true)
+    })
+  })
+
+  describe('when the retired sign-in casing differs', () => {
+    it('should return true because the check is case-insensitive', () => {
+      expect(isRetiredSignInMethod('DCL_Personal_Sign')).toBe(true)
+    })
+  })
+
+  describe('when the method is a supported one', () => {
+    it('should return false', () => {
+      expect(isRetiredSignInMethod('personal_sign')).toBe(false)
     })
   })
 })

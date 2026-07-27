@@ -25,6 +25,7 @@ import {
   UnsupportedMethodError,
   createAuthServerHttpClient
 } from '../../../shared/auth'
+import { isRetiredSignInMethod } from '../../../shared/auth/signMethodGuard'
 import { isSocialProviderType, useCurrentConnectionData } from '../../../shared/connection'
 import { isSessionMismatch } from '../../../shared/connection/sessionMismatch'
 import { isErrorWithMessage, isRpcError, isUserRejectedTransaction } from '../../../shared/errors'
@@ -66,6 +67,7 @@ import {
   DifferentAccountError,
   IpValidationError as IpValidationErrorView,
   LoadingRequest,
+  OutdatedClientError,
   RecoverError,
   SignatureRequestView,
   SigningError,
@@ -89,6 +91,8 @@ enum View {
   DEEP_LINK_CONTINUE_IN_APP,
   // Client-login pseudo request (identity post failed)
   CLIENT_LOGIN_ERROR,
+  // Request used the retired dcl_personal_sign sign-in (client too old to migrate)
+  OUTDATED_CLIENT,
   // Wallet Interaction
   WALLET_INTERACTION,
   WALLET_SIGNATURE_INTERACTION,
@@ -107,6 +111,7 @@ enum View {
 const TERMINAL_VIEWS = new Set([
   View.DEEP_LINK_CONTINUE_IN_APP,
   View.CLIENT_LOGIN_ERROR,
+  View.OUTDATED_CLIENT,
   View.WALLET_INTERACTION_COMPLETE,
   View.WALLET_NFT_INTERACTION_COMPLETE,
   View.WALLET_MANA_INTERACTION_COMPLETE,
@@ -705,11 +710,12 @@ export const RequestPage = () => {
           setView(View.WALLET_INTERACTION_ERROR)
           return
         } else if (e instanceof UnsupportedMethodError) {
-          // The request used a method that is not on the allowlist (e.g. the dangerous legacy
-          // eth_sign). Block it outright — a retry would re-trigger the same rejection.
+          // The request used a method that is not on the allowlist. Block it outright — a retry
+          // would re-trigger the same rejection. A client still on the retired sign-in method
+          // gets the "update your app" view instead of a generic error whose retry cannot work.
           hasCompletedRef.current = true
           setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
-          setView(View.LOADING_ERROR)
+          setView(isRetiredSignInMethod(e.method) ? View.OUTDATED_CLIENT : View.LOADING_ERROR)
           return
         }
 
@@ -1017,6 +1023,8 @@ export const RequestPage = () => {
       return <SigningError error={error} />
     case View.CLIENT_LOGIN_ERROR:
       return <ClientLoginError error={error} onTryAgain={onRetryClientLogin} />
+    case View.OUTDATED_CLIENT:
+      return <OutdatedClientError explorerText={targetConfig.explorerText} />
     case View.DEEP_LINK_CONTINUE_IN_APP:
       return (
         <ContinueInApp

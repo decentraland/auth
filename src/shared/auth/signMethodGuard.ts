@@ -21,6 +21,20 @@ const ALLOWED_METHODS = new Set([
   'eth_sendtransaction'
 ])
 
+// The retired sign-in method. Named here only so a rejected request can be recognized as coming
+// from a client that has not migrated to the identity handoff — it is NOT allowed, and this must
+// never be added back to ALLOWED_METHODS.
+const RETIRED_SIGN_IN_METHOD = 'dcl_personal_sign'
+
+/**
+ * Returns whether a rejected method is the retired Decentraland sign-in. Lets the request page
+ * tell the user their app is out of date instead of showing a generic recover error whose retry
+ * would re-create the same rejected request.
+ */
+function isRetiredSignInMethod(method: string): boolean {
+  return method.toLowerCase() === RETIRED_SIGN_IN_METHOD
+}
+
 /**
  * Rejects any recovered request whose method is not on the {@link ALLOWED_METHODS} allowlist.
  * This is the primary defense against dangerous methods (e.g. `eth_sign`) reaching the wallet;
@@ -77,4 +91,4 @@ function assertRequestIsNotImpersonatingSignIn(method: string, params: unknown[]
   }
 }
 
-export { isDecentralandIdentityAuthMessage, assertRequestIsNotImpersonatingSignIn, assertMethodIsAllowed }
+export { isDecentralandIdentityAuthMessage, assertRequestIsNotImpersonatingSignIn, assertMethodIsAllowed, isRetiredSignInMethod }
