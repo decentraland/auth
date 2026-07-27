@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { injectMockWallet, mockApiRoutes, MOCK_REQUEST_ID } from '../helpers/setup'
+import { injectMockWallet, mockApiRoutes, MOCK_REQUEST_ID, DEEP_LINK_REQUEST_ID } from '../helpers/setup'
 
 test.describe('Social login: AutoLoginRedirect renders for each provider', () => {
   test.beforeEach(async ({ context }) => {
@@ -175,33 +175,33 @@ test.describe('Explorer social flow: request page after social login', () => {
     await injectMockWallet(context)
   })
 
-  test('existing user: request page → verify → approve → success → auto-deeplink', async ({ page }) => {
+  test('existing user: request page → posts the identity → fires the client deep link', async ({ page }) => {
     await mockApiRoutes(page, { hasProfile: true, onboardingToExplorer: true })
 
     // Simulate arriving at request page after social login (wallet already connected via mock)
     // loginMethod=METAMASK needed so RequestPage → login → AutoLoginRedirect → reconnect
-    await page.goto(`/auth/requests/${MOCK_REQUEST_ID}?loginMethod=METAMASK`)
+    await page.goto(`/auth/requests/${DEEP_LINK_REQUEST_ID}?loginMethod=METAMASK&flow=deeplink`)
 
-    // Verification screen
-    await expect(page.getByText('Verify Sign In')).toBeVisible({ timeout: 15_000 })
-    await expect(page.getByText('1234')).toBeVisible()
-
-    // Approve
-    await page.getByRole('button', { name: /yes, they are the same/i }).click()
-
-    // Success page — deeplink fires automatically on mount
-    await expect(page.getByText(/Sign In successful/i)).toBeVisible({ timeout: 15_000 })
+    await expect(page.locator('[data-testid="continue-in-app-try-again-button"]')).toBeVisible({ timeout: 20_000 })
   })
 
-  test('new user (no profile): auto-signs → success without verification', async ({
-    page
-  }) => {
+  test('new user (no profile): completes the handoff without a setup page', async ({ page }) => {
+    // Longest path in the suite (login redirect → connect → profile fetch), so assert the handoff
+    // itself rather than the ContinueInApp fallback, which only appears after a further countdown.
+    test.slow()
     await mockApiRoutes(page, { hasProfile: false, onboardingToExplorer: true })
 
-    await page.goto(`/auth/requests/${MOCK_REQUEST_ID}?loginMethod=METAMASK`)
+    let postedIdentity = false
+    await page.route('**/identities', async (route, request) => {
+      if (request.method() === 'POST') {
+        postedIdentity = true
+      }
+      return route.fallback()
+    })
 
-    // New users skip verification — auto-sign goes straight to success
-    await expect(page.getByText(/Sign In successful/i)).toBeVisible({ timeout: 20_000 })
+    await page.goto(`/auth/requests/${DEEP_LINK_REQUEST_ID}?loginMethod=METAMASK&flow=deeplink`)
+
+    await expect.poll(() => postedIdentity, { timeout: 40_000 }).toBe(true)
 
     // Should NOT show setup pages
     await expect(page.getByPlaceholder(/enter your username/i)).not.toBeVisible()

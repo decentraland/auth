@@ -134,31 +134,14 @@ export const createAuthServerWsClient = (authServerUrl?: string) => {
       // before anything is forwarded to the wallet.
       assertMethodIsAllowed(response.method)
 
-      // Reject requests that try to replicate the dcl_personal_sign sign-in through a
-      // generic signing method (e.g. personal_sign), which would bypass its protections.
+      // Reject requests that ask the wallet to sign a Decentraland identity-authorization
+      // payload, which would yield an auth chain that impersonates the user.
       assertRequestIsNotImpersonatingSignIn(response.method, response.params)
 
-      switch (response.method) {
-        case 'dcl_personal_sign':
-          trackEvent(TrackingEvents.REQUEST_INTERACTION, {
-            type: RequestInteractionType.VERIFY_SIGN_IN,
-            browserTime: Date.now(),
-            requestTime: new Date(response.expiration).getTime(),
-            requestType: response?.method
-          })
-          break
-        case 'eth_sendTransaction':
-          trackEvent(TrackingEvents.REQUEST_INTERACTION, {
-            type: RequestInteractionType.WALLET_INTERACTION,
-            requestType: response.method
-          })
-          break
-        default:
-          trackEvent(TrackingEvents.REQUEST_INTERACTION, {
-            type: RequestInteractionType.WALLET_INTERACTION,
-            requestType: response.method
-          })
-      }
+      trackEvent(TrackingEvents.REQUEST_INTERACTION, {
+        type: RequestInteractionType.WALLET_INTERACTION,
+        requestType: response.method
+      })
 
       return response
     } catch (e) {

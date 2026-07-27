@@ -5,22 +5,15 @@
 
 export const MOCK_WALLET = '0x747c6f502272129bf1ba872a1903045b837ee86c'
 export const MOCK_REQUEST_ID = 'e2e-test-request-id-1234'
+/** A valid UUID v4 — the client-generated correlation id the deep-link login handoff requires. */
+export const DEEP_LINK_REQUEST_ID = '123e4567-e89b-42d3-a456-426614174000'
 
-/** Auth server: GET /v2/requests/:id — recover a signing request (with verification code) */
+/** Auth server: GET /v2/requests/:id — recover a wallet signature request */
 export const recoverRequestResponse = {
   requestId: MOCK_REQUEST_ID,
-  code: '1234',
   expiration: new Date(Date.now() + 600_000).toISOString(), // 10 min from now
-  method: 'dcl_personal_sign',
-  params: ['Sign this message to verify your identity']
-}
-
-/** Auth server: GET /v2/requests/:id — recover WITHOUT code (new user, no verification needed) */
-export const recoverRequestNoCodeResponse = {
-  requestId: MOCK_REQUEST_ID,
-  expiration: new Date(Date.now() + 600_000).toISOString(),
-  method: 'dcl_personal_sign',
-  params: ['Sign this message to verify your identity']
+  method: 'personal_sign',
+  params: ['Sign this message to prove you own this wallet', MOCK_WALLET]
 }
 
 /** Auth server: POST /v2/requests/:id/outcome — successful outcome */
@@ -28,23 +21,26 @@ export const outcomeResponse = {
   ok: true
 }
 
+/** Auth server: POST /identities — the login handoff that replaced the dcl_personal_sign sign-in */
+export const createIdentityResponse = {
+  identityId: 'e2e-identity-id'
+}
+
 /** Auth server: GET /v2/requests/:id — recover with a DIFFERENT sender than connected wallet */
 export const recoverRequestDifferentSenderResponse = {
   requestId: MOCK_REQUEST_ID,
   sender: '0x0000000000000000000000000000000000000001', // doesn't match MOCK_WALLET
-  code: '1234',
   expiration: new Date(Date.now() + 600_000).toISOString(),
-  method: 'dcl_personal_sign',
-  params: ['Sign this message to verify your identity']
+  method: 'personal_sign',
+  params: ['Sign this message to prove you own this wallet', MOCK_WALLET]
 }
 
 /** Auth server: GET /v2/requests/:id — recover with EXPIRED expiration */
 export const recoverRequestExpiredResponse = {
   requestId: MOCK_REQUEST_ID,
-  code: '1234',
   expiration: new Date(Date.now() - 60_000).toISOString(), // 1 min in the past
-  method: 'dcl_personal_sign',
-  params: ['Sign this message to verify your identity']
+  method: 'personal_sign',
+  params: ['Sign this message to prove you own this wallet', MOCK_WALLET]
 }
 
 /** Auth server: GET /health — for clock sync check */

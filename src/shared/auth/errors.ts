@@ -55,11 +55,11 @@ class TimedOutError extends Error {
 }
 
 /**
- * Thrown when a request whose method is not `dcl_personal_sign` (e.g. a plain
- * `personal_sign`) asks the user to sign a Decentraland identity-authorization
- * payload. Allowing it would let a malicious site replicate the `dcl_personal_sign`
- * sign-in flow through the generic signing path, bypassing its protections, and
- * obtain a valid auth chain that impersonates the user.
+ * Thrown when a request asks the user to sign a Decentraland identity-authorization
+ * payload through a generic signing method (e.g. `personal_sign`). Allowing it would
+ * hand the requester a valid auth chain that impersonates the user. No method is
+ * exempt: identities are issued through `POST /identities`, never through a signature
+ * the auth site produces on a request's behalf.
  */
 class ImpersonatedSignInError extends Error {
   constructor(public readonly method: string) {

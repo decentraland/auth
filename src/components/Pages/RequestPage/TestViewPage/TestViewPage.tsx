@@ -5,13 +5,12 @@ import { TransferType } from '../types'
 import {
   CloseWindow,
   ContinueInApp,
-  DeniedSignIn,
   DeniedWalletInteraction,
   DifferentAccountError,
   IpValidationError,
   LoadingRequest,
+  OutdatedClientError,
   RecoverError,
-  SignInComplete,
   SignatureRequestView,
   SigningError,
   SimulationSummary,
@@ -20,7 +19,6 @@ import {
   TransferCanceledView,
   TransferCompletedView,
   TransferConfirmView,
-  VerifySignIn,
   WalletInteraction,
   WalletInteractionComplete
 } from '../Views'
@@ -56,7 +54,6 @@ export const TestViewPage = () => {
         label: 'ContinueInApp',
         element: <ContinueInApp autoStart={false} onContinue={noop} requestId={DEFAULT_REQUEST_ID} deepLinkUrl="decentraland://" />
       },
-      deniedSignIn: { label: 'DeniedSignIn', element: <DeniedSignIn requestId={DEFAULT_REQUEST_ID} /> },
       deniedWalletInteraction: { label: 'DeniedWalletInteraction', element: <DeniedWalletInteraction /> },
       differentAccountError: { label: 'DifferentAccountError', element: <DifferentAccountError requestId={DEFAULT_REQUEST_ID} /> },
       ipValidationError: { label: 'IpValidationError', element: <IpValidationError requestId={DEFAULT_REQUEST_ID} reason="Test reason" /> },
@@ -89,14 +86,10 @@ export const TestViewPage = () => {
         label: 'TransferCompletedView (Gift)',
         element: <TransferCompletedView type={TransferType.GIFT} transferData={nftData} />
       },
+      outdatedClientError: { label: 'OutdatedClientError', element: <OutdatedClientError explorerText="Explorer" /> },
       recoverError: { label: 'RecoverError', element: <RecoverError onTryAgain={() => alert('try again')} /> },
       signingError: { label: 'SigningError', element: <SigningError error="Test error" /> },
-      signInComplete: { label: 'SignInComplete', element: <SignInComplete /> },
       timeoutError: { label: 'TimeoutError', element: <TimeoutError requestId={DEFAULT_REQUEST_ID} /> },
-      verifySignIn: {
-        label: 'Verify Sign In',
-        element: <VerifySignIn requestId={DEFAULT_REQUEST_ID} code={1234} onDeny={noop} onApprove={noop} />
-      },
       walletInteraction: {
         label: 'Wallet Interaction',
         element: <WalletInteraction requestId={DEFAULT_REQUEST_ID} onDeny={noop} onApprove={noop} />

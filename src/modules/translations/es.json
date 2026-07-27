@@ -62,7 +62,6 @@
     "error_contact_support": "O contacta a soporte con el siguiente mensaje de error:"
   },
   "request": {
-    "verify_sign_in": "Verificar inicio de sesión",
     "verification_match": "¿El número de verificación de abajo coincide con el del {explorerText}?",
     "no_it_doesnt": "No, no coincide",
     "yes_same": "Sí, son iguales",
@@ -128,15 +127,9 @@
       "title": "Parece que estás conectado con una cuenta diferente.",
       "description": "Por favor, cambia la cuenta de tu billetera a la que está conectada a la {explorerText}."
     },
-    "sign_in_complete": {
-      "title": "¡Inicio de sesión exitoso!",
-      "description": "¡Regresa a la {explorerText} para entrar!",
-      "explorer_title": "¡Inicio de sesión exitoso!",
-      "explorer_description_line2": "¡Regresa a Decentraland App para completar tu cuenta!"
-    },
-    "denied_sign_in": {
-      "title": "¿El número no coincidió o esta acción no fue realizada por ti?",
-      "description": "Si estás intentando iniciar sesión, reintenta la acción. Si esta acción no fue iniciada por ti, ignora este mensaje."
+    "outdated_client_error": {
+      "title": "Tu aplicación necesita una actualización",
+      "description": "Esta versión de {explorerText} usa un método de inicio de sesión que ya no es compatible. Actualiza a la última versión e inicia sesión de nuevo."
     },
     "wallet_interaction_complete": {
       "title": "Interacción con billetera completada",

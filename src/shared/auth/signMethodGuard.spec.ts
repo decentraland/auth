@@ -1,5 +1,10 @@
 import { ImpersonatedSignInError, UnsupportedMethodError } from './errors'
-import { assertMethodIsAllowed, assertRequestIsNotImpersonatingSignIn, isDecentralandIdentityAuthMessage } from './signMethodGuard'
+import {
+  assertMethodIsAllowed,
+  assertRequestIsNotImpersonatingSignIn,
+  isDecentralandIdentityAuthMessage,
+  isRetiredSignInMethod
+} from './signMethodGuard'
 
 describe('isDecentralandIdentityAuthMessage', () => {
   describe('when the message is a canonical Decentraland sign-in payload', () => {
@@ -107,15 +112,15 @@ describe('assertRequestIsNotImpersonatingSignIn', () => {
     ].join('\n')
   })
 
-  describe('when the method is dcl_personal_sign', () => {
+  describe('when the method is dcl_personal_sign and the message is a sign-in payload', () => {
     let params: unknown[]
 
     beforeEach(() => {
       params = [signInPayload]
     })
 
-    it('should not throw even when the message is a sign-in payload', () => {
-      expect(() => assertRequestIsNotImpersonatingSignIn('dcl_personal_sign', params)).not.toThrow()
+    it('should throw an ImpersonatedSignInError because no method is exempt anymore', () => {
+      expect(() => assertRequestIsNotImpersonatingSignIn('dcl_personal_sign', params)).toThrow(ImpersonatedSignInError)
     })
   })
 
@@ -140,6 +145,69 @@ describe('assertRequestIsNotImpersonatingSignIn', () => {
 
     it('should throw an ImpersonatedSignInError regardless of the param order', () => {
       expect(() => assertRequestIsNotImpersonatingSignIn('eth_sign', params)).toThrow(ImpersonatedSignInError)
+    })
+  })
+
+  describe('when the method is personal_sign and the sign-in payload is hex-encoded UTF-8', () => {
+    let params: unknown[]
+
+    beforeEach(() => {
+      // How a wallet actually receives most personal_sign messages. The signature is produced over
+      // the DECODED bytes, so this yields the same usable auth chain as the plaintext form.
+      params = ['0x' + Buffer.from(signInPayload, 'utf8').toString('hex')]
+    })
+
+    it('should throw an ImpersonatedSignInError because detection looks through the encoding', () => {
+      expect(() => assertRequestIsNotImpersonatingSignIn('personal_sign', params)).toThrow(ImpersonatedSignInError)
+    })
+  })
+
+  describe('when the hex-encoded sign-in payload uses an uppercase 0X prefix', () => {
+    let params: unknown[]
+
+    beforeEach(() => {
+      params = ['0X' + Buffer.from(signInPayload, 'utf8').toString('hex').toUpperCase()]
+    })
+
+    it('should throw an ImpersonatedSignInError', () => {
+      expect(() => assertRequestIsNotImpersonatingSignIn('personal_sign', params)).toThrow(ImpersonatedSignInError)
+    })
+  })
+
+  describe('when the hex-encoded payload is not a sign-in message', () => {
+    let params: unknown[]
+
+    beforeEach(() => {
+      params = ['0x' + Buffer.from('Sign this message to prove you own this wallet', 'utf8').toString('hex')]
+    })
+
+    it('should not throw', () => {
+      expect(() => assertRequestIsNotImpersonatingSignIn('personal_sign', params)).not.toThrow()
+    })
+  })
+
+  describe('when a param is a plain hex value that is not decodable text', () => {
+    let params: unknown[]
+
+    beforeEach(() => {
+      // An address-like param must not be mistaken for an encoded payload, and must not throw.
+      params = ['0x1234567890123456789012345678901234567890']
+    })
+
+    it('should not throw', () => {
+      expect(() => assertRequestIsNotImpersonatingSignIn('personal_sign', params)).not.toThrow()
+    })
+  })
+
+  describe('when a param is malformed hex (odd length)', () => {
+    let params: unknown[]
+
+    beforeEach(() => {
+      params = ['0xabc']
+    })
+
+    it('should not throw', () => {
+      expect(() => assertRequestIsNotImpersonatingSignIn('personal_sign', params)).not.toThrow()
     })
   })
 
@@ -175,18 +243,14 @@ describe('assertRequestIsNotImpersonatingSignIn', () => {
 })
 
 describe('assertMethodIsAllowed', () => {
-  describe.each([
-    'dcl_personal_sign',
-    'personal_sign',
-    'eth_signTypedData',
-    'eth_signTypedData_v3',
-    'eth_signTypedData_v4',
-    'eth_sendTransaction'
-  ])('when the method is the allowed method %s', method => {
-    it('should not throw', () => {
-      expect(() => assertMethodIsAllowed(method)).not.toThrow()
-    })
-  })
+  describe.each(['personal_sign', 'eth_signTypedData', 'eth_signTypedData_v3', 'eth_signTypedData_v4', 'eth_sendTransaction'])(
+    'when the method is the allowed method %s',
+    method => {
+      it('should not throw', () => {
+        expect(() => assertMethodIsAllowed(method)).not.toThrow()
+      })
+    }
+  )
 
   describe('when the method casing differs from the canonical allowlist entry', () => {
     it('should not throw because the check is case-insensitive', () => {
@@ -200,9 +264,35 @@ describe('assertMethodIsAllowed', () => {
     })
   })
 
+  describe('when the method is the retired dcl_personal_sign sign-in', () => {
+    it('should throw an UnsupportedMethodError', () => {
+      expect(() => assertMethodIsAllowed('dcl_personal_sign')).toThrow(UnsupportedMethodError)
+    })
+  })
+
   describe('when the method is an unknown method', () => {
     it('should throw an UnsupportedMethodError', () => {
       expect(() => assertMethodIsAllowed('eth_doSomethingWeird')).toThrow(UnsupportedMethodError)
+    })
+  })
+})
+
+describe('isRetiredSignInMethod', () => {
+  describe('when the method is the retired sign-in', () => {
+    it('should return true', () => {
+      expect(isRetiredSignInMethod('dcl_personal_sign')).toBe(true)
+    })
+  })
+
+  describe('when the retired sign-in casing differs', () => {
+    it('should return true because the check is case-insensitive', () => {
+      expect(isRetiredSignInMethod('DCL_Personal_Sign')).toBe(true)
+    })
+  })
+
+  describe('when the method is a supported one', () => {
+    it('should return false', () => {
+      expect(isRetiredSignInMethod('personal_sign')).toBe(false)
     })
   })
 })

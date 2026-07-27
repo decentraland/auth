@@ -24,15 +24,12 @@ enum TrackingEvents {
 }
 
 enum RequestInteractionType {
-  VERIFY_SIGN_IN = 'Verify sign in',
   WALLET_INTERACTION = 'Wallet interaction'
 }
 
 enum ClickEvents {
   LEARN_MORE = 'Learn More',
-  DENY_SIGN_IN = 'Deny Sign In',
   DENY_WALLET_INTERACTION = 'Deny Wallet Interaction',
-  APPROVE_SING_IN = 'Approve Sign In',
   APPROVE_WALLET_INTERACTION = 'Approve Wallet Interaction',
   IDENTITY_DEEP_LINK_OPENED = 'Identity Deep Link Opened',
   RANDOMIZE = 'Randomize default profile',

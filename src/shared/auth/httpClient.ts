@@ -176,30 +176,14 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
       // before anything is forwarded to the wallet.
       assertMethodIsAllowed(recoverResponse.method)
 
-      // Reject requests that try to replicate the dcl_personal_sign sign-in through a
-      // generic signing method (e.g. personal_sign), which would bypass its protections.
+      // Reject requests that ask the wallet to sign a Decentraland identity-authorization
+      // payload, which would yield an auth chain that impersonates the user.
       assertRequestIsNotImpersonatingSignIn(recoverResponse.method, recoverResponse.params)
 
-      switch (recoverResponse.method) {
-        case 'dcl_personal_sign':
-          trackEvent(TrackingEvents.REQUEST_INTERACTION, {
-            type: RequestInteractionType.VERIFY_SIGN_IN,
-            browserTime: Date.now(),
-            requestType: recoverResponse?.method
-          })
-          break
-        case 'eth_sendTransaction':
-          trackEvent(TrackingEvents.REQUEST_INTERACTION, {
-            type: RequestInteractionType.WALLET_INTERACTION,
-            requestType: recoverResponse.method
-          })
-          break
-        default:
-          trackEvent(TrackingEvents.REQUEST_INTERACTION, {
-            type: RequestInteractionType.WALLET_INTERACTION,
-            requestType: recoverResponse.method
-          })
-      }
+      trackEvent(TrackingEvents.REQUEST_INTERACTION, {
+        type: RequestInteractionType.WALLET_INTERACTION,
+        requestType: recoverResponse.method
+      })
 
       return recoverResponse
     } catch (e) {
