@@ -73,7 +73,7 @@ describe('createAuthServerClient', () => {
       mockResponse = {
         sender: mockSignerAddressLower,
         expiration: new Date(Date.now() + 3600000).toISOString(), // 1 hour in the future
-        method: 'dcl_personal_sign'
+        method: 'personal_sign'
       }
 
       mockEmitWithAck.mockResolvedValueOnce(mockResponse)
@@ -143,7 +143,7 @@ describe('createAuthServerClient', () => {
       })
     })
 
-    describe('when a non dcl_personal_sign method carries a sign-in payload', () => {
+    describe('when a method carries a sign-in payload', () => {
       beforeEach(() => {
         mockResponse.method = 'personal_sign'
         mockResponse.params = [

@@ -3,11 +3,12 @@ import { createMockProviderScript } from '../fixtures/ethereum-provider'
 import {
   MOCK_WALLET,
   MOCK_REQUEST_ID,
+  DEEP_LINK_REQUEST_ID,
   recoverRequestResponse,
-  recoverRequestNoCodeResponse,
   recoverRequestDifferentSenderResponse,
   recoverRequestExpiredResponse,
   outcomeResponse,
+  createIdentityResponse,
   healthResponse,
   featureFlagsResponse,
   explorerFeatureFlagsResponse,
@@ -22,10 +23,6 @@ type SetupOptions = {
   hasProfile?: boolean
   /** Whether ONBOARDING_TO_EXPLORER FF is enabled (default: true) */
   onboardingToExplorer?: boolean
-  /** Whether the auth-server recover response includes a verification code (default: true) */
-  showVerificationCode?: boolean
-  /** Whether LOGIN_ON_SETUP FF is enabled (default: false) */
-  loginOnSetup?: boolean
   /** How the mocked POST /simulations endpoint responds (default: 'success') */
   simulation?: 'success' | 'reverted' | 'error'
 }
@@ -53,8 +50,6 @@ export async function mockApiRoutes(page: Page, options: SetupOptions = {}) {
   const {
     hasProfile = true,
     onboardingToExplorer = true,
-    showVerificationCode = true,
-    loginOnSetup = false,
     simulation = 'success'
   } = options
 
@@ -64,11 +59,10 @@ export async function mockApiRoutes(page: Page, options: SetupOptions = {}) {
     const url = request.url()
 
     if (method === 'GET' && !url.includes('/outcome')) {
-      const response = showVerificationCode ? recoverRequestResponse : recoverRequestNoCodeResponse
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify(response)
+        body: JSON.stringify(recoverRequestResponse)
       })
     }
 
@@ -105,6 +99,18 @@ export async function mockApiRoutes(page: Page, options: SetupOptions = {}) {
     })
   })
 
+  // Auth server: identity handoff (the login mechanism that replaced dcl_personal_sign)
+  await page.route('**/identities', async (route, request) => {
+    if (request.method() === 'POST') {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(createIdentityResponse)
+      })
+    }
+    return route.continue()
+  })
+
   // Auth server: health (for clock sync)
   await page.route('**/health', async route => {
     return route.fulfill({
@@ -119,8 +125,7 @@ export async function mockApiRoutes(page: Page, options: SetupOptions = {}) {
     ...featureFlagsResponse,
     flags: {
       ...featureFlagsResponse.flags,
-      'dapps-onboarding-to-explorer': onboardingToExplorer,
-      'dapps-login-on-setup': loginOnSetup
+      'dapps-onboarding-to-explorer': onboardingToExplorer
     }
   }
   await page.route('**/feature-flags**/dapps.json', async route => {
@@ -328,4 +333,4 @@ export async function injectPreviousConnection(context: BrowserContext, provider
   await context.addInitScript(createPreviousConnectionScript(providerType, chainId))
 }
 
-export { MOCK_WALLET, MOCK_REQUEST_ID }
+export { MOCK_WALLET, MOCK_REQUEST_ID, DEEP_LINK_REQUEST_ID }

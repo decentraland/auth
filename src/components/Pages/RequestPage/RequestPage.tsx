@@ -22,7 +22,6 @@ import {
   RequestFulfilledError,
   SimulationRequestBody,
   SimulationResponseBody,
-  TimedOutError,
   UnsupportedMethodError,
   createAuthServerHttpClient
 } from '../../../shared/auth'
@@ -38,10 +37,9 @@ import {
   isValidUuidV4
 } from '../../../shared/locations'
 import { sendTipNotification } from '../../../shared/notifications'
-import { isProfileComplete } from '../../../shared/profile'
 import { identifyUser, trackEvent } from '../../../shared/utils/analytics'
 import { handleError } from '../../../shared/utils/errorHandler'
-import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
+import { FeatureFlagsContext } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
 import { MANATransferData, NFTTransferData, SignaturePayload, SimulationState, TransferType } from './types'
 import {
   buildSendTransactionSimulationPayload,
@@ -64,14 +62,11 @@ import {
 import {
   ClientLoginError,
   ContinueInApp,
-  DeniedSignIn,
   DeniedWalletInteraction,
   DifferentAccountError,
   IpValidationError as IpValidationErrorView,
   LoadingRequest,
   RecoverError,
-  SignInComplete,
-  SignInCompletePage,
   SignatureRequestView,
   SigningError,
   TimeoutError,
@@ -79,7 +74,6 @@ import {
   TransferCanceledView,
   TransferCompletedView,
   TransferConfirmView,
-  VerifySignIn,
   WalletInteraction,
   WalletInteractionComplete
 } from './Views'
@@ -91,11 +85,6 @@ enum View {
   // Loading
   LOADING_REQUEST,
   LOADING_ERROR,
-  // Verify Sign In
-  VERIFY_SIGN_IN,
-  VERIFY_SIGN_IN_DENIED,
-  VERIFY_SIGN_IN_ERROR,
-  VERIFY_SIGN_IN_COMPLETE,
   // Deep Link Flow
   DEEP_LINK_CONTINUE_IN_APP,
   // Client-login pseudo request (identity post failed)
@@ -116,9 +105,6 @@ enum View {
 
 // Terminal views that should not trigger a re-fetch of the request
 const TERMINAL_VIEWS = new Set([
-  View.VERIFY_SIGN_IN_COMPLETE,
-  View.VERIFY_SIGN_IN_DENIED,
-  View.VERIFY_SIGN_IN_ERROR,
   View.DEEP_LINK_CONTINUE_IN_APP,
   View.CLIENT_LOGIN_ERROR,
   View.WALLET_INTERACTION_COMPLETE,
@@ -139,15 +125,13 @@ export const RequestPage = () => {
   const [searchParams] = useSearchParams()
   const navigate = useNavigateWithSearchParams()
   const { isLoading: isConnecting, account, provider, providerType, identity } = useCurrentConnectionData()
-  const { flags, initialized: initializedFlags } = useContext(FeatureFlagsContext)
+  const { initialized: initializedFlags } = useContext(FeatureFlagsContext)
   const { trackClick } = useAnalytics()
   const { ensureProfile } = useEnsureProfile()
   const publicClientRef = useRef<ReturnType<typeof createPublicClient>>()
   const walletClientRef = useRef<ReturnType<typeof createWalletClient>>()
   const [view, setView] = useState(View.LOADING_REQUEST)
   const [isLoading, setIsLoading] = useState(false)
-  const [hasTimedOut, setHasTimedOut] = useState(false)
-  const [skipDeepLinkRedirect, setSkipDeepLinkRedirect] = useState(false)
   const [walletInfo, setWalletInfo] = useState<{
     balance: bigint
     chainId: number
@@ -491,69 +475,6 @@ export const RequestPage = () => {
 
         // Show different views depending on the request method.
         switch (request.method) {
-          case 'dcl_personal_sign': {
-            // For new users coming from Explorer (skipSetup=true), auto-sign without
-            // showing the verification code screen. This matches the old behavior where
-            // SetupPage signed the request automatically after profile deployment.
-            // Returning users (with profile) still see the verification screen.
-            if (skipSetup) {
-              const userProfile = await fetchProfile(signerAddress)
-              if (cancelled) return
-
-              if (!userProfile || !isProfileComplete(userProfile)) {
-                // New user: auto-sign and go straight to success.
-                // Do NOT call notifyRequestNeedsValidation — the Explorer should
-                // not show the verification code screen for new users.
-                const autoSignMessage = request.params?.[0]
-                // Only auto-sign a well-formed string message. If the payload is malformed, fall
-                // through to the normal verification flow below rather than `break`ing out of the
-                // switch with no view set (which strands the user on the loading spinner forever).
-                if (typeof autoSignMessage === 'string') {
-                  try {
-                    const signature = await walletClientRef.current.signMessage({
-                      account: signerAddress,
-                      message: autoSignMessage
-                    })
-                    if (cancelled) return
-                    await authServerClient.current.sendSuccessfulOutcome(requestId, signerAddress, signature)
-                    hasCompletedRef.current = true
-                    setView(View.VERIFY_SIGN_IN_COMPLETE)
-                    break
-                  } catch (e) {
-                    if (cancelled) return
-                    console.info('Auto-sign failed for new user:', e instanceof Error ? e.message : String(e))
-                    if (isUserRejectedTransaction(e)) {
-                      hasCompletedRef.current = true
-                      setView(View.VERIFY_SIGN_IN_DENIED)
-                      break
-                    }
-                    if (e instanceof RequestFulfilledError) {
-                      // Auto-sign runs with no user action, so two tabs open on the same request
-                      // URL can both auto-sign; the loser's outcome is rejected as already
-                      // fulfilled. That means it succeeded — show completion, not an error.
-                      hasCompletedRef.current = true
-                      setView(View.VERIFY_SIGN_IN_COMPLETE)
-                      break
-                    }
-                    setError(e instanceof Error ? e.message : 'Auto-sign failed')
-                    setView(View.VERIFY_SIGN_IN_ERROR)
-                    break
-                  }
-                }
-              }
-            }
-
-            // Notify the auth server that the request needs validation.
-            // This tells the Explorer to show the verification code screen.
-            // Only reached for returning users (new users auto-signed above).
-            if (flags[FeatureFlagsKeys.LOGIN_ON_SETUP]) {
-              await authServerClient.current.notifyRequestNeedsValidation(requestId)
-              if (cancelled) return
-            }
-
-            setView(View.VERIFY_SIGN_IN)
-            break
-          }
           case 'eth_sendTransaction': {
             try {
               // Get wallet info first
@@ -774,14 +695,14 @@ export const RequestPage = () => {
         } else if (e instanceof RequestFulfilledError) {
           // Request was already consumed successfully — not an error, stop re-fetching
           hasCompletedRef.current = true
-          setView(View.VERIFY_SIGN_IN_COMPLETE)
+          setView(View.WALLET_INTERACTION_COMPLETE)
           return
         } else if (e instanceof ImpersonatedSignInError) {
-          // A non-dcl_personal_sign request tried to sign a sign-in payload. Block it
-          // outright instead of offering a retry that would re-trigger the same attack.
+          // The request tried to sign a sign-in payload. Block it outright instead of
+          // offering a retry that would re-trigger the same attack.
           hasCompletedRef.current = true
           setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
-          setView(View.VERIFY_SIGN_IN_ERROR)
+          setView(View.WALLET_INTERACTION_ERROR)
           return
         } else if (e instanceof UnsupportedMethodError) {
           // The request used a method that is not on the allowlist (e.g. the dangerous legacy
@@ -823,10 +744,9 @@ export const RequestPage = () => {
   ])
 
   useEffect(() => {
-    // The timeout is only necessary on the verify sign in and wallet interaction views.
+    // The timeout is only necessary on the wallet interaction views.
     // We can clear it out when the user is shown another view to prevent the timeout from triggering somewhere not intended.
     if (
-      view !== View.VERIFY_SIGN_IN &&
       view !== View.WALLET_INTERACTION &&
       view !== View.WALLET_SIGNATURE_INTERACTION &&
       view !== View.WALLET_NFT_INTERACTION &&
@@ -835,141 +755,6 @@ export const RequestPage = () => {
       clearTimeout(timeoutRef.current)
     }
   }, [view])
-
-  const onDenyVerifySignIn = useCallback(async () => {
-    setIsLoading(true)
-    trackClick(ClickEvents.DENY_SIGN_IN)
-    try {
-      if (walletClientRef.current) {
-        const [address] = await walletClientRef.current.getAddresses()
-        await authServerClient.current.sendFailedOutcome(requestId, address, {
-          code: -32003,
-          message: 'Transaction rejected'
-        })
-      }
-    } catch (e) {
-      // The user deliberately denied, so we always show the DENIED view. Swallow a delivery
-      // failure here (don't let it escape as an unhandled rejection / Sentry noise); if the
-      // failed outcome never reached the server the request simply expires server-side. Mirrors
-      // onDenyWalletInteraction.
-      console.error('Failed to send sign-in denial outcome:', e)
-    } finally {
-      hasCompletedRef.current = true
-      setIsLoading(false)
-      setView(View.VERIFY_SIGN_IN_DENIED)
-    }
-  }, [requestId])
-
-  const onApproveSignInVerification = useCallback(async () => {
-    // Guard against a re-entrant approval (e.g. a fast double-click before the button disables),
-    // mirroring onApproveWalletInteraction. The two handlers run on mutually exclusive views, so
-    // sharing the ref is safe.
-    if (isApprovingRef.current) return
-    isApprovingRef.current = true
-    trackClick(ClickEvents.APPROVE_SING_IN)
-    setIsLoading(true)
-    setHasTimedOut(false)
-    const walletClient = walletClientRef.current
-
-    if (!walletClient) {
-      isApprovingRef.current = false
-      setIsLoading(false)
-      setError('Provider not created')
-      setView(View.VERIFY_SIGN_IN_ERROR)
-      return
-    }
-
-    let hasTimeouted = false
-    // Arm the timeout BEFORE any await so a wallet that hangs on getAddresses() — not just
-    // signMessage — is covered too. On fire it releases the re-entrancy guard so the "try
-    // again" button actually works: otherwise the guard stays held until the hung call
-    // settles (which may be never) and every retry click is silently swallowed.
-    const timeoutId = setTimeout(() => {
-      hasTimeouted = true
-      setHasTimedOut(true)
-      setIsLoading(false)
-      isApprovingRef.current = false
-    }, 30000)
-    signTimeoutRef.current = timeoutId
-
-    let address = ''
-    try {
-      ;[address] = await walletClient.getAddresses()
-      const signMessage = requestRef.current?.params?.[0]
-      if (typeof signMessage !== 'string') throw new Error('Invalid sign message in request params')
-      const signature = await walletClient.signMessage({ account: address as `0x${string}`, message: signMessage })
-
-      if (hasTimeouted) {
-        throw new TimedOutError()
-      }
-      // A dcl_personal_sign request always has a backing auth-server request, and the signature is
-      // the outcome the requesting client (Explorer) is waiting for — so always send it. The
-      // deep-link flow is NOT special here: it still needs the outcome, and it must NOT post the
-      // identity (which would leave the request without an outcome and orphan an identity on the
-      // server). postIdentity is only for the client-login pseudo-request, which has no backing
-      // request to fulfill.
-      await authServerClient.current.sendSuccessfulOutcome(requestId, address, signature)
-      hasCompletedRef.current = true
-      // Prompt the user to open the Explorer via the deep link once here (routed through
-      // getExplorerDeeplink so it carries the same dclenv/bridgeOnly/authRequestId params as the
-      // other deep-link sites). For skipSetup targets the completion view is SignInCompletePage,
-      // which ALSO auto-redirects on mount — flag it to skip so the identical deep link doesn't
-      // fire twice (which can produce duplicate "Open Decentraland?" prompts).
-      if (targetConfig.deepLink) {
-        setSkipDeepLinkRedirect(true)
-        window.location.href = getExplorerDeeplink(targetConfig.deepLink, isBridgeOnly, authRequestId)
-      }
-      setView(View.VERIFY_SIGN_IN_COMPLETE)
-    } catch (e) {
-      // Either this attempt already timed out (the UI moved on, possibly to a retry that is now
-      // in flight) or it was a deliberate timeout signal — in both cases a late error from the
-      // abandoned wallet call must not overwrite the current UI.
-      if (e instanceof TimedOutError || hasTimeouted) {
-        return
-      }
-
-      if (isUserRejectedTransaction(e)) {
-        console.info('User rejected sign-in verification in wallet — not reporting to Sentry')
-        try {
-          await authServerClient.current.sendFailedOutcome(requestId, address, {
-            code: -32003,
-            message: 'Transaction rejected'
-          })
-        } catch (failedOutcomeError) {
-          console.error('Failed to send denied notification:', failedOutcomeError)
-        }
-        hasCompletedRef.current = true
-        setView(View.VERIFY_SIGN_IN_DENIED)
-      } else if (e instanceof RequestFulfilledError) {
-        // Another tab / an auto-login race already signed this request — it succeeded, so show
-        // completion rather than reporting an expected state as a signing error.
-        hasCompletedRef.current = true
-        setView(View.VERIFY_SIGN_IN_COMPLETE)
-      } else if (e instanceof IpValidationError) {
-        setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
-        setView(View.IP_VALIDATION_ERROR)
-      } else {
-        const errorMessage = handleError(e, 'Error approving sign in verification', {
-          sentryTags: { isWeb2Wallet: isUserUsingWeb2Wallet }
-        })
-        setError(errorMessage)
-        setView(View.VERIFY_SIGN_IN_ERROR)
-      }
-    } finally {
-      clearTimeout(timeoutId)
-      // Only clear the shared ref if it still points at this attempt's timer — a retry started
-      // after a timeout owns the ref now and must not have its timer cancelled from here.
-      if (signTimeoutRef.current === timeoutId) {
-        signTimeoutRef.current = undefined
-      }
-      // The timeout path already reset isLoading and released the guard (and a retry may now be
-      // running), so only a non-timed-out attempt resets them here.
-      if (!hasTimeouted) {
-        setIsLoading(false)
-        isApprovingRef.current = false
-      }
-    }
-  }, [setIsLoading, isUserUsingWeb2Wallet, requestId, targetConfig, isBridgeOnly, authRequestId])
 
   const onDenyWalletInteraction = useCallback(async () => {
     setIsLoading(true)
@@ -1177,16 +962,9 @@ export const RequestPage = () => {
       // to the instance that requested the login.
       trackClick(ClickEvents.IDENTITY_DEEP_LINK_OPENED, { authRequestId: requestId })
     }
-
-    // Deep-link flow: the client was opened via the deep link and there is nothing to
-    // navigate to — stay on the ContinueInApp view, which doubles as the retry fallback.
-    if (isDeepLinkFlow) return
-
-    // The deep link already fired in ContinueInApp — skip the auto-redirect in SignInCompletePage
-    setSkipDeepLinkRedirect(true)
-    // Show completion view
-    setView(View.VERIFY_SIGN_IN_COMPLETE)
-  }, [identityId, trackClick, isDeepLinkFlow, requestId])
+    // The client was opened via the deep link and there is nothing to navigate to — stay on
+    // the ContinueInApp view, which doubles as the retry fallback.
+  }, [identityId, trackClick, requestId])
 
   const onRetryClientLogin = useCallback(() => {
     // A fresh mount re-runs completeClientLoginFlow: the view resets to LOADING_REQUEST and
@@ -1235,24 +1013,10 @@ export const RequestPage = () => {
           }}
         />
       )
-    case View.VERIFY_SIGN_IN_ERROR:
     case View.WALLET_INTERACTION_ERROR:
       return <SigningError error={error} />
     case View.CLIENT_LOGIN_ERROR:
       return <ClientLoginError error={error} onTryAgain={onRetryClientLogin} />
-    case View.VERIFY_SIGN_IN_COMPLETE:
-      // From Explorer (skipSetup enabled): show full-page success with Continue button
-      // From web (has redirectTo): show minimal success view
-      return skipSetup ? (
-        <SignInCompletePage
-          skipRedirect={skipDeepLinkRedirect}
-          deepLink={targetConfig.deepLink}
-          bridgeOnly={isBridgeOnly}
-          authRequestId={authRequestId}
-        />
-      ) : (
-        <SignInComplete />
-      )
     case View.DEEP_LINK_CONTINUE_IN_APP:
       return (
         <ContinueInApp
@@ -1264,8 +1028,6 @@ export const RequestPage = () => {
           isClientLogin={isDeepLinkFlow}
         />
       )
-    case View.VERIFY_SIGN_IN_DENIED:
-      return <DeniedSignIn requestId={requestId} />
     case View.WALLET_INTERACTION_COMPLETE:
       return <WalletInteractionComplete />
     case View.WALLET_NFT_INTERACTION_COMPLETE:
@@ -1280,18 +1042,6 @@ export const RequestPage = () => {
       return manaTransferData ? <TransferCanceledView type={TransferType.TIP} transferData={manaTransferData} /> : null
     case View.LOADING_REQUEST:
       return <LoadingRequest />
-    case View.VERIFY_SIGN_IN:
-      return (
-        <VerifySignIn
-          requestId={requestId}
-          code={requestRef.current?.code}
-          isLoading={isLoading}
-          hasTimedOut={hasTimedOut}
-          explorerText={targetConfig.explorerText}
-          onDeny={onDenyVerifySignIn}
-          onApprove={onApproveSignInVerification}
-        />
-      )
 
     case View.WALLET_NFT_INTERACTION:
       return nftTransferData ? (

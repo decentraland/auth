@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { injectMockWallet, mockApiRoutes, MOCK_REQUEST_ID } from '../helpers/setup'
+import { injectMockWallet, mockApiRoutes, MOCK_REQUEST_ID, DEEP_LINK_REQUEST_ID } from '../helpers/setup'
 
 test.describe('Guest login option', () => {
   test.beforeEach(async ({ context }) => {
@@ -50,7 +50,7 @@ test.describe('Unknown routes (404 / DefaultPage)', () => {
     await expect(page.locator('body')).toBeVisible()
 
     // Should NOT show login page or request page content
-    await expect(page.getByText('Verify Sign In')).not.toBeVisible()
+    await expect(page.locator('[data-testid="continue-in-app-try-again-button"]')).not.toBeVisible()
   })
 })
 
@@ -61,7 +61,7 @@ test.describe('skipSetup logic: FF + redirectTo interaction', () => {
    * 2. ONBOARDING_TO_EXPLORER FF enabled AND no explicit redirect (internal auth redirect)
    *
    * skipSetup affects:
-   * - RequestPage: SignInCompletePage (full page + Continue) vs SignInComplete (minimal)
+   * - RequestPage: skips the profile consistency check before loading the request
    * - AutoLoginRedirect: skip ensureProfile call
    * - CallbackPage: skip ensureProfile call
    */
@@ -70,22 +70,16 @@ test.describe('skipSetup logic: FF + redirectTo interaction', () => {
     await injectMockWallet(context)
   })
 
-  test('FF enabled + no redirectTo (Explorer flow) → skipSetup=true → SignInCompletePage with auto-deeplink', async ({
-    page
-  }) => {
+  test('FF enabled + no redirectTo (Explorer flow) → skipSetup=true → completes the identity handoff', async ({ page }) => {
     await mockApiRoutes(page, { hasProfile: true, onboardingToExplorer: true })
 
     // No redirectTo — this is an Explorer-initiated request (internal redirect)
-    await page.goto(`/auth/requests/e2e-test-request-id-1234?loginMethod=METAMASK`)
+    await page.goto(`/auth/requests/${DEEP_LINK_REQUEST_ID}?loginMethod=METAMASK&flow=deeplink`)
 
-    await expect(page.getByText('Verify Sign In')).toBeVisible({ timeout: 15_000 })
-    await page.getByRole('button', { name: /yes, they are the same/i }).click()
-
-    // skipSetup=true → SignInCompletePage (deeplink fires automatically on mount)
-    await expect(page.getByText(/Sign In successful/i)).toBeVisible({ timeout: 15_000 })
+    await expect(page.locator('[data-testid="continue-in-app-try-again-button"]')).toBeVisible({ timeout: 20_000 })
   })
 
-  test('FF enabled + external redirectTo (Web flow) → skipSetup=false → SignInComplete (minimal)', async ({
+  test('FF enabled + external redirectTo (Web flow) → skipSetup=false → still completes the identity handoff', async ({
     page
   }) => {
     await mockApiRoutes(page, { hasProfile: true, onboardingToExplorer: true })
@@ -93,14 +87,10 @@ test.describe('skipSetup logic: FF + redirectTo interaction', () => {
     // Navigate to request page with an external redirectTo (web flow)
     // Must use localhost URL — redirect validation rejects cross-origin URLs
     await page.goto(
-      `/auth/requests/e2e-test-request-id-1234?loginMethod=METAMASK&redirectTo=${encodeURIComponent('http://localhost:5174/marketplace')}`
+      `/auth/requests/${DEEP_LINK_REQUEST_ID}?loginMethod=METAMASK&flow=deeplink&redirectTo=${encodeURIComponent('http://localhost:5174/marketplace')}`
     )
 
-    await expect(page.getByText('Verify Sign In')).toBeVisible({ timeout: 15_000 })
-    await page.getByRole('button', { name: /yes, they are the same/i }).click()
-
-    // Should show some completion view
-    await expect(page.getByText(/Sign In successful/i)).toBeVisible({ timeout: 15_000 })
+    await expect(page.locator('[data-testid="continue-in-app-try-again-button"]')).toBeVisible({ timeout: 20_000 })
 
     // Note: whether Continue button appears depends on how redirectTo flows through
     // the useSkipSetup hook. The key assertion is that we reach completion.
@@ -131,11 +121,11 @@ test.describe('skipSetup logic: FF + redirectTo interaction', () => {
     // Explorer URL but FF off: skipSetup=false, so ensureProfile runs → new user → QuickSetup
     await page.goto(`/auth/requests/${MOCK_REQUEST_ID}?loginMethod=METAMASK`)
 
-    // Should show QuickSetup (not the old setup, not the verify screen)
+    // Should show QuickSetup (not the old setup, not the request approval screen)
     await expect(page.getByText('Welcome to')).toBeVisible({ timeout: 20_000 })
     await expect(page.getByPlaceholder(/enter your username/i)).toBeVisible()
 
-    // Should NOT show verification screen (user goes through setup first)
-    await expect(page.getByText('Verify Sign In')).not.toBeVisible()
+    // Should NOT show the request approval screen (user goes through setup first)
+    await expect(page.locator('[data-testid="wallet-interaction-allow-button"]')).not.toBeVisible()
   })
 })

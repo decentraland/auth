@@ -6,7 +6,6 @@ import { DclThemeProvider, WearablePreview, darkTheme } from 'decentraland-ui2'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { useAnalytics } from '../../../hooks/useAnalytics'
-import { useSignRequest } from '../../../hooks/useSignRequest'
 import { useTrackReferral } from '../../../hooks/useTrackReferral'
 import { fetchProfileWithStatus } from '../../../modules/profile'
 import { translations } from '../../../modules/translations'
@@ -31,10 +30,6 @@ jest.mock('../../../hooks/redirection', () => ({
 
 jest.mock('../../../hooks/useAnalytics', () => ({
   useAnalytics: jest.fn()
-}))
-
-jest.mock('../../../hooks/useSignRequest', () => ({
-  useSignRequest: jest.fn()
 }))
 
 jest.mock('../../../hooks/useTrackReferral', () => ({
@@ -165,7 +160,6 @@ const mockRedirect = jest.fn()
 const mockTrackAvatarEditSuccess = jest.fn()
 const mockTrackTermsOfServiceSuccess = jest.fn()
 const mockTrackCheckTermsOfService = jest.fn()
-const mockSignRequest = jest.fn()
 const mockTrackReferral = jest.fn()
 
 const MOCK_ACCOUNT = '0x1234567890abcdef'
@@ -182,10 +176,6 @@ function setupDefaultMocks() {
     trackAvatarEditSuccess: mockTrackAvatarEditSuccess,
     trackTermsOfServiceSuccess: mockTrackTermsOfServiceSuccess,
     trackCheckTermsOfService: mockTrackCheckTermsOfService
-  })
-  ;(useSignRequest as jest.Mock).mockReturnValue({
-    signRequest: mockSignRequest,
-    authServerClient: { current: null }
   })
   ;(useTrackReferral as jest.Mock).mockReturnValue({
     track: mockTrackReferral,

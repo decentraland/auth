@@ -4,18 +4,18 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ProviderType } from '@dcl/schemas'
+import { TrackingEvents } from '../../../modules/analytics/types'
 import { fetchProfile } from '../../../modules/profile'
 import {
   DifferentSenderError,
   ExpiredRequestError,
   ImpersonatedSignInError,
   IpValidationError,
-  RequestFulfilledError
+  RequestFulfilledError,
+  UnsupportedMethodError
 } from '../../../shared/auth'
 import { getAuthRequestId, isBridgeOnlyEnabled } from '../../../shared/locations'
-import { isProfileComplete } from '../../../shared/profile'
 import { trackEvent } from '../../../shared/utils/analytics'
-import { TrackingEvents } from '../../../modules/analytics/types'
 import { FeatureFlagsContext } from '../../FeatureFlagsProvider'
 import { RequestPage } from './RequestPage'
 import { decodeManaTransferData, decodeNftTransferData, fetchNftMetadata, getSigninDeeplink } from './utils'
@@ -153,20 +153,6 @@ jest.mock('viem', () => ({
 // --- Views (mock them to be simple identifiable components) ---
 jest.mock('./Views', () => ({
   LoadingRequest: () => <div data-testid="loading-request">Loading...</div>,
-  VerifySignIn: (props: any) => (
-    <div data-testid="verify-sign-in">
-      Verify Sign In - Code: {props.code}
-      <button data-testid="verify-sign-in-approve" onClick={props.onApprove}>
-        approve
-      </button>
-      <button data-testid="verify-sign-in-deny" onClick={props.onDeny}>
-        deny
-      </button>
-    </div>
-  ),
-  DeniedSignIn: () => <div data-testid="denied-sign-in">Denied</div>,
-  SignInComplete: () => <div data-testid="sign-in-complete">Complete</div>,
-  SignInCompletePage: () => <div data-testid="sign-in-complete-page">Login Successful!</div>,
   TimeoutError: () => <div data-testid="timeout-error">Timeout</div>,
   DifferentAccountError: () => <div data-testid="different-account">Different Account</div>,
   IpValidationError: (props: any) => <div data-testid="ip-validation-error">IP Error: {props.reason}</div>,
@@ -364,24 +350,19 @@ describe('RequestPage', () => {
   })
 
   describe('when the user is connected and flags are initialized', () => {
-    describe('and the request recovery returns a dcl_personal_sign method', () => {
+    describe('and recovery fails with an UnsupportedMethodError (the retired dcl_personal_sign sign-in)', () => {
       beforeEach(() => {
         mockGetAddresses.mockResolvedValue(['0xabc123'])
         mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'User' }] })
-        mockRecover.mockResolvedValue({
-          sender: '0xabc123',
-          expiration: new Date(Date.now() + 60000).toISOString(),
-          method: 'dcl_personal_sign',
-          code: '1234',
-          params: ['Sign this message']
-        })
+        mockRecover.mockRejectedValue(new UnsupportedMethodError('dcl_personal_sign'))
       })
 
-      it('should show the verify sign in view', async () => {
+      it('should show the recover error view instead of signing anything', async () => {
         renderRequestPage()
         await waitFor(() => {
-          expect(screen.getByTestId('verify-sign-in')).toBeInTheDocument()
+          expect(screen.getByTestId('recover-error')).toBeInTheDocument()
         })
+        expect(mockSignMessage).not.toHaveBeenCalled()
       })
     })
 
@@ -461,14 +442,14 @@ describe('RequestPage', () => {
         mockRecover.mockRejectedValue(new RequestFulfilledError(REQUEST_ID))
       })
 
-      it('should show sign-in complete view (request already consumed)', async () => {
+      it('should show the interaction complete view (request already consumed)', async () => {
         renderRequestPage()
         await waitFor(() => {
           expect(mockRecover).toHaveBeenCalled()
         })
         // Should show completion view — the request was already successfully consumed
         await waitFor(() => {
-          expect(screen.getByTestId('sign-in-complete')).toBeInTheDocument()
+          expect(screen.getByTestId('wallet-interaction-complete')).toBeInTheDocument()
         })
       })
     })
@@ -526,56 +507,17 @@ describe('RequestPage', () => {
         mockRecover.mockResolvedValue({
           sender: '0xabc123',
           expiration: new Date(Date.now() + 60000).toISOString(),
-          method: 'dcl_personal_sign',
-          code: '5678',
-          params: ['Sign this']
+          method: 'personal_sign',
+          params: ['hello', '0xabc123']
         })
       })
 
-      it('should skip profile consistency check and show verify for returning user', async () => {
-        // Returning user (has profile) → shows verification screen
-        jest.mocked(fetchProfile).mockResolvedValue({ avatars: [{ name: 'TestUser' }] } as any)
-        jest.mocked(isProfileComplete).mockReturnValue(true)
-
+      it('should skip the profile consistency check', async () => {
         renderRequestPage()
         await waitFor(() => {
-          expect(screen.getByTestId('verify-sign-in')).toBeInTheDocument()
+          expect(mockRecover).toHaveBeenCalled()
         })
         expect(mockEnsureProfile).not.toHaveBeenCalled()
-      })
-
-      it('should auto-sign for new user and show success page', async () => {
-        // New user (no profile) → auto-signs → shows success
-        jest.mocked(fetchProfile).mockResolvedValue(null)
-        jest.mocked(isProfileComplete).mockReturnValue(false)
-        mockSignMessage.mockResolvedValue('0xsignature')
-        mockSendSuccessfulOutcome.mockResolvedValue({})
-
-        renderRequestPage()
-        await waitFor(() => {
-          expect(screen.getByTestId('sign-in-complete-page')).toBeInTheDocument()
-        })
-        expect(mockEnsureProfile).not.toHaveBeenCalled()
-      })
-
-      it('should fall through to the verify screen for a new user when the auto-sign message is malformed', async () => {
-        // New user (no profile) but the request carries a non-string message: instead of dead-ending
-        // on the loading spinner, the flow falls through to the normal verification screen.
-        jest.mocked(fetchProfile).mockResolvedValue(null)
-        jest.mocked(isProfileComplete).mockReturnValue(false)
-        mockRecover.mockResolvedValue({
-          sender: '0xabc123',
-          expiration: new Date(Date.now() + 60000).toISOString(),
-          method: 'dcl_personal_sign',
-          code: '5678',
-          params: [{ not: 'a string' }]
-        })
-
-        renderRequestPage()
-        await waitFor(() => {
-          expect(screen.getByTestId('verify-sign-in')).toBeInTheDocument()
-        })
-        expect(mockSignMessage).not.toHaveBeenCalled()
       })
     })
 
@@ -743,18 +685,16 @@ describe('RequestPage', () => {
         mockRecover.mockResolvedValue({
           sender: '0xabc123',
           expiration: new Date(Date.now() + 60000).toISOString(),
-          method: 'dcl_personal_sign',
-          code: '1234',
-          params: ['Sign this message']
+          method: 'personal_sign',
+          params: ['hello', '0xabc123']
         })
       })
 
       it('should recover the request normally and not post an identity', async () => {
         renderRequestPage(`/auth/requests/${DEEP_LINK_REQUEST_ID}?targetConfigId=default`)
         await waitFor(() => {
-          expect(screen.getByTestId('verify-sign-in')).toBeInTheDocument()
+          expect(mockRecover).toHaveBeenCalledWith(DEEP_LINK_REQUEST_ID, '0xabc123')
         })
-        expect(mockRecover).toHaveBeenCalledWith(DEEP_LINK_REQUEST_ID, '0xabc123')
         expect(mockPostIdentity).not.toHaveBeenCalled()
       })
     })
@@ -814,38 +754,6 @@ describe('RequestPage', () => {
           expect(mockEnsureProfile).toHaveBeenCalledWith('0xnewwallet', expect.anything(), expect.anything())
         })
       })
-    })
-  })
-
-  describe('when approving a sign-in verification (dcl_personal_sign)', () => {
-    beforeEach(() => {
-      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'User' }] })
-      mockRecover.mockResolvedValue({
-        method: 'dcl_personal_sign',
-        code: '1234',
-        params: ['Sign this message'],
-        sender: '0xabc123',
-        expiration: new Date(Date.now() + 3600000).toISOString()
-      })
-      mockGetAddresses.mockResolvedValue(['0xabc123'])
-      mockSignMessage.mockResolvedValue('0xsignature')
-      mockSendSuccessfulOutcome.mockResolvedValue({})
-    })
-
-    it('should sign the message and send the signature as the outcome', async () => {
-      renderRequestPage()
-      await userEvent.click(await screen.findByTestId('verify-sign-in-approve'))
-      await waitFor(() => {
-        expect(mockSendSuccessfulOutcome).toHaveBeenCalledWith(REQUEST_ID, '0xabc123', '0xsignature')
-      })
-      expect(await screen.findByTestId('sign-in-complete')).toBeInTheDocument()
-    })
-
-    it('should not post the identity (that mechanism is only for the deep-link handoff)', async () => {
-      renderRequestPage()
-      await userEvent.click(await screen.findByTestId('verify-sign-in-approve'))
-      await waitFor(() => expect(mockSendSuccessfulOutcome).toHaveBeenCalled())
-      expect(mockPostIdentity).not.toHaveBeenCalled()
     })
   })
 

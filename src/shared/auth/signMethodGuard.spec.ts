@@ -107,15 +107,15 @@ describe('assertRequestIsNotImpersonatingSignIn', () => {
     ].join('\n')
   })
 
-  describe('when the method is dcl_personal_sign', () => {
+  describe('when the method is dcl_personal_sign and the message is a sign-in payload', () => {
     let params: unknown[]
 
     beforeEach(() => {
       params = [signInPayload]
     })
 
-    it('should not throw even when the message is a sign-in payload', () => {
-      expect(() => assertRequestIsNotImpersonatingSignIn('dcl_personal_sign', params)).not.toThrow()
+    it('should throw an ImpersonatedSignInError because no method is exempt anymore', () => {
+      expect(() => assertRequestIsNotImpersonatingSignIn('dcl_personal_sign', params)).toThrow(ImpersonatedSignInError)
     })
   })
 
@@ -175,18 +175,14 @@ describe('assertRequestIsNotImpersonatingSignIn', () => {
 })
 
 describe('assertMethodIsAllowed', () => {
-  describe.each([
-    'dcl_personal_sign',
-    'personal_sign',
-    'eth_signTypedData',
-    'eth_signTypedData_v3',
-    'eth_signTypedData_v4',
-    'eth_sendTransaction'
-  ])('when the method is the allowed method %s', method => {
-    it('should not throw', () => {
-      expect(() => assertMethodIsAllowed(method)).not.toThrow()
-    })
-  })
+  describe.each(['personal_sign', 'eth_signTypedData', 'eth_signTypedData_v3', 'eth_signTypedData_v4', 'eth_sendTransaction'])(
+    'when the method is the allowed method %s',
+    method => {
+      it('should not throw', () => {
+        expect(() => assertMethodIsAllowed(method)).not.toThrow()
+      })
+    }
+  )
 
   describe('when the method casing differs from the canonical allowlist entry', () => {
     it('should not throw because the check is case-insensitive', () => {
@@ -197,6 +193,12 @@ describe('assertMethodIsAllowed', () => {
   describe('when the method is the dangerous legacy eth_sign', () => {
     it('should throw an UnsupportedMethodError', () => {
       expect(() => assertMethodIsAllowed('eth_sign')).toThrow(UnsupportedMethodError)
+    })
+  })
+
+  describe('when the method is the retired dcl_personal_sign sign-in', () => {
+    it('should throw an UnsupportedMethodError', () => {
+      expect(() => assertMethodIsAllowed('dcl_personal_sign')).toThrow(UnsupportedMethodError)
     })
   })
 

@@ -172,7 +172,7 @@ test.describe('Request already fulfilled', () => {
     await page.goto(`/auth/requests/${MOCK_REQUEST_ID}?loginMethod=METAMASK`)
 
     // RequestFulfilledError → shows completion view
-    await expect(page.getByText(/Sign In successful/i)).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText(/Wallet interaction complete/i)).toBeVisible({ timeout: 15_000 })
   })
 })
 

@@ -1,6 +1,7 @@
 import { AuthIdentity } from '@dcl/crypto'
 import signedFetchMock from 'decentraland-crypto-fetch'
 import { getAnalytics } from '../../modules/analytics/segment'
+import { TrackingEvents } from '../../modules/analytics/types'
 import { config } from '../../modules/config'
 import {
   DifferentSenderError,
@@ -9,7 +10,6 @@ import {
   RequestNotFoundError,
   SimulationUnavailableError
 } from './errors'
-import { TrackingEvents } from '../../modules/analytics/types'
 import { createAuthServerHttpClient } from './httpClient'
 import { RecoverResponse, SimulationRequestBody, SimulationResponseBody } from './types'
 // Mock dependencies
@@ -68,7 +68,7 @@ describe('createAuthServerClient', () => {
       mockResponse = {
         sender: mockSignerAddressLower,
         expiration: new Date(Date.now() + 3600000).toISOString(), // 1 hour in the future
-        method: 'dcl_personal_sign'
+        method: 'personal_sign'
       }
     })
 
@@ -148,7 +148,7 @@ describe('createAuthServerClient', () => {
       })
     })
 
-    describe('when a non dcl_personal_sign method carries a sign-in payload', () => {
+    describe('when a method carries a sign-in payload', () => {
       beforeEach(() => {
         mockResponse.method = 'personal_sign'
         mockResponse.params = [

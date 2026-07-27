@@ -21,8 +21,8 @@ test.describe('Error: auth server fails', () => {
 
     await page.waitForTimeout(10000)
 
-    // Should NOT show success page
-    await expect(page.getByText(/Sign In successful/i)).not.toBeVisible()
+    // Should NOT show the completion view
+    await expect(page.getByText(/Wallet interaction complete/i)).not.toBeVisible()
     // Should NOT crash (page should still be rendered)
     await expect(page.locator('body')).toBeVisible()
   })
@@ -162,24 +162,21 @@ test.describe('Error: generic login error → LoginErrorPage', () => {
   })
 })
 
-test.describe('Error: user denies sign-in', () => {
+test.describe('Error: user denies a wallet interaction', () => {
   test.beforeEach(async ({ context }) => {
     await injectMockWallet(context)
   })
 
-  test('clicking "No, it doesn\'t" → denied view, flow stops', async ({ page }) => {
+  test('clicking "Deny" → denied view, flow stops', async ({ page }) => {
     await mockApiRoutes(page, { hasProfile: true, onboardingToExplorer: true })
 
     await page.goto(`/auth/requests/${MOCK_REQUEST_ID}?loginMethod=METAMASK`)
 
-    await expect(page.getByText('Verify Sign In')).toBeVisible({ timeout: 20_000 })
+    await page.locator('[data-testid="wallet-interaction-deny-button"]').click({ timeout: 20_000 })
 
-    // Click "No"
-    await page.getByRole('button', { name: /no, it doesn't/i }).click()
-
-    // Should show denied state — NOT success page
-    await expect(page.getByText(/Sign In successful/i)).not.toBeVisible()
-    await expect(page.getByText(/not match|denied|wasn't you/i)).toBeVisible({ timeout: 5_000 })
+    // Should show denied state — NOT the completion view
+    await expect(page.getByText(/Wallet interaction complete/i)).not.toBeVisible()
+    await expect(page.getByText(/Was this action not initiated by you\?/i)).toBeVisible({ timeout: 5_000 })
   })
 })
 

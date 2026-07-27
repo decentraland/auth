@@ -4,6 +4,7 @@ import {
   injectPreviousConnection,
   mockApiRoutes,
   MOCK_REQUEST_ID,
+  DEEP_LINK_REQUEST_ID,
   MOCK_WALLET
 } from '../helpers/setup'
 
@@ -23,27 +24,15 @@ test.describe('Previous connection: returning user with persisted wallet', () =>
     await injectPreviousConnection(context, 'injected', 1)
   })
 
-  test('Explorer: returning user goes directly to verify screen (no login redirect)', async ({ page }) => {
+  test('Explorer: returning user goes directly to the request (no login redirect)', async ({ page }) => {
     await mockApiRoutes(page, { hasProfile: true, onboardingToExplorer: true })
 
     // Navigate directly to request page — no loginMethod needed since wallet is already connected
     await page.goto(`/auth/requests/${MOCK_REQUEST_ID}`)
 
-    // ConnectionProvider restores wallet → RequestPage sees account → shows verify screen
-    // Should NOT redirect to /login since the wallet is already available
-    await expect(page.getByText('Verify Sign In')).toBeVisible({ timeout: 15_000 })
-    await expect(page.getByText('1234')).toBeVisible()
-  })
-
-  test('Explorer: returning user can complete full flow without re-login', async ({ page }) => {
-    await mockApiRoutes(page, { hasProfile: true, onboardingToExplorer: true })
-
-    await page.goto(`/auth/requests/${MOCK_REQUEST_ID}`)
-
-    // Verify → approve → success
-    await expect(page.getByText('Verify Sign In')).toBeVisible({ timeout: 15_000 })
-    await page.getByRole('button', { name: /yes, they are the same/i }).click()
-    await expect(page.getByText(/Sign In successful/i)).toBeVisible({ timeout: 15_000 })
+    // ConnectionProvider restores wallet → RequestPage sees account → shows the approval screen.
+    // Should NOT redirect to /login since the wallet is already available.
+    await expect(page.locator('[data-testid="wallet-interaction-allow-button"]')).toBeVisible({ timeout: 20_000 })
   })
 
   test('Web: returning existing user with redirectTo → skips login page entirely', async ({ page }) => {
@@ -114,12 +103,12 @@ test.describe('No previous connection: fresh user with no persisted wallet', () 
     await mockApiRoutes(page, { hasProfile: true, onboardingToExplorer: true })
 
     // With loginMethod, after redirect to /login, AutoLoginRedirect kicks in
-    await page.goto(`/auth/requests/${MOCK_REQUEST_ID}?loginMethod=METAMASK`)
+    await page.goto(`/auth/requests/${DEEP_LINK_REQUEST_ID}?loginMethod=METAMASK&flow=deeplink`)
 
     // Flow: RequestPage → no wallet → redirect to /login?loginMethod=METAMASK
     // → LoginRouteGuard → AutoLoginRedirect → connectToProvider() → redirect back
-    // → RequestPage → VerifySignIn
-    await expect(page.getByText('Verify Sign In')).toBeVisible({ timeout: 20_000 })
+    // → RequestPage → identity handoff
+    await expect(page.locator('[data-testid="continue-in-app-try-again-button"]')).toBeVisible({ timeout: 20_000 })
   })
 
   test('Web: login page renders full UI for wallet selection', async ({ page }) => {
@@ -141,8 +130,8 @@ test.describe('Connection persistence: wallet data survives page reload', () => 
     await mockApiRoutes(page, { hasProfile: true, onboardingToExplorer: true })
 
     // Login via auto-login
-    await page.goto(`/auth/requests/${MOCK_REQUEST_ID}?loginMethod=METAMASK`)
-    await expect(page.getByText('Verify Sign In')).toBeVisible({ timeout: 15_000 })
+    await page.goto(`/auth/requests/${DEEP_LINK_REQUEST_ID}?loginMethod=METAMASK&flow=deeplink`)
+    await expect(page.locator('[data-testid="continue-in-app-try-again-button"]')).toBeVisible({ timeout: 20_000 })
 
     // Verify connection was stored
     const connectionData = await page.evaluate(() => {
