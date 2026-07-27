@@ -1,4 +1,4 @@
-import { connection } from 'decentraland-connect'
+import { WalletConnectV2Connector, connection } from 'decentraland-connect'
 import { ConnectionOptionType, SignInOptionsMode } from '../../Connection/Connection.types'
 import { FeatureFlagsKeys, SignInPrimaryOptionVariant } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
 import type { FeatureFlagsVariants } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
@@ -6,11 +6,14 @@ import { connectToProvider, getSignInOptionsMode } from './utils'
 
 jest.mock('decentraland-connect', () => ({
   connection: { connect: jest.fn() },
-  getConfiguration: jest.fn()
+  getConfiguration: jest.fn(),
+  // eslint-disable-next-line @typescript-eslint/naming-convention -- mirrors the exported class name
+  WalletConnectV2Connector: { clearStorage: jest.fn() }
 }))
 
 // eslint-disable-next-line @typescript-eslint/unbound-method -- connection is fully mocked; connect is a jest.fn with no `this` binding
 const mockConnect = connection.connect as jest.Mock
+const mockClearStorage = WalletConnectV2Connector.clearStorage as jest.Mock
 
 afterEach(() => {
   jest.clearAllMocks()
@@ -122,6 +125,49 @@ describe('connectToProvider', () => {
       await connectToProvider(ConnectionOptionType.WALLET_CONNECT)
 
       expect(removeItemSpy).toHaveBeenCalledWith('WALLETCONNECT_DEEPLINK_CHOICE')
+    })
+
+    it('should clear the stored WalletConnect session so the wallet chooser is always prompted', async () => {
+      await connectToProvider(ConnectionOptionType.WALLET_CONNECT)
+
+      expect(mockClearStorage).toHaveBeenCalled()
+    })
+
+    it('should clear the stored session before connecting, so the session cannot be reused', async () => {
+      await connectToProvider(ConnectionOptionType.WALLET_CONNECT)
+
+      expect(mockClearStorage.mock.invocationCallOrder[0]).toBeLessThan(mockConnect.mock.invocationCallOrder[0])
+    })
+
+    it('should clear the stored session again on a subsequent connect, so a second click re-prompts', async () => {
+      await connectToProvider(ConnectionOptionType.WALLET_CONNECT)
+      await connectToProvider(ConnectionOptionType.WALLET_CONNECT)
+
+      expect(mockClearStorage).toHaveBeenCalledTimes(2)
+    })
+  })
+
+  describe('when connecting to MetaMask Mobile', () => {
+    beforeEach(() => {
+      mockConnect.mockResolvedValue({ account: '0xabc', provider: {} })
+    })
+
+    it('should clear the stored WalletConnect session, since it also pairs over WalletConnect', async () => {
+      await connectToProvider(ConnectionOptionType.METAMASK_MOBILE)
+
+      expect(mockClearStorage).toHaveBeenCalled()
+    })
+  })
+
+  describe('when connecting to a provider that does not use WalletConnect', () => {
+    beforeEach(() => {
+      mockConnect.mockResolvedValue({ account: '0xabc', provider: {} })
+    })
+
+    it('should not clear the stored WalletConnect session', async () => {
+      await connectToProvider(ConnectionOptionType.COINBASE)
+
+      expect(mockClearStorage).not.toHaveBeenCalled()
     })
   })
 })

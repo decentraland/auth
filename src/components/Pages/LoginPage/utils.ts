@@ -1,7 +1,7 @@
 import type { OAuthProvider } from '@magic-ext/oauth2'
 import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
 import { Env } from '@dcl/ui-env'
-import { ConnectionResponse, connection, getConfiguration } from 'decentraland-connect'
+import { ConnectionResponse, WalletConnectV2Connector, connection, getConfiguration } from 'decentraland-connect'
 import { config } from '../../../modules/config'
 import { extractReferrerFromSearchParameters } from '../../../shared/locations'
 import { ConnectionOptionType, SignInOptionsMode } from '../../Connection'
@@ -119,12 +119,23 @@ async function connectToProvider(connectionOption: ConnectionOptionType): Promis
   }
 
   const promise = (async () => {
-    // Clear only WalletConnect v1's leftover deep-link choice, which can pin the mobile wallet
-    // chooser. WalletConnect session storage itself is owned by decentraland-connect, which
-    // validates and clears stale sessions on connect — wiping it here forced a fresh QR pairing on
-    // every attempt and prevented reusing the session established during the auth handoff.
     if (providerType === ProviderType.WALLET_CONNECT_V2) {
+      // Clear WalletConnect v1's leftover deep-link choice, which can pin the mobile wallet chooser.
       localStorage.removeItem('WALLETCONNECT_DEEPLINK_CHOICE')
+
+      // Force a fresh pairing on every explicit WalletConnect click. decentraland-connect's
+      // `activate()` reuses a restored session whenever it is still alive and, on that branch, never
+      // opens the AppKit modal — so clicking WalletConnect would silently reconnect the previously
+      // paired wallet and give a user who wants to sign in with a *different* wallet no way to
+      // choose one. Clearing the session here is what guarantees `activate()` takes its
+      // "not connected" branch and prompts.
+      //
+      // This is not redundant with the library's own stale-session handling: that only clears a
+      // session it can prove is dead, whereas an explicit click must re-prompt even when the
+      // session is perfectly alive. It also only runs on a user-initiated connect — automatic
+      // restores go through `connection.tryPreviousConnection()` and never reach this function, so
+      // the session reuse the handoff depends on is untouched.
+      WalletConnectV2Connector.clearStorage()
     }
 
     const connectionData = await connection.connect(providerType)
