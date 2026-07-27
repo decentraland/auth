@@ -878,17 +878,25 @@ export const RequestPage = () => {
       await authServerClient.current.sendSuccessfulOutcome(requestId, signerAddress, result)
       hasCompletedRef.current = true
 
+      // A side effect of an outcome the server has already accepted, so its failure is its own
+      // concern: report it under its own context rather than as an outcome-delivery problem, and
+      // complete either way.
       if (manaTransferData && result && identity) {
-        await sendTipNotification(identity, result)
+        try {
+          await sendTipNotification(identity, result)
+        } catch (notificationError) {
+          handleError(notificationError, 'Error sending the tip notification')
+        }
       }
       showInteractionCompleteView()
     } catch (e) {
       if (hasWalletResult) {
-        // The wallet already executed the request; only the delivery of its outcome failed (a
-        // network blip on the outcome POST, or the tip notification that follows it). Reporting a
-        // failed outcome here would tell the client the user rejected a transaction that is
-        // already on-chain, and the error view would invite them to send it a second time. Neither
-        // is true, so surface completion and leave the request for the server to expire.
+        // The wallet already executed the request; only the delivery of its outcome failed.
+        // Reporting a failed outcome here would tell the client the user rejected a transaction
+        // that is already on-chain, and the error view would invite them to send it a second time.
+        // Neither is true, so surface completion and leave the request for the server to expire.
+        // An expected race (RequestFulfilledError, which carries skipReporting) is swallowed by
+        // handleError, so it lands on the same completion view without Sentry noise.
         handleError(e, 'Error delivering the outcome of an executed wallet interaction', {
           sentryTags: { isWeb2Wallet: isUserUsingWeb2Wallet }
         })

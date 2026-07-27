@@ -812,6 +812,21 @@ describe('RequestPage', () => {
       await userEvent.click(await screen.findByTestId('wallet-interaction-approve'))
       expect(await screen.findByTestId('wallet-interaction-complete')).toBeInTheDocument()
     })
+
+    describe('and the failure is an expected already-fulfilled race', () => {
+      beforeEach(() => {
+        mockSendSuccessfulOutcome.mockRejectedValue(new RequestFulfilledError(REQUEST_ID))
+      })
+
+      it('should show the completion view without reporting a failed outcome', async () => {
+        renderRequestPage()
+        await userEvent.click(await screen.findByTestId('wallet-interaction-approve'))
+        await waitFor(() => {
+          expect(screen.getByTestId('wallet-interaction-complete')).toBeInTheDocument()
+        })
+        expect(mockSendFailedOutcome).not.toHaveBeenCalled()
+      })
+    })
   })
 
   describe('when a Thirdweb user approves a transaction', () => {
