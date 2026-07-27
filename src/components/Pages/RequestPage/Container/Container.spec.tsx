@@ -64,6 +64,16 @@ describe('Container change-account link', () => {
         expect(mockNavigate).toHaveBeenCalledWith(expect.stringContaining(`referrer%3D${REFERRER}`))
       })
     })
+
+    it('should also pass the referrer as a top-level /login param so the login page can hand it to setup', async () => {
+      const { getByText } = renderContainer(`/auth/requests/req-1?targetConfigId=default&referrer=${REFERRER}`)
+
+      fireEvent.click(getByText('request_views.container.return_to_login'))
+
+      await waitFor(() => {
+        expect(mockNavigate).toHaveBeenCalledWith(expect.stringContaining(`&referrer=${REFERRER}`))
+      })
+    })
   })
 
   describe('when the request URL has no referrer', () => {

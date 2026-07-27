@@ -235,10 +235,14 @@ export const RequestPage = () => {
   const toLoginPage = useCallback(() => {
     // Preserve the referrer across the login round-trip so a new wallet user that
     // isn't connected yet still carries attribution back to this page after login.
+    // It travels twice on purpose: embedded in redirectTo (so it survives the trip
+    // back here) AND as a top-level /login param (LoginPage reads its own URL to
+    // hand the referrer to the profile setup flow, where the referral is registered).
     const referrer = extractReferrerFromSearchParameters(searchParams)
     const redirectToUrl = buildRequestPageUrl(requestId, targetConfigId, { isDeepLinkFlow, isBridgeOnly, authRequestId, referrer })
     const loginMethodQuery = loginMethodParam ? `&loginMethod=${encodeURIComponent(loginMethodParam)}` : ''
-    const finalUrl = `/login?redirectTo=${encodeURIComponent(redirectToUrl)}${loginMethodQuery}`
+    const referrerQuery = referrer ? `&referrer=${encodeURIComponent(referrer)}` : ''
+    const finalUrl = `/login?redirectTo=${encodeURIComponent(redirectToUrl)}${loginMethodQuery}${referrerQuery}`
     navigate(finalUrl)
   }, [requestId, targetConfigId, isDeepLinkFlow, isBridgeOnly, authRequestId, loginMethodParam, navigate, searchParams])
 

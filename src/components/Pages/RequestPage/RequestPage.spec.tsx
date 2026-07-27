@@ -367,6 +367,16 @@ describe('RequestPage', () => {
           expect(mockNavigate).toHaveBeenCalledWith(expect.stringContaining(`referrer%3D${REFERRER}`))
         })
       })
+
+      it('should also pass the referrer as a top-level /login param so the login page can hand it to setup', async () => {
+        // LoginPage reads the referrer from its OWN url (not from inside redirectTo) when
+        // routing a new user to profile setup — without the top-level param the referral
+        // POST never fires for a not-yet-connected wallet user.
+        renderRequestPage(`/auth/requests/${REQUEST_ID}?targetConfigId=default&referrer=${REFERRER}`)
+        await waitFor(() => {
+          expect(mockNavigate).toHaveBeenCalledWith(expect.stringContaining(`&referrer=${REFERRER}`))
+        })
+      })
     })
   })
 

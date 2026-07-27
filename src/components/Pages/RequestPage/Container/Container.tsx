@@ -35,10 +35,13 @@ export const Container = (props: { children: ReactNode; requestId?: string; canC
       evt.preventDefault()
       await connection.disconnect()
       // Don't preserve loginMethod — the user explicitly wants to choose a different method.
-      // Do preserve the referrer so switching accounts on the request page keeps attribution.
+      // Do preserve the referrer so switching accounts on the request page keeps attribution:
+      // embedded in redirectTo for the return trip AND top-level so /login can hand it to
+      // the profile setup flow, where the referral is registered.
       const referrer = extractReferrerFromSearchParameters(searchParams)
       const redirectToUrl = buildRequestPageUrl(requestId ?? '', targetConfigId, { isDeepLinkFlow, isBridgeOnly, authRequestId, referrer })
-      navigate(`/login?redirectTo=${encodeURIComponent(redirectToUrl)}`)
+      const referrerQuery = referrer ? `&referrer=${encodeURIComponent(referrer)}` : ''
+      navigate(`/login?redirectTo=${encodeURIComponent(redirectToUrl)}${referrerQuery}`)
     },
     [requestId, targetConfigId, isDeepLinkFlow, isBridgeOnly, authRequestId, navigate, searchParams]
   )
