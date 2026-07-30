@@ -46,16 +46,22 @@ export const useWalletOptions = ({ connectionOptions, signInOptionsMode }: UseWa
 
     // For ONE and TWO modes: determine which wallet options to show
     const hasEthereumProvider = !!window.ethereum
+    const isMobileMetaMaskBrowser =
+      hasEthereumProvider && !!(window.ethereum as { isMetaMask?: boolean })?.isMetaMask && /Mobi|Android/i.test(navigator.userAgent)
     const googleOption = allWalletOptions.find(opt => opt === ConnectionOptionType.GOOGLE)
     const metamaskOption = allWalletOptions.find(opt => opt === ConnectionOptionType.METAMASK)
+    const walletConnectOption = allWalletOptions.find(opt => opt === ConnectionOptionType.WALLET_CONNECT)
 
-    // TWO mode: Show Google + MetaMask (if Ethereum provider exists)
+    // On mobile MetaMask browser, prefer WalletConnect over MetaMask
+    const preferredWalletOption = isMobileMetaMaskBrowser && walletConnectOption ? walletConnectOption : metamaskOption
+
+    // TWO mode: Show Google + wallet option (if Ethereum provider exists)
     if (signInOptionsMode === SignInOptionsMode.TWO) {
-      if (hasEthereumProvider && metamaskOption) {
+      if (hasEthereumProvider && preferredWalletOption) {
         return {
           firstWalletOption: googleOption,
-          secondWalletOption: metamaskOption,
-          remainingWalletOptions: allWalletOptions.filter(opt => opt !== googleOption && opt !== metamaskOption)
+          secondWalletOption: preferredWalletOption,
+          remainingWalletOptions: allWalletOptions.filter(opt => opt !== googleOption && opt !== preferredWalletOption)
         }
       }
 
@@ -67,12 +73,12 @@ export const useWalletOptions = ({ connectionOptions, signInOptionsMode }: UseWa
       }
     }
 
-    // ONE mode: Show MetaMask (if Ethereum provider exists) or nothing
-    if (hasEthereumProvider && metamaskOption) {
+    // ONE mode: Show wallet option (if Ethereum provider exists) or nothing
+    if (hasEthereumProvider && preferredWalletOption) {
       return {
-        firstWalletOption: metamaskOption,
+        firstWalletOption: preferredWalletOption,
         secondWalletOption: undefined,
-        remainingWalletOptions: allWalletOptions.filter(opt => opt !== metamaskOption)
+        remainingWalletOptions: allWalletOptions.filter(opt => opt !== preferredWalletOption)
       }
     }
 
