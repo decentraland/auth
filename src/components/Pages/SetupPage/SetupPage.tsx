@@ -12,11 +12,9 @@ import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { useAnalytics } from '../../../hooks/useAnalytics'
 import { useDisabledCatalysts } from '../../../hooks/useDisabledCatalysts'
-import { useSignRequest } from '../../../hooks/useSignRequest'
 import { useTrackReferral } from '../../../hooks/useTrackReferral'
 import { ClickEvents } from '../../../modules/analytics/types'
 import { fetchProfileWithStatus } from '../../../modules/profile'
-import { createAuthServerHttpClient, createAuthServerWsClient } from '../../../shared/auth'
 import { useCurrentConnectionData } from '../../../shared/connection'
 import { isEmailValid } from '../../../shared/email'
 import { locations } from '../../../shared/locations'
@@ -24,15 +22,8 @@ import { getStoredEmail } from '../../../shared/onboarding/getStoredEmail'
 import { trackCheckpoint } from '../../../shared/onboarding/trackCheckpoint'
 import { isProfileComplete } from '../../../shared/profile'
 import { handleError } from '../../../shared/utils/errorHandler'
-import { ConnectionModal } from '../../ConnectionModal'
-import { ConnectionLayoutState } from '../../ConnectionModal/ConnectionLayout.type'
 import { CustomWearablePreview } from '../../CustomWearablePreview'
-import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
-import { IpValidationError as IpValidationErrorView } from '../RequestPage/Views/IpValidationError'
-import { RecoverError } from '../RequestPage/Views/RecoverError'
-import { SignInComplete } from '../RequestPage/Views/SignInComplete'
-import { SigningError } from '../RequestPage/Views/SigningError'
-import { TimeoutError } from '../RequestPage/Views/TimeoutError'
+import { FeatureFlagsContext } from '../../FeatureFlagsProvider'
 import { deployProfileFromDefault, subscribeToNewsletter } from './utils'
 import styles from './SetupPage.module.css'
 
@@ -40,12 +31,7 @@ const MAX_CHARACTERS = 15
 
 enum View {
   RANDOMIZE,
-  FORM,
-  RECOVER_ERROR,
-  SIGN_IN_COMPLETE,
-  SIGNING_ERROR,
-  TIMEOUT_ERROR,
-  IP_VALIDATION_ERROR
+  FORM
 }
 
 function getRandomDefaultProfile() {
@@ -77,21 +63,19 @@ export const SetupPage = () => {
   const hasTrackedReferral = useRef(false)
   const initializedAccountRef = useRef<string | null>(null)
   const [urlSearchParams] = useSearchParams()
-  const [isConnectionModalOpen, setIsConnectionModalOpen] = useState(false)
-  const { flags, initialized: initializedFlags } = useContext(FeatureFlagsContext)
+  const { initialized: initializedFlags } = useContext(FeatureFlagsContext)
   const [initialized, setInitialized] = useState(false)
   const [view, setView] = useState(View.RANDOMIZE)
   const [profile, setProfile] = useState(getRandomDefaultProfile())
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [agree, setAgree] = useState(false)
-  const [requestError, setRequestError] = useState<string | null>(null)
   const [showErrors, setShowErrors] = useState(false)
   const [deploying, setDeploying] = useState(false)
   const [deployError, setDeployError] = useState<string | null>(null)
   const isMobile = useMobileMediaQuery()
   const { url: redirectTo, redirect } = useAfterLoginRedirection()
-  const { isLoading: isConnecting, account, identity, provider, providerType } = useCurrentConnectionData()
+  const { isLoading: isConnecting, account, identity } = useCurrentConnectionData()
   const navigate = useNavigateWithSearchParams()
   const referrer = urlSearchParams.get('referrer')
   const {
@@ -104,21 +88,6 @@ export const SetupPage = () => {
   } = useAnalytics()
   const { track: trackReferral } = useTrackReferral()
   const disabledCatalysts = useDisabledCatalysts()
-
-  const requestId = useMemo(() => {
-    // Grab the request id from redirectTo parameter.
-    const redirectTo = urlSearchParams.get('redirectTo')
-    let requestId: string | null = null
-    try {
-      const url = new URL(redirectTo ?? '', window.location.origin)
-      // Match the path: /auth/requests/0377e459-8fdf-4ce5-89f4-4f1f1c7bbb7f
-      const regex = /^\/?auth\/requests\/([a-zA-Z0-9-]+)$/
-      requestId = url.pathname.match(regex)?.[1] ?? null
-    } catch {
-      // Do nothing
-    }
-    return requestId
-  }, [urlSearchParams])
 
   // Validate the name.
   const nameError = useMemo(() => {
@@ -238,25 +207,6 @@ export const SetupPage = () => {
     }
   }, [trackCheckTermsOfService])
 
-  const { signRequest, authServerClient } = useSignRequest(redirect, {
-    onExpiredRequest: () => setView(View.TIMEOUT_ERROR),
-    onRecoverError: error => {
-      setRequestError(error)
-      setView(View.RECOVER_ERROR)
-    },
-    onSigningError: error => {
-      setRequestError(error)
-      setView(View.SIGNING_ERROR)
-    },
-    onIpValidationError: error => {
-      setRequestError(error)
-      setView(View.IP_VALIDATION_ERROR)
-    },
-    onSuccess: () => setView(View.SIGN_IN_COMPLETE),
-    onConnectionModalOpen: () => setIsConnectionModalOpen(true),
-    onConnectionModalClose: () => setIsConnectionModalOpen(false)
-  })
-
   // Handles the deployment of a new profile based on the selected default profile.
   // Also subscribes the user to the newsletter if an email is provided.
   const handleSubmit = useCallback(
@@ -327,12 +277,9 @@ export const SetupPage = () => {
           wallet: account.toLowerCase()
         })
 
-        // If the site to be redirect to is a request site, we need to recover the request and sign in.
-        if (requestId && provider && flags[FeatureFlagsKeys.LOGIN_ON_SETUP]) {
-          await signRequest(provider, requestId, account)
-        } else {
-          redirect()
-        }
+        // Hand control back to whatever started the flow. When that is a request page, the
+        // preserved `flow=deeplink` param resumes the identity handoff there.
+        redirect()
       } catch (e) {
         const errorMessage = handleError(e, 'Error deploying profile')
         setDeployError(errorMessage)
@@ -341,18 +288,14 @@ export const SetupPage = () => {
     },
     [
       nameError,
-      requestId,
       emailError,
       agreeError,
       name,
       email,
       agree,
       profile,
-      provider,
       referrer,
-      flags[FeatureFlagsKeys.LOGIN_ON_SETUP],
       redirect,
-      signRequest,
       trackClick,
       trackTermsOfServiceSuccess,
       account,
@@ -372,11 +315,9 @@ export const SetupPage = () => {
       return
     }
 
-    // Run the one-time initialization once per connected account. The feature-flags provider
-    // rebuilds the `flags` object on every poll (~60s), which would otherwise re-run this effect
-    // and re-fetch the profile, re-fire the CP3 "reached" checkpoint, overwrite an email the user
-    // is editing with the stored one, and — worst — redirect() mid-signing if a poll landed
-    // between deploy and signRequest.
+    // Run the one-time initialization once per connected account: a dep identity change must not
+    // re-fetch the profile, re-fire the CP3 "reached" checkpoint, or overwrite an email the user
+    // is editing with the stored one.
     if (initializedAccountRef.current === account) return
     initializedAccountRef.current = account
     ;(async () => {
@@ -395,8 +336,6 @@ export const SetupPage = () => {
         console.warn('Profile already exists')
         return redirect()
       }
-
-      authServerClient.current = flags[FeatureFlagsKeys.HTTP_AUTH] ? createAuthServerHttpClient() : createAuthServerWsClient()
 
       // Try to get stored email from web2 auth (Magic or Thirdweb)
       const storedEmail = getStoredEmail()
@@ -425,7 +364,7 @@ export const SetupPage = () => {
 
       setInitialized(true)
     })()
-  }, [redirect, navigate, account, identity, isConnecting, initializedFlags, flags, referrer, provider])
+  }, [redirect, navigate, account, identity, isConnecting, initializedFlags, referrer])
 
   if (!initialized) {
     return (
@@ -437,16 +376,6 @@ export const SetupPage = () => {
   }
 
   switch (view) {
-    case View.RECOVER_ERROR:
-      return <RecoverError onTryAgain={() => navigate(locations.login())} />
-    case View.SIGN_IN_COMPLETE:
-      return <SignInComplete />
-    case View.SIGNING_ERROR:
-      return <SigningError error={requestError} />
-    case View.TIMEOUT_ERROR:
-      return <TimeoutError requestId={requestId ?? ''} />
-    case View.IP_VALIDATION_ERROR:
-      return <IpValidationErrorView requestId={requestId ?? ''} reason={requestError || 'Unknown error'} />
     case View.RANDOMIZE:
       return (
         <div className={styles.container}>
@@ -522,12 +451,6 @@ export const SetupPage = () => {
       return (
         <div className={styles.container}>
           <div className={styles.background} />
-          <ConnectionModal
-            open={isConnectionModalOpen}
-            state={ConnectionLayoutState.WAITING_FOR_SIGNATURE}
-            providerType={providerType ?? null}
-            onTryAgain={() => undefined}
-          />
           <div className={isMobile ? styles.mobileContainer : styles.left}>
             <div className={isMobile ? undefined : styles.leftInner}>
               {!isMobile && <img className={styles.logoSmall} src={logoImg} alt="logo" />}

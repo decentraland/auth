@@ -12,11 +12,9 @@ import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useAfterLoginRedirection } from '../../../hooks/redirection'
 import { useAnalytics } from '../../../hooks/useAnalytics'
 import { useDisabledCatalysts } from '../../../hooks/useDisabledCatalysts'
-import { useSignRequest } from '../../../hooks/useSignRequest'
 import { useTrackReferral } from '../../../hooks/useTrackReferral'
 import { config } from '../../../modules/config'
 import { fetchProfileWithStatus } from '../../../modules/profile'
-import { IpValidationError, createAuthServerHttpClient, createAuthServerWsClient } from '../../../shared/auth'
 import { useCurrentConnectionData } from '../../../shared/connection'
 import { isEmailValid } from '../../../shared/email'
 import { locations } from '../../../shared/locations'
@@ -27,7 +25,7 @@ import { handleError } from '../../../shared/utils/errorHandler'
 import { checkWebGpuSupport } from '../../../shared/utils/webgpu'
 import { AnimatedBackground } from '../../AnimatedBackground'
 import { CharacterCounterComponent } from '../../CharacterCounter'
-import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
+import { FeatureFlagsContext } from '../../FeatureFlagsProvider'
 import { subscribeToNewsletter } from '../SetupPage/utils'
 import { deployProfileFromAvatarShape } from './utils'
 import { AvatarSetupState, AvatarShape, CUSTOMIZATION_STEP_NAMES, CustomizationStep } from './AvatarSetupPage.types'
@@ -71,10 +69,10 @@ const AvatarSetupPage: React.FC = () => {
   const hasTrackedReferral = useRef(false)
   const initializedAccountRef = useRef<string | null>(null)
   const [urlSearchParams] = useSearchParams()
-  const { flags, initialized: initializedFlags } = useContext(FeatureFlagsContext)
+  const { initialized: initializedFlags } = useContext(FeatureFlagsContext)
   const [initialized, setInitialized] = useState(false)
   const { url: redirectTo, redirect } = useAfterLoginRedirection()
-  const { isLoading: isConnecting, account, identity, provider } = useCurrentConnectionData()
+  const { isLoading: isConnecting, account, identity } = useCurrentConnectionData()
   const navigate = useNavigateWithSearchParams()
   const referrer = urlSearchParams.get('referrer')
   const { track: trackReferral } = useTrackReferral()
@@ -98,29 +96,6 @@ const AvatarSetupPage: React.FC = () => {
   const isProcessingMessageRef = useRef(false)
 
   const [isAvatarParticlesAnimationEnded, setIsAvatarParticlesAnimationEnded] = useState(false)
-
-  // Wire error handlers so a failed sign step surfaces instead of leaving the button stuck on
-  // "Deploying" forever: useSignRequest swallows recover/expired/IP errors when no handler is
-  // provided (it only console.errors and returns), so without these the deploy flow would complete
-  // its try block with `deploying` still true and no view change. Mirrors SetupPage.
-  const { signRequest, authServerClient } = useSignRequest(redirect, {
-    onExpiredRequest: () => {
-      setError(t('connection_layout.error_generic'))
-      setDeploying(false)
-    },
-    onRecoverError: message => {
-      setError(message)
-      setDeploying(false)
-    },
-    onSigningError: message => {
-      setError(message)
-      setDeploying(false)
-    },
-    onIpValidationError: message => {
-      setError(message)
-      setDeploying(false)
-    }
-  })
 
   const requestId = useMemo(() => {
     const redirectTo = urlSearchParams.get('redirectTo')
@@ -346,27 +321,25 @@ const AvatarSetupPage: React.FC = () => {
         sessionStorage.removeItem('dcl_avatar_setup_email')
         sessionStorage.removeItem('dcl_avatar_setup_is_terms_checked')
 
-        const hasLauncher = await launchDesktopApp({})
-
-        if (hasLauncher) {
-          navigate('/')
+        // A request-originated setup must go back to the request page, where the preserved
+        // `flow=deeplink` param resumes the identity handoff. This has to win over launching the
+        // desktop app: navigating home instead would leave the request with no identity ever
+        // posted, so the client would never receive its `signin=<identityId>` deep link.
+        if (requestId) {
+          redirect()
         } else {
-          // If the site has a request, sign it first
-          if (requestId && provider && flags[FeatureFlagsKeys.LOGIN_ON_SETUP]) {
-            await signRequest(provider, requestId, account)
+          const hasLauncher = await launchDesktopApp({})
+
+          if (hasLauncher) {
+            navigate('/')
           } else {
             const emailParam = state.email || getStoredEmail()
             redirect({ user: account, ...(emailParam ? { email: emailParam } : {}) }, config.get('DOWNLOAD_URL'))
           }
         }
       } catch (e) {
-        if (e instanceof IpValidationError) {
-          const errorMessage = handleError(e, 'IP validation failed')
-          setError(errorMessage)
-        } else {
-          const errorMessage = handleError(e, 'Error deploying profile')
-          setError(errorMessage)
-        }
+        const errorMessage = handleError(e, 'Error deploying profile')
+        setError(errorMessage)
         setDeploying(false)
       } finally {
         isProcessingMessageRef.current = false
@@ -382,10 +355,7 @@ const AvatarSetupPage: React.FC = () => {
       identity,
       referrer,
       requestId,
-      provider,
-      flags,
       redirect,
-      signRequest,
       trackAvatarCustomizationStep,
       trackAvatarEditSuccess,
       trackReferral,
@@ -425,8 +395,6 @@ const AvatarSetupPage: React.FC = () => {
       return redirect()
     }
 
-    authServerClient.current = flags[FeatureFlagsKeys.HTTP_AUTH] ? createAuthServerHttpClient() : createAuthServerWsClient()
-
     // Try to get stored email from web2 auth (Magic or Thirdweb)
     const storedEmail = getStoredEmail()
     if (storedEmail) {
@@ -455,7 +423,7 @@ const AvatarSetupPage: React.FC = () => {
     }
 
     setInitialized(true)
-  }, [account, identity, flags, provider, referrer, redirect, trackReferral])
+  }, [account, identity, referrer, redirect, trackReferral])
 
   useEffect(() => {
     window.addEventListener('message', handleMessage, false)
@@ -482,10 +450,9 @@ const AvatarSetupPage: React.FC = () => {
       return
     }
 
-    // Run the one-time initialization once per connected account. `initializeAvatarSetup` depends
-    // on the `flags` object, which the feature-flags provider rebuilds on every poll (~60s). Without
-    // this guard the effect would re-run each poll and re-check WebGPU, re-fetch the profile, re-fire
-    // the CP3 "reached" checkpoint, and overwrite an inherited email that had just been resolved.
+    // Run the one-time initialization once per connected account: a dep identity change must not
+    // re-check WebGPU, re-fetch the profile, re-fire the CP3 "reached" checkpoint, or overwrite an
+    // inherited email that had just been resolved.
     if (initializedAccountRef.current === account) return
     initializedAccountRef.current = account
 

@@ -1,11 +1,12 @@
+import { hexToString } from 'viem'
 import { ImpersonatedSignInError, UnsupportedMethodError } from './errors'
-
-// The Decentraland-specific signing method used by the sign-in flow. It is the only
-// method allowed to produce a signature over an identity-authorization payload.
-const DCL_SIGN_IN_METHOD = 'dcl_personal_sign'
 
 // The only methods the auth site is willing to forward to the connected wallet. Anything
 // outside this set is rejected at recover time (see {@link assertMethodIsAllowed}).
+//
+// `dcl_personal_sign` is deliberately excluded: the sign-in flow it served was retired in
+// favour of the identity handoff (`POST /identities` + the `open?signin=<id>` deep link), so
+// the auth site no longer signs an identity-authorization payload under any method.
 //
 // `eth_sign` is deliberately excluded: unlike `personal_sign`, it signs a raw 32-byte digest
 // with no EIP-191 (`\x19Ethereum Signed Message:\n`) prefix. That lets a request blind-sign an
@@ -13,24 +14,45 @@ const DCL_SIGN_IN_METHOD = 'dcl_personal_sign'
 // sign-in message. The latter would bypass `assertRequestIsNotImpersonatingSignIn`, which can
 // only recognize a *plaintext* sign-in payload, not its hash. Major wallets deprecated
 // `eth_sign` for the same reason.
-const ALLOWED_METHODS = new Set([
-  'dcl_personal_sign',
-  'personal_sign',
-  'eth_signtypeddata',
-  'eth_signtypeddata_v3',
-  'eth_signtypeddata_v4',
-  'eth_sendtransaction'
-])
+const ALLOWED_METHODS = ['personal_sign', 'eth_signTypedData', 'eth_signTypedData_v3', 'eth_signTypedData_v4', 'eth_sendTransaction']
+
+// Lowercased method → its canonical EIP-1193 spelling, so the allowlist can stay forgiving about
+// casing while everything downstream only ever sees the canonical form (see assertMethodIsAllowed).
+const CANONICAL_METHODS_BY_LOWERCASE = new Map(ALLOWED_METHODS.map(method => [method.toLowerCase(), method]))
+
+// The retired sign-in method. Named here only so a rejected request can be recognized as coming
+// from a client that has not migrated to the identity handoff — it is NOT allowed, and this must
+// never be added back to ALLOWED_METHODS.
+const RETIRED_SIGN_IN_METHOD = 'dcl_personal_sign'
 
 /**
- * Rejects any recovered request whose method is not on the {@link ALLOWED_METHODS} allowlist.
- * This is the primary defense against dangerous methods (e.g. `eth_sign`) reaching the wallet;
- * forwarding arbitrary provider methods is never safe on a signing surface.
+ * Returns whether a rejected method is the retired Decentraland sign-in. Lets the request page
+ * tell the user their app is out of date instead of showing a generic recover error whose retry
+ * would re-create the same rejected request.
  */
-function assertMethodIsAllowed(method: string): void {
-  if (!ALLOWED_METHODS.has(method.toLowerCase())) {
+function isRetiredSignInMethod(method: string): boolean {
+  return method.toLowerCase() === RETIRED_SIGN_IN_METHOD
+}
+
+/**
+ * Rejects any recovered request whose method is not on the {@link ALLOWED_METHODS} allowlist and
+ * returns it in its canonical EIP-1193 spelling. This is the primary defense against dangerous
+ * methods (e.g. `eth_sign`) reaching the wallet; forwarding arbitrary provider methods is never
+ * safe on a signing surface.
+ *
+ * Matching stays case-insensitive so a client with a casing quirk isn't turned away, but the
+ * canonical spelling is what callers must dispatch on. Dispatch downstream is case-SENSITIVE
+ * (RequestPage switches on `eth_sendTransaction` exactly and forwards the method verbatim to the
+ * wallet), so an oddly-cased method that only passed the gate would otherwise skip the whole
+ * transaction path — simulation, meta-transaction relay, gas estimate — and then dead-end at a
+ * wallet that doesn't recognize it.
+ */
+function assertMethodIsAllowed(method: string): string {
+  const canonicalMethod = CANONICAL_METHODS_BY_LOWERCASE.get(method.toLowerCase())
+  if (!canonicalMethod) {
     throw new UnsupportedMethodError(method)
   }
+  return canonicalMethod
 }
 
 // A Decentraland identity-authorization message (built by @dcl/crypto's
@@ -49,10 +71,9 @@ const EPHEMERAL_ADDRESS_LINE_PREFIX = 'Ephemeral address: 0x'
 const EXPIRATION_LINE_PREFIX = 'Expiration: '
 
 /**
- * Returns whether a message replicates the Decentraland identity-authorization payload
- * that the `dcl_personal_sign` sign-in flow asks the user to sign. Detection mirrors how
- * @dcl/crypto validates the payload so that any message which would yield a usable auth
- * chain is caught, regardless of its first line.
+ * Returns whether a message replicates the Decentraland identity-authorization payload.
+ * Detection mirrors how @dcl/crypto validates the payload so that any message which would
+ * yield a usable auth chain is caught, regardless of its first line.
  */
 function isDecentralandIdentityAuthMessage(message: unknown): boolean {
   if (typeof message !== 'string') {
@@ -67,20 +88,49 @@ function isDecentralandIdentityAuthMessage(message: unknown): boolean {
   return lines[1].startsWith(EPHEMERAL_ADDRESS_LINE_PREFIX) && lines[2].startsWith(EXPIRATION_LINE_PREFIX)
 }
 
+// `personal_sign` params are routinely hex-encoded UTF-8 rather than plaintext — the approval UI
+// decodes them the same way (see extractSignaturePayload). The wallet signs the DECODED bytes, so a
+// hex-wrapped identity payload produces exactly the same usable auth chain as a plaintext one.
+// Detection therefore has to look through the encoding instead of only at the literal param.
+const HEX_STRING_REGEX = /^0x([0-9a-fA-F]{2})+$/i
+
+function decodeHexUtf8(value: string): string | null {
+  if (!HEX_STRING_REGEX.test(value)) {
+    return null
+  }
+  try {
+    // Normalize a `0X` prefix, which hexToString does not accept.
+    return hexToString(`0x${value.slice(2)}`)
+  } catch {
+    return null
+  }
+}
+
 /**
- * Guards a recovered request against sign-in impersonation. Any method other than
- * `dcl_personal_sign` that carries a Decentraland identity-authorization payload in its
- * params is rejected with an {@link ImpersonatedSignInError}, since signing it would
- * grant the requester an auth chain that impersonates the user.
+ * Returns whether a single request param carries a Decentraland identity-authorization payload,
+ * either as plaintext or as hex-encoded UTF-8.
+ */
+function isIdentityAuthParam(param: unknown): boolean {
+  if (isDecentralandIdentityAuthMessage(param)) {
+    return true
+  }
+  if (typeof param !== 'string') {
+    return false
+  }
+  const decoded = decodeHexUtf8(param)
+  return decoded !== null && isDecentralandIdentityAuthMessage(decoded)
+}
+
+/**
+ * Guards a recovered request against sign-in impersonation. No method may sign a
+ * Decentraland identity-authorization payload: doing so would grant the requester an auth
+ * chain that impersonates the user. There is no exemption — the sign-in flow that used to
+ * need one now hands the identity over through `POST /identities` instead of a signature.
  */
 function assertRequestIsNotImpersonatingSignIn(method: string, params: unknown[] | undefined): void {
-  if (method === DCL_SIGN_IN_METHOD) {
-    return
-  }
-
-  if (params?.some(isDecentralandIdentityAuthMessage)) {
+  if (params?.some(isIdentityAuthParam)) {
     throw new ImpersonatedSignInError(method)
   }
 }
 
-export { DCL_SIGN_IN_METHOD, isDecentralandIdentityAuthMessage, assertRequestIsNotImpersonatingSignIn, assertMethodIsAllowed }
+export { isDecentralandIdentityAuthMessage, assertRequestIsNotImpersonatingSignIn, assertMethodIsAllowed, isRetiredSignInMethod }

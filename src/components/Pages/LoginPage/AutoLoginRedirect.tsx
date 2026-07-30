@@ -8,7 +8,7 @@ import { usePostLoginRedirect } from '../../../hooks/usePostLoginRedirect'
 import { ConnectionType } from '../../../modules/analytics/types'
 import { useCurrentConnectionData } from '../../../shared/connection'
 import { isUserRejectedTransaction } from '../../../shared/errors'
-import { locations } from '../../../shared/locations'
+import { extractReferrerFromSearchParameters, locations } from '../../../shared/locations'
 import { markReturningUser } from '../../../shared/onboarding/markReturningUser'
 import { trackCheckpoint } from '../../../shared/onboarding/trackCheckpoint'
 import { checkClockSync } from '../../../shared/utils/clockSync'
@@ -50,6 +50,11 @@ export const AutoLoginRedirect = ({ connectionType }: Props) => {
   // Raw redirectTo for connectToSocialProvider (needs the original, unsanitized value
   // because Magic encodes it in customData for the OAuth callback round-trip)
   const rawRedirectTo = useMemo(() => new URLSearchParams(window.location.search).get('redirectTo') ?? undefined, [])
+
+  // Referrer from the invite link (`/invite/:name` sends it as `?referrer=0x…`).
+  // QuickSetup is the only place that posts the referral, so it has to survive
+  // the hop into setup or the referral is never recorded.
+  const referrer = useMemo(() => extractReferrerFromSearchParameters(new URLSearchParams(window.location.search)), [])
 
   const handleCancel = useCallback(() => {
     // Navigate to login page without loginMethod — shows full login UI.
@@ -124,7 +129,7 @@ export const AutoLoginRedirect = ({ connectionType }: Props) => {
       if (!isExplorerRedirect && !skipSetupRef.current && connectionData.account) {
         const profile = await ensureProfile(connectionData.account, freshIdentity, {
           redirectTo,
-          referrer: null,
+          referrer,
           navigateOptions: { replace: true }
         })
         if (!profile) return
@@ -150,6 +155,7 @@ export const AutoLoginRedirect = ({ connectionType }: Props) => {
     isSocial,
     isMagicTest,
     rawRedirectTo,
+    referrer,
     redirectTo,
     trackLoginClick,
     trackLoginSuccess,

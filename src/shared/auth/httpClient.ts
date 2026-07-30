@@ -8,7 +8,6 @@ import { handleError } from '../utils/errorHandler'
 import {
   DifferentSenderError,
   ExpiredRequestError,
-  IpValidationError,
   RequestFulfilledError,
   RequestNotFoundError,
   SimulationUnavailableError
@@ -28,14 +27,17 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
       throw new Error('Unknown error')
     }
 
-    if (data.error?.includes('already been fulfilled')) {
+    // "already been fulfilled" (the outcome was delivered) and "already has a response" (an
+    // outcome is stored, pending delivery) both mean the request was already answered. Treat them
+    // alike: there is nothing left to do, and retrying only re-sends an outcome the server keeps
+    // rejecting. Without the second string it degrades to a generic error whose "Try Again"
+    // reopens the client for a request that is already done.
+    if (data.error?.includes('already been fulfilled') || data.error?.includes('already has a response')) {
       throw new RequestFulfilledError(requestId)
     } else if (data.error?.includes('not found')) {
       throw new RequestNotFoundError(requestId)
     } else if (data.error?.includes('has expired')) {
       throw new ExpiredRequestError(requestId)
-    } else if (data.error?.includes('IP validation failed')) {
-      throw new IpValidationError(requestId, data.error)
     } else if (data.error) {
       throw new Error(data.error)
     }
@@ -154,13 +156,6 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
 
       recoverResponse = (await response.json()) as RecoverResponse
 
-      // NOTE: do NOT normalize `recoverResponse.method` casing here. It is dispatched downstream on
-      // its EIP-1193 canonical form (RequestPage switches on `case 'eth_sendTransaction'` and
-      // forwards the method verbatim to the wallet), so lowercasing it would break the normal
-      // transaction path. The allowlist guard and isSignatureMethod already compare
-      // case-insensitively, so a non-canonical-cased method still fails safe (the wallet rejects an
-      // unknown-cased method) without corrupting the canonical case.
-
       // If the sender defined in the request is different than the one that is connected, show an
       // error. Compare both sides case-insensitively — the server is not guaranteed to lowercase
       // `sender`, and a checksummed address must still match the connected (lowercased) account.
@@ -173,33 +168,21 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
       }
 
       // Reject methods the auth site does not support (e.g. the dangerous legacy `eth_sign`)
-      // before anything is forwarded to the wallet.
-      assertMethodIsAllowed(recoverResponse.method)
+      // before anything is forwarded to the wallet, and pin the method to its canonical EIP-1193
+      // spelling. Everything downstream dispatches case-SENSITIVELY (RequestPage switches on
+      // `case 'eth_sendTransaction'` and forwards the method verbatim to the wallet), so an
+      // oddly-cased method that passed the case-insensitive gate would otherwise miss the
+      // transaction path entirely and dead-end at the wallet.
+      recoverResponse.method = assertMethodIsAllowed(recoverResponse.method)
 
-      // Reject requests that try to replicate the dcl_personal_sign sign-in through a
-      // generic signing method (e.g. personal_sign), which would bypass its protections.
+      // Reject requests that ask the wallet to sign a Decentraland identity-authorization
+      // payload, which would yield an auth chain that impersonates the user.
       assertRequestIsNotImpersonatingSignIn(recoverResponse.method, recoverResponse.params)
 
-      switch (recoverResponse.method) {
-        case 'dcl_personal_sign':
-          trackEvent(TrackingEvents.REQUEST_INTERACTION, {
-            type: RequestInteractionType.VERIFY_SIGN_IN,
-            browserTime: Date.now(),
-            requestType: recoverResponse?.method
-          })
-          break
-        case 'eth_sendTransaction':
-          trackEvent(TrackingEvents.REQUEST_INTERACTION, {
-            type: RequestInteractionType.WALLET_INTERACTION,
-            requestType: recoverResponse.method
-          })
-          break
-        default:
-          trackEvent(TrackingEvents.REQUEST_INTERACTION, {
-            type: RequestInteractionType.WALLET_INTERACTION,
-            requestType: recoverResponse.method
-          })
-      }
+      trackEvent(TrackingEvents.REQUEST_INTERACTION, {
+        type: RequestInteractionType.WALLET_INTERACTION,
+        requestType: recoverResponse.method
+      })
 
       return recoverResponse
     } catch (e) {
@@ -210,21 +193,6 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
         },
         trackingEvent: TrackingEvents.REQUEST_LOADING_ERROR
       })
-      throw e
-    }
-  }
-
-  const notifyRequestNeedsValidation = async (requestId: string) => {
-    try {
-      const response = await fetch(baseUrl + '/v2/requests/' + requestId + '/validation', {
-        method: 'POST'
-      })
-
-      if (!response.ok) {
-        await extractError(response, requestId)
-      }
-    } catch (e) {
-      handleError(e, 'Error notifying request needs validation')
       throw e
     }
   }
@@ -283,5 +251,5 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
     }
   }
 
-  return { recover, sendSuccessfulOutcome, sendFailedOutcome, notifyRequestNeedsValidation, checkHealth, postIdentity, simulateTransaction }
+  return { recover, sendSuccessfulOutcome, sendFailedOutcome, checkHealth, postIdentity, simulateTransaction }
 }

@@ -62,7 +62,6 @@
     "error_contact_support": "或联系支持团队并提供以下错误信息："
   },
   "request": {
-    "verify_sign_in": "验证登录",
     "verification_match": "下方的验证号码是否与 {explorerText} 中的匹配？",
     "no_it_doesnt": "不，不匹配",
     "yes_same": "是的，它们相同",
@@ -128,15 +127,9 @@
       "title": "看起来您使用了不同的账户连接。",
       "description": "请将您的钱包账户切换为连接到 {explorerText} 的账户。"
     },
-    "sign_in_complete": {
-      "title": "登录成功！",
-      "description": "返回 {explorerText} 开始探索！",
-      "explorer_title": "登录成功！",
-      "explorer_description_line2": "请返回 Decentraland App 以完成您的账户设置！"
-    },
-    "denied_sign_in": {
-      "title": "号码不匹配，或者此操作不是由您发起的？",
-      "description": "如果您正在尝试登录，请重试操作。如果此操作不是由您发起的，请忽略此消息。"
+    "outdated_client_error": {
+      "title": "您的应用需要更新",
+      "description": "此版本的 {explorerText} 使用的登录方式已不再受支持。请更新到最新版本后重新登录。"
     },
     "wallet_interaction_complete": {
       "title": "钱包交互完成",
@@ -158,12 +151,6 @@
     "client_login_error": {
       "title": "我们无法完成您的登录",
       "description": "完成登录时出现问题。请重试。"
-    },
-    "ip_validation_error": {
-      "title": "安全验证失败",
-      "description": "此确认请求是从不同的设备或网络创建的。出于安全原因，您只能从最初发起请求的同一设备完成此请求。",
-      "request_id": "请求 ID：",
-      "reason": "原因："
     },
     "continue_in_app": {
       "sign_in_successful": "登录成功",

@@ -3,7 +3,6 @@ import { createContext } from 'react'
 enum FeatureFlagsKeys {
   MAGIC_TEST = 'dapps-magic-dev-test',
   DAPPS_MAGIC_AUTO_SIGN = 'dapps-magic-auto-sign',
-  LOGIN_ON_SETUP = 'dapps-login-on-setup',
   HTTP_AUTH = 'dapps-http-auth',
   UNITY_WEARABLE_PREVIEW = 'dapps-unity-wearable-preview',
   ONBOARDING_FLOW = 'dapps-onboarding-flow',

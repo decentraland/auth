@@ -99,6 +99,13 @@ function requiresInjectedProvider(connectionOption: ConnectionOptionType): boole
   return fromConnectionOptionToProviderType(connectionOption) === ProviderType.INJECTED
 }
 
+// Coalesces concurrent connect attempts for the SAME provider (double-click, racing retry) behind a
+// single in-flight promise, so a repeated click can't spawn a second overlapping connect for that
+// provider. A different provider is allowed to supersede (a genuine "user switched wallet" action);
+// cross-provider concurrency isn't serialized here and is instead prevented at the UI layer, where
+// the wallet-selection modal is modal (the user can't pick another wallet while one is pending).
+let inFlightConnect: { providerType: ProviderType; promise: Promise<ConnectionResponse> } | null = null
+
 async function connectToProvider(connectionOption: ConnectionOptionType): Promise<ConnectionResponse> {
   const providerType = fromConnectionOptionToProviderType(connectionOption)
 
@@ -106,25 +113,50 @@ async function connectToProvider(connectionOption: ConnectionOptionType): Promis
     throw new Error('No wallet extension detected. Please install MetaMask or another Ethereum wallet.')
   }
 
-  // Clear stale WalletConnect/AppKit data to prevent session conflicts
-  if (providerType === ProviderType.WALLET_CONNECT || providerType === ProviderType.WALLET_CONNECT_V2) {
-    WalletConnectV2Connector.clearStorage()
-    localStorage.removeItem('WALLETCONNECT_DEEPLINK_CHOICE')
+  // Reuse an in-flight connect for the same provider instead of starting a second, overlapping one.
+  if (inFlightConnect && inFlightConnect.providerType === providerType) {
+    return inFlightConnect.promise
   }
 
-  let connectionData: ConnectionResponse
+  const promise = (async () => {
+    if (providerType === ProviderType.WALLET_CONNECT_V2) {
+      // Clear WalletConnect v1's leftover deep-link choice, which can pin the mobile wallet chooser.
+      localStorage.removeItem('WALLETCONNECT_DEEPLINK_CHOICE')
+
+      // Force a fresh pairing on every explicit WalletConnect click. decentraland-connect's
+      // `activate()` reuses a restored session whenever it is still alive and, on that branch, never
+      // opens the AppKit modal — so clicking WalletConnect would silently reconnect the previously
+      // paired wallet and give a user who wants to sign in with a *different* wallet no way to
+      // choose one. Clearing the session here is what guarantees `activate()` takes its
+      // "not connected" branch and prompts.
+      //
+      // This is not redundant with the library's own stale-session handling: that only clears a
+      // session it can prove is dead, whereas an explicit click must re-prompt even when the
+      // session is perfectly alive. It also only runs on a user-initiated connect — automatic
+      // restores go through `connection.tryPreviousConnection()` and never reach this function, so
+      // the session reuse the handoff depends on is untouched.
+      WalletConnectV2Connector.clearStorage()
+    }
+
+    const connectionData = await connection.connect(providerType)
+    if (!connectionData.account || !connectionData.provider) {
+      throw new Error('Could not get provider')
+    }
+    return connectionData
+  })()
+
+  inFlightConnect = { providerType, promise }
   try {
-    connectionData = await connection.connect(providerType)
+    return await promise
   } catch (error) {
     console.error('Error connecting to provider', error)
     throw error
+  } finally {
+    // Only clear if this call still owns the slot (a different-provider connect may have replaced it).
+    if (inFlightConnect?.promise === promise) {
+      inFlightConnect = null
+    }
   }
-
-  if (!connectionData.account || !connectionData.provider) {
-    throw new Error('Could not get provider')
-  }
-
-  return connectionData
 }
 
 function isSocialLogin(connectionType: ConnectionOptionType): boolean {

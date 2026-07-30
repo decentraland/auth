@@ -62,7 +62,6 @@
     "error_contact_support": "Oppure contatta il supporto con il seguente messaggio di errore:"
   },
   "request": {
-    "verify_sign_in": "Verifica l'accesso",
     "verification_match": "Il numero di verifica qui sotto corrisponde a quello nel {explorerText}?",
     "no_it_doesnt": "No, non corrisponde",
     "yes_same": "Sì, sono uguali",
@@ -128,15 +127,9 @@
       "title": "Sembra che tu sia connesso con un account diverso.",
       "description": "Cambia l'account del tuo portafoglio con quello connesso al {explorerText}."
     },
-    "sign_in_complete": {
-      "title": "Accesso riuscito!",
-      "description": "Torna al {explorerText} per entrare!",
-      "explorer_title": "Accesso riuscito!",
-      "explorer_description_line2": "Torna a Decentraland App per completare il tuo account!"
-    },
-    "denied_sign_in": {
-      "title": "Il numero non corrispondeva, o questa azione non è stata eseguita da te?",
-      "description": "Se stai cercando di accedere, riprova l'azione. Se questa azione non è stata avviata da te, ignora questo messaggio."
+    "outdated_client_error": {
+      "title": "La tua app richiede un aggiornamento",
+      "description": "Questa versione di {explorerText} usa un metodo di accesso che non è più supportato. Aggiorna all'ultima versione ed effettua di nuovo l'accesso."
     },
     "wallet_interaction_complete": {
       "title": "Interazione con il portafoglio completata",
@@ -158,12 +151,6 @@
     "client_login_error": {
       "title": "Non è stato possibile completare l'accesso",
       "description": "Si è verificato un problema durante il completamento dell'accesso. Riprova."
-    },
-    "ip_validation_error": {
-      "title": "Validazione di sicurezza non riuscita",
-      "description": "Questa richiesta di conferma è stata creata da un dispositivo o una rete diversa. Per motivi di sicurezza, puoi completare questa richiesta solo dallo stesso dispositivo da cui è stata originariamente avviata.",
-      "request_id": "ID richiesta:",
-      "reason": "Motivo:"
     },
     "continue_in_app": {
       "sign_in_successful": "Accesso riuscito",
