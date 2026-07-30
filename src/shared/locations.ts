@@ -197,12 +197,15 @@ const isValidUuidV4 = (value: string): boolean => UUID_V4_REGEX.test(value)
 const buildRequestPageUrl = (
   requestId: string,
   targetConfigId: string,
-  options: { isDeepLinkFlow?: boolean; isBridgeOnly?: boolean; authRequestId?: string | null } = {}
+  options: { isDeepLinkFlow?: boolean; isBridgeOnly?: boolean; authRequestId?: string | null; referrer?: string | null } = {}
 ): string => {
   const flowParam = options.isDeepLinkFlow ? `&${FLOW_PARAM}=${DEEP_LINK_FLOW_VALUE}` : ''
   const bridgeOnlyParam = options.isBridgeOnly ? `&${BRIDGE_ONLY_PARAM}=true` : ''
   const authRequestIdParam = options.authRequestId ? `&${AUTH_REQUEST_ID_PARAM}=${encodeURIComponent(options.authRequestId)}` : ''
-  return `/auth/requests/${requestId}?targetConfigId=${targetConfigId}${flowParam}${bridgeOnlyParam}${authRequestIdParam}`
+  // Referral attribution must survive the login round-trip too: a new wallet
+  // user hits /login and returns here, and without this the referrer is lost.
+  const referrerParam = options.referrer ? `&referrer=${encodeURIComponent(options.referrer)}` : ''
+  return `/auth/requests/${requestId}?targetConfigId=${targetConfigId}${flowParam}${bridgeOnlyParam}${authRequestIdParam}${referrerParam}`
 }
 
 export type { LoginMethod }

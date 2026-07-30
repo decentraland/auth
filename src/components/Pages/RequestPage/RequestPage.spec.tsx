@@ -13,7 +13,7 @@ import {
   RequestFulfilledError,
   UnsupportedMethodError
 } from '../../../shared/auth'
-import { getAuthRequestId, isBridgeOnlyEnabled } from '../../../shared/locations'
+import { extractReferrerFromSearchParameters, getAuthRequestId, isBridgeOnlyEnabled } from '../../../shared/locations'
 import { trackEvent } from '../../../shared/utils/analytics'
 import { FeatureFlagsContext } from '../../FeatureFlagsProvider'
 import { RequestPage } from './RequestPage'
@@ -88,8 +88,8 @@ jest.mock('../../../shared/locations', () => {
     ...actual,
     extractReferrerFromSearchParameters: jest.fn().mockReturnValue(null),
     isBridgeOnlyEnabled: jest.fn().mockReturnValue(false),
-    getAuthRequestId: jest.fn().mockReturnValue(null),
-    buildRequestPageUrl: (requestId: string, targetConfigId: string) => `/auth/requests/${requestId}?targetConfigId=${targetConfigId}`
+    getAuthRequestId: jest.fn().mockReturnValue(null)
+    // buildRequestPageUrl is intentionally left real so referrer/param preservation is exercised end-to-end
   }
 })
 jest.mock('../../../shared/utils/analytics', () => ({
@@ -327,6 +327,35 @@ describe('RequestPage', () => {
       renderRequestPage()
       await waitFor(() => {
         expect(mockNavigate).toHaveBeenCalledWith(expect.stringContaining('/login?redirectTo='))
+      })
+    })
+
+    describe('and the request URL carries a referrer', () => {
+      const REFERRER = '0x24e5f44999c151f08609f8e27b2238c773c4d020'
+
+      beforeEach(() => {
+        ;(extractReferrerFromSearchParameters as jest.Mock).mockReturnValue(REFERRER)
+      })
+
+      afterEach(() => {
+        ;(extractReferrerFromSearchParameters as jest.Mock).mockReturnValue(null)
+      })
+
+      it('should preserve the referrer inside the login redirectTo so it survives the round-trip', async () => {
+        renderRequestPage(`/auth/requests/${REQUEST_ID}?targetConfigId=default&referrer=${REFERRER}`)
+        await waitFor(() => {
+          expect(mockNavigate).toHaveBeenCalledWith(expect.stringContaining(`referrer%3D${REFERRER}`))
+        })
+      })
+
+      it('should also pass the referrer as a top-level /login param so the login page can hand it to setup', async () => {
+        // LoginPage reads the referrer from its OWN url (not from inside redirectTo) when
+        // routing a new user to profile setup — without the top-level param the referral
+        // POST never fires for a not-yet-connected wallet user.
+        renderRequestPage(`/auth/requests/${REQUEST_ID}?targetConfigId=default&referrer=${REFERRER}`)
+        await waitFor(() => {
+          expect(mockNavigate).toHaveBeenCalledWith(expect.stringContaining(`&referrer=${REFERRER}`))
+        })
       })
     })
   })

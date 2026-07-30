@@ -466,5 +466,19 @@ describe('locations', () => {
         expect(buildRequestPageUrl('request-id', 'default')).toBe('/auth/requests/request-id?targetConfigId=default')
       })
     })
+
+    describe('and a referrer is provided', () => {
+      it('should append it url-encoded so it survives the login round-trip', () => {
+        expect(buildRequestPageUrl('request-id', 'default', { referrer: '0x24e5f44999c151f08609f8e27b2238c773c4d020' })).toBe(
+          '/auth/requests/request-id?targetConfigId=default&referrer=0x24e5f44999c151f08609f8e27b2238c773c4d020'
+        )
+      })
+    })
+
+    describe('and no referrer is provided', () => {
+      it('should not append the referrer param', () => {
+        expect(buildRequestPageUrl('request-id', 'default')).not.toContain('referrer')
+      })
+    })
   })
 })
