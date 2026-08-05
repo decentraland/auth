@@ -154,9 +154,9 @@
     },
     "continue_in_app": {
       "sign_in_successful": "Sign In Successful",
-      "redirect_countdown": "You will be redirected to {explorerText} in {countdown}...",
-      "redirecting": "Redirecting to {explorerText}...",
-      "return_to": "Return to {explorerText}",
+      "redirect_countdown": "Reconnecting you to your already-open {explorerText} in {countdown}s. It's a quick security check — the launcher may flash briefly, but it's not opening again.",
+      "redirecting": "Reconnecting to {explorerText}...",
+      "return_to": "Reconnect to {explorerText}",
       "could_not_open": "Could not open {explorerText}",
       "app_not_launched": "The application could not be launched. Please make sure {explorerText} is installed and try again.",
       "go_back_login": "Go back to login"
@@ -305,9 +305,9 @@
   },
   "mobile_auth": {
     "sign_in_successful": "Sign In Successful",
-    "redirect_countdown": "You will be redirected to\n{explorerText} in {countdown}...",
-    "redirecting": "Redirecting to {explorerText}...",
-    "return_to": "Return to {explorerText}",
+    "redirect_countdown": "Reconnecting you to {explorerText} in {countdown}s.\nIt's a quick security check — {explorerText} will open or come to the foreground.",
+    "redirecting": "Reconnecting to {explorerText}...",
+    "return_to": "Reconnect to {explorerText}",
     "could_not_open": "Could not open {explorerText}",
     "app_not_launched": "The application could not be launched. Please make sure {explorerText} is installed and try again."
   }
