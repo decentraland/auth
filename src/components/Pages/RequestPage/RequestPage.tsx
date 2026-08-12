@@ -40,6 +40,7 @@ import { sendTipNotification } from '../../../shared/notifications'
 import { identifyUser, trackEvent } from '../../../shared/utils/analytics'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { FeatureFlagsContext } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
+import { getTransactionToAddress } from './transactionParams'
 import { MANATransferData, NFTTransferData, SignaturePayload, SimulationState, TransferType } from './types'
 import {
   buildSendTransactionSimulationPayload,
@@ -836,12 +837,7 @@ export const RequestPage = () => {
         })
       } else {
         const chainId = getMetaTransactionChainId()
-        const txParams = requestRef.current?.params?.[0] as Record<string, unknown> | undefined
-        const toAddress = txParams?.to as string | undefined
-
-        if (!toAddress) {
-          throw new Error(`Contract address not found in transaction parameters. Received params: ${JSON.stringify(txParams ?? null)}`)
-        }
+        const toAddress = getTransactionToAddress(requestRef.current?.params)
 
         // Check if this contract will use meta transactions, reusing the prefetch result for the
         // same contract when available to avoid repeating the lookup.
