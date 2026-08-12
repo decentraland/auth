@@ -66,6 +66,9 @@ function isMagicExtensionError(error: unknown): error is { code: string; rawMess
  *    is exactly "User denied message signature". Viem uses a different message
  *    ("User rejected the request.") so the library falls through to code 'unknown',
  *    requiring a message-based fallback.
+ * - @web3-react/injected-connector's UserRejectedRequestError (no code at all)
+ *    Thrown by connection.connect() during login, reached through decentraland-connect.
+ *    Matched by message ("The user rejected the request.") since it exposes nothing else.
  */
 function isUserRejectedTransaction(error: unknown): boolean {
   if (error === null || typeof error !== 'object') return false
@@ -82,6 +85,13 @@ function isUserRejectedTransaction(error: unknown): boolean {
   // because it only checks for "User denied message signature" (ethers-era message).
   // Detect via the preserved viem message.
   if (code === 'unknown' && isErrorWithMessage(error) && error.message === 'User rejected the request.') return true
+
+  // @web3-react/injected-connector throws its own UserRejectedRequestError from
+  // connection.connect(), which reaches us through decentraland-connect's ConnectionManager.
+  // It carries no EIP-1193 code at all, and its name comes from `this.constructor.name`, which
+  // minification rewrites to a single letter in production — leaving the message as the only
+  // stable signal. Note the wording differs from viem's by a leading article.
+  if (isErrorWithMessage(error) && error.message === 'The user rejected the request.') return true
 
   return false
 }
