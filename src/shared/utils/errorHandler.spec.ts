@@ -1,4 +1,5 @@
 import { captureException } from '@sentry/react'
+import { trackEvent } from './analytics'
 import { handleError } from './errorHandler'
 
 jest.mock('@sentry/react', () => ({
@@ -91,6 +92,47 @@ describe('handleError → captureException', () => {
           url: 'https://decentraland.org/auth/login'
         })
       )
+    })
+  })
+})
+
+describe('handleError → expected wallet conditions', () => {
+  const mockTrackEvent = trackEvent as jest.Mock
+
+  beforeEach(() => {
+    mockCaptureException.mockClear()
+    mockTrackEvent.mockClear()
+  })
+
+  const expectedConditions: [string, unknown][] = [
+    ['a locked wallet', Object.assign(new Error('There was an error unlocking your wallet.'), { name: 'ErrorUnlockingWallet' })],
+    ['a wallet prompt already pending', { code: -32002, message: "Request of type 'wallet_requestPermissions' already pending" }],
+    ['the WalletConnect modal being dismissed', new Error('User closed the modal without connecting')]
+  ]
+
+  it.each(expectedConditions)('should not report %s to Sentry', (_case, error) => {
+    handleError(error, 'context')
+
+    expect(mockCaptureException).not.toHaveBeenCalled()
+  })
+
+  it.each(expectedConditions)('should still track %s, since the login did fail for the user', (_case, error) => {
+    handleError(error, 'context')
+
+    expect(mockTrackEvent).toHaveBeenCalled()
+  })
+
+  it('should return the message so callers can still render it', () => {
+    const message = handleError(new Error('User closed the modal without connecting'), 'context')
+
+    expect(message).toBe('User closed the modal without connecting')
+  })
+
+  describe('and the failure is a genuine fault', () => {
+    it('should still be reported', () => {
+      handleError({ code: -32603, message: 'Internal error' }, 'context')
+
+      expect(mockCaptureException).toHaveBeenCalledTimes(1)
     })
   })
 })

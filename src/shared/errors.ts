@@ -96,5 +96,40 @@ function isUserRejectedTransaction(error: unknown): boolean {
   return false
 }
 
+/**
+ * Wallet and connector conditions that are not application faults: the wallet is locked, it
+ * already has a prompt open for this origin, or the user dismissed the connection modal. The
+ * login genuinely fails for the user — so these are still logged and tracked — but there is
+ * nothing here for us to fix.
+ *
+ * User rejections are detected separately by {@link isUserRejectedTransaction}, which some call
+ * sites also use to drive navigation and so must stay distinguishable.
+ */
+function isExpectedWalletError(error: unknown): boolean {
+  if (error === null || typeof error !== 'object') return false
+
+  // decentraland-connect's InjectedConnector rejects with this when the injected wallet will not
+  // unlock. The login screen already keys its ERROR_LOCKED_WALLET state off the same name.
+  if (isErrorWithName(error) && error.name === 'ErrorUnlockingWallet') return true
+
+  // EIP-1193 "resource unavailable". MetaMask uses it for "a request of this type is already
+  // pending for this origin", which clears as soon as the user answers the prompt already open.
+  if ((error as { code: unknown }).code === -32002) return true
+
+  // decentraland-connect's WalletConnectV2Connector rejects with a bare Error when the user closes
+  // the AppKit modal, so the message is the only signal it leaves.
+  if (isErrorWithMessage(error) && error.message === 'User closed the modal without connecting') return true
+
+  return false
+}
+
 export type { RPCError }
-export { isErrorWithMessage, isErrorWithName, isRpcError, isMagicRpcError, isMagicExtensionError, isUserRejectedTransaction }
+export {
+  isErrorWithMessage,
+  isErrorWithName,
+  isRpcError,
+  isMagicRpcError,
+  isMagicExtensionError,
+  isUserRejectedTransaction,
+  isExpectedWalletError
+}

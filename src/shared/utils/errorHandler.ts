@@ -1,7 +1,7 @@
 import { captureException } from '@sentry/react'
 import { TrackingEvents } from '../../modules/analytics/types'
 import { DeploymentError } from '../../modules/profile/errors'
-import { isErrorWithMessage } from '../errors'
+import { isErrorWithMessage, isExpectedWalletError } from '../errors'
 import { trackEvent } from './analytics'
 import { ErrorContext, HandleErrorOptions, SentryExtra } from './errorHandler.types'
 
@@ -77,13 +77,19 @@ const handleError = (error: unknown, context: string, options?: HandleErrorOptio
     console.error(`${context}:`, errorMessage)
   }
 
-  const deploymentExtra = getDeploymentErrorExtra(error)
-  const { error: normalised, originalShape } = normaliseError(error)
+  // Expected wallet conditions (locked wallet, a prompt already open, a dismissed modal) still
+  // reach the console and the analytics event below — the login really did fail for the user —
+  // but they are not faults of ours, so they stay out of Sentry. Left unfiltered they were the
+  // bulk of this project's volume and buried the failures worth acting on.
+  if (!isExpectedWalletError(error)) {
+    const deploymentExtra = getDeploymentErrorExtra(error)
+    const { error: normalised, originalShape } = normaliseError(error)
 
-  captureException(normalised, {
-    tags: options?.sentryTags,
-    extra: { ...deploymentExtra, ...(originalShape ?? {}), ...options?.sentryExtra }
-  })
+    captureException(normalised, {
+      tags: options?.sentryTags,
+      extra: { ...deploymentExtra, ...(originalShape ?? {}), ...options?.sentryExtra }
+    })
+  }
 
   if (!options?.skipTracking) {
     const trackingEvent = (options?.trackingEvent as TrackingEvents) || TrackingEvents.LOGIN_ERROR
