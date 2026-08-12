@@ -1,4 +1,4 @@
-import { isUserRejectedTransaction } from './errors'
+import { isExpectedWalletError, isUserRejectedTransaction } from './errors'
 
 /**
  * `@web3-react/injected-connector` throws this when the user dismisses the wallet prompt during
@@ -63,6 +63,57 @@ describe('isUserRejectedTransaction', () => {
       expect(isUserRejectedTransaction(null)).toBe(false)
       expect(isUserRejectedTransaction(undefined)).toBe(false)
       expect(isUserRejectedTransaction('The user rejected the request.')).toBe(false)
+    })
+  })
+})
+
+describe('isExpectedWalletError', () => {
+  describe('when the wallet is locked and decentraland-connect gives up', () => {
+    it('should classify it as expected', () => {
+      const lockedWallet = new Error('There was an error unlocking your wallet. Please be sure your wallet is unlocked and try again.')
+      lockedWallet.name = 'ErrorUnlockingWallet'
+
+      expect(isExpectedWalletError(lockedWallet)).toBe(true)
+    })
+  })
+
+  describe('when the wallet already has a prompt open for this origin', () => {
+    it('should classify the EIP-1193 resource-unavailable code as expected', () => {
+      const alreadyPending = {
+        code: -32002,
+        message: "Request of type 'wallet_requestPermissions' already pending for origin https://decentraland.org. Please wait."
+      }
+
+      expect(isExpectedWalletError(alreadyPending)).toBe(true)
+    })
+  })
+
+  describe('when the user dismisses the WalletConnect modal', () => {
+    it('should classify it as expected, since it arrives as a bare Error', () => {
+      expect(isExpectedWalletError(new Error('User closed the modal without connecting'))).toBe(true)
+    })
+  })
+
+  describe('when the failure is a genuine fault', () => {
+    it('should not classify an internal rpc error as expected', () => {
+      expect(isExpectedWalletError({ code: -32603, message: 'Internal error' })).toBe(false)
+    })
+
+    it('should not classify a missing provider as expected', () => {
+      expect(isExpectedWalletError(new Error('Could not get provider'))).toBe(false)
+    })
+
+    it('should not classify an arbitrary error carrying a wallet-ish name as expected', () => {
+      const other = new Error('boom')
+      other.name = 'SomeOtherError'
+
+      expect(isExpectedWalletError(other)).toBe(false)
+    })
+
+    it('should not classify non-object values as expected', () => {
+      expect(isExpectedWalletError(null)).toBe(false)
+      expect(isExpectedWalletError(undefined)).toBe(false)
+      expect(isExpectedWalletError('User closed the modal without connecting')).toBe(false)
     })
   })
 })
