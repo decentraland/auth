@@ -149,3 +149,6 @@ dist
 /blob-report/
 /playwright/.cache/
 .playwright-mcp/
+# Local working notes and drafts. Kept out of a public repo on purpose: a stray `git add -A`
+# has put an internal document on a public branch before, and refs/pull/* cannot be rewritten.
+notes/
