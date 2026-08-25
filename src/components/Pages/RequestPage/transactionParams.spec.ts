@@ -68,6 +68,12 @@ describe('findInvalidTransactionParam', () => {
 
       expect(findInvalidTransactionParam(txParams)).toBeNull()
     })
+
+    it('should accept standard type-4 fields such as authorizationList', () => {
+      const txParams = { to: '0xdef', data: '0x', type: '0x4', authorizationList: [{ chainId: '0x1' }] }
+
+      expect(findInvalidTransactionParam(txParams)).toBeNull()
+    })
   })
 
   describe('when a field the preview does not simulate is present', () => {

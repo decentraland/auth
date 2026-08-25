@@ -12,7 +12,7 @@ const describeType = (value: unknown): string => (Array.isArray(value) ? 'array'
  * without a `to` means the request itself is incomplete. Conflating them produced a message that
  * blamed a missing contract address while printing a payload that visibly contained one.
  */
-export function getTransactionToAddress(params: unknown[] | undefined): string {
+function getTransactionToAddress(params: unknown[] | undefined): string {
   const [txParams] = params ?? []
 
   if (txParams === null || typeof txParams !== 'object' || Array.isArray(txParams)) {
@@ -44,15 +44,18 @@ const ALLOWED_TX_PARAMS = new Set([
   'type',
   'chainId',
   'accessList',
-  'blobVersionedHashes'
+  'blobVersionedHashes',
+  'authorizationList'
 ])
 
-export function findInvalidTransactionParam(txParams: unknown): string | null {
+function findInvalidTransactionParam(txParams: unknown): string | null {
   if (!txParams || typeof txParams !== 'object' || Array.isArray(txParams)) return null
   return Object.keys(txParams).find(key => !ALLOWED_TX_PARAMS.has(key)) ?? null
 }
 
-export function assertValidTransactionParams(params: unknown[] | undefined): void {
+function assertValidTransactionParams(params: unknown[] | undefined): void {
   const invalid = findInvalidTransactionParam((params ?? [])[0])
   if (invalid) throw new Error(`Invalid transaction param "${invalid}"`)
 }
+
+export { getTransactionToAddress, findInvalidTransactionParam, assertValidTransactionParams }
