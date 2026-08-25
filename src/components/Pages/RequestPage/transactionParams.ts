@@ -27,3 +27,32 @@ export function getTransactionToAddress(params: unknown[] | undefined): string {
 
   return toAddress
 }
+
+// Fields the preview simulates. Calldata is read only from `data`, so any other key (the `input` alias, thirdweb's extraCallData) is rejected — nothing executes unpreviewed.
+const ALLOWED_TX_PARAMS = new Set([
+  'from',
+  'to',
+  'value',
+  'data',
+  'gas',
+  'gasLimit',
+  'gasPrice',
+  'maxFeePerGas',
+  'maxPriorityFeePerGas',
+  'maxFeePerBlobGas',
+  'nonce',
+  'type',
+  'chainId',
+  'accessList',
+  'blobVersionedHashes'
+])
+
+export function findInvalidTransactionParam(txParams: unknown): string | null {
+  if (!txParams || typeof txParams !== 'object' || Array.isArray(txParams)) return null
+  return Object.keys(txParams).find(key => !ALLOWED_TX_PARAMS.has(key)) ?? null
+}
+
+export function assertValidTransactionParams(params: unknown[] | undefined): void {
+  const invalid = findInvalidTransactionParam((params ?? [])[0])
+  if (invalid) throw new Error(`Invalid transaction param "${invalid}"`)
+}
