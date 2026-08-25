@@ -40,7 +40,7 @@ import { sendTipNotification } from '../../../shared/notifications'
 import { identifyUser, trackEvent } from '../../../shared/utils/analytics'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { FeatureFlagsContext } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
-import { getTransactionToAddress } from './transactionParams'
+import { assertValidTransactionParams, getTransactionToAddress } from './transactionParams'
 import { MANATransferData, NFTTransferData, SignaturePayload, SimulationState, TransferType } from './types'
 import {
   buildSendTransactionSimulationPayload,
@@ -836,6 +836,8 @@ export const RequestPage = () => {
           params: requestRef.current?.params as [Record<string, unknown>]
         })
       } else {
+        // Reject params the preview didn't show before signing (covers the meta-tx and direct paths).
+        assertValidTransactionParams(requestRef.current?.params)
         const chainId = getMetaTransactionChainId()
         const toAddress = getTransactionToAddress(requestRef.current?.params)
 
