@@ -1258,9 +1258,9 @@ describe('when testing buildSendTransactionSimulationPayload', () => {
     })
   })
 
-  describe('and the transaction carries a field the simulation cannot model', () => {
-    it('should return null so the preview is unavailable rather than a false no-op', () => {
-      const txParams = { to: '0x1111111111111111111111111111111111111111', data: '0x', value: '0x0', extraCallData: '0xa9059cbb' }
+  describe('and the transaction carries calldata outside the data field', () => {
+    it.each(['input', 'extraCallData'])('should return null for %s so the preview is unavailable', field => {
+      const txParams = { to: '0x1111111111111111111111111111111111111111', data: '0x', value: '0x0', [field]: '0xa9059cbb' }
       expect(buildSendTransactionSimulationPayload(txParams, signerAddress, 1, false)).toBeNull()
     })
   })
