@@ -7,7 +7,6 @@ import { ContractName, getContract, getContractName } from 'decentraland-transac
 import { config } from '../../../modules/config'
 import { SimulationRequestBody } from '../../../shared/auth'
 import { isMobile } from '../LoginPage/utils'
-import { findInvalidTransactionParam } from './transactionParams'
 import { SignaturePayload, TypedDataPayload } from './types'
 
 const ADDRESS_REGEX = /^0x[a-fA-F0-9]{40}$/
@@ -178,9 +177,6 @@ function buildSendTransactionSimulationPayload(
 ): SimulationRequestBody | null {
   const to = txParams.to as string | undefined
   if (!to) return null
-
-  // No preview for a param we don't simulate; show "unavailable", not a false "no changes".
-  if (findInvalidTransactionParam(txParams)) return null
 
   const chainId = willUseMetaTransaction ? Number(getMetaTransactionChainId()) : connectedChainId
 

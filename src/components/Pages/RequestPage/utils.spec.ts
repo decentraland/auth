@@ -1258,10 +1258,16 @@ describe('when testing buildSendTransactionSimulationPayload', () => {
     })
   })
 
-  describe('and the transaction carries a field the simulation cannot model', () => {
-    it('should return null so the preview is unavailable rather than a false no-op', () => {
+  describe('and the transaction carries an extra field', () => {
+    it('should ignore it and simulate only to, data and value', () => {
       const txParams = { to: '0x1111111111111111111111111111111111111111', data: '0x', value: '0x0', extraCallData: '0xa9059cbb' }
-      expect(buildSendTransactionSimulationPayload(txParams, signerAddress, 1, false)).toBeNull()
+      expect(buildSendTransactionSimulationPayload(txParams, signerAddress, 1, false)).toEqual({
+        chainId: 1,
+        from: signerAddress,
+        to: '0x1111111111111111111111111111111111111111',
+        data: '0x',
+        value: '0x0'
+      })
     })
   })
 })

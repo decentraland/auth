@@ -884,6 +884,43 @@ describe('RequestPage', () => {
       await waitFor(() => expect(mockSimulateTransaction).toHaveBeenCalled())
       expect(view).toBeInTheDocument()
     })
+
+    describe('and the request carries fee, gas and other non-reviewed fields', () => {
+      beforeEach(() => {
+        mockRecover.mockResolvedValue({
+          method: 'eth_sendTransaction',
+          params: [
+            {
+              from: '0xattacker',
+              to: '0xcontract',
+              data: '0x',
+              value: '0x0',
+              gas: '0x5208',
+              maxFeePerGas: '0x26f2c8b1a76',
+              maxPriorityFeePerGas: '0x26f2c8b1a76',
+              nonce: '0x1',
+              type: '0x2',
+              extraCallData: '0xa9059cbb'
+            }
+          ],
+          sender: '0xabc123',
+          expiration: new Date(Date.now() + 3600000).toISOString()
+        })
+        mockWalletRequest.mockResolvedValue('0xhash')
+        mockSendSuccessfulOutcome.mockResolvedValue({})
+      })
+
+      it('should dispatch only the reviewed to, data and value to the wallet', async () => {
+        renderRequestPage()
+        await userEvent.click(await screen.findByTestId('wallet-interaction-approve'))
+        await screen.findByTestId('wallet-interaction-complete')
+
+        expect(mockWalletRequest).toHaveBeenCalledWith({
+          method: 'eth_sendTransaction',
+          params: [{ to: '0xcontract', data: '0x', value: '0x0' }]
+        })
+      })
+    })
   })
 
   describe('when a web2 transaction is relayed as a meta-transaction', () => {

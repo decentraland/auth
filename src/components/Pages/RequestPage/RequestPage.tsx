@@ -40,7 +40,7 @@ import { sendTipNotification } from '../../../shared/notifications'
 import { identifyUser, trackEvent } from '../../../shared/utils/analytics'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { FeatureFlagsContext } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
-import { assertValidTransactionParams, getTransactionToAddress } from './transactionParams'
+import { buildTransactionParams } from './transactionParams'
 import { MANATransferData, NFTTransferData, SignaturePayload, SimulationState, TransferType } from './types'
 import {
   buildSendTransactionSimulationPayload,
@@ -836,10 +836,14 @@ export const RequestPage = () => {
           params: requestRef.current?.params as [Record<string, unknown>]
         })
       } else {
-        // Reject params the preview didn't show before signing (covers the meta-tx and direct paths).
-        assertValidTransactionParams(requestRef.current?.params)
+        const [transactionParams] = buildTransactionParams(requestRef.current?.params)
+        const toAddress = transactionParams.to as string | undefined
+        if (!toAddress) {
+          throw new Error(
+            `Contract address not found in transaction parameters. Received params: ${JSON.stringify(requestRef.current?.params?.[0] ?? null)}`
+          )
+        }
         const chainId = getMetaTransactionChainId()
-        const toAddress = getTransactionToAddress(requestRef.current?.params)
 
         // Check if this contract will use meta transactions, reusing the prefetch result for the
         // same contract when available to avoid repeating the lookup.
@@ -858,19 +862,13 @@ export const RequestPage = () => {
           // session (poisoning later getContractName/isKnownDecentralandContract lookups). Clone it.
           const contract = { ...getContract(contractName, chainId), address: toAddress }
 
-          result = await sendMetaTransaction(
-            connectedProvider,
-            networkProvider,
-            (requestRef.current?.params?.[0] as Record<string, unknown>).data as string,
-            contract,
-            {
-              serverURL: `${config.get('META_TRANSACTION_SERVER_URL')}/v1`
-            }
-          )
+          result = await sendMetaTransaction(connectedProvider, networkProvider, transactionParams.data as string, contract, {
+            serverURL: `${config.get('META_TRANSACTION_SERVER_URL')}/v1`
+          })
         } else {
           result = await walletClient.request({
             method: 'eth_sendTransaction',
-            params: requestRef.current?.params as [Record<string, unknown>]
+            params: [transactionParams]
           })
         }
       }
