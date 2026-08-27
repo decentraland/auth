@@ -916,7 +916,7 @@ describe('RequestPage', () => {
 
         expect(mockWalletRequest).toHaveBeenCalledWith({
           method: 'eth_sendTransaction',
-          params: [{ to: '0xcontract', data: '0x', value: '0x0' }]
+          params: [{ to: '0xcontract', data: '0x', value: '0x0', from: '0xabc123' }]
         })
       })
     })

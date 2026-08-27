@@ -863,7 +863,7 @@ export const RequestPage = () => {
         } else {
           result = await walletClient.request({
             method: 'eth_sendTransaction',
-            params: [transactionParams]
+            params: [{ ...transactionParams, from: signerAddress }]
           })
         }
       }
