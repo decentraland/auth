@@ -899,8 +899,7 @@ describe('RequestPage', () => {
               maxFeePerGas: '0x26f2c8b1a76',
               maxPriorityFeePerGas: '0x26f2c8b1a76',
               nonce: '0x1',
-              type: '0x2',
-              extraCallData: '0xa9059cbb'
+              type: '0x2'
             }
           ],
           sender: '0xabc123',

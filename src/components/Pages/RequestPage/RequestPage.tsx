@@ -837,12 +837,7 @@ export const RequestPage = () => {
         })
       } else {
         const [transactionParams] = buildTransactionParams(requestRef.current?.params)
-        const toAddress = transactionParams.to as string | undefined
-        if (!toAddress) {
-          throw new Error(
-            `Contract address not found in transaction parameters. Received params: ${JSON.stringify(requestRef.current?.params?.[0] ?? null)}`
-          )
-        }
+        const toAddress = transactionParams.to as string
         const chainId = getMetaTransactionChainId()
 
         // Check if this contract will use meta transactions, reusing the prefetch result for the
