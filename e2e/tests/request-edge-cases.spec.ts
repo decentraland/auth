@@ -126,18 +126,21 @@ test.describe('Retired dcl_personal_sign sign-in (unmigrated client)', () => {
       return route.fallback()
     })
 
-    let outcomeSent = false
+    // What the site reports back matters as much as what it shows: the rejection happens before the
+    // wallet, so nothing else will ever answer this request.
+    const outcome: { body: { sender?: string; error?: { code: number; message: string } } | null } = { body: null }
     await page.route('**/v2/requests/**/outcome', async route => {
-      outcomeSent = true
+      outcome.body = route.request().postDataJSON()
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) })
     })
 
     await page.goto(`/auth/requests/${MOCK_REQUEST_ID}?loginMethod=METAMASK`)
 
     await expect(page.locator('[data-testid="outdated-client-error"]')).toBeVisible({ timeout: 20_000 })
-    // No retry is offered, and nothing was signed or reported back to the client.
+    // No retry is offered and nothing is signed, but the unmigrated client is told its request was
+    // rejected instead of being left to wait out the request's expiration.
     await expect(page.locator('[data-testid="client-login-error-try-again-button"]')).not.toBeVisible()
-    expect(outcomeSent).toBe(false)
+    await expect.poll(() => outcome.body?.error?.code, { timeout: 10_000 }).toBe(-32601)
   })
 })
 
