@@ -203,6 +203,23 @@ describe('createAuthServerClient', () => {
       })
     })
 
+    describe('when a personal_sign request arrives as [signer, message]', () => {
+      beforeEach(() => {
+        mockResponse.method = 'personal_sign'
+        mockResponse.params = [mockSignerAddressLower, 'hello']
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockResponse)
+        })
+      })
+
+      it('should return the params reordered to [message, signer]', async () => {
+        const result = await client.recover(mockRequestId, mockSignerAddress)
+
+        expect(result.params).toEqual(['hello', mockSignerAddressLower])
+      })
+    })
+
     describe('when a typed-data request carries two payloads and no signer address', () => {
       beforeEach(() => {
         mockResponse.method = 'eth_signTypedData_v4'
