@@ -7,6 +7,7 @@ import {
   DifferentSenderError,
   ExpiredRequestError,
   ImpersonatedSignInError,
+  MalformedSignatureRequestError,
   RequestFulfilledError,
   RequestNotFoundError,
   SimulationUnavailableError
@@ -69,7 +70,8 @@ describe('createAuthServerClient', () => {
       mockResponse = {
         sender: mockSignerAddressLower,
         expiration: new Date(Date.now() + 3600000).toISOString(), // 1 hour in the future
-        method: 'personal_sign'
+        method: 'personal_sign',
+        params: ['hello', mockSignerAddressLower]
       }
     })
 
@@ -183,6 +185,44 @@ describe('createAuthServerClient', () => {
 
       it('should throw an ImpersonatedSignInError', async () => {
         await expect(client.recover(mockRequestId, mockSignerAddress)).rejects.toBeInstanceOf(ImpersonatedSignInError)
+      })
+    })
+
+    describe('when a typed-data request has the canonical [signer, typed data] params', () => {
+      beforeEach(() => {
+        mockResponse.method = 'eth_signTypedData_v4'
+        mockResponse.params = [mockSignerAddress, JSON.stringify({ primaryType: 'Statement', domain: {}, types: {}, message: {} })]
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockResponse)
+        })
+      })
+
+      it('should recover the request', async () => {
+        await expect(client.recover(mockRequestId, mockSignerAddress)).resolves.toEqual(mockResponse)
+      })
+    })
+
+    describe('when a typed-data request carries two payloads and no signer address', () => {
+      beforeEach(() => {
+        mockResponse.method = 'eth_signTypedData_v4'
+        mockResponse.params = [
+          JSON.stringify({ primaryType: 'Statement', domain: {}, types: {}, message: { text: 'harmless' } }),
+          JSON.stringify({
+            primaryType: 'Permit',
+            domain: {},
+            types: {},
+            message: { spender: '0x000000000000000000000000000000000000dead' }
+          })
+        ]
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockResponse)
+        })
+      })
+
+      it('should throw a MalformedSignatureRequestError', async () => {
+        await expect(client.recover(mockRequestId, mockSignerAddress)).rejects.toBeInstanceOf(MalformedSignatureRequestError)
       })
     })
   })

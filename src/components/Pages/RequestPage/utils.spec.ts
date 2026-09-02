@@ -8,6 +8,8 @@ import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
 import { connection } from 'decentraland-connect'
 import { ContractName, getContract, getContractName } from 'decentraland-transactions'
 import { config } from '../../../modules/config'
+import { MalformedSignatureRequestError } from '../../../shared/auth/errors'
+import { assertSignatureParamsAreCanonical } from '../../../shared/auth/signMethodGuard'
 import {
   buildSendTransactionSimulationPayload,
   checkMetaTransactionSupport,
@@ -1114,6 +1116,33 @@ describe('when testing extractSignaturePayload', () => {
   describe('and no params are provided', () => {
     it('should return null', () => {
       expect(extractSignaturePayload('personal_sign', undefined)).toBeNull()
+    })
+  })
+
+  describe('and the typed-data params pass the canonical guard', () => {
+    const signer = '0x1234567890abcdef1234567890abcdef12345678'
+    const permit = JSON.stringify({ primaryType: 'Permit', domain: {}, types: {}, message: {} })
+
+    it('should preview exactly the payload the wallet signs, the second param', () => {
+      const params = [signer, permit]
+      expect(() => assertSignatureParamsAreCanonical('eth_signTypedData_v4', params, signer)).not.toThrow()
+      expect(extractSignaturePayload('eth_signTypedData_v4', params, signer)).toEqual({
+        kind: 'typedData',
+        typedData: JSON.parse(permit),
+        raw: params[1]
+      })
+    })
+  })
+
+  describe('and two typed-data payloads are passed with no signer address', () => {
+    const signer = '0x1234567890abcdef1234567890abcdef12345678'
+    const statement = JSON.stringify({ primaryType: 'Statement', domain: {}, types: {}, message: { text: 'harmless' } })
+    const permit = JSON.stringify({ primaryType: 'Permit', domain: {}, types: {}, message: {} })
+
+    it('should preview the first one while the wallet signs the second, which is why the canonical guard rejects it', () => {
+      const params = [statement, permit]
+      expect(extractSignaturePayload('eth_signTypedData_v4', params, signer)).toMatchObject({ kind: 'typedData', raw: statement })
+      expect(() => assertSignatureParamsAreCanonical('eth_signTypedData_v4', params, signer)).toThrow(MalformedSignatureRequestError)
     })
   })
 })

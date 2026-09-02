@@ -12,7 +12,7 @@ import {
   RequestNotFoundError,
   SimulationUnavailableError
 } from './errors'
-import { assertMethodIsAllowed, assertRequestIsNotImpersonatingSignIn } from './signMethodGuard'
+import { assertMethodIsAllowed, assertRequestIsNotImpersonatingSignIn, assertSignatureParamsAreCanonical } from './signMethodGuard'
 import { IdentityResponse, OutcomeError, OutcomeResponse, RecoverResponse, SimulationRequestBody, SimulationResponseBody } from './types'
 
 const SIMULATION_TIMEOUT_MS = 10_000
@@ -178,6 +178,9 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
       // Reject requests that ask the wallet to sign a Decentraland identity-authorization
       // payload, which would yield an auth chain that impersonates the user.
       assertRequestIsNotImpersonatingSignIn(recoverResponse.method, recoverResponse.params)
+
+      // Reject params the preview and the wallet would read from different positions.
+      assertSignatureParamsAreCanonical(recoverResponse.method, recoverResponse.params, signerAddress)
 
       trackEvent(TrackingEvents.REQUEST_INTERACTION, {
         type: RequestInteractionType.WALLET_INTERACTION,

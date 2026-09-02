@@ -10,6 +10,7 @@ import {
   DifferentSenderError,
   ExpiredRequestError,
   ImpersonatedSignInError,
+  MalformedSignatureRequestError,
   RequestFulfilledError,
   UnsupportedMethodError
 } from '../../../shared/auth'
@@ -506,6 +507,22 @@ describe('RequestPage', () => {
         await waitFor(() => {
           expect(screen.getByTestId('signing-error')).toBeInTheDocument()
         })
+      })
+    })
+
+    describe('and recovery fails with a MalformedSignatureRequestError', () => {
+      beforeEach(() => {
+        mockGetAddresses.mockResolvedValue(['0xabc123'])
+        mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'User' }] })
+        mockRecover.mockRejectedValue(new MalformedSignatureRequestError('eth_signTypedData_v4'))
+      })
+
+      it('should show the signing error view instead of offering a retry', async () => {
+        renderRequestPage()
+        await waitFor(() => {
+          expect(screen.getByTestId('signing-error')).toBeInTheDocument()
+        })
+        expect(screen.queryByTestId('recover-error')).not.toBeInTheDocument()
       })
     })
 
