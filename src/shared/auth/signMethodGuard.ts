@@ -1,5 +1,5 @@
 import { hexToString } from 'viem'
-import { ImpersonatedSignInError, UnsupportedMethodError } from './errors'
+import { ImpersonatedSignInError, MalformedSignatureRequestError, UnsupportedMethodError } from './errors'
 
 // The only methods the auth site is willing to forward to the connected wallet. Anything
 // outside this set is rejected at recover time (see {@link assertMethodIsAllowed}).
@@ -14,7 +14,9 @@ import { ImpersonatedSignInError, UnsupportedMethodError } from './errors'
 // sign-in message. The latter would bypass `assertRequestIsNotImpersonatingSignIn`, which can
 // only recognize a *plaintext* sign-in payload, not its hash. Major wallets deprecated
 // `eth_sign` for the same reason.
-const ALLOWED_METHODS = ['personal_sign', 'eth_signTypedData', 'eth_signTypedData_v3', 'eth_signTypedData_v4', 'eth_sendTransaction']
+//
+// `eth_signTypedData` (v1) is excluded: no client uses it, Thirdweb cannot sign it, and its params are reversed.
+const ALLOWED_METHODS = ['personal_sign', 'eth_signTypedData_v3', 'eth_signTypedData_v4', 'eth_sendTransaction']
 
 // Lowercased method → its canonical EIP-1193 spelling, so the allowlist can stay forgiving about
 // casing while everything downstream only ever sees the canonical form (see assertMethodIsAllowed).
@@ -133,4 +135,60 @@ function assertRequestIsNotImpersonatingSignIn(method: string, params: unknown[]
   }
 }
 
-export { isDecentralandIdentityAuthMessage, assertRequestIsNotImpersonatingSignIn, assertMethodIsAllowed, isRetiredSignInMethod }
+// Methods whose params the wallet and the preview both read by position; see assertSignatureParamsAreCanonical.
+const POSITIONAL_SIGNATURE_METHODS = new Set(['personal_sign', 'eth_signtypeddata_v3', 'eth_signtypeddata_v4'])
+
+function isSigner(param: unknown, signer: string): boolean {
+  return typeof param === 'string' && param.toLowerCase() === signer
+}
+
+function parseTypedData(param: unknown): unknown {
+  if (typeof param !== 'string') {
+    return param
+  }
+  try {
+    return JSON.parse(param)
+  } catch {
+    return null
+  }
+}
+
+function hasPrimaryType(typedData: unknown): boolean {
+  return typeof typedData === 'object' && typedData !== null && typeof (typedData as { primaryType?: unknown }).primaryType === 'string'
+}
+
+/**
+ * Rejects signature params that are not in the canonical EIP-1193 order for their method.
+ * Typed data must be `[signer, typedData]`; personal_sign must be `[message, signer]`.
+ */
+function assertSignatureParamsAreCanonical(method: string, params: unknown[] | undefined, signerAddress: string): void {
+  const normalizedMethod = method.toLowerCase()
+  if (!POSITIONAL_SIGNATURE_METHODS.has(normalizedMethod)) {
+    return
+  }
+  if (!Array.isArray(params) || params.length !== 2) {
+    throw new MalformedSignatureRequestError(method)
+  }
+
+  const signer = signerAddress.toLowerCase()
+  const [first, second] = params
+  if (normalizedMethod === 'personal_sign') {
+    // Wallets sign the first param, so the message must come first and the signer second.
+    if (typeof first !== 'string' || typeof second !== 'string' || isSigner(first, signer) || !isSigner(second, signer)) {
+      throw new MalformedSignatureRequestError(method)
+    }
+    return
+  }
+
+  if (!isSigner(first, signer) || !hasPrimaryType(parseTypedData(second))) {
+    throw new MalformedSignatureRequestError(method)
+  }
+}
+
+export {
+  isDecentralandIdentityAuthMessage,
+  assertRequestIsNotImpersonatingSignIn,
+  assertMethodIsAllowed,
+  assertSignatureParamsAreCanonical,
+  isRetiredSignInMethod
+}

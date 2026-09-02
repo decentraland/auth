@@ -17,6 +17,7 @@ import {
   ExpiredRequestError,
   IdentityResponse,
   ImpersonatedSignInError,
+  MalformedSignatureRequestError,
   RecoverResponse,
   RequestFulfilledError,
   SimulationRequestBody,
@@ -704,6 +705,12 @@ export const RequestPage = () => {
         } else if (e instanceof ImpersonatedSignInError) {
           // The request tried to sign a sign-in payload. Block it outright instead of
           // offering a retry that would re-trigger the same attack.
+          hasCompletedRef.current = true
+          setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
+          setView(View.WALLET_INTERACTION_ERROR)
+          return
+        } else if (e instanceof MalformedSignatureRequestError) {
+          // The params could preview one payload and sign another. Block it; a retry recovers the same request.
           hasCompletedRef.current = true
           setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
           setView(View.WALLET_INTERACTION_ERROR)

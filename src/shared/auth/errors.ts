@@ -59,6 +59,17 @@ class UnsupportedMethodError extends Error {
 }
 
 /**
+ * Thrown when a signature request's params are not in the canonical EIP-1193 shape for the method.
+ * The preview and the wallet read params by position, so any other shape could show one payload and sign another.
+ */
+class MalformedSignatureRequestError extends Error {
+  constructor(public readonly method: string) {
+    super(`The "${method}" request parameters are malformed`)
+    this.name = 'MalformedSignatureRequestError'
+  }
+}
+
+/**
  * Thrown when the transaction-simulation endpoint is unreachable, times out, or
  * returns a non-200 response. The approval UI treats this as "details unavailable"
  * and falls back to the default confirmation — simulation is never allowed to block
@@ -79,5 +90,6 @@ export {
   RequestFulfilledError,
   ImpersonatedSignInError,
   UnsupportedMethodError,
+  MalformedSignatureRequestError,
   SimulationUnavailableError
 }
