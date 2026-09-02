@@ -135,7 +135,7 @@ function assertRequestIsNotImpersonatingSignIn(method: string, params: unknown[]
   }
 }
 
-// Methods whose params the wallet and the preview both read by position; see canonicalizeSignatureParams.
+// Methods whose params the wallet and the preview both read by position; see assertSignatureParamsAreCanonical.
 const POSITIONAL_SIGNATURE_METHODS = new Set(['personal_sign', 'eth_signtypeddata_v3', 'eth_signtypeddata_v4'])
 
 function isSigner(param: unknown, signer: string): boolean {
@@ -158,13 +158,13 @@ function hasPrimaryType(typedData: unknown): boolean {
 }
 
 /**
- * Validates signature params and returns them in the canonical EIP-1193 order for their method.
- * Typed data must arrive as `[signer, typedData]`; personal_sign is returned as `[message, signer]`.
+ * Rejects signature params that are not in the canonical EIP-1193 order for their method.
+ * Typed data must be `[signer, typedData]`; personal_sign must be `[message, signer]`.
  */
-function canonicalizeSignatureParams(method: string, params: unknown[] | undefined, signerAddress: string): unknown[] | undefined {
+function assertSignatureParamsAreCanonical(method: string, params: unknown[] | undefined, signerAddress: string): void {
   const normalizedMethod = method.toLowerCase()
   if (!POSITIONAL_SIGNATURE_METHODS.has(normalizedMethod)) {
-    return params
+    return
   }
   if (!Array.isArray(params) || params.length !== 2) {
     throw new MalformedSignatureRequestError(method)
@@ -173,24 +173,22 @@ function canonicalizeSignatureParams(method: string, params: unknown[] | undefin
   const signer = signerAddress.toLowerCase()
   const [first, second] = params
   if (normalizedMethod === 'personal_sign') {
-    // Wallets disagree on the order, so accept either and hand the wallet the same [message, signer] the preview shows.
-    const isFirstSigner = isSigner(first, signer)
-    if (typeof first !== 'string' || typeof second !== 'string' || isFirstSigner === isSigner(second, signer)) {
+    // Wallets sign the first param, so the message must come first and the signer second.
+    if (typeof first !== 'string' || typeof second !== 'string' || isSigner(first, signer) || !isSigner(second, signer)) {
       throw new MalformedSignatureRequestError(method)
     }
-    return isFirstSigner ? [second, first] : [first, second]
+    return
   }
 
   if (!isSigner(first, signer) || !hasPrimaryType(parseTypedData(second))) {
     throw new MalformedSignatureRequestError(method)
   }
-  return params
 }
 
 export {
   isDecentralandIdentityAuthMessage,
   assertRequestIsNotImpersonatingSignIn,
   assertMethodIsAllowed,
-  canonicalizeSignatureParams,
+  assertSignatureParamsAreCanonical,
   isRetiredSignInMethod
 }

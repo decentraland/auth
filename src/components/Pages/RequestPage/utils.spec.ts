@@ -9,7 +9,7 @@ import { connection } from 'decentraland-connect'
 import { ContractName, getContract, getContractName } from 'decentraland-transactions'
 import { config } from '../../../modules/config'
 import { MalformedSignatureRequestError } from '../../../shared/auth/errors'
-import { canonicalizeSignatureParams } from '../../../shared/auth/signMethodGuard'
+import { assertSignatureParamsAreCanonical } from '../../../shared/auth/signMethodGuard'
 import {
   buildSendTransactionSimulationPayload,
   checkMetaTransactionSupport,
@@ -1125,7 +1125,7 @@ describe('when testing extractSignaturePayload', () => {
 
     it('should preview exactly the payload the wallet signs, the second param', () => {
       const params = [signer, permit]
-      expect(canonicalizeSignatureParams('eth_signTypedData_v4', params, signer)).toEqual(params)
+      expect(() => assertSignatureParamsAreCanonical('eth_signTypedData_v4', params, signer)).not.toThrow()
       expect(extractSignaturePayload('eth_signTypedData_v4', params, signer)).toEqual({
         kind: 'typedData',
         typedData: JSON.parse(permit),
@@ -1142,7 +1142,7 @@ describe('when testing extractSignaturePayload', () => {
     it('should preview the first one while the wallet signs the second, which is why the canonical guard rejects it', () => {
       const params = [statement, permit]
       expect(extractSignaturePayload('eth_signTypedData_v4', params, signer)).toMatchObject({ kind: 'typedData', raw: statement })
-      expect(() => canonicalizeSignatureParams('eth_signTypedData_v4', params, signer)).toThrow(MalformedSignatureRequestError)
+      expect(() => assertSignatureParamsAreCanonical('eth_signTypedData_v4', params, signer)).toThrow(MalformedSignatureRequestError)
     })
   })
 })

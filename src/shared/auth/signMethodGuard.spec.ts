@@ -2,7 +2,7 @@ import { ImpersonatedSignInError, MalformedSignatureRequestError, UnsupportedMet
 import {
   assertMethodIsAllowed,
   assertRequestIsNotImpersonatingSignIn,
-  canonicalizeSignatureParams,
+  assertSignatureParamsAreCanonical,
   isDecentralandIdentityAuthMessage,
   isRetiredSignInMethod
 } from './signMethodGuard'
@@ -308,7 +308,7 @@ describe('isRetiredSignInMethod', () => {
   })
 })
 
-describe('canonicalizeSignatureParams', () => {
+describe('assertSignatureParamsAreCanonical', () => {
   const signer = '0x1234567890AbcdEF1234567890aBcdef12345678'
   const statement = JSON.stringify({
     domain: { name: 'Decentraland', version: '1' },
@@ -335,116 +335,117 @@ describe('canonicalizeSignatureParams', () => {
 
   describe.each(['eth_signTypedData_v4', 'eth_signTypedData_v3'])('when the method is %s', method => {
     describe('and the params are [signer, typed data]', () => {
-      it('should return the params unchanged', () => {
-        expect(canonicalizeSignatureParams(method, [signer, permit], signer)).toEqual([signer, permit])
+      it('should not throw', () => {
+        expect(() => assertSignatureParamsAreCanonical(method, [signer, permit], signer)).not.toThrow()
       })
     })
 
     describe('and the signer casing differs from the connected address', () => {
-      it('should return the params unchanged because addresses compare case-insensitively', () => {
-        expect(canonicalizeSignatureParams(method, [signer.toLowerCase(), permit], signer)).toEqual([signer.toLowerCase(), permit])
+      it('should not throw because addresses compare case-insensitively', () => {
+        expect(() => assertSignatureParamsAreCanonical(method, [signer.toLowerCase(), permit], signer)).not.toThrow()
       })
     })
 
     describe('and the typed data is passed as an object instead of a JSON string', () => {
-      it('should return the params unchanged', () => {
-        expect(canonicalizeSignatureParams(method, [signer, JSON.parse(permit)], signer)).toEqual([signer, JSON.parse(permit)])
+      it('should not throw', () => {
+        expect(() => assertSignatureParamsAreCanonical(method, [signer, JSON.parse(permit)], signer)).not.toThrow()
       })
     })
 
     describe('and both params are typed data, with the harmless one first', () => {
       it('should throw a MalformedSignatureRequestError because the wallet would sign the second one', () => {
-        expect(() => canonicalizeSignatureParams(method, [statement, permit], signer)).toThrow(MalformedSignatureRequestError)
+        expect(() => assertSignatureParamsAreCanonical(method, [statement, permit], signer)).toThrow(MalformedSignatureRequestError)
       })
     })
 
     describe('and the params are in the legacy [typed data, signer] order', () => {
       it('should throw a MalformedSignatureRequestError', () => {
-        expect(() => canonicalizeSignatureParams(method, [permit, signer], signer)).toThrow(MalformedSignatureRequestError)
+        expect(() => assertSignatureParamsAreCanonical(method, [permit, signer], signer)).toThrow(MalformedSignatureRequestError)
       })
     })
 
     describe('and the address is not the connected signer', () => {
       it('should throw a MalformedSignatureRequestError', () => {
         const other = '0x0000000000000000000000000000000000000002'
-        expect(() => canonicalizeSignatureParams(method, [other, permit], signer)).toThrow(MalformedSignatureRequestError)
+        expect(() => assertSignatureParamsAreCanonical(method, [other, permit], signer)).toThrow(MalformedSignatureRequestError)
       })
     })
 
     describe('and there is a single param', () => {
       it('should throw a MalformedSignatureRequestError', () => {
-        expect(() => canonicalizeSignatureParams(method, [permit], signer)).toThrow(MalformedSignatureRequestError)
+        expect(() => assertSignatureParamsAreCanonical(method, [permit], signer)).toThrow(MalformedSignatureRequestError)
       })
     })
 
     describe('and there is a third param', () => {
       it('should throw a MalformedSignatureRequestError', () => {
-        expect(() => canonicalizeSignatureParams(method, [signer, permit, statement], signer)).toThrow(MalformedSignatureRequestError)
+        expect(() => assertSignatureParamsAreCanonical(method, [signer, permit, statement], signer)).toThrow(MalformedSignatureRequestError)
       })
     })
 
     describe('and there are no params', () => {
       it('should throw a MalformedSignatureRequestError', () => {
-        expect(() => canonicalizeSignatureParams(method, undefined, signer)).toThrow(MalformedSignatureRequestError)
+        expect(() => assertSignatureParamsAreCanonical(method, undefined, signer)).toThrow(MalformedSignatureRequestError)
       })
     })
 
     describe('and the typed data is not valid JSON', () => {
       it('should throw a MalformedSignatureRequestError', () => {
-        expect(() => canonicalizeSignatureParams(method, [signer, '{not json'], signer)).toThrow(MalformedSignatureRequestError)
+        expect(() => assertSignatureParamsAreCanonical(method, [signer, '{not json'], signer)).toThrow(MalformedSignatureRequestError)
       })
     })
 
     describe('and the typed data has no primaryType, like a v1 field list', () => {
       it('should throw a MalformedSignatureRequestError', () => {
         const legacy = JSON.stringify([{ type: 'string', name: 'Message', value: 'hi' }])
-        expect(() => canonicalizeSignatureParams(method, [signer, legacy], signer)).toThrow(MalformedSignatureRequestError)
+        expect(() => assertSignatureParamsAreCanonical(method, [signer, legacy], signer)).toThrow(MalformedSignatureRequestError)
       })
     })
   })
 
   describe('when the method casing differs from the canonical spelling', () => {
     it('should still validate the typed data shape', () => {
-      expect(() => canonicalizeSignatureParams('ETH_SIGNTYPEDDATA_V4', [statement, permit], signer)).toThrow(MalformedSignatureRequestError)
+      expect(() => assertSignatureParamsAreCanonical('ETH_SIGNTYPEDDATA_V4', [statement, permit], signer)).toThrow(
+        MalformedSignatureRequestError
+      )
     })
   })
 
   describe('when the method is personal_sign', () => {
     describe('and the params are [message, signer]', () => {
-      it('should return the params unchanged', () => {
-        expect(canonicalizeSignatureParams('personal_sign', ['hello', signer], signer)).toEqual(['hello', signer])
+      it('should not throw', () => {
+        expect(() => assertSignatureParamsAreCanonical('personal_sign', ['hello', signer], signer)).not.toThrow()
       })
     })
 
     describe('and the params are [signer, message]', () => {
-      it('should move the signer to the second position so the wallet signs the same message the preview shows', () => {
-        expect(canonicalizeSignatureParams('personal_sign', [signer, 'hello'], signer)).toEqual(['hello', signer])
+      it('should throw a MalformedSignatureRequestError because wallets sign the first param', () => {
+        expect(() => assertSignatureParamsAreCanonical('personal_sign', [signer, 'hello'], signer)).toThrow(MalformedSignatureRequestError)
       })
     })
 
     describe('and the message is hex and the signer is sent in lowercase', () => {
-      it('should keep the params and the signer casing as sent', () => {
-        const params = ['0x68656c6c6f', signer.toLowerCase()]
-        expect(canonicalizeSignatureParams('personal_sign', params, signer)).toEqual(params)
+      it('should not throw because addresses compare case-insensitively', () => {
+        expect(() => assertSignatureParamsAreCanonical('personal_sign', ['0x68656c6c6f', signer.toLowerCase()], signer)).not.toThrow()
       })
     })
 
     describe('and the signer is not among the params', () => {
       it('should throw a MalformedSignatureRequestError', () => {
         const other = '0x0000000000000000000000000000000000000002'
-        expect(() => canonicalizeSignatureParams('personal_sign', ['hello', other], signer)).toThrow(MalformedSignatureRequestError)
+        expect(() => assertSignatureParamsAreCanonical('personal_sign', ['hello', other], signer)).toThrow(MalformedSignatureRequestError)
       })
     })
 
     describe('and both params are the signer address', () => {
       it('should throw a MalformedSignatureRequestError because the message cannot be told apart', () => {
-        expect(() => canonicalizeSignatureParams('personal_sign', [signer, signer], signer)).toThrow(MalformedSignatureRequestError)
+        expect(() => assertSignatureParamsAreCanonical('personal_sign', [signer, signer], signer)).toThrow(MalformedSignatureRequestError)
       })
     })
 
     describe('and the message is not a string', () => {
       it('should throw a MalformedSignatureRequestError', () => {
-        expect(() => canonicalizeSignatureParams('personal_sign', [{ text: 'hello' }, signer], signer)).toThrow(
+        expect(() => assertSignatureParamsAreCanonical('personal_sign', [{ text: 'hello' }, signer], signer)).toThrow(
           MalformedSignatureRequestError
         )
       })
@@ -452,19 +453,18 @@ describe('canonicalizeSignatureParams', () => {
 
     describe('and there is a single param', () => {
       it('should throw a MalformedSignatureRequestError', () => {
-        expect(() => canonicalizeSignatureParams('personal_sign', ['hello'], signer)).toThrow(MalformedSignatureRequestError)
+        expect(() => assertSignatureParamsAreCanonical('personal_sign', ['hello'], signer)).toThrow(MalformedSignatureRequestError)
       })
     })
   })
 
   describe('when the method is eth_sendTransaction', () => {
-    it('should return the params untouched because the transaction path builds its own canonical params', () => {
-      const params = [{ to: '0x1', data: '0x' }, 'extra']
-      expect(canonicalizeSignatureParams('eth_sendTransaction', params, signer)).toBe(params)
+    it('should not throw for any params because the transaction path builds its own canonical params', () => {
+      expect(() => assertSignatureParamsAreCanonical('eth_sendTransaction', [{ to: '0x1', data: '0x' }, 'extra'], signer)).not.toThrow()
     })
 
-    it('should return undefined when there are no params', () => {
-      expect(canonicalizeSignatureParams('eth_sendTransaction', undefined, signer)).toBeUndefined()
+    it('should not throw when there are no params', () => {
+      expect(() => assertSignatureParamsAreCanonical('eth_sendTransaction', undefined, signer)).not.toThrow()
     })
   })
 })

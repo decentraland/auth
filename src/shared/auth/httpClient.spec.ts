@@ -213,10 +213,8 @@ describe('createAuthServerClient', () => {
         })
       })
 
-      it('should return the params reordered to [message, signer]', async () => {
-        const result = await client.recover(mockRequestId, mockSignerAddress)
-
-        expect(result.params).toEqual(['hello', mockSignerAddressLower])
+      it('should throw a MalformedSignatureRequestError because wallets sign the first param', async () => {
+        await expect(client.recover(mockRequestId, mockSignerAddress)).rejects.toBeInstanceOf(MalformedSignatureRequestError)
       })
     })
 
