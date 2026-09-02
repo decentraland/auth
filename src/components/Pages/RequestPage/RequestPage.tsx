@@ -123,6 +123,12 @@ const TERMINAL_VIEWS = new Set([
   View.DIFFERENT_ACCOUNT
 ])
 
+// JSON-RPC error codes for the outcomes reported when a request is rejected at recover time,
+// before it ever reaches the wallet. The client only ever sees the pair (method rejected vs.
+// params rejected); the human-readable reason travels in the message.
+const RPC_METHOD_NOT_SUPPORTED = -32601
+const RPC_INVALID_PARAMS = -32602
+
 export const RequestPage = () => {
   const params = useParams()
   const [searchParams] = useSearchParams()
@@ -385,9 +391,29 @@ export const RequestPage = () => {
       const timeTheSiteStartedLoading = Date.now()
       publicClientRef.current = createPublicClient({ transport: custom(provider) })
       walletClientRef.current = createWalletClient({ chain: mainnet, transport: custom(provider) })
+      // Held outside the try so the catch can still name a sender when it reports a rejection.
+      // Stays undefined only when `getAddresses` itself failed, which is the one case where there
+      // is no address to report as (and no request was recovered to answer either).
+      let connectedAddress: string | undefined
+
+      // A request rejected at recover time never reaches the wallet, so no approve/deny path will
+      // ever answer it. Left unreported, the auth server keeps it pending and the client blocks for
+      // the whole expiration window; reporting the rejection is what lets the client fail fast.
+      // Best-effort by design: the error view is the user-facing answer and must not depend on the
+      // notification going through, which is how onDenyWalletInteraction treats it too.
+      const reportRejectedRequest = async (code: number, message: string) => {
+        if (!connectedAddress) return
+
+        try {
+          await authServerClient.current.sendFailedOutcome(requestId, connectedAddress, { code, message })
+        } catch (error) {
+          console.error('Failed to send rejected request outcome:', error)
+        }
+      }
 
       try {
         const [signerAddress] = await walletClientRef.current.getAddresses()
+        connectedAddress = signerAddress
         identifyUser(signerAddress)
         // Recover the request from the auth server. Only the non-deep-link flow reaches here — the
         // deep-link handoff has no backing request and never recovers.
@@ -692,6 +718,9 @@ export const RequestPage = () => {
         if (cancelled) return
 
         if (e instanceof DifferentSenderError) {
+          // Deliberately not reported: the outcome endpoint does not check the sender against the
+          // request's, so answering here would consume a request addressed to a different account.
+          // It stays pending for the account it was actually meant for.
           setView(View.DIFFERENT_ACCOUNT)
           return
         } else if (e instanceof ExpiredRequestError) {
@@ -708,12 +737,14 @@ export const RequestPage = () => {
           hasCompletedRef.current = true
           setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
           setView(View.WALLET_INTERACTION_ERROR)
+          await reportRejectedRequest(RPC_INVALID_PARAMS, e.message)
           return
         } else if (e instanceof MalformedSignatureRequestError) {
           // The params could preview one payload and sign another. Block it; a retry recovers the same request.
           hasCompletedRef.current = true
           setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
           setView(View.WALLET_INTERACTION_ERROR)
+          await reportRejectedRequest(RPC_INVALID_PARAMS, e.message)
           return
         } else if (e instanceof UnsupportedMethodError) {
           // The request used a method that is not on the allowlist. Block it outright — a retry
@@ -722,9 +753,13 @@ export const RequestPage = () => {
           hasCompletedRef.current = true
           setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
           setView(isRetiredSignInMethod(e.method) ? View.OUTDATED_CLIENT : View.LOADING_ERROR)
+          await reportRejectedRequest(RPC_METHOD_NOT_SUPPORTED, e.message)
           return
         }
 
+        // Nothing is reported for the rest. An expired, fulfilled or missing request has nothing
+        // left to answer, and any other failure (network, a server 5xx) is retryable — the error
+        // view offers a retry that recovers the very same request.
         setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
         setView(View.LOADING_ERROR)
       }

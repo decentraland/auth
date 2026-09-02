@@ -379,6 +379,7 @@ describe('RequestPage', () => {
         mockGetAddresses.mockResolvedValue(['0xabc123'])
         mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'User' }] })
         mockRecover.mockRejectedValue(new UnsupportedMethodError('dcl_personal_sign'))
+        mockSendFailedOutcome.mockResolvedValue({})
       })
 
       it('should tell the user to update instead of offering a retry that cannot succeed', async () => {
@@ -389,6 +390,16 @@ describe('RequestPage', () => {
         expect(screen.queryByTestId('recover-error')).not.toBeInTheDocument()
         expect(mockSignMessage).not.toHaveBeenCalled()
       })
+
+      it('should report a method-not-supported outcome so the un-migrated client is answered instead of left waiting', async () => {
+        renderRequestPage()
+        await waitFor(() => {
+          expect(mockSendFailedOutcome).toHaveBeenCalledWith(REQUEST_ID, '0xabc123', {
+            code: -32601,
+            message: 'The "dcl_personal_sign" method is not supported'
+          })
+        })
+      })
     })
 
     describe('and recovery fails with an UnsupportedMethodError for any other method', () => {
@@ -396,6 +407,7 @@ describe('RequestPage', () => {
         mockGetAddresses.mockResolvedValue(['0xabc123'])
         mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'User' }] })
         mockRecover.mockRejectedValue(new UnsupportedMethodError('eth_sign'))
+        mockSendFailedOutcome.mockResolvedValue({})
       })
 
       it('should show the generic recover error view, not the outdated client one', async () => {
@@ -404,6 +416,16 @@ describe('RequestPage', () => {
           expect(screen.getByTestId('recover-error')).toBeInTheDocument()
         })
         expect(screen.queryByTestId('outdated-client-error')).not.toBeInTheDocument()
+      })
+
+      it('should report a method-not-supported outcome carrying the rejected method', async () => {
+        renderRequestPage()
+        await waitFor(() => {
+          expect(mockSendFailedOutcome).toHaveBeenCalledWith(REQUEST_ID, '0xabc123', {
+            code: -32601,
+            message: 'The "eth_sign" method is not supported'
+          })
+        })
       })
     })
 
@@ -436,6 +458,7 @@ describe('RequestPage', () => {
         mockGetAddresses.mockResolvedValue(['0xabc123'])
         mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'User' }] })
         mockRecover.mockRejectedValue(new DifferentSenderError('0xabc123', '0xother'))
+        mockSendFailedOutcome.mockResolvedValue({})
       })
 
       it('should show the different account error view', async () => {
@@ -443,6 +466,14 @@ describe('RequestPage', () => {
         await waitFor(() => {
           expect(screen.getByTestId('different-account')).toBeInTheDocument()
         })
+      })
+
+      it('should leave the request pending rather than answering one addressed to another account', async () => {
+        renderRequestPage()
+        await waitFor(() => {
+          expect(screen.getByTestId('different-account')).toBeInTheDocument()
+        })
+        expect(mockSendFailedOutcome).not.toHaveBeenCalled()
       })
     })
 
@@ -500,12 +531,23 @@ describe('RequestPage', () => {
         mockGetAddresses.mockResolvedValue(['0xabc123'])
         mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'User' }] })
         mockRecover.mockRejectedValue(new ImpersonatedSignInError('personal_sign'))
+        mockSendFailedOutcome.mockResolvedValue({})
       })
 
       it('should show the signing error view instead of offering a retry', async () => {
         renderRequestPage()
         await waitFor(() => {
           expect(screen.getByTestId('signing-error')).toBeInTheDocument()
+        })
+      })
+
+      it('should report an invalid-params outcome instead of leaving the blocked sign-in attempt unanswered', async () => {
+        renderRequestPage()
+        await waitFor(() => {
+          expect(mockSendFailedOutcome).toHaveBeenCalledWith(REQUEST_ID, '0xabc123', {
+            code: -32602,
+            message: 'The "personal_sign" method cannot be used to sign a Decentraland sign-in payload'
+          })
         })
       })
     })
@@ -515,6 +557,7 @@ describe('RequestPage', () => {
         mockGetAddresses.mockResolvedValue(['0xabc123'])
         mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'User' }] })
         mockRecover.mockRejectedValue(new MalformedSignatureRequestError('eth_signTypedData_v4'))
+        mockSendFailedOutcome.mockResolvedValue({})
       })
 
       it('should show the signing error view instead of offering a retry', async () => {
@@ -523,6 +566,36 @@ describe('RequestPage', () => {
           expect(screen.getByTestId('signing-error')).toBeInTheDocument()
         })
         expect(screen.queryByTestId('recover-error')).not.toBeInTheDocument()
+      })
+
+      it('should report an invalid-params outcome so the client is answered immediately', async () => {
+        renderRequestPage()
+        await waitFor(() => {
+          expect(mockSendFailedOutcome).toHaveBeenCalledWith(REQUEST_ID, '0xabc123', {
+            code: -32602,
+            message: 'The "eth_signTypedData_v4" request parameters are malformed'
+          })
+        })
+      })
+
+      describe('and reporting the rejection to the auth server fails', () => {
+        let consoleErrorSpy: jest.SpyInstance
+
+        beforeEach(() => {
+          consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined)
+          mockSendFailedOutcome.mockRejectedValue(new Error('Auth server unreachable'))
+        })
+
+        afterEach(() => {
+          consoleErrorSpy.mockRestore()
+        })
+
+        it('should still show the signing error view, since the report is best-effort', async () => {
+          renderRequestPage()
+          await waitFor(() => {
+            expect(screen.getByTestId('signing-error')).toBeInTheDocument()
+          })
+        })
       })
     })
 
