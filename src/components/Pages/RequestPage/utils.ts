@@ -104,19 +104,28 @@ function extractSignaturePayload(method: string, params: unknown[] | undefined, 
   return null
 }
 
-// EIP-712 primaryTypes that grant a third party the ability to move the user's assets off-chain
-// (token allowances and marketplace order listings). These carry the same risk as an on-chain
-// `approve`/`setApprovalForAll` but are invisible to a transaction simulation because no
-// transaction is sent — so signing them must be gated behind an explicit acknowledgment.
+// EIP-712 primaryTypes known to grant a third party the ability to move the user's assets
+// off-chain (token allowances, gasless transfers and marketplace order listings). These carry the
+// same risk as an on-chain `approve`/`setApprovalForAll` but are invisible to a transaction
+// simulation because no transaction is sent — so signing them must be gated behind an explicit
+// acknowledgment. The list only tailors the wording: a primaryType that is neither here nor a
+// MetaTransaction is treated as unrecognized and gated as well (see RequestPage).
 const APPROVAL_GRANTING_PRIMARY_TYPES = new Set([
-  'permit', // EIP-2612
+  'permit', // EIP-2612 (and DAI-style / ERC-4494 permits, same type name)
   'permitsingle', // Uniswap Permit2 (AllowanceTransfer)
   'permitbatch',
   'permittransferfrom', // Uniswap Permit2 (SignatureTransfer)
   'permitbatchtransferfrom',
+  'permitwitnesstransferfrom', // Uniswap Permit2 (SignatureTransfer with witness)
+  'permitbatchwitnesstransferfrom',
   'permitforall',
+  'transferwithauthorization', // EIP-3009 gasless transfer (e.g. USDC): moves tokens outright
+  'receivewithauthorization',
   'ordercomponents', // Seaport order
-  'bulkorder' // Seaport bulk order
+  'bulkorder', // Seaport bulk order
+  'trade', // Decentraland off-chain marketplace order
+  'order', // 0x, Blur, Rarible and other exchange orders
+  'makerorder' // LooksRare order
 ])
 
 /**
@@ -127,6 +136,21 @@ const APPROVAL_GRANTING_PRIMARY_TYPES = new Set([
 function isApprovalGrantingTypedData(typedData: TypedDataPayload | undefined | null): boolean {
   const primaryType = typedData?.primaryType
   return typeof primaryType === 'string' && APPROVAL_GRANTING_PRIMARY_TYPES.has(primaryType.toLowerCase())
+}
+
+// Control characters other than tab, newline and carriage return, plus U+FFFD, which is what
+// decoding bytes that are not valid UTF-8 produces.
+// eslint-disable-next-line no-control-regex
+const UNREADABLE_CHARACTER_REGEX = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\uFFFD]/
+
+/**
+ * Returns true when a personal_sign message is not something the user can read and check: it is
+ * still raw hex (it could not be decoded as text) or it decodes to bytes that are not text. Such a
+ * payload may be a hash that a contract accepts as an EIP-191 authorization, so it must not be
+ * signed on a single click.
+ */
+function isOpaqueSignatureMessage(message: string): boolean {
+  return HEX_STRING_REGEX.test(message) || UNREADABLE_CHARACTER_REGEX.test(message)
 }
 
 /**
@@ -637,5 +661,6 @@ export {
   isKnownDecentralandContract,
   extractSignaturePayload,
   decodeMetaTransactionTypedData,
+  isOpaqueSignatureMessage,
   buildSendTransactionSimulationPayload
 }

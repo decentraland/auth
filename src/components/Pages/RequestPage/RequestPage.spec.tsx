@@ -190,6 +190,7 @@ jest.mock('./Views', () => ({
       data-sim={props.simulation?.status}
       data-requires-acknowledgment={String(props.requiresAcknowledgment)}
       data-contract-trust={props.contractTrust}
+      data-unverifiable={props.unverifiableReason ?? ''}
     >
       <button data-testid="signature-approve" onClick={props.onApprove}>
         approve
@@ -206,6 +207,7 @@ const mockIsSignatureMethod = jest.fn()
 const mockExtractSignaturePayload = jest.fn()
 const mockDecodeMetaTransactionTypedData = jest.fn()
 const mockBuildSendTransactionSimulationPayload = jest.fn()
+const mockIsOpaqueSignatureMessage = jest.fn()
 const mockCheckMetaTransactionSupport = jest.fn()
 const mockIsKnownDecentralandContract = jest.fn()
 const mockIsDecentralandContractAddress = jest.fn()
@@ -227,6 +229,7 @@ jest.mock('./utils', () => ({
   isApprovalGrantingTypedData: (...args: any[]) => mockIsApprovalGrantingTypedData(...args),
   extractSignaturePayload: (...args: any[]) => mockExtractSignaturePayload(...args),
   decodeMetaTransactionTypedData: (...args: any[]) => mockDecodeMetaTransactionTypedData(...args),
+  isOpaqueSignatureMessage: (...args: any[]) => mockIsOpaqueSignatureMessage(...args),
   buildSendTransactionSimulationPayload: (...args: any[]) => mockBuildSendTransactionSimulationPayload(...args)
 }))
 
@@ -290,6 +293,7 @@ describe('RequestPage', () => {
     mockIsKnownDecentralandContract.mockReturnValue(false)
     mockIsDecentralandContractAddress.mockResolvedValue(false)
     mockIsApprovalGrantingTypedData.mockReturnValue(false)
+    mockIsOpaqueSignatureMessage.mockReturnValue(false)
     mockExtractSignaturePayload.mockReturnValue({ kind: 'message', message: 'hello' })
     mockDecodeMetaTransactionTypedData.mockReturnValue(null)
     mockCheckMetaTransactionSupport.mockResolvedValue({ willUseMetaTransaction: false, contractName: null })
@@ -1103,6 +1107,69 @@ describe('RequestPage', () => {
       await screen.findByTestId('signature-request')
       expect(screen.queryByTestId('wallet-interaction')).not.toBeInTheDocument()
     })
+
+    it('should not require acknowledgment for readable text', async () => {
+      renderRequestPage()
+      const view = await screen.findByTestId('signature-request')
+      expect(view).toHaveAttribute('data-requires-acknowledgment', 'false')
+    })
+  })
+
+  describe('when a web2 user receives a personal_sign message that is not readable text', () => {
+    beforeEach(() => {
+      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.MAGIC }
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockRecover.mockResolvedValue({
+        method: 'personal_sign',
+        params: [`0x${'ab'.repeat(32)}`, '0xabc123'],
+        sender: '0xabc123',
+        expiration: new Date(Date.now() + 3600000).toISOString()
+      })
+      mockGetAddresses.mockResolvedValue(['0xabc123'])
+      mockExtractSignaturePayload.mockReturnValue({ kind: 'message', message: `0x${'ab'.repeat(32)}` })
+      mockIsOpaqueSignatureMessage.mockReturnValue(true)
+    })
+
+    it('should require an acknowledgment because the user cannot check what is being signed', async () => {
+      renderRequestPage()
+      const view = await screen.findByTestId('signature-request')
+      expect(view).toHaveAttribute('data-requires-acknowledgment', 'true')
+    })
+
+    it('should tell the view the message is opaque', async () => {
+      renderRequestPage()
+      const view = await screen.findByTestId('signature-request')
+      expect(view).toHaveAttribute('data-unverifiable', 'opaque_message')
+    })
+  })
+
+  describe('when a web2 user receives a typed-data signature Auth does not recognize', () => {
+    beforeEach(() => {
+      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.MAGIC }
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockRecover.mockResolvedValue({
+        method: 'eth_signTypedData_v4',
+        params: ['0xabc123', '{"primaryType":"Statement"}'],
+        sender: '0xabc123',
+        expiration: new Date(Date.now() + 3600000).toISOString()
+      })
+      mockGetAddresses.mockResolvedValue(['0xabc123'])
+      mockExtractSignaturePayload.mockReturnValue({ kind: 'typedData', typedData: { primaryType: 'Statement' }, raw: '{}' })
+      mockDecodeMetaTransactionTypedData.mockReturnValue(null)
+      mockIsApprovalGrantingTypedData.mockReturnValue(false)
+    })
+
+    it('should require an acknowledgment instead of a single click', async () => {
+      renderRequestPage()
+      const view = await screen.findByTestId('signature-request')
+      expect(view).toHaveAttribute('data-requires-acknowledgment', 'true')
+    })
+
+    it('should tell the view the struct is unrecognized', async () => {
+      renderRequestPage()
+      const view = await screen.findByTestId('signature-request')
+      expect(view).toHaveAttribute('data-unverifiable', 'unrecognized_typed_data')
+    })
   })
 
   describe('when a web2 user receives an off-chain approval signature (permit/order)', () => {
@@ -1125,6 +1192,12 @@ describe('RequestPage', () => {
       renderRequestPage()
       const view = await screen.findByTestId('signature-request')
       expect(view).toHaveAttribute('data-requires-acknowledgment', 'true')
+    })
+
+    it('should not treat a known approval type as unrecognized', async () => {
+      renderRequestPage()
+      const view = await screen.findByTestId('signature-request')
+      expect(view).toHaveAttribute('data-unverifiable', '')
     })
   })
 

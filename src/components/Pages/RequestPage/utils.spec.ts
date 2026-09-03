@@ -26,6 +26,7 @@ import {
   getSigninDeeplink,
   isApprovalGrantingTypedData,
   isDecentralandContractAddress,
+  isOpaqueSignatureMessage,
   isSignatureMethod
 } from './utils'
 
@@ -1239,14 +1240,27 @@ describe('when testing decodeMetaTransactionTypedData', () => {
 })
 
 describe('when testing isApprovalGrantingTypedData', () => {
-  describe.each(['Permit', 'PermitSingle', 'PermitBatch', 'PermitTransferFrom', 'PermitBatchTransferFrom', 'OrderComponents', 'BulkOrder'])(
-    'and the typed data primaryType is the approval-granting type %s',
-    primaryType => {
-      it('should return true', () => {
-        expect(isApprovalGrantingTypedData({ primaryType } as any)).toBe(true)
-      })
-    }
-  )
+  describe.each([
+    'Permit',
+    'PermitSingle',
+    'PermitBatch',
+    'PermitTransferFrom',
+    'PermitBatchTransferFrom',
+    'PermitWitnessTransferFrom',
+    'PermitBatchWitnessTransferFrom',
+    'PermitForAll',
+    'TransferWithAuthorization',
+    'ReceiveWithAuthorization',
+    'OrderComponents',
+    'BulkOrder',
+    'Trade',
+    'Order',
+    'MakerOrder'
+  ])('and the typed data primaryType is the approval-granting type %s', primaryType => {
+    it('should return true', () => {
+      expect(isApprovalGrantingTypedData({ primaryType } as any)).toBe(true)
+    })
+  })
 
   describe('and the primaryType casing differs', () => {
     it('should still match case-insensitively', () => {
@@ -1269,6 +1283,68 @@ describe('when testing isApprovalGrantingTypedData', () => {
   describe('and the typed data is undefined', () => {
     it('should return false', () => {
       expect(isApprovalGrantingTypedData(undefined)).toBe(false)
+    })
+  })
+})
+
+describe('when testing isOpaqueSignatureMessage', () => {
+  describe('and the message is readable text', () => {
+    let message: string
+
+    beforeEach(() => {
+      message = 'Sign in to Decentraland\nNonce: 1234'
+    })
+
+    it('should return false', () => {
+      expect(isOpaqueSignatureMessage(message)).toBe(false)
+    })
+  })
+
+  describe('and the message contains emoji and non-latin text', () => {
+    let message: string
+
+    beforeEach(() => {
+      message = 'Bienvenido 👋 — 欢迎'
+    })
+
+    it('should return false because those are readable', () => {
+      expect(isOpaqueSignatureMessage(message)).toBe(false)
+    })
+  })
+
+  describe('and the message is still raw hex', () => {
+    let message: string
+
+    beforeEach(() => {
+      message = `0x${'ab'.repeat(32)}`
+    })
+
+    it('should return true because a hash cannot be checked by the user', () => {
+      expect(isOpaqueSignatureMessage(message)).toBe(true)
+    })
+  })
+
+  describe('and the message decoded to bytes that are not text', () => {
+    let message: string
+
+    beforeEach(() => {
+      message = 'abc\u0000\u0007def'
+    })
+
+    it('should return true', () => {
+      expect(isOpaqueSignatureMessage(message)).toBe(true)
+    })
+  })
+
+  describe('and the message contains the replacement character left by invalid UTF-8', () => {
+    let message: string
+
+    beforeEach(() => {
+      message = 'abc\uFFFDdef'
+    })
+
+    it('should return true', () => {
+      expect(isOpaqueSignatureMessage(message)).toBe(true)
     })
   })
 })

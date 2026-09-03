@@ -118,7 +118,9 @@
       "meta_tx_notice": "Questa firma autorizza il contratto a eseguire questa azione per tuo conto. Non scade e l'app che l'ha richiesta può inviarla in seguito.",
       "meta_tx_reverted": "Questa azione al momento fallisce, quindi non è stato possibile visualizzarne gli effetti in anteprima. Firmala solo se prevedi che funzioni in seguito.",
       "acknowledge_unverified": "Capisco che non è stato possibile verificare gli effetti di questa firma",
-      "meta_tx_unrecognized_contract": "Questo non è un contratto Decentraland riconosciuto, quindi Decentraland non può garantire cosa farà questa firma."
+      "meta_tx_unrecognized_contract": "Questo non è un contratto Decentraland riconosciuto, quindi Decentraland non può garantire cosa farà questa firma.",
+      "unrecognized_typed_data": "Decentraland non riconosce questo tipo di firma, quindi non può mostrare in anteprima cosa autorizza. Firmala solo se ti fidi dell'app che l'ha richiesta.",
+      "opaque_message": "Questo messaggio non è testo leggibile, quindi non puoi verificare cosa stai firmando. Potrebbe essere un hash che autorizza un'azione in un contratto. Firmalo solo se ti fidi dell'app che l'ha richiesto."
     }
   },
   "request_views": {

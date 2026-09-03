@@ -44,7 +44,15 @@ import { identifyUser, trackEvent } from '../../../shared/utils/analytics'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { FeatureFlagsContext } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
 import { buildTransactionParams } from './transactionParams'
-import { MANATransferData, MetaTransactionContractTrust, NFTTransferData, SignaturePayload, SimulationState, TransferType } from './types'
+import {
+  MANATransferData,
+  MetaTransactionContractTrust,
+  NFTTransferData,
+  SignaturePayload,
+  SimulationState,
+  TransferType,
+  UnverifiableSignatureReason
+} from './types'
 import {
   buildSendTransactionSimulationPayload,
   checkMetaTransactionSupport,
@@ -61,6 +69,7 @@ import {
   getSigninDeeplink,
   isApprovalGrantingTypedData,
   isKnownDecentralandContract,
+  isOpaqueSignatureMessage,
   isSignatureMethod
 } from './utils'
 import {
@@ -173,6 +182,11 @@ export const RequestPage = () => {
   // Whether the typed-data signature grants an off-chain asset approval (EIP-2612 Permit, Permit2,
   // Seaport order). These aren't simulated, so they must always require an explicit acknowledgment.
   const [isHighRiskSignature, setIsHighRiskSignature] = useState(false)
+  // Why the signature cannot be checked at all: typed data that is neither a MetaTransaction
+  // (previewed) nor a known approval type (flagged), or a personal_sign message that is not readable
+  // text. Nothing on screen then says what a counterparty can do with the signature, so it fails
+  // closed and requires an acknowledgment instead of a single click.
+  const [unverifiableSignatureReason, setUnverifiableSignatureReason] = useState<UnverifiableSignatureReason | null>(null)
   const requestRef = useRef<RecoverResponse>()
   const viewRef = useRef(view)
   viewRef.current = view
@@ -688,13 +702,19 @@ export const RequestPage = () => {
               const payload = extractSignaturePayload(request.method, request.params, signerAddress)
               setSignaturePayload(payload)
               if (payload?.kind === 'typedData') {
-                // Off-chain approval permits/orders (EIP-2612, Permit2, Seaport) hand control of the
-                // user's assets to a third party but are never simulated — always require an explicit
-                // acknowledgment before signing them.
-                if (isApprovalGrantingTypedData(payload.typedData)) {
+                // Off-chain approval permits/orders (EIP-2612, Permit2, EIP-3009, Seaport, marketplace
+                // orders) hand control of the user's assets to a third party but are never simulated —
+                // always require an explicit acknowledgment before signing them.
+                const isApprovalGranting = isApprovalGrantingTypedData(payload.typedData)
+                if (isApprovalGranting) {
                   setIsHighRiskSignature(true)
                 }
                 const metaTx = decodeMetaTransactionTypedData(payload.typedData, request.method)
+                // Anything else is signed blind: its fields are shown, but nothing says what a
+                // counterparty can do with the signature. Fail closed.
+                if (!metaTx && !isApprovalGranting) {
+                  setUnverifiableSignatureReason('unrecognized_typed_data')
+                }
                 if (metaTx) {
                   setIsSignatureMetaTx(true)
                   setSimulationChainId(metaTx.chainId)
@@ -722,6 +742,10 @@ export const RequestPage = () => {
                     { rejectUnpreviewable: true }
                   )
                 }
+              } else if (payload?.kind === 'message' && isOpaqueSignatureMessage(payload.message)) {
+                // Not readable text: the user cannot check it, and it may be a hash a contract accepts
+                // as an EIP-191 authorization.
+                setUnverifiableSignatureReason('opaque_message')
               }
               setView(View.WALLET_SIGNATURE_INTERACTION)
             } else {
@@ -1076,14 +1100,17 @@ export const RequestPage = () => {
   // permission; (b) the simulation could NOT be produced for a transaction we can't otherwise vouch
   // for — only a relayed meta-transaction to a known DCL contract is exempt (prevents the fail-open
   // where an unpreviewable payload degrades to a single-click approve); (c) a signed MetaTransaction
-  // has no verified effects or targets a contract Auth cannot vouch for; or (d) the request is an
-  // off-chain approval signature (permit/order), which grants asset control but is never simulated.
+  // has no verified effects or targets a contract Auth cannot vouch for; (d) the request is an
+  // off-chain approval signature (permit/order), which grants asset control but is never simulated;
+  // or (e) Auth cannot tell what the signature authorizes at all (an unrecognized typed-data struct
+  // or a message that is not readable text).
   const requiresApprovalAcknowledgment =
     hasDangerousApprovalChange ||
     (simulationState.status === 'unavailable' && !isMetaTransaction) ||
     isSignatureWithoutVerifiedEffects ||
     isSignatureToUnrecognizedContract ||
-    isHighRiskSignature
+    isHighRiskSignature ||
+    unverifiableSignatureReason !== null
 
   switch (view) {
     case View.TIMEOUT:
@@ -1225,6 +1252,7 @@ export const RequestPage = () => {
           requiresAcknowledgment={requiresApprovalAcknowledgment}
           isMetaTransaction={isSignatureMetaTx}
           contractTrust={signatureContractTrust}
+          unverifiableReason={unverifiableSignatureReason}
           isLoading={isLoading}
           onDeny={onDenyWalletInteraction}
           onApprove={onApproveWalletInteraction}

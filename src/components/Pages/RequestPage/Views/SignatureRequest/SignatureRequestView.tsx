@@ -36,6 +36,7 @@ export const SignatureRequestView = ({
   requiresAcknowledgment = false,
   isMetaTransaction,
   contractTrust,
+  unverifiableReason = null,
   isLoading = false,
   onDeny,
   onApprove
@@ -56,6 +57,8 @@ export const SignatureRequestView = ({
   // its effects could not be previewed — or the contract that will execute it is not one Auth can
   // vouch for — the acknowledgment must say that, not talk about approvals.
   const hasUnverifiedEffects = isMetaTransaction && (simulation.status === 'unavailable' || isReverted || isContractUnrecognized)
+  // Likewise when Auth cannot tell what the signature authorizes in the first place.
+  const isUnverifiable = hasUnverifiedEffects || unverifiableReason !== null
 
   // A tick given to one statement must not carry over to another: when the wording changes (for
   // instance the contract lookup resolves to unrecognized after the user acknowledged an approval),
@@ -143,6 +146,14 @@ export const SignatureRequestView = ({
 
         {!payload ? <MessageBlock>{t('request.signature.description')}</MessageBlock> : null}
 
+        {unverifiableReason !== null ? (
+          <Notice data-testid="signature-unverifiable-notice">
+            {unverifiableReason === 'opaque_message'
+              ? t('request.signature.opaque_message')
+              : t('request.signature.unrecognized_typed_data')}
+          </Notice>
+        ) : null}
+
         {requiresAcknowledgment ? (
           <FormControlLabel
             control={
@@ -152,7 +163,7 @@ export const SignatureRequestView = ({
                 data-testid="risk-acknowledgment"
               />
             }
-            label={hasUnverifiedEffects ? t('request.signature.acknowledge_unverified') : t('request.transaction_dialog.acknowledge_risk')}
+            label={isUnverifiable ? t('request.signature.acknowledge_unverified') : t('request.transaction_dialog.acknowledge_risk')}
           />
         ) : null}
       </Content>

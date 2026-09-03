@@ -47,6 +47,12 @@ type SignaturePayload = { kind: 'message'; message: string } | { kind: 'typedDat
  */
 type MetaTransactionContractTrust = 'pending' | 'confirmed' | 'unconfirmed'
 
+/**
+ * Why a signature request cannot be checked by Auth: typed data whose primaryType is neither a
+ * MetaTransaction nor a known approval type, or a personal_sign message that is not readable text.
+ */
+type UnverifiableSignatureReason = 'unrecognized_typed_data' | 'opaque_message'
+
 /** Lifecycle of the best-effort transaction simulation shown to web2 users. */
 type SimulationState =
   | { status: 'idle' }
@@ -62,5 +68,6 @@ export type {
   ProfileAvatar,
   TypedDataPayload,
   SignaturePayload,
-  SimulationState
+  SimulationState,
+  UnverifiableSignatureReason
 }

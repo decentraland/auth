@@ -67,6 +67,52 @@ describe('when rendering the SignatureRequestView', () => {
       expect(onApprove).toHaveBeenCalledTimes(1)
     })
 
+    describe('and the message is not readable text', () => {
+      let opaquePayload: SignaturePayload
+
+      beforeEach(() => {
+        opaquePayload = { kind: 'message', message: `0x${'ab'.repeat(32)}` }
+      })
+
+      it('should warn that the message cannot be checked', () => {
+        render(
+          <SignatureRequestView
+            requestId="r1"
+            method="personal_sign"
+            payload={opaquePayload}
+            simulation={{ status: 'idle' }}
+            userAddress={USER}
+            isMetaTransaction={false}
+            unverifiableReason="opaque_message"
+            requiresAcknowledgment
+            onDeny={onDeny}
+            onApprove={onApprove}
+          />
+        )
+        expect(screen.getByTestId('signature-unverifiable-notice')).toHaveTextContent('request.signature.opaque_message')
+      })
+
+      it('should keep approval disabled until the user acknowledges it', async () => {
+        render(
+          <SignatureRequestView
+            requestId="r1"
+            method="personal_sign"
+            payload={opaquePayload}
+            simulation={{ status: 'idle' }}
+            userAddress={USER}
+            isMetaTransaction={false}
+            unverifiableReason="opaque_message"
+            requiresAcknowledgment
+            onDeny={onDeny}
+            onApprove={onApprove}
+          />
+        )
+        expect(screen.getByTestId('signature-approve-button')).toBeDisabled()
+        await userEvent.click(screen.getByTestId('risk-acknowledgment'))
+        expect(screen.getByTestId('signature-approve-button')).toBeEnabled()
+      })
+    })
+
     it('should gate approval behind the acknowledgment when required', async () => {
       render(
         <SignatureRequestView
@@ -116,6 +162,60 @@ describe('when rendering the SignatureRequestView', () => {
         />
       )
       expect(screen.getByText('0x480a…45ef')).toBeInTheDocument()
+    })
+
+    describe('and Auth does not recognize the struct', () => {
+      it('should explain that it cannot preview what the signature authorizes', () => {
+        render(
+          <SignatureRequestView
+            requestId="r1"
+            method="eth_signTypedData_v4"
+            payload={payload}
+            simulation={{ status: 'idle' }}
+            userAddress={USER}
+            isMetaTransaction={false}
+            unverifiableReason="unrecognized_typed_data"
+            requiresAcknowledgment
+            onDeny={onDeny}
+            onApprove={onApprove}
+          />
+        )
+        expect(screen.getByTestId('signature-unverifiable-notice')).toHaveTextContent('request.signature.unrecognized_typed_data')
+      })
+
+      it('should ask the user to acknowledge unverified effects rather than an approval', () => {
+        render(
+          <SignatureRequestView
+            requestId="r1"
+            method="eth_signTypedData_v4"
+            payload={payload}
+            simulation={{ status: 'idle' }}
+            userAddress={USER}
+            isMetaTransaction={false}
+            unverifiableReason="unrecognized_typed_data"
+            requiresAcknowledgment
+            onDeny={onDeny}
+            onApprove={onApprove}
+          />
+        )
+        expect(screen.getByText('request.signature.acknowledge_unverified')).toBeInTheDocument()
+      })
+    })
+
+    it('should not show an unverifiable notice when the struct is recognized', () => {
+      render(
+        <SignatureRequestView
+          requestId="r1"
+          method="eth_signTypedData_v4"
+          payload={payload}
+          simulation={{ status: 'idle' }}
+          userAddress={USER}
+          isMetaTransaction={false}
+          onDeny={onDeny}
+          onApprove={onApprove}
+        />
+      )
+      expect(screen.queryByTestId('signature-unverifiable-notice')).not.toBeInTheDocument()
     })
 
     it('should not show the meta-transaction notice', () => {

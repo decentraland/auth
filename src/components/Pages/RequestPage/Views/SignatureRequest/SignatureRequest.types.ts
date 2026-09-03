@@ -1,4 +1,4 @@
-import { MetaTransactionContractTrust, SignaturePayload, SimulationState } from '../../types'
+import { MetaTransactionContractTrust, SignaturePayload, SimulationState, UnverifiableSignatureReason } from '../../types'
 
 export interface SignatureRequestViewProps {
   requestId: string
@@ -21,6 +21,11 @@ export interface SignatureRequestViewProps {
    * acknowledgment wording. Recognition never relaxes anything.
    */
   contractTrust?: MetaTransactionContractTrust
+  /**
+   * Set when Auth cannot tell what the signature authorizes (an unrecognized typed-data struct, or
+   * a message that is not readable text). Shows a notice and uses the unverified acknowledgment.
+   */
+  unverifiableReason?: UnverifiableSignatureReason | null
   isLoading?: boolean
   onDeny: () => void
   onApprove: () => void
