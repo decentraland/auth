@@ -28,7 +28,12 @@ export const WalletInteraction = ({
   onApprove
 }: WalletInteractionProps) => {
   const { t } = useTranslation()
-  const [acknowledged, setAcknowledged] = useState(false)
+  // The statement being acknowledged: this request and this preview outcome. Stored as a key and
+  // derived, never synced, so a tick cannot carry over to another request or outcome and the button
+  // is right in the same render the statement changes.
+  const acknowledgmentStatement = [requestId, simulation?.status ?? 'idle', isReverted ? 'reverted' : ''].join('|')
+  const [acknowledgedStatement, setAcknowledgedStatement] = useState<string | null>(null)
+  const acknowledged = acknowledgedStatement === acknowledgmentStatement
   const hasSummary = simulation !== undefined && simulation.status !== 'idle'
   // Block approval while the request is submitting, while the simulation is still resolving (so a
   // user can't approve before the summary and any high-risk warnings render), and until any
@@ -59,7 +64,7 @@ export const WalletInteraction = ({
             control={
               <Checkbox
                 checked={acknowledged}
-                onChange={event => setAcknowledged(event.target.checked)}
+                onChange={event => setAcknowledgedStatement(event.target.checked ? acknowledgmentStatement : null)}
                 data-testid="risk-acknowledgment"
               />
             }

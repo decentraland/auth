@@ -451,6 +451,44 @@ describe('when rendering the SimulationSummary', () => {
     })
   })
 
+  describe('and a non-zero ERC-20 allowance is granted to the zero address', () => {
+    beforeEach(() => {
+      simulation = {
+        status: 'ready',
+        result: emptyResult({
+          approvalChanges: [
+            {
+              kind: 'approval',
+              standard: 'erc20',
+              owner: USER,
+              spender: '0x0000000000000000000000000000000000000000',
+              amount: '100',
+              rawAmount: '100000000000000000000',
+              isUnlimited: false,
+              tokenId: null,
+              approved: null,
+              contractAddress: '0x0f5d2fb29fb7d3cfee444a200298f468908cc942',
+              symbol: 'MANA',
+              name: 'MANA'
+            }
+          ]
+        })
+      }
+    })
+
+    it('should word it as a grant, not a revocation, because it revokes nobody', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} />)
+      expect(screen.getByText(/approval_can_spend/)).toBeInTheDocument()
+      expect(screen.queryByText(/approval_allowance_revoked/)).not.toBeInTheDocument()
+    })
+
+    it('should flag it and name the zero address as the spender', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} />)
+      expect(screen.getByText('⚠')).toBeInTheDocument()
+      expect(screen.getByText(/0x0000/)).toBeInTheDocument()
+    })
+  })
+
   describe('and an ERC-20 allowance is set to zero', () => {
     beforeEach(() => {
       simulation = {

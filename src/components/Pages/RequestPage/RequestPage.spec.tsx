@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/naming-convention */
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ProviderType } from '@dcl/schemas'
@@ -1753,6 +1753,99 @@ describe('RequestPage', () => {
         await waitFor(() => expect(view).toHaveAttribute('data-sim', 'unavailable'))
         expect(view).toHaveAttribute('data-requires-acknowledgment', 'true')
       })
+    })
+  })
+
+  describe('when the request id changes while the page stays mounted', () => {
+    const OTHER_REQUEST_ID = 'other-request-456'
+    const NavigateToOther = () => {
+      const navigate = useNavigate()
+      return (
+        <button data-testid="go-to-other" onClick={() => navigate(`/auth/requests/${OTHER_REQUEST_ID}?targetConfigId=default`)}>
+          other
+        </button>
+      )
+    }
+    const renderMountedPage = () =>
+      render(
+        <MemoryRouter initialEntries={[`/auth/requests/${REQUEST_ID}?targetConfigId=default`]}>
+          <FeatureFlagsContext.Provider value={{ flags: mockFlags as any, variants: {} as any, initialized: mockFlagsInitialized }}>
+            <Routes>
+              <Route
+                path="/auth/requests/:requestId"
+                element={
+                  <>
+                    <RequestPage />
+                    <NavigateToOther />
+                  </>
+                }
+              />
+            </Routes>
+          </FeatureFlagsContext.Provider>
+        </MemoryRouter>
+      )
+
+    beforeEach(() => {
+      // These tests queue one-shot values; clearAllMocks does not drain unused queues, so start clean.
+      mockRecover.mockReset()
+      mockSimulateTransaction.mockReset()
+      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.MAGIC }
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockRecover.mockResolvedValue({
+        method: 'eth_sendTransaction',
+        params: [{ to: '0xcontract', data: '0xabcd', value: '0x0' }],
+        sender: '0xabc123',
+        expiration: new Date(Date.now() + 3600000).toISOString()
+      })
+      mockGetAddresses.mockResolvedValue(['0xabc123'])
+      mockGetBalance.mockResolvedValue(BigInt(1))
+      mockGetChainId.mockResolvedValue(1)
+      mockEstimateFeesPerGas.mockResolvedValue({ gasPrice: BigInt(1) })
+      mockEstimateGas.mockResolvedValue(BigInt(1))
+      // The first request previews; the second never resolves, so any "ready" state seen after the
+      // change can only be stale.
+      mockSimulateTransaction
+        .mockResolvedValueOnce({ status: 'success', assetChanges: [], approvalChanges: [], balanceChanges: [], events: [] })
+        .mockImplementationOnce(() => new Promise(() => undefined))
+    })
+
+    afterEach(() => {
+      mockRecover.mockReset()
+      mockSimulateTransaction.mockReset()
+    })
+
+    it('should drop the previous preview and show the loading view before anything of the new request', async () => {
+      renderMountedPage()
+      const view = await screen.findByTestId('wallet-interaction')
+      await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+      // Hold the new request's recovery so the state between the change and the new preview is observable.
+      mockRecover.mockImplementationOnce(() => new Promise(() => undefined))
+      await userEvent.click(screen.getByTestId('go-to-other'))
+      expect(await screen.findByTestId('loading-request')).toBeInTheDocument()
+      expect(screen.queryByTestId('wallet-interaction')).not.toBeInTheDocument()
+    })
+
+    it('should recover the new request and preview it from scratch instead of reusing the old summary', async () => {
+      renderMountedPage()
+      const view = await screen.findByTestId('wallet-interaction')
+      await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+      await userEvent.click(screen.getByTestId('go-to-other'))
+      const fresh = await screen.findByTestId('wallet-interaction')
+      expect(mockRecover.mock.calls.some(call => call[0] === OTHER_REQUEST_ID)).toBe(true)
+      expect(fresh).toHaveAttribute('data-sim', 'loading')
+    })
+
+    it('should load the new request even though the previous one was completed', async () => {
+      mockWalletRequest.mockResolvedValue('0xhash')
+      mockSendSuccessfulOutcome.mockResolvedValue({})
+      renderMountedPage()
+      const view = await screen.findByTestId('wallet-interaction')
+      await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+      await userEvent.click(screen.getByTestId('wallet-interaction-approve'))
+      await screen.findByTestId('wallet-interaction-complete')
+      await userEvent.click(screen.getByTestId('go-to-other'))
+      await waitFor(() => expect(mockRecover.mock.calls.some(call => call[0] === OTHER_REQUEST_ID)).toBe(true))
+      expect(screen.queryByTestId('wallet-interaction-complete')).not.toBeInTheDocument()
     })
   })
 

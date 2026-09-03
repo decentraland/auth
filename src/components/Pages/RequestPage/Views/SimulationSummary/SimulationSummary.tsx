@@ -256,8 +256,10 @@ const ApprovalItem = ({
   )
 
   const symbol = approval.symbol || token
-  // Approving the zero address means "nobody": there is no counterparty to name.
-  const hasCounterparty = !isZeroAddress(approval.spender)
+  const isRevocation = isApprovalRevocation(approval)
+  // A revocation to the zero address has no counterparty to name. A grant to the zero address is
+  // still shown with its address: it is a grant to an unrecognized spender and is worded as one.
+  const hasCounterparty = !(isRevocation && isZeroAddress(approval.spender))
 
   let predicate: string
   if (approval.kind === 'approvalForAll') {
@@ -266,7 +268,7 @@ const ApprovalItem = ({
     } else {
       predicate = t('request.transaction_dialog.approval_can_access_all', { name: token })
     }
-  } else if (isApprovalRevocation(approval)) {
+  } else if (isRevocation) {
     // Same rule the gate uses, so a revocation is never worded as a grant.
     if (approval.tokenId) {
       predicate = t('request.transaction_dialog.approval_token_approval_revoked', { token, tokenId: approval.tokenId })

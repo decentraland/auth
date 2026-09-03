@@ -193,6 +193,8 @@ export const RequestPage = () => {
   const viewRef = useRef(view)
   viewRef.current = view
   const hasCompletedRef = useRef(false)
+  // The request id whose state this mounted page currently holds (see the load effect).
+  const loadedRequestIdRef = useRef<string>()
   // Guards against re-entrant approvals (e.g. a fast double-click on the confirm dialog),
   // which would otherwise fire two transactions before `isLoading` re-renders the buttons.
   const isApprovingRef = useRef(false)
@@ -362,10 +364,37 @@ export const RequestPage = () => {
 
     if (!initializedFlags || !isProfileReady) return
 
-    // Don't re-fetch if we're already in a terminal view (completed, denied, error, etc.)
-    // This prevents the bug where after approving, dependency changes cause a re-fetch
-    // of an already-consumed request
-    if (TERMINAL_VIEWS.has(viewRef.current) || hasCompletedRef.current) {
+    // A different request id on a still-mounted page starts over. Everything derived from the
+    // previous request — its preview, verified contracts, classification and completion — must go
+    // before anything of the new one is shown; otherwise a click on Allow could execute the new
+    // request under the previous request's summary and acknowledgment. The reset is keyed to the
+    // request id so re-runs of this effect for other dependencies leave in-flight state untouched.
+    if (loadedRequestIdRef.current !== requestId) {
+      loadedRequestIdRef.current = requestId
+      hasCompletedRef.current = false
+      requestRef.current = undefined
+      metaTxCheckRef.current = null
+      setView(View.LOADING_REQUEST)
+      setIsLoading(false)
+      setError(undefined)
+      setWalletInfo(undefined)
+      setTransactionGasCost(undefined)
+      setNftTransferData(null)
+      setManaTransferData(null)
+      setIsTransactionModalOpen(false)
+      setSimulationState({ status: 'idle' })
+      setSimulationProfiles({})
+      setSimulationChainId(undefined)
+      setSimulationVerified([])
+      setIsMetaTransaction(false)
+      setSignaturePayload(null)
+      setIsSignatureMetaTx(false)
+      setSignatureContractTrust('pending')
+      setIsHighRiskSignature(false)
+      setUnverifiableSignatureReason(null)
+    } else if (TERMINAL_VIEWS.has(viewRef.current) || hasCompletedRef.current) {
+      // Same request, already in a terminal view (completed, denied, error...): dependency changes
+      // must not re-fetch an already-consumed request.
       return
     }
 
@@ -1222,6 +1251,7 @@ export const RequestPage = () => {
             />
           )}
           <WalletInteraction
+            key={requestId}
             requestId={requestId}
             isWeb2Wallet={isUserUsingWeb2Wallet}
             explorerText={targetConfig.explorerText}
@@ -1244,6 +1274,7 @@ export const RequestPage = () => {
     case View.WALLET_SIGNATURE_INTERACTION:
       return (
         <SignatureRequestView
+          key={requestId}
           requestId={requestId}
           method={requestRef.current?.method ?? ''}
           payload={signaturePayload}

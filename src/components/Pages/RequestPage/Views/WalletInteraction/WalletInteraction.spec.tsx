@@ -92,6 +92,45 @@ describe('when rendering the WalletInteraction view', () => {
     })
   })
 
+  describe('and the request changes after the user ticked the acknowledgment', () => {
+    let onApprove: jest.Mock
+    let onDeny: jest.Mock
+
+    beforeEach(() => {
+      onApprove = jest.fn()
+      onDeny = jest.fn()
+    })
+
+    it('should clear the tick and disable approval for the new request in the same render', async () => {
+      const { rerender } = render(
+        <WalletInteraction
+          requestId="r1"
+          isWeb2Wallet
+          simulation={{ status: 'ready', result: successResult }}
+          userAddress={USER}
+          requiresAcknowledgment
+          onDeny={onDeny}
+          onApprove={onApprove}
+        />
+      )
+      await userEvent.click(screen.getByRole('checkbox'))
+      expect(screen.getByRole('button', { name: 'common.allow' })).toBeEnabled()
+      rerender(
+        <WalletInteraction
+          requestId="r2"
+          isWeb2Wallet
+          simulation={{ status: 'ready', result: successResult }}
+          userAddress={USER}
+          requiresAcknowledgment
+          onDeny={onDeny}
+          onApprove={onApprove}
+        />
+      )
+      expect(screen.getByRole('checkbox')).not.toBeChecked()
+      expect(screen.getByRole('button', { name: 'common.allow' })).toBeDisabled()
+    })
+  })
+
   describe('and a high-risk acknowledgment is required', () => {
     it('should keep approval disabled until the acknowledgment is checked', async () => {
       render(

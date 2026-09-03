@@ -23,20 +23,19 @@ function isZeroAmount(amount: string): boolean {
 
 /**
  * Whether a simulated approval takes a permission away rather than granting one: ApprovalForAll set
- * to false, any approval to the zero address (how ERC-721 clears a token approval), or an ERC-20
- * allowance of zero. The allowance is judged on the canonical base-unit `rawAmount` whenever the
- * server provides it; the decimals-applied `amount` is a display value that could round a tiny
- * allowance down to zero, so it is consulted only when there is nothing else.
+ * to false, a token approval to the zero address (how ERC-721 clears one), or an ERC-20 allowance of
+ * zero. An ERC-20 allowance to the zero address is judged by its amount like any other: a non-zero
+ * one revokes nobody (and reverts on OpenZeppelin tokens), so it is not a revocation. The allowance
+ * is judged on the canonical base-unit `rawAmount` whenever the server provides it; the
+ * decimals-applied `amount` is a display value that could round a tiny allowance down to zero, so it
+ * is consulted only when there is nothing else.
  */
 function isApprovalRevocation(approval: ApprovalChange): boolean {
   if (approval.kind === 'approvalForAll') {
     return approval.approved === false
   }
-  if (isZeroAddress(approval.spender)) {
-    return true
-  }
   if (approval.tokenId) {
-    return false
+    return isZeroAddress(approval.spender)
   }
   if (approval.rawAmount !== null) {
     return isZeroAmount(approval.rawAmount)

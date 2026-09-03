@@ -29,7 +29,7 @@ describe('isApprovalRevocation', () => {
       'a single token is approved to the zero address',
       { standard: 'erc721', spender: ZERO_ADDRESS, amount: null, rawAmount: null, tokenId: '7' }
     ],
-    ['an allowance is granted to the zero address', { spender: ZERO_ADDRESS }],
+    ['an allowance to the zero address is set to zero', { spender: ZERO_ADDRESS, rawAmount: '0', amount: '0.0' }],
     ['the base-unit allowance is zero', { rawAmount: '0', amount: '0.0' }],
     ['the base-unit allowance is zero even though the display amount is not', { rawAmount: '0', amount: '5' }],
     ['only a display amount is available and it is zero', { rawAmount: null, amount: '0.0' }]
@@ -43,6 +43,7 @@ describe('isApprovalRevocation', () => {
     ['ApprovalForAll is set to true', { kind: 'approvalForAll', standard: 'erc721', amount: null, rawAmount: null, approved: true }],
     ['a single token is approved to a spender', { standard: 'erc721', amount: null, rawAmount: null, tokenId: '7' }],
     ['a limited allowance is granted', {}],
+    ['a non-zero allowance is granted to the zero address, which revokes nobody', { spender: ZERO_ADDRESS }],
     ['the display amount rounds to zero but the base-unit allowance does not', { rawAmount: '1', amount: '0' }],
     ['only a display amount is available and it is tiny but not zero', { rawAmount: null, amount: '0.000000000000000001' }],
     ['no amount is available at all', { rawAmount: null, amount: null }],
