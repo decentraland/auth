@@ -226,7 +226,7 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
     if (!response.ok) {
       // Drain the body so the connection can be reused; ignore parse failures.
       await response.body?.cancel().catch(() => undefined)
-      throw new SimulationUnavailableError(`status ${response.status}`)
+      throw new SimulationUnavailableError(`status ${response.status}`, response.status)
     }
 
     try {

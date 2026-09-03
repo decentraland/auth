@@ -114,7 +114,10 @@
       "network": "Network",
       "contract": "Contract",
       "view_raw": "View raw data",
-      "hide_raw": "Hide raw data"
+      "hide_raw": "Hide raw data",
+      "meta_tx_notice": "This signature authorizes the contract to run this action on your behalf. It doesn't expire and can be submitted later by the app that requested it.",
+      "meta_tx_reverted": "This action fails right now, so its effects couldn't be previewed. Only sign it if you expect it to work later.",
+      "acknowledge_unverified": "I understand the effects of this signature couldn't be verified"
     }
   },
   "request_views": {

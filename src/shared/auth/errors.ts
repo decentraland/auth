@@ -59,12 +59,18 @@ class UnsupportedMethodError extends Error {
 }
 
 /**
- * Thrown when a signature request's params are not in the canonical EIP-1193 shape for the method.
- * The preview and the wallet read params by position, so any other shape could show one payload and sign another.
+ * Thrown when a signature request's params are not in the canonical EIP-1193 shape for the method,
+ * or when a MetaTransaction payload is not shaped the way a Decentraland contract signs it. The
+ * preview and the wallet read params by position, and EIP-712 signs only the fields the struct
+ * declares, so any other shape could show one payload and sign another. `reason` says which rule
+ * was broken; it is safe to display.
  */
 class MalformedSignatureRequestError extends Error {
-  constructor(public readonly method: string) {
-    super(`The "${method}" request parameters are malformed`)
+  constructor(
+    public readonly method: string,
+    public readonly reason?: string
+  ) {
+    super(`The "${method}" request parameters are malformed${reason ? `: ${reason}` : ''}`)
     this.name = 'MalformedSignatureRequestError'
   }
 }
@@ -73,11 +79,15 @@ class MalformedSignatureRequestError extends Error {
  * Thrown when the transaction-simulation endpoint is unreachable, times out, or
  * returns a non-200 response. The approval UI treats this as "details unavailable"
  * and falls back to the default confirmation — simulation is never allowed to block
- * or fail an approval.
+ * or fail an approval. `status` carries the HTTP status when there was a response, so a
+ * caller can tell the server rejecting the call itself (400) from an outage.
  */
 class SimulationUnavailableError extends Error {
   readonly skipReporting = true
-  constructor(reason?: string) {
+  constructor(
+    reason?: string,
+    public readonly status?: number
+  ) {
     super(`Transaction simulation unavailable${reason ? `: ${reason}` : ''}`)
     this.name = 'SimulationUnavailableError'
   }

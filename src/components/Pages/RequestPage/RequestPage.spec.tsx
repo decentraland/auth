@@ -12,6 +12,7 @@ import {
   ImpersonatedSignInError,
   MalformedSignatureRequestError,
   RequestFulfilledError,
+  SimulationUnavailableError,
   UnsupportedMethodError
 } from '../../../shared/auth'
 import { extractReferrerFromSearchParameters, getAuthRequestId, isBridgeOnlyEnabled } from '../../../shared/locations'
@@ -191,6 +192,9 @@ jest.mock('./Views', () => ({
     >
       <button data-testid="signature-approve" onClick={props.onApprove}>
         approve
+      </button>
+      <button data-testid="signature-deny" onClick={props.onDeny}>
+        deny
       </button>
     </div>
   )
@@ -1037,6 +1041,19 @@ describe('RequestPage', () => {
       const view = await screen.findByTestId('wallet-interaction')
       await waitFor(() => expect(view).toHaveAttribute('data-gas-covered', 'true'))
     })
+
+    describe('and the simulation is unavailable', () => {
+      beforeEach(() => {
+        mockSimulateTransaction.mockRejectedValue(new SimulationUnavailableError('status 502', 502))
+      })
+
+      it('should keep the trusted exemption because Auth signs and submits the relayed transaction in one step', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('wallet-interaction')
+        await waitFor(() => expect(view).toHaveAttribute('data-sim', 'unavailable'))
+        expect(view).toHaveAttribute('data-requires-acknowledgment', 'false')
+      })
+    })
   })
 
   describe('when a web2 transaction is a MANA tip (donation)', () => {
@@ -1123,9 +1140,10 @@ describe('RequestPage', () => {
       mockGetAddresses.mockResolvedValue(['0xabc123'])
       mockExtractSignaturePayload.mockReturnValue({ kind: 'typedData', typedData: { primaryType: 'MetaTransaction' }, raw: '{}' })
       mockDecodeMetaTransactionTypedData.mockReturnValue({
+        calldataField: 'functionSignature',
+        calldata: '0xdeadbeef',
         from: '0xabc123',
         verifyingContract: '0xVerifyingContract',
-        functionSignature: '0xdeadbeef',
         chainId: 137
       })
       mockSimulateTransaction.mockRejectedValue(new Error('tenderly down'))
@@ -1139,12 +1157,195 @@ describe('RequestPage', () => {
       expect(view).toHaveAttribute('data-requires-acknowledgment', 'true')
     })
 
-    it('should NOT require acknowledgment once the verifying contract is verified as a Decentraland contract', async () => {
+    it('should still require acknowledgment when the verifying contract is a Decentraland contract, because the signature leaves Auth as a bearer authorization', async () => {
       mockCheckMetaTransactionSupport.mockResolvedValue({ willUseMetaTransaction: true, contractName: 'ERC721CollectionV2' })
       renderRequestPage()
       const view = await screen.findByTestId('signature-request')
       await waitFor(() => expect(view).toHaveAttribute('data-sim', 'unavailable'))
-      await waitFor(() => expect(view).toHaveAttribute('data-requires-acknowledgment', 'false'))
+      expect(view).toHaveAttribute('data-requires-acknowledgment', 'true')
+    })
+
+    describe('and the server was unavailable rather than rejecting the call', () => {
+      beforeEach(() => {
+        mockSimulateTransaction.mockRejectedValue(new SimulationUnavailableError('status 502', 502))
+      })
+
+      it('should degrade to the unavailable preview with an acknowledgment instead of rejecting the request', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('signature-request')
+        await waitFor(() => expect(view).toHaveAttribute('data-sim', 'unavailable'))
+        expect(view).toHaveAttribute('data-requires-acknowledgment', 'true')
+      })
+    })
+  })
+
+  describe('when a web2 user receives a MetaTransaction signature and the server rejects the call itself', () => {
+    beforeEach(() => {
+      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.MAGIC }
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockRecover.mockResolvedValue({
+        method: 'eth_signTypedData_v4',
+        params: ['0xabc123', '{"primaryType":"MetaTransaction"}'],
+        sender: '0xabc123',
+        expiration: new Date(Date.now() + 3600000).toISOString()
+      })
+      mockGetAddresses.mockResolvedValue(['0xabc123'])
+      mockExtractSignaturePayload.mockReturnValue({ kind: 'typedData', typedData: { primaryType: 'MetaTransaction' }, raw: '{}' })
+      mockDecodeMetaTransactionTypedData.mockReturnValue({
+        calldataField: 'functionData',
+        calldata: '0xdeadbeef',
+        from: '0xabc123',
+        verifyingContract: '0xVerifyingContract',
+        chainId: 137
+      })
+      mockCheckMetaTransactionSupport.mockResolvedValue({ willUseMetaTransaction: true, contractName: 'ERC721CollectionV2' })
+      mockSimulateTransaction.mockRejectedValue(new SimulationUnavailableError('status 400', 400))
+      mockSendFailedOutcome.mockResolvedValue({})
+    })
+
+    it('should show the signing error view instead of an unpreviewable signature', async () => {
+      renderRequestPage()
+      await waitFor(() => expect(screen.getByTestId('signing-error')).toBeInTheDocument())
+    })
+
+    it('should report an invalid-params outcome naming the unpreviewable call', async () => {
+      renderRequestPage()
+      await waitFor(() =>
+        expect(mockSendFailedOutcome).toHaveBeenCalledWith(REQUEST_ID, '0xabc123', {
+          code: -32602,
+          message: 'The "eth_signTypedData_v4" request parameters are malformed: the MetaTransaction call cannot be previewed'
+        })
+      )
+    })
+  })
+
+  describe('when a web2 user denies a MetaTransaction signature while its preview is still loading', () => {
+    let rejectSimulation: (error: unknown) => void
+
+    beforeEach(() => {
+      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.MAGIC }
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockRecover.mockResolvedValue({
+        method: 'eth_signTypedData_v4',
+        params: ['0xabc123', '{"primaryType":"MetaTransaction"}'],
+        sender: '0xabc123',
+        expiration: new Date(Date.now() + 3600000).toISOString()
+      })
+      mockGetAddresses.mockResolvedValue(['0xabc123'])
+      mockExtractSignaturePayload.mockReturnValue({ kind: 'typedData', typedData: { primaryType: 'MetaTransaction' }, raw: '{}' })
+      mockDecodeMetaTransactionTypedData.mockReturnValue({
+        calldataField: 'functionData',
+        calldata: '0xdeadbeef',
+        from: '0xabc123',
+        verifyingContract: '0xVerifyingContract',
+        chainId: 137
+      })
+      mockSimulateTransaction.mockImplementation(
+        () =>
+          new Promise((_resolve, reject) => {
+            rejectSimulation = reject
+          })
+      )
+      mockSendFailedOutcome.mockResolvedValue({})
+    })
+
+    describe('and the server then rejects the call', () => {
+      it('should keep the denied view and report only the user rejection', async () => {
+        renderRequestPage()
+        await userEvent.click(await screen.findByTestId('signature-deny'))
+        await screen.findByTestId('denied-wallet-interaction')
+        rejectSimulation(new SimulationUnavailableError('status 400', 400))
+        await waitFor(() => expect(mockSendFailedOutcome).toHaveBeenCalledTimes(1))
+        expect(screen.getByTestId('denied-wallet-interaction')).toBeInTheDocument()
+        expect(mockSendFailedOutcome).toHaveBeenCalledWith(REQUEST_ID, '0xabc123', { code: -32003, message: 'Transaction rejected' })
+      })
+    })
+  })
+
+  describe('when a web2 user receives a MetaTransaction signature with a successful preview', () => {
+    beforeEach(() => {
+      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.MAGIC }
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockRecover.mockResolvedValue({
+        method: 'eth_signTypedData_v4',
+        params: ['0xabc123', '{"primaryType":"MetaTransaction"}'],
+        sender: '0xabc123',
+        expiration: new Date(Date.now() + 3600000).toISOString()
+      })
+      mockGetAddresses.mockResolvedValue(['0xabc123'])
+      mockExtractSignaturePayload.mockReturnValue({ kind: 'typedData', typedData: { primaryType: 'MetaTransaction' }, raw: '{}' })
+      mockDecodeMetaTransactionTypedData.mockReturnValue({
+        calldataField: 'functionData',
+        calldata: '0xdeadbeef',
+        from: '0xattacker',
+        verifyingContract: '0xVerifyingContract',
+        chainId: 137
+      })
+      mockSimulateTransaction.mockResolvedValue({
+        status: 'success',
+        assetChanges: [],
+        approvalChanges: [],
+        balanceChanges: [],
+        events: []
+      })
+    })
+
+    it('should preview the contract calling itself with the connected signer appended, not the from carried in the typed data', async () => {
+      renderRequestPage()
+      const view = await screen.findByTestId('signature-request')
+      await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+      expect(mockSimulateTransaction).toHaveBeenCalledWith({
+        chainId: 137,
+        from: '0xVerifyingContract',
+        to: '0xVerifyingContract',
+        data: '0xdeadbeefabc123',
+        value: '0'
+      })
+    })
+
+    it('should not require acknowledgment when the preview succeeds without dangerous changes', async () => {
+      renderRequestPage()
+      const view = await screen.findByTestId('signature-request')
+      await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+      expect(view).toHaveAttribute('data-requires-acknowledgment', 'false')
+    })
+  })
+
+  describe('when a web2 user receives a MetaTransaction signature whose inner call reverts', () => {
+    beforeEach(() => {
+      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.MAGIC }
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockRecover.mockResolvedValue({
+        method: 'eth_signTypedData_v4',
+        params: ['0xabc123', '{"primaryType":"MetaTransaction"}'],
+        sender: '0xabc123',
+        expiration: new Date(Date.now() + 3600000).toISOString()
+      })
+      mockGetAddresses.mockResolvedValue(['0xabc123'])
+      mockExtractSignaturePayload.mockReturnValue({ kind: 'typedData', typedData: { primaryType: 'MetaTransaction' }, raw: '{}' })
+      mockDecodeMetaTransactionTypedData.mockReturnValue({
+        calldataField: 'functionData',
+        calldata: '0xdeadbeef',
+        from: '0xabc123',
+        verifyingContract: '0xVerifyingContract',
+        chainId: 137
+      })
+      mockCheckMetaTransactionSupport.mockResolvedValue({ willUseMetaTransaction: true, contractName: 'ERC721CollectionV2' })
+      mockSimulateTransaction.mockResolvedValue({
+        status: 'reverted',
+        error: 'Trade not effective yet',
+        assetChanges: [],
+        approvalChanges: [],
+        balanceChanges: [],
+        events: []
+      })
+    })
+
+    it('should require acknowledgment even for a Decentraland contract, because the call can be relayed once it stops reverting', async () => {
+      renderRequestPage()
+      const view = await screen.findByTestId('signature-request')
+      await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+      expect(view).toHaveAttribute('data-requires-acknowledgment', 'true')
     })
   })
 

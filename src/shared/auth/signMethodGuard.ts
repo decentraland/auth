@@ -1,5 +1,6 @@
 import { hexToString } from 'viem'
 import { ImpersonatedSignInError, MalformedSignatureRequestError, UnsupportedMethodError } from './errors'
+import { isMetaTransactionTypedData, resolveMetaTransactionTypedData } from './metaTransactionTypedData'
 
 // The only methods the auth site is willing to forward to the connected wallet. Anything
 // outside this set is rejected at recover time (see {@link assertMethodIsAllowed}).
@@ -160,6 +161,11 @@ function hasPrimaryType(typedData: unknown): boolean {
 /**
  * Rejects signature params that are not in the canonical EIP-1193 order for their method.
  * Typed data must be `[signer, typedData]`; personal_sign must be `[message, signer]`.
+ *
+ * A typed-data MetaTransaction is additionally held to the exact struct, message and domain a
+ * Decentraland contract signs (see {@link resolveMetaTransactionTypedData}): its preview simulates
+ * the inner call, and EIP-712 signs only the fields the struct declares, so a looser shape could
+ * simulate one call while the signature covers another.
  */
 function assertSignatureParamsAreCanonical(method: string, params: unknown[] | undefined, signerAddress: string): void {
   const normalizedMethod = method.toLowerCase()
@@ -180,8 +186,13 @@ function assertSignatureParamsAreCanonical(method: string, params: unknown[] | u
     return
   }
 
-  if (!isSigner(first, signer) || !hasPrimaryType(parseTypedData(second))) {
+  const typedData = parseTypedData(second)
+  if (!isSigner(first, signer) || !hasPrimaryType(typedData)) {
     throw new MalformedSignatureRequestError(method)
+  }
+  if (isMetaTransactionTypedData(typedData)) {
+    // Validation only: the request page resolves the call again when it simulates.
+    resolveMetaTransactionTypedData(typedData, method)
   }
 }
 

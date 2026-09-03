@@ -76,6 +76,12 @@ const MethodChip = styled(Box)(({ theme }) => ({
   padding: theme.spacing(0.5, 1.5)
 }))
 
+const Notice = styled(Typography)(({ theme }) => ({
+  color: theme.palette.text.secondary,
+  fontSize: theme.typography.pxToRem(13),
+  lineHeight: 1.4
+}))
+
 const RawToggle = styled('button')(({ theme }) => ({
   alignSelf: 'flex-start',
   background: 'none',
@@ -124,6 +130,7 @@ export {
   FieldLabel,
   MessageBlock,
   MethodChip,
+  Notice,
   RawToggle,
   Section,
   TreeKey,

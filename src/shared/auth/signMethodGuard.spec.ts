@@ -1,3 +1,4 @@
+import { DOMAIN_TYPE, OFFCHAIN_META_TRANSACTION_TYPE } from 'decentraland-transactions'
 import { ImpersonatedSignInError, MalformedSignatureRequestError, UnsupportedMethodError } from './errors'
 import {
   assertMethodIsAllowed,
@@ -399,6 +400,78 @@ describe('assertSignatureParamsAreCanonical', () => {
       it('should throw a MalformedSignatureRequestError', () => {
         const legacy = JSON.stringify([{ type: 'string', name: 'Message', value: 'hi' }])
         expect(() => assertSignatureParamsAreCanonical(method, [signer, legacy], signer)).toThrow(MalformedSignatureRequestError)
+      })
+    })
+  })
+
+  describe('when the typed data is an off-chain marketplace Trade rather than a MetaTransaction', () => {
+    let signerAddress: string
+    let trade: string
+
+    beforeEach(() => {
+      signerAddress = '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd'
+      trade = JSON.stringify({
+        domain: {
+          name: 'DecentralandMarketplacePolygon',
+          version: '1.0.0',
+          chainId: 137,
+          verifyingContract: '0xa40b1d129b8906888720686f3a01921ddf37716f'
+        },
+        primaryType: 'Trade',
+        types: {
+          // eslint-disable-next-line @typescript-eslint/naming-convention
+          Trade: [
+            { name: 'checks', type: 'Checks' },
+            { name: 'sent', type: 'AssetWithoutBeneficiary[]' },
+            { name: 'received', type: 'Asset[]' }
+          ]
+        },
+        message: { checks: { uses: 1, expiration: 1 }, sent: [], received: [] }
+      })
+    })
+
+    it('should not throw because the MetaTransaction checks do not apply to other structs', () => {
+      expect(() => assertSignatureParamsAreCanonical('eth_signTypedData_v4', [signerAddress, trade], signerAddress)).not.toThrow()
+    })
+  })
+
+  describe('when the typed data is a MetaTransaction', () => {
+    let signerAddress: string
+    let typedData: Record<string, unknown>
+
+    beforeEach(() => {
+      signerAddress = '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd'
+      typedData = {
+        // eslint-disable-next-line @typescript-eslint/naming-convention
+        types: { EIP712Domain: DOMAIN_TYPE, MetaTransaction: OFFCHAIN_META_TRANSACTION_TYPE },
+        domain: {
+          name: 'DecentralandMarketplacePolygon',
+          version: '1.0.0',
+          verifyingContract: '0xa40b1d129b8906888720686f3a01921ddf37716f',
+          salt: '0x0000000000000000000000000000000000000000000000000000000000000089'
+        },
+        primaryType: 'MetaTransaction',
+        message: { nonce: 0, from: signerAddress, functionData: `0xdeadbeef${'00'.repeat(64)}` }
+      }
+    })
+
+    describe('and it is shaped the way decentraland-transactions builds it', () => {
+      it('should not throw', () => {
+        expect(() =>
+          assertSignatureParamsAreCanonical('eth_signTypedData_v4', [signerAddress, JSON.stringify(typedData)], signerAddress)
+        ).not.toThrow()
+      })
+    })
+
+    describe('and its message carries a second call in a field the struct does not declare', () => {
+      beforeEach(() => {
+        typedData.message = { ...(typedData.message as Record<string, unknown>), functionSignature: `0x2d0335ab${'00'.repeat(32)}` }
+      })
+
+      it('should throw a MalformedSignatureRequestError because the wallet would sign only the declared call', () => {
+        expect(() =>
+          assertSignatureParamsAreCanonical('eth_signTypedData_v4', [signerAddress, JSON.stringify(typedData)], signerAddress)
+        ).toThrow(MalformedSignatureRequestError)
       })
     })
   })

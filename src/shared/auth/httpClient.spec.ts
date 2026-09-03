@@ -203,6 +203,46 @@ describe('createAuthServerClient', () => {
       })
     })
 
+    describe('when a typed-data request is a MetaTransaction carrying an undeclared second call', () => {
+      beforeEach(() => {
+        mockResponse.method = 'eth_signTypedData_v4'
+        mockResponse.params = [
+          mockSignerAddress,
+          JSON.stringify({
+            types: {
+              // eslint-disable-next-line @typescript-eslint/naming-convention
+              MetaTransaction: [
+                { name: 'nonce', type: 'uint256' },
+                { name: 'from', type: 'address' },
+                { name: 'functionData', type: 'bytes' }
+              ]
+            },
+            domain: {
+              name: 'DecentralandMarketplacePolygon',
+              version: '1.0.0',
+              verifyingContract: '0xa40b1d129b8906888720686f3a01921ddf37716f',
+              salt: '0x0000000000000000000000000000000000000000000000000000000000000089'
+            },
+            primaryType: 'MetaTransaction',
+            message: {
+              nonce: 0,
+              from: '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd',
+              functionData: `0xdeadbeef${'00'.repeat(64)}`,
+              functionSignature: `0x2d0335ab${'00'.repeat(32)}`
+            }
+          })
+        ]
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockResponse)
+        })
+      })
+
+      it('should throw a MalformedSignatureRequestError because the preview would simulate a call the wallet does not sign', async () => {
+        await expect(client.recover(mockRequestId, mockSignerAddress)).rejects.toBeInstanceOf(MalformedSignatureRequestError)
+      })
+    })
+
     describe('when a personal_sign request arrives as [signer, message]', () => {
       beforeEach(() => {
         mockResponse.method = 'personal_sign'
@@ -593,6 +633,10 @@ describe('createAuthServerClient', () => {
 
       it('should throw a SimulationUnavailableError', async () => {
         await expect(client.simulateTransaction(body)).rejects.toBeInstanceOf(SimulationUnavailableError)
+      })
+
+      it('should carry the response status so a caller can tell a rejected call from an outage', async () => {
+        await expect(client.simulateTransaction(body)).rejects.toMatchObject({ status: 502 })
       })
     })
 

@@ -17,6 +17,7 @@ import {
   FieldLabel,
   MessageBlock,
   MethodChip,
+  Notice,
   RawToggle,
   Section
 } from './SignatureRequest.styled'
@@ -45,6 +46,10 @@ export const SignatureRequestView = ({
   const domain = payload?.kind === 'typedData' ? payload.typedData.domain : undefined
   const domainChainId = chainId ?? (domain?.chainId !== undefined ? Number(domain.chainId) : undefined)
   const contractUrl = typeof domain?.verifyingContract === 'string' ? getExplorerAddressUrl(domainChainId, domain.verifyingContract) : null
+  const isReverted = simulation.status === 'ready' && simulation.result.status === 'reverted'
+  // A signed meta-transaction is a bearer authorization the requester can submit later, so when
+  // its effects could not be previewed the acknowledgment must say that, not talk about approvals.
+  const hasUnverifiedEffects = isMetaTransaction && (simulation.status === 'unavailable' || isReverted)
 
   return (
     <Container canChangeAccount requestId={requestId}>
@@ -70,6 +75,8 @@ export const SignatureRequestView = ({
               verifiedContracts={verifiedContracts}
               chainId={chainId}
             />
+            <Notice data-testid="signature-meta-tx-notice">{t('request.signature.meta_tx_notice')}</Notice>
+            {isReverted ? <Notice data-testid="signature-meta-tx-reverted">{t('request.signature.meta_tx_reverted')}</Notice> : null}
             <RawToggle type="button" aria-expanded={showRaw} onClick={() => setShowRaw(show => !show)}>
               {showRaw ? t('request.signature.hide_raw') : t('request.signature.view_raw')}
             </RawToggle>
@@ -129,7 +136,7 @@ export const SignatureRequestView = ({
                 data-testid="risk-acknowledgment"
               />
             }
-            label={t('request.transaction_dialog.acknowledge_risk')}
+            label={hasUnverifiedEffects ? t('request.signature.acknowledge_unverified') : t('request.transaction_dialog.acknowledge_risk')}
           />
         ) : null}
       </Content>
@@ -140,6 +147,7 @@ export const SignatureRequestView = ({
         </Button>
         <Button
           variant="contained"
+          color={isReverted ? 'error' : 'primary'}
           disabled={isLoading || simulation.status === 'loading' || (requiresAcknowledgment && !acknowledged)}
           onClick={onApprove}
           data-testid="signature-approve-button"
