@@ -120,7 +120,7 @@
       "acknowledge_unverified": "我了解无法验证此签名的效果",
       "meta_tx_unrecognized_contract": "这不是一个已识别的 Decentraland 合约，因此 Decentraland 无法保证此签名将执行的操作。",
       "unrecognized_typed_data": "Decentraland 无法识别此类签名，因此无法预览它授权的内容。只有在你信任请求它的应用时才签名。",
-      "opaque_message": "此消息不是可读文本，因此你无法核对正在签署的内容。它可能是一个授权合约中某项操作的哈希。只有在你信任请求它的应用时才签名。"
+      "opaque_message": "此消息看起来不像可读文本，因此你无法核对正在签署的内容。它可能是一个授权合约中某项操作的哈希。只有在你信任请求它的应用时才签名。"
     }
   },
   "request_views": {

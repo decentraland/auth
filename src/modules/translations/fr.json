@@ -120,7 +120,7 @@
       "acknowledge_unverified": "Je comprends que les effets de cette signature n'ont pas pu être vérifiés",
       "meta_tx_unrecognized_contract": "Ce contrat n'est pas un contrat Decentraland reconnu, Decentraland ne peut donc pas garantir ce que fera cette signature.",
       "unrecognized_typed_data": "Decentraland ne reconnaît pas ce type de signature et ne peut donc pas prévisualiser ce qu'elle autorise. Ne la signez que si vous faites confiance à l'application qui l'a demandée.",
-      "opaque_message": "Ce message n'est pas un texte lisible, vous ne pouvez donc pas vérifier ce que vous signez. Il pourrait s'agir d'un hash autorisant une action dans un contrat. Ne le signez que si vous faites confiance à l'application qui l'a demandé."
+      "opaque_message": "Ce message ne ressemble pas à un texte lisible, vous ne pouvez donc pas vérifier ce que vous signez. Il pourrait s'agir d'un hash autorisant une action dans un contrat. Ne le signez que si vous faites confiance à l'application qui l'a demandé."
     }
   },
   "request_views": {

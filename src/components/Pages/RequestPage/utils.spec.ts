@@ -1347,6 +1347,68 @@ describe('when testing isOpaqueSignatureMessage', () => {
       expect(isOpaqueSignatureMessage(message)).toBe(true)
     })
   })
+
+  describe('and the request carried 32 hex-encoded bytes that all decode to printable characters', () => {
+    let message: string
+
+    beforeEach(() => {
+      const payload = extractSignaturePayload('personal_sign', [`0x${'61'.repeat(32)}`, '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd'])
+      message = payload?.kind === 'message' ? payload.message : ''
+    })
+
+    it('should return true because a digest-sized string with no whitespace is a hash, not a sentence', () => {
+      expect(isOpaqueSignatureMessage(message)).toBe(true)
+    })
+  })
+
+  describe('and the same 32 printable bytes arrive as plaintext instead of hex', () => {
+    let message: string
+
+    beforeEach(() => {
+      message = 'a'.repeat(32)
+    })
+
+    it('should return true because the wallet signs the same bytes either way', () => {
+      expect(isOpaqueSignatureMessage(message)).toBe(true)
+    })
+  })
+
+  describe('and the message is 32 bytes of multibyte characters with no whitespace', () => {
+    let message: string
+
+    beforeEach(() => {
+      message = 'é'.repeat(16)
+    })
+
+    it('should return true because the size is measured in bytes', () => {
+      expect(isOpaqueSignatureMessage(message)).toBe(true)
+    })
+  })
+
+  describe('and the message is 32 bytes of text with spaces', () => {
+    let message: string
+
+    beforeEach(() => {
+      message = 'Sign in to Decentraland today!!!'
+    })
+
+    it('should return false because whitespace marks it as a sentence', () => {
+      expect(new TextEncoder().encode(message).length).toBe(32)
+      expect(isOpaqueSignatureMessage(message)).toBe(false)
+    })
+  })
+
+  describe('and the message has no whitespace but is not digest-sized', () => {
+    let message: string
+
+    beforeEach(() => {
+      message = 'a'.repeat(31)
+    })
+
+    it('should return false', () => {
+      expect(isOpaqueSignatureMessage(message)).toBe(false)
+    })
+  })
 })
 
 describe('when testing buildSendTransactionSimulationPayload', () => {

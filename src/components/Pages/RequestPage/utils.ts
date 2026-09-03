@@ -143,14 +143,24 @@ function isApprovalGrantingTypedData(typedData: TypedDataPayload | undefined | n
 // eslint-disable-next-line no-control-regex
 const UNREADABLE_CHARACTER_REGEX = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\uFFFD]/
 
+// The size of a keccak256 digest — what a contract accepting EIP-191 signatures over a hash expects.
+const DIGEST_BYTE_LENGTH = 32
+
 /**
  * Returns true when a personal_sign message is not something the user can read and check: it is
- * still raw hex (it could not be decoded as text) or it decodes to bytes that are not text. Such a
- * payload may be a hash that a contract accepts as an EIP-191 authorization, so it must not be
- * signed on a single click.
+ * still raw hex (it could not be decoded as text), it decodes to bytes that are not text, or it is
+ * digest-shaped — exactly 32 bytes with no whitespace, which a sentence never is but a hash whose
+ * bytes happen to be (or were ground to be) printable always is. Such a payload may be a hash that a
+ * contract accepts as an EIP-191 authorization, so it must not be signed on a single click.
+ *
+ * The check runs on the decoded message on purpose: the wallet signs bytes, so a hex-encoded
+ * message and its plaintext are the same signature. Whether the request arrived as hex says nothing.
  */
 function isOpaqueSignatureMessage(message: string): boolean {
-  return HEX_STRING_REGEX.test(message) || UNREADABLE_CHARACTER_REGEX.test(message)
+  if (HEX_STRING_REGEX.test(message) || UNREADABLE_CHARACTER_REGEX.test(message)) {
+    return true
+  }
+  return !/\s/.test(message) && new TextEncoder().encode(message).length === DIGEST_BYTE_LENGTH
 }
 
 /**
