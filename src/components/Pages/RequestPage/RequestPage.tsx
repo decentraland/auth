@@ -123,9 +123,7 @@ const TERMINAL_VIEWS = new Set([
   View.DIFFERENT_ACCOUNT
 ])
 
-// JSON-RPC error codes for the outcomes reported when a request is rejected at recover time,
-// before it ever reaches the wallet. The client only ever sees the pair (method rejected vs.
-// params rejected); the human-readable reason travels in the message.
+// Reported to the client when a request is rejected at recover time, before it reaches the wallet.
 const RPC_METHOD_NOT_SUPPORTED = -32601
 const RPC_INVALID_PARAMS = -32602
 
@@ -391,16 +389,11 @@ export const RequestPage = () => {
       const timeTheSiteStartedLoading = Date.now()
       publicClientRef.current = createPublicClient({ transport: custom(provider) })
       walletClientRef.current = createWalletClient({ chain: mainnet, transport: custom(provider) })
-      // Held outside the try so the catch can still name a sender when it reports a rejection.
-      // Stays undefined only when `getAddresses` itself failed, which is the one case where there
-      // is no address to report as (and no request was recovered to answer either).
+      // Held outside the try so the catch can name a sender when it reports a rejection.
       let connectedAddress: string | undefined
 
-      // A request rejected at recover time never reaches the wallet, so no approve/deny path will
-      // ever answer it. Left unreported, the auth server keeps it pending and the client blocks for
-      // the whole expiration window; reporting the rejection is what lets the client fail fast.
-      // Best-effort by design: the error view is the user-facing answer and must not depend on the
-      // notification going through, which is how onDenyWalletInteraction treats it too.
+      // Nothing else answers a request rejected before the wallet, so without this the client blocks
+      // until it expires. Best-effort: the error view is the user-facing answer.
       const reportRejectedRequest = async (code: number, message: string) => {
         if (!connectedAddress) return
 
@@ -718,9 +711,8 @@ export const RequestPage = () => {
         if (cancelled) return
 
         if (e instanceof DifferentSenderError) {
-          // Deliberately not reported: the outcome endpoint does not check the sender against the
-          // request's, so answering here would consume a request addressed to a different account.
-          // It stays pending for the account it was actually meant for.
+          // Not reported: the outcome endpoint does not check the sender, so answering here would
+          // consume a request addressed to another account.
           setView(View.DIFFERENT_ACCOUNT)
           return
         } else if (e instanceof ExpiredRequestError) {
@@ -757,9 +749,8 @@ export const RequestPage = () => {
           return
         }
 
-        // Nothing is reported for the rest. An expired, fulfilled or missing request has nothing
-        // left to answer, and any other failure (network, a server 5xx) is retryable — the error
-        // view offers a retry that recovers the very same request.
+        // Not reported either: an expired, fulfilled or missing request has nothing left to answer,
+        // and any other failure is retryable through the error view.
         setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
         setView(View.LOADING_ERROR)
       }
