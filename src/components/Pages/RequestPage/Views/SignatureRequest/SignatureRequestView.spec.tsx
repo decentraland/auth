@@ -256,6 +256,40 @@ describe('when rendering the SignatureRequestView', () => {
       expect(screen.getByTestId('signature-meta-tx-notice')).toHaveTextContent('request.signature.meta_tx_notice')
     })
 
+    it('should keep approval disabled while the contract is still being recognized', () => {
+      render(
+        <SignatureRequestView
+          requestId="r1"
+          method="eth_signTypedData_v4"
+          payload={payload}
+          simulation={simulation}
+          userAddress={USER}
+          isMetaTransaction={true}
+          contractTrust="pending"
+          onDeny={onDeny}
+          onApprove={onApprove}
+        />
+      )
+      expect(screen.getByTestId('signature-approve-button')).toBeDisabled()
+    })
+
+    it('should not warn about the contract when it is a recognized Decentraland contract', () => {
+      render(
+        <SignatureRequestView
+          requestId="r1"
+          method="eth_signTypedData_v4"
+          payload={payload}
+          simulation={simulation}
+          userAddress={USER}
+          isMetaTransaction={true}
+          contractTrust="confirmed"
+          onDeny={onDeny}
+          onApprove={onApprove}
+        />
+      )
+      expect(screen.queryByTestId('signature-meta-tx-unrecognized-contract')).not.toBeInTheDocument()
+    })
+
     it('should not mention a revert when the simulated call succeeds', () => {
       render(
         <SignatureRequestView
@@ -356,6 +390,78 @@ describe('when rendering the SignatureRequestView', () => {
           simulation={simulation}
           userAddress={USER}
           isMetaTransaction={true}
+          requiresAcknowledgment
+          onDeny={onDeny}
+          onApprove={onApprove}
+        />
+      )
+      expect(screen.getByTestId('signature-approve-button')).toBeDisabled()
+      await userEvent.click(screen.getByTestId('risk-acknowledgment'))
+      expect(screen.getByTestId('signature-approve-button')).toBeEnabled()
+    })
+  })
+
+  describe('and the payload is a meta-transaction to a contract that is not a recognized Decentraland contract', () => {
+    let payload: SignaturePayload
+    let simulation: SimulationState
+
+    beforeEach(() => {
+      payload = {
+        kind: 'typedData',
+        raw: '{"primaryType":"MetaTransaction"}',
+        typedData: { primaryType: 'MetaTransaction', domain: {}, message: {} }
+      }
+      simulation = { status: 'ready', result: { status: 'success', assetChanges: [], approvalChanges: [], balanceChanges: [], events: [] } }
+    })
+
+    it('should warn that Decentraland cannot vouch for the contract', () => {
+      render(
+        <SignatureRequestView
+          requestId="r1"
+          method="eth_signTypedData_v4"
+          payload={payload}
+          simulation={simulation}
+          userAddress={USER}
+          isMetaTransaction={true}
+          contractTrust="unconfirmed"
+          requiresAcknowledgment
+          onDeny={onDeny}
+          onApprove={onApprove}
+        />
+      )
+      expect(screen.getByTestId('signature-meta-tx-unrecognized-contract')).toHaveTextContent(
+        'request.signature.meta_tx_unrecognized_contract'
+      )
+    })
+
+    it('should ask the user to acknowledge unverified effects', () => {
+      render(
+        <SignatureRequestView
+          requestId="r1"
+          method="eth_signTypedData_v4"
+          payload={payload}
+          simulation={simulation}
+          userAddress={USER}
+          isMetaTransaction={true}
+          contractTrust="unconfirmed"
+          requiresAcknowledgment
+          onDeny={onDeny}
+          onApprove={onApprove}
+        />
+      )
+      expect(screen.getByText('request.signature.acknowledge_unverified')).toBeInTheDocument()
+    })
+
+    it('should keep approval disabled until acknowledged', async () => {
+      render(
+        <SignatureRequestView
+          requestId="r1"
+          method="eth_signTypedData_v4"
+          payload={payload}
+          simulation={simulation}
+          userAddress={USER}
+          isMetaTransaction={true}
+          contractTrust="unconfirmed"
           requiresAcknowledgment
           onDeny={onDeny}
           onApprove={onApprove}

@@ -189,6 +189,7 @@ jest.mock('./Views', () => ({
       data-meta={String(props.isMetaTransaction)}
       data-sim={props.simulation?.status}
       data-requires-acknowledgment={String(props.requiresAcknowledgment)}
+      data-contract-trust={props.contractTrust}
     >
       <button data-testid="signature-approve" onClick={props.onApprove}>
         approve
@@ -1288,6 +1289,14 @@ describe('RequestPage', () => {
         balanceChanges: [],
         events: []
       })
+      mockCheckMetaTransactionSupport.mockResolvedValue({ willUseMetaTransaction: true, contractName: 'ERC721CollectionV2' })
+    })
+
+    it('should look up whether the verifying contract is a recognized Decentraland contract', async () => {
+      renderRequestPage()
+      const view = await screen.findByTestId('signature-request')
+      await waitFor(() => expect(view).toHaveAttribute('data-contract-trust', 'confirmed'))
+      expect(mockCheckMetaTransactionSupport).toHaveBeenCalledWith('0xVerifyingContract')
     })
 
     it('should preview the contract calling itself with the connected signer appended, not the from carried in the typed data', async () => {
@@ -1303,11 +1312,39 @@ describe('RequestPage', () => {
       })
     })
 
-    it('should not require acknowledgment when the preview succeeds without dangerous changes', async () => {
+    it('should not require acknowledgment when the preview succeeds without dangerous changes and the contract is recognized', async () => {
       renderRequestPage()
       const view = await screen.findByTestId('signature-request')
       await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+      await waitFor(() => expect(view).toHaveAttribute('data-contract-trust', 'confirmed'))
       expect(view).toHaveAttribute('data-requires-acknowledgment', 'false')
+    })
+
+    describe('and the verifying contract is not a recognized Decentraland contract', () => {
+      beforeEach(() => {
+        mockCheckMetaTransactionSupport.mockResolvedValue({ willUseMetaTransaction: false, contractName: null })
+      })
+
+      it('should require acknowledgment even for a clean preview, because Auth cannot vouch for how the contract executes it', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('signature-request')
+        await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+        await waitFor(() => expect(view).toHaveAttribute('data-contract-trust', 'unconfirmed'))
+        expect(view).toHaveAttribute('data-requires-acknowledgment', 'true')
+      })
+    })
+
+    describe('and the contract lookup fails', () => {
+      beforeEach(() => {
+        mockCheckMetaTransactionSupport.mockRejectedValue(new Error('meta-transaction server down'))
+      })
+
+      it('should treat the contract as unrecognized rather than skipping the acknowledgment', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('signature-request')
+        await waitFor(() => expect(view).toHaveAttribute('data-contract-trust', 'unconfirmed'))
+        expect(view).toHaveAttribute('data-requires-acknowledgment', 'true')
+      })
     })
   })
 

@@ -44,7 +44,7 @@ import { identifyUser, trackEvent } from '../../../shared/utils/analytics'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { FeatureFlagsContext } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
 import { buildTransactionParams } from './transactionParams'
-import { MANATransferData, NFTTransferData, SignaturePayload, SimulationState, TransferType } from './types'
+import { MANATransferData, MetaTransactionContractTrust, NFTTransferData, SignaturePayload, SimulationState, TransferType } from './types'
 import {
   buildSendTransactionSimulationPayload,
   checkMetaTransactionSupport,
@@ -164,6 +164,12 @@ export const RequestPage = () => {
   // eth_sendTransaction, the signature leaves Auth, so no contract is ever "trusted" enough to skip
   // the acknowledgment when its inner call could not be previewed (see requiresApprovalAcknowledgment).
   const [isSignatureMetaTx, setIsSignatureMetaTx] = useState(false)
+  // Whether the MetaTransaction's verifyingContract is a recognized Decentraland contract (static
+  // registry, or a collection known to the meta-transaction server). Recognition never relaxes a
+  // gate — the signature leaves Auth either way — but an unrecognized contract means Auth cannot
+  // vouch for how it executes the previewed call, so approval needs an acknowledgment; while the
+  // lookup is pending, approval stays disabled so the answer cannot be skipped.
+  const [signatureContractTrust, setSignatureContractTrust] = useState<MetaTransactionContractTrust>('pending')
   // Whether the typed-data signature grants an off-chain asset approval (EIP-2612 Permit, Permit2,
   // Seaport order). These aren't simulated, so they must always require an explicit acknowledgment.
   const [isHighRiskSignature, setIsHighRiskSignature] = useState(false)
@@ -693,6 +699,14 @@ export const RequestPage = () => {
                   setIsSignatureMetaTx(true)
                   setSimulationChainId(metaTx.chainId)
                   setSimulationState({ status: 'loading' })
+                  setSignatureContractTrust('pending')
+                  checkMetaTransactionSupport(metaTx.verifyingContract)
+                    .then(({ willUseMetaTransaction }) => {
+                      if (!cancelled) setSignatureContractTrust(willUseMetaTransaction ? 'confirmed' : 'unconfirmed')
+                    })
+                    .catch(() => {
+                      if (!cancelled) setSignatureContractTrust('unconfirmed')
+                    })
                   // Preview the inner call the way the contract will make it — calling itself with
                   // the connected signer appended, not the `from` carried in the typed data — using
                   // the calldata field the signed struct declares, which the decoder proved to be the
@@ -1048,16 +1062,21 @@ export const RequestPage = () => {
   // Being a verified Decentraland contract does not change that, which is why the trusted
   // exemption below applies to the relay path only.
   const isSignatureWithoutVerifiedEffects = isSignatureMetaTx && (simulationState.status === 'unavailable' || isSimulationReverted)
+  // A MetaTransaction whose verifying contract is not a recognized Decentraland contract. The
+  // preview models the Decentraland self-call; a contract Auth does not know may execute the
+  // signature any other way, so a clean preview is not something Auth can vouch for.
+  const isSignatureToUnrecognizedContract = isSignatureMetaTx && signatureContractTrust === 'unconfirmed'
   // Require an explicit acknowledgment before approving when: (a) the simulation shows a high-risk
   // permission; (b) the simulation could NOT be produced for a transaction we can't otherwise vouch
   // for — only a relayed meta-transaction to a known DCL contract is exempt (prevents the fail-open
   // where an unpreviewable payload degrades to a single-click approve); (c) a signed MetaTransaction
-  // has no verified effects; or (d) the request is an off-chain approval signature (permit/order),
-  // which grants asset control but is never simulated.
+  // has no verified effects or targets a contract Auth cannot vouch for; or (d) the request is an
+  // off-chain approval signature (permit/order), which grants asset control but is never simulated.
   const requiresApprovalAcknowledgment =
     hasDangerousApprovalChange ||
     (simulationState.status === 'unavailable' && !isMetaTransaction) ||
     isSignatureWithoutVerifiedEffects ||
+    isSignatureToUnrecognizedContract ||
     isHighRiskSignature
 
   switch (view) {
@@ -1199,6 +1218,7 @@ export const RequestPage = () => {
           chainId={simulationChainId}
           requiresAcknowledgment={requiresApprovalAcknowledgment}
           isMetaTransaction={isSignatureMetaTx}
+          contractTrust={signatureContractTrust}
           isLoading={isLoading}
           onDeny={onDenyWalletInteraction}
           onApprove={onApproveWalletInteraction}
