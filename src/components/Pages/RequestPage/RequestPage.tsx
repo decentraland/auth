@@ -123,6 +123,10 @@ const TERMINAL_VIEWS = new Set([
   View.DIFFERENT_ACCOUNT
 ])
 
+// Reported to the client when a request is rejected at recover time, before it reaches the wallet.
+const RPC_METHOD_NOT_SUPPORTED = -32601
+const RPC_INVALID_PARAMS = -32602
+
 export const RequestPage = () => {
   const params = useParams()
   const [searchParams] = useSearchParams()
@@ -385,9 +389,24 @@ export const RequestPage = () => {
       const timeTheSiteStartedLoading = Date.now()
       publicClientRef.current = createPublicClient({ transport: custom(provider) })
       walletClientRef.current = createWalletClient({ chain: mainnet, transport: custom(provider) })
+      // Held outside the try so the catch can name a sender when it reports a rejection.
+      let connectedAddress: string | undefined
+
+      // Nothing else answers a request rejected before the wallet, so without this the client blocks
+      // until it expires. Best-effort: the error view is the user-facing answer.
+      const reportRejectedRequest = async (code: number, message: string) => {
+        if (!connectedAddress) return
+
+        try {
+          await authServerClient.current.sendFailedOutcome(requestId, connectedAddress, { code, message })
+        } catch (error) {
+          console.error('Failed to send rejected request outcome:', error)
+        }
+      }
 
       try {
         const [signerAddress] = await walletClientRef.current.getAddresses()
+        connectedAddress = signerAddress
         identifyUser(signerAddress)
         // Recover the request from the auth server. Only the non-deep-link flow reaches here — the
         // deep-link handoff has no backing request and never recovers.
@@ -692,6 +711,8 @@ export const RequestPage = () => {
         if (cancelled) return
 
         if (e instanceof DifferentSenderError) {
+          // Not reported: the outcome endpoint does not check the sender, so answering here would
+          // consume a request addressed to another account.
           setView(View.DIFFERENT_ACCOUNT)
           return
         } else if (e instanceof ExpiredRequestError) {
@@ -708,12 +729,14 @@ export const RequestPage = () => {
           hasCompletedRef.current = true
           setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
           setView(View.WALLET_INTERACTION_ERROR)
+          await reportRejectedRequest(RPC_INVALID_PARAMS, e.message)
           return
         } else if (e instanceof MalformedSignatureRequestError) {
           // The params could preview one payload and sign another. Block it; a retry recovers the same request.
           hasCompletedRef.current = true
           setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
           setView(View.WALLET_INTERACTION_ERROR)
+          await reportRejectedRequest(RPC_INVALID_PARAMS, e.message)
           return
         } else if (e instanceof UnsupportedMethodError) {
           // The request used a method that is not on the allowlist. Block it outright — a retry
@@ -722,9 +745,12 @@ export const RequestPage = () => {
           hasCompletedRef.current = true
           setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
           setView(isRetiredSignInMethod(e.method) ? View.OUTDATED_CLIENT : View.LOADING_ERROR)
+          await reportRejectedRequest(RPC_METHOD_NOT_SUPPORTED, e.message)
           return
         }
 
+        // Not reported either: an expired, fulfilled or missing request has nothing left to answer,
+        // and any other failure is retryable through the error view.
         setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
         setView(View.LOADING_ERROR)
       }
