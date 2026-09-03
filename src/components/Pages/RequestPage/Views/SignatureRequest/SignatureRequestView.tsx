@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from '@dcl/hooks'
 import { Box, Button, Checkbox, CircularProgress, FormControlLabel } from 'decentraland-ui2'
 import { getExplorerAddressUrl, getExplorerName, getNetworkName } from '../../../../../shared/explorer'
@@ -56,6 +56,13 @@ export const SignatureRequestView = ({
   // its effects could not be previewed — or the contract that will execute it is not one Auth can
   // vouch for — the acknowledgment must say that, not talk about approvals.
   const hasUnverifiedEffects = isMetaTransaction && (simulation.status === 'unavailable' || isReverted || isContractUnrecognized)
+
+  // A tick given to one statement must not carry over to another: when the wording changes (for
+  // instance the contract lookup resolves to unrecognized after the user acknowledged an approval),
+  // ask again.
+  useEffect(() => {
+    setAcknowledged(false)
+  }, [hasUnverifiedEffects])
 
   return (
     <Container canChangeAccount requestId={requestId}>

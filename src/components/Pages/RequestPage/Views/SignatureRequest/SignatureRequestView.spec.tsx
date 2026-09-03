@@ -256,6 +256,42 @@ describe('when rendering the SignatureRequestView', () => {
       expect(screen.getByTestId('signature-meta-tx-notice')).toHaveTextContent('request.signature.meta_tx_notice')
     })
 
+    describe('and the acknowledgment wording changes after the user ticked it', () => {
+      it('should ask again instead of carrying the tick over to the new statement', async () => {
+        const { rerender } = render(
+          <SignatureRequestView
+            requestId="r1"
+            method="eth_signTypedData_v4"
+            payload={payload}
+            simulation={simulation}
+            userAddress={USER}
+            isMetaTransaction={true}
+            contractTrust="pending"
+            requiresAcknowledgment
+            onDeny={onDeny}
+            onApprove={onApprove}
+          />
+        )
+        await userEvent.click(screen.getByRole('checkbox'))
+        expect(screen.getByRole('checkbox')).toBeChecked()
+        rerender(
+          <SignatureRequestView
+            requestId="r1"
+            method="eth_signTypedData_v4"
+            payload={payload}
+            simulation={simulation}
+            userAddress={USER}
+            isMetaTransaction={true}
+            contractTrust="unconfirmed"
+            requiresAcknowledgment
+            onDeny={onDeny}
+            onApprove={onApprove}
+          />
+        )
+        expect(screen.getByRole('checkbox')).not.toBeChecked()
+      })
+    })
+
     it('should keep approval disabled while the contract is still being recognized', () => {
       render(
         <SignatureRequestView

@@ -700,13 +700,19 @@ export const RequestPage = () => {
                   setSimulationChainId(metaTx.chainId)
                   setSimulationState({ status: 'loading' })
                   setSignatureContractTrust('pending')
-                  checkMetaTransactionSupport(metaTx.verifyingContract)
-                    .then(({ willUseMetaTransaction }) => {
-                      if (!cancelled) setSignatureContractTrust(willUseMetaTransaction ? 'confirmed' : 'unconfirmed')
-                    })
-                    .catch(() => {
-                      if (!cancelled) setSignatureContractTrust('unconfirmed')
-                    })
+                  // Recognition is per deployment: the lookup matches the address on the meta-transaction
+                  // chain, so the same address under another chain's salt is not that contract.
+                  if (metaTx.chainId !== Number(getMetaTransactionChainId())) {
+                    setSignatureContractTrust('unconfirmed')
+                  } else {
+                    checkMetaTransactionSupport(metaTx.verifyingContract)
+                      .then(({ willUseMetaTransaction }) => {
+                        if (!cancelled) setSignatureContractTrust(willUseMetaTransaction ? 'confirmed' : 'unconfirmed')
+                      })
+                      .catch(() => {
+                        if (!cancelled) setSignatureContractTrust('unconfirmed')
+                      })
+                  }
                   // Preview the inner call the way the contract will make it — calling itself with
                   // the connected signer appended, not the `from` carried in the typed data — using
                   // the calldata field the signed struct declares, which the decoder proved to be the

@@ -1346,6 +1346,32 @@ describe('RequestPage', () => {
         expect(view).toHaveAttribute('data-requires-acknowledgment', 'true')
       })
     })
+
+    describe('and the typed data is bound to a different chain than the meta-transaction chain', () => {
+      beforeEach(() => {
+        mockDecodeMetaTransactionTypedData.mockReturnValue({
+          calldataField: 'functionData',
+          calldata: '0xdeadbeef',
+          from: '0xabc123',
+          verifyingContract: '0xVerifyingContract',
+          chainId: 1
+        })
+      })
+
+      it('should treat the contract as unrecognized because recognition is per deployment', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('signature-request')
+        await waitFor(() => expect(view).toHaveAttribute('data-contract-trust', 'unconfirmed'))
+        expect(view).toHaveAttribute('data-requires-acknowledgment', 'true')
+      })
+
+      it('should not look the address up on the meta-transaction chain', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('signature-request')
+        await waitFor(() => expect(view).toHaveAttribute('data-contract-trust', 'unconfirmed'))
+        expect(mockCheckMetaTransactionSupport).not.toHaveBeenCalled()
+      })
+    })
   })
 
   describe('when a web2 user receives a MetaTransaction signature whose inner call reverts', () => {

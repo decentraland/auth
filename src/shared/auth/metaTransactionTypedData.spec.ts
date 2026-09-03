@@ -158,6 +158,36 @@ describe('resolveMetaTransactionTypedData', () => {
     })
   })
 
+  describe('when the domain salt and chainId name the same chain', () => {
+    let typedData: MutableTypedData
+
+    beforeEach(() => {
+      typedData = buildOffchainTypedData()
+      typedData.domain.chainId = 137
+    })
+
+    it('should resolve that chain', () => {
+      expect(resolveMetaTransactionTypedData(typedData, METHOD).chainId).toBe(137)
+    })
+  })
+
+  describe('when the domain salt and chainId name different chains', () => {
+    let typedData: MutableTypedData
+
+    beforeEach(() => {
+      typedData = buildOffchainTypedData()
+      typedData.domain.chainId = 80002
+    })
+
+    it('should throw a MalformedSignatureRequestError instead of picking one', () => {
+      expect(() => resolveMetaTransactionTypedData(typedData, METHOD)).toThrow(MalformedSignatureRequestError)
+    })
+
+    it('should say the two fields disagree', () => {
+      expect(() => resolveMetaTransactionTypedData(typedData, METHOD)).toThrow('salt and chainId name different chains')
+    })
+  })
+
   describe('when the domain carries a chainId field instead of a salt', () => {
     let typedData: MutableTypedData
 

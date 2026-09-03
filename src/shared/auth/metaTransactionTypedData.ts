@@ -60,28 +60,17 @@ function matchesSchema(fields: unknown, schema: readonly TypedDataField[]): bool
   })
 }
 
-/**
- * Decentraland contracts encode the chain id in the domain `salt` (bytes32); `chainId` is the
- * standard EIP-712 fallback. Returns undefined when neither resolves to a usable chain id.
- */
-function resolveChainId(domain: Record<string, unknown>): number | undefined {
-  if (typeof domain.salt === 'string') {
-    try {
-      const fromSalt = Number(BigInt(domain.salt))
-      if (Number.isSafeInteger(fromSalt) && fromSalt > 0) {
-        return fromSalt
-      }
-    } catch {
-      // Not a numeric salt — fall through to chainId.
-    }
+/** Parses a positive chain id from a domain field (hex or decimal string, number or bigint). */
+function parseChainId(value: unknown): number | undefined {
+  if (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'bigint') {
+    return undefined
   }
-  if (domain.chainId !== undefined) {
-    const fromChainId = Number(domain.chainId)
-    if (Number.isSafeInteger(fromChainId) && fromChainId > 0) {
-      return fromChainId
-    }
+  try {
+    const parsed = Number(BigInt(value))
+    return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined
+  } catch {
+    return undefined
   }
-  return undefined
 }
 
 /**
@@ -140,7 +129,15 @@ function resolveMetaTransactionTypedData(typedData: unknown, method: string): Me
   if (typeof verifyingContract !== 'string' || !ADDRESS_REGEX.test(verifyingContract)) {
     return reject('the MetaTransaction domain has no verifying contract')
   }
-  const chainId = resolveChainId(domain)
+  // Decentraland contracts encode the chain id in the domain `salt` (bytes32); `chainId` is the
+  // standard EIP-712 field. Both are signed when present, so if they name different chains the
+  // payload is at best broken and there is no right chain to preview on.
+  const chainIdFromSalt = parseChainId(domain.salt)
+  const chainIdFromDomain = parseChainId(domain.chainId)
+  if (chainIdFromSalt !== undefined && chainIdFromDomain !== undefined && chainIdFromSalt !== chainIdFromDomain) {
+    return reject('the MetaTransaction domain salt and chainId name different chains')
+  }
+  const chainId = chainIdFromSalt ?? chainIdFromDomain
   if (chainId === undefined) {
     return reject('the MetaTransaction domain has no chain id')
   }
@@ -160,6 +157,9 @@ function resolveMetaTransactionTypedData(typedData: unknown, method: string): Me
   let requestHash: string
   let canonicalHash: string
   try {
+    // viem types typed data generically over its own struct definitions. The checks above already
+    // guarantee `types`, `domain` and `message` have the shape it needs, so the cast only bridges
+    // the generics; anything viem still refuses is caught below and treated as malformed.
     requestHash = hashTypedData(typedData as unknown as Parameters<typeof hashTypedData>[0])
     canonicalHash = hashTypedData(canonical as unknown as Parameters<typeof hashTypedData>[0])
   } catch {
