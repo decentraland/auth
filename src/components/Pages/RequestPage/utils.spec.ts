@@ -1288,62 +1288,39 @@ describe('when testing isApprovalGrantingTypedData', () => {
 })
 
 describe('when testing isOpaqueSignatureMessage', () => {
-  describe('and the message is readable text', () => {
-    let message: string
-
-    beforeEach(() => {
-      message = 'Sign in to Decentraland\nNonce: 1234'
-    })
-
+  describe.each([
+    ['a readable sentence', 'Sign in to Decentraland\nNonce: 1234'],
+    ['emoji and non-latin text', 'Bienvenido 👋 — 欢迎'],
+    [
+      'a long readable sign-in message',
+      'decentraland.org wants you to sign in with your Ethereum account.\n\nURI: https://decentraland.org\nVersion: 1'
+    ],
+    ['a short nonce-like token', 'nonce-1234'],
+    ['a URL with a scheme', 'https://decentraland.org/auth/requests/abc'],
+    ['31 characters with no whitespace', 'a'.repeat(31)]
+  ])('and the message is %s', (_label, message) => {
     it('should return false', () => {
       expect(isOpaqueSignatureMessage(message)).toBe(false)
     })
   })
 
-  describe('and the message contains emoji and non-latin text', () => {
-    let message: string
-
-    beforeEach(() => {
-      message = 'Bienvenido 👋 — 欢迎'
-    })
-
-    it('should return false because those are readable', () => {
-      expect(isOpaqueSignatureMessage(message)).toBe(false)
-    })
-  })
-
-  describe('and the message is still raw hex', () => {
-    let message: string
-
-    beforeEach(() => {
-      message = `0x${'ab'.repeat(32)}`
-    })
-
-    it('should return true because a hash cannot be checked by the user', () => {
-      expect(isOpaqueSignatureMessage(message)).toBe(true)
-    })
-  })
-
-  describe('and the message decoded to bytes that are not text', () => {
-    let message: string
-
-    beforeEach(() => {
-      message = 'abc\u0000\u0007def'
-    })
-
-    it('should return true', () => {
-      expect(isOpaqueSignatureMessage(message)).toBe(true)
-    })
-  })
-
-  describe('and the message contains the replacement character left by invalid UTF-8', () => {
-    let message: string
-
-    beforeEach(() => {
-      message = 'abc\uFFFDdef'
-    })
-
-    it('should return true', () => {
+  describe.each([
+    ['still raw hex', `0x${'ab'.repeat(32)}`],
+    ['bytes that are not text', 'abc\u0000\u0007def'],
+    ['the replacement character left by invalid UTF-8', 'abc\uFFFDdef'],
+    ['32 printable bytes with no whitespace', 'a'.repeat(32)],
+    ['32 printable bytes that include a space', `${'a'.repeat(15)} ${'b'.repeat(16)}`],
+    ['32 printable bytes that include a newline', `${'a'.repeat(31)}\n`],
+    ['32 bytes of multibyte characters', 'é'.repeat(16)],
+    ['a 32-byte sentence with spaces', 'Sign in to Decentraland today!!!'],
+    ['a 64-character unprefixed hex digest', 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'],
+    ['a base64 digest', '47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU='],
+    ['a base64url digest', '47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU'],
+    ['a UUID', '0f8fad5b-d9cb-469f-a165-70867728950e'],
+    ['a JWT-like token', 'eyJhbGciOiJIUzI1NiJ9.eyJhY3Rpb24iOiJ3aXRoZHJhdyJ9.dGhpcy1pcy1ub3QtYS1yZWFsLXNpZ25hdHVyZQ'],
+    ['a token surrounded by whitespace', `  ${'A'.repeat(40)}\n`]
+  ])('and the message is %s', (_label, message) => {
+    it('should return true because the user cannot check what it means', () => {
       expect(isOpaqueSignatureMessage(message)).toBe(true)
     })
   })
@@ -1356,57 +1333,8 @@ describe('when testing isOpaqueSignatureMessage', () => {
       message = payload?.kind === 'message' ? payload.message : ''
     })
 
-    it('should return true because a digest-sized string with no whitespace is a hash, not a sentence', () => {
+    it('should return true because a digest-sized payload is a hash, however it arrived', () => {
       expect(isOpaqueSignatureMessage(message)).toBe(true)
-    })
-  })
-
-  describe('and the same 32 printable bytes arrive as plaintext instead of hex', () => {
-    let message: string
-
-    beforeEach(() => {
-      message = 'a'.repeat(32)
-    })
-
-    it('should return true because the wallet signs the same bytes either way', () => {
-      expect(isOpaqueSignatureMessage(message)).toBe(true)
-    })
-  })
-
-  describe('and the message is 32 bytes of multibyte characters with no whitespace', () => {
-    let message: string
-
-    beforeEach(() => {
-      message = 'é'.repeat(16)
-    })
-
-    it('should return true because the size is measured in bytes', () => {
-      expect(isOpaqueSignatureMessage(message)).toBe(true)
-    })
-  })
-
-  describe('and the message is 32 bytes of text with spaces', () => {
-    let message: string
-
-    beforeEach(() => {
-      message = 'Sign in to Decentraland today!!!'
-    })
-
-    it('should return false because whitespace marks it as a sentence', () => {
-      expect(new TextEncoder().encode(message).length).toBe(32)
-      expect(isOpaqueSignatureMessage(message)).toBe(false)
-    })
-  })
-
-  describe('and the message has no whitespace but is not digest-sized', () => {
-    let message: string
-
-    beforeEach(() => {
-      message = 'a'.repeat(31)
-    })
-
-    it('should return false', () => {
-      expect(isOpaqueSignatureMessage(message)).toBe(false)
     })
   })
 })

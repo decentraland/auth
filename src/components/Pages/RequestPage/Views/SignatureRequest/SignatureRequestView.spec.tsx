@@ -392,6 +392,42 @@ describe('when rendering the SignatureRequestView', () => {
       })
     })
 
+    describe('and the same statement is shown for a different request after the user ticked it', () => {
+      it('should ask again because the tick belonged to the previous request', async () => {
+        const { rerender } = render(
+          <SignatureRequestView
+            requestId="r1"
+            method="eth_signTypedData_v4"
+            payload={payload}
+            simulation={simulation}
+            userAddress={USER}
+            isMetaTransaction={true}
+            contractTrust="unconfirmed"
+            requiresAcknowledgment
+            onDeny={onDeny}
+            onApprove={onApprove}
+          />
+        )
+        await userEvent.click(screen.getByRole('checkbox'))
+        expect(screen.getByRole('checkbox')).toBeChecked()
+        rerender(
+          <SignatureRequestView
+            requestId="r2"
+            method="eth_signTypedData_v4"
+            payload={payload}
+            simulation={simulation}
+            userAddress={USER}
+            isMetaTransaction={true}
+            contractTrust="unconfirmed"
+            requiresAcknowledgment
+            onDeny={onDeny}
+            onApprove={onApprove}
+          />
+        )
+        expect(screen.getByRole('checkbox')).not.toBeChecked()
+      })
+    })
+
     it('should keep approval disabled while the contract is still being recognized', () => {
       render(
         <SignatureRequestView
@@ -606,6 +642,48 @@ describe('when rendering the SignatureRequestView', () => {
       expect(screen.getByTestId('signature-approve-button')).toBeDisabled()
       await userEvent.click(screen.getByTestId('risk-acknowledgment'))
       expect(screen.getByTestId('signature-approve-button')).toBeEnabled()
+    })
+  })
+
+  describe('and the reason a signature cannot be checked changes after the user ticked the acknowledgment', () => {
+    let payload: SignaturePayload
+
+    beforeEach(() => {
+      payload = { kind: 'message', message: `0x${'ab'.repeat(32)}` }
+    })
+
+    it('should ask again even though the label wording stays the same', async () => {
+      const { rerender } = render(
+        <SignatureRequestView
+          requestId="r1"
+          method="personal_sign"
+          payload={payload}
+          simulation={{ status: 'idle' }}
+          userAddress={USER}
+          isMetaTransaction={false}
+          unverifiableReason="opaque_message"
+          requiresAcknowledgment
+          onDeny={onDeny}
+          onApprove={onApprove}
+        />
+      )
+      await userEvent.click(screen.getByRole('checkbox'))
+      expect(screen.getByRole('checkbox')).toBeChecked()
+      rerender(
+        <SignatureRequestView
+          requestId="r1"
+          method="eth_signTypedData_v4"
+          payload={payload}
+          simulation={{ status: 'idle' }}
+          userAddress={USER}
+          isMetaTransaction={false}
+          unverifiableReason="unrecognized_typed_data"
+          requiresAcknowledgment
+          onDeny={onDeny}
+          onApprove={onApprove}
+        />
+      )
+      expect(screen.getByRole('checkbox')).not.toBeChecked()
     })
   })
 

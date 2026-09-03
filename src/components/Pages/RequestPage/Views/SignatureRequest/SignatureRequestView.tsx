@@ -60,12 +60,20 @@ export const SignatureRequestView = ({
   // Likewise when Auth cannot tell what the signature authorizes in the first place.
   const isUnverifiable = hasUnverifiedEffects || unverifiableReason !== null
 
-  // A tick given to one statement must not carry over to another: when the wording changes (for
-  // instance the contract lookup resolves to unrecognized after the user acknowledged an approval),
-  // ask again.
+  // The exact statement the user is asked to acknowledge: the request it belongs to, the label, and
+  // every notice shown alongside it. A tick is given to that statement only — when any part of it
+  // changes (another request, the lookup resolving to unrecognized, a different reason), ask again.
+  const acknowledgmentStatement = [
+    requestId,
+    isUnverifiable ? 'unverified' : 'risk',
+    unverifiableReason ?? '',
+    isReverted ? 'reverted' : '',
+    isContractUnrecognized ? 'unrecognized-contract' : '',
+    simulation.status === 'unavailable' ? 'unavailable' : ''
+  ].join('|')
   useEffect(() => {
     setAcknowledged(false)
-  }, [isUnverifiable])
+  }, [acknowledgmentStatement])
 
   return (
     <Container canChangeAccount requestId={requestId}>
