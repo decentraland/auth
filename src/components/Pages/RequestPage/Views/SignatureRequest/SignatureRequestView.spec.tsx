@@ -1,3 +1,4 @@
+import { useLayoutEffect } from 'react'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { SimulationResponseBody } from '../../../../../shared/auth'
@@ -389,6 +390,62 @@ describe('when rendering the SignatureRequestView', () => {
           />
         )
         expect(screen.getByRole('checkbox')).not.toBeChecked()
+      })
+    })
+
+    describe('and the statement changes on a render where the previous one had been acknowledged', () => {
+      let disabledAtCommit: boolean[]
+      let CommitProbe: ({ children }: { children: React.ReactNode }) => JSX.Element
+
+      beforeEach(() => {
+        disabledAtCommit = []
+        // A layout effect runs in the same commit as the DOM update, before any passive effect, so
+        // it sees the button exactly as the user would on that render.
+        CommitProbe = ({ children }: { children: React.ReactNode }) => {
+          useLayoutEffect(() => {
+            disabledAtCommit.push(screen.getByTestId('signature-approve-button').hasAttribute('disabled'))
+          })
+          return <>{children}</>
+        }
+      })
+
+      it('should disable approval within that same commit, before any effect can run', async () => {
+        const { rerender } = render(
+          <CommitProbe>
+            <SignatureRequestView
+              requestId="r1"
+              method="eth_signTypedData_v4"
+              payload={payload}
+              simulation={simulation}
+              userAddress={USER}
+              isMetaTransaction={true}
+              contractTrust="confirmed"
+              requiresAcknowledgment
+              onDeny={onDeny}
+              onApprove={onApprove}
+            />
+          </CommitProbe>
+        )
+        await userEvent.click(screen.getByRole('checkbox'))
+        expect(screen.getByTestId('signature-approve-button')).toBeEnabled()
+        const commitsBefore = disabledAtCommit.length
+        rerender(
+          <CommitProbe>
+            <SignatureRequestView
+              requestId="r1"
+              method="eth_signTypedData_v4"
+              payload={payload}
+              simulation={simulation}
+              userAddress={USER}
+              isMetaTransaction={true}
+              contractTrust="unconfirmed"
+              requiresAcknowledgment
+              onDeny={onDeny}
+              onApprove={onApprove}
+            />
+          </CommitProbe>
+        )
+        expect(disabledAtCommit[commitsBefore]).toBe(true)
       })
     })
 

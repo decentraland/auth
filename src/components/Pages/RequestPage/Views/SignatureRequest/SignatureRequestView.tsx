@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from '@dcl/hooks'
 import { Box, Button, Checkbox, CircularProgress, FormControlLabel } from 'decentraland-ui2'
 import { getExplorerAddressUrl, getExplorerName, getNetworkName } from '../../../../../shared/explorer'
@@ -43,7 +43,8 @@ export const SignatureRequestView = ({
 }: SignatureRequestViewProps) => {
   const { t } = useTranslation()
   const [showRaw, setShowRaw] = useState(false)
-  const [acknowledged, setAcknowledged] = useState(false)
+  // The statement the user ticked, if any (see acknowledgmentStatement below).
+  const [acknowledgedStatement, setAcknowledgedStatement] = useState<string | null>(null)
 
   const domain = payload?.kind === 'typedData' ? payload.typedData.domain : undefined
   const domainChainId = chainId ?? (domain?.chainId !== undefined ? Number(domain.chainId) : undefined)
@@ -71,9 +72,9 @@ export const SignatureRequestView = ({
     isContractUnrecognized ? 'unrecognized-contract' : '',
     simulation.status === 'unavailable' ? 'unavailable' : ''
   ].join('|')
-  useEffect(() => {
-    setAcknowledged(false)
-  }, [acknowledgmentStatement])
+  // Derived, not synced: an effect would clear a stale tick one render late, and for that one commit
+  // the Allow button would be enabled against a statement the user never acknowledged.
+  const acknowledged = acknowledgedStatement === acknowledgmentStatement
 
   return (
     <Container canChangeAccount requestId={requestId}>
@@ -167,7 +168,7 @@ export const SignatureRequestView = ({
             control={
               <Checkbox
                 checked={acknowledged}
-                onChange={event => setAcknowledged(event.target.checked)}
+                onChange={event => setAcknowledgedStatement(event.target.checked ? acknowledgmentStatement : null)}
                 data-testid="risk-acknowledgment"
               />
             }
