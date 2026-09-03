@@ -274,6 +274,16 @@ const ApprovalItem = ({
     highRisk = approval.isUnlimited
   }
 
+  // Any grant to a spender that is not a recognized Decentraland contract is high-risk whatever the
+  // amount or token; the page gates approval on the same rule.
+  const isRevocation =
+    approval.kind === 'approvalForAll'
+      ? approval.approved === false
+      : !approval.tokenId && (approval.rawAmount === '0' || approval.amount === '0')
+  if (!isRevocation && !spenderVerified) {
+    highRisk = true
+  }
+
   return (
     <ApprovalLine emphasized={highRisk}>
       {highRisk ? <RiskIcon aria-hidden="true">⚠</RiskIcon> : null}

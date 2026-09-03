@@ -12,7 +12,12 @@ import {
   RequestNotFoundError,
   SimulationUnavailableError
 } from './errors'
-import { assertMethodIsAllowed, assertRequestIsNotImpersonatingSignIn, assertSignatureParamsAreCanonical } from './signMethodGuard'
+import {
+  assertMethodIsAllowed,
+  assertRequestIsNotImpersonatingSignIn,
+  assertSignatureParamsAreCanonical,
+  assertTransactionParamsAreCanonical
+} from './signMethodGuard'
 import { IdentityResponse, OutcomeError, OutcomeResponse, RecoverResponse, SimulationRequestBody, SimulationResponseBody } from './types'
 
 const SIMULATION_TIMEOUT_MS = 10_000
@@ -181,6 +186,9 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
 
       // Reject params the preview and the wallet would read from different positions.
       assertSignatureParamsAreCanonical(recoverResponse.method, recoverResponse.params, signerAddress)
+
+      // Reject transaction params the preview cannot read or that the wallet would not execute as shown.
+      assertTransactionParamsAreCanonical(recoverResponse.method, recoverResponse.params)
 
       trackEvent(TrackingEvents.REQUEST_INTERACTION, {
         type: RequestInteractionType.WALLET_INTERACTION,

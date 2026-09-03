@@ -11,6 +11,7 @@ import {
   ExpiredRequestError,
   ImpersonatedSignInError,
   MalformedSignatureRequestError,
+  MalformedTransactionRequestError,
   RequestFulfilledError,
   SimulationUnavailableError,
   UnsupportedMethodError
@@ -558,6 +559,30 @@ describe('RequestPage', () => {
             message: 'The "personal_sign" method cannot be used to sign a Decentraland sign-in payload'
           })
         })
+      })
+    })
+
+    describe('and recovery fails with a MalformedTransactionRequestError', () => {
+      beforeEach(() => {
+        mockGetAddresses.mockResolvedValue(['0xabc123'])
+        mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'User' }] })
+        mockRecover.mockRejectedValue(new MalformedTransactionRequestError('eth_sendTransaction', '"to" must be an address'))
+        mockSendFailedOutcome.mockResolvedValue({})
+      })
+
+      it('should show the signing error view instead of offering a retry', async () => {
+        renderRequestPage()
+        await waitFor(() => expect(screen.getByTestId('signing-error')).toBeInTheDocument())
+      })
+
+      it('should report an invalid-params outcome naming the broken rule', async () => {
+        renderRequestPage()
+        await waitFor(() =>
+          expect(mockSendFailedOutcome).toHaveBeenCalledWith(REQUEST_ID, '0xabc123', {
+            code: -32602,
+            message: 'The "eth_sendTransaction" transaction parameters are malformed: "to" must be an address'
+          })
+        )
       })
     })
 
@@ -1551,6 +1576,104 @@ describe('RequestPage', () => {
     it('should prefetch the transaction simulation', async () => {
       renderRequestPage()
       await waitFor(() => expect(mockSimulateTransaction).toHaveBeenCalled())
+    })
+
+    describe('and the simulation grants an approval', () => {
+      const approval = {
+        kind: 'approval',
+        standard: 'erc20',
+        owner: '0xabc123',
+        spender: '0xspender',
+        amount: '100',
+        rawAmount: '100000000000000000000',
+        isUnlimited: false,
+        tokenId: null,
+        approved: null,
+        contractAddress: '0xmana',
+        symbol: 'MANA',
+        name: 'MANA'
+      }
+      const simulationWith = (approvalChanges: unknown[]) => ({
+        status: 'success',
+        assetChanges: [],
+        approvalChanges,
+        balanceChanges: [],
+        events: []
+      })
+
+      describe('and it is a limited allowance to a spender that is not a recognized Decentraland contract', () => {
+        beforeEach(() => {
+          mockIsKnownDecentralandContract.mockReturnValue(false)
+          mockSimulateTransaction.mockResolvedValue(simulationWith([approval]))
+        })
+
+        it('should require an acknowledgment because a limited allowance hands the asset over just as surely', async () => {
+          renderRequestPage()
+          const view = await screen.findByTestId('wallet-interaction')
+          await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+          expect(view).toHaveAttribute('data-requires-acknowledgment', 'true')
+        })
+      })
+
+      describe('and it is a limited allowance to a recognized Decentraland contract', () => {
+        beforeEach(() => {
+          mockIsKnownDecentralandContract.mockReturnValue(true)
+          mockSimulateTransaction.mockResolvedValue(simulationWith([approval]))
+        })
+
+        it('should not require an acknowledgment because such approvals are routine', async () => {
+          renderRequestPage()
+          const view = await screen.findByTestId('wallet-interaction')
+          await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+          expect(view).toHaveAttribute('data-requires-acknowledgment', 'false')
+        })
+      })
+
+      describe('and it is a single token approved to a spender that is not a recognized Decentraland contract', () => {
+        beforeEach(() => {
+          mockIsKnownDecentralandContract.mockReturnValue(false)
+          mockSimulateTransaction.mockResolvedValue(
+            simulationWith([{ ...approval, standard: 'erc721', amount: null, rawAmount: null, tokenId: '7' }])
+          )
+        })
+
+        it('should require an acknowledgment', async () => {
+          renderRequestPage()
+          const view = await screen.findByTestId('wallet-interaction')
+          await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+          expect(view).toHaveAttribute('data-requires-acknowledgment', 'true')
+        })
+      })
+
+      describe('and it revokes an allowance from an unrecognized spender', () => {
+        beforeEach(() => {
+          mockIsKnownDecentralandContract.mockReturnValue(false)
+          mockSimulateTransaction.mockResolvedValue(simulationWith([{ ...approval, amount: '0', rawAmount: '0' }]))
+        })
+
+        it('should not require an acknowledgment because nothing is granted', async () => {
+          renderRequestPage()
+          const view = await screen.findByTestId('wallet-interaction')
+          await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+          expect(view).toHaveAttribute('data-requires-acknowledgment', 'false')
+        })
+      })
+
+      describe('and it revokes ApprovalForAll from an unrecognized operator', () => {
+        beforeEach(() => {
+          mockIsKnownDecentralandContract.mockReturnValue(false)
+          mockSimulateTransaction.mockResolvedValue(
+            simulationWith([{ ...approval, kind: 'approvalForAll', standard: 'erc721', amount: null, rawAmount: null, approved: false }])
+          )
+        })
+
+        it('should not require an acknowledgment', async () => {
+          renderRequestPage()
+          const view = await screen.findByTestId('wallet-interaction')
+          await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+          expect(view).toHaveAttribute('data-requires-acknowledgment', 'false')
+        })
+      })
     })
 
     it('should reuse the prefetched meta-transaction check on approve instead of re-checking', async () => {

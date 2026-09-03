@@ -8,6 +8,7 @@ import {
   ExpiredRequestError,
   ImpersonatedSignInError,
   MalformedSignatureRequestError,
+  MalformedTransactionRequestError,
   RequestFulfilledError,
   RequestNotFoundError,
   SimulationUnavailableError
@@ -99,6 +100,7 @@ describe('createAuthServerClient', () => {
     describe('and the method casing differs from the canonical EIP-1193 spelling', () => {
       beforeEach(() => {
         mockResponse.method = 'ETH_SENDTRANSACTION'
+        mockResponse.params = [{ to: '0xfef5c99885c3036e591b6e6db52482891834a5f4', data: '0x', value: '0x0' }]
         mockFetch.mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve(mockResponse)
@@ -240,6 +242,21 @@ describe('createAuthServerClient', () => {
 
       it('should throw a MalformedSignatureRequestError because the preview would simulate a call the wallet does not sign', async () => {
         await expect(client.recover(mockRequestId, mockSignerAddress)).rejects.toBeInstanceOf(MalformedSignatureRequestError)
+      })
+    })
+
+    describe('when a transaction request carries calldata outside the data field', () => {
+      beforeEach(() => {
+        mockResponse.method = 'eth_sendTransaction'
+        mockResponse.params = [{ to: '0xfef5c99885c3036e591b6e6db52482891834a5f4', data: '0x', extraCallData: '0xa9059cbb' }]
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockResponse)
+        })
+      })
+
+      it('should throw a MalformedTransactionRequestError at recover instead of at approve', async () => {
+        await expect(client.recover(mockRequestId, mockSignerAddress)).rejects.toBeInstanceOf(MalformedTransactionRequestError)
       })
     })
 

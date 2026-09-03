@@ -1,9 +1,10 @@
 import { DOMAIN_TYPE, OFFCHAIN_META_TRANSACTION_TYPE } from 'decentraland-transactions'
-import { ImpersonatedSignInError, MalformedSignatureRequestError, UnsupportedMethodError } from './errors'
+import { ImpersonatedSignInError, MalformedSignatureRequestError, MalformedTransactionRequestError, UnsupportedMethodError } from './errors'
 import {
   assertMethodIsAllowed,
   assertRequestIsNotImpersonatingSignIn,
   assertSignatureParamsAreCanonical,
+  assertTransactionParamsAreCanonical,
   isDecentralandIdentityAuthMessage,
   isRetiredSignInMethod
 } from './signMethodGuard'
@@ -538,6 +539,78 @@ describe('assertSignatureParamsAreCanonical', () => {
 
     it('should not throw when there are no params', () => {
       expect(() => assertSignatureParamsAreCanonical('eth_sendTransaction', undefined, signer)).not.toThrow()
+    })
+  })
+})
+
+describe('assertTransactionParamsAreCanonical', () => {
+  const to = '0xfef5c99885c3036e591b6e6db52482891834a5f4'
+  const method = 'eth_sendTransaction'
+
+  describe('when the params are a single transaction with an address, hex calldata and a hex value', () => {
+    it('should not throw', () => {
+      expect(() => assertTransactionParamsAreCanonical(method, [{ to, data: '0xa9059cbb', value: '0x0' }])).not.toThrow()
+    })
+  })
+
+  describe('when the transaction omits data and value', () => {
+    it('should not throw because both default downstream', () => {
+      expect(() => assertTransactionParamsAreCanonical(method, [{ to }])).not.toThrow()
+    })
+  })
+
+  describe('when the value is a decimal quantity', () => {
+    it('should not throw', () => {
+      expect(() => assertTransactionParamsAreCanonical(method, [{ to, value: '1000' }])).not.toThrow()
+    })
+  })
+
+  describe('when the transaction carries fields the wallet is left to fill in', () => {
+    it('should not throw because gas, nonce and chainId are dropped at dispatch', () => {
+      expect(() =>
+        assertTransactionParamsAreCanonical(method, [{ to, data: '0x', gas: '0x5208', nonce: '0x1', chainId: '0x89' }])
+      ).not.toThrow()
+    })
+  })
+
+  describe('when the method casing differs', () => {
+    it('should still validate the transaction', () => {
+      expect(() => assertTransactionParamsAreCanonical('ETH_SENDTRANSACTION', [{ to: 'not-an-address' }])).toThrow(
+        MalformedTransactionRequestError
+      )
+    })
+  })
+
+  describe('when the method is not eth_sendTransaction', () => {
+    it('should not throw for any params', () => {
+      expect(() => assertTransactionParamsAreCanonical('personal_sign', ['hello', to])).not.toThrow()
+    })
+  })
+
+  describe.each([
+    ['there are no params', undefined],
+    ['there are two params', [{ to }, { to }]],
+    ['the param is a string', ['0xabcd']],
+    ['the param is an array', [[to]]],
+    ['calldata is carried in extraCallData', [{ to, data: '0x', extraCallData: '0xa9059cbb' }]],
+    ['calldata is carried in input', [{ to, input: '0xa9059cbb' }]],
+    ['to is missing', [{ data: '0x' }]],
+    ['to is not an address', [{ to: 'attacker.eth' }]],
+    ['data is not a string', [{ to, data: { hidden: true } }]],
+    ['data is odd-length hex', [{ to, data: '0xabc' }]],
+    ['data is not hex', [{ to, data: '0xzz' }]],
+    ['data exceeds the preview limit', [{ to, data: `0x${'ab'.repeat(96 * 1024 + 1)}` }]],
+    ['value is a number', [{ to, value: 1 }]],
+    ['value is not a quantity', [{ to, value: '1 MANA' }]]
+  ])('when %s', (_label, params) => {
+    it('should throw a MalformedTransactionRequestError', () => {
+      expect(() => assertTransactionParamsAreCanonical(method, params as unknown[] | undefined)).toThrow(MalformedTransactionRequestError)
+    })
+  })
+
+  describe('when data is exactly at the preview limit', () => {
+    it('should not throw', () => {
+      expect(() => assertTransactionParamsAreCanonical(method, [{ to, data: `0x${'ab'.repeat(96 * 1024)}` }])).not.toThrow()
     })
   })
 })

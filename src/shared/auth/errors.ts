@@ -76,6 +76,22 @@ class MalformedSignatureRequestError extends Error {
 }
 
 /**
+ * Thrown when an eth_sendTransaction request's params are not a single transaction object the
+ * preview can read and the wallet would execute as shown: calldata outside `data`, a `to` that is
+ * not an address, `data` that is not hex-encoded bytes or is too large to preview, or a `value`
+ * that is not a quantity. `reason` says which rule was broken; it is safe to display.
+ */
+class MalformedTransactionRequestError extends Error {
+  constructor(
+    public readonly method: string,
+    public readonly reason: string
+  ) {
+    super(`The "${method}" transaction parameters are malformed: ${reason}`)
+    this.name = 'MalformedTransactionRequestError'
+  }
+}
+
+/**
  * Thrown when the transaction-simulation endpoint is unreachable, times out, or
  * returns a non-200 response. The approval UI treats this as "details unavailable"
  * and falls back to the default confirmation — simulation is never allowed to block
@@ -101,5 +117,6 @@ export {
   ImpersonatedSignInError,
   UnsupportedMethodError,
   MalformedSignatureRequestError,
+  MalformedTransactionRequestError,
   SimulationUnavailableError
 }

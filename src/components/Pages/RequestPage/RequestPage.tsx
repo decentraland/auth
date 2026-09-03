@@ -13,11 +13,13 @@ import { ClickEvents, TrackingEvents } from '../../../modules/analytics/types'
 import { config } from '../../../modules/config'
 import { fetchProfile } from '../../../modules/profile'
 import {
+  ApprovalChange,
   DifferentSenderError,
   ExpiredRequestError,
   IdentityResponse,
   ImpersonatedSignInError,
   MalformedSignatureRequestError,
+  MalformedTransactionRequestError,
   RecoverResponse,
   RequestFulfilledError,
   SimulationRequestBody,
@@ -137,6 +139,27 @@ const TERMINAL_VIEWS = new Set([
 // Reported to the client when a request is rejected at recover time, before it reaches the wallet.
 const RPC_METHOD_NOT_SUPPORTED = -32601
 const RPC_INVALID_PARAMS = -32602
+
+/**
+ * Whether a simulated approval must be acknowledged before approving. Full-collection access and an
+ * unlimited ERC-20 allowance are always gated, whoever the spender. Any other grant — a limited
+ * allowance, even for exactly the balance, or a single token, even one LAND — hands the asset over
+ * just as surely, so it is gated unless the spender is a recognized Decentraland contract, for which
+ * such approvals are routine. Revocations are never gated.
+ */
+function isDangerousApproval(approval: ApprovalChange): boolean {
+  if (approval.kind === 'approvalForAll') {
+    return approval.approved !== false
+  }
+  const isRevocation = !approval.tokenId && (approval.rawAmount === '0' || approval.amount === '0')
+  if (isRevocation) {
+    return false
+  }
+  if (!approval.tokenId && approval.isUnlimited) {
+    return true
+  }
+  return !isKnownDecentralandContract(approval.spender)
+}
 
 export const RequestPage = () => {
   const params = useParams()
@@ -777,8 +800,8 @@ export const RequestPage = () => {
           setView(View.WALLET_INTERACTION_ERROR)
           await reportRejectedRequest(RPC_INVALID_PARAMS, e.message)
           return
-        } else if (e instanceof MalformedSignatureRequestError) {
-          // The params could preview one payload and sign another. Block it; a retry recovers the same request.
+        } else if (e instanceof MalformedSignatureRequestError || e instanceof MalformedTransactionRequestError) {
+          // The params could preview one payload and sign or execute another. Block it; a retry recovers the same request.
           hasCompletedRef.current = true
           setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
           setView(View.WALLET_INTERACTION_ERROR)
@@ -1074,15 +1097,9 @@ export const RequestPage = () => {
   // resolved. In that case approval is a single step (gas shown inline, no confirm modal); without
   // a summary it keeps the classic two-step confirm dialog for the gas check.
   const hasSimulationSummary = simulationState.status !== 'idle'
-  // The simulation resolved and shows a high-risk permission: an unlimited ERC-20 allowance or a
-  // full-collection ApprovalForAll.
-  const hasDangerousApprovalChange =
-    simulationState.status === 'ready' &&
-    simulationState.result.approvalChanges.some(
-      approval =>
-        (approval.kind === 'approvalForAll' && approval.approved !== false) ||
-        (approval.kind === 'approval' && !approval.tokenId && approval.isUnlimited)
-    )
+  // The simulation resolved and grants a permission the user should not approve on a single click
+  // (see isDangerousApproval).
+  const hasDangerousApprovalChange = simulationState.status === 'ready' && simulationState.result.approvalChanges.some(isDangerousApproval)
   // A typed-data MetaTransaction whose inner call could not be previewed: the simulation was
   // unavailable, or the call reverts today. Unlike an eth_sendTransaction relayed through the gas
   // tank — which Auth signs and submits in one step, so the signature is consumed the moment it is

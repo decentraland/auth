@@ -326,6 +326,56 @@ describe('when rendering the SimulationSummary', () => {
       render(<SimulationSummary simulation={simulation} userAddress={USER} />)
       expect(screen.getByText(/approval_can_transfer_token/)).toBeInTheDocument()
     })
+
+    it('should flag it with a warning icon when the spender is not a recognized Decentraland contract', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} />)
+      expect(screen.getByText('⚠')).toBeInTheDocument()
+    })
+
+    it('should not flag it when the spender is a recognized Decentraland contract', () => {
+      render(
+        <SimulationSummary simulation={simulation} userAddress={USER} verifiedContracts={['0x1234567890abcdef1234567890abcdef12345678']} />
+      )
+      expect(screen.queryByText('⚠')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('and a limited allowance is granted', () => {
+    const spender = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd'
+
+    beforeEach(() => {
+      simulation = {
+        status: 'ready',
+        result: emptyResult({
+          approvalChanges: [
+            {
+              kind: 'approval',
+              standard: 'erc20',
+              owner: USER,
+              spender,
+              amount: '100',
+              rawAmount: '100000000000000000000',
+              isUnlimited: false,
+              tokenId: null,
+              approved: null,
+              contractAddress: '0x0f5d2fb29fb7d3cfee444a200298f468908cc942',
+              symbol: 'MANA',
+              name: 'MANA'
+            }
+          ]
+        })
+      }
+    })
+
+    it('should flag it with a warning icon when the spender is not a recognized Decentraland contract', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} />)
+      expect(screen.getByText('⚠')).toBeInTheDocument()
+    })
+
+    it('should not flag it when the spender is a recognized Decentraland contract', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} verifiedContracts={[spender]} />)
+      expect(screen.queryByText('⚠')).not.toBeInTheDocument()
+    })
   })
 
   describe('and there is a net dollar balance change for the user', () => {
