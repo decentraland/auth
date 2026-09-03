@@ -114,7 +114,11 @@
       "network": "Rete",
       "contract": "Contratto",
       "view_raw": "Mostra dati grezzi",
-      "hide_raw": "Nascondi dati grezzi"
+      "hide_raw": "Nascondi dati grezzi",
+      "meta_tx_notice": "Questa firma autorizza il contratto a eseguire questa azione per tuo conto. Non scade e l'app che l'ha richiesta può inviarla in seguito.",
+      "meta_tx_reverted": "Questa azione al momento fallisce, quindi non è stato possibile visualizzarne gli effetti in anteprima. Firmala solo se prevedi che funzioni in seguito.",
+      "acknowledge_unverified": "Capisco che non è stato possibile verificare gli effetti di questa firma",
+      "meta_tx_unrecognized_contract": "Questo non è un contratto Decentraland riconosciuto, quindi Decentraland non può garantire cosa farà questa firma."
     }
   },
   "request_views": {

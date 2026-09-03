@@ -118,6 +118,22 @@ describe('when rendering the SignatureRequestView', () => {
       expect(screen.getByText('0x480a…45ef')).toBeInTheDocument()
     })
 
+    it('should not show the meta-transaction notice', () => {
+      render(
+        <SignatureRequestView
+          requestId="r1"
+          method="eth_signTypedData_v4"
+          payload={payload}
+          simulation={{ status: 'idle' }}
+          userAddress={USER}
+          isMetaTransaction={false}
+          onDeny={onDeny}
+          onApprove={onApprove}
+        />
+      )
+      expect(screen.queryByTestId('signature-meta-tx-notice')).not.toBeInTheDocument()
+    })
+
     it('should render the typed-data message fields as a tree', () => {
       render(
         <SignatureRequestView
@@ -222,6 +238,303 @@ describe('when rendering the SignatureRequestView', () => {
         />
       )
       expect(screen.getByTestId('signature-approve-button')).toBeDisabled()
+    })
+
+    it('should explain that the signature is a bearer authorization the requester can submit later', () => {
+      render(
+        <SignatureRequestView
+          requestId="r1"
+          method="eth_signTypedData_v4"
+          payload={payload}
+          simulation={simulation}
+          userAddress={USER}
+          isMetaTransaction={true}
+          onDeny={onDeny}
+          onApprove={onApprove}
+        />
+      )
+      expect(screen.getByTestId('signature-meta-tx-notice')).toHaveTextContent('request.signature.meta_tx_notice')
+    })
+
+    describe('and the acknowledgment wording changes after the user ticked it', () => {
+      it('should ask again instead of carrying the tick over to the new statement', async () => {
+        const { rerender } = render(
+          <SignatureRequestView
+            requestId="r1"
+            method="eth_signTypedData_v4"
+            payload={payload}
+            simulation={simulation}
+            userAddress={USER}
+            isMetaTransaction={true}
+            contractTrust="pending"
+            requiresAcknowledgment
+            onDeny={onDeny}
+            onApprove={onApprove}
+          />
+        )
+        await userEvent.click(screen.getByRole('checkbox'))
+        expect(screen.getByRole('checkbox')).toBeChecked()
+        rerender(
+          <SignatureRequestView
+            requestId="r1"
+            method="eth_signTypedData_v4"
+            payload={payload}
+            simulation={simulation}
+            userAddress={USER}
+            isMetaTransaction={true}
+            contractTrust="unconfirmed"
+            requiresAcknowledgment
+            onDeny={onDeny}
+            onApprove={onApprove}
+          />
+        )
+        expect(screen.getByRole('checkbox')).not.toBeChecked()
+      })
+    })
+
+    it('should keep approval disabled while the contract is still being recognized', () => {
+      render(
+        <SignatureRequestView
+          requestId="r1"
+          method="eth_signTypedData_v4"
+          payload={payload}
+          simulation={simulation}
+          userAddress={USER}
+          isMetaTransaction={true}
+          contractTrust="pending"
+          onDeny={onDeny}
+          onApprove={onApprove}
+        />
+      )
+      expect(screen.getByTestId('signature-approve-button')).toBeDisabled()
+    })
+
+    it('should not warn about the contract when it is a recognized Decentraland contract', () => {
+      render(
+        <SignatureRequestView
+          requestId="r1"
+          method="eth_signTypedData_v4"
+          payload={payload}
+          simulation={simulation}
+          userAddress={USER}
+          isMetaTransaction={true}
+          contractTrust="confirmed"
+          onDeny={onDeny}
+          onApprove={onApprove}
+        />
+      )
+      expect(screen.queryByTestId('signature-meta-tx-unrecognized-contract')).not.toBeInTheDocument()
+    })
+
+    it('should not mention a revert when the simulated call succeeds', () => {
+      render(
+        <SignatureRequestView
+          requestId="r1"
+          method="eth_signTypedData_v4"
+          payload={payload}
+          simulation={simulation}
+          userAddress={USER}
+          isMetaTransaction={true}
+          onDeny={onDeny}
+          onApprove={onApprove}
+        />
+      )
+      expect(screen.queryByTestId('signature-meta-tx-reverted')).not.toBeInTheDocument()
+    })
+
+    describe('and an acknowledgment is required for a dangerous approval', () => {
+      it('should use the approval acknowledgment label', () => {
+        render(
+          <SignatureRequestView
+            requestId="r1"
+            method="eth_signTypedData_v4"
+            payload={payload}
+            simulation={simulation}
+            userAddress={USER}
+            isMetaTransaction={true}
+            requiresAcknowledgment
+            onDeny={onDeny}
+            onApprove={onApprove}
+          />
+        )
+        expect(screen.getByText('request.transaction_dialog.acknowledge_risk')).toBeInTheDocument()
+      })
+    })
+  })
+
+  describe('and the payload is a meta-transaction whose simulated call reverts', () => {
+    let payload: SignaturePayload
+    let simulation: SimulationState
+
+    beforeEach(() => {
+      payload = {
+        kind: 'typedData',
+        raw: '{"primaryType":"MetaTransaction"}',
+        typedData: { primaryType: 'MetaTransaction', domain: {}, message: {} }
+      }
+      const result: SimulationResponseBody = {
+        status: 'reverted',
+        error: 'Trade not effective yet',
+        assetChanges: [],
+        approvalChanges: [],
+        balanceChanges: [],
+        events: []
+      }
+      simulation = { status: 'ready', result }
+    })
+
+    it('should warn that the effects could not be previewed because the call fails today', () => {
+      render(
+        <SignatureRequestView
+          requestId="r1"
+          method="eth_signTypedData_v4"
+          payload={payload}
+          simulation={simulation}
+          userAddress={USER}
+          isMetaTransaction={true}
+          requiresAcknowledgment
+          onDeny={onDeny}
+          onApprove={onApprove}
+        />
+      )
+      expect(screen.getByTestId('signature-meta-tx-reverted')).toHaveTextContent('request.signature.meta_tx_reverted')
+    })
+
+    it('should ask the user to acknowledge unverified effects rather than an approval', () => {
+      render(
+        <SignatureRequestView
+          requestId="r1"
+          method="eth_signTypedData_v4"
+          payload={payload}
+          simulation={simulation}
+          userAddress={USER}
+          isMetaTransaction={true}
+          requiresAcknowledgment
+          onDeny={onDeny}
+          onApprove={onApprove}
+        />
+      )
+      expect(screen.getByText('request.signature.acknowledge_unverified')).toBeInTheDocument()
+    })
+
+    it('should keep approval disabled until the unverified effects are acknowledged', async () => {
+      render(
+        <SignatureRequestView
+          requestId="r1"
+          method="eth_signTypedData_v4"
+          payload={payload}
+          simulation={simulation}
+          userAddress={USER}
+          isMetaTransaction={true}
+          requiresAcknowledgment
+          onDeny={onDeny}
+          onApprove={onApprove}
+        />
+      )
+      expect(screen.getByTestId('signature-approve-button')).toBeDisabled()
+      await userEvent.click(screen.getByTestId('risk-acknowledgment'))
+      expect(screen.getByTestId('signature-approve-button')).toBeEnabled()
+    })
+  })
+
+  describe('and the payload is a meta-transaction to a contract that is not a recognized Decentraland contract', () => {
+    let payload: SignaturePayload
+    let simulation: SimulationState
+
+    beforeEach(() => {
+      payload = {
+        kind: 'typedData',
+        raw: '{"primaryType":"MetaTransaction"}',
+        typedData: { primaryType: 'MetaTransaction', domain: {}, message: {} }
+      }
+      simulation = { status: 'ready', result: { status: 'success', assetChanges: [], approvalChanges: [], balanceChanges: [], events: [] } }
+    })
+
+    it('should warn that Decentraland cannot vouch for the contract', () => {
+      render(
+        <SignatureRequestView
+          requestId="r1"
+          method="eth_signTypedData_v4"
+          payload={payload}
+          simulation={simulation}
+          userAddress={USER}
+          isMetaTransaction={true}
+          contractTrust="unconfirmed"
+          requiresAcknowledgment
+          onDeny={onDeny}
+          onApprove={onApprove}
+        />
+      )
+      expect(screen.getByTestId('signature-meta-tx-unrecognized-contract')).toHaveTextContent(
+        'request.signature.meta_tx_unrecognized_contract'
+      )
+    })
+
+    it('should ask the user to acknowledge unverified effects', () => {
+      render(
+        <SignatureRequestView
+          requestId="r1"
+          method="eth_signTypedData_v4"
+          payload={payload}
+          simulation={simulation}
+          userAddress={USER}
+          isMetaTransaction={true}
+          contractTrust="unconfirmed"
+          requiresAcknowledgment
+          onDeny={onDeny}
+          onApprove={onApprove}
+        />
+      )
+      expect(screen.getByText('request.signature.acknowledge_unverified')).toBeInTheDocument()
+    })
+
+    it('should keep approval disabled until acknowledged', async () => {
+      render(
+        <SignatureRequestView
+          requestId="r1"
+          method="eth_signTypedData_v4"
+          payload={payload}
+          simulation={simulation}
+          userAddress={USER}
+          isMetaTransaction={true}
+          contractTrust="unconfirmed"
+          requiresAcknowledgment
+          onDeny={onDeny}
+          onApprove={onApprove}
+        />
+      )
+      expect(screen.getByTestId('signature-approve-button')).toBeDisabled()
+      await userEvent.click(screen.getByTestId('risk-acknowledgment'))
+      expect(screen.getByTestId('signature-approve-button')).toBeEnabled()
+    })
+  })
+
+  describe('and the payload is a meta-transaction whose simulation is unavailable', () => {
+    let payload: SignaturePayload
+
+    beforeEach(() => {
+      payload = {
+        kind: 'typedData',
+        raw: '{"primaryType":"MetaTransaction"}',
+        typedData: { primaryType: 'MetaTransaction', domain: {}, message: {} }
+      }
+    })
+
+    it('should ask the user to acknowledge unverified effects', () => {
+      render(
+        <SignatureRequestView
+          requestId="r1"
+          method="eth_signTypedData_v4"
+          payload={payload}
+          simulation={{ status: 'unavailable' }}
+          userAddress={USER}
+          isMetaTransaction={true}
+          requiresAcknowledgment
+          onDeny={onDeny}
+          onApprove={onApprove}
+        />
+      )
+      expect(screen.getByText('request.signature.acknowledge_unverified')).toBeInTheDocument()
     })
   })
 })

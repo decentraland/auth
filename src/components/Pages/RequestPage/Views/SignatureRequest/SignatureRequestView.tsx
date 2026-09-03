@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from '@dcl/hooks'
 import { Box, Button, Checkbox, CircularProgress, FormControlLabel } from 'decentraland-ui2'
 import { getExplorerAddressUrl, getExplorerName, getNetworkName } from '../../../../../shared/explorer'
@@ -17,6 +17,7 @@ import {
   FieldLabel,
   MessageBlock,
   MethodChip,
+  Notice,
   RawToggle,
   Section
 } from './SignatureRequest.styled'
@@ -34,6 +35,7 @@ export const SignatureRequestView = ({
   chainId,
   requiresAcknowledgment = false,
   isMetaTransaction,
+  contractTrust,
   isLoading = false,
   onDeny,
   onApprove
@@ -45,6 +47,22 @@ export const SignatureRequestView = ({
   const domain = payload?.kind === 'typedData' ? payload.typedData.domain : undefined
   const domainChainId = chainId ?? (domain?.chainId !== undefined ? Number(domain.chainId) : undefined)
   const contractUrl = typeof domain?.verifyingContract === 'string' ? getExplorerAddressUrl(domainChainId, domain.verifyingContract) : null
+  const isReverted = simulation.status === 'ready' && simulation.result.status === 'reverted'
+  // Approval waits for the contract lookup the same way it waits for the simulation, so the
+  // unrecognized-contract acknowledgment cannot be skipped by clicking before it resolves.
+  const isContractTrustPending = isMetaTransaction && contractTrust === 'pending'
+  const isContractUnrecognized = isMetaTransaction && contractTrust === 'unconfirmed'
+  // A signed meta-transaction is a bearer authorization the requester can submit later, so when
+  // its effects could not be previewed — or the contract that will execute it is not one Auth can
+  // vouch for — the acknowledgment must say that, not talk about approvals.
+  const hasUnverifiedEffects = isMetaTransaction && (simulation.status === 'unavailable' || isReverted || isContractUnrecognized)
+
+  // A tick given to one statement must not carry over to another: when the wording changes (for
+  // instance the contract lookup resolves to unrecognized after the user acknowledged an approval),
+  // ask again.
+  useEffect(() => {
+    setAcknowledged(false)
+  }, [hasUnverifiedEffects])
 
   return (
     <Container canChangeAccount requestId={requestId}>
@@ -70,6 +88,11 @@ export const SignatureRequestView = ({
               verifiedContracts={verifiedContracts}
               chainId={chainId}
             />
+            <Notice data-testid="signature-meta-tx-notice">{t('request.signature.meta_tx_notice')}</Notice>
+            {isReverted ? <Notice data-testid="signature-meta-tx-reverted">{t('request.signature.meta_tx_reverted')}</Notice> : null}
+            {isContractUnrecognized ? (
+              <Notice data-testid="signature-meta-tx-unrecognized-contract">{t('request.signature.meta_tx_unrecognized_contract')}</Notice>
+            ) : null}
             <RawToggle type="button" aria-expanded={showRaw} onClick={() => setShowRaw(show => !show)}>
               {showRaw ? t('request.signature.hide_raw') : t('request.signature.view_raw')}
             </RawToggle>
@@ -129,7 +152,7 @@ export const SignatureRequestView = ({
                 data-testid="risk-acknowledgment"
               />
             }
-            label={t('request.transaction_dialog.acknowledge_risk')}
+            label={hasUnverifiedEffects ? t('request.signature.acknowledge_unverified') : t('request.transaction_dialog.acknowledge_risk')}
           />
         ) : null}
       </Content>
@@ -140,7 +163,8 @@ export const SignatureRequestView = ({
         </Button>
         <Button
           variant="contained"
-          disabled={isLoading || simulation.status === 'loading' || (requiresAcknowledgment && !acknowledged)}
+          color={isReverted ? 'error' : 'primary'}
+          disabled={isLoading || simulation.status === 'loading' || isContractTrustPending || (requiresAcknowledgment && !acknowledged)}
           onClick={onApprove}
           data-testid="signature-approve-button"
         >

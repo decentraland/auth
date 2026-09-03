@@ -40,6 +40,13 @@ type TypedDataPayload = {
 /** What a non-transaction signature request is asking the user to sign. */
 type SignaturePayload = { kind: 'message'; message: string } | { kind: 'typedData'; typedData: TypedDataPayload; raw: string }
 
+/**
+ * Whether a MetaTransaction's verifying contract is a recognized Decentraland contract: `pending`
+ * while the lookup runs, `confirmed` when it is in the static registry or known to the
+ * meta-transaction server as a collection, `unconfirmed` otherwise.
+ */
+type MetaTransactionContractTrust = 'pending' | 'confirmed' | 'unconfirmed'
+
 /** Lifecycle of the best-effort transaction simulation shown to web2 users. */
 type SimulationState =
   | { status: 'idle' }
@@ -48,4 +55,12 @@ type SimulationState =
   | { status: 'unavailable' }
 
 export { TransferType }
-export type { MANATransferData, NFTTransferData, ProfileAvatar, TypedDataPayload, SignaturePayload, SimulationState }
+export type {
+  MANATransferData,
+  MetaTransactionContractTrust,
+  NFTTransferData,
+  ProfileAvatar,
+  TypedDataPayload,
+  SignaturePayload,
+  SimulationState
+}

@@ -5,7 +5,13 @@ import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
 import { Provider, connection } from 'decentraland-connect'
 import { ContractName, getContract, getContractName } from 'decentraland-transactions'
 import { config } from '../../../modules/config'
-import { SimulationRequestBody } from '../../../shared/auth'
+import {
+  MetaTransactionTypedData,
+  SimulationRequestBody,
+  buildMetaTransactionSimulationPayload,
+  isMetaTransactionTypedData,
+  resolveMetaTransactionTypedData
+} from '../../../shared/auth'
 import { isMobile } from '../LoginPage/utils'
 import { getUnsupportedCalldataAlias } from './transactionParams'
 import { SignaturePayload, TypedDataPayload } from './types'
@@ -125,42 +131,16 @@ function isApprovalGrantingTypedData(typedData: TypedDataPayload | undefined | n
 
 /**
  * Detects a Decentraland meta-transaction typed-data payload and returns the inner call so it
- * can be simulated (from = message.from, to = domain.verifyingContract, data =
- * message.functionSignature). Returns null when the typed data isn't a MetaTransaction.
+ * can be simulated (from = message.from, to = domain.verifyingContract, data = the calldata field
+ * the signed struct declares). Returns null when the typed data isn't a MetaTransaction.
+ *
+ * Throws MalformedSignatureRequestError when it is a MetaTransaction shaped in a way no
+ * Decentraland contract signs. The recover guard already rejects those, but the check is repeated
+ * here so the simulation can never be handed bytes the signature does not cover.
  */
-function decodeMetaTransactionTypedData(
-  typedData: TypedDataPayload | undefined
-): { from: string; verifyingContract: string; functionSignature: string; chainId: number } | null {
-  try {
-    if (!typedData || typedData.primaryType !== 'MetaTransaction') return null
-    const message = typedData.message
-    const domain = typedData.domain
-    if (!message || !domain) return null
-
-    const from = message.from
-    const functionSignature = message.functionSignature
-    const verifyingContract = domain.verifyingContract
-    if (typeof from !== 'string' || typeof functionSignature !== 'string' || typeof verifyingContract !== 'string') {
-      return null
-    }
-
-    let chainId: number | undefined
-    if (typeof domain.salt === 'string') {
-      try {
-        chainId = Number(BigInt(domain.salt))
-      } catch {
-        chainId = undefined
-      }
-    }
-    if ((chainId === undefined || Number.isNaN(chainId)) && domain.chainId !== undefined) {
-      chainId = Number(domain.chainId)
-    }
-    if (chainId === undefined || Number.isNaN(chainId)) return null
-
-    return { from, verifyingContract, functionSignature, chainId }
-  } catch {
-    return null
-  }
+function decodeMetaTransactionTypedData(typedData: TypedDataPayload | undefined, method: string): MetaTransactionTypedData | null {
+  if (!isMetaTransactionTypedData(typedData)) return null
+  return resolveMetaTransactionTypedData(typedData, method)
 }
 
 /**
@@ -181,10 +161,17 @@ function buildSendTransactionSimulationPayload(
 
   if (getUnsupportedCalldataAlias(txParams)) return null
 
-  const chainId = willUseMetaTransaction ? Number(getMetaTransactionChainId()) : connectedChainId
+  const data = (txParams.data as string | undefined) ?? '0x'
+
+  if (willUseMetaTransaction) {
+    // Relayed through the gas tank: preview the inner self-call the contract will make on the
+    // meta-transaction chain, for the connected signer (the relay executes for the logged-in
+    // account regardless of `params.from`) and without value (the relay forwards none).
+    return buildMetaTransactionSimulationPayload(Number(getMetaTransactionChainId()), to, data, signerAddress)
+  }
 
   return {
-    chainId,
+    chainId: connectedChainId,
     // Always simulate as the connected signer, never the request-supplied `from`. Web2 wallets
     // (Magic/Thirdweb) execute the transaction as the logged-in account regardless of
     // `params.from`, so honoring an attacker-chosen `from` would decouple the preview from what
@@ -193,7 +180,7 @@ function buildSendTransactionSimulationPayload(
     // really pays — and it would suppress approvalChanges, bypassing the high-risk approval gate.
     from: signerAddress,
     to,
-    data: (txParams.data as string | undefined) ?? '0x',
+    data,
     value: (txParams.value as string | undefined) ?? '0'
   }
 }

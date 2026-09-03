@@ -1,4 +1,4 @@
-import { SignaturePayload, SimulationState } from '../../types'
+import { MetaTransactionContractTrust, SignaturePayload, SimulationState } from '../../types'
 
 export interface SignatureRequestViewProps {
   requestId: string
@@ -15,6 +15,12 @@ export interface SignatureRequestViewProps {
   /** When true, gates approval behind a high-risk acknowledgment checkbox. */
   requiresAcknowledgment?: boolean
   isMetaTransaction: boolean
+  /**
+   * For a meta-transaction, whether its verifying contract is a recognized Decentraland contract.
+   * Approval stays disabled while `pending`; `unconfirmed` adds a warning and reuses the unverified
+   * acknowledgment wording. Recognition never relaxes anything.
+   */
+  contractTrust?: MetaTransactionContractTrust
   isLoading?: boolean
   onDeny: () => void
   onApprove: () => void

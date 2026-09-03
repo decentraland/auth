@@ -114,7 +114,11 @@
       "network": "网络",
       "contract": "合约",
       "view_raw": "查看原始数据",
-      "hide_raw": "隐藏原始数据"
+      "hide_raw": "隐藏原始数据",
+      "meta_tx_notice": "此签名授权该合约代表你执行此操作。它不会过期，请求它的应用可以稍后提交。",
+      "meta_tx_reverted": "此操作当前会失败，因此无法预览其效果。只有在你预计它稍后能成功时才签名。",
+      "acknowledge_unverified": "我了解无法验证此签名的效果",
+      "meta_tx_unrecognized_contract": "这不是一个已识别的 Decentraland 合约，因此 Decentraland 无法保证此签名将执行的操作。"
     }
   },
   "request_views": {

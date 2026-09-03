@@ -22,7 +22,9 @@ import {
   RequestFulfilledError,
   SimulationRequestBody,
   SimulationResponseBody,
+  SimulationUnavailableError,
   UnsupportedMethodError,
+  buildMetaTransactionSimulationPayload,
   createAuthServerHttpClient
 } from '../../../shared/auth'
 import { isRetiredSignInMethod } from '../../../shared/auth/signMethodGuard'
@@ -42,7 +44,7 @@ import { identifyUser, trackEvent } from '../../../shared/utils/analytics'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { FeatureFlagsContext } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
 import { buildTransactionParams } from './transactionParams'
-import { MANATransferData, NFTTransferData, SignaturePayload, SimulationState, TransferType } from './types'
+import { MANATransferData, MetaTransactionContractTrust, NFTTransferData, SignaturePayload, SimulationState, TransferType } from './types'
 import {
   buildSendTransactionSimulationPayload,
   checkMetaTransactionSupport,
@@ -158,12 +160,16 @@ export const RequestPage = () => {
   // by Decentraland's gas tank), so the confirm dialog can hide the user-facing gas cost.
   const [isMetaTransaction, setIsMetaTransaction] = useState(false)
   const [signaturePayload, setSignaturePayload] = useState<SignaturePayload | null>(null)
+  // Whether the pending typed-data signature is a Decentraland MetaTransaction. Unlike a relayed
+  // eth_sendTransaction, the signature leaves Auth, so no contract is ever "trusted" enough to skip
+  // the acknowledgment when its inner call could not be previewed (see requiresApprovalAcknowledgment).
   const [isSignatureMetaTx, setIsSignatureMetaTx] = useState(false)
-  // Whether the signature meta-transaction's verifyingContract was verified to be a Decentraland
-  // contract. A request can self-declare `primaryType: "MetaTransaction"` for ANY contract, so the
-  // decoded meta-tx is only *trusted* (exempt from the simulation-unavailable acknowledgment) once
-  // this async verification confirms it. Defaults to false so an unverified contract is never trusted.
-  const [isSignatureMetaTxTrusted, setIsSignatureMetaTxTrusted] = useState(false)
+  // Whether the MetaTransaction's verifyingContract is a recognized Decentraland contract (static
+  // registry, or a collection known to the meta-transaction server). Recognition never relaxes a
+  // gate — the signature leaves Auth either way — but an unrecognized contract means Auth cannot
+  // vouch for how it executes the previewed call, so approval needs an acknowledgment; while the
+  // lookup is pending, approval stays disabled so the answer cannot be skipped.
+  const [signatureContractTrust, setSignatureContractTrust] = useState<MetaTransactionContractTrust>('pending')
   // Whether the typed-data signature grants an off-chain asset approval (EIP-2612 Permit, Permit2,
   // Seaport order). These aren't simulated, so they must always require an explicit acknowledgment.
   const [isHighRiskSignature, setIsHighRiskSignature] = useState(false)
@@ -487,7 +493,13 @@ export const RequestPage = () => {
 
         // Best-effort transaction simulation for web2 users. Fires without blocking the view
         // render and never throws to the caller — failures surface as "details unavailable".
-        const fetchSimulation = async (body: SimulationRequestBody) => {
+        //
+        // `rejectUnpreviewable` is for signatures that leave Auth as a bearer authorization (a
+        // typed-data MetaTransaction). When the server rejects the call itself (400) there is no
+        // preview to fall back to, so the request is rejected instead of degrading to an
+        // acknowledgment: otherwise oversized or otherwise unpreviewable calldata would be a
+        // deterministic way to skip the preview. Outages (5xx, timeouts) still degrade.
+        const fetchSimulation = async (body: SimulationRequestBody, { rejectUnpreviewable = false } = {}) => {
           try {
             const result = await authServerClient.current.simulateTransaction(body)
             if (cancelled) return
@@ -496,6 +508,15 @@ export const RequestPage = () => {
             void resolveSimulationProfiles(result)
           } catch (e) {
             if (cancelled) return
+            // Nothing to reject once the user has already answered (e.g. denied while loading).
+            if (rejectUnpreviewable && e instanceof SimulationUnavailableError && e.status === 400 && !hasCompletedRef.current) {
+              const rejection = new MalformedSignatureRequestError(request.method, 'the MetaTransaction call cannot be previewed')
+              hasCompletedRef.current = true
+              setError(rejection.message)
+              setView(View.WALLET_INTERACTION_ERROR)
+              await reportRejectedRequest(RPC_INVALID_PARAMS, rejection.message)
+              return
+            }
             console.info('Transaction simulation unavailable:', e instanceof Error ? e.message : String(e))
             setSimulationState({ status: 'unavailable' })
           }
@@ -673,32 +694,33 @@ export const RequestPage = () => {
                 if (isApprovalGrantingTypedData(payload.typedData)) {
                   setIsHighRiskSignature(true)
                 }
-                const metaTx = decodeMetaTransactionTypedData(payload.typedData)
+                const metaTx = decodeMetaTransactionTypedData(payload.typedData, request.method)
                 if (metaTx) {
                   setIsSignatureMetaTx(true)
                   setSimulationChainId(metaTx.chainId)
                   setSimulationState({ status: 'loading' })
-                  // A request can self-declare `primaryType: "MetaTransaction"` for ANY contract.
-                  // Verify the verifyingContract really is a Decentraland contract before treating
-                  // this as a *trusted* meta-tx; until confirmed it stays untrusted, so a
-                  // MetaTransaction pointed at an arbitrary contract still requires acknowledgment
-                  // when the simulation is unavailable (matching the eth_sendTransaction path).
-                  checkMetaTransactionSupport(metaTx.verifyingContract)
-                    .then(({ willUseMetaTransaction }) => {
-                      if (!cancelled && willUseMetaTransaction) setIsSignatureMetaTxTrusted(true)
-                    })
-                    .catch(() => undefined)
-                  void fetchSimulation({
-                    chainId: metaTx.chainId,
-                    // Simulate as the connected signer, not the `from` carried in the typed data.
-                    // A valid Decentraland meta-transaction is authorized by (and executed on behalf
-                    // of) the signer, so a differing `from` is only ever an attempt to make the
-                    // asset-change preview attribute movements to another address.
-                    from: signerAddress,
-                    to: metaTx.verifyingContract,
-                    data: metaTx.functionSignature,
-                    value: '0'
-                  })
+                  setSignatureContractTrust('pending')
+                  // Recognition is per deployment: the lookup matches the address on the meta-transaction
+                  // chain, so the same address under another chain's salt is not that contract.
+                  if (metaTx.chainId !== Number(getMetaTransactionChainId())) {
+                    setSignatureContractTrust('unconfirmed')
+                  } else {
+                    checkMetaTransactionSupport(metaTx.verifyingContract)
+                      .then(({ willUseMetaTransaction }) => {
+                        if (!cancelled) setSignatureContractTrust(willUseMetaTransaction ? 'confirmed' : 'unconfirmed')
+                      })
+                      .catch(() => {
+                        if (!cancelled) setSignatureContractTrust('unconfirmed')
+                      })
+                  }
+                  // Preview the inner call the way the contract will make it — calling itself with
+                  // the connected signer appended, not the `from` carried in the typed data — using
+                  // the calldata field the signed struct declares, which the decoder proved to be the
+                  // bytes the signature covers whatever else the message carries.
+                  void fetchSimulation(
+                    buildMetaTransactionSimulationPayload(metaTx.chainId, metaTx.verifyingContract, metaTx.calldata, signerAddress),
+                    { rejectUnpreviewable: true }
+                  )
                 }
               }
               setView(View.WALLET_SIGNATURE_INTERACTION)
@@ -805,6 +827,10 @@ export const RequestPage = () => {
   }, [nftTransferData, manaTransferData])
 
   const onDenyWalletInteraction = useCallback(async () => {
+    // The decision is final the moment the user clicks: mark completion before the outcome
+    // round-trip so nothing that resolves in the meantime (e.g. a late simulation rejection)
+    // can override the denied view or answer the request a second time.
+    hasCompletedRef.current = true
     setIsLoading(true)
     setIsTransactionModalOpen(false)
     trackClick(ClickEvents.DENY_WALLET_INTERACTION)
@@ -821,7 +847,6 @@ export const RequestPage = () => {
       console.error('Failed to send denied notification:', error)
     }
 
-    hasCompletedRef.current = true
     setIsLoading(false)
     // Set appropriate view based on whether it's an NFT transfer or MANA transfer
     if (nftTransferData) {
@@ -1025,25 +1050,39 @@ export const RequestPage = () => {
   // resolved. In that case approval is a single step (gas shown inline, no confirm modal); without
   // a summary it keeps the classic two-step confirm dialog for the gas check.
   const hasSimulationSummary = simulationState.status !== 'idle'
-  // A trusted Decentraland meta-transaction is exempt from the "simulation unavailable"
-  // acknowledgment below: either an eth_sendTransaction relayed through the gas tank to a known
-  // DCL contract, or a typed-data meta-tx whose verifyingContract was VERIFIED to be a DCL
-  // contract (isSignatureMetaTxTrusted). A self-declared MetaTransaction to an arbitrary contract
-  // is NOT trusted.
-  const isTrustedMetaTransaction = isMetaTransaction || (isSignatureMetaTx && isSignatureMetaTxTrusted)
-  // Require an explicit acknowledgment before approving when: (a) the simulation resolved and shows
-  // a high-risk permission (unlimited ERC-20 allowance or full-collection ApprovalForAll); (b) the
-  // simulation could NOT be produced for a transaction we can't otherwise vouch for (prevents the
-  // fail-open where an unpreviewable payload degrades to a single-click approve); or (c) the request
-  // is an off-chain approval signature (permit/order), which grants asset control but is never simulated.
+  // The simulation resolved and shows a high-risk permission: an unlimited ERC-20 allowance or a
+  // full-collection ApprovalForAll.
+  const hasDangerousApprovalChange =
+    simulationState.status === 'ready' &&
+    simulationState.result.approvalChanges.some(
+      approval =>
+        (approval.kind === 'approvalForAll' && approval.approved !== false) ||
+        (approval.kind === 'approval' && !approval.tokenId && approval.isUnlimited)
+    )
+  // A typed-data MetaTransaction whose inner call could not be previewed: the simulation was
+  // unavailable, or the call reverts today. Unlike an eth_sendTransaction relayed through the gas
+  // tank — which Auth signs and submits in one step, so the signature is consumed the moment it is
+  // made — a signed MetaTransaction is handed back to the requester as a bearer authorization: it
+  // has no expiry and anyone holding it can submit it until the nonce is used. A call that reverts
+  // now can therefore be relayed once the state changes, so "would fail" is not a safe preview.
+  // Being a verified Decentraland contract does not change that, which is why the trusted
+  // exemption below applies to the relay path only.
+  const isSignatureWithoutVerifiedEffects = isSignatureMetaTx && (simulationState.status === 'unavailable' || isSimulationReverted)
+  // A MetaTransaction whose verifying contract is not a recognized Decentraland contract. The
+  // preview models the Decentraland self-call; a contract Auth does not know may execute the
+  // signature any other way, so a clean preview is not something Auth can vouch for.
+  const isSignatureToUnrecognizedContract = isSignatureMetaTx && signatureContractTrust === 'unconfirmed'
+  // Require an explicit acknowledgment before approving when: (a) the simulation shows a high-risk
+  // permission; (b) the simulation could NOT be produced for a transaction we can't otherwise vouch
+  // for — only a relayed meta-transaction to a known DCL contract is exempt (prevents the fail-open
+  // where an unpreviewable payload degrades to a single-click approve); (c) a signed MetaTransaction
+  // has no verified effects or targets a contract Auth cannot vouch for; or (d) the request is an
+  // off-chain approval signature (permit/order), which grants asset control but is never simulated.
   const requiresApprovalAcknowledgment =
-    (simulationState.status === 'ready' &&
-      simulationState.result.approvalChanges.some(
-        approval =>
-          (approval.kind === 'approvalForAll' && approval.approved !== false) ||
-          (approval.kind === 'approval' && !approval.tokenId && approval.isUnlimited)
-      )) ||
-    (simulationState.status === 'unavailable' && !isTrustedMetaTransaction) ||
+    hasDangerousApprovalChange ||
+    (simulationState.status === 'unavailable' && !isMetaTransaction) ||
+    isSignatureWithoutVerifiedEffects ||
+    isSignatureToUnrecognizedContract ||
     isHighRiskSignature
 
   switch (view) {
@@ -1185,6 +1224,7 @@ export const RequestPage = () => {
           chainId={simulationChainId}
           requiresAcknowledgment={requiresApprovalAcknowledgment}
           isMetaTransaction={isSignatureMetaTx}
+          contractTrust={signatureContractTrust}
           isLoading={isLoading}
           onDeny={onDenyWalletInteraction}
           onApprove={onApproveWalletInteraction}

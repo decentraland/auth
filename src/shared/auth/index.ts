@@ -1,4 +1,6 @@
 export * from './errors'
 export * from './httpClient'
+export * from './metaTransactionSimulation'
+export * from './metaTransactionTypedData'
 export * from './signMethodGuard'
 export * from './types'

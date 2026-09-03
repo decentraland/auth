@@ -9,6 +9,7 @@ import { connection } from 'decentraland-connect'
 import { ContractName, getContract, getContractName } from 'decentraland-transactions'
 import { config } from '../../../modules/config'
 import { MalformedSignatureRequestError } from '../../../shared/auth/errors'
+import { isMetaTransactionTypedData, resolveMetaTransactionTypedData } from '../../../shared/auth/metaTransactionTypedData'
 import { assertSignatureParamsAreCanonical } from '../../../shared/auth/signMethodGuard'
 import {
   buildSendTransactionSimulationPayload,
@@ -30,6 +31,7 @@ import {
 
 jest.mock('decentraland-connect')
 jest.mock('decentraland-transactions')
+jest.mock('../../../shared/auth/metaTransactionTypedData')
 jest.mock('../../../modules/config')
 jest.mock('viem', () => ({
   createPublicClient: jest.fn(),
@@ -1148,55 +1150,90 @@ describe('when testing extractSignaturePayload', () => {
 })
 
 describe('when testing decodeMetaTransactionTypedData', () => {
-  describe('and the typed data is a meta-transaction with a salt-encoded chain id', () => {
+  let method: string
+
+  beforeEach(() => {
+    method = 'eth_signTypedData_v4'
+  })
+
+  afterEach(() => {
+    jest.mocked(isMetaTransactionTypedData).mockReset()
+    jest.mocked(resolveMetaTransactionTypedData).mockReset()
+  })
+
+  describe('and the typed data is a meta-transaction', () => {
     let typedData: any
+    let resolved: ReturnType<typeof resolveMetaTransactionTypedData>
 
     beforeEach(() => {
-      typedData = {
-        primaryType: 'MetaTransaction',
-        domain: {
-          verifyingContract: '0xfef5c99885c3036e591b6e6db52482891834a5f4',
-          salt: '0x0000000000000000000000000000000000000000000000000000000000000089'
-        },
-        message: { nonce: 0, from: '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd', functionSignature: '0xa9059cbb' }
-      }
-    })
-
-    it('should return the inner call with the chain id decoded from the salt', () => {
-      expect(decodeMetaTransactionTypedData(typedData)).toEqual({
+      typedData = { primaryType: 'MetaTransaction', types: {}, domain: {}, message: {} }
+      resolved = {
+        calldataField: 'functionData',
+        calldata: '0xa9059cbb',
         from: '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd',
         verifyingContract: '0xfef5c99885c3036e591b6e6db52482891834a5f4',
-        functionSignature: '0xa9059cbb',
         chainId: 137
-      })
+      }
+      jest.mocked(isMetaTransactionTypedData).mockReturnValueOnce(true)
+      jest.mocked(resolveMetaTransactionTypedData).mockReturnValueOnce(resolved)
+    })
+
+    it('should return the inner call the signed struct declares', () => {
+      expect(decodeMetaTransactionTypedData(typedData, method)).toEqual(resolved)
+    })
+
+    it('should resolve the typed data for the request method so a rejection names it', () => {
+      decodeMetaTransactionTypedData(typedData, method)
+      expect(resolveMetaTransactionTypedData).toHaveBeenCalledWith(typedData, method)
     })
   })
 
-  describe('and the meta-transaction has no salt but a chainId domain field', () => {
+  describe('and the typed data is a meta-transaction shaped in a way no Decentraland contract signs', () => {
     let typedData: any
+    let error: MalformedSignatureRequestError
 
     beforeEach(() => {
-      typedData = {
-        primaryType: 'MetaTransaction',
-        domain: { verifyingContract: '0xfef5c99885c3036e591b6e6db52482891834a5f4', chainId: 80002 },
-        message: { from: '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd', functionSignature: '0xa9059cbb' }
-      }
+      typedData = { primaryType: 'MetaTransaction', types: {}, domain: {}, message: {} }
+      error = new MalformedSignatureRequestError(
+        'eth_signTypedData_v4',
+        'the MetaTransaction struct is not one a Decentraland contract signs'
+      )
+      jest.mocked(isMetaTransactionTypedData).mockReturnValueOnce(true)
+      jest.mocked(resolveMetaTransactionTypedData).mockImplementationOnce(() => {
+        throw error
+      })
     })
 
-    it('should fall back to the chainId domain field', () => {
-      expect(decodeMetaTransactionTypedData(typedData)?.chainId).toBe(80002)
+    it('should throw the resolver rejection instead of returning null', () => {
+      expect(() => decodeMetaTransactionTypedData(typedData, method)).toThrow(error)
     })
   })
 
   describe('and the typed data is not a meta-transaction', () => {
+    let typedData: any
+
+    beforeEach(() => {
+      typedData = { primaryType: 'Order', domain: {}, message: {} }
+      jest.mocked(isMetaTransactionTypedData).mockReturnValueOnce(false)
+    })
+
     it('should return null', () => {
-      expect(decodeMetaTransactionTypedData({ primaryType: 'Order', domain: {}, message: {} })).toBeNull()
+      expect(decodeMetaTransactionTypedData(typedData, method)).toBeNull()
+    })
+
+    it('should not try to resolve it', () => {
+      decodeMetaTransactionTypedData(typedData, method)
+      expect(resolveMetaTransactionTypedData).not.toHaveBeenCalled()
     })
   })
 
   describe('and the typed data is undefined', () => {
+    beforeEach(() => {
+      jest.mocked(isMetaTransactionTypedData).mockReturnValueOnce(false)
+    })
+
     it('should return null', () => {
-      expect(decodeMetaTransactionTypedData(undefined)).toBeNull()
+      expect(decodeMetaTransactionTypedData(undefined, method)).toBeNull()
     })
   })
 })
@@ -1256,15 +1293,25 @@ describe('when testing buildSendTransactionSimulationPayload', () => {
       expect(result?.chainId).toBe(ChainId.MATIC_MAINNET)
     })
 
-    it('should default the from address to the signer when not present in the params', () => {
+    it('should preview the contract calling itself, as the relay makes the inner call', () => {
       const result = buildSendTransactionSimulationPayload(txParams, signerAddress, 1, true)
-      expect(result?.from).toBe(signerAddress)
+      expect(result).toMatchObject({ from: txParams.to, to: txParams.to })
     })
 
-    it('should ignore a request-supplied from address and always simulate as the connected signer', () => {
+    it('should append the connected signer to the calldata as the meta-transaction sender', () => {
+      const result = buildSendTransactionSimulationPayload(txParams, signerAddress, 1, true)
+      expect(result?.data).toBe(`0xa9059cbb${signerAddress.slice(2)}`)
+    })
+
+    it('should ignore a request-supplied from address and always append the connected signer', () => {
       const attackerControlledFrom = '0x000000000000000000000000000000000000dead'
       const result = buildSendTransactionSimulationPayload({ ...txParams, from: attackerControlledFrom }, signerAddress, 1, true)
-      expect(result?.from).toBe(signerAddress)
+      expect(result?.data).toBe(`0xa9059cbb${signerAddress.slice(2)}`)
+    })
+
+    it('should preview without value because the relay forwards none', () => {
+      const result = buildSendTransactionSimulationPayload({ ...txParams, value: '0x10' }, signerAddress, 1, true)
+      expect(result?.value).toBe('0')
     })
   })
 
@@ -1278,6 +1325,11 @@ describe('when testing buildSendTransactionSimulationPayload', () => {
     it('should simulate on the connected chain', () => {
       const result = buildSendTransactionSimulationPayload(txParams, signerAddress, 1, false)
       expect(result?.chainId).toBe(1)
+    })
+
+    it('should simulate as the connected signer with the request value, since the wallet sends it as is', () => {
+      const result = buildSendTransactionSimulationPayload({ ...txParams, value: '0x10' }, signerAddress, 1, false)
+      expect(result).toMatchObject({ from: signerAddress, to: txParams.to, data: '0x', value: '0x10' })
     })
   })
 
