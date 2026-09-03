@@ -104,7 +104,10 @@
       "verified_contract": "Contrato de Decentraland verificado",
       "on_network": "en {network}",
       "acknowledge_risk": "Entiendo que esto otorga acceso a mis activos",
-      "approval_can_spend_symbol": "puede gastar {symbol}"
+      "approval_can_spend_symbol": "puede gastar {symbol}",
+      "approval_can_no_longer_spend": "ya no puede gastar {symbol}",
+      "approval_allowance_revoked": "Permiso de gasto de {symbol} revocado",
+      "approval_token_approval_revoked": "Permiso de transferencia de {token} #{tokenId} revocado"
     },
     "signature": {
       "title": "Confirmar firma",

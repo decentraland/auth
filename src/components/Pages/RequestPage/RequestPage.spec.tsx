@@ -210,7 +210,7 @@ const mockDecodeMetaTransactionTypedData = jest.fn()
 const mockBuildSendTransactionSimulationPayload = jest.fn()
 const mockIsOpaqueSignatureMessage = jest.fn()
 const mockCheckMetaTransactionSupport = jest.fn()
-const mockIsKnownDecentralandContract = jest.fn()
+const mockIsKnownDecentralandContractOnChain = jest.fn()
 const mockIsDecentralandContractAddress = jest.fn()
 const mockIsApprovalGrantingTypedData = jest.fn()
 jest.mock('./utils', () => ({
@@ -225,7 +225,7 @@ jest.mock('./utils', () => ({
   getMetaTransactionChainId: jest.fn().mockReturnValue(137),
   getNetworkProvider: jest.fn(),
   isSignatureMethod: (...args: any[]) => mockIsSignatureMethod(...args),
-  isKnownDecentralandContract: (...args: any[]) => mockIsKnownDecentralandContract(...args),
+  isKnownDecentralandContractOnChain: (...args: any[]) => mockIsKnownDecentralandContractOnChain(...args),
   isDecentralandContractAddress: (...args: any[]) => mockIsDecentralandContractAddress(...args),
   isApprovalGrantingTypedData: (...args: any[]) => mockIsApprovalGrantingTypedData(...args),
   extractSignaturePayload: (...args: any[]) => mockExtractSignaturePayload(...args),
@@ -291,7 +291,7 @@ describe('RequestPage', () => {
     mockIsSignatureMethod.mockImplementation((method: string) =>
       ['personal_sign', 'eth_sign', 'eth_signtypeddata', 'eth_signtypeddata_v3', 'eth_signtypeddata_v4'].includes(method.toLowerCase())
     )
-    mockIsKnownDecentralandContract.mockReturnValue(false)
+    mockIsKnownDecentralandContractOnChain.mockReturnValue(false)
     mockIsDecentralandContractAddress.mockResolvedValue(false)
     mockIsApprovalGrantingTypedData.mockReturnValue(false)
     mockIsOpaqueSignatureMessage.mockReturnValue(false)
@@ -1603,7 +1603,7 @@ describe('RequestPage', () => {
 
       describe('and it is a limited allowance to a spender that is not a recognized Decentraland contract', () => {
         beforeEach(() => {
-          mockIsKnownDecentralandContract.mockReturnValue(false)
+          mockIsKnownDecentralandContractOnChain.mockReturnValue(false)
           mockSimulateTransaction.mockResolvedValue(simulationWith([approval]))
         })
 
@@ -1617,7 +1617,7 @@ describe('RequestPage', () => {
 
       describe('and it is a limited allowance to a recognized Decentraland contract', () => {
         beforeEach(() => {
-          mockIsKnownDecentralandContract.mockReturnValue(true)
+          mockIsKnownDecentralandContractOnChain.mockReturnValue(true)
           mockSimulateTransaction.mockResolvedValue(simulationWith([approval]))
         })
 
@@ -1627,11 +1627,19 @@ describe('RequestPage', () => {
           await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
           expect(view).toHaveAttribute('data-requires-acknowledgment', 'false')
         })
+
+        it('should recognize the spender on the chain the simulation ran on, not on any chain', async () => {
+          renderRequestPage()
+          const view = await screen.findByTestId('wallet-interaction')
+          await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+          // The mocked simulation payload names chain 137, so recognition must be asked for 137.
+          expect(mockIsKnownDecentralandContractOnChain).toHaveBeenCalledWith('0xspender', 137)
+        })
       })
 
       describe('and it is a single token approved to a spender that is not a recognized Decentraland contract', () => {
         beforeEach(() => {
-          mockIsKnownDecentralandContract.mockReturnValue(false)
+          mockIsKnownDecentralandContractOnChain.mockReturnValue(false)
           mockSimulateTransaction.mockResolvedValue(
             simulationWith([{ ...approval, standard: 'erc721', amount: null, rawAmount: null, tokenId: '7' }])
           )
@@ -1647,7 +1655,7 @@ describe('RequestPage', () => {
 
       describe('and it is a tiny allowance whose display amount rounds to zero, to an unrecognized spender', () => {
         beforeEach(() => {
-          mockIsKnownDecentralandContract.mockReturnValue(false)
+          mockIsKnownDecentralandContractOnChain.mockReturnValue(false)
           mockSimulateTransaction.mockResolvedValue(simulationWith([{ ...approval, amount: '0', rawAmount: '1' }]))
         })
 
@@ -1661,7 +1669,7 @@ describe('RequestPage', () => {
 
       describe('and it clears a single-token approval with the zero address', () => {
         beforeEach(() => {
-          mockIsKnownDecentralandContract.mockReturnValue(false)
+          mockIsKnownDecentralandContractOnChain.mockReturnValue(false)
           mockSimulateTransaction.mockResolvedValue(
             simulationWith([
               {
@@ -1686,7 +1694,7 @@ describe('RequestPage', () => {
 
       describe('and it revokes an allowance from an unrecognized spender', () => {
         beforeEach(() => {
-          mockIsKnownDecentralandContract.mockReturnValue(false)
+          mockIsKnownDecentralandContractOnChain.mockReturnValue(false)
           mockSimulateTransaction.mockResolvedValue(simulationWith([{ ...approval, amount: '0', rawAmount: '0' }]))
         })
 
@@ -1700,7 +1708,7 @@ describe('RequestPage', () => {
 
       describe('and it revokes ApprovalForAll from an unrecognized operator', () => {
         beforeEach(() => {
-          mockIsKnownDecentralandContract.mockReturnValue(false)
+          mockIsKnownDecentralandContractOnChain.mockReturnValue(false)
           mockSimulateTransaction.mockResolvedValue(
             simulationWith([{ ...approval, kind: 'approvalForAll', standard: 'erc721', amount: null, rawAmount: null, approved: false }])
           )

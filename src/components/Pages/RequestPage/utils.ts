@@ -33,17 +33,21 @@ function isSignatureMethod(method: string): boolean {
 }
 
 /**
- * Returns true when the address is a recognized Decentraland contract (present in the
- * decentraland-transactions registry), used to show a "verified" trust badge. This only
- * covers the static registry (MANA, marketplace, etc.), not dynamic collection contracts.
+ * Whether an address is a Decentraland contract on the given chain, per the decentraland-transactions
+ * registry. Recognition is per deployment on purpose: the same address can hold a Decentraland
+ * contract on one chain and something else, or nothing, on another, so a match on any chain would
+ * vouch for code that was never Decentraland's on the chain a transaction actually runs on.
  */
-function isKnownDecentralandContract(address: string): boolean {
-  try {
-    getContractName(address)
-    return true
-  } catch {
-    return false
-  }
+function isKnownDecentralandContractOnChain(address: string, chainId: number): boolean {
+  const normalizedAddress = address.toLowerCase()
+  return Object.values(ContractName).some(contractName => {
+    try {
+      return getContract(contractName, chainId).address.toLowerCase() === normalizedAddress
+    } catch {
+      // Not deployed on that chain.
+      return false
+    }
+  })
 }
 
 /**
@@ -684,7 +688,7 @@ export {
   fetchNftMetadata,
   fetchPlaceByCreatorAddress,
   isSignatureMethod,
-  isKnownDecentralandContract,
+  isKnownDecentralandContractOnChain,
   extractSignaturePayload,
   decodeMetaTransactionTypedData,
   isOpaqueSignatureMessage,

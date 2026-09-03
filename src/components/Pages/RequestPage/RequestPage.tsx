@@ -70,7 +70,7 @@ import {
   getNetworkProvider,
   getSigninDeeplink,
   isApprovalGrantingTypedData,
-  isKnownDecentralandContract,
+  isKnownDecentralandContractOnChain,
   isOpaqueSignatureMessage,
   isSignatureMethod
 } from './utils'
@@ -490,10 +490,12 @@ export const RequestPage = () => {
 
         // Collects the addresses in the simulation that are recognized Decentraland contracts,
         // so the summary can show a "verified" badge next to them.
-        const collectVerifiedContracts = (result: SimulationResponseBody): string[] => {
+        // Recognition is per chain: the addresses are judged against the deployments on the chain the
+        // simulation ran on, never against the registry as a whole.
+        const collectVerifiedContracts = (result: SimulationResponseBody, chainId: number): string[] => {
           const verified = new Set<string>()
           const consider = (address: string | null) => {
-            if (address && isKnownDecentralandContract(address)) verified.add(address.toLowerCase())
+            if (address && isKnownDecentralandContractOnChain(address, chainId)) verified.add(address.toLowerCase())
           }
           for (const change of result.assetChanges) {
             consider(change.from)
@@ -520,7 +522,7 @@ export const RequestPage = () => {
             const result = await authServerClient.current.simulateTransaction(body)
             if (cancelled) return
             setSimulationState({ status: 'ready', result })
-            setSimulationVerified(collectVerifiedContracts(result))
+            setSimulationVerified(collectVerifiedContracts(result, body.chainId))
             void resolveSimulationProfiles(result)
           } catch (e) {
             if (cancelled) return
@@ -938,7 +940,7 @@ export const RequestPage = () => {
           const networkProvider = await getNetworkProvider(chainId)
           // getContract returns the registry entry BY REFERENCE, so mutating .address would
           // permanently rewrite the shared decentraland-transactions registry for the rest of the
-          // session (poisoning later getContractName/isKnownDecentralandContract lookups). Clone it.
+          // session (poisoning later getContractName/isKnownDecentralandContractOnChain lookups). Clone it.
           const contract = { ...getContract(contractName, chainId), address: toAddress }
 
           result = await sendMetaTransaction(connectedProvider, networkProvider, transactionParams.data as string, contract, {
@@ -1077,10 +1079,13 @@ export const RequestPage = () => {
   // a summary it keeps the classic two-step confirm dialog for the gas check.
   const hasSimulationSummary = simulationState.status !== 'idle'
   // The simulation resolved and grants a permission the user should not approve on a single click
-  // (see isDangerousApproval); the summary shows its warning on the same rule.
+  // (see isDangerousApproval). Spenders are recognized from the same chain-aware verified set the
+  // summary uses for its badge and warning, so the checkbox and the icon always agree.
   const hasDangerousApprovalChange =
     simulationState.status === 'ready' &&
-    simulationState.result.approvalChanges.some(approval => isDangerousApproval(approval, isKnownDecentralandContract))
+    simulationState.result.approvalChanges.some(approval =>
+      isDangerousApproval(approval, address => simulationVerified.includes(address.toLowerCase()))
+    )
   // A typed-data MetaTransaction whose inner call could not be previewed: the simulation was
   // unavailable, or the call reverts today. Unlike an eth_sendTransaction relayed through the gas
   // tank — which Auth signs and submits in one step, so the signature is consumed the moment it is

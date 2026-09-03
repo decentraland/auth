@@ -1,7 +1,14 @@
 import { useState } from 'react'
 import { useTranslation } from '@dcl/hooks'
 import { Skeleton } from 'decentraland-ui2'
-import { ApprovalChange, AssetChange, SimulationResponseBody, isDangerousApproval } from '../../../../../shared/auth'
+import {
+  ApprovalChange,
+  AssetChange,
+  SimulationResponseBody,
+  isApprovalRevocation,
+  isDangerousApproval,
+  isZeroAddress
+} from '../../../../../shared/auth'
 import { getExplorerAddressUrl, getExplorerName, getNetworkName } from '../../../../../shared/explorer'
 import { SimulationSummaryProps } from './SimulationSummary.types'
 import {
@@ -248,6 +255,10 @@ const ApprovalItem = ({
     />
   )
 
+  const symbol = approval.symbol || token
+  // Approving the zero address means "nobody": there is no counterparty to name.
+  const hasCounterparty = !isZeroAddress(approval.spender)
+
   let predicate: string
   if (approval.kind === 'approvalForAll') {
     if (approval.approved === false) {
@@ -255,10 +266,18 @@ const ApprovalItem = ({
     } else {
       predicate = t('request.transaction_dialog.approval_can_access_all', { name: token })
     }
+  } else if (isApprovalRevocation(approval)) {
+    // Same rule the gate uses, so a revocation is never worded as a grant.
+    if (approval.tokenId) {
+      predicate = t('request.transaction_dialog.approval_token_approval_revoked', { token, tokenId: approval.tokenId })
+    } else if (hasCounterparty) {
+      predicate = t('request.transaction_dialog.approval_can_no_longer_spend', { symbol })
+    } else {
+      predicate = t('request.transaction_dialog.approval_allowance_revoked', { symbol })
+    }
   } else if (approval.tokenId) {
     predicate = t('request.transaction_dialog.approval_can_transfer_token', { token, tokenId: approval.tokenId })
   } else {
-    const symbol = approval.symbol || token
     // Never show `rawAmount` (base units) here — approvals carry no decimals, so an unformatted
     // finite allowance would render as a huge misleading number. Show the decimals-applied
     // `amount` when the server provides it; otherwise state the permission without a figure.
@@ -277,7 +296,7 @@ const ApprovalItem = ({
   return (
     <ApprovalLine emphasized={highRisk}>
       {highRisk ? <RiskIcon aria-hidden="true">⚠</RiskIcon> : null}
-      {spender} {predicate}
+      {hasCounterparty ? spender : null} {predicate}
     </ApprovalLine>
   )
 }

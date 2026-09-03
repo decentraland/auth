@@ -438,6 +438,54 @@ describe('when rendering the SimulationSummary', () => {
       render(<SimulationSummary simulation={simulation} userAddress={USER} />)
       expect(screen.queryByText('⚠')).not.toBeInTheDocument()
     })
+
+    it('should say the transfer approval was revoked rather than granted', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} />)
+      expect(screen.getByText(/approval_token_approval_revoked/)).toBeInTheDocument()
+      expect(screen.queryByText(/approval_can_transfer_token/)).not.toBeInTheDocument()
+    })
+
+    it('should not present the zero address as a counterparty', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} />)
+      expect(screen.queryByText(/0x0000/)).not.toBeInTheDocument()
+    })
+  })
+
+  describe('and an ERC-20 allowance is set to zero', () => {
+    beforeEach(() => {
+      simulation = {
+        status: 'ready',
+        result: emptyResult({
+          approvalChanges: [
+            {
+              kind: 'approval',
+              standard: 'erc20',
+              owner: USER,
+              spender: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd',
+              amount: '0.0',
+              rawAmount: '0',
+              isUnlimited: false,
+              tokenId: null,
+              approved: null,
+              contractAddress: '0x0f5d2fb29fb7d3cfee444a200298f468908cc942',
+              symbol: 'MANA',
+              name: 'MANA'
+            }
+          ]
+        })
+      }
+    })
+
+    it('should say the spender can no longer spend rather than that it can spend zero', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} />)
+      expect(screen.getByText(/approval_can_no_longer_spend/)).toBeInTheDocument()
+      expect(screen.queryByText(/approval_can_spend/)).not.toBeInTheDocument()
+    })
+
+    it('should not flag it because nothing is granted', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} />)
+      expect(screen.queryByText('⚠')).not.toBeInTheDocument()
+    })
   })
 
   describe('and there is a net dollar balance change for the user', () => {

@@ -2,6 +2,11 @@ import { ApprovalChange } from './types'
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
 
+/** Whether an address is the zero address, which approvals use to mean "nobody". */
+function isZeroAddress(address: string): boolean {
+  return address.toLowerCase() === ZERO_ADDRESS
+}
+
 /** Whether an amount string, in base units or with decimals applied, is zero. Non-numeric is not. */
 function isZeroAmount(amount: string): boolean {
   if (amount.trim() === '') {
@@ -27,7 +32,7 @@ function isApprovalRevocation(approval: ApprovalChange): boolean {
   if (approval.kind === 'approvalForAll') {
     return approval.approved === false
   }
-  if (approval.spender.toLowerCase() === ZERO_ADDRESS) {
+  if (isZeroAddress(approval.spender)) {
     return true
   }
   if (approval.tokenId) {
@@ -62,4 +67,4 @@ function isDangerousApproval(approval: ApprovalChange, isRecognizedSpender: (add
   return !isRecognizedSpender(approval.spender)
 }
 
-export { isApprovalRevocation, isDangerousApproval }
+export { isApprovalRevocation, isDangerousApproval, isZeroAddress }

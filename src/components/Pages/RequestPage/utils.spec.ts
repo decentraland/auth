@@ -26,6 +26,7 @@ import {
   getSigninDeeplink,
   isApprovalGrantingTypedData,
   isDecentralandContractAddress,
+  isKnownDecentralandContractOnChain,
   isOpaqueSignatureMessage,
   isSignatureMethod
 } from './utils'
@@ -1283,6 +1284,47 @@ describe('when testing isApprovalGrantingTypedData', () => {
   describe('and the typed data is undefined', () => {
     it('should return false', () => {
       expect(isApprovalGrantingTypedData(undefined)).toBe(false)
+    })
+  })
+})
+
+describe('when testing isKnownDecentralandContractOnChain', () => {
+  const manaOnPolygon = '0xa1c57f48f0deb89f569dfbe6e2b7f46d33606fd4'
+  const manaOnMainnet = '0x0f5d2fb29fb7d3cfee444a200298f468908cc942'
+
+  beforeEach(() => {
+    jest.mocked(getContract).mockImplementation((_name, chainId) => {
+      if (Number(chainId) === 137) return { address: manaOnPolygon } as ReturnType<typeof getContract>
+      if (Number(chainId) === 1) return { address: manaOnMainnet } as ReturnType<typeof getContract>
+      throw new Error('not deployed')
+    })
+  })
+
+  afterEach(() => {
+    jest.mocked(getContract).mockReset()
+  })
+
+  describe('and the address is the deployment on the given chain', () => {
+    it('should return true', () => {
+      expect(isKnownDecentralandContractOnChain(manaOnPolygon.toUpperCase().replace('0X', '0x'), 137)).toBe(true)
+    })
+  })
+
+  describe('and the address is a Decentraland deployment on another chain only', () => {
+    it('should return false because recognition is per deployment', () => {
+      expect(isKnownDecentralandContractOnChain(manaOnPolygon, 1)).toBe(false)
+    })
+  })
+
+  describe('and no Decentraland contract is deployed on the chain', () => {
+    it('should return false', () => {
+      expect(isKnownDecentralandContractOnChain(manaOnPolygon, 5)).toBe(false)
+    })
+  })
+
+  describe('and the address is not a Decentraland contract anywhere', () => {
+    it('should return false', () => {
+      expect(isKnownDecentralandContractOnChain('0x000000000000000000000000000000000000dead', 137)).toBe(false)
     })
   })
 })

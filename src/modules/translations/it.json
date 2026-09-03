@@ -104,7 +104,10 @@
       "verified_contract": "Contratto Decentraland verificato",
       "on_network": "su {network}",
       "acknowledge_risk": "Capisco che questo concede l'accesso ai miei asset",
-      "approval_can_spend_symbol": "può spendere {symbol}"
+      "approval_can_spend_symbol": "può spendere {symbol}",
+      "approval_can_no_longer_spend": "non può più spendere {symbol}",
+      "approval_allowance_revoked": "Autorizzazione di spesa per {symbol} revocata",
+      "approval_token_approval_revoked": "Autorizzazione al trasferimento di {token} #{tokenId} revocata"
     },
     "signature": {
       "title": "Conferma firma",

@@ -104,7 +104,10 @@
       "verified_contract": "已验证的 Decentraland 合约",
       "on_network": "在 {network} 上",
       "acknowledge_risk": "我了解这会授予对我资产的访问权限",
-      "approval_can_spend_symbol": "可以使用 {symbol}"
+      "approval_can_spend_symbol": "可以使用 {symbol}",
+      "approval_can_no_longer_spend": "不再可以使用 {symbol}",
+      "approval_allowance_revoked": "已撤销 {symbol} 的使用授权",
+      "approval_token_approval_revoked": "已撤销 {token} #{tokenId} 的转移授权"
     },
     "signature": {
       "title": "确认签名",
