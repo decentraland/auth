@@ -118,7 +118,9 @@
       "meta_tx_notice": "Esta firma autoriza al contrato a ejecutar esta acción en tu nombre. No expira y la aplicación que la solicitó puede enviarla más adelante.",
       "meta_tx_reverted": "Esta acción falla ahora mismo, por lo que no se pudieron previsualizar sus efectos. Fírmala solo si esperas que funcione más adelante.",
       "acknowledge_unverified": "Entiendo que no se pudieron verificar los efectos de esta firma",
-      "meta_tx_unrecognized_contract": "Este no es un contrato reconocido de Decentraland, por lo que Decentraland no puede garantizar lo que hará esta firma."
+      "meta_tx_unrecognized_contract": "Este no es un contrato reconocido de Decentraland, por lo que Decentraland no puede garantizar lo que hará esta firma.",
+      "unrecognized_typed_data": "Decentraland no reconoce este tipo de firma, por lo que no puede previsualizar lo que autoriza. Fírmala solo si confías en la aplicación que la solicitó.",
+      "opaque_message": "Este mensaje no parece texto legible, por lo que no puedes comprobar lo que estás firmando. Podría ser un hash que autoriza una acción en un contrato. Fírmalo solo si confías en la aplicación que lo solicitó."
     }
   },
   "request_views": {

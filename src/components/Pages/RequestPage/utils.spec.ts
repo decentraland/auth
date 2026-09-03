@@ -26,6 +26,7 @@ import {
   getSigninDeeplink,
   isApprovalGrantingTypedData,
   isDecentralandContractAddress,
+  isOpaqueSignatureMessage,
   isSignatureMethod
 } from './utils'
 
@@ -1239,14 +1240,27 @@ describe('when testing decodeMetaTransactionTypedData', () => {
 })
 
 describe('when testing isApprovalGrantingTypedData', () => {
-  describe.each(['Permit', 'PermitSingle', 'PermitBatch', 'PermitTransferFrom', 'PermitBatchTransferFrom', 'OrderComponents', 'BulkOrder'])(
-    'and the typed data primaryType is the approval-granting type %s',
-    primaryType => {
-      it('should return true', () => {
-        expect(isApprovalGrantingTypedData({ primaryType } as any)).toBe(true)
-      })
-    }
-  )
+  describe.each([
+    'Permit',
+    'PermitSingle',
+    'PermitBatch',
+    'PermitTransferFrom',
+    'PermitBatchTransferFrom',
+    'PermitWitnessTransferFrom',
+    'PermitBatchWitnessTransferFrom',
+    'PermitForAll',
+    'TransferWithAuthorization',
+    'ReceiveWithAuthorization',
+    'OrderComponents',
+    'BulkOrder',
+    'Trade',
+    'Order',
+    'MakerOrder'
+  ])('and the typed data primaryType is the approval-granting type %s', primaryType => {
+    it('should return true', () => {
+      expect(isApprovalGrantingTypedData({ primaryType } as any)).toBe(true)
+    })
+  })
 
   describe('and the primaryType casing differs', () => {
     it('should still match case-insensitively', () => {
@@ -1269,6 +1283,89 @@ describe('when testing isApprovalGrantingTypedData', () => {
   describe('and the typed data is undefined', () => {
     it('should return false', () => {
       expect(isApprovalGrantingTypedData(undefined)).toBe(false)
+    })
+  })
+})
+
+describe('when testing isOpaqueSignatureMessage', () => {
+  describe.each([
+    ['a readable sentence', 'Sign in to Decentraland\nNonce: 1234'],
+    ['emoji and non-latin text', 'Bienvenido 👋 — 欢迎'],
+    [
+      'a long readable sign-in message',
+      'decentraland.org wants you to sign in with your Ethereum account.\n\nURI: https://decentraland.org\nVersion: 1'
+    ],
+    ['a short nonce-like token', 'nonce-1234'],
+    ['text with a non-breaking space', 'Sign\u00A0in to Decentraland today please'],
+    ['a URL with a scheme', 'https://decentraland.org/auth/requests/abc'],
+    ['31 characters with no whitespace', 'a'.repeat(31)]
+  ])('and the message is %s', (_label, message) => {
+    it('should return false', () => {
+      expect(isOpaqueSignatureMessage(message)).toBe(false)
+    })
+  })
+
+  describe.each([
+    ['still raw hex', `0x${'ab'.repeat(32)}`],
+    ['bytes that are not text', 'abc\u0000\u0007def'],
+    ['the replacement character left by invalid UTF-8', 'abc\uFFFDdef'],
+    ['a C1 control character', 'authorize\u0085withdrawal'],
+    ['the last C1 control character', 'abc\u009Fdef'],
+    ['a zero-width space', 'abc\u200Bdef'],
+    ['a bidi override', 'abc\u202Edef'],
+    ['a byte order mark', '\uFEFFabc'],
+    ['a private-use code point', 'abc\uE000def'],
+    ['an unassigned code point', 'abc\u0378def'],
+    ['a line separator', 'abc\u2028def'],
+    ['32 printable bytes with no whitespace', 'a'.repeat(32)],
+    ['32 printable bytes that include a space', `${'a'.repeat(15)} ${'b'.repeat(16)}`],
+    ['32 printable bytes that include a newline', `${'a'.repeat(31)}\n`],
+    ['32 bytes of multibyte characters', 'é'.repeat(16)],
+    ['a 32-byte sentence with spaces', 'Sign in to Decentraland today!!!'],
+    ['a 64-character unprefixed hex digest', 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'],
+    ['a base64 digest', '47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU='],
+    ['a base64url digest', '47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU'],
+    ['a UUID', '0f8fad5b-d9cb-469f-a165-70867728950e'],
+    ['a JWT-like token', 'eyJhbGciOiJIUzI1NiJ9.eyJhY3Rpb24iOiJ3aXRoZHJhdyJ9.dGhpcy1pcy1ub3QtYS1yZWFsLXNpZ25hdHVyZQ'],
+    ['a token surrounded by whitespace', `  ${'A'.repeat(40)}\n`]
+  ])('and the message is %s', (_label, message) => {
+    it('should return true because the user cannot check what it means', () => {
+      expect(isOpaqueSignatureMessage(message)).toBe(true)
+    })
+  })
+
+  describe('and the request carried hex-encoded bytes that decode to a C1 control character', () => {
+    let message: string
+
+    beforeEach(() => {
+      const toHex = (text: string) =>
+        Array.from(new TextEncoder().encode(text))
+          .map(byte => byte.toString(16).padStart(2, '0'))
+          .join('')
+      // "authorize" + U+0085 (bytes C2 85) + "withdrawal", as a wallet would decode it.
+      const payload = extractSignaturePayload('personal_sign', [
+        `0x${toHex('authorize')}c285${toHex('withdrawal')}`,
+        '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd'
+      ])
+      message = payload?.kind === 'message' ? payload.message : ''
+    })
+
+    it('should return true because the control character is invisible to the user', () => {
+      expect(message).toBe('authorize\u0085withdrawal')
+      expect(isOpaqueSignatureMessage(message)).toBe(true)
+    })
+  })
+
+  describe('and the request carried 32 hex-encoded bytes that all decode to printable characters', () => {
+    let message: string
+
+    beforeEach(() => {
+      const payload = extractSignaturePayload('personal_sign', [`0x${'61'.repeat(32)}`, '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd'])
+      message = payload?.kind === 'message' ? payload.message : ''
+    })
+
+    it('should return true because a digest-sized payload is a hash, however it arrived', () => {
+      expect(isOpaqueSignatureMessage(message)).toBe(true)
     })
   })
 })

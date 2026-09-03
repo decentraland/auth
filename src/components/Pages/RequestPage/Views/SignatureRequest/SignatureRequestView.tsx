@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from '@dcl/hooks'
 import { Box, Button, Checkbox, CircularProgress, FormControlLabel } from 'decentraland-ui2'
 import { getExplorerAddressUrl, getExplorerName, getNetworkName } from '../../../../../shared/explorer'
@@ -36,13 +36,15 @@ export const SignatureRequestView = ({
   requiresAcknowledgment = false,
   isMetaTransaction,
   contractTrust,
+  unverifiableReason = null,
   isLoading = false,
   onDeny,
   onApprove
 }: SignatureRequestViewProps) => {
   const { t } = useTranslation()
   const [showRaw, setShowRaw] = useState(false)
-  const [acknowledged, setAcknowledged] = useState(false)
+  // The statement the user ticked, if any (see acknowledgmentStatement below).
+  const [acknowledgedStatement, setAcknowledgedStatement] = useState<string | null>(null)
 
   const domain = payload?.kind === 'typedData' ? payload.typedData.domain : undefined
   const domainChainId = chainId ?? (domain?.chainId !== undefined ? Number(domain.chainId) : undefined)
@@ -56,13 +58,23 @@ export const SignatureRequestView = ({
   // its effects could not be previewed — or the contract that will execute it is not one Auth can
   // vouch for — the acknowledgment must say that, not talk about approvals.
   const hasUnverifiedEffects = isMetaTransaction && (simulation.status === 'unavailable' || isReverted || isContractUnrecognized)
+  // Likewise when Auth cannot tell what the signature authorizes in the first place.
+  const isUnverifiable = hasUnverifiedEffects || unverifiableReason !== null
 
-  // A tick given to one statement must not carry over to another: when the wording changes (for
-  // instance the contract lookup resolves to unrecognized after the user acknowledged an approval),
-  // ask again.
-  useEffect(() => {
-    setAcknowledged(false)
-  }, [hasUnverifiedEffects])
+  // The exact statement the user is asked to acknowledge: the request it belongs to, the label, and
+  // every notice shown alongside it. A tick is given to that statement only — when any part of it
+  // changes (another request, the lookup resolving to unrecognized, a different reason), ask again.
+  const acknowledgmentStatement = [
+    requestId,
+    isUnverifiable ? 'unverified' : 'risk',
+    unverifiableReason ?? '',
+    isReverted ? 'reverted' : '',
+    isContractUnrecognized ? 'unrecognized-contract' : '',
+    simulation.status === 'unavailable' ? 'unavailable' : ''
+  ].join('|')
+  // Derived, not synced: an effect would clear a stale tick one render late, and for that one commit
+  // the Allow button would be enabled against a statement the user never acknowledged.
+  const acknowledged = acknowledgedStatement === acknowledgmentStatement
 
   return (
     <Container canChangeAccount requestId={requestId}>
@@ -143,16 +155,24 @@ export const SignatureRequestView = ({
 
         {!payload ? <MessageBlock>{t('request.signature.description')}</MessageBlock> : null}
 
+        {unverifiableReason !== null ? (
+          <Notice data-testid="signature-unverifiable-notice">
+            {unverifiableReason === 'opaque_message'
+              ? t('request.signature.opaque_message')
+              : t('request.signature.unrecognized_typed_data')}
+          </Notice>
+        ) : null}
+
         {requiresAcknowledgment ? (
           <FormControlLabel
             control={
               <Checkbox
                 checked={acknowledged}
-                onChange={event => setAcknowledged(event.target.checked)}
+                onChange={event => setAcknowledgedStatement(event.target.checked ? acknowledgmentStatement : null)}
                 data-testid="risk-acknowledgment"
               />
             }
-            label={hasUnverifiedEffects ? t('request.signature.acknowledge_unverified') : t('request.transaction_dialog.acknowledge_risk')}
+            label={isUnverifiable ? t('request.signature.acknowledge_unverified') : t('request.transaction_dialog.acknowledge_risk')}
           />
         ) : null}
       </Content>

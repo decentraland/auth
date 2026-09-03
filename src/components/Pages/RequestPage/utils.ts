@@ -104,19 +104,28 @@ function extractSignaturePayload(method: string, params: unknown[] | undefined, 
   return null
 }
 
-// EIP-712 primaryTypes that grant a third party the ability to move the user's assets off-chain
-// (token allowances and marketplace order listings). These carry the same risk as an on-chain
-// `approve`/`setApprovalForAll` but are invisible to a transaction simulation because no
-// transaction is sent — so signing them must be gated behind an explicit acknowledgment.
+// EIP-712 primaryTypes known to grant a third party the ability to move the user's assets
+// off-chain (token allowances, gasless transfers and marketplace order listings). These carry the
+// same risk as an on-chain `approve`/`setApprovalForAll` but are invisible to a transaction
+// simulation because no transaction is sent — so signing them must be gated behind an explicit
+// acknowledgment. The list only tailors the wording: a primaryType that is neither here nor a
+// MetaTransaction is treated as unrecognized and gated as well (see RequestPage).
 const APPROVAL_GRANTING_PRIMARY_TYPES = new Set([
-  'permit', // EIP-2612
+  'permit', // EIP-2612 (and DAI-style / ERC-4494 permits, same type name)
   'permitsingle', // Uniswap Permit2 (AllowanceTransfer)
   'permitbatch',
   'permittransferfrom', // Uniswap Permit2 (SignatureTransfer)
   'permitbatchtransferfrom',
+  'permitwitnesstransferfrom', // Uniswap Permit2 (SignatureTransfer with witness)
+  'permitbatchwitnesstransferfrom',
   'permitforall',
+  'transferwithauthorization', // EIP-3009 gasless transfer (e.g. USDC): moves tokens outright
+  'receivewithauthorization',
   'ordercomponents', // Seaport order
-  'bulkorder' // Seaport bulk order
+  'bulkorder', // Seaport bulk order
+  'trade', // Decentraland off-chain marketplace order
+  'order', // 0x, Blur, Rarible and other exchange orders
+  'makerorder' // LooksRare order
 ])
 
 /**
@@ -127,6 +136,47 @@ const APPROVAL_GRANTING_PRIMARY_TYPES = new Set([
 function isApprovalGrantingTypedData(typedData: TypedDataPayload | undefined | null): boolean {
   const primaryType = typedData?.primaryType
   return typeof primaryType === 'string' && APPROVAL_GRANTING_PRIMARY_TYPES.has(primaryType.toLowerCase())
+}
+
+// Anything the user cannot see or read as text, defined by Unicode category rather than by
+// enumerated ranges: controls (C0 and C1), format characters such as zero-width and bidi controls,
+// surrogates, private-use and unassigned code points, the line and paragraph separators, and U+FFFD,
+// which is what decoding bytes that are not valid UTF-8 produces. Tab, newline and carriage return
+// are the only controls a message may contain.
+const UNREADABLE_CHARACTER_REGEX = /(?![\t\n\r])[\p{C}\p{Zl}\p{Zp}\uFFFD]/u
+
+// The size of a keccak256 digest — what a contract accepting EIP-191 signatures over a hash expects.
+const DIGEST_BYTE_LENGTH = 32
+// One unbroken run of hex, base64, base64url or dotted-token characters, at least 32 of them and
+// nothing else: unprefixed hex hashes (64), base64 digests (43–44), UUIDs (36), JWT-like tokens.
+// A sentence has spaces and punctuation outside this alphabet; a token does not.
+const TOKEN_SHAPED_REGEX = /^[A-Za-z0-9+/=_.-]{32,}$/
+
+/**
+ * Returns true when a personal_sign message is not something the user can read and check:
+ * - it is still raw hex (it could not be decoded as text);
+ * - it decodes to bytes that are not text;
+ * - it is exactly digest-sized (32 bytes), whatever those bytes look like — a hash whose bytes happen
+ *   to be (or were ground to be) printable can contain a space as easily as a letter, so whitespace
+ *   is no exemption;
+ * - it is a single token-shaped run of characters: an unprefixed hex hash, a base64/base64url
+ *   digest, a UUID or a JWT-like token. Signing the text form of a digest is not the same bytes as
+ *   signing the digest, so this is not an on-chain authorization, but off-chain services do accept a
+ *   signature over such a token as authorization, and the user cannot tell what it means either way.
+ *
+ * Such payloads may authorize something the screen cannot show, so they must not be signed on a
+ * single click. The check runs on the decoded message on purpose: the wallet signs bytes, so a
+ * hex-encoded message and its plaintext are the same signature, and whether the request arrived as
+ * hex says nothing.
+ */
+function isOpaqueSignatureMessage(message: string): boolean {
+  if (HEX_STRING_REGEX.test(message) || UNREADABLE_CHARACTER_REGEX.test(message)) {
+    return true
+  }
+  if (new TextEncoder().encode(message).length === DIGEST_BYTE_LENGTH) {
+    return true
+  }
+  return TOKEN_SHAPED_REGEX.test(message.trim())
 }
 
 /**
@@ -637,5 +687,6 @@ export {
   isKnownDecentralandContract,
   extractSignaturePayload,
   decodeMetaTransactionTypedData,
+  isOpaqueSignatureMessage,
   buildSendTransactionSimulationPayload
 }

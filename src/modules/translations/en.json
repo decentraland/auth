@@ -118,7 +118,9 @@
       "meta_tx_notice": "This signature authorizes the contract to run this action on your behalf. It doesn't expire and can be submitted later by the app that requested it.",
       "meta_tx_reverted": "This action fails right now, so its effects couldn't be previewed. Only sign it if you expect it to work later.",
       "acknowledge_unverified": "I understand the effects of this signature couldn't be verified",
-      "meta_tx_unrecognized_contract": "This isn't a recognized Decentraland contract, so Decentraland can't vouch for what this signature will do."
+      "meta_tx_unrecognized_contract": "This isn't a recognized Decentraland contract, so Decentraland can't vouch for what this signature will do.",
+      "unrecognized_typed_data": "Decentraland doesn't recognize this type of signature, so it can't preview what it authorizes. Only sign it if you trust the app that requested it.",
+      "opaque_message": "This message doesn't look like readable text, so you can't check what you're signing. It could be a hash that authorizes an action in a contract. Only sign it if you trust the app that requested it."
     }
   },
   "request_views": {
