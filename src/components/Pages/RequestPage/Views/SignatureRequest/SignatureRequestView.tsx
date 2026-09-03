@@ -65,7 +65,7 @@ export const SignatureRequestView = ({
   // ask again.
   useEffect(() => {
     setAcknowledged(false)
-  }, [hasUnverifiedEffects])
+  }, [isUnverifiable])
 
   return (
     <Container canChangeAccount requestId={requestId}>
