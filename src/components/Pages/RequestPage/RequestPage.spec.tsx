@@ -1645,6 +1645,45 @@ describe('RequestPage', () => {
         })
       })
 
+      describe('and it is a tiny allowance whose display amount rounds to zero, to an unrecognized spender', () => {
+        beforeEach(() => {
+          mockIsKnownDecentralandContract.mockReturnValue(false)
+          mockSimulateTransaction.mockResolvedValue(simulationWith([{ ...approval, amount: '0', rawAmount: '1' }]))
+        })
+
+        it('should still require an acknowledgment because the base units say it is a grant', async () => {
+          renderRequestPage()
+          const view = await screen.findByTestId('wallet-interaction')
+          await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+          expect(view).toHaveAttribute('data-requires-acknowledgment', 'true')
+        })
+      })
+
+      describe('and it clears a single-token approval with the zero address', () => {
+        beforeEach(() => {
+          mockIsKnownDecentralandContract.mockReturnValue(false)
+          mockSimulateTransaction.mockResolvedValue(
+            simulationWith([
+              {
+                ...approval,
+                standard: 'erc721',
+                spender: '0x0000000000000000000000000000000000000000',
+                amount: null,
+                rawAmount: null,
+                tokenId: '7'
+              }
+            ])
+          )
+        })
+
+        it('should not require an acknowledgment because it is a revocation', async () => {
+          renderRequestPage()
+          const view = await screen.findByTestId('wallet-interaction')
+          await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+          expect(view).toHaveAttribute('data-requires-acknowledgment', 'false')
+        })
+      })
+
       describe('and it revokes an allowance from an unrecognized spender', () => {
         beforeEach(() => {
           mockIsKnownDecentralandContract.mockReturnValue(false)

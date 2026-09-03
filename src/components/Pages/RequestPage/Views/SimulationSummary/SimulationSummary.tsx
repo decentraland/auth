@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from '@dcl/hooks'
 import { Skeleton } from 'decentraland-ui2'
-import { ApprovalChange, AssetChange, SimulationResponseBody } from '../../../../../shared/auth'
+import { ApprovalChange, AssetChange, SimulationResponseBody, isDangerousApproval } from '../../../../../shared/auth'
 import { getExplorerAddressUrl, getExplorerName, getNetworkName } from '../../../../../shared/explorer'
 import { SimulationSummaryProps } from './SimulationSummary.types'
 import {
@@ -249,13 +249,11 @@ const ApprovalItem = ({
   )
 
   let predicate: string
-  let highRisk = false
   if (approval.kind === 'approvalForAll') {
     if (approval.approved === false) {
       predicate = t('request.transaction_dialog.approval_access_revoked', { name: token })
     } else {
       predicate = t('request.transaction_dialog.approval_can_access_all', { name: token })
-      highRisk = true
     }
   } else if (approval.tokenId) {
     predicate = t('request.transaction_dialog.approval_can_transfer_token', { token, tokenId: approval.tokenId })
@@ -271,18 +269,10 @@ const ApprovalItem = ({
     } else {
       predicate = t('request.transaction_dialog.approval_can_spend_symbol', { symbol })
     }
-    highRisk = approval.isUnlimited
   }
 
-  // Any grant to a spender that is not a recognized Decentraland contract is high-risk whatever the
-  // amount or token; the page gates approval on the same rule.
-  const isRevocation =
-    approval.kind === 'approvalForAll'
-      ? approval.approved === false
-      : !approval.tokenId && (approval.rawAmount === '0' || approval.amount === '0')
-  if (!isRevocation && !spenderVerified) {
-    highRisk = true
-  }
+  // The page gates the Allow button on the same rule, so the warning and the checkbox always agree.
+  const highRisk = isDangerousApproval(approval, address => verified.has(address.toLowerCase()))
 
   return (
     <ApprovalLine emphasized={highRisk}>

@@ -378,6 +378,68 @@ describe('when rendering the SimulationSummary', () => {
     })
   })
 
+  describe('and a tiny allowance is displayed as zero while its base units are not', () => {
+    beforeEach(() => {
+      simulation = {
+        status: 'ready',
+        result: emptyResult({
+          approvalChanges: [
+            {
+              kind: 'approval',
+              standard: 'erc20',
+              owner: USER,
+              spender: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd',
+              amount: '0',
+              rawAmount: '1',
+              isUnlimited: false,
+              tokenId: null,
+              approved: null,
+              contractAddress: '0x0f5d2fb29fb7d3cfee444a200298f468908cc942',
+              symbol: 'MANA',
+              name: 'MANA'
+            }
+          ]
+        })
+      }
+    })
+
+    it('should still flag it because the display amount is not what decides', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} />)
+      expect(screen.getByText('⚠')).toBeInTheDocument()
+    })
+  })
+
+  describe('and a single-token approval is cleared with the zero address', () => {
+    beforeEach(() => {
+      simulation = {
+        status: 'ready',
+        result: emptyResult({
+          approvalChanges: [
+            {
+              kind: 'approval',
+              standard: 'erc721',
+              owner: USER,
+              spender: '0x0000000000000000000000000000000000000000',
+              amount: null,
+              rawAmount: null,
+              isUnlimited: false,
+              tokenId: '7',
+              approved: null,
+              contractAddress: '0xfef5c99885c3036e591b6e6db52482891834a5f4',
+              symbol: null,
+              name: 'Fancy Wearables'
+            }
+          ]
+        })
+      }
+    })
+
+    it('should not flag it because it is a revocation', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} />)
+      expect(screen.queryByText('⚠')).not.toBeInTheDocument()
+    })
+  })
+
   describe('and there is a net dollar balance change for the user', () => {
     beforeEach(() => {
       simulation = { status: 'ready', result: emptyResult({ balanceChanges: [{ address: USER, dollarValue: '-38.00' }] }) }
