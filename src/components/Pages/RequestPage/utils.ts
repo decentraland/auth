@@ -138,10 +138,12 @@ function isApprovalGrantingTypedData(typedData: TypedDataPayload | undefined | n
   return typeof primaryType === 'string' && APPROVAL_GRANTING_PRIMARY_TYPES.has(primaryType.toLowerCase())
 }
 
-// Control characters other than tab, newline and carriage return, plus U+FFFD, which is what
-// decoding bytes that are not valid UTF-8 produces.
-// eslint-disable-next-line no-control-regex
-const UNREADABLE_CHARACTER_REGEX = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\uFFFD]/
+// Anything the user cannot see or read as text, defined by Unicode category rather than by
+// enumerated ranges: controls (C0 and C1), format characters such as zero-width and bidi controls,
+// surrogates, private-use and unassigned code points, the line and paragraph separators, and U+FFFD,
+// which is what decoding bytes that are not valid UTF-8 produces. Tab, newline and carriage return
+// are the only controls a message may contain.
+const UNREADABLE_CHARACTER_REGEX = /(?![\t\n\r])[\p{C}\p{Zl}\p{Zp}\uFFFD]/u
 
 // The size of a keccak256 digest — what a contract accepting EIP-191 signatures over a hash expects.
 const DIGEST_BYTE_LENGTH = 32

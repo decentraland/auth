@@ -1296,6 +1296,7 @@ describe('when testing isOpaqueSignatureMessage', () => {
       'decentraland.org wants you to sign in with your Ethereum account.\n\nURI: https://decentraland.org\nVersion: 1'
     ],
     ['a short nonce-like token', 'nonce-1234'],
+    ['text with a non-breaking space', 'Sign\u00A0in to Decentraland today please'],
     ['a URL with a scheme', 'https://decentraland.org/auth/requests/abc'],
     ['31 characters with no whitespace', 'a'.repeat(31)]
   ])('and the message is %s', (_label, message) => {
@@ -1308,6 +1309,14 @@ describe('when testing isOpaqueSignatureMessage', () => {
     ['still raw hex', `0x${'ab'.repeat(32)}`],
     ['bytes that are not text', 'abc\u0000\u0007def'],
     ['the replacement character left by invalid UTF-8', 'abc\uFFFDdef'],
+    ['a C1 control character', 'authorize\u0085withdrawal'],
+    ['the last C1 control character', 'abc\u009Fdef'],
+    ['a zero-width space', 'abc\u200Bdef'],
+    ['a bidi override', 'abc\u202Edef'],
+    ['a byte order mark', '\uFEFFabc'],
+    ['a private-use code point', 'abc\uE000def'],
+    ['an unassigned code point', 'abc\u0378def'],
+    ['a line separator', 'abc\u2028def'],
     ['32 printable bytes with no whitespace', 'a'.repeat(32)],
     ['32 printable bytes that include a space', `${'a'.repeat(15)} ${'b'.repeat(16)}`],
     ['32 printable bytes that include a newline', `${'a'.repeat(31)}\n`],
@@ -1321,6 +1330,28 @@ describe('when testing isOpaqueSignatureMessage', () => {
     ['a token surrounded by whitespace', `  ${'A'.repeat(40)}\n`]
   ])('and the message is %s', (_label, message) => {
     it('should return true because the user cannot check what it means', () => {
+      expect(isOpaqueSignatureMessage(message)).toBe(true)
+    })
+  })
+
+  describe('and the request carried hex-encoded bytes that decode to a C1 control character', () => {
+    let message: string
+
+    beforeEach(() => {
+      const toHex = (text: string) =>
+        Array.from(new TextEncoder().encode(text))
+          .map(byte => byte.toString(16).padStart(2, '0'))
+          .join('')
+      // "authorize" + U+0085 (bytes C2 85) + "withdrawal", as a wallet would decode it.
+      const payload = extractSignaturePayload('personal_sign', [
+        `0x${toHex('authorize')}c285${toHex('withdrawal')}`,
+        '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd'
+      ])
+      message = payload?.kind === 'message' ? payload.message : ''
+    })
+
+    it('should return true because the control character is invisible to the user', () => {
+      expect(message).toBe('authorize\u0085withdrawal')
       expect(isOpaqueSignatureMessage(message)).toBe(true)
     })
   })
