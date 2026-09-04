@@ -190,6 +190,47 @@ describe('resolveMetaTransactionTypedData', () => {
     })
   })
 
+  describe('when the domain type declares a field under a type the contract does not hash', () => {
+    let typedData: MutableTypedData
+
+    beforeEach(() => {
+      typedData = buildOffchainTypedData()
+      typedData.types.EIP712Domain = DOMAIN_TYPE.map(field => (field.name === 'salt' ? { name: 'salt', type: 'uint256' } : field))
+    })
+
+    it('should reject the request because the domain would be hashed differently from what the contract verifies', () => {
+      expect(() => resolveMetaTransactionTypedData(typedData, METHOD)).toThrow('domain type does not match the domain fields')
+    })
+  })
+
+  describe('when the domain type repeats a field the domain does have', () => {
+    let typedData: MutableTypedData
+
+    beforeEach(() => {
+      typedData = buildOffchainTypedData()
+      typedData.types.EIP712Domain = [...DOMAIN_TYPE, DOMAIN_TYPE[0]]
+    })
+
+    it('should reject the request', () => {
+      expect(() => resolveMetaTransactionTypedData(typedData, METHOD)).toThrow('domain type does not match the domain fields')
+    })
+  })
+
+  describe('when the domain carries a field EIP-712 does not define', () => {
+    let typedData: MutableTypedData
+
+    beforeEach(() => {
+      typedData = buildOffchainTypedData()
+      // With no struct the wallet derives one from the standard names and drops this field unsigned.
+      delete typedData.types.EIP712Domain
+      typedData.domain.extra = 'unsigned'
+    })
+
+    it('should reject the request', () => {
+      expect(() => resolveMetaTransactionTypedData(typedData, METHOD)).toThrow('domain has a field EIP-712 does not define')
+    })
+  })
+
   describe('when the domain type lists the domain fields in another order', () => {
     let typedData: MutableTypedData
 

@@ -6,6 +6,16 @@ import { MalformedSignatureRequestError } from './errors'
 const META_TRANSACTION_PRIMARY_TYPE = 'MetaTransaction'
 // A 4-byte function selector followed by whole bytes of arguments.
 const CALLDATA_REGEX = /^0x[0-9a-fA-F]{8}([0-9a-fA-F]{2})*$/
+// The fields EIP-712 defines for a domain, with the types the standard gives them. A Decentraland
+// contract hashes its domain with exactly these types, and a wallet asked to derive the struct from the
+// domain (when `types.EIP712Domain` is absent) knows these names and no other.
+const EIP712_DOMAIN_FIELD_TYPES: ReadonlyMap<string, string> = new Map([
+  ['name', 'string'],
+  ['version', 'string'],
+  ['chainId', 'uint256'],
+  ['verifyingContract', 'address'],
+  ['salt', 'bytes32']
+])
 
 type TypedDataField = { name: string; type: string }
 
@@ -83,7 +93,8 @@ function parseChainId(value: unknown): number | undefined {
  * undeclared call for the preview to simulate. The same holds for the domain: a `salt` the
  * `EIP712Domain` struct does not declare names a chain the signature is not bound to. The struct
  * therefore decides which field is the calldata, the message may hold nothing but the declared
- * fields, the domain struct (when given) must cover the domain, and the request is finally
+ * fields, the domain may carry only the standard fields and its struct (when given) must declare
+ * exactly those with their standard types, and the request is finally
  * hashed the way the wallet will and compared with a payload rebuilt from the resolved fields
  * alone — equality proves the bytes handed to the simulation are the bytes the signature covers.
  * (Thirdweb signs through ox, which shares viem's EIP-712 encoding.)
@@ -145,18 +156,31 @@ function resolveMetaTransactionTypedData(typedData: unknown, method: string): Me
     return reject('the MetaTransaction domain has no chain id')
   }
 
-  // 2b. The domain must be signed whole. EIP-712 hashes only the fields `types.EIP712Domain`
-  //     declares, so a request could carry a `salt` — the chain this preview runs on — that the
-  //     wallet never signs, or declare a field the domain does not have. When the struct is given it
-  //     must name exactly the domain's keys; when it is absent the wallet derives it from the domain,
-  //     which signs every field present.
+  // 2b. The domain must be signed whole, and as the standard defines it. EIP-712 hashes only the
+  //     fields `types.EIP712Domain` declares, so a request could carry a `salt` — the chain this
+  //     preview runs on — that the wallet never signs, declare a field the domain lacks, or declare a
+  //     field under a type the contract does not hash. The domain may only carry the standard fields:
+  //     when the struct is absent the wallet derives it from those names and drops anything else,
+  //     unsigned. When the struct is given it must declare exactly the domain's keys, each once, with
+  //     its standard type.
+  const domainKeys = Object.keys(domain)
+  if (domainKeys.some(key => !EIP712_DOMAIN_FIELD_TYPES.has(key))) {
+    return reject('the MetaTransaction domain has a field EIP-712 does not define')
+  }
   const domainType = types.EIP712Domain
   if (domainType !== undefined) {
-    const declaredNames = Array.isArray(domainType) ? domainType.map(field => (isRecord(field) ? field.name : undefined)) : []
-    const domainKeys = Object.keys(domain)
-    const signsEveryDomainField = domainKeys.every(key => declaredNames.includes(key))
-    const declaresOnlyDomainFields = declaredNames.every(name => typeof name === 'string' && domainKeys.includes(name))
-    if (!Array.isArray(domainType) || !signsEveryDomainField || !declaresOnlyDomainFields) {
+    const declaresDomainExactly =
+      Array.isArray(domainType) &&
+      domainType.length === domainKeys.length &&
+      new Set(domainType.map(field => (isRecord(field) ? field.name : undefined))).size === domainKeys.length &&
+      domainType.every(
+        field =>
+          isRecord(field) &&
+          typeof field.name === 'string' &&
+          domainKeys.includes(field.name) &&
+          field.type === EIP712_DOMAIN_FIELD_TYPES.get(field.name)
+      )
+    if (!declaresDomainExactly) {
       return reject('the MetaTransaction domain type does not match the domain fields')
     }
   }
