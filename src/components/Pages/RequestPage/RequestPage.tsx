@@ -72,6 +72,7 @@ import {
   getNetworkProvider,
   getSigninDeeplink,
   isApprovalGrantingTypedData,
+  isExactNftTransferSimulation,
   isKnownDecentralandContractOnChain,
   isOpaqueSignatureMessage,
   isSignatureMethod
@@ -593,6 +594,7 @@ export const RequestPage = () => {
             setSimulationState({ status: 'ready', result })
             setSimulationVerified(collectVerifiedContracts(result, body.chainId))
             void resolveSimulationProfiles(result)
+            return result
           } catch (e) {
             if (cancelled) return
             // Nothing to reject once the user has already answered (e.g. denied while loading).
@@ -685,6 +687,29 @@ export const RequestPage = () => {
                       nftContractCheck.willUseMetaTransaction && nftContractCheck.contractName === ContractName.ERC721CollectionV2
 
                     if (isVerifiedCollection) {
+                      // A recognized selector is not a complete preview: safeTransferFrom invokes
+                      // the receiver, whose callback may move other assets through existing
+                      // allowances. Simulate first and retain the branded view only when the sole
+                      // asset effect is exactly the NFT transfer shown below. Every other result
+                      // falls back to the generic summary and its acknowledgment gates.
+                      const body = txParams ? buildSendTransactionSimulationPayload(txParams, signerAddress, currentChainId, true) : null
+                      setIsMetaTransaction(true)
+                      if (!body) {
+                        setSimulationState({ status: 'unavailable' })
+                        setView(View.WALLET_INTERACTION)
+                        break
+                      }
+
+                      setSimulationChainId(body.chainId)
+                      setSimulationState({ status: 'loading' })
+                      const simulation = await fetchSimulation(body)
+
+                      if (!simulation || !isExactNftTransferSimulation(simulation, signerAddress, contractAddress, transferData)) {
+                        if (cancelled) return
+                        setView(View.WALLET_INTERACTION)
+                        break
+                      }
+
                       const [metadata, recipientProfile] = await Promise.all([
                         fetchNftMetadata(contractAddress, contract.abi, transferData.tokenId),
                         fetchProfile(transferData.toAddress)
