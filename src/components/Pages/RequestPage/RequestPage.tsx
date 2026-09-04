@@ -208,6 +208,11 @@ export const RequestPage = () => {
   // account may execute it: an external wallet can switch accounts while the page is open, and the
   // wallet would then run the reviewed request from an account that never saw it.
   const recoveredSignerRef = useRef<string>()
+  // The connected chain on which a plain transaction was reviewed. A wallet can change networks
+  // while this page remains mounted without changing its account, so the approve path must compare
+  // the live chain with this value before sending. Relayed meta-transactions are excluded: their
+  // execution chain is fixed by getMetaTransactionChainId rather than by the wallet's active chain.
+  const reviewedWalletChainIdRef = useRef<number>()
   // Guards against re-entrant approvals (e.g. a fast double-click on the confirm dialog),
   // which would otherwise fire two transactions before `isLoading` re-renders the buttons.
   const isApprovingRef = useRef(false)
@@ -356,6 +361,7 @@ export const RequestPage = () => {
       loadedAccountRef.current = account
       recoveredRequestIdRef.current = undefined
       recoveredSignerRef.current = undefined
+      reviewedWalletChainIdRef.current = undefined
       hasCompletedRef.current = false
       requestRef.current = undefined
       metaTxCheckRef.current = null
@@ -623,6 +629,7 @@ export const RequestPage = () => {
                 balance: userBalance,
                 chainId: currentChainId
               })
+              reviewedWalletChainIdRef.current = currentChainId
 
               // Check if this is an NFT transfer or MANA transfer by analyzing the transaction data
               const txParams = request.params?.[0] as Record<string, unknown> | undefined
@@ -1079,6 +1086,15 @@ export const RequestPage = () => {
             serverURL: `${config.get('META_TRANSACTION_SERVER_URL')}/v1`
           })
         } else {
+          const reviewedChainId = reviewedWalletChainIdRef.current
+          const currentChainId = await publicClientRef.current?.getChainId()
+          if (reviewedChainId === undefined || currentChainId !== reviewedChainId) {
+            // Do not execute or consume the request: the address and calldata may refer to entirely
+            // different code on the new chain, so the previous simulation/review is no longer valid.
+            setError('Your wallet network changed. Reload this request to review it on the current network.')
+            setView(View.WALLET_INTERACTION_ERROR)
+            return
+          }
           result = await walletClient.request({
             method: 'eth_sendTransaction',
             params: [{ ...transactionParams, from: signerAddress }]

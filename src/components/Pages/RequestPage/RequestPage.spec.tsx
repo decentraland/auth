@@ -982,6 +982,50 @@ describe('RequestPage', () => {
     })
   })
 
+  describe('when the wallet changes network after a plain transaction was reviewed', () => {
+    beforeEach(() => {
+      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.INJECTED }
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockRecover.mockResolvedValue({
+        method: 'eth_sendTransaction',
+        params: [{ to: '0x0000000000000000000000000000000000000001', data: '0x', value: '0x0' }],
+        sender: '0xabc123',
+        expiration: new Date(Date.now() + 3600000).toISOString()
+      })
+      mockGetAddresses.mockResolvedValue(['0xabc123'])
+      // The request is reviewed on Polygon, then the same account is active on Ethereum at approval.
+      mockGetChainId.mockResolvedValue(1).mockResolvedValueOnce(137)
+      mockGetBalance.mockResolvedValue(1n)
+      mockEstimateFeesPerGas.mockResolvedValue({ gasPrice: 1n })
+      mockEstimateGas.mockResolvedValue(21000n)
+      mockWalletRequest.mockResolvedValue('0xhash')
+      mockSendSuccessfulOutcome.mockResolvedValue({})
+    })
+
+    it('should not forward the transaction to the wallet', async () => {
+      renderRequestPage()
+      await userEvent.click(await screen.findByTestId('wallet-interaction-approve'))
+      await screen.findByTestId('signing-error')
+
+      expect(mockWalletRequest).not.toHaveBeenCalled()
+    })
+
+    it('should tell the user that the reviewed network changed', async () => {
+      renderRequestPage()
+      await userEvent.click(await screen.findByTestId('wallet-interaction-approve'))
+
+      expect(await screen.findByTestId('signing-error')).toHaveTextContent('wallet network changed')
+    })
+
+    it('should leave the request unconsumed so it can be reviewed again', async () => {
+      renderRequestPage()
+      await userEvent.click(await screen.findByTestId('wallet-interaction-approve'))
+      await screen.findByTestId('signing-error')
+
+      expect(mockSendSuccessfulOutcome).not.toHaveBeenCalled()
+    })
+  })
+
   describe('when the wallet reports a different active account at denial time than the one that reviewed the request', () => {
     beforeEach(() => {
       mockConnectionData = { ...mockConnectionData, providerType: ProviderType.INJECTED }
