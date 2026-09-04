@@ -6,8 +6,11 @@ import {
   isBridgeOnlyEnabled,
   isDeepLinkFlowEnabled,
   isValidUuidV4,
-  locations
+  locations,
+  parseStateCustomData
 } from './locations'
+
+const encodeState = (customData: unknown): string => btoa(JSON.stringify({ customData: JSON.stringify(customData) }))
 
 describe('locations', () => {
   describe('login', () => {
@@ -479,6 +482,65 @@ describe('locations', () => {
       it('should not append the referrer param', () => {
         expect(buildRequestPageUrl('request-id', 'default')).not.toContain('referrer')
       })
+    })
+  })
+})
+
+describe('parseStateCustomData', () => {
+  describe('when the state is missing', () => {
+    it.each([
+      ['null', null],
+      ['undefined', undefined],
+      ['an empty string', '']
+    ])('should return null for %s', (_label, state) => {
+      expect(parseStateCustomData(state)).toBeNull()
+    })
+  })
+
+  describe('when the state is not valid base64', () => {
+    it('should return null instead of throwing', () => {
+      expect(parseStateCustomData('not-valid-base64!!')).toBeNull()
+    })
+  })
+
+  describe('when the decoded state is not JSON', () => {
+    it('should return null', () => {
+      expect(parseStateCustomData(btoa('this is not json'))).toBeNull()
+    })
+  })
+
+  describe('when the outer JSON has no customData string to parse', () => {
+    it('should return null', () => {
+      expect(parseStateCustomData(btoa(JSON.stringify({ somethingElse: 1 })))).toBeNull()
+    })
+  })
+
+  describe('when customData decodes to a non-object', () => {
+    it.each([
+      ['a number', 5],
+      ['a string', 'hello'],
+      ['null', null]
+    ])('should return null for %s', (_label, value) => {
+      expect(parseStateCustomData(encodeState(value))).toBeNull()
+    })
+  })
+
+  describe('when customData is a well-formed object', () => {
+    it('should return the parsed object', () => {
+      expect(parseStateCustomData(encodeState({ redirectTo: '/play', referrer: '0xabc' }))).toEqual({
+        redirectTo: '/play',
+        referrer: '0xabc'
+      })
+    })
+  })
+
+  describe('when customData is a deeply nested object', () => {
+    it('should parse it without throwing', () => {
+      let nested: Record<string, unknown> = { leaf: true }
+      for (let depth = 0; depth < 50; depth++) {
+        nested = { child: nested }
+      }
+      expect(() => parseStateCustomData(encodeState(nested))).not.toThrow()
     })
   })
 })

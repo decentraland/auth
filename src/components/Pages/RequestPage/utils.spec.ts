@@ -1208,6 +1208,47 @@ describe('when testing extractSignaturePayload', () => {
       expect(extractSignaturePayload('personal_sign', ['0X48656c6c6f', signer], signer)).toEqual({ kind: 'message', message: 'Hello' })
     })
   })
+
+  describe('and the typed data is passed as an object instead of a JSON string', () => {
+    let signer: string
+    let typedData: Record<string, unknown>
+    let params: unknown[]
+
+    beforeEach(() => {
+      signer = '0x1234567890abcdef1234567890abcdef12345678'
+      // Some providers pass the typed data as an object rather than a JSON string.
+      typedData = { primaryType: 'Permit', domain: { chainId: 1 }, types: {}, message: { value: '1' } }
+      params = [signer, typedData]
+    })
+
+    it('should classify the object as the typed data and serialize it into raw', () => {
+      expect(extractSignaturePayload('eth_signTypedData_v4', params, signer)).toEqual({
+        kind: 'typedData',
+        typedData,
+        raw: JSON.stringify(typedData, null, 2)
+      })
+    })
+  })
+
+  describe('and the method is eth_signTypedData_v3', () => {
+    let signer: string
+    let json: string
+    let params: unknown[]
+
+    beforeEach(() => {
+      signer = '0x1234567890abcdef1234567890abcdef12345678'
+      json = JSON.stringify({ primaryType: 'Permit', domain: { chainId: 1 }, types: {}, message: { value: '1' } })
+      params = [signer, json]
+    })
+
+    it('should parse the typed data the same way as v4', () => {
+      expect(extractSignaturePayload('eth_signTypedData_v3', params, signer)).toEqual({
+        kind: 'typedData',
+        typedData: JSON.parse(json),
+        raw: json
+      })
+    })
+  })
 })
 
 describe('when testing decodeMetaTransactionTypedData', () => {
@@ -1399,7 +1440,14 @@ describe('when testing isOpaqueSignatureMessage', () => {
     ['a short nonce-like token', 'nonce-1234'],
     ['text with a non-breaking space', 'Sign\u00A0in to Decentraland today please'],
     ['a URL with a scheme', 'https://decentraland.org/auth/requests/abc'],
-    ['31 characters with no whitespace', 'a'.repeat(31)]
+    ['31 characters with no whitespace', 'a'.repeat(31)],
+    // By design: a hash embedded in an otherwise-readable, multi-line message does not make the
+    // whole message opaque — the user still sees the surrounding text. The specific sign-in
+    // delegation structure is blocked separately by assertRequestIsNotImpersonatingSignIn.
+    [
+      'readable text with a hash on a separate line (the whole message is not a token, so the user sees it)',
+      'Sign in to Decentraland\ne3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
+    ]
   ])('and the message is %s', (_label, message) => {
     it('should return false', () => {
       expect(isOpaqueSignatureMessage(message)).toBe(false)
@@ -1528,6 +1576,16 @@ describe('when testing buildSendTransactionSimulationPayload', () => {
     it('should simulate as the connected signer with the request value, since the wallet sends it as is', () => {
       const result = buildSendTransactionSimulationPayload({ ...txParams, value: '0x10' }, signerAddress, 1, false)
       expect(result).toMatchObject({ from: signerAddress, to: txParams.to, data: '0x', value: '0x10' })
+    })
+
+    it.each([
+      ['a hex value', '0x3e8'],
+      ['a decimal value', '1000']
+    ])('should pass %s through to the preview unchanged, so it matches the value the wallet executes', (_label, value) => {
+      // The guard accepts both hex and decimal quantities; the preview must not transform the value,
+      // or the simulated amount would diverge from what the wallet actually sends.
+      const result = buildSendTransactionSimulationPayload({ ...txParams, value }, signerAddress, 1, false)
+      expect(result?.value).toBe(value)
     })
   })
 
