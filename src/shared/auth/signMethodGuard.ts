@@ -1,4 +1,5 @@
 import { hexToString } from 'viem'
+import { ADDRESS_REGEX } from './address'
 import { ImpersonatedSignInError, MalformedSignatureRequestError, MalformedTransactionRequestError, UnsupportedMethodError } from './errors'
 import { isMetaTransactionTypedData, resolveMetaTransactionTypedData } from './metaTransactionTypedData'
 
@@ -68,15 +69,23 @@ function assertMethodIsAllowed(method: string): string {
 // When validating an auth chain, @dcl/crypto's `parseEmphemeralPayload` strips `\r`,
 // splits on `\n`, and only reads the 2nd line (ephemeral address) and 3rd line
 // (expiration) — the first "human readable" line is ignored. A forged message can
-// therefore use any header and still yield a usable ephemeral auth chain, so we match
-// that same structure rather than the literal "Decentraland Login" header.
-const EPHEMERAL_ADDRESS_LINE_PREFIX = 'Ephemeral address: 0x'
-const EXPIRATION_LINE_PREFIX = 'Expiration: '
+// therefore use any header and still yield a usable ephemeral auth chain.
+//
+// Crucially, `parseEmphemeralPayload` extracts the ephemeral address and expiration by FIXED offsets —
+// `line.substring('Ephemeral address: '.length)` and `line.substring('Expiration: '.length)` — and
+// never checks those prefixes. Matching the literal prefixes here would be STRICTER than the
+// consumer: a forged message that keeps the offsets but changes the prefixes would evade this guard
+// yet still parse into a usable ephemeral auth chain. So detect on the same offsets the consumer
+// reads, not on the prefixes.
+const EPHEMERAL_ADDRESS_LINE_OFFSET = 'Ephemeral address: '.length
+const EXPIRATION_LINE_OFFSET = 'Expiration: '.length
 
 /**
- * Returns whether a message replicates the Decentraland identity-authorization payload.
- * Detection mirrors how @dcl/crypto validates the payload so that any message which would
- * yield a usable auth chain is caught, regardless of its first line.
+ * Returns whether a message would parse as a Decentraland identity-authorization payload the way
+ * @dcl/crypto reads it: three or more lines, with the 2nd carrying an ephemeral address at the
+ * offset the consumer slices from and the 3rd a parseable expiration at its offset. The literal
+ * "Ephemeral address:" / "Expiration:" prefixes are deliberately NOT required — the consumer
+ * ignores them, so requiring them would let a re-prefixed forgery through.
  */
 function isDecentralandIdentityAuthMessage(message: unknown): boolean {
   if (typeof message !== 'string') {
@@ -88,7 +97,10 @@ function isDecentralandIdentityAuthMessage(message: unknown): boolean {
     return false
   }
 
-  return lines[1].startsWith(EPHEMERAL_ADDRESS_LINE_PREFIX) && lines[2].startsWith(EXPIRATION_LINE_PREFIX)
+  // The exact bytes parseEmphemeralPayload would take as the ephemeral address and expiration.
+  const ephemeralAddress = lines[1].slice(EPHEMERAL_ADDRESS_LINE_OFFSET)
+  const expiration = Date.parse(lines[2].slice(EXPIRATION_LINE_OFFSET))
+  return ADDRESS_REGEX.test(ephemeralAddress) && !Number.isNaN(expiration)
 }
 
 // `personal_sign` params are routinely hex-encoded UTF-8 rather than plaintext — the approval UI
@@ -199,7 +211,6 @@ function assertSignatureParamsAreCanonical(method: string, params: unknown[] | u
 // Fields other than `data` that carry calldata. viem forwards them and thirdweb concatenates
 // `extraCallData` onto `data`, so a request using them would execute bytes the preview never read.
 const CALLDATA_ALIASES = ['input', 'extraCallData']
-const ADDRESS_REGEX = /^0x[0-9a-fA-F]{40}$/
 const CALLDATA_REGEX = /^0x([0-9a-fA-F]{2})*$/
 // A JSON-RPC quantity: hex, or the decimal form some clients send.
 const QUANTITY_REGEX = /^(0x[0-9a-fA-F]{1,64}|[0-9]{1,78})$/

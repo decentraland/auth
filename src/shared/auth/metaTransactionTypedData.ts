@@ -1,9 +1,9 @@
 import { hashTypedData } from 'viem'
 import { META_TRANSACTION_TYPE, OFFCHAIN_META_TRANSACTION_TYPE } from 'decentraland-transactions'
+import { ADDRESS_REGEX } from './address'
 import { MalformedSignatureRequestError } from './errors'
 
 const META_TRANSACTION_PRIMARY_TYPE = 'MetaTransaction'
-const ADDRESS_REGEX = /^0x[0-9a-fA-F]{40}$/
 // A 4-byte function selector followed by whole bytes of arguments.
 const CALLDATA_REGEX = /^0x[0-9a-fA-F]{8}([0-9a-fA-F]{2})*$/
 
