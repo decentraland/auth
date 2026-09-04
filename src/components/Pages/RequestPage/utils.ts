@@ -444,35 +444,43 @@ async function checkMetaTransactionSupport(
   return { willUseMetaTransaction: false, contractName: null }
 }
 
+// The only collection calls the branded "gift" view may stand in for. Other functions on the
+// CollectionV2 ABI also take three or more arguments — batchTransferFrom, safeBatchTransferFrom,
+// setItemsMinters, setItemsManagers, editItemsData — and would decode into a "to" and a "token id" as
+// well, so without this check they would be shown as the gift of one token while doing something else.
+const NFT_TRANSFER_FUNCTIONS = new Set(['transferFrom', 'safeTransferFrom'])
+
 /**
- * Decodes NFT transfer data to extract token ID and destination address
+ * Decodes an ERC-721 transfer to extract the recipient and the token id. Only `transferFrom` and
+ * `safeTransferFrom` qualify: the branded gift view previews exactly those, so any other call, even one
+ * that decodes with the same ABI, is left to the generic review and its simulation.
  * @param data The transaction data
  * @param contractABI The contract ABI to use for decoding
- * @returns Object containing tokenId and toAddress, or null if decoding fails
+ * @returns Object containing tokenId and toAddress, or null when the data is not a single-token transfer
  */
 function decodeNftTransferData(data: string, contractABI: object[]): { tokenId: string; toAddress: string } | null {
   try {
     if (!data || data.length < 10) return null
 
-    // Decode the transaction data using the ABI
-    const { args } = decodeFunctionData({
+    const { functionName, args } = decodeFunctionData({
       abi: contractABI as readonly unknown[],
       data: data as `0x${string}`
     })
 
-    if (!args || args.length < 3) {
+    if (!NFT_TRANSFER_FUNCTIONS.has(functionName)) {
+      return null
+    }
+
+    // transferFrom(address from, address to, uint256 tokenId)
+    // safeTransferFrom(address from, address to, uint256 tokenId)
+    // safeTransferFrom(address from, address to, uint256 tokenId, bytes data)
+    const [, toAddress, tokenId] = args ?? []
+    if (typeof toAddress !== 'string' || typeof tokenId !== 'bigint') {
       console.error('Failed to decode transaction data')
       return null
     }
 
-    // All ERC721 transfer methods have these parameters:
-    // transferFrom(address from, address to, uint256 tokenId)
-    // safeTransferFrom(address from, address to, uint256 tokenId)
-    // safeTransferFrom(address from, address to, uint256 tokenId, bytes data)
-    const toAddress = args[1] as string // 'to' address is always the second parameter
-    const tokenId = (args[2] as bigint).toString() // tokenId is always the third parameter
-
-    return { tokenId, toAddress }
+    return { tokenId: tokenId.toString(), toAddress }
   } catch (error) {
     console.error('Error decoding NFT transfer data:', error)
     return null

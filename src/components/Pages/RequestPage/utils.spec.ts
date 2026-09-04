@@ -422,6 +422,66 @@ describe('when testing decodeNftTransferData', () => {
     })
   })
 
+  describe('and the calldata is safeTransferFrom with a data argument', () => {
+    beforeEach(() => {
+      jest.mocked(decodeFunctionData).mockReturnValueOnce({
+        functionName: 'safeTransferFrom',
+        args: ['0xfrom', '0xto', BigInt(9), '0x']
+      })
+    })
+
+    it('should return the tokenId and toAddress', () => {
+      const result = decodeNftTransferData(transactionData, contractABI)
+      expect(result).toEqual({ tokenId: '9', toAddress: '0xto' })
+    })
+  })
+
+  describe('and the calldata is another collection call that also takes three arguments', () => {
+    beforeEach(() => {
+      // batchTransferFrom(address from, address to, uint256[] tokenIds) decodes into a "to" and a
+      // "token id" as well; shown as the gift of one token it would transfer every listed one.
+      jest.mocked(decodeFunctionData).mockReturnValueOnce({
+        functionName: 'batchTransferFrom',
+        args: ['0xfrom', '0xto', [BigInt(1), BigInt(2), BigInt(3)]]
+      })
+    })
+
+    it('should return null so the generic review previews it', () => {
+      const result = decodeNftTransferData(transactionData, contractABI)
+      expect(result).toBeNull()
+    })
+  })
+
+  describe('and the calldata is a collection admin call whose second argument is a list of addresses', () => {
+    beforeEach(() => {
+      // setItemsMinters(uint256[] itemIds, address[] minters, uint256[] values) grants minting rights;
+      // its single-element lists decode into a plausible "to" and "token id".
+      jest.mocked(decodeFunctionData).mockReturnValueOnce({
+        functionName: 'setItemsMinters',
+        args: [[BigInt(0)], ['0xto'], [BigInt(1)]]
+      })
+    })
+
+    it('should return null instead of presenting it as a gift', () => {
+      const result = decodeNftTransferData(transactionData, contractABI)
+      expect(result).toBeNull()
+    })
+  })
+
+  describe('and a transfer decodes with a token id that is not a single uint256', () => {
+    beforeEach(() => {
+      jest.mocked(decodeFunctionData).mockReturnValueOnce({
+        functionName: 'transferFrom',
+        args: ['0xfrom', '0xto', 'not-a-token-id']
+      })
+    })
+
+    it('should return null', () => {
+      const result = decodeNftTransferData(transactionData, contractABI)
+      expect(result).toBeNull()
+    })
+  })
+
   describe('and decoding throws an error', () => {
     beforeEach(() => {
       jest.mocked(decodeFunctionData).mockImplementationOnce(() => {
