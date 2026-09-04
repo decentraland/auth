@@ -1,3 +1,4 @@
+export * from './address'
 export * from './approvalRisk'
 export * from './errors'
 export * from './httpClient'

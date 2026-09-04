@@ -21,7 +21,9 @@ function buildMetaTransactionSimulationPayload(
   calldata: string,
   userAddress: string
 ): SimulationRequestBody {
-  const appendedUser = (userAddress.startsWith('0x') ? userAddress.slice(2) : userAddress).toLowerCase()
+  // Lowercase first so a `0X` prefix is stripped too; the relay appends the bare 20-byte address.
+  const normalizedUser = userAddress.toLowerCase()
+  const appendedUser = normalizedUser.startsWith('0x') ? normalizedUser.slice(2) : normalizedUser
   return {
     chainId,
     from: contractAddress,

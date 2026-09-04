@@ -103,6 +103,36 @@ describe('isDecentralandIdentityAuthMessage', () => {
       expect(isDecentralandIdentityAuthMessage(message)).toBe(false)
     })
   })
+
+  describe('when the message keeps the ephemeral structure at the same offsets but re-prefixes lines two and three', () => {
+    let message: string
+
+    beforeEach(() => {
+      // A forgery: the address and expiration sit at the exact offsets @dcl/crypto slices from
+      // (past 'Ephemeral address: ' and 'Expiration: '), but the prefixes differ. The consumer
+      // ignores the prefixes, so this still yields a usable auth chain and must be detected.
+      const addressLine = 'x'.repeat('Ephemeral address: '.length) + '0x1234567890123456789012345678901234567890'
+      const expirationLine = 'x'.repeat('Expiration: '.length) + '2100-01-01T00:00:00.000Z'
+      message = ['Please sign in to continue', addressLine, expirationLine].join('\n')
+    })
+
+    it('should return true because the consumer reads by offset, not by the prefix', () => {
+      expect(isDecentralandIdentityAuthMessage(message)).toBe(true)
+    })
+  })
+
+  describe('when an address sits at the right offset but the third line has no parseable expiration', () => {
+    let message: string
+
+    beforeEach(() => {
+      const addressLine = 'x'.repeat('Ephemeral address: '.length) + '0x1234567890123456789012345678901234567890'
+      message = ['Header', addressLine, 'no date here at all'].join('\n')
+    })
+
+    it('should return false because the consumer could not derive an expiration', () => {
+      expect(isDecentralandIdentityAuthMessage(message)).toBe(false)
+    })
+  })
 })
 
 describe('assertRequestIsNotImpersonatingSignIn', () => {
@@ -242,6 +272,36 @@ describe('assertRequestIsNotImpersonatingSignIn', () => {
   describe('when the request has no params', () => {
     it('should not throw', () => {
       expect(() => assertRequestIsNotImpersonatingSignIn('personal_sign', undefined)).not.toThrow()
+    })
+  })
+
+  describe('when the sign-in payload re-prefixes lines two and three to evade a literal-prefix check', () => {
+    let params: unknown[]
+
+    beforeEach(() => {
+      const addressLine = 'x'.repeat('Ephemeral address: '.length) + '0x1234567890123456789012345678901234567890'
+      const expirationLine = 'x'.repeat('Expiration: '.length) + '2100-01-01T00:00:00.000Z'
+      const forgedPayload = ['Please sign in to continue', addressLine, expirationLine].join('\n')
+      params = [forgedPayload]
+    })
+
+    it('should throw an ImpersonatedSignInError because the payload still yields a usable auth chain', () => {
+      expect(() => assertRequestIsNotImpersonatingSignIn('personal_sign', params)).toThrow(ImpersonatedSignInError)
+    })
+  })
+
+  describe('when the re-prefixed sign-in payload is hex-encoded UTF-8', () => {
+    let params: unknown[]
+
+    beforeEach(() => {
+      const addressLine = 'x'.repeat('Ephemeral address: '.length) + '0x1234567890123456789012345678901234567890'
+      const expirationLine = 'x'.repeat('Expiration: '.length) + '2100-01-01T00:00:00.000Z'
+      const forgedPayload = ['Please sign in to continue', addressLine, expirationLine].join('\n')
+      params = ['0x' + Buffer.from(forgedPayload, 'utf8').toString('hex')]
+    })
+
+    it('should throw an ImpersonatedSignInError because detection looks through the encoding', () => {
+      expect(() => assertRequestIsNotImpersonatingSignIn('personal_sign', params)).toThrow(ImpersonatedSignInError)
     })
   })
 })
