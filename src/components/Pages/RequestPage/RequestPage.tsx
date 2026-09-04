@@ -202,12 +202,21 @@ export const RequestPage = () => {
   const [loadedRequestId, setLoadedRequestId] = useState<string>()
   const loadedAccountRef = useRef<string>()
   const [loadedAccount, setLoadedAccount] = useState<string>()
+  // Incremented when an approval discovers that its transaction review is no longer bound to a
+  // verifiable live chain. This deliberately re-runs the load effect for the same route/account.
+  const [reviewAttempt, setReviewAttempt] = useState(0)
   // The route id the recovered request in requestRef belongs to.
   const recoveredRequestIdRef = useRef<string>()
   // The lowercased account that recovered, and is reviewing, the request in requestRef. Only that
   // account may execute it: an external wallet can switch accounts while the page is open, and the
   // wallet would then run the reviewed request from an account that never saw it.
   const recoveredSignerRef = useRef<string>()
+  // The connected chain on which an eth_sendTransaction request was reviewed. A wallet can change
+  // networks while this page remains mounted without changing its account, so the plain-send
+  // approve path must compare the live chain with this value before sending. Relayed
+  // meta-transactions are excluded from that check: their execution chain is fixed by
+  // getMetaTransactionChainId rather than by the wallet's active chain.
+  const reviewedWalletChainIdRef = useRef<number>()
   // Guards against re-entrant approvals (e.g. a fast double-click on the confirm dialog),
   // which would otherwise fire two transactions before `isLoading` re-renders the buttons.
   const isApprovingRef = useRef(false)
@@ -349,13 +358,15 @@ export const RequestPage = () => {
     // account, and the wallet would now execute it from the new one, so nothing of that review may
     // stay actionable until the new account has recovered the request itself (and the sender check
     // has had its say). The reset is keyed to these two so re-runs of this effect for other
-    // dependencies leave in-flight state untouched.
+    // dependencies leave in-flight state untouched. Approval can also explicitly invalidate the
+    // current review by clearing the request ref and incrementing reviewAttempt below.
     const isNewRequest = loadedRequestIdRef.current !== requestId || loadedAccountRef.current !== account
     if (isNewRequest) {
       loadedRequestIdRef.current = requestId
       loadedAccountRef.current = account
       recoveredRequestIdRef.current = undefined
       recoveredSignerRef.current = undefined
+      reviewedWalletChainIdRef.current = undefined
       hasCompletedRef.current = false
       requestRef.current = undefined
       metaTxCheckRef.current = null
@@ -623,6 +634,7 @@ export const RequestPage = () => {
                 balance: userBalance,
                 chainId: currentChainId
               })
+              reviewedWalletChainIdRef.current = currentChainId
 
               // Check if this is an NFT transfer or MANA transfer by analyzing the transaction data
               const txParams = request.params?.[0] as Record<string, unknown> | undefined
@@ -933,7 +945,8 @@ export const RequestPage = () => {
     requestId,
     isDeepLinkFlow,
     isInvalidDeepLinkId,
-    skipSetup
+    skipSetup,
+    reviewAttempt
   ])
 
   useEffect(() => {
@@ -1003,6 +1016,19 @@ export const RequestPage = () => {
       setView(View.WALLET_INTERACTION_DENIED)
     }
   }, [nftTransferData, manaTransferData, requestId])
+
+  const restartTransactionReview = useCallback(() => {
+    // Make the stale review non-actionable immediately, then let the load effect's existing reset
+    // clear every derived preview/classification and recover the same request again. No outcome is
+    // sent: a missing, changed, or temporarily unreadable chain says nothing about the user's
+    // decision and the request must remain available for the fresh review.
+    recoveredRequestIdRef.current = undefined
+    reviewedWalletChainIdRef.current = undefined
+    loadedRequestIdRef.current = undefined
+    setLoadedRequestId(undefined)
+    setView(View.LOADING_REQUEST)
+    setReviewAttempt(attempt => attempt + 1)
+  }, [])
 
   const onApproveWalletInteraction = useCallback(async () => {
     // Only the request this page recovered can be executed. If the route has moved on to another
@@ -1079,9 +1105,21 @@ export const RequestPage = () => {
             serverURL: `${config.get('META_TRANSACTION_SERVER_URL')}/v1`
           })
         } else {
+          const reviewedChainId = reviewedWalletChainIdRef.current
+          const currentChainId = await publicClientRef.current?.getChainId().catch(() => undefined)
+          if (reviewedChainId === undefined || currentChainId !== reviewedChainId) {
+            // The address and calldata may refer to entirely different code on another chain, and
+            // an unreadable chain cannot be compared safely. Discard the stale review and recover
+            // the still-unconsumed request so it is previewed on a verified live chain.
+            restartTransactionReview()
+            return
+          }
           result = await walletClient.request({
             method: 'eth_sendTransaction',
-            params: [{ ...transactionParams, from: signerAddress }]
+            // Bind the wallet request to the chain that was reviewed as well as checking it above.
+            // Providers that validate the standard JSON-RPC chainId reject a last-moment switch
+            // between the check and eth_sendTransaction rather than broadcasting on the new chain.
+            params: [{ ...transactionParams, from: signerAddress, chainId: `0x${reviewedChainId.toString(16)}` }]
           })
         }
       }
@@ -1174,7 +1212,7 @@ export const RequestPage = () => {
       setIsLoading(false)
       isApprovingRef.current = false
     }
-  }, [isUserUsingWeb2Wallet, nftTransferData, manaTransferData, requestId, identity, showInteractionCompleteView])
+  }, [isUserUsingWeb2Wallet, nftTransferData, manaTransferData, requestId, identity, showInteractionCompleteView, restartTransactionReview])
 
   const handleApproveWalletInteraction = useCallback(async () => {
     if (isUserUsingWeb2Wallet) {

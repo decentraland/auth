@@ -277,6 +277,13 @@ const renderRequestPage = (path = `/auth/requests/${REQUEST_ID}?targetConfigId=d
   )
 }
 
+const waitForRecoverCalls = (count: number) =>
+  waitFor(() => {
+    if (mockRecover.mock.calls.length !== count) {
+      throw new Error(`Expected recover to be called ${count} times, received ${mockRecover.mock.calls.length}`)
+    }
+  })
+
 describe('RequestPage', () => {
   beforeEach(() => {
     mockSkipSetup = false
@@ -982,6 +989,111 @@ describe('RequestPage', () => {
     })
   })
 
+  describe('when the wallet changes network after a plain transaction was reviewed', () => {
+    beforeEach(() => {
+      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.INJECTED }
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockRecover.mockResolvedValue({
+        method: 'eth_sendTransaction',
+        params: [{ to: '0x0000000000000000000000000000000000000001', data: '0x', value: '0x0' }],
+        sender: '0xabc123',
+        expiration: new Date(Date.now() + 3600000).toISOString()
+      })
+      mockGetAddresses.mockResolvedValue(['0xabc123'])
+      // The request is reviewed on Polygon, then the same account is active on Ethereum at approval.
+      mockGetChainId.mockResolvedValue(1).mockResolvedValueOnce(137)
+      mockGetBalance.mockResolvedValue(1n)
+      mockEstimateFeesPerGas.mockResolvedValue({ gasPrice: 1n })
+      mockEstimateGas.mockResolvedValue(21000n)
+      mockWalletRequest.mockResolvedValue('0xhash')
+      mockSendSuccessfulOutcome.mockResolvedValue({})
+    })
+
+    it('should not forward the transaction to the wallet', async () => {
+      renderRequestPage()
+      await userEvent.click(await screen.findByTestId('wallet-interaction-approve'))
+      await waitForRecoverCalls(2)
+
+      expect(mockWalletRequest).not.toHaveBeenCalled()
+    })
+
+    it('should recover the request again so it can be reviewed on the current network', async () => {
+      renderRequestPage()
+      await userEvent.click(await screen.findByTestId('wallet-interaction-approve'))
+
+      await waitFor(() => expect(mockRecover).toHaveBeenCalledTimes(2))
+    })
+
+    it('should not report a successful outcome for the invalidated review', async () => {
+      renderRequestPage()
+      await userEvent.click(await screen.findByTestId('wallet-interaction-approve'))
+      await waitForRecoverCalls(2)
+
+      expect(mockSendSuccessfulOutcome).not.toHaveBeenCalled()
+    })
+
+    it('should not report a failed outcome for the invalidated review', async () => {
+      renderRequestPage()
+      await userEvent.click(await screen.findByTestId('wallet-interaction-approve'))
+      await waitForRecoverCalls(2)
+
+      expect(mockSendFailedOutcome).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('when the wallet network cannot be read at approval time', () => {
+    beforeEach(() => {
+      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.INJECTED }
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockRecover.mockResolvedValue({
+        method: 'eth_sendTransaction',
+        params: [{ to: '0x0000000000000000000000000000000000000001', data: '0x', value: '0x0' }],
+        sender: '0xabc123',
+        expiration: new Date(Date.now() + 3600000).toISOString()
+      })
+      mockGetAddresses.mockResolvedValue(['0xabc123'])
+      mockGetChainId.mockResolvedValue(137).mockResolvedValueOnce(137).mockRejectedValueOnce(new Error('Network unavailable'))
+      mockGetBalance.mockResolvedValue(1n)
+      mockEstimateFeesPerGas.mockResolvedValue({ gasPrice: 1n })
+      mockEstimateGas.mockResolvedValue(21000n)
+      mockWalletRequest.mockResolvedValue('0xhash')
+    })
+
+    it('should recover the request again instead of consuming it as a failure', async () => {
+      renderRequestPage()
+      await userEvent.click(await screen.findByTestId('wallet-interaction-approve'))
+      await waitForRecoverCalls(2)
+
+      expect(mockSendFailedOutcome).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('when no wallet network was recorded during the initial review', () => {
+    beforeEach(() => {
+      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.INJECTED }
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockRecover.mockResolvedValue({
+        method: 'eth_sendTransaction',
+        params: [{ to: '0x0000000000000000000000000000000000000001', data: '0x', value: '0x0' }],
+        sender: '0xabc123',
+        expiration: new Date(Date.now() + 3600000).toISOString()
+      })
+      mockGetAddresses.mockResolvedValue(['0xabc123'])
+      mockGetChainId.mockResolvedValue(137).mockRejectedValueOnce(new Error('Network unavailable'))
+      mockGetBalance.mockResolvedValue(1n)
+      mockEstimateFeesPerGas.mockResolvedValue({ gasPrice: 1n })
+      mockEstimateGas.mockResolvedValue(21000n)
+      mockWalletRequest.mockResolvedValue('0xhash')
+    })
+
+    it('should recover the request again instead of claiming that the network changed', async () => {
+      renderRequestPage()
+      await userEvent.click(await screen.findByTestId('wallet-interaction-approve'))
+
+      await waitFor(() => expect(mockRecover).toHaveBeenCalledTimes(2))
+    })
+  })
+
   describe('when the wallet reports a different active account at denial time than the one that reviewed the request', () => {
     beforeEach(() => {
       mockConnectionData = { ...mockConnectionData, providerType: ProviderType.INJECTED }
@@ -1138,14 +1250,14 @@ describe('RequestPage', () => {
         mockSendSuccessfulOutcome.mockResolvedValue({})
       })
 
-      it('should dispatch only the reviewed to, data and value to the wallet', async () => {
+      it('should omit unreviewed request fields and bind the trusted sender and chain', async () => {
         renderRequestPage()
         await userEvent.click(await screen.findByTestId('wallet-interaction-approve'))
         await screen.findByTestId('wallet-interaction-complete')
 
         expect(mockWalletRequest).toHaveBeenCalledWith({
           method: 'eth_sendTransaction',
-          params: [{ to: '0xcontract', data: '0x', value: '0x0', from: '0xabc123' }]
+          params: [{ to: '0xcontract', data: '0x', value: '0x0', from: '0xabc123', chainId: '0x1' }]
         })
       })
     })
