@@ -38,4 +38,18 @@ describe('buildMetaTransactionSimulationPayload', () => {
       )
     })
   })
+
+  describe('when the user address has an uppercase 0X prefix', () => {
+    let user: string
+
+    beforeEach(() => {
+      user = '0XD9B96b5Dc720fC52bEDE1eC3B40a930E15f70DdD'
+    })
+
+    it('should strip the 0X prefix and append the bare lowercased 20 bytes', () => {
+      expect(buildMetaTransactionSimulationPayload(137, '0xa40b1d129b8906888720686f3a01921ddf37716f', '0xdeadbeef', user).data).toBe(
+        `0xdeadbeef${user.slice(2).toLowerCase()}`
+      )
+    })
+  })
 })
