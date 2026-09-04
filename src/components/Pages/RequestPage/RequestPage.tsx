@@ -195,12 +195,19 @@ export const RequestPage = () => {
   const viewRef = useRef(view)
   viewRef.current = view
   const hasCompletedRef = useRef(false)
-  // The request id whose state this mounted page currently holds (see the load effect). The ref is
-  // read by the effect; the state drives rendering, so a route change is caught on its own render.
+  // The request id and account whose state this mounted page currently holds (see the load effect).
+  // The refs are read by the effect; the state drives rendering, so a route or account change is
+  // caught on its own render.
   const loadedRequestIdRef = useRef<string>()
   const [loadedRequestId, setLoadedRequestId] = useState<string>()
+  const loadedAccountRef = useRef<string>()
+  const [loadedAccount, setLoadedAccount] = useState<string>()
   // The route id the recovered request in requestRef belongs to.
   const recoveredRequestIdRef = useRef<string>()
+  // The lowercased account that recovered, and is reviewing, the request in requestRef. Only that
+  // account may execute it: an external wallet can switch accounts while the page is open, and the
+  // wallet would then run the reviewed request from an account that never saw it.
+  const recoveredSignerRef = useRef<string>()
   // Guards against re-entrant approvals (e.g. a fast double-click on the confirm dialog),
   // which would otherwise fire two transactions before `isLoading` re-renders the buttons.
   const isApprovingRef = useRef(false)
@@ -332,17 +339,23 @@ export const RequestPage = () => {
 
   // Effect 2: Load the request once the user is connected and the profile is ready.
   useEffect(() => {
-    // A different request id on a still-mounted page starts over, before any other branch runs.
-    // Everything derived from the previous request — its preview, verified contracts,
-    // classification and completion — must go; otherwise a click on Allow could execute the new
-    // request under the previous request's summary and acknowledgment. `loadedRequestId` is what
-    // the render reads: until it matches the route, the page shows the loading view and nothing of
-    // the previous request. The reset is keyed to the request id so re-runs of this effect for other
+    // A different request id, or a different account, on a still-mounted page starts over, before
+    // any other branch runs. Everything derived from the previous request — its preview, verified
+    // contracts, classification and completion — must go; otherwise a click on Allow could execute
+    // the new request under the previous request's summary and acknowledgment. `loadedRequestId`
+    // and `loadedAccount` are what the render reads: until both match, the page shows the loading
+    // view and nothing of the previous review. The account is part of the key because an external
+    // wallet can switch accounts while the page is open: the request was reviewed by the previous
+    // account, and the wallet would now execute it from the new one, so nothing of that review may
+    // stay actionable until the new account has recovered the request itself (and the sender check
+    // has had its say). The reset is keyed to these two so re-runs of this effect for other
     // dependencies leave in-flight state untouched.
-    const isNewRequest = loadedRequestIdRef.current !== requestId
+    const isNewRequest = loadedRequestIdRef.current !== requestId || loadedAccountRef.current !== account
     if (isNewRequest) {
       loadedRequestIdRef.current = requestId
+      loadedAccountRef.current = account
       recoveredRequestIdRef.current = undefined
+      recoveredSignerRef.current = undefined
       hasCompletedRef.current = false
       requestRef.current = undefined
       metaTxCheckRef.current = null
@@ -351,6 +364,7 @@ export const RequestPage = () => {
       hasTrackedDeepLinkRef.current = false
       setIdentityId(undefined)
       setLoadedRequestId(requestId)
+      setLoadedAccount(account)
       setView(View.LOADING_REQUEST)
       setIsLoading(false)
       setError(undefined)
@@ -487,6 +501,7 @@ export const RequestPage = () => {
 
         requestRef.current = request
         recoveredRequestIdRef.current = requestId
+        recoveredSignerRef.current = signerAddress.toLowerCase()
 
         // Initialize the timeout to display the timeout view when the request expires.
         // Guard against an unparseable expiration: `new Date(...).getTime()` would be NaN,
@@ -958,6 +973,15 @@ export const RequestPage = () => {
     try {
       if (walletClientRef.current) {
         const [address] = await walletClientRef.current.getAddresses()
+        if (address.toLowerCase() !== recoveredSignerRef.current) {
+          // The wallet's active account is no longer the one that recovered and reviewed this
+          // request, so it has nothing to answer for it. Undo the early completion mark, say what
+          // happened, and leave the rest to the load effect starting over for the new account.
+          hasCompletedRef.current = false
+          setIsLoading(false)
+          setView(View.DIFFERENT_ACCOUNT)
+          return
+        }
         await authServerClient.current.sendFailedOutcome(requestId, address, {
           code: -32003,
           message: 'Transaction rejected'
@@ -1004,6 +1028,16 @@ export const RequestPage = () => {
       }
 
       const [signerAddress] = await walletClient.getAddresses()
+      if (signerAddress.toLowerCase() !== recoveredSignerRef.current) {
+        // The wallet's active account is no longer the one that recovered and reviewed this request.
+        // Executing here would run the reviewed request from an account that never saw it. Say what
+        // happened rather than silently doing nothing: a wallet that never reports the switch would
+        // otherwise leave the reviewed request on screen with an Allow that does nothing. The load
+        // effect starts over if and when the connection reports the new account; the finally block
+        // clears the loading state.
+        setView(View.DIFFERENT_ACCOUNT)
+        return
+      }
       const method = requestRef.current.method
 
       let result: string | null = null
@@ -1220,10 +1254,11 @@ export const RequestPage = () => {
     isHighRiskSignature ||
     unverifiableSignatureReason !== null
 
-  // Derived, not synced: on the render where the route id changes, every piece of state still
-  // belongs to the previous request. Show none of it — no summary, no Allow — until this instance has
-  // started loading the current id, which the load effect records together with its reset.
-  const renderedView = loadedRequestId === requestId ? view : View.LOADING_REQUEST
+  // Derived, not synced: on the render where the route id or the account changes, every piece of
+  // state still belongs to the previous review. Show none of it — no summary, no Allow — until this
+  // instance has started loading the current id for the current account, which the load effect
+  // records together with its reset.
+  const renderedView = loadedRequestId === requestId && loadedAccount === account ? view : View.LOADING_REQUEST
 
   switch (renderedView) {
     case View.TIMEOUT:
