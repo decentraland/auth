@@ -973,6 +973,40 @@ describe('RequestPage', () => {
       expect(mockSendSuccessfulOutcome).not.toHaveBeenCalled()
       expect(mockSendFailedOutcome).not.toHaveBeenCalled()
     })
+
+    it('should show the different-account view instead of leaving an Allow button that does nothing', async () => {
+      renderRequestPage()
+      await userEvent.click(await screen.findByTestId('wallet-interaction-approve'))
+      expect(await screen.findByTestId('different-account')).toBeInTheDocument()
+    })
+  })
+
+  describe('when the wallet reports a different active account at denial time than the one that reviewed the request', () => {
+    beforeEach(() => {
+      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.INJECTED }
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockRecover.mockResolvedValue({
+        method: 'personal_sign',
+        params: ['hello', '0xabc123'],
+        sender: '0xabc123',
+        expiration: new Date(Date.now() + 3600000).toISOString()
+      })
+      mockGetAddresses.mockResolvedValueOnce(['0xabc123']).mockResolvedValue(['0xnewwallet'])
+      mockSendFailedOutcome.mockResolvedValue({})
+    })
+
+    it('should not report a rejection from an account that never reviewed the request', async () => {
+      renderRequestPage()
+      await userEvent.click(await screen.findByTestId('wallet-interaction-deny'))
+      await waitFor(() => expect(mockGetAddresses).toHaveBeenCalledTimes(2))
+      expect(mockSendFailedOutcome).not.toHaveBeenCalled()
+    })
+
+    it('should show the different-account view', async () => {
+      renderRequestPage()
+      await userEvent.click(await screen.findByTestId('wallet-interaction-deny'))
+      expect(await screen.findByTestId('different-account')).toBeInTheDocument()
+    })
   })
 
   describe('when approving a plain signature request', () => {

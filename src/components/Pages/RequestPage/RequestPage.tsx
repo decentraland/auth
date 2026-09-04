@@ -930,6 +930,15 @@ export const RequestPage = () => {
     try {
       if (walletClientRef.current) {
         const [address] = await walletClientRef.current.getAddresses()
+        if (address.toLowerCase() !== recoveredSignerRef.current) {
+          // The wallet's active account is no longer the one that recovered and reviewed this
+          // request, so it has nothing to answer for it. Undo the early completion mark, say what
+          // happened, and leave the rest to the load effect starting over for the new account.
+          hasCompletedRef.current = false
+          setIsLoading(false)
+          setView(View.DIFFERENT_ACCOUNT)
+          return
+        }
         await authServerClient.current.sendFailedOutcome(requestId, address, {
           code: -32003,
           message: 'Transaction rejected'
@@ -977,9 +986,13 @@ export const RequestPage = () => {
 
       const [signerAddress] = await walletClient.getAddresses()
       if (signerAddress.toLowerCase() !== recoveredSignerRef.current) {
-        // The wallet's active account is no longer the one that recovered and reviewed this request;
-        // the load effect is starting over for the new account. Executing here would run the reviewed
-        // request from an account that never saw it. The finally block clears the loading state.
+        // The wallet's active account is no longer the one that recovered and reviewed this request.
+        // Executing here would run the reviewed request from an account that never saw it. Say what
+        // happened rather than silently doing nothing: a wallet that never reports the switch would
+        // otherwise leave the reviewed request on screen with an Allow that does nothing. The load
+        // effect starts over if and when the connection reports the new account; the finally block
+        // clears the loading state.
+        setView(View.DIFFERENT_ACCOUNT)
         return
       }
       const method = requestRef.current.method
