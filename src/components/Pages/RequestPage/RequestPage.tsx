@@ -227,8 +227,10 @@ export const RequestPage = () => {
   // Social / web2 wallets (Magic and Thirdweb) sign without their own confirmation UI, so the
   // auth site must show what is being approved (transaction simulation + signature preview and
   // the associated acknowledgment gates). This is always on for web2 users — it is the only
-  // confirmation they get. External wallets keep their own confirmation UI unchanged, so the
-  // informative UI is not shown for them.
+  // confirmation they get. External wallets keep their own confirmation UI for plain transactions
+  // and signatures, so the informative UI is not shown for those — except for meta-transactions,
+  // which reach the wallet as an EIP-712 struct with opaque calldata and are previewed for everyone
+  // (see the eth_sendTransaction and signature branches of the load effect).
   const isUserUsingWeb2Wallet = isSocialProviderType(providerType)
   const authServerClient = useRef(createAuthServerHttpClient())
   // The deep-link flow (opted in via `?flow=deeplink`, compared case-insensitively) has no
@@ -697,12 +699,20 @@ export const RequestPage = () => {
               }
 
               // Generic transaction only — MANA tips and NFT gifts have their own views and
-              // returned above, so they are left untouched. For web2 users, decide whether this
-              // will be relayed as a meta-transaction (a Decentraland contract call, relayed on
-              // Polygon where the gas tank pays) so the dialog can say "gas covered"; other
-              // contracts/networks show the gas. Also prefetch the asset-change simulation of the
-              // original transaction. Non-blocking.
-              if (isUserUsingWeb2Wallet && contractAddress) {
+              // returned above, so they are left untouched. Decide whether this will be relayed as
+              // a meta-transaction (a Decentraland contract call, relayed on Polygon where the gas
+              // tank pays) and prefetch the asset-change simulation of the original transaction.
+              // Non-blocking, but approval stays blocked while it resolves.
+              //
+              // Web2 wallets always get the preview: this page is their only confirmation. External
+              // wallets show a plain eth_sendTransaction themselves, so they keep the classic
+              // confirmation for those — but a relayed transaction never reaches them as a
+              // transaction. The approve path asks them to sign an EIP-712 MetaTransaction whose
+              // calldata is an opaque `functionSignature`, so the wallet prompt cannot show what the
+              // call does: an unlimited MANA approve or a setApprovalForAll looks like any other hex
+              // blob. The preview and its acknowledgment gates therefore apply to everyone when the
+              // call is relayed, and the relay decision has to be known before Allow is enabled.
+              if (contractAddress) {
                 setSimulationState({ status: 'loading' })
                 // Reuse the meta-transaction check if the NFT-gift gate already resolved it for this
                 // same contract (it falls through to here for non-DCL contracts), so we don't repeat
@@ -718,6 +728,11 @@ export const RequestPage = () => {
                     metaTxCheckRef.current = { address: contractAddress.toLowerCase(), willUseMetaTransaction, contractName }
                     if (cancelled) return undefined
                     setIsMetaTransaction(willUseMetaTransaction)
+                    if (!isUserUsingWeb2Wallet && !willUseMetaTransaction) {
+                      // The wallet will show this transaction itself: back to the classic confirmation.
+                      setSimulationState({ status: 'idle' })
+                      return undefined
+                    }
                     if (txParams) {
                       const body = buildSendTransactionSimulationPayload(txParams, signerAddress, currentChainId, willUseMetaTransaction)
                       if (body) {
@@ -763,62 +778,66 @@ export const RequestPage = () => {
             break
           }
           default: {
-            // For web2 users, plain signature requests get an informative preview of what they
-            // are signing. Meta-transaction typed data additionally gets the asset-change summary
-            // by simulating the inner call.
-            if (isUserUsingWeb2Wallet && isSignatureMethod(request.method)) {
-              const payload = extractSignaturePayload(request.method, request.params, signerAddress)
-              setSignaturePayload(payload)
-              if (payload?.kind === 'typedData') {
-                // Off-chain approval permits/orders (EIP-2612, Permit2, EIP-3009, Seaport, marketplace
-                // orders) hand control of the user's assets to a third party but are never simulated —
-                // always require an explicit acknowledgment before signing them.
-                const isApprovalGranting = isApprovalGrantingTypedData(payload.typedData)
-                if (isApprovalGranting) {
-                  setIsHighRiskSignature(true)
-                }
-                const metaTx = decodeMetaTransactionTypedData(payload.typedData, request.method)
-                // Anything else is signed blind: its fields are shown, but nothing says what a
-                // counterparty can do with the signature. Fail closed.
-                if (!metaTx && !isApprovalGranting) {
-                  setUnverifiableSignatureReason('unrecognized_typed_data')
-                }
-                if (metaTx) {
-                  setIsSignatureMetaTx(true)
-                  setSimulationChainId(metaTx.chainId)
-                  setSimulationState({ status: 'loading' })
-                  setSignatureContractTrust('pending')
-                  // Recognition is per deployment: the lookup matches the address on the meta-transaction
-                  // chain, so the same address under another chain's salt is not that contract.
-                  if (metaTx.chainId !== Number(getMetaTransactionChainId())) {
-                    setSignatureContractTrust('unconfirmed')
-                  } else {
-                    checkMetaTransactionSupport(metaTx.verifyingContract)
-                      .then(({ willUseMetaTransaction }) => {
-                        if (!cancelled) setSignatureContractTrust(willUseMetaTransaction ? 'confirmed' : 'unconfirmed')
-                      })
-                      .catch(() => {
-                        if (!cancelled) setSignatureContractTrust('unconfirmed')
-                      })
-                  }
-                  // Preview the inner call the way the contract will make it — calling itself with
-                  // the connected signer appended, not the `from` carried in the typed data — using
-                  // the calldata field the signed struct declares, which the decoder proved to be the
-                  // bytes the signature covers whatever else the message carries.
-                  void fetchSimulation(
-                    buildMetaTransactionSimulationPayload(metaTx.chainId, metaTx.verifyingContract, metaTx.calldata, signerAddress),
-                    { rejectUnpreviewable: true }
-                  )
-                }
-              } else if (payload?.kind === 'message' && isOpaqueSignatureMessage(payload.message)) {
-                // Not readable text: the user cannot check it, and it may be a hash a contract accepts
-                // as an EIP-191 authorization.
-                setUnverifiableSignatureReason('opaque_message')
-              }
-              setView(View.WALLET_SIGNATURE_INTERACTION)
-            } else {
+            // Web2 users get an informative preview of every signature they are asked for: this
+            // page is their only confirmation. External wallets show a plain message or a permit
+            // themselves, so they keep the classic confirmation for those — but a Decentraland
+            // MetaTransaction reaches them as an EIP-712 struct whose calldata is an opaque
+            // `functionSignature`, so the wallet prompt cannot show what the signature authorizes.
+            // Its inner call is therefore previewed here for everyone, behind the same gates.
+            const isSignature = isSignatureMethod(request.method)
+            const payload = isSignature ? extractSignaturePayload(request.method, request.params, signerAddress) : null
+            const metaTx = payload?.kind === 'typedData' ? decodeMetaTransactionTypedData(payload.typedData, request.method) : null
+            if (!isSignature || (!isUserUsingWeb2Wallet && !metaTx)) {
               setView(View.WALLET_INTERACTION)
+              break
             }
+            setSignaturePayload(payload)
+            if (payload?.kind === 'typedData') {
+              // Off-chain approval permits/orders (EIP-2612, Permit2, EIP-3009, Seaport, marketplace
+              // orders) hand control of the user's assets to a third party but are never simulated —
+              // always require an explicit acknowledgment before signing them.
+              const isApprovalGranting = isApprovalGrantingTypedData(payload.typedData)
+              if (isApprovalGranting) {
+                setIsHighRiskSignature(true)
+              }
+              // Anything else is signed blind: its fields are shown, but nothing says what a
+              // counterparty can do with the signature. Fail closed.
+              if (!metaTx && !isApprovalGranting) {
+                setUnverifiableSignatureReason('unrecognized_typed_data')
+              }
+              if (metaTx) {
+                setIsSignatureMetaTx(true)
+                setSimulationChainId(metaTx.chainId)
+                setSimulationState({ status: 'loading' })
+                setSignatureContractTrust('pending')
+                // Recognition is per deployment: the lookup matches the address on the meta-transaction
+                // chain, so the same address under another chain's salt is not that contract.
+                if (metaTx.chainId !== Number(getMetaTransactionChainId())) {
+                  setSignatureContractTrust('unconfirmed')
+                } else {
+                  checkMetaTransactionSupport(metaTx.verifyingContract)
+                    .then(({ willUseMetaTransaction }) => {
+                      if (!cancelled) setSignatureContractTrust(willUseMetaTransaction ? 'confirmed' : 'unconfirmed')
+                    })
+                    .catch(() => {
+                      if (!cancelled) setSignatureContractTrust('unconfirmed')
+                    })
+                }
+                // Preview the inner call the way the contract will make it — calling itself with
+                // the connected signer appended, not the `from` carried in the typed data — using
+                // the calldata field the signed struct declares, which the decoder proved to be the
+                // bytes the signature covers whatever else the message carries.
+                void fetchSimulation(
+                  buildMetaTransactionSimulationPayload(metaTx.chainId, metaTx.verifyingContract, metaTx.calldata, signerAddress),
+                  { rejectUnpreviewable: true }
+                )
+              }
+            } else if (payload?.kind === 'message' && isOpaqueSignatureMessage(payload.message)) {
+              // Not readable text: the user cannot check it, and it may be a hash a contract accepts
+              // as an EIP-191 authorization.
+              setUnverifiableSignatureReason('opaque_message')
+            }
+            setView(View.WALLET_SIGNATURE_INTERACTION)
           }
         }
       } catch (e) {
