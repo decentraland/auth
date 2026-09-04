@@ -1542,6 +1542,24 @@ describe('RequestPage', () => {
         renderRequestPage()
         expect(await screen.findByTestId('transfer-confirm')).toBeInTheDocument()
       })
+
+      describe('and the token metadata cannot be fetched', () => {
+        beforeEach(() => {
+          jest.mocked(fetchNftMetadata).mockRejectedValueOnce(new Error('tokenURI reverted'))
+        })
+
+        it('should fall through to the generic review instead of the branded gift view', async () => {
+          renderRequestPage()
+          expect(await screen.findByTestId('wallet-interaction')).toBeInTheDocument()
+          expect(screen.queryByTestId('transfer-confirm')).not.toBeInTheDocument()
+        })
+
+        it('should still preview the transaction so approval is not a bare confirm', async () => {
+          renderRequestPage()
+          await screen.findByTestId('wallet-interaction')
+          await waitFor(() => expect(mockSimulateTransaction).toHaveBeenCalled())
+        })
+      })
     })
 
     describe('and the target is not a Decentraland collection', () => {
@@ -1554,6 +1572,38 @@ describe('RequestPage', () => {
         expect(await screen.findByTestId('wallet-interaction')).toBeInTheDocument()
         expect(screen.queryByTestId('transfer-confirm')).not.toBeInTheDocument()
       })
+    })
+  })
+
+  describe('when a web2 transaction fails before its preview is requested', () => {
+    beforeEach(() => {
+      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.MAGIC }
+      // A generic transaction. Reset the decoders explicitly — a prior test sets a persistent NFT return value.
+      jest.mocked(decodeManaTransferData).mockReturnValue(null)
+      jest.mocked(decodeNftTransferData).mockReturnValue(null)
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockRecover.mockResolvedValue({
+        method: 'eth_sendTransaction',
+        params: [{ to: '0xcontract', data: '0xabcd', value: '0x0' }],
+        sender: '0xabc123',
+        expiration: new Date(Date.now() + 3600000).toISOString()
+      })
+      mockGetAddresses.mockResolvedValue(['0xabc123'])
+      // The balance lookup fails, before the simulation is ever requested.
+      mockGetBalance.mockRejectedValueOnce(new Error('rpc down'))
+    })
+
+    it('should mark the preview unavailable instead of showing the bare confirm dialog', async () => {
+      renderRequestPage()
+      const view = await screen.findByTestId('wallet-interaction')
+      await waitFor(() => expect(view).toHaveAttribute('data-sim', 'unavailable'))
+    })
+
+    it('should require an acknowledgment before approving', async () => {
+      renderRequestPage()
+      const view = await screen.findByTestId('wallet-interaction')
+      await waitFor(() => expect(view).toHaveAttribute('data-sim', 'unavailable'))
+      expect(view).toHaveAttribute('data-requires-acknowledgment', 'true')
     })
   })
 
