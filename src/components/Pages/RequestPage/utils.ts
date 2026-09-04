@@ -13,7 +13,7 @@ import {
   resolveMetaTransactionTypedData
 } from '../../../shared/auth'
 import { isMobile } from '../LoginPage/utils'
-import { getUnsupportedCalldataAlias } from './transactionParams'
+import { getUnsupportedCalldataAlias, toHexQuantity } from './transactionParams'
 import { SignaturePayload, TypedDataPayload } from './types'
 
 // Case-insensitive on the `0x` prefix so these agree with the recover-time guard, which compares
@@ -248,7 +248,9 @@ function buildSendTransactionSimulationPayload(
     from: signerAddress,
     to,
     data,
-    value: (txParams.value as string | undefined) ?? '0'
+    // The same canonical hex the wallet is dispatched (see buildTransactionParams), so the preview and
+    // the execution read one quantity whatever form the request used.
+    value: toHexQuantity(txParams.value ?? '0x0')
   }
 }
 
