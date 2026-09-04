@@ -8,6 +8,7 @@ import { config } from '../../../modules/config'
 import {
   MetaTransactionTypedData,
   SimulationRequestBody,
+  SimulationResponseBody,
   buildMetaTransactionSimulationPayload,
   isMetaTransactionTypedData,
   resolveMetaTransactionTypedData
@@ -456,9 +457,9 @@ const NFT_TRANSFER_FUNCTIONS = new Set(['transferFrom', 'safeTransferFrom'])
  * that decodes with the same ABI, is left to the generic review and its simulation.
  * @param data The transaction data
  * @param contractABI The contract ABI to use for decoding
- * @returns Object containing tokenId and toAddress, or null when the data is not a single-token transfer
+ * @returns The transfer source, destination and token id, or null when the data is not a single-token transfer
  */
-function decodeNftTransferData(data: string, contractABI: object[]): { tokenId: string; toAddress: string } | null {
+function decodeNftTransferData(data: string, contractABI: object[]): { fromAddress: string; tokenId: string; toAddress: string } | null {
   try {
     if (!data || data.length < 10) return null
 
@@ -474,17 +475,49 @@ function decodeNftTransferData(data: string, contractABI: object[]): { tokenId: 
     // transferFrom(address from, address to, uint256 tokenId)
     // safeTransferFrom(address from, address to, uint256 tokenId)
     // safeTransferFrom(address from, address to, uint256 tokenId, bytes data)
-    const [, toAddress, tokenId] = args ?? []
-    if (typeof toAddress !== 'string' || typeof tokenId !== 'bigint') {
+    const [fromAddress, toAddress, tokenId] = args ?? []
+    if (typeof fromAddress !== 'string' || typeof toAddress !== 'string' || typeof tokenId !== 'bigint') {
       console.error('Failed to decode transaction data')
       return null
     }
 
-    return { tokenId: tokenId.toString(), toAddress }
+    return { fromAddress, tokenId: tokenId.toString(), toAddress }
   } catch (error) {
     console.error('Error decoding NFT transfer data:', error)
     return null
   }
+}
+
+/**
+ * Whether a simulation proves that the branded NFT view describes the complete asset effect of the
+ * transaction. `safeTransferFrom` can invoke an arbitrary receiver callback, so recognizing the
+ * collection and selector is not enough: any additional transfer or approval must use the generic
+ * summary instead of being hidden behind the specialized gift screen.
+ */
+function isExactNftTransferSimulation(
+  result: SimulationResponseBody,
+  signerAddress: string,
+  contractAddress: string,
+  transfer: { fromAddress: string; tokenId: string; toAddress: string }
+): boolean {
+  if (
+    result.status !== 'success' ||
+    transfer.fromAddress.toLowerCase() !== signerAddress.toLowerCase() ||
+    result.assetChanges.length !== 1 ||
+    result.approvalChanges.length !== 0
+  ) {
+    return false
+  }
+
+  const [change] = result.assetChanges
+  return (
+    change.type === 'transfer' &&
+    change.standard === 'erc721' &&
+    change.from?.toLowerCase() === signerAddress.toLowerCase() &&
+    change.to?.toLowerCase() === transfer.toAddress.toLowerCase() &&
+    change.contractAddress?.toLowerCase() === contractAddress.toLowerCase() &&
+    change.tokenId === transfer.tokenId
+  )
 }
 
 /**
@@ -707,6 +740,7 @@ export {
   getMetaTransactionChainId,
   checkMetaTransactionSupport,
   decodeNftTransferData,
+  isExactNftTransferSimulation,
   decodeManaTransferData,
   fetchNftMetadata,
   fetchPlaceByCreatorAddress,

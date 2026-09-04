@@ -215,6 +215,7 @@ const mockCheckMetaTransactionSupport = jest.fn()
 const mockIsKnownDecentralandContractOnChain = jest.fn()
 const mockIsDecentralandContractAddress = jest.fn()
 const mockIsApprovalGrantingTypedData = jest.fn()
+const mockIsExactNftTransferSimulation = jest.fn()
 jest.mock('./utils', () => ({
   checkMetaTransactionSupport: (...args: any[]) => mockCheckMetaTransactionSupport(...args),
   decodeManaTransferData: jest.fn().mockReturnValue(null),
@@ -230,6 +231,7 @@ jest.mock('./utils', () => ({
   isKnownDecentralandContractOnChain: (...args: any[]) => mockIsKnownDecentralandContractOnChain(...args),
   isDecentralandContractAddress: (...args: any[]) => mockIsDecentralandContractAddress(...args),
   isApprovalGrantingTypedData: (...args: any[]) => mockIsApprovalGrantingTypedData(...args),
+  isExactNftTransferSimulation: (...args: any[]) => mockIsExactNftTransferSimulation(...args),
   extractSignaturePayload: (...args: any[]) => mockExtractSignaturePayload(...args),
   decodeMetaTransactionTypedData: (...args: any[]) => mockDecodeMetaTransactionTypedData(...args),
   isOpaqueSignatureMessage: (...args: any[]) => mockIsOpaqueSignatureMessage(...args),
@@ -296,6 +298,7 @@ describe('RequestPage', () => {
     mockIsKnownDecentralandContractOnChain.mockReturnValue(false)
     mockIsDecentralandContractAddress.mockResolvedValue(false)
     mockIsApprovalGrantingTypedData.mockReturnValue(false)
+    mockIsExactNftTransferSimulation.mockReturnValue(true)
     mockIsOpaqueSignatureMessage.mockReturnValue(false)
     mockExtractSignaturePayload.mockReturnValue({ kind: 'message', message: 'hello' })
     mockDecodeMetaTransactionTypedData.mockReturnValue(null)
@@ -1798,7 +1801,7 @@ describe('RequestPage', () => {
       mockGetChainId.mockResolvedValue(1)
       mockEstimateFeesPerGas.mockResolvedValue({ gasPrice: BigInt(1) })
       mockEstimateGas.mockResolvedValue(BigInt(1))
-      jest.mocked(decodeNftTransferData).mockReturnValue({ tokenId: '1', toAddress: '0xrecipient' })
+      jest.mocked(decodeNftTransferData).mockReturnValue({ fromAddress: '0xabc123', tokenId: '1', toAddress: '0xrecipient' })
       jest.mocked(fetchProfile).mockResolvedValue(null)
     })
 
@@ -1813,6 +1816,50 @@ describe('RequestPage', () => {
       it('should show the branded gift confirmation view', async () => {
         renderRequestPage()
         expect(await screen.findByTestId('transfer-confirm')).toBeInTheDocument()
+      })
+
+      it('should simulate the complete transfer before showing the branded view', async () => {
+        renderRequestPage()
+        await screen.findByTestId('transfer-confirm')
+
+        expect(mockSimulateTransaction).toHaveBeenCalled()
+      })
+
+      describe('and the receiver callback produces additional asset effects', () => {
+        beforeEach(() => {
+          mockIsExactNftTransferSimulation.mockReturnValue(false)
+        })
+
+        it('should fall back to the generic simulation summary', async () => {
+          renderRequestPage()
+
+          expect(await screen.findByTestId('wallet-interaction')).toHaveAttribute('data-sim', 'ready')
+        })
+
+        it('should not hide the additional effects behind the branded view', async () => {
+          renderRequestPage()
+          await screen.findByTestId('wallet-interaction')
+
+          expect(screen.queryByTestId('transfer-confirm')).not.toBeInTheDocument()
+        })
+      })
+
+      describe('and the transfer cannot be simulated', () => {
+        beforeEach(() => {
+          mockSimulateTransaction.mockRejectedValue(new Error('simulation unavailable'))
+        })
+
+        it('should fall back to the generic review', async () => {
+          renderRequestPage()
+
+          expect(await screen.findByTestId('wallet-interaction')).toHaveAttribute('data-sim', 'unavailable')
+        })
+
+        it('should require acknowledgment before the unpreviewed transfer can continue', async () => {
+          renderRequestPage()
+
+          expect(await screen.findByTestId('wallet-interaction')).toHaveAttribute('data-requires-acknowledgment', 'true')
+        })
       })
 
       describe('and the token metadata cannot be fetched', () => {
@@ -1880,7 +1927,7 @@ describe('RequestPage', () => {
       mockGetChainId.mockResolvedValue(1)
       mockEstimateFeesPerGas.mockResolvedValue({ gasPrice: BigInt(1) })
       mockEstimateGas.mockResolvedValue(BigInt(1))
-      jest.mocked(decodeNftTransferData).mockReturnValue({ tokenId: '1', toAddress: '0xrecipient' })
+      jest.mocked(decodeNftTransferData).mockReturnValue({ fromAddress: '0xabc123', tokenId: '1', toAddress: '0xrecipient' })
       jest.mocked(fetchProfile).mockResolvedValue(null)
       jest.mocked(fetchNftMetadata).mockResolvedValue({ imageUrl: 'x', tokenId: '1', name: 'n', description: 'd', rarity: 'common' } as any)
     })
@@ -1899,6 +1946,13 @@ describe('RequestPage', () => {
       it('should show the branded gift confirmation view', async () => {
         renderRequestPage()
         expect(await screen.findByTestId('transfer-confirm')).toBeInTheDocument()
+      })
+
+      it('should simulate the complete transfer before showing the branded view', async () => {
+        renderRequestPage()
+        await screen.findByTestId('transfer-confirm')
+
+        expect(mockSimulateTransaction).toHaveBeenCalled()
       })
     })
 

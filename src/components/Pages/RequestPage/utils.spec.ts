@@ -8,6 +8,7 @@ import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
 import { connection } from 'decentraland-connect'
 import { ContractName, getContract, getContractName } from 'decentraland-transactions'
 import { config } from '../../../modules/config'
+import { SimulationResponseBody } from '../../../shared/auth'
 import { MalformedSignatureRequestError } from '../../../shared/auth/errors'
 import { isMetaTransactionTypedData, resolveMetaTransactionTypedData } from '../../../shared/auth/metaTransactionTypedData'
 import { assertSignatureParamsAreCanonical } from '../../../shared/auth/signMethodGuard'
@@ -26,6 +27,7 @@ import {
   getSigninDeeplink,
   isApprovalGrantingTypedData,
   isDecentralandContractAddress,
+  isExactNftTransferSimulation,
   isKnownDecentralandContractOnChain,
   isOpaqueSignatureMessage,
   isSignatureMethod
@@ -377,9 +379,10 @@ describe('when testing decodeNftTransferData', () => {
       })
     })
 
-    it('should return the tokenId and toAddress', () => {
+    it('should return the source, tokenId and destination', () => {
       const result = decodeNftTransferData(transactionData, contractABI)
       expect(result).toEqual({
+        fromAddress: '0xfrom',
         tokenId: '123',
         toAddress: '0xto'
       })
@@ -430,9 +433,9 @@ describe('when testing decodeNftTransferData', () => {
       })
     })
 
-    it('should return the tokenId and toAddress', () => {
+    it('should return the source, tokenId and destination', () => {
       const result = decodeNftTransferData(transactionData, contractABI)
-      expect(result).toEqual({ tokenId: '9', toAddress: '0xto' })
+      expect(result).toEqual({ fromAddress: '0xfrom', tokenId: '9', toAddress: '0xto' })
     })
   })
 
@@ -492,6 +495,114 @@ describe('when testing decodeNftTransferData', () => {
     it('should return null', () => {
       const result = decodeNftTransferData(transactionData, contractABI)
       expect(result).toBeNull()
+    })
+  })
+})
+
+describe('when checking whether an NFT simulation exactly matches the branded gift', () => {
+  let result: SimulationResponseBody
+  let signerAddress: string
+  let contractAddress: string
+  let transfer: { fromAddress: string; tokenId: string; toAddress: string }
+
+  beforeEach(() => {
+    signerAddress = '0x0000000000000000000000000000000000000001'
+    contractAddress = '0x0000000000000000000000000000000000000002'
+    transfer = {
+      fromAddress: signerAddress,
+      tokenId: '7',
+      toAddress: '0x0000000000000000000000000000000000000003'
+    }
+    result = {
+      status: 'success',
+      assetChanges: [
+        {
+          type: 'transfer',
+          standard: 'erc721',
+          from: signerAddress,
+          to: transfer.toAddress,
+          amount: '1',
+          rawAmount: '1',
+          tokenId: transfer.tokenId,
+          contractAddress,
+          symbol: null,
+          name: 'Wearable',
+          decimals: null,
+          logoUrl: null,
+          dollarValue: null
+        }
+      ],
+      approvalChanges: [],
+      balanceChanges: [],
+      events: []
+    }
+  })
+
+  afterEach(() => {
+    jest.resetAllMocks()
+  })
+
+  describe('and the only effect is the displayed transfer from the connected signer', () => {
+    it('should allow the specialized gift view', () => {
+      expect(isExactNftTransferSimulation(result, signerAddress, contractAddress, transfer)).toBe(true)
+    })
+  })
+
+  describe('and a receiver callback moves another asset', () => {
+    beforeEach(() => {
+      result.assetChanges.push({
+        ...result.assetChanges[0],
+        standard: 'erc20',
+        tokenId: null,
+        contractAddress: '0x0000000000000000000000000000000000000004'
+      })
+    })
+
+    it('should require the generic simulation summary', () => {
+      expect(isExactNftTransferSimulation(result, signerAddress, contractAddress, transfer)).toBe(false)
+    })
+  })
+
+  describe('and the transfer grants an approval', () => {
+    beforeEach(() => {
+      result.approvalChanges.push({
+        kind: 'approvalForAll',
+        standard: 'erc721',
+        owner: signerAddress,
+        spender: transfer.toAddress,
+        amount: null,
+        rawAmount: null,
+        isUnlimited: true,
+        tokenId: null,
+        approved: true,
+        contractAddress,
+        symbol: null,
+        name: null
+      })
+    })
+
+    it('should require the generic simulation summary', () => {
+      expect(isExactNftTransferSimulation(result, signerAddress, contractAddress, transfer)).toBe(false)
+    })
+  })
+
+  describe('and the calldata transfers an NFT owned by another account', () => {
+    beforeEach(() => {
+      transfer.fromAddress = '0x0000000000000000000000000000000000000005'
+    })
+
+    it('should require the generic simulation summary', () => {
+      expect(isExactNftTransferSimulation(result, signerAddress, contractAddress, transfer)).toBe(false)
+    })
+  })
+
+  describe('and the simulation reverted', () => {
+    beforeEach(() => {
+      result.status = 'reverted'
+    })
+
+    it('should require the generic simulation summary', () => {
+      expect(isExactNftTransferSimulation(result, signerAddress, contractAddress, transfer)).toBe(false)
     })
   })
 })
