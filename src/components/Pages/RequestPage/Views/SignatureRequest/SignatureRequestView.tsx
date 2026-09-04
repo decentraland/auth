@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from '@dcl/hooks'
 import { Box, Button, Checkbox, CircularProgress, FormControlLabel } from 'decentraland-ui2'
-import { getPreviewFingerprint } from '../../../../../shared/auth'
+import { getPreviewFingerprint, hasNoVisibleEffects } from '../../../../../shared/auth'
 import { getExplorerAddressUrl, getExplorerName, getNetworkName } from '../../../../../shared/explorer'
 import { Container } from '../../Container'
 import { ButtonsContainer } from '../../RequestPage.styled'
@@ -61,6 +61,10 @@ export const SignatureRequestView = ({
   const hasUnverifiedEffects = isMetaTransaction && (simulation.status === 'unavailable' || isReverted || isContractUnrecognized)
   // Likewise when Auth cannot tell what the signature authorizes in the first place.
   const isUnverifiable = hasUnverifiedEffects || unverifiableReason !== null
+  // The inner call previewed cleanly but moves nothing the user can check. It may still change state
+  // the summary cannot show, so the acknowledgment says that instead of talking about approvals.
+  const isPreviewWithoutVisibleEffects =
+    isMetaTransaction && simulation.status === 'ready' && hasNoVisibleEffects(simulation.result, userAddress)
 
   // The exact statement the user is asked to acknowledge: the request it belongs to, the label, and
   // every notice shown alongside it. A tick is given to that statement only — when any part of it
@@ -72,6 +76,7 @@ export const SignatureRequestView = ({
     isReverted ? 'reverted' : '',
     isContractUnrecognized ? 'unrecognized-contract' : '',
     simulation.status === 'unavailable' ? 'unavailable' : '',
+    isPreviewWithoutVisibleEffects ? 'no-visible-effects' : '',
     // Exactly this preview: a re-simulation that showed something else is another statement.
     getPreviewFingerprint(simulation.status === 'ready' ? simulation.result : undefined)
   ].join('|')
@@ -175,7 +180,13 @@ export const SignatureRequestView = ({
                 data-testid="risk-acknowledgment"
               />
             }
-            label={isUnverifiable ? t('request.signature.acknowledge_unverified') : t('request.transaction_dialog.acknowledge_risk')}
+            label={
+              isUnverifiable
+                ? t('request.signature.acknowledge_unverified')
+                : isPreviewWithoutVisibleEffects
+                  ? t('request.transaction_dialog.acknowledge_no_visible_effects')
+                  : t('request.transaction_dialog.acknowledge_risk')
+            }
           />
         ) : null}
       </Content>

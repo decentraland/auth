@@ -27,6 +27,7 @@ import {
   UnsupportedMethodError,
   buildMetaTransactionSimulationPayload,
   createAuthServerHttpClient,
+  hasNoVisibleEffects,
   isDangerousApproval
 } from '../../../shared/auth'
 import { isRetiredSignInMethod } from '../../../shared/auth/signMethodGuard'
@@ -1181,6 +1182,12 @@ export const RequestPage = () => {
     simulationState.result.approvalChanges.some(approval =>
       isDangerousApproval(approval, address => simulationVerified.includes(address.toLowerCase()))
     )
+  // The preview ran and shows the user nothing to check: no asset moving into or out of the account
+  // and no permission change (see hasNoVisibleEffects). A call can still change state the summary
+  // does not model — an update operator on LAND, a collection's minters, managers or creator, a
+  // name's resolver — so "nothing to show" is not "nothing happens" and must not be a single click.
+  // Applies to a transaction and to a MetaTransaction signature alike.
+  const hasPreviewWithoutVisibleEffects = simulationState.status === 'ready' && hasNoVisibleEffects(simulationState.result, account ?? '')
   // A typed-data MetaTransaction whose inner call could not be previewed: the simulation was
   // unavailable, or the call reverts today. Unlike an eth_sendTransaction relayed through the gas
   // tank — which Auth signs and submits in one step, so the signature is consumed the moment it is
@@ -1201,10 +1208,12 @@ export const RequestPage = () => {
   // acknowledged, never degraded to a single-click approve; (c) a signed MetaTransaction
   // has no verified effects or targets a contract Auth cannot vouch for; (d) the request is an
   // off-chain approval signature (permit/order), which grants asset control but is never simulated;
-  // or (e) Auth cannot tell what the signature authorizes at all (an unrecognized typed-data struct
-  // or a message that is not readable text).
+  // (e) Auth cannot tell what the signature authorizes at all (an unrecognized typed-data struct
+  // or a message that is not readable text); or (f) the preview ran but shows no change the user
+  // can check, so whatever the call does happens outside what this page can show.
   const requiresApprovalAcknowledgment =
     hasDangerousApprovalChange ||
+    hasPreviewWithoutVisibleEffects ||
     simulationState.status === 'unavailable' ||
     isSignatureWithoutVerifiedEffects ||
     isSignatureToUnrecognizedContract ||

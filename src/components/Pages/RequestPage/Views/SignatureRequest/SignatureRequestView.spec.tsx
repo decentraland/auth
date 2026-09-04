@@ -821,4 +821,36 @@ describe('when rendering the SignatureRequestView', () => {
       expect(screen.getByText('request.signature.acknowledge_unverified')).toBeInTheDocument()
     })
   })
+
+  describe('and the payload is a meta-transaction whose preview shows no visible effects', () => {
+    let payload: SignaturePayload
+    let simulation: SimulationState
+
+    beforeEach(() => {
+      payload = {
+        kind: 'typedData',
+        raw: '{"primaryType":"MetaTransaction"}',
+        typedData: { primaryType: 'MetaTransaction', domain: {}, message: {} }
+      }
+      simulation = { status: 'ready', result: { status: 'success', assetChanges: [], approvalChanges: [], balanceChanges: [], events: [] } }
+    })
+
+    it('should word the acknowledgment for a call whose effects the preview cannot show', () => {
+      render(
+        <SignatureRequestView
+          requestId="r1"
+          method="eth_signTypedData_v4"
+          payload={payload}
+          simulation={simulation}
+          userAddress={USER}
+          isMetaTransaction={true}
+          contractTrust="confirmed"
+          requiresAcknowledgment
+          onDeny={onDeny}
+          onApprove={onApprove}
+        />
+      )
+      expect(screen.getByText('request.transaction_dialog.acknowledge_no_visible_effects')).toBeInTheDocument()
+    })
+  })
 })
