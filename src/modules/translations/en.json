@@ -71,7 +71,9 @@
       "title_web2": "A scene wants to access your Decentraland account assets",
       "title_web3": "The {explorerText} wants to interact with your wallet",
       "description": "Only proceed if you are aware of all transaction details and trust this scene.",
-      "review_title": "Review this transaction"
+      "review_title": "Review this transaction",
+      "preview_unavailable_warning": "We couldn't check what this transaction does because the preview service is temporarily unavailable. Only approve if you trust the scene that requested it.",
+      "acknowledge_preview_unavailable": "I understand the preview is unavailable and I'm approving without seeing what this transaction does"
     },
     "transaction_dialog": {
       "title": "Confirm Transaction",

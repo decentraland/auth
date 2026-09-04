@@ -71,7 +71,9 @@
       "title_web2": "Una escena quiere acceder a los activos de tu cuenta de Decentraland",
       "title_web3": "El {explorerText} quiere interactuar con tu billetera",
       "description": "Solo procede si estás al tanto de todos los detalles de la transacción y confías en esta escena.",
-      "review_title": "Revisa esta transacción"
+      "review_title": "Revisa esta transacción",
+      "preview_unavailable_warning": "No pudimos verificar qué hace esta transacción porque el servicio de vista previa no está disponible temporalmente. Aprueba solo si confías en la escena que la solicitó.",
+      "acknowledge_preview_unavailable": "Entiendo que la vista previa no está disponible y estoy aprobando sin ver qué hace esta transacción"
     },
     "transaction_dialog": {
       "title": "Confirmar transacción",

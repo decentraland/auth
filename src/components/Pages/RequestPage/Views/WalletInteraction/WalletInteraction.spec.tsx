@@ -247,4 +247,56 @@ describe('when rendering the WalletInteraction view', () => {
       expect(onApprove).toHaveBeenCalledTimes(1)
     })
   })
+
+  describe('and the simulation preview is unavailable', () => {
+    it('should warn that the preview is unavailable', () => {
+      render(
+        <WalletInteraction
+          requestId="r1"
+          isWeb2Wallet
+          simulation={{ status: 'unavailable' }}
+          userAddress={USER}
+          requiresAcknowledgment
+          gasCovered
+          onDeny={onDeny}
+          onApprove={onApprove}
+        />
+      )
+      expect(screen.getByTestId('preview-unavailable-warning')).toBeInTheDocument()
+    })
+
+    it('should word the acknowledgment for the unavailable preview rather than the generic risk copy', () => {
+      render(
+        <WalletInteraction
+          requestId="r1"
+          isWeb2Wallet
+          simulation={{ status: 'unavailable' }}
+          userAddress={USER}
+          requiresAcknowledgment
+          gasCovered
+          onDeny={onDeny}
+          onApprove={onApprove}
+        />
+      )
+      expect(screen.getByText('request.wallet_interaction.acknowledge_preview_unavailable')).toBeInTheDocument()
+    })
+
+    it('should keep approval disabled until the unavailable preview is acknowledged', async () => {
+      render(
+        <WalletInteraction
+          requestId="r1"
+          isWeb2Wallet
+          simulation={{ status: 'unavailable' }}
+          userAddress={USER}
+          requiresAcknowledgment
+          gasCovered
+          onDeny={onDeny}
+          onApprove={onApprove}
+        />
+      )
+      expect(screen.getByTestId('transfer-confirm-button')).toBeDisabled()
+      await userEvent.click(screen.getByRole('checkbox'))
+      expect(screen.getByTestId('transfer-confirm-button')).not.toBeDisabled()
+    })
+  })
 })
