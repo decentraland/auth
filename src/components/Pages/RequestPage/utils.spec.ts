@@ -1149,6 +1149,65 @@ describe('when testing extractSignaturePayload', () => {
       expect(() => assertSignatureParamsAreCanonical('eth_signTypedData_v4', params, signer)).toThrow(MalformedSignatureRequestError)
     })
   })
+
+  describe('and the eth_signTypedData_v4 signer uses an uppercase 0X prefix', () => {
+    let signer: string
+    let permit: string
+    let params: unknown[]
+
+    beforeEach(() => {
+      signer = '0x1234567890abcdef1234567890abcdef12345678'
+      permit = JSON.stringify({ primaryType: 'Permit', domain: {}, types: {}, message: { value: '1' } })
+      // params[0] uses the uppercase-X prefix that the case-insensitive guard (isSigner) accepts as
+      // the signer. A case-sensitive parser used to misread it as the content and drop the real
+      // typed data in params[1], letting the wallet sign something never shown to the user.
+      params = [`0X${signer.slice(2)}`, permit]
+    })
+
+    it('should classify the second param as the typed data instead of misreading the 0X signer as an opaque message', () => {
+      expect(extractSignaturePayload('eth_signTypedData_v4', params, signer)).toEqual({
+        kind: 'typedData',
+        typedData: JSON.parse(permit),
+        raw: permit
+      })
+    })
+
+    it('should classify it consistently with the canonical guard, which also accepts the 0X-prefixed signer', () => {
+      expect(() => assertSignatureParamsAreCanonical('eth_signTypedData_v4', params, signer)).not.toThrow()
+    })
+  })
+
+  describe('and the eth_signTypedData_v4 signer uses an uppercase 0X prefix with no signer address provided', () => {
+    let signer: string
+    let permit: string
+    let params: unknown[]
+
+    beforeEach(() => {
+      signer = '0x1234567890abcdef1234567890abcdef12345678'
+      permit = JSON.stringify({ primaryType: 'Permit', domain: {}, types: {}, message: { value: '1' } })
+      params = [`0X${signer.slice(2)}`, permit]
+    })
+
+    it('should still recognize the 0X value as the signer address and return the typed data', () => {
+      expect(extractSignaturePayload('eth_signTypedData_v4', params)).toEqual({
+        kind: 'typedData',
+        typedData: JSON.parse(permit),
+        raw: permit
+      })
+    })
+  })
+
+  describe('and the method is personal_sign with an uppercase 0X hex-encoded message', () => {
+    let signer: string
+
+    beforeEach(() => {
+      signer = '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd'
+    })
+
+    it('should decode the 0X-prefixed hex message to its UTF-8 text', () => {
+      expect(extractSignaturePayload('personal_sign', ['0X48656c6c6f', signer], signer)).toEqual({ kind: 'message', message: 'Hello' })
+    })
+  })
 })
 
 describe('when testing decodeMetaTransactionTypedData', () => {
