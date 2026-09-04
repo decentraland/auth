@@ -1574,6 +1574,24 @@ describe('RequestPage', () => {
         expect(screen.queryByTestId('transfer-confirm')).not.toBeInTheDocument()
       })
     })
+
+    describe('and the target is a relayed Decentraland contract that is not a collection', () => {
+      beforeEach(() => {
+        mockCheckMetaTransactionSupport.mockResolvedValue({ willUseMetaTransaction: true, contractName: 'MANAToken' })
+      })
+
+      it('should fall through to the generic review instead of the branded gift view', async () => {
+        renderRequestPage()
+        expect(await screen.findByTestId('wallet-interaction')).toBeInTheDocument()
+        expect(screen.queryByTestId('transfer-confirm')).not.toBeInTheDocument()
+      })
+
+      it('should not fetch token metadata from it', async () => {
+        renderRequestPage()
+        await screen.findByTestId('wallet-interaction')
+        expect(fetchNftMetadata).not.toHaveBeenCalled()
+      })
+    })
   })
 
   describe('when an external (web3) wallet receives an NFT transfer', () => {
@@ -1625,6 +1643,25 @@ describe('RequestPage', () => {
       })
 
       it("should not fetch the contract's token metadata, which would hand the user's IP to whoever runs it", async () => {
+        renderRequestPage()
+        await screen.findByTestId('wallet-interaction')
+        expect(fetchNftMetadata).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and the target is a relayed Decentraland contract that is not a collection', () => {
+      beforeEach(() => {
+        // An ERC-20 transferFrom shares the ERC-721 selector, so a transfer aimed at MANA decodes like a gift.
+        mockCheckMetaTransactionSupport.mockResolvedValue({ willUseMetaTransaction: true, contractName: 'MANAToken' })
+      })
+
+      it('should not show the branded gift view', async () => {
+        renderRequestPage()
+        expect(await screen.findByTestId('wallet-interaction')).toBeInTheDocument()
+        expect(screen.queryByTestId('transfer-confirm')).not.toBeInTheDocument()
+      })
+
+      it('should not fetch token metadata from it', async () => {
         renderRequestPage()
         await screen.findByTestId('wallet-interaction')
         expect(fetchNftMetadata).not.toHaveBeenCalled()

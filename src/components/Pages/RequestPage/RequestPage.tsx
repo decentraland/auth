@@ -662,8 +662,13 @@ export const RequestPage = () => {
                     const nftContractCheck = await checkMetaTransactionSupport(contractAddress)
                     if (cancelled) return
                     metaTxCheckRef.current = { address: contractAddress.toLowerCase(), ...nftContractCheck }
+                    // Relayed is not enough: MANA and the marketplaces are relayed too, and an ERC-20
+                    // transferFrom shares the ERC-721 selector, so a transfer aimed at one of them would
+                    // decode like a gift. Only a collection is one.
+                    const isVerifiedCollection =
+                      nftContractCheck.willUseMetaTransaction && nftContractCheck.contractName === ContractName.ERC721CollectionV2
 
-                    if (nftContractCheck.willUseMetaTransaction) {
+                    if (isVerifiedCollection) {
                       const [metadata, recipientProfile] = await Promise.all([
                         fetchNftMetadata(contractAddress, contract.abi, transferData.tokenId),
                         fetchProfile(transferData.toAddress)
