@@ -1,4 +1,4 @@
-import { buildTransactionParams, getUnsupportedCalldataAlias } from './transactionParams'
+import { buildTransactionParams, getUnsupportedCalldataAlias, toHexQuantity } from './transactionParams'
 
 describe('buildTransactionParams', () => {
   describe('when the request carries only the reviewed fields', () => {
@@ -58,6 +58,30 @@ describe('buildTransactionParams', () => {
     })
   })
 
+  describe('when the value is a decimal quantity', () => {
+    let params: unknown[]
+
+    beforeEach(() => {
+      // 1e7 wei. A signer that reads a non-hex string as text would sign 0x3130303030303030, about
+      // 3.5 ETH, so the decimal form must never reach the wallet.
+      params = [{ to: '0xdef', data: '0x', value: '10000000' }]
+    })
+
+    it('should dispatch it as the hex quantity the preview showed', () => {
+      expect(buildTransactionParams(params)).toEqual([{ to: '0xdef', data: '0x', value: '0x989680' }])
+    })
+  })
+
+  describe('when the value is not a quantity', () => {
+    it.each([
+      ['a number', 1],
+      ['a unit string', '1 MANA'],
+      ['an empty string', '']
+    ])('should reject %s instead of forwarding it to the wallet', (_label, value) => {
+      expect(() => buildTransactionParams([{ to: '0xdef', value }])).toThrow(/hex or decimal quantity/)
+    })
+  })
+
   describe('when the params are not a usable transaction object', () => {
     it('should name the type when the caller serialised the payload', () => {
       expect(() => buildTransactionParams([JSON.stringify({ to: '0xdef' })])).toThrow(/received string/)
@@ -80,6 +104,37 @@ describe('buildTransactionParams', () => {
 
     it('should reject a non-string to instead of failing later on it', () => {
       expect(() => buildTransactionParams([{ to: 42 }])).toThrow(/missing a "to" address/)
+    })
+  })
+})
+
+describe('toHexQuantity', () => {
+  describe('when the value is a decimal string', () => {
+    it('should return the same number as a hex quantity', () => {
+      expect(toHexQuantity('1000')).toBe('0x3e8')
+    })
+  })
+
+  describe('when the value is a hex string with leading zeros', () => {
+    it('should return the canonical hex quantity', () => {
+      expect(toHexQuantity('0x0003e8')).toBe('0x3e8')
+    })
+  })
+
+  describe('when the value is zero', () => {
+    it.each(['0', '0x0', '0x00'])('should return 0x0 for %s', value => {
+      expect(toHexQuantity(value)).toBe('0x0')
+    })
+  })
+
+  describe('when the value is not a quantity', () => {
+    it.each([
+      ['a number', 1],
+      ['undefined', undefined],
+      ['a unit string', '1 MANA'],
+      ['odd hex without a prefix', 'f4240']
+    ])('should throw for %s', (_label, value) => {
+      expect(() => toHexQuantity(value)).toThrow(/hex or decimal quantity/)
     })
   })
 })

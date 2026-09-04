@@ -162,6 +162,7 @@ jest.mock('./Views', () => ({
       data-sim={props.simulation?.status}
       data-requires-acknowledgment={String(props.requiresAcknowledgment)}
       data-gas-covered={String(props.gasCovered)}
+      data-profiles={JSON.stringify(props.profiles ?? {})}
     >
       <button data-testid="wallet-interaction-approve" onClick={props.onApprove}>
         approve
@@ -1710,6 +1711,24 @@ describe('RequestPage', () => {
         renderRequestPage()
         expect(await screen.findByTestId('transfer-confirm')).toBeInTheDocument()
       })
+
+      describe('and the token metadata cannot be fetched', () => {
+        beforeEach(() => {
+          jest.mocked(fetchNftMetadata).mockRejectedValueOnce(new Error('tokenURI reverted'))
+        })
+
+        it('should fall through to the generic review instead of the branded gift view', async () => {
+          renderRequestPage()
+          expect(await screen.findByTestId('wallet-interaction')).toBeInTheDocument()
+          expect(screen.queryByTestId('transfer-confirm')).not.toBeInTheDocument()
+        })
+
+        it('should still preview the transaction so approval is not a bare confirm', async () => {
+          renderRequestPage()
+          await screen.findByTestId('wallet-interaction')
+          await waitFor(() => expect(mockSimulateTransaction).toHaveBeenCalled())
+        })
+      })
     })
 
     describe('and the target is not a Decentraland collection', () => {
@@ -1722,6 +1741,38 @@ describe('RequestPage', () => {
         expect(await screen.findByTestId('wallet-interaction')).toBeInTheDocument()
         expect(screen.queryByTestId('transfer-confirm')).not.toBeInTheDocument()
       })
+    })
+  })
+
+  describe('when a web2 transaction fails before its preview is requested', () => {
+    beforeEach(() => {
+      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.MAGIC }
+      // A generic transaction. Reset the decoders explicitly — a prior test sets a persistent NFT return value.
+      jest.mocked(decodeManaTransferData).mockReturnValue(null)
+      jest.mocked(decodeNftTransferData).mockReturnValue(null)
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockRecover.mockResolvedValue({
+        method: 'eth_sendTransaction',
+        params: [{ to: '0xcontract', data: '0xabcd', value: '0x0' }],
+        sender: '0xabc123',
+        expiration: new Date(Date.now() + 3600000).toISOString()
+      })
+      mockGetAddresses.mockResolvedValue(['0xabc123'])
+      // The balance lookup fails, before the simulation is ever requested.
+      mockGetBalance.mockRejectedValueOnce(new Error('rpc down'))
+    })
+
+    it('should mark the preview unavailable instead of showing the bare confirm dialog', async () => {
+      renderRequestPage()
+      const view = await screen.findByTestId('wallet-interaction')
+      await waitFor(() => expect(view).toHaveAttribute('data-sim', 'unavailable'))
+    })
+
+    it('should require an acknowledgment before approving', async () => {
+      renderRequestPage()
+      const view = await screen.findByTestId('wallet-interaction')
+      await waitFor(() => expect(view).toHaveAttribute('data-sim', 'unavailable'))
+      expect(view).toHaveAttribute('data-requires-acknowledgment', 'true')
     })
   })
 
@@ -1745,6 +1796,64 @@ describe('RequestPage', () => {
     it('should prefetch the transaction simulation', async () => {
       renderRequestPage()
       await waitFor(() => expect(mockSimulateTransaction).toHaveBeenCalled())
+    })
+
+    describe('and the simulation names a counterparty with a Decentraland profile', () => {
+      const counterparty = '0x1111111111111111111111111111111111111234'
+
+      beforeEach(() => {
+        mockSimulateTransaction.mockResolvedValue({
+          status: 'success',
+          assetChanges: [
+            {
+              type: 'transfer',
+              standard: 'erc20',
+              from: '0xabc123',
+              to: counterparty,
+              amount: '500',
+              rawAmount: '500000000000000000000',
+              tokenId: null,
+              contractAddress: '0xmana',
+              symbol: 'MANA',
+              name: 'MANA',
+              decimals: 18,
+              logoUrl: null,
+              dollarValue: null
+            }
+          ],
+          approvalChanges: [],
+          balanceChanges: [],
+          events: []
+        })
+      })
+
+      afterEach(() => {
+        jest.mocked(fetchProfile).mockReset()
+      })
+
+      describe('and the name is unclaimed', () => {
+        beforeEach(() => {
+          jest.mocked(fetchProfile).mockResolvedValue({ avatars: [{ name: 'Decentraland', hasClaimedName: false }] } as any)
+        })
+
+        it('should qualify the name with the address so a self-chosen name cannot pose as a trusted party', async () => {
+          renderRequestPage()
+          const view = await screen.findByTestId('wallet-interaction')
+          await waitFor(() => expect(view).toHaveAttribute('data-profiles', JSON.stringify({ [counterparty]: 'Decentraland#1234' })))
+        })
+      })
+
+      describe('and the name is claimed', () => {
+        beforeEach(() => {
+          jest.mocked(fetchProfile).mockResolvedValue({ avatars: [{ name: 'Decentraland', hasClaimedName: true }] } as any)
+        })
+
+        it('should show the name on its own', async () => {
+          renderRequestPage()
+          const view = await screen.findByTestId('wallet-interaction')
+          await waitFor(() => expect(view).toHaveAttribute('data-profiles', JSON.stringify({ [counterparty]: 'Decentraland' })))
+        })
+      })
     })
 
     describe('and the simulation grants an approval', () => {
@@ -2087,7 +2196,163 @@ describe('RequestPage', () => {
       mockEstimateGas.mockResolvedValue(BigInt(1))
     })
 
-    it('should not call the simulation endpoint (external wallets keep their own confirmation UI)', async () => {
+    describe('and the wallet will send the transaction itself', () => {
+      beforeEach(() => {
+        mockCheckMetaTransactionSupport.mockResolvedValue({ willUseMetaTransaction: false, contractName: null })
+      })
+
+      it('should keep the classic confirmation because the wallet shows the transaction', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('wallet-interaction')
+        await waitFor(() => expect(view).toHaveAttribute('data-sim', 'idle'))
+      })
+
+      it('should not call the simulation endpoint', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('wallet-interaction')
+        await waitFor(() => expect(view).toHaveAttribute('data-sim', 'idle'))
+        expect(mockSimulateTransaction).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and the transaction will be relayed as a meta-transaction', () => {
+      beforeEach(() => {
+        mockCheckMetaTransactionSupport.mockResolvedValue({ willUseMetaTransaction: true, contractName: 'ERC721CollectionV2' })
+      })
+
+      it('should preview the inner call because the wallet is only shown an opaque MetaTransaction signature', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('wallet-interaction')
+        await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+        expect(mockSimulateTransaction).toHaveBeenCalled()
+      })
+
+      it('should mark the interaction as gas-covered', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('wallet-interaction')
+        await waitFor(() => expect(view).toHaveAttribute('data-gas-covered', 'true'))
+      })
+
+      describe('and the simulation grants collection-wide access', () => {
+        beforeEach(() => {
+          mockIsKnownDecentralandContractOnChain.mockReturnValue(false)
+          mockSimulateTransaction.mockResolvedValue({
+            status: 'success',
+            assetChanges: [],
+            approvalChanges: [
+              {
+                kind: 'approvalForAll',
+                standard: 'erc721',
+                owner: '0xabc123',
+                spender: '0xattacker',
+                amount: null,
+                rawAmount: null,
+                isUnlimited: false,
+                tokenId: null,
+                approved: true,
+                contractAddress: '0xcollection',
+                symbol: null,
+                name: null
+              }
+            ],
+            balanceChanges: [],
+            events: []
+          })
+        })
+
+        it('should require an acknowledgment, the same gate a web2 user gets', async () => {
+          renderRequestPage()
+          const view = await screen.findByTestId('wallet-interaction')
+          await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+          expect(view).toHaveAttribute('data-requires-acknowledgment', 'true')
+        })
+      })
+
+      describe('and the simulation is unavailable', () => {
+        beforeEach(() => {
+          mockSimulateTransaction.mockRejectedValue(new SimulationUnavailableError('status 502', 502))
+        })
+
+        it('should require an acknowledgment because the relay still executes the unpreviewable call', async () => {
+          renderRequestPage()
+          const view = await screen.findByTestId('wallet-interaction')
+          await waitFor(() => expect(view).toHaveAttribute('data-sim', 'unavailable'))
+          expect(view).toHaveAttribute('data-requires-acknowledgment', 'true')
+        })
+      })
+    })
+  })
+
+  describe('when an external (web3) wallet receives a MetaTransaction signature', () => {
+    beforeEach(() => {
+      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.INJECTED }
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockRecover.mockResolvedValue({
+        method: 'eth_signTypedData_v4',
+        params: ['0xabc123', '{"primaryType":"MetaTransaction"}'],
+        sender: '0xabc123',
+        expiration: new Date(Date.now() + 3600000).toISOString()
+      })
+      mockGetAddresses.mockResolvedValue(['0xabc123'])
+      mockExtractSignaturePayload.mockReturnValue({ kind: 'typedData', typedData: { primaryType: 'MetaTransaction' }, raw: '{}' })
+      mockDecodeMetaTransactionTypedData.mockReturnValue({
+        calldataField: 'functionSignature',
+        calldata: '0xdeadbeef',
+        from: '0xabc123',
+        verifyingContract: '0xVerifyingContract',
+        chainId: 137
+      })
+      mockCheckMetaTransactionSupport.mockResolvedValue({ willUseMetaTransaction: true, contractName: 'ERC721CollectionV2' })
+    })
+
+    it('should render the signature preview instead of the classic confirmation', async () => {
+      renderRequestPage()
+      expect(await screen.findByTestId('signature-request')).toBeInTheDocument()
+    })
+
+    it('should simulate the inner call the signature authorizes', async () => {
+      renderRequestPage()
+      const view = await screen.findByTestId('signature-request')
+      await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+      expect(mockSimulateTransaction).toHaveBeenCalled()
+    })
+
+    describe('and the simulation is unavailable', () => {
+      beforeEach(() => {
+        mockSimulateTransaction.mockRejectedValue(new SimulationUnavailableError('status 502', 502))
+      })
+
+      it('should require an acknowledgment because the signature is a bearer authorization', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('signature-request')
+        await waitFor(() => expect(view).toHaveAttribute('data-sim', 'unavailable'))
+        expect(view).toHaveAttribute('data-requires-acknowledgment', 'true')
+      })
+    })
+  })
+
+  describe('when an external (web3) wallet receives a typed-data signature that is not a MetaTransaction', () => {
+    beforeEach(() => {
+      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.INJECTED }
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockRecover.mockResolvedValue({
+        method: 'eth_signTypedData_v4',
+        params: ['0xabc123', '{"primaryType":"Permit"}'],
+        sender: '0xabc123',
+        expiration: new Date(Date.now() + 3600000).toISOString()
+      })
+      mockGetAddresses.mockResolvedValue(['0xabc123'])
+      mockExtractSignaturePayload.mockReturnValue({ kind: 'typedData', typedData: { primaryType: 'Permit' }, raw: '{}' })
+      mockDecodeMetaTransactionTypedData.mockReturnValue(null)
+      mockIsApprovalGrantingTypedData.mockReturnValue(true)
+    })
+
+    it('should keep the classic confirmation because the wallet shows the permit itself', async () => {
+      renderRequestPage()
+      expect(await screen.findByTestId('wallet-interaction')).toBeInTheDocument()
+    })
+
+    it('should not call the simulation endpoint', async () => {
       renderRequestPage()
       await screen.findByTestId('wallet-interaction')
       expect(mockSimulateTransaction).not.toHaveBeenCalled()
