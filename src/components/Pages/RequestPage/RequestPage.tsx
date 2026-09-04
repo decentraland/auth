@@ -42,6 +42,7 @@ import {
   isValidUuidV4
 } from '../../../shared/locations'
 import { sendTipNotification } from '../../../shared/notifications'
+import { getProfileDisplayName } from '../../../shared/profile'
 import { identifyUser, trackEvent } from '../../../shared/utils/analytics'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { FeatureFlagsContext } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
@@ -506,6 +507,10 @@ export const RequestPage = () => {
         // Resolves Decentraland profile names for the transaction's counterparties as a
         // progressive enhancement — the summary renders immediately with addresses and names
         // fill in when (and if) they resolve. Never blocks or fails the summary.
+        // Names follow the rule the rest of the UI uses (getProfileDisplayName): only a claimed
+        // name stands on its own; an unclaimed one is free text anyone can set, so it is qualified
+        // with the address, or a wallet named "Decentraland" would read as the counterparty
+        // "Decentraland" in "You send".
         const resolveSimulationProfiles = async (result: SimulationResponseBody) => {
           const addresses = new Set<string>()
           for (const change of result.assetChanges) {
@@ -522,7 +527,7 @@ export const RequestPage = () => {
             [...addresses].map(async address => {
               try {
                 const profile = await fetchProfile(address)
-                const name = profile?.avatars?.[0]?.name
+                const name = getProfileDisplayName(profile, address)
                 return name ? ([address, name] as const) : null
               } catch {
                 return null
