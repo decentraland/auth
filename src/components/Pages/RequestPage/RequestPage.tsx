@@ -666,23 +666,25 @@ export const RequestPage = () => {
                   const transferData = decodeNftTransferData(transactionData, contract.abi)
 
                   if (transferData) {
-                    // For web2 wallets (whose only confirmation is this site), only show the branded
-                    // Decentraland "gift" view when the target is a verified DCL collection. Otherwise an
-                    // arbitrary contract could impersonate a DCL wearable (spoofed name/image/rarity from
-                    // its own tokenURI) to socially-engineer the transfer of the user's own NFT — so fall
-                    // through to the generic simulation + acknowledgment path instead. Web3 wallets keep
-                    // the instant branded view since the wallet itself shows the authoritative transaction.
-                    // The verification result is cached in metaTxCheckRef so the generic fall-through and
-                    // the approve path don't repeat the (networked) lookup for the same contract.
-                    let isDclCollection = true
-                    if (isUserUsingWeb2Wallet) {
-                      const nftContractCheck = await checkMetaTransactionSupport(contractAddress)
-                      if (cancelled) return
-                      metaTxCheckRef.current = { address: contractAddress.toLowerCase(), ...nftContractCheck }
-                      isDclCollection = nftContractCheck.willUseMetaTransaction
-                    }
+                    // Only show the branded Decentraland "gift" view when the target is a verified DCL collection.
+                    // Otherwise an arbitrary contract could impersonate a DCL wearable (spoofed name/image/rarity
+                    // from its own tokenURI) to socially-engineer the transfer of the user's own NFT, and the page
+                    // would fetch that contract's metadata URL, handing the user's IP to whoever runs it. This holds
+                    // for external wallets too: their prompt shows the authoritative transaction, but the branded
+                    // view is what the user reads first, and it must not vouch for a contract Decentraland does not
+                    // know. Anything else falls through to the generic review. The result is cached in
+                    // metaTxCheckRef so the generic fall-through and the approve path don't repeat the (networked)
+                    // lookup for the same contract.
+                    const nftContractCheck = await checkMetaTransactionSupport(contractAddress)
+                    if (cancelled) return
+                    metaTxCheckRef.current = { address: contractAddress.toLowerCase(), ...nftContractCheck }
+                    // Relayed is not enough: MANA and the marketplaces are relayed too, and an ERC-20
+                    // transferFrom shares the ERC-721 selector, so a transfer aimed at one of them would
+                    // decode like a gift. Only a collection is one.
+                    const isVerifiedCollection =
+                      nftContractCheck.willUseMetaTransaction && nftContractCheck.contractName === ContractName.ERC721CollectionV2
 
-                    if (isDclCollection) {
+                    if (isVerifiedCollection) {
                       const [metadata, recipientProfile] = await Promise.all([
                         fetchNftMetadata(contractAddress, contract.abi, transferData.tokenId),
                         fetchProfile(transferData.toAddress)

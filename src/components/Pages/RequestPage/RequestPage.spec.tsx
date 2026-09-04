@@ -1845,6 +1845,99 @@ describe('RequestPage', () => {
         expect(screen.queryByTestId('transfer-confirm')).not.toBeInTheDocument()
       })
     })
+
+    describe('and the target is a relayed Decentraland contract that is not a collection', () => {
+      beforeEach(() => {
+        mockCheckMetaTransactionSupport.mockResolvedValue({ willUseMetaTransaction: true, contractName: 'MANAToken' })
+      })
+
+      it('should fall through to the generic review instead of the branded gift view', async () => {
+        renderRequestPage()
+        expect(await screen.findByTestId('wallet-interaction')).toBeInTheDocument()
+        expect(screen.queryByTestId('transfer-confirm')).not.toBeInTheDocument()
+      })
+
+      it('should not fetch token metadata from it', async () => {
+        renderRequestPage()
+        await screen.findByTestId('wallet-interaction')
+        expect(fetchNftMetadata).not.toHaveBeenCalled()
+      })
+    })
+  })
+
+  describe('when an external (web3) wallet receives an NFT transfer', () => {
+    beforeEach(() => {
+      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.INJECTED }
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockRecover.mockResolvedValue({
+        method: 'eth_sendTransaction',
+        params: [{ to: '0xcollection', data: '0x23b872dd', value: '0x0' }],
+        sender: '0xabc123',
+        expiration: new Date(Date.now() + 3600000).toISOString()
+      })
+      mockGetAddresses.mockResolvedValue(['0xabc123'])
+      mockGetBalance.mockResolvedValue(BigInt(1))
+      mockGetChainId.mockResolvedValue(1)
+      mockEstimateFeesPerGas.mockResolvedValue({ gasPrice: BigInt(1) })
+      mockEstimateGas.mockResolvedValue(BigInt(1))
+      jest.mocked(decodeNftTransferData).mockReturnValue({ tokenId: '1', toAddress: '0xrecipient' })
+      jest.mocked(fetchProfile).mockResolvedValue(null)
+      jest.mocked(fetchNftMetadata).mockResolvedValue({ imageUrl: 'x', tokenId: '1', name: 'n', description: 'd', rarity: 'common' } as any)
+    })
+
+    afterEach(() => {
+      // The decoder is set persistently above; later suites expect a generic transaction.
+      jest.mocked(decodeNftTransferData).mockReturnValue(null)
+      jest.mocked(fetchNftMetadata).mockReset()
+    })
+
+    describe('and the target is a verified Decentraland collection', () => {
+      beforeEach(() => {
+        mockCheckMetaTransactionSupport.mockResolvedValue({ willUseMetaTransaction: true, contractName: 'ERC721CollectionV2' })
+      })
+
+      it('should show the branded gift confirmation view', async () => {
+        renderRequestPage()
+        expect(await screen.findByTestId('transfer-confirm')).toBeInTheDocument()
+      })
+    })
+
+    describe('and the target is not a Decentraland collection', () => {
+      beforeEach(() => {
+        mockCheckMetaTransactionSupport.mockResolvedValue({ willUseMetaTransaction: false, contractName: null })
+      })
+
+      it('should fall back to the classic confirmation instead of dressing the transfer as a Decentraland gift', async () => {
+        renderRequestPage()
+        expect(await screen.findByTestId('wallet-interaction')).toBeInTheDocument()
+        expect(screen.queryByTestId('transfer-confirm')).not.toBeInTheDocument()
+      })
+
+      it("should not fetch the contract's token metadata, which would hand the user's IP to whoever runs it", async () => {
+        renderRequestPage()
+        await screen.findByTestId('wallet-interaction')
+        expect(fetchNftMetadata).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and the target is a relayed Decentraland contract that is not a collection', () => {
+      beforeEach(() => {
+        // An ERC-20 transferFrom shares the ERC-721 selector, so a transfer aimed at MANA decodes like a gift.
+        mockCheckMetaTransactionSupport.mockResolvedValue({ willUseMetaTransaction: true, contractName: 'MANAToken' })
+      })
+
+      it('should not show the branded gift view', async () => {
+        renderRequestPage()
+        expect(await screen.findByTestId('wallet-interaction')).toBeInTheDocument()
+        expect(screen.queryByTestId('transfer-confirm')).not.toBeInTheDocument()
+      })
+
+      it('should not fetch token metadata from it', async () => {
+        renderRequestPage()
+        await screen.findByTestId('wallet-interaction')
+        expect(fetchNftMetadata).not.toHaveBeenCalled()
+      })
+    })
   })
 
   describe('when a web2 transaction fails before its preview is requested', () => {
