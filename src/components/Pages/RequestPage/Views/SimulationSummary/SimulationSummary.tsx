@@ -5,6 +5,7 @@ import {
   ApprovalChange,
   AssetChange,
   SimulationResponseBody,
+  hasNoVisibleEffects,
   isApprovalRevocation,
   isDangerousApproval,
   isZeroAddress
@@ -419,7 +420,8 @@ export const SimulationSummary = ({
   // third-party movement is never mislabelled as something the user receives.
   const sends = result.assetChanges.filter(change => change.from?.toLowerCase() === user)
   const receives = result.assetChanges.filter(change => change.from?.toLowerCase() !== user && change.to?.toLowerCase() === user)
-  const hasNoChanges = sends.length === 0 && receives.length === 0 && result.approvalChanges.length === 0
+  // Same rule the page gates approval on, so this note and the acknowledgment checkbox always agree.
+  const hasNoChanges = hasNoVisibleEffects(result, user)
   const networkName = getNetworkName(chainId)
 
   return (
@@ -475,9 +477,7 @@ export const SimulationSummary = ({
         </ApprovalsAlert>
       ) : null}
 
-      {hasNoChanges && result.status !== 'reverted' ? (
-        <UnavailableNote>{t('request.transaction_dialog.no_changes')}</UnavailableNote>
-      ) : null}
+      {hasNoChanges ? <UnavailableNote>{t('request.transaction_dialog.no_changes')}</UnavailableNote> : null}
 
       {gasFooter}
 
