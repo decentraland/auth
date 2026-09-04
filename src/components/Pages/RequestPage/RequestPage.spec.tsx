@@ -906,6 +906,75 @@ describe('RequestPage', () => {
     })
   })
 
+  describe('when the wallet switches account after the request was recovered', () => {
+    beforeEach(() => {
+      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.INJECTED }
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockRecover.mockResolvedValue({
+        method: 'personal_sign',
+        params: ['hello', '0xabc123'],
+        sender: '0xabc123',
+        expiration: new Date(Date.now() + 3600000).toISOString()
+      })
+      mockGetAddresses.mockResolvedValue(['0xabc123'])
+    })
+
+    it('should drop the previous review and show the loading view until the new account has recovered the request', async () => {
+      const { rerender } = renderRequestPage()
+      expect(await screen.findByTestId('wallet-interaction')).toBeInTheDocument()
+
+      // The new account's own recovery is held so the state in between is observable.
+      mockRecover.mockImplementationOnce(() => new Promise(() => undefined))
+      mockGetAddresses.mockResolvedValue(['0xnewwallet'])
+      mockConnectionData = { ...mockConnectionData, account: '0xnewwallet' }
+      rerender(
+        <MemoryRouter initialEntries={[`/auth/requests/${REQUEST_ID}?targetConfigId=default`]}>
+          <FeatureFlagsContext.Provider value={{ flags: mockFlags as any, variants: {} as any, initialized: mockFlagsInitialized }}>
+            <Routes>
+              <Route path="/auth/requests/:requestId" element={<RequestPage />} />
+            </Routes>
+          </FeatureFlagsContext.Provider>
+        </MemoryRouter>
+      )
+
+      expect(await screen.findByTestId('loading-request')).toBeInTheDocument()
+      expect(screen.queryByTestId('wallet-interaction-approve')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('when the wallet reports a different active account at approval time than the one that reviewed the request', () => {
+    beforeEach(() => {
+      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.INJECTED }
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockRecover.mockResolvedValue({
+        method: 'personal_sign',
+        params: ['hello', '0xabc123'],
+        sender: '0xabc123',
+        expiration: new Date(Date.now() + 3600000).toISOString()
+      })
+      // The request is recovered by the reviewing account; by the time Allow is clicked the wallet has
+      // moved on to another one.
+      mockGetAddresses.mockResolvedValueOnce(['0xabc123']).mockResolvedValue(['0xnewwallet'])
+      mockWalletRequest.mockResolvedValue('0xsignature')
+      mockSendSuccessfulOutcome.mockResolvedValue({})
+    })
+
+    it('should not forward the request to the wallet', async () => {
+      renderRequestPage()
+      await userEvent.click(await screen.findByTestId('wallet-interaction-approve'))
+      await waitFor(() => expect(mockGetAddresses).toHaveBeenCalledTimes(2))
+      expect(mockWalletRequest).not.toHaveBeenCalled()
+    })
+
+    it('should not report an outcome for it', async () => {
+      renderRequestPage()
+      await userEvent.click(await screen.findByTestId('wallet-interaction-approve'))
+      await waitFor(() => expect(mockGetAddresses).toHaveBeenCalledTimes(2))
+      expect(mockSendSuccessfulOutcome).not.toHaveBeenCalled()
+      expect(mockSendFailedOutcome).not.toHaveBeenCalled()
+    })
+  })
+
   describe('when approving a plain signature request', () => {
     beforeEach(() => {
       mockConnectionData = { ...mockConnectionData, providerType: ProviderType.INJECTED }
