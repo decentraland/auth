@@ -1579,13 +1579,14 @@ describe('when testing buildSendTransactionSimulationPayload', () => {
     })
 
     it.each([
-      ['a hex value', '0x3e8'],
-      ['a decimal value', '1000']
-    ])('should pass %s through to the preview unchanged, so it matches the value the wallet executes', (_label, value) => {
-      // The guard accepts both hex and decimal quantities; the preview must not transform the value,
-      // or the simulated amount would diverge from what the wallet actually sends.
+      ['a hex value', '0x3e8', '0x3e8'],
+      ['a decimal value', '1000', '0x3e8']
+    ])('should hand the preview %s as the same hex quantity the wallet is dispatched', (_label, value, expected) => {
+      // The guard accepts both forms, and the wallet is handed the canonical hex (see
+      // buildTransactionParams). The preview must read that same quantity, or the simulated amount
+      // would diverge from what the wallet actually sends.
       const result = buildSendTransactionSimulationPayload({ ...txParams, value }, signerAddress, 1, false)
-      expect(result?.value).toBe(value)
+      expect(result?.value).toBe(expected)
     })
   })
 
