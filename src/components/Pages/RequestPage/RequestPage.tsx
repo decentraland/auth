@@ -193,8 +193,12 @@ export const RequestPage = () => {
   const viewRef = useRef(view)
   viewRef.current = view
   const hasCompletedRef = useRef(false)
-  // The request id whose state this mounted page currently holds (see the load effect).
+  // The request id whose state this mounted page currently holds (see the load effect). The ref is
+  // read by the effect; the state drives rendering, so a route change is caught on its own render.
   const loadedRequestIdRef = useRef<string>()
+  const [loadedRequestId, setLoadedRequestId] = useState<string>()
+  // The route id the recovered request in requestRef belongs to.
+  const recoveredRequestIdRef = useRef<string>()
   // Guards against re-entrant approvals (e.g. a fast double-click on the confirm dialog),
   // which would otherwise fire two transactions before `isLoading` re-renders the buttons.
   const isApprovingRef = useRef(false)
@@ -324,6 +328,41 @@ export const RequestPage = () => {
 
   // Effect 2: Load the request once the user is connected and the profile is ready.
   useEffect(() => {
+    // A different request id on a still-mounted page starts over, before any other branch runs.
+    // Everything derived from the previous request — its preview, verified contracts,
+    // classification and completion — must go; otherwise a click on Allow could execute the new
+    // request under the previous request's summary and acknowledgment. `loadedRequestId` is what
+    // the render reads: until it matches the route, the page shows the loading view and nothing of
+    // the previous request. The reset is keyed to the request id so re-runs of this effect for other
+    // dependencies leave in-flight state untouched.
+    const isNewRequest = loadedRequestIdRef.current !== requestId
+    if (isNewRequest) {
+      loadedRequestIdRef.current = requestId
+      recoveredRequestIdRef.current = undefined
+      hasCompletedRef.current = false
+      requestRef.current = undefined
+      metaTxCheckRef.current = null
+      setLoadedRequestId(requestId)
+      setView(View.LOADING_REQUEST)
+      setIsLoading(false)
+      setError(undefined)
+      setWalletInfo(undefined)
+      setTransactionGasCost(undefined)
+      setNftTransferData(null)
+      setManaTransferData(null)
+      setIsTransactionModalOpen(false)
+      setSimulationState({ status: 'idle' })
+      setSimulationProfiles({})
+      setSimulationChainId(undefined)
+      setSimulationVerified([])
+      setIsMetaTransaction(false)
+      setSignaturePayload(null)
+      setIsSignatureMetaTx(false)
+      setSignatureContractTrust('pending')
+      setIsHighRiskSignature(false)
+      setUnverifiableSignatureReason(null)
+    }
+
     // A deep-link handoff requires a valid UUID v4 id (the client's correlation id). Reject a
     // malformed id up front with the error view instead of running the login handoff for it.
     // Surface the reason (rendered as the error detail) so the copy matches the cause — a retry
@@ -364,37 +403,10 @@ export const RequestPage = () => {
 
     if (!initializedFlags || !isProfileReady) return
 
-    // A different request id on a still-mounted page starts over. Everything derived from the
-    // previous request — its preview, verified contracts, classification and completion — must go
-    // before anything of the new one is shown; otherwise a click on Allow could execute the new
-    // request under the previous request's summary and acknowledgment. The reset is keyed to the
-    // request id so re-runs of this effect for other dependencies leave in-flight state untouched.
-    if (loadedRequestIdRef.current !== requestId) {
-      loadedRequestIdRef.current = requestId
-      hasCompletedRef.current = false
-      requestRef.current = undefined
-      metaTxCheckRef.current = null
-      setView(View.LOADING_REQUEST)
-      setIsLoading(false)
-      setError(undefined)
-      setWalletInfo(undefined)
-      setTransactionGasCost(undefined)
-      setNftTransferData(null)
-      setManaTransferData(null)
-      setIsTransactionModalOpen(false)
-      setSimulationState({ status: 'idle' })
-      setSimulationProfiles({})
-      setSimulationChainId(undefined)
-      setSimulationVerified([])
-      setIsMetaTransaction(false)
-      setSignaturePayload(null)
-      setIsSignatureMetaTx(false)
-      setSignatureContractTrust('pending')
-      setIsHighRiskSignature(false)
-      setUnverifiableSignatureReason(null)
-    } else if (TERMINAL_VIEWS.has(viewRef.current) || hasCompletedRef.current) {
-      // Same request, already in a terminal view (completed, denied, error...): dependency changes
-      // must not re-fetch an already-consumed request.
+    // Same request, already in a terminal view (completed, denied, error...): dependency changes
+    // must not re-fetch an already-consumed request. A new request is never gated by the previous
+    // request's terminal view.
+    if (!isNewRequest && (TERMINAL_VIEWS.has(viewRef.current) || hasCompletedRef.current)) {
       return
     }
 
@@ -466,6 +478,7 @@ export const RequestPage = () => {
         if (cancelled) return
 
         requestRef.current = request
+        recoveredRequestIdRef.current = requestId
 
         // Initialize the timeout to display the timeout view when the request expires.
         // Guard against an unparseable expiration: `new Date(...).getTime()` would be NaN,
@@ -884,6 +897,9 @@ export const RequestPage = () => {
   }, [nftTransferData, manaTransferData])
 
   const onDenyWalletInteraction = useCallback(async () => {
+    // Only the request this page recovered can be answered. If the route has moved on to another id,
+    // nothing has been reviewed for it yet.
+    if (recoveredRequestIdRef.current !== requestId) return
     // The decision is final the moment the user clicks: mark completion before the outcome
     // round-trip so nothing that resolves in the meantime (e.g. a late simulation rejection)
     // can override the denied view or answer the request a second time.
@@ -916,6 +932,10 @@ export const RequestPage = () => {
   }, [nftTransferData, manaTransferData, requestId])
 
   const onApproveWalletInteraction = useCallback(async () => {
+    // Only the request this page recovered can be executed. If the route has moved on to another
+    // id, requestRef still holds the previous request and its outcome would be reported under the
+    // new id; nothing reviewed exists for the new one yet.
+    if (recoveredRequestIdRef.current !== requestId) return
     // Prevent duplicate submissions — the confirm dialog buttons aren't disabled synchronously,
     // so a double-click could otherwise re-enter before the first call flips isLoading.
     if (isApprovingRef.current) return
@@ -1144,7 +1164,12 @@ export const RequestPage = () => {
     isHighRiskSignature ||
     unverifiableSignatureReason !== null
 
-  switch (view) {
+  // Derived, not synced: on the render where the route id changes, every piece of state still
+  // belongs to the previous request. Show none of it — no summary, no Allow — until this instance has
+  // started loading the current id, which the load effect records together with its reset.
+  const renderedView = loadedRequestId === requestId ? view : View.LOADING_REQUEST
+
+  switch (renderedView) {
     case View.TIMEOUT:
       return <TimeoutError requestId={requestId} />
     case View.DIFFERENT_ACCOUNT:

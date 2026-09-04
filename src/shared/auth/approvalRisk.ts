@@ -15,10 +15,11 @@ function isZeroAmount(amount: string): boolean {
   try {
     return BigInt(amount) === 0n
   } catch {
-    // Not an integer string; fall through to a decimal parse.
+    // Not an integer string; judge the decimal form below.
   }
-  const parsed = Number(amount)
-  return Number.isFinite(parsed) && parsed === 0
+  // A decimal display amount is zero only when every digit is zero. A float parse would underflow a
+  // tiny non-zero value to 0 and hide a grant.
+  return /^(0+\.?0*|0*\.0+)$/.test(amount.trim())
 }
 
 /**

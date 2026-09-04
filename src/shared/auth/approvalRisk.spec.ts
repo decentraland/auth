@@ -32,7 +32,8 @@ describe('isApprovalRevocation', () => {
     ['an allowance to the zero address is set to zero', { spender: ZERO_ADDRESS, rawAmount: '0', amount: '0.0' }],
     ['the base-unit allowance is zero', { rawAmount: '0', amount: '0.0' }],
     ['the base-unit allowance is zero even though the display amount is not', { rawAmount: '0', amount: '5' }],
-    ['only a display amount is available and it is zero', { rawAmount: null, amount: '0.0' }]
+    ['only a display amount is available and it is zero', { rawAmount: null, amount: '0.0' }],
+    ['only a display amount is available and it is zero with several decimals', { rawAmount: null, amount: '0.000' }]
   ])('when %s', (_label, overrides) => {
     it('should return true', () => {
       expect(isApprovalRevocation(buildAllowance(overrides))).toBe(true)
@@ -46,6 +47,11 @@ describe('isApprovalRevocation', () => {
     ['a non-zero allowance is granted to the zero address, which revokes nobody', { spender: ZERO_ADDRESS }],
     ['the display amount rounds to zero but the base-unit allowance does not', { rawAmount: '1', amount: '0' }],
     ['only a display amount is available and it is tiny but not zero', { rawAmount: null, amount: '0.000000000000000001' }],
+    ['only a display amount is available and a float parse would underflow it to zero', { rawAmount: null, amount: '1e-400' }],
+    [
+      'only a display amount is available and it has hundreds of leading zeros before a digit',
+      { rawAmount: null, amount: `0.${'0'.repeat(400)}1` }
+    ],
     ['no amount is available at all', { rawAmount: null, amount: null }],
     ['the base-unit allowance is an empty string', { rawAmount: '', amount: null }]
   ])('when %s', (_label, overrides) => {

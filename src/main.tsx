@@ -7,7 +7,7 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { DclThemeProvider, darkTheme } from 'decentraland-ui2'
 import { TranslationProvider } from '@dcl/hooks'
-import { RequestPage } from './components/Pages/RequestPage'
+import { RequestPageRoute } from './components/Pages/RequestPage'
 import { SetupPage } from './components/Pages/SetupPage'
 import { DefaultPage } from './components/Pages/DefaultPage'
 import { AvatarSetupPage } from './components/Pages/AvatarSetupPage/AvatarSetupPage'
@@ -82,7 +82,7 @@ const SiteRoutes = () => {
       <Route path="/login" Component={LoginRouteGuard} />
       <Route path="/invalidRedirection" Component={InvalidRedirectionPage} />
       <Route path="/callback" Component={CallbackPage} />
-      <Route path="/requests/:requestId" Component={RequestPage} />
+      <Route path="/requests/:requestId" Component={RequestPageRoute} />
       {DevTestViewPage ? (
         <Route
           path="/testView/:viewId"

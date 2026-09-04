@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/naming-convention */
-import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom'
+import { useLayoutEffect } from 'react'
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ProviderType } from '@dcl/schemas'
@@ -1833,6 +1834,54 @@ describe('RequestPage', () => {
       const fresh = await screen.findByTestId('wallet-interaction')
       expect(mockRecover.mock.calls.some(call => call[0] === OTHER_REQUEST_ID)).toBe(true)
       expect(fresh).toHaveAttribute('data-sim', 'loading')
+    })
+
+    describe('and the change is observed commit by commit', () => {
+      let approvalUiAtCommit: boolean[]
+      let CommitProbe: ({ children }: { children: React.ReactNode }) => JSX.Element
+
+      beforeEach(() => {
+        approvalUiAtCommit = []
+        // A layout effect runs in the same commit as the DOM update, before any passive effect, so it
+        // sees exactly what the user would see on that render.
+        CommitProbe = ({ children }: { children: React.ReactNode }) => {
+          // The route element is a stable reference, so the probe must subscribe to the location
+          // itself to be re-rendered, and thus record, on the commit that changes the route.
+          useLocation()
+          useLayoutEffect(() => {
+            approvalUiAtCommit.push(screen.queryByTestId('wallet-interaction-approve') !== null)
+          })
+          return <>{children}</>
+        }
+      })
+
+      it('should show no approval UI on the very commit the route id changes, before any effect runs', async () => {
+        render(
+          <MemoryRouter initialEntries={[`/auth/requests/${REQUEST_ID}?targetConfigId=default`]}>
+            <FeatureFlagsContext.Provider value={{ flags: mockFlags as any, variants: {} as any, initialized: mockFlagsInitialized }}>
+              <Routes>
+                <Route
+                  path="/auth/requests/:requestId"
+                  element={
+                    <CommitProbe>
+                      <RequestPage />
+                      <NavigateToOther />
+                    </CommitProbe>
+                  }
+                />
+              </Routes>
+            </FeatureFlagsContext.Provider>
+          </MemoryRouter>
+        )
+        const view = await screen.findByTestId('wallet-interaction')
+        await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+        expect(screen.getByTestId('wallet-interaction-approve')).toBeInTheDocument()
+        mockRecover.mockImplementationOnce(() => new Promise(() => undefined))
+        const commitsBefore = approvalUiAtCommit.length
+        await userEvent.click(screen.getByTestId('go-to-other'))
+        expect(approvalUiAtCommit.length).toBeGreaterThan(commitsBefore)
+        expect(approvalUiAtCommit.slice(commitsBefore).some(present => present)).toBe(false)
+      })
     })
 
     it('should load the new request even though the previous one was completed', async () => {
