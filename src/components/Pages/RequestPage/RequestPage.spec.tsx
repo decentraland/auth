@@ -162,6 +162,7 @@ jest.mock('./Views', () => ({
       data-sim={props.simulation?.status}
       data-requires-acknowledgment={String(props.requiresAcknowledgment)}
       data-gas-covered={String(props.gasCovered)}
+      data-profiles={JSON.stringify(props.profiles ?? {})}
     >
       <button data-testid="wallet-interaction-approve" onClick={props.onApprove}>
         approve
@@ -1577,6 +1578,64 @@ describe('RequestPage', () => {
     it('should prefetch the transaction simulation', async () => {
       renderRequestPage()
       await waitFor(() => expect(mockSimulateTransaction).toHaveBeenCalled())
+    })
+
+    describe('and the simulation names a counterparty with a Decentraland profile', () => {
+      const counterparty = '0x1111111111111111111111111111111111111234'
+
+      beforeEach(() => {
+        mockSimulateTransaction.mockResolvedValue({
+          status: 'success',
+          assetChanges: [
+            {
+              type: 'transfer',
+              standard: 'erc20',
+              from: '0xabc123',
+              to: counterparty,
+              amount: '500',
+              rawAmount: '500000000000000000000',
+              tokenId: null,
+              contractAddress: '0xmana',
+              symbol: 'MANA',
+              name: 'MANA',
+              decimals: 18,
+              logoUrl: null,
+              dollarValue: null
+            }
+          ],
+          approvalChanges: [],
+          balanceChanges: [],
+          events: []
+        })
+      })
+
+      afterEach(() => {
+        jest.mocked(fetchProfile).mockReset()
+      })
+
+      describe('and the name is unclaimed', () => {
+        beforeEach(() => {
+          jest.mocked(fetchProfile).mockResolvedValue({ avatars: [{ name: 'Decentraland', hasClaimedName: false }] } as any)
+        })
+
+        it('should qualify the name with the address so a self-chosen name cannot pose as a trusted party', async () => {
+          renderRequestPage()
+          const view = await screen.findByTestId('wallet-interaction')
+          await waitFor(() => expect(view).toHaveAttribute('data-profiles', JSON.stringify({ [counterparty]: 'Decentraland#1234' })))
+        })
+      })
+
+      describe('and the name is claimed', () => {
+        beforeEach(() => {
+          jest.mocked(fetchProfile).mockResolvedValue({ avatars: [{ name: 'Decentraland', hasClaimedName: true }] } as any)
+        })
+
+        it('should show the name on its own', async () => {
+          renderRequestPage()
+          const view = await screen.findByTestId('wallet-interaction')
+          await waitFor(() => expect(view).toHaveAttribute('data-profiles', JSON.stringify({ [counterparty]: 'Decentraland' })))
+        })
+      })
     })
 
     describe('and the simulation grants an approval', () => {
