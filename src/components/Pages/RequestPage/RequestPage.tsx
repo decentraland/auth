@@ -609,82 +609,92 @@ export const RequestPage = () => {
               const contractAddress = txParams?.to as string | undefined
 
               if (transactionData && contractAddress) {
-                const manaData = decodeManaTransferData(transactionData, contractAddress)
-                if (manaData) {
-                  const [recipientProfile, placeInfo] = await Promise.all([
-                    fetchProfile(manaData.toAddress),
-                    fetchPlaceByCreatorAddress(manaData.toAddress)
-                  ])
-
-                  if (cancelled) return
-
-                  setManaTransferData({
-                    // Show the exact formatted amount (formatEther already trims trailing zeros).
-                    // parseInt truncated fractional MANA, under-displaying what is actually signed.
-                    manaAmount: `${manaData.manaAmount} MANA`,
-                    toAddress: manaData.toAddress,
-                    recipientProfile: recipientProfile || undefined,
-                    sceneName: placeInfo?.sceneName || 'Unknown Place',
-                    sceneImageUrl:
-                      placeInfo?.sceneImageUrl ||
-                      'https://peer.decentraland.org/content/contents/bafkreidj26s7aenyxfthfdibnqonzqm5ptc4iamml744gmcyuokewkr76y'
-                  })
-                  // A MANA tip only decodes when it targets the canonical MANA contract, which is
-                  // always relayed as a meta-transaction (gas covered by the gas tank). Mark it so
-                  // the web2 confirm dialog says "gas covered" instead of showing a 0-ETH cost.
-                  setIsMetaTransaction(true)
-                  setView(View.WALLET_MANA_INTERACTION)
-                  break
-                }
-
-                // Try to decode as NFT transfer using CollectionV2 contract
-                // If it decodes successfully, it's an NFT transfer
-                const chainId = getMetaTransactionChainId()
-                const contract = getContract(ContractName.ERC721CollectionV2, chainId)
-                const transferData = decodeNftTransferData(transactionData, contract.abi)
-
-                if (transferData) {
-                  // For web2 wallets (whose only confirmation is this site), only show the branded
-                  // Decentraland "gift" view when the target is a verified DCL collection. Otherwise an
-                  // arbitrary contract could impersonate a DCL wearable (spoofed name/image/rarity from
-                  // its own tokenURI) to socially-engineer the transfer of the user's own NFT — so fall
-                  // through to the generic simulation + acknowledgment path instead. Web3 wallets keep
-                  // the instant branded view since the wallet itself shows the authoritative transaction.
-                  // The verification result is cached in metaTxCheckRef so the generic fall-through and
-                  // the approve path don't repeat the (networked) lookup for the same contract.
-                  let isDclCollection = true
-                  if (isUserUsingWeb2Wallet) {
-                    const nftContractCheck = await checkMetaTransactionSupport(contractAddress)
-                    if (cancelled) return
-                    metaTxCheckRef.current = { address: contractAddress.toLowerCase(), ...nftContractCheck }
-                    isDclCollection = nftContractCheck.willUseMetaTransaction
-                  }
-
-                  if (isDclCollection) {
-                    const [metadata, recipientProfile] = await Promise.all([
-                      fetchNftMetadata(contractAddress, contract.abi, transferData.tokenId),
-                      fetchProfile(transferData.toAddress)
+                try {
+                  const manaData = decodeManaTransferData(transactionData, contractAddress)
+                  if (manaData) {
+                    const [recipientProfile, placeInfo] = await Promise.all([
+                      fetchProfile(manaData.toAddress),
+                      fetchPlaceByCreatorAddress(manaData.toAddress)
                     ])
 
                     if (cancelled) return
 
-                    setNftTransferData({
-                      imageUrl: metadata.imageUrl,
-                      tokenId: transferData.tokenId,
-                      toAddress: transferData.toAddress,
-                      contractAddress,
-                      name: metadata.name,
-                      description: metadata.description,
-                      rarity: metadata.rarity,
-                      recipientProfile: recipientProfile || undefined
+                    setManaTransferData({
+                      // Show the exact formatted amount (formatEther already trims trailing zeros).
+                      // parseInt truncated fractional MANA, under-displaying what is actually signed.
+                      manaAmount: `${manaData.manaAmount} MANA`,
+                      toAddress: manaData.toAddress,
+                      recipientProfile: recipientProfile || undefined,
+                      sceneName: placeInfo?.sceneName || 'Unknown Place',
+                      sceneImageUrl:
+                        placeInfo?.sceneImageUrl ||
+                        'https://peer.decentraland.org/content/contents/bafkreidj26s7aenyxfthfdibnqonzqm5ptc4iamml744gmcyuokewkr76y'
                     })
-                    // The branded gift view is only shown for a verified DCL collection, which is
-                    // relayed as a meta-transaction (gas covered). Mark it so the web2 confirm
-                    // dialog says "gas covered" instead of showing a 0-ETH cost.
+                    // A MANA tip only decodes when it targets the canonical MANA contract, which is
+                    // always relayed as a meta-transaction (gas covered by the gas tank). Mark it so
+                    // the web2 confirm dialog says "gas covered" instead of showing a 0-ETH cost.
                     setIsMetaTransaction(true)
-                    setView(View.WALLET_NFT_INTERACTION)
+                    setView(View.WALLET_MANA_INTERACTION)
                     break
                   }
+
+                  // Try to decode as NFT transfer using CollectionV2 contract
+                  // If it decodes successfully, it's an NFT transfer
+                  const chainId = getMetaTransactionChainId()
+                  const contract = getContract(ContractName.ERC721CollectionV2, chainId)
+                  const transferData = decodeNftTransferData(transactionData, contract.abi)
+
+                  if (transferData) {
+                    // For web2 wallets (whose only confirmation is this site), only show the branded
+                    // Decentraland "gift" view when the target is a verified DCL collection. Otherwise an
+                    // arbitrary contract could impersonate a DCL wearable (spoofed name/image/rarity from
+                    // its own tokenURI) to socially-engineer the transfer of the user's own NFT — so fall
+                    // through to the generic simulation + acknowledgment path instead. Web3 wallets keep
+                    // the instant branded view since the wallet itself shows the authoritative transaction.
+                    // The verification result is cached in metaTxCheckRef so the generic fall-through and
+                    // the approve path don't repeat the (networked) lookup for the same contract.
+                    let isDclCollection = true
+                    if (isUserUsingWeb2Wallet) {
+                      const nftContractCheck = await checkMetaTransactionSupport(contractAddress)
+                      if (cancelled) return
+                      metaTxCheckRef.current = { address: contractAddress.toLowerCase(), ...nftContractCheck }
+                      isDclCollection = nftContractCheck.willUseMetaTransaction
+                    }
+
+                    if (isDclCollection) {
+                      const [metadata, recipientProfile] = await Promise.all([
+                        fetchNftMetadata(contractAddress, contract.abi, transferData.tokenId),
+                        fetchProfile(transferData.toAddress)
+                      ])
+
+                      if (cancelled) return
+
+                      setNftTransferData({
+                        imageUrl: metadata.imageUrl,
+                        tokenId: transferData.tokenId,
+                        toAddress: transferData.toAddress,
+                        contractAddress,
+                        name: metadata.name,
+                        description: metadata.description,
+                        rarity: metadata.rarity,
+                        recipientProfile: recipientProfile || undefined
+                      })
+                      // The branded gift view is only shown for a verified DCL collection, which is
+                      // relayed as a meta-transaction (gas covered). Mark it so the web2 confirm
+                      // dialog says "gas covered" instead of showing a 0-ETH cost.
+                      setIsMetaTransaction(true)
+                      setView(View.WALLET_NFT_INTERACTION)
+                      break
+                    }
+                  }
+                } catch (e) {
+                  if (cancelled) return
+                  // The branded tip and gift views are a convenience over the generic review, not a gate.
+                  // When one of their lookups fails (token metadata, recipient profile, place), fall
+                  // through to the generic review — for a web2 user that still runs the simulation and
+                  // its acknowledgment gates — instead of letting the failure reach the outer catch,
+                  // which would show the bare confirm dialog with no preview at all.
+                  console.error('Error building the branded transfer view, falling back to the generic review', e)
                 }
               }
 
@@ -751,6 +761,14 @@ export const RequestPage = () => {
               setTransactionGasCost(totalGasCost)
             } catch (e) {
               console.error('Error estimating gas (may be normal for meta transactions)', e)
+              // For a web2 user this page is the only confirmation. When the failure came before the
+              // simulation was requested (the balance or chain lookup), the generic view would otherwise
+              // render with no preview and no acknowledgment, and a single click would execute the
+              // request. Mark the preview unavailable so the acknowledgment gate applies; a preview
+              // already in flight or resolved is left alone.
+              if (!cancelled && isUserUsingWeb2Wallet) {
+                setSimulationState(previous => (previous.status === 'idle' ? { status: 'unavailable' } : previous))
+              }
             }
 
             // Show regular wallet interaction view

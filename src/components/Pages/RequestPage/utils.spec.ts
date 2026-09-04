@@ -422,6 +422,66 @@ describe('when testing decodeNftTransferData', () => {
     })
   })
 
+  describe('and the calldata is safeTransferFrom with a data argument', () => {
+    beforeEach(() => {
+      jest.mocked(decodeFunctionData).mockReturnValueOnce({
+        functionName: 'safeTransferFrom',
+        args: ['0xfrom', '0xto', BigInt(9), '0x']
+      })
+    })
+
+    it('should return the tokenId and toAddress', () => {
+      const result = decodeNftTransferData(transactionData, contractABI)
+      expect(result).toEqual({ tokenId: '9', toAddress: '0xto' })
+    })
+  })
+
+  describe('and the calldata is another collection call that also takes three arguments', () => {
+    beforeEach(() => {
+      // batchTransferFrom(address from, address to, uint256[] tokenIds) decodes into a "to" and a
+      // "token id" as well; shown as the gift of one token it would transfer every listed one.
+      jest.mocked(decodeFunctionData).mockReturnValueOnce({
+        functionName: 'batchTransferFrom',
+        args: ['0xfrom', '0xto', [BigInt(1), BigInt(2), BigInt(3)]]
+      })
+    })
+
+    it('should return null so the generic review previews it', () => {
+      const result = decodeNftTransferData(transactionData, contractABI)
+      expect(result).toBeNull()
+    })
+  })
+
+  describe('and the calldata is a collection admin call whose second argument is a list of addresses', () => {
+    beforeEach(() => {
+      // setItemsMinters(uint256[] itemIds, address[] minters, uint256[] values) grants minting rights;
+      // its single-element lists decode into a plausible "to" and "token id".
+      jest.mocked(decodeFunctionData).mockReturnValueOnce({
+        functionName: 'setItemsMinters',
+        args: [[BigInt(0)], ['0xto'], [BigInt(1)]]
+      })
+    })
+
+    it('should return null instead of presenting it as a gift', () => {
+      const result = decodeNftTransferData(transactionData, contractABI)
+      expect(result).toBeNull()
+    })
+  })
+
+  describe('and a transfer decodes with a token id that is not a single uint256', () => {
+    beforeEach(() => {
+      jest.mocked(decodeFunctionData).mockReturnValueOnce({
+        functionName: 'transferFrom',
+        args: ['0xfrom', '0xto', 'not-a-token-id']
+      })
+    })
+
+    it('should return null', () => {
+      const result = decodeNftTransferData(transactionData, contractABI)
+      expect(result).toBeNull()
+    })
+  })
+
   describe('and decoding throws an error', () => {
     beforeEach(() => {
       jest.mocked(decodeFunctionData).mockImplementationOnce(() => {
@@ -1579,13 +1639,14 @@ describe('when testing buildSendTransactionSimulationPayload', () => {
     })
 
     it.each([
-      ['a hex value', '0x3e8'],
-      ['a decimal value', '1000']
-    ])('should pass %s through to the preview unchanged, so it matches the value the wallet executes', (_label, value) => {
-      // The guard accepts both hex and decimal quantities; the preview must not transform the value,
-      // or the simulated amount would diverge from what the wallet actually sends.
+      ['a hex value', '0x3e8', '0x3e8'],
+      ['a decimal value', '1000', '0x3e8']
+    ])('should hand the preview %s as the same hex quantity the wallet is dispatched', (_label, value, expected) => {
+      // The guard accepts both forms, and the wallet is handed the canonical hex (see
+      // buildTransactionParams). The preview must read that same quantity, or the simulated amount
+      // would diverge from what the wallet actually sends.
       const result = buildSendTransactionSimulationPayload({ ...txParams, value }, signerAddress, 1, false)
-      expect(result?.value).toBe(value)
+      expect(result?.value).toBe(expected)
     })
   })
 

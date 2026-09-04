@@ -212,7 +212,9 @@ function assertSignatureParamsAreCanonical(method: string, params: unknown[] | u
 // `extraCallData` onto `data`, so a request using them would execute bytes the preview never read.
 const CALLDATA_ALIASES = ['input', 'extraCallData']
 const CALLDATA_REGEX = /^0x([0-9a-fA-F]{2})*$/
-// A JSON-RPC quantity: hex, or the decimal form some clients send.
+// A JSON-RPC quantity: hex, or the decimal form some clients send. Shared with the request page's
+// toHexQuantity, which turns either form into the canonical hex the wallet and the preview are handed,
+// so the guard and the normalizer judge a quantity the same way.
 const QUANTITY_REGEX = /^(0x[0-9a-fA-F]{1,64}|[0-9]{1,78})$/
 // Below the preview server's limit even with the meta-transaction sender appended, so anything
 // accepted here can always be previewed. Legitimate Decentraland calls are far smaller; without a
@@ -262,6 +264,7 @@ function assertTransactionParamsAreCanonical(method: string, params: unknown[] |
 
 export {
   CALLDATA_ALIASES,
+  QUANTITY_REGEX,
   assertTransactionParamsAreCanonical,
   isDecentralandIdentityAuthMessage,
   assertRequestIsNotImpersonatingSignIn,
