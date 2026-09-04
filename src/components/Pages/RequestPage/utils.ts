@@ -16,8 +16,11 @@ import { isMobile } from '../LoginPage/utils'
 import { getUnsupportedCalldataAlias } from './transactionParams'
 import { SignaturePayload, TypedDataPayload } from './types'
 
-const ADDRESS_REGEX = /^0x[a-fA-F0-9]{40}$/
-const HEX_STRING_REGEX = /^0x([0-9a-fA-F]{2})*$/
+// Case-insensitive on the `0x` prefix so these agree with the recover-time guard, which compares
+// the signer case-insensitively (isSigner in signMethodGuard). A `0X`-prefixed value the guard
+// accepts must be recognized here too, or it is misread as signable content (see extractSignaturePayload).
+const ADDRESS_REGEX = /^0x[0-9a-fA-F]{40}$/i
+const HEX_STRING_REGEX = /^0x([0-9a-fA-F]{2})*$/i
 
 // Wallet-RPC methods that request a signature rather than a transaction. `eth_sign` is kept here
 // (and in extractSignaturePayload) for parser completeness and symmetry only — it is rejected
@@ -83,7 +86,8 @@ function extractSignaturePayload(method: string, params: unknown[] | undefined, 
     let text = message
     if (HEX_STRING_REGEX.test(message) && message.length > 2) {
       try {
-        text = hexToString(message as `0x${string}`)
+        // Normalize a `0X` prefix, which hexToString does not accept.
+        text = hexToString(`0x${message.slice(2)}`)
       } catch {
         text = message
       }
@@ -91,8 +95,17 @@ function extractSignaturePayload(method: string, params: unknown[] | undefined, 
     return { kind: 'message', message: text }
   }
 
-  // eth_signTypedData variants. v3/v4 pass [address, jsonString]; some providers pass an object.
-  const jsonCandidate = params.find(param => typeof param === 'string' && !ADDRESS_REGEX.test(param))
+  // eth_signTypedData variants. The canonical shape is [signer, typedData], but the order isn't
+  // consistent across providers and some pass the typed data as an object rather than a JSON string.
+  // Identify the typed data as the param that is NOT the signer, matching the signer the same way
+  // the recover-time guard does (assertSignatureParamsAreCanonical): case-insensitively. A
+  // case-sensitive `0x` test here would misread a signer whose only difference is casing — an
+  // uppercase `0X` prefix, which the guard accepts — as the content, and drop the real typed data in
+  // the other param, leaving the user signing something that was never shown.
+  const signer = signerAddress ? signerAddress.toLowerCase() : undefined
+  const isSignerParam = (param: unknown): boolean =>
+    typeof param === 'string' && (signer !== undefined ? param.toLowerCase() === signer : ADDRESS_REGEX.test(param))
+  const jsonCandidate = params.find((param): param is string => typeof param === 'string' && !isSignerParam(param))
   if (typeof jsonCandidate === 'string') {
     try {
       const parsed = JSON.parse(jsonCandidate) as TypedDataPayload
