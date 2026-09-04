@@ -71,7 +71,9 @@
       "title_web2": "一个场景想要访问您的 Decentraland 账户资产",
       "title_web3": "{explorerText} 想要与您的钱包交互",
       "description": "只有在您了解所有交易详情并信任此场景时才继续。",
-      "review_title": "查看此交易"
+      "review_title": "查看此交易",
+      "preview_unavailable_warning": "由于预览服务暂时不可用，我们无法检查此交易的作用。请仅在您信任发起该请求的场景时批准。",
+      "acknowledge_preview_unavailable": "我了解预览不可用，并且我在未查看此交易作用的情况下进行批准"
     },
     "transaction_dialog": {
       "title": "确认交易",

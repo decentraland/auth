@@ -1153,16 +1153,17 @@ export const RequestPage = () => {
   // signature any other way, so a clean preview is not something Auth can vouch for.
   const isSignatureToUnrecognizedContract = isSignatureMetaTx && signatureContractTrust === 'unconfirmed'
   // Require an explicit acknowledgment before approving when: (a) the simulation shows a high-risk
-  // permission; (b) the simulation could NOT be produced for a transaction we can't otherwise vouch
-  // for — only a relayed meta-transaction to a known DCL contract is exempt (prevents the fail-open
-  // where an unpreviewable payload degrades to a single-click approve); (c) a signed MetaTransaction
+  // permission; (b) the simulation could NOT be produced, so the effects can't be shown — this holds
+  // even for a relayed meta-transaction to a known DCL contract, because a gas-covered relay still
+  // executes whatever call it is handed (e.g. setApprovalForAll), so an unpreviewable payload must be
+  // acknowledged, never degraded to a single-click approve; (c) a signed MetaTransaction
   // has no verified effects or targets a contract Auth cannot vouch for; (d) the request is an
   // off-chain approval signature (permit/order), which grants asset control but is never simulated;
   // or (e) Auth cannot tell what the signature authorizes at all (an unrecognized typed-data struct
   // or a message that is not readable text).
   const requiresApprovalAcknowledgment =
     hasDangerousApprovalChange ||
-    (simulationState.status === 'unavailable' && !isMetaTransaction) ||
+    simulationState.status === 'unavailable' ||
     isSignatureWithoutVerifiedEffects ||
     isSignatureToUnrecognizedContract ||
     isHighRiskSignature ||

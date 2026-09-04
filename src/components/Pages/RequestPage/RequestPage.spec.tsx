@@ -1078,11 +1078,11 @@ describe('RequestPage', () => {
         mockSimulateTransaction.mockRejectedValue(new SimulationUnavailableError('status 502', 502))
       })
 
-      it('should keep the trusted exemption because Auth signs and submits the relayed transaction in one step', async () => {
+      it('should require an acknowledgment because a gas-covered relay still executes the unpreviewable call', async () => {
         renderRequestPage()
         const view = await screen.findByTestId('wallet-interaction')
         await waitFor(() => expect(view).toHaveAttribute('data-sim', 'unavailable'))
-        expect(view).toHaveAttribute('data-requires-acknowledgment', 'false')
+        expect(view).toHaveAttribute('data-requires-acknowledgment', 'true')
       })
     })
   })

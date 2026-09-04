@@ -8,7 +8,7 @@ import { ButtonsContainer } from '../../RequestPage.styled'
 import { SimulationSummary } from '../SimulationSummary'
 import styles from '../Views.module.css'
 import { WalletInteractionProps } from './WalletInteraction.types'
-import { SummaryBody } from './WalletInteraction.styled'
+import { PreviewUnavailableWarning, SummaryBody } from './WalletInteraction.styled'
 
 export const WalletInteraction = ({
   requestId,
@@ -42,6 +42,9 @@ export const WalletInteraction = ({
   const [acknowledgedStatement, setAcknowledgedStatement] = useState<string | null>(null)
   const acknowledged = acknowledgedStatement === acknowledgmentStatement
   const hasSummary = simulation !== undefined && simulation.status !== 'idle'
+  // The preview could not be produced (simulation service down, or the call could not be simulated).
+  // The effects can't be shown, so warn explicitly and word the acknowledgment for that case.
+  const isPreviewUnavailable = simulation?.status === 'unavailable'
   // Block approval while the request is submitting, while the simulation is still resolving (so a
   // user can't approve before the summary and any high-risk warnings render), and until any
   // required acknowledgment is given.
@@ -66,6 +69,11 @@ export const WalletInteraction = ({
             gas={{ covered: gasCovered, cost: formatEther(transactionCost), balance: formatEther(balance) }}
           />
         </SummaryBody>
+        {isPreviewUnavailable ? (
+          <PreviewUnavailableWarning severity="warning" role="alert" data-testid="preview-unavailable-warning">
+            {t('request.wallet_interaction.preview_unavailable_warning')}
+          </PreviewUnavailableWarning>
+        ) : null}
         {requiresAcknowledgment ? (
           <FormControlLabel
             control={
@@ -75,7 +83,11 @@ export const WalletInteraction = ({
                 data-testid="risk-acknowledgment"
               />
             }
-            label={t('request.transaction_dialog.acknowledge_risk')}
+            label={
+              isPreviewUnavailable
+                ? t('request.wallet_interaction.acknowledge_preview_unavailable')
+                : t('request.transaction_dialog.acknowledge_risk')
+            }
           />
         ) : null}
         <ButtonsContainer>

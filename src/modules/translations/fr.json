@@ -71,7 +71,9 @@
       "title_web2": "Une scène souhaite accéder aux actifs de votre compte Decentraland",
       "title_web3": "Le {explorerText} souhaite interagir avec votre portefeuille",
       "description": "Ne continuez que si vous êtes au courant de tous les détails de la transaction et faites confiance à cette scène.",
-      "review_title": "Vérifiez cette transaction"
+      "review_title": "Vérifiez cette transaction",
+      "preview_unavailable_warning": "Nous n'avons pas pu vérifier ce que fait cette transaction car le service d'aperçu est temporairement indisponible. N'approuvez que si vous faites confiance à la scène qui l'a demandée.",
+      "acknowledge_preview_unavailable": "Je comprends que l'aperçu est indisponible et j'approuve sans voir ce que fait cette transaction"
     },
     "transaction_dialog": {
       "title": "Confirmer la transaction",
