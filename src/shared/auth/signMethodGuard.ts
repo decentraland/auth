@@ -1,5 +1,5 @@
 import { hexToString } from 'viem'
-import { ImpersonatedSignInError, MalformedSignatureRequestError, UnsupportedMethodError } from './errors'
+import { ImpersonatedSignInError, MalformedSignatureRequestError, MalformedTransactionRequestError, UnsupportedMethodError } from './errors'
 import { isMetaTransactionTypedData, resolveMetaTransactionTypedData } from './metaTransactionTypedData'
 
 // The only methods the auth site is willing to forward to the connected wallet. Anything
@@ -196,7 +196,62 @@ function assertSignatureParamsAreCanonical(method: string, params: unknown[] | u
   }
 }
 
+// Fields other than `data` that carry calldata. viem forwards them and thirdweb concatenates
+// `extraCallData` onto `data`, so a request using them would execute bytes the preview never read.
+const CALLDATA_ALIASES = ['input', 'extraCallData']
+const ADDRESS_REGEX = /^0x[0-9a-fA-F]{40}$/
+const CALLDATA_REGEX = /^0x([0-9a-fA-F]{2})*$/
+// A JSON-RPC quantity: hex, or the decimal form some clients send.
+const QUANTITY_REGEX = /^(0x[0-9a-fA-F]{1,64}|[0-9]{1,78})$/
+// Below the preview server's limit even with the meta-transaction sender appended, so anything
+// accepted here can always be previewed. Legitimate Decentraland calls are far smaller; without a
+// cap, oversized calldata is a deterministic way to make the preview unavailable.
+const MAX_CALLDATA_BYTES = 96 * 1024
+
+/**
+ * Rejects eth_sendTransaction params that are not a single transaction object the preview can read
+ * and the wallet would execute as shown. Every rule here fails closed at recover time, so the request
+ * is answered with invalid params instead of degrading to an unavailable preview that a later click
+ * would still execute.
+ */
+function assertTransactionParamsAreCanonical(method: string, params: unknown[] | undefined): void {
+  if (method.toLowerCase() !== 'eth_sendtransaction') {
+    return
+  }
+  const reject = (reason: string): never => {
+    throw new MalformedTransactionRequestError(method, reason)
+  }
+  if (!Array.isArray(params) || params.length !== 1) {
+    return reject('expected exactly one transaction object')
+  }
+  const transaction: unknown = params[0]
+  if (typeof transaction !== 'object' || transaction === null || Array.isArray(transaction)) {
+    return reject('the transaction must be an object')
+  }
+  const fields = transaction as Record<string, unknown>
+  const alias = CALLDATA_ALIASES.find(key => fields[key] !== undefined)
+  if (alias) {
+    return reject(`calldata must be provided in "data", not "${alias}"`)
+  }
+  if (typeof fields.to !== 'string' || !ADDRESS_REGEX.test(fields.to)) {
+    return reject('"to" must be an address')
+  }
+  if (fields.data !== undefined) {
+    if (typeof fields.data !== 'string' || !CALLDATA_REGEX.test(fields.data)) {
+      return reject('"data" must be hex-encoded bytes')
+    }
+    if ((fields.data.length - 2) / 2 > MAX_CALLDATA_BYTES) {
+      return reject('"data" is too large to preview')
+    }
+  }
+  if (fields.value !== undefined && (typeof fields.value !== 'string' || !QUANTITY_REGEX.test(fields.value))) {
+    return reject('"value" must be a hex or decimal quantity')
+  }
+}
+
 export {
+  CALLDATA_ALIASES,
+  assertTransactionParamsAreCanonical,
   isDecentralandIdentityAuthMessage,
   assertRequestIsNotImpersonatingSignIn,
   assertMethodIsAllowed,

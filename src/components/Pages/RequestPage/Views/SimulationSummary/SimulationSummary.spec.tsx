@@ -326,6 +326,204 @@ describe('when rendering the SimulationSummary', () => {
       render(<SimulationSummary simulation={simulation} userAddress={USER} />)
       expect(screen.getByText(/approval_can_transfer_token/)).toBeInTheDocument()
     })
+
+    it('should flag it with a warning icon when the spender is not a recognized Decentraland contract', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} />)
+      expect(screen.getByText('⚠')).toBeInTheDocument()
+    })
+
+    it('should not flag it when the spender is a recognized Decentraland contract', () => {
+      render(
+        <SimulationSummary simulation={simulation} userAddress={USER} verifiedContracts={['0x1234567890abcdef1234567890abcdef12345678']} />
+      )
+      expect(screen.queryByText('⚠')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('and a limited allowance is granted', () => {
+    const spender = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd'
+
+    beforeEach(() => {
+      simulation = {
+        status: 'ready',
+        result: emptyResult({
+          approvalChanges: [
+            {
+              kind: 'approval',
+              standard: 'erc20',
+              owner: USER,
+              spender,
+              amount: '100',
+              rawAmount: '100000000000000000000',
+              isUnlimited: false,
+              tokenId: null,
+              approved: null,
+              contractAddress: '0x0f5d2fb29fb7d3cfee444a200298f468908cc942',
+              symbol: 'MANA',
+              name: 'MANA'
+            }
+          ]
+        })
+      }
+    })
+
+    it('should flag it with a warning icon when the spender is not a recognized Decentraland contract', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} />)
+      expect(screen.getByText('⚠')).toBeInTheDocument()
+    })
+
+    it('should not flag it when the spender is a recognized Decentraland contract', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} verifiedContracts={[spender]} />)
+      expect(screen.queryByText('⚠')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('and a tiny allowance is displayed as zero while its base units are not', () => {
+    beforeEach(() => {
+      simulation = {
+        status: 'ready',
+        result: emptyResult({
+          approvalChanges: [
+            {
+              kind: 'approval',
+              standard: 'erc20',
+              owner: USER,
+              spender: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd',
+              amount: '0',
+              rawAmount: '1',
+              isUnlimited: false,
+              tokenId: null,
+              approved: null,
+              contractAddress: '0x0f5d2fb29fb7d3cfee444a200298f468908cc942',
+              symbol: 'MANA',
+              name: 'MANA'
+            }
+          ]
+        })
+      }
+    })
+
+    it('should still flag it because the display amount is not what decides', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} />)
+      expect(screen.getByText('⚠')).toBeInTheDocument()
+    })
+  })
+
+  describe('and a single-token approval is cleared with the zero address', () => {
+    beforeEach(() => {
+      simulation = {
+        status: 'ready',
+        result: emptyResult({
+          approvalChanges: [
+            {
+              kind: 'approval',
+              standard: 'erc721',
+              owner: USER,
+              spender: '0x0000000000000000000000000000000000000000',
+              amount: null,
+              rawAmount: null,
+              isUnlimited: false,
+              tokenId: '7',
+              approved: null,
+              contractAddress: '0xfef5c99885c3036e591b6e6db52482891834a5f4',
+              symbol: null,
+              name: 'Fancy Wearables'
+            }
+          ]
+        })
+      }
+    })
+
+    it('should not flag it because it is a revocation', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} />)
+      expect(screen.queryByText('⚠')).not.toBeInTheDocument()
+    })
+
+    it('should say the transfer approval was revoked rather than granted', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} />)
+      expect(screen.getByText(/approval_token_approval_revoked/)).toBeInTheDocument()
+      expect(screen.queryByText(/approval_can_transfer_token/)).not.toBeInTheDocument()
+    })
+
+    it('should not present the zero address as a counterparty', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} />)
+      expect(screen.queryByText(/0x0000/)).not.toBeInTheDocument()
+    })
+  })
+
+  describe('and a non-zero ERC-20 allowance is granted to the zero address', () => {
+    beforeEach(() => {
+      simulation = {
+        status: 'ready',
+        result: emptyResult({
+          approvalChanges: [
+            {
+              kind: 'approval',
+              standard: 'erc20',
+              owner: USER,
+              spender: '0x0000000000000000000000000000000000000000',
+              amount: '100',
+              rawAmount: '100000000000000000000',
+              isUnlimited: false,
+              tokenId: null,
+              approved: null,
+              contractAddress: '0x0f5d2fb29fb7d3cfee444a200298f468908cc942',
+              symbol: 'MANA',
+              name: 'MANA'
+            }
+          ]
+        })
+      }
+    })
+
+    it('should word it as a grant, not a revocation, because it revokes nobody', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} />)
+      expect(screen.getByText(/approval_can_spend/)).toBeInTheDocument()
+      expect(screen.queryByText(/approval_allowance_revoked/)).not.toBeInTheDocument()
+    })
+
+    it('should flag it and name the zero address as the spender', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} />)
+      expect(screen.getByText('⚠')).toBeInTheDocument()
+      expect(screen.getByText(/0x0000/)).toBeInTheDocument()
+    })
+  })
+
+  describe('and an ERC-20 allowance is set to zero', () => {
+    beforeEach(() => {
+      simulation = {
+        status: 'ready',
+        result: emptyResult({
+          approvalChanges: [
+            {
+              kind: 'approval',
+              standard: 'erc20',
+              owner: USER,
+              spender: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd',
+              amount: '0.0',
+              rawAmount: '0',
+              isUnlimited: false,
+              tokenId: null,
+              approved: null,
+              contractAddress: '0x0f5d2fb29fb7d3cfee444a200298f468908cc942',
+              symbol: 'MANA',
+              name: 'MANA'
+            }
+          ]
+        })
+      }
+    })
+
+    it('should say the spender can no longer spend rather than that it can spend zero', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} />)
+      expect(screen.getByText(/approval_can_no_longer_spend/)).toBeInTheDocument()
+      expect(screen.queryByText(/approval_can_spend/)).not.toBeInTheDocument()
+    })
+
+    it('should not flag it because nothing is granted', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} />)
+      expect(screen.queryByText('⚠')).not.toBeInTheDocument()
+    })
   })
 
   describe('and there is a net dollar balance change for the user', () => {

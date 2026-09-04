@@ -18,6 +18,7 @@ import {
   IdentityResponse,
   ImpersonatedSignInError,
   MalformedSignatureRequestError,
+  MalformedTransactionRequestError,
   RecoverResponse,
   RequestFulfilledError,
   SimulationRequestBody,
@@ -25,7 +26,8 @@ import {
   SimulationUnavailableError,
   UnsupportedMethodError,
   buildMetaTransactionSimulationPayload,
-  createAuthServerHttpClient
+  createAuthServerHttpClient,
+  isDangerousApproval
 } from '../../../shared/auth'
 import { isRetiredSignInMethod } from '../../../shared/auth/signMethodGuard'
 import { isSocialProviderType, useCurrentConnectionData } from '../../../shared/connection'
@@ -68,7 +70,7 @@ import {
   getNetworkProvider,
   getSigninDeeplink,
   isApprovalGrantingTypedData,
-  isKnownDecentralandContract,
+  isKnownDecentralandContractOnChain,
   isOpaqueSignatureMessage,
   isSignatureMethod
 } from './utils'
@@ -191,6 +193,12 @@ export const RequestPage = () => {
   const viewRef = useRef(view)
   viewRef.current = view
   const hasCompletedRef = useRef(false)
+  // The request id whose state this mounted page currently holds (see the load effect). The ref is
+  // read by the effect; the state drives rendering, so a route change is caught on its own render.
+  const loadedRequestIdRef = useRef<string>()
+  const [loadedRequestId, setLoadedRequestId] = useState<string>()
+  // The route id the recovered request in requestRef belongs to.
+  const recoveredRequestIdRef = useRef<string>()
   // Guards against re-entrant approvals (e.g. a fast double-click on the confirm dialog),
   // which would otherwise fire two transactions before `isLoading` re-renders the buttons.
   const isApprovingRef = useRef(false)
@@ -320,6 +328,45 @@ export const RequestPage = () => {
 
   // Effect 2: Load the request once the user is connected and the profile is ready.
   useEffect(() => {
+    // A different request id on a still-mounted page starts over, before any other branch runs.
+    // Everything derived from the previous request — its preview, verified contracts,
+    // classification and completion — must go; otherwise a click on Allow could execute the new
+    // request under the previous request's summary and acknowledgment. `loadedRequestId` is what
+    // the render reads: until it matches the route, the page shows the loading view and nothing of
+    // the previous request. The reset is keyed to the request id so re-runs of this effect for other
+    // dependencies leave in-flight state untouched.
+    const isNewRequest = loadedRequestIdRef.current !== requestId
+    if (isNewRequest) {
+      loadedRequestIdRef.current = requestId
+      recoveredRequestIdRef.current = undefined
+      hasCompletedRef.current = false
+      requestRef.current = undefined
+      metaTxCheckRef.current = null
+      // Deep-link handoff state is per request as well: a new id is a new identity handoff.
+      clientLoginPromiseRef.current = null
+      hasTrackedDeepLinkRef.current = false
+      setIdentityId(undefined)
+      setLoadedRequestId(requestId)
+      setView(View.LOADING_REQUEST)
+      setIsLoading(false)
+      setError(undefined)
+      setWalletInfo(undefined)
+      setTransactionGasCost(undefined)
+      setNftTransferData(null)
+      setManaTransferData(null)
+      setIsTransactionModalOpen(false)
+      setSimulationState({ status: 'idle' })
+      setSimulationProfiles({})
+      setSimulationChainId(undefined)
+      setSimulationVerified([])
+      setIsMetaTransaction(false)
+      setSignaturePayload(null)
+      setIsSignatureMetaTx(false)
+      setSignatureContractTrust('pending')
+      setIsHighRiskSignature(false)
+      setUnverifiableSignatureReason(null)
+    }
+
     // A deep-link handoff requires a valid UUID v4 id (the client's correlation id). Reject a
     // malformed id up front with the error view instead of running the login handoff for it.
     // Surface the reason (rendered as the error detail) so the copy matches the cause — a retry
@@ -360,10 +407,10 @@ export const RequestPage = () => {
 
     if (!initializedFlags || !isProfileReady) return
 
-    // Don't re-fetch if we're already in a terminal view (completed, denied, error, etc.)
-    // This prevents the bug where after approving, dependency changes cause a re-fetch
-    // of an already-consumed request
-    if (TERMINAL_VIEWS.has(viewRef.current) || hasCompletedRef.current) {
+    // Same request, already in a terminal view (completed, denied, error...): dependency changes
+    // must not re-fetch an already-consumed request. A new request is never gated by the previous
+    // request's terminal view.
+    if (!isNewRequest && (TERMINAL_VIEWS.has(viewRef.current) || hasCompletedRef.current)) {
       return
     }
 
@@ -435,6 +482,7 @@ export const RequestPage = () => {
         if (cancelled) return
 
         requestRef.current = request
+        recoveredRequestIdRef.current = requestId
 
         // Initialize the timeout to display the timeout view when the request expires.
         // Guard against an unparseable expiration: `new Date(...).getTime()` would be NaN,
@@ -488,10 +536,12 @@ export const RequestPage = () => {
 
         // Collects the addresses in the simulation that are recognized Decentraland contracts,
         // so the summary can show a "verified" badge next to them.
-        const collectVerifiedContracts = (result: SimulationResponseBody): string[] => {
+        // Recognition is per chain: the addresses are judged against the deployments on the chain the
+        // simulation ran on, never against the registry as a whole.
+        const collectVerifiedContracts = (result: SimulationResponseBody, chainId: number): string[] => {
           const verified = new Set<string>()
           const consider = (address: string | null) => {
-            if (address && isKnownDecentralandContract(address)) verified.add(address.toLowerCase())
+            if (address && isKnownDecentralandContractOnChain(address, chainId)) verified.add(address.toLowerCase())
           }
           for (const change of result.assetChanges) {
             consider(change.from)
@@ -518,7 +568,7 @@ export const RequestPage = () => {
             const result = await authServerClient.current.simulateTransaction(body)
             if (cancelled) return
             setSimulationState({ status: 'ready', result })
-            setSimulationVerified(collectVerifiedContracts(result))
+            setSimulationVerified(collectVerifiedContracts(result, body.chainId))
             void resolveSimulationProfiles(result)
           } catch (e) {
             if (cancelled) return
@@ -777,8 +827,8 @@ export const RequestPage = () => {
           setView(View.WALLET_INTERACTION_ERROR)
           await reportRejectedRequest(RPC_INVALID_PARAMS, e.message)
           return
-        } else if (e instanceof MalformedSignatureRequestError) {
-          // The params could preview one payload and sign another. Block it; a retry recovers the same request.
+        } else if (e instanceof MalformedSignatureRequestError || e instanceof MalformedTransactionRequestError) {
+          // The params could preview one payload and sign or execute another. Block it; a retry recovers the same request.
           hasCompletedRef.current = true
           setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
           setView(View.WALLET_INTERACTION_ERROR)
@@ -851,6 +901,9 @@ export const RequestPage = () => {
   }, [nftTransferData, manaTransferData])
 
   const onDenyWalletInteraction = useCallback(async () => {
+    // Only the request this page recovered can be answered. If the route has moved on to another id,
+    // nothing has been reviewed for it yet.
+    if (recoveredRequestIdRef.current !== requestId) return
     // The decision is final the moment the user clicks: mark completion before the outcome
     // round-trip so nothing that resolves in the meantime (e.g. a late simulation rejection)
     // can override the denied view or answer the request a second time.
@@ -883,6 +936,10 @@ export const RequestPage = () => {
   }, [nftTransferData, manaTransferData, requestId])
 
   const onApproveWalletInteraction = useCallback(async () => {
+    // Only the request this page recovered can be executed. If the route has moved on to another
+    // id, requestRef still holds the previous request and its outcome would be reported under the
+    // new id; nothing reviewed exists for the new one yet.
+    if (recoveredRequestIdRef.current !== requestId) return
     // Prevent duplicate submissions — the confirm dialog buttons aren't disabled synchronously,
     // so a double-click could otherwise re-enter before the first call flips isLoading.
     if (isApprovingRef.current) return
@@ -936,7 +993,7 @@ export const RequestPage = () => {
           const networkProvider = await getNetworkProvider(chainId)
           // getContract returns the registry entry BY REFERENCE, so mutating .address would
           // permanently rewrite the shared decentraland-transactions registry for the rest of the
-          // session (poisoning later getContractName/isKnownDecentralandContract lookups). Clone it.
+          // session (poisoning later getContractName/isKnownDecentralandContractOnChain lookups). Clone it.
           const contract = { ...getContract(contractName, chainId), address: toAddress }
 
           result = await sendMetaTransaction(connectedProvider, networkProvider, transactionParams.data as string, contract, {
@@ -1074,14 +1131,13 @@ export const RequestPage = () => {
   // resolved. In that case approval is a single step (gas shown inline, no confirm modal); without
   // a summary it keeps the classic two-step confirm dialog for the gas check.
   const hasSimulationSummary = simulationState.status !== 'idle'
-  // The simulation resolved and shows a high-risk permission: an unlimited ERC-20 allowance or a
-  // full-collection ApprovalForAll.
+  // The simulation resolved and grants a permission the user should not approve on a single click
+  // (see isDangerousApproval). Spenders are recognized from the same chain-aware verified set the
+  // summary uses for its badge and warning, so the checkbox and the icon always agree.
   const hasDangerousApprovalChange =
     simulationState.status === 'ready' &&
-    simulationState.result.approvalChanges.some(
-      approval =>
-        (approval.kind === 'approvalForAll' && approval.approved !== false) ||
-        (approval.kind === 'approval' && !approval.tokenId && approval.isUnlimited)
+    simulationState.result.approvalChanges.some(approval =>
+      isDangerousApproval(approval, address => simulationVerified.includes(address.toLowerCase()))
     )
   // A typed-data MetaTransaction whose inner call could not be previewed: the simulation was
   // unavailable, or the call reverts today. Unlike an eth_sendTransaction relayed through the gas
@@ -1112,7 +1168,12 @@ export const RequestPage = () => {
     isHighRiskSignature ||
     unverifiableSignatureReason !== null
 
-  switch (view) {
+  // Derived, not synced: on the render where the route id changes, every piece of state still
+  // belongs to the previous request. Show none of it — no summary, no Allow — until this instance has
+  // started loading the current id, which the load effect records together with its reset.
+  const renderedView = loadedRequestId === requestId ? view : View.LOADING_REQUEST
+
+  switch (renderedView) {
     case View.TIMEOUT:
       return <TimeoutError requestId={requestId} />
     case View.DIFFERENT_ACCOUNT:
@@ -1219,6 +1280,7 @@ export const RequestPage = () => {
             />
           )}
           <WalletInteraction
+            key={requestId}
             requestId={requestId}
             isWeb2Wallet={isUserUsingWeb2Wallet}
             explorerText={targetConfig.explorerText}
@@ -1241,6 +1303,7 @@ export const RequestPage = () => {
     case View.WALLET_SIGNATURE_INTERACTION:
       return (
         <SignatureRequestView
+          key={requestId}
           requestId={requestId}
           method={requestRef.current?.method ?? ''}
           payload={signaturePayload}

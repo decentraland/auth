@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { formatEther } from 'viem'
 import { useTranslation } from '@dcl/hooks'
 import { Box, Button, Checkbox, CircularProgress, FormControlLabel } from 'decentraland-ui2'
+import { getPreviewFingerprint } from '../../../../../shared/auth'
 import { Container } from '../../Container'
 import { ButtonsContainer } from '../../RequestPage.styled'
 import { SimulationSummary } from '../SimulationSummary'
@@ -28,7 +29,18 @@ export const WalletInteraction = ({
   onApprove
 }: WalletInteractionProps) => {
   const { t } = useTranslation()
-  const [acknowledged, setAcknowledged] = useState(false)
+  // The statement being acknowledged: this request and exactly this preview — outcome, movements
+  // and approvals. Stored as a key and derived, never synced, so a tick cannot carry over to another
+  // request, another outcome or a re-simulation that showed something else, and the button is right
+  // in the same render the statement changes.
+  const acknowledgmentStatement = [
+    requestId,
+    simulation?.status ?? 'idle',
+    isReverted ? 'reverted' : '',
+    getPreviewFingerprint(simulation?.status === 'ready' ? simulation.result : undefined)
+  ].join('|')
+  const [acknowledgedStatement, setAcknowledgedStatement] = useState<string | null>(null)
+  const acknowledged = acknowledgedStatement === acknowledgmentStatement
   const hasSummary = simulation !== undefined && simulation.status !== 'idle'
   // Block approval while the request is submitting, while the simulation is still resolving (so a
   // user can't approve before the summary and any high-risk warnings render), and until any
@@ -59,7 +71,7 @@ export const WalletInteraction = ({
             control={
               <Checkbox
                 checked={acknowledged}
-                onChange={event => setAcknowledged(event.target.checked)}
+                onChange={event => setAcknowledgedStatement(event.target.checked ? acknowledgmentStatement : null)}
                 data-testid="risk-acknowledgment"
               />
             }

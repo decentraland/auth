@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/naming-convention */
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { useLayoutEffect } from 'react'
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ProviderType } from '@dcl/schemas'
@@ -11,6 +12,7 @@ import {
   ExpiredRequestError,
   ImpersonatedSignInError,
   MalformedSignatureRequestError,
+  MalformedTransactionRequestError,
   RequestFulfilledError,
   SimulationUnavailableError,
   UnsupportedMethodError
@@ -209,7 +211,7 @@ const mockDecodeMetaTransactionTypedData = jest.fn()
 const mockBuildSendTransactionSimulationPayload = jest.fn()
 const mockIsOpaqueSignatureMessage = jest.fn()
 const mockCheckMetaTransactionSupport = jest.fn()
-const mockIsKnownDecentralandContract = jest.fn()
+const mockIsKnownDecentralandContractOnChain = jest.fn()
 const mockIsDecentralandContractAddress = jest.fn()
 const mockIsApprovalGrantingTypedData = jest.fn()
 jest.mock('./utils', () => ({
@@ -224,7 +226,7 @@ jest.mock('./utils', () => ({
   getMetaTransactionChainId: jest.fn().mockReturnValue(137),
   getNetworkProvider: jest.fn(),
   isSignatureMethod: (...args: any[]) => mockIsSignatureMethod(...args),
-  isKnownDecentralandContract: (...args: any[]) => mockIsKnownDecentralandContract(...args),
+  isKnownDecentralandContractOnChain: (...args: any[]) => mockIsKnownDecentralandContractOnChain(...args),
   isDecentralandContractAddress: (...args: any[]) => mockIsDecentralandContractAddress(...args),
   isApprovalGrantingTypedData: (...args: any[]) => mockIsApprovalGrantingTypedData(...args),
   extractSignaturePayload: (...args: any[]) => mockExtractSignaturePayload(...args),
@@ -290,7 +292,7 @@ describe('RequestPage', () => {
     mockIsSignatureMethod.mockImplementation((method: string) =>
       ['personal_sign', 'eth_sign', 'eth_signtypeddata', 'eth_signtypeddata_v3', 'eth_signtypeddata_v4'].includes(method.toLowerCase())
     )
-    mockIsKnownDecentralandContract.mockReturnValue(false)
+    mockIsKnownDecentralandContractOnChain.mockReturnValue(false)
     mockIsDecentralandContractAddress.mockResolvedValue(false)
     mockIsApprovalGrantingTypedData.mockReturnValue(false)
     mockIsOpaqueSignatureMessage.mockReturnValue(false)
@@ -558,6 +560,30 @@ describe('RequestPage', () => {
             message: 'The "personal_sign" method cannot be used to sign a Decentraland sign-in payload'
           })
         })
+      })
+    })
+
+    describe('and recovery fails with a MalformedTransactionRequestError', () => {
+      beforeEach(() => {
+        mockGetAddresses.mockResolvedValue(['0xabc123'])
+        mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'User' }] })
+        mockRecover.mockRejectedValue(new MalformedTransactionRequestError('eth_sendTransaction', '"to" must be an address'))
+        mockSendFailedOutcome.mockResolvedValue({})
+      })
+
+      it('should show the signing error view instead of offering a retry', async () => {
+        renderRequestPage()
+        await waitFor(() => expect(screen.getByTestId('signing-error')).toBeInTheDocument())
+      })
+
+      it('should report an invalid-params outcome naming the broken rule', async () => {
+        renderRequestPage()
+        await waitFor(() =>
+          expect(mockSendFailedOutcome).toHaveBeenCalledWith(REQUEST_ID, '0xabc123', {
+            code: -32602,
+            message: 'The "eth_sendTransaction" transaction parameters are malformed: "to" must be an address'
+          })
+        )
       })
     })
 
@@ -1553,6 +1579,151 @@ describe('RequestPage', () => {
       await waitFor(() => expect(mockSimulateTransaction).toHaveBeenCalled())
     })
 
+    describe('and the simulation grants an approval', () => {
+      const approval = {
+        kind: 'approval',
+        standard: 'erc20',
+        owner: '0xabc123',
+        spender: '0xspender',
+        amount: '100',
+        rawAmount: '100000000000000000000',
+        isUnlimited: false,
+        tokenId: null,
+        approved: null,
+        contractAddress: '0xmana',
+        symbol: 'MANA',
+        name: 'MANA'
+      }
+      const simulationWith = (approvalChanges: unknown[]) => ({
+        status: 'success',
+        assetChanges: [],
+        approvalChanges,
+        balanceChanges: [],
+        events: []
+      })
+
+      describe('and it is a limited allowance to a spender that is not a recognized Decentraland contract', () => {
+        beforeEach(() => {
+          mockIsKnownDecentralandContractOnChain.mockReturnValue(false)
+          mockSimulateTransaction.mockResolvedValue(simulationWith([approval]))
+        })
+
+        it('should require an acknowledgment because a limited allowance hands the asset over just as surely', async () => {
+          renderRequestPage()
+          const view = await screen.findByTestId('wallet-interaction')
+          await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+          expect(view).toHaveAttribute('data-requires-acknowledgment', 'true')
+        })
+      })
+
+      describe('and it is a limited allowance to a recognized Decentraland contract', () => {
+        beforeEach(() => {
+          mockIsKnownDecentralandContractOnChain.mockReturnValue(true)
+          mockSimulateTransaction.mockResolvedValue(simulationWith([approval]))
+        })
+
+        it('should not require an acknowledgment because such approvals are routine', async () => {
+          renderRequestPage()
+          const view = await screen.findByTestId('wallet-interaction')
+          await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+          expect(view).toHaveAttribute('data-requires-acknowledgment', 'false')
+        })
+
+        it('should recognize the spender on the chain the simulation ran on, not on any chain', async () => {
+          renderRequestPage()
+          const view = await screen.findByTestId('wallet-interaction')
+          await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+          // The mocked simulation payload names chain 137, so recognition must be asked for 137.
+          expect(mockIsKnownDecentralandContractOnChain).toHaveBeenCalledWith('0xspender', 137)
+        })
+      })
+
+      describe('and it is a single token approved to a spender that is not a recognized Decentraland contract', () => {
+        beforeEach(() => {
+          mockIsKnownDecentralandContractOnChain.mockReturnValue(false)
+          mockSimulateTransaction.mockResolvedValue(
+            simulationWith([{ ...approval, standard: 'erc721', amount: null, rawAmount: null, tokenId: '7' }])
+          )
+        })
+
+        it('should require an acknowledgment', async () => {
+          renderRequestPage()
+          const view = await screen.findByTestId('wallet-interaction')
+          await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+          expect(view).toHaveAttribute('data-requires-acknowledgment', 'true')
+        })
+      })
+
+      describe('and it is a tiny allowance whose display amount rounds to zero, to an unrecognized spender', () => {
+        beforeEach(() => {
+          mockIsKnownDecentralandContractOnChain.mockReturnValue(false)
+          mockSimulateTransaction.mockResolvedValue(simulationWith([{ ...approval, amount: '0', rawAmount: '1' }]))
+        })
+
+        it('should still require an acknowledgment because the base units say it is a grant', async () => {
+          renderRequestPage()
+          const view = await screen.findByTestId('wallet-interaction')
+          await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+          expect(view).toHaveAttribute('data-requires-acknowledgment', 'true')
+        })
+      })
+
+      describe('and it clears a single-token approval with the zero address', () => {
+        beforeEach(() => {
+          mockIsKnownDecentralandContractOnChain.mockReturnValue(false)
+          mockSimulateTransaction.mockResolvedValue(
+            simulationWith([
+              {
+                ...approval,
+                standard: 'erc721',
+                spender: '0x0000000000000000000000000000000000000000',
+                amount: null,
+                rawAmount: null,
+                tokenId: '7'
+              }
+            ])
+          )
+        })
+
+        it('should not require an acknowledgment because it is a revocation', async () => {
+          renderRequestPage()
+          const view = await screen.findByTestId('wallet-interaction')
+          await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+          expect(view).toHaveAttribute('data-requires-acknowledgment', 'false')
+        })
+      })
+
+      describe('and it revokes an allowance from an unrecognized spender', () => {
+        beforeEach(() => {
+          mockIsKnownDecentralandContractOnChain.mockReturnValue(false)
+          mockSimulateTransaction.mockResolvedValue(simulationWith([{ ...approval, amount: '0', rawAmount: '0' }]))
+        })
+
+        it('should not require an acknowledgment because nothing is granted', async () => {
+          renderRequestPage()
+          const view = await screen.findByTestId('wallet-interaction')
+          await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+          expect(view).toHaveAttribute('data-requires-acknowledgment', 'false')
+        })
+      })
+
+      describe('and it revokes ApprovalForAll from an unrecognized operator', () => {
+        beforeEach(() => {
+          mockIsKnownDecentralandContractOnChain.mockReturnValue(false)
+          mockSimulateTransaction.mockResolvedValue(
+            simulationWith([{ ...approval, kind: 'approvalForAll', standard: 'erc721', amount: null, rawAmount: null, approved: false }])
+          )
+        })
+
+        it('should not require an acknowledgment', async () => {
+          renderRequestPage()
+          const view = await screen.findByTestId('wallet-interaction')
+          await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+          expect(view).toHaveAttribute('data-requires-acknowledgment', 'false')
+        })
+      })
+    })
+
     it('should reuse the prefetched meta-transaction check on approve instead of re-checking', async () => {
       mockWalletRequest.mockResolvedValue('0xhash')
       mockSendSuccessfulOutcome.mockResolvedValue({})
@@ -1583,6 +1754,147 @@ describe('RequestPage', () => {
         await waitFor(() => expect(view).toHaveAttribute('data-sim', 'unavailable'))
         expect(view).toHaveAttribute('data-requires-acknowledgment', 'true')
       })
+    })
+  })
+
+  describe('when the request id changes while the page stays mounted', () => {
+    const OTHER_REQUEST_ID = 'other-request-456'
+    const NavigateToOther = () => {
+      const navigate = useNavigate()
+      return (
+        <button data-testid="go-to-other" onClick={() => navigate(`/auth/requests/${OTHER_REQUEST_ID}?targetConfigId=default`)}>
+          other
+        </button>
+      )
+    }
+    const renderMountedPage = () =>
+      render(
+        <MemoryRouter initialEntries={[`/auth/requests/${REQUEST_ID}?targetConfigId=default`]}>
+          <FeatureFlagsContext.Provider value={{ flags: mockFlags as any, variants: {} as any, initialized: mockFlagsInitialized }}>
+            <Routes>
+              <Route
+                path="/auth/requests/:requestId"
+                element={
+                  <>
+                    <RequestPage />
+                    <NavigateToOther />
+                  </>
+                }
+              />
+            </Routes>
+          </FeatureFlagsContext.Provider>
+        </MemoryRouter>
+      )
+
+    beforeEach(() => {
+      // These tests queue one-shot values; clearAllMocks does not drain unused queues, so start clean.
+      mockRecover.mockReset()
+      mockSimulateTransaction.mockReset()
+      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.MAGIC }
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockRecover.mockResolvedValue({
+        method: 'eth_sendTransaction',
+        params: [{ to: '0xcontract', data: '0xabcd', value: '0x0' }],
+        sender: '0xabc123',
+        expiration: new Date(Date.now() + 3600000).toISOString()
+      })
+      mockGetAddresses.mockResolvedValue(['0xabc123'])
+      mockGetBalance.mockResolvedValue(BigInt(1))
+      mockGetChainId.mockResolvedValue(1)
+      mockEstimateFeesPerGas.mockResolvedValue({ gasPrice: BigInt(1) })
+      mockEstimateGas.mockResolvedValue(BigInt(1))
+      // The first request previews; the second never resolves, so any "ready" state seen after the
+      // change can only be stale.
+      mockSimulateTransaction
+        .mockResolvedValueOnce({ status: 'success', assetChanges: [], approvalChanges: [], balanceChanges: [], events: [] })
+        .mockImplementationOnce(() => new Promise(() => undefined))
+    })
+
+    afterEach(() => {
+      mockRecover.mockReset()
+      mockSimulateTransaction.mockReset()
+    })
+
+    it('should drop the previous preview and show the loading view before anything of the new request', async () => {
+      renderMountedPage()
+      const view = await screen.findByTestId('wallet-interaction')
+      await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+      // Hold the new request's recovery so the state between the change and the new preview is observable.
+      mockRecover.mockImplementationOnce(() => new Promise(() => undefined))
+      await userEvent.click(screen.getByTestId('go-to-other'))
+      expect(await screen.findByTestId('loading-request')).toBeInTheDocument()
+      expect(screen.queryByTestId('wallet-interaction')).not.toBeInTheDocument()
+    })
+
+    it('should recover the new request and preview it from scratch instead of reusing the old summary', async () => {
+      renderMountedPage()
+      const view = await screen.findByTestId('wallet-interaction')
+      await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+      await userEvent.click(screen.getByTestId('go-to-other'))
+      const fresh = await screen.findByTestId('wallet-interaction')
+      expect(mockRecover.mock.calls.some(call => call[0] === OTHER_REQUEST_ID)).toBe(true)
+      expect(fresh).toHaveAttribute('data-sim', 'loading')
+    })
+
+    describe('and the change is observed commit by commit', () => {
+      let approvalUiAtCommit: boolean[]
+      let CommitProbe: ({ children }: { children: React.ReactNode }) => JSX.Element
+
+      beforeEach(() => {
+        approvalUiAtCommit = []
+        // A layout effect runs in the same commit as the DOM update, before any passive effect, so it
+        // sees exactly what the user would see on that render.
+        CommitProbe = ({ children }: { children: React.ReactNode }) => {
+          // The route element is a stable reference, so the probe must subscribe to the location
+          // itself to be re-rendered, and thus record, on the commit that changes the route.
+          useLocation()
+          useLayoutEffect(() => {
+            approvalUiAtCommit.push(screen.queryByTestId('wallet-interaction-approve') !== null)
+          })
+          return <>{children}</>
+        }
+      })
+
+      it('should show no approval UI on the very commit the route id changes, before any effect runs', async () => {
+        render(
+          <MemoryRouter initialEntries={[`/auth/requests/${REQUEST_ID}?targetConfigId=default`]}>
+            <FeatureFlagsContext.Provider value={{ flags: mockFlags as any, variants: {} as any, initialized: mockFlagsInitialized }}>
+              <Routes>
+                <Route
+                  path="/auth/requests/:requestId"
+                  element={
+                    <CommitProbe>
+                      <RequestPage />
+                      <NavigateToOther />
+                    </CommitProbe>
+                  }
+                />
+              </Routes>
+            </FeatureFlagsContext.Provider>
+          </MemoryRouter>
+        )
+        const view = await screen.findByTestId('wallet-interaction')
+        await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+        expect(screen.getByTestId('wallet-interaction-approve')).toBeInTheDocument()
+        mockRecover.mockImplementationOnce(() => new Promise(() => undefined))
+        const commitsBefore = approvalUiAtCommit.length
+        await userEvent.click(screen.getByTestId('go-to-other'))
+        expect(approvalUiAtCommit.length).toBeGreaterThan(commitsBefore)
+        expect(approvalUiAtCommit.slice(commitsBefore).some(present => present)).toBe(false)
+      })
+    })
+
+    it('should load the new request even though the previous one was completed', async () => {
+      mockWalletRequest.mockResolvedValue('0xhash')
+      mockSendSuccessfulOutcome.mockResolvedValue({})
+      renderMountedPage()
+      const view = await screen.findByTestId('wallet-interaction')
+      await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+      await userEvent.click(screen.getByTestId('wallet-interaction-approve'))
+      await screen.findByTestId('wallet-interaction-complete')
+      await userEvent.click(screen.getByTestId('go-to-other'))
+      await waitFor(() => expect(mockRecover.mock.calls.some(call => call[0] === OTHER_REQUEST_ID)).toBe(true))
+      expect(screen.queryByTestId('wallet-interaction-complete')).not.toBeInTheDocument()
     })
   })
 

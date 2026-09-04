@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from '@dcl/hooks'
 import { Box, Button, Checkbox, CircularProgress, FormControlLabel } from 'decentraland-ui2'
+import { getPreviewFingerprint } from '../../../../../shared/auth'
 import { getExplorerAddressUrl, getExplorerName, getNetworkName } from '../../../../../shared/explorer'
 import { Container } from '../../Container'
 import { ButtonsContainer } from '../../RequestPage.styled'
@@ -70,7 +71,9 @@ export const SignatureRequestView = ({
     unverifiableReason ?? '',
     isReverted ? 'reverted' : '',
     isContractUnrecognized ? 'unrecognized-contract' : '',
-    simulation.status === 'unavailable' ? 'unavailable' : ''
+    simulation.status === 'unavailable' ? 'unavailable' : '',
+    // Exactly this preview: a re-simulation that showed something else is another statement.
+    getPreviewFingerprint(simulation.status === 'ready' ? simulation.result : undefined)
   ].join('|')
   // Derived, not synced: an effect would clear a stale tick one render late, and for that one commit
   // the Allow button would be enabled against a statement the user never acknowledged.

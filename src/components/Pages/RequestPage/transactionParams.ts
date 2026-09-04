@@ -1,6 +1,6 @@
-const describeType = (value: unknown): string => (Array.isArray(value) ? 'array' : value === null ? 'null' : typeof value)
+import { CALLDATA_ALIASES } from '../../../shared/auth'
 
-const CALLDATA_ALIASES = ['input', 'extraCallData']
+const describeType = (value: unknown): string => (Array.isArray(value) ? 'array' : value === null ? 'null' : typeof value)
 
 function getUnsupportedCalldataAlias(txParams: Record<string, unknown> | undefined): string | null {
   if (!txParams) return null
