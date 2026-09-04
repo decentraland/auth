@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { formatEther } from 'viem'
 import { useTranslation } from '@dcl/hooks'
 import { Box, Button, Checkbox, CircularProgress, FormControlLabel } from 'decentraland-ui2'
-import { getPreviewFingerprint } from '../../../../../shared/auth'
+import { getPreviewFingerprint, hasNoVisibleEffects } from '../../../../../shared/auth'
 import { Container } from '../../Container'
 import { ButtonsContainer } from '../../RequestPage.styled'
 import { SimulationSummary } from '../SimulationSummary'
@@ -29,6 +29,12 @@ export const WalletInteraction = ({
   onApprove
 }: WalletInteractionProps) => {
   const { t } = useTranslation()
+  // The preview could not be produced (simulation service down, or the call could not be simulated).
+  // The effects can't be shown, so warn explicitly and word the acknowledgment for that case.
+  const isPreviewUnavailable = simulation?.status === 'unavailable'
+  // The preview resolved but shows nothing the user can check. The call may still change state the
+  // summary cannot show, so the acknowledgment says that instead of talking about approvals.
+  const isPreviewWithoutVisibleEffects = simulation?.status === 'ready' && hasNoVisibleEffects(simulation.result, userAddress)
   // The statement being acknowledged: this request and exactly this preview — outcome, movements
   // and approvals. Stored as a key and derived, never synced, so a tick cannot carry over to another
   // request, another outcome or a re-simulation that showed something else, and the button is right
@@ -37,14 +43,12 @@ export const WalletInteraction = ({
     requestId,
     simulation?.status ?? 'idle',
     isReverted ? 'reverted' : '',
+    isPreviewWithoutVisibleEffects ? 'no-visible-effects' : '',
     getPreviewFingerprint(simulation?.status === 'ready' ? simulation.result : undefined)
   ].join('|')
   const [acknowledgedStatement, setAcknowledgedStatement] = useState<string | null>(null)
   const acknowledged = acknowledgedStatement === acknowledgmentStatement
   const hasSummary = simulation !== undefined && simulation.status !== 'idle'
-  // The preview could not be produced (simulation service down, or the call could not be simulated).
-  // The effects can't be shown, so warn explicitly and word the acknowledgment for that case.
-  const isPreviewUnavailable = simulation?.status === 'unavailable'
   // Block approval while the request is submitting, while the simulation is still resolving (so a
   // user can't approve before the summary and any high-risk warnings render), and until any
   // required acknowledgment is given.
@@ -86,7 +90,9 @@ export const WalletInteraction = ({
             label={
               isPreviewUnavailable
                 ? t('request.wallet_interaction.acknowledge_preview_unavailable')
-                : t('request.transaction_dialog.acknowledge_risk')
+                : isPreviewWithoutVisibleEffects
+                  ? t('request.transaction_dialog.acknowledge_no_visible_effects')
+                  : t('request.transaction_dialog.acknowledge_risk')
             }
           />
         ) : null}

@@ -299,4 +299,28 @@ describe('when rendering the WalletInteraction view', () => {
       expect(screen.getByTestId('transfer-confirm-button')).not.toBeDisabled()
     })
   })
+
+  describe('and the preview shows no visible effects', () => {
+    let emptyResult: SimulationResponseBody
+
+    beforeEach(() => {
+      emptyResult = { ...successResult, assetChanges: [] }
+    })
+
+    it('should word the acknowledgment for a call whose effects the preview cannot show', () => {
+      render(
+        <WalletInteraction
+          requestId="r1"
+          isWeb2Wallet
+          simulation={{ status: 'ready', result: emptyResult }}
+          userAddress={USER}
+          requiresAcknowledgment
+          gasCovered
+          onDeny={onDeny}
+          onApprove={onApprove}
+        />
+      )
+      expect(screen.getByText('request.transaction_dialog.acknowledge_no_visible_effects')).toBeInTheDocument()
+    })
+  })
 })

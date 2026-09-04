@@ -1381,9 +1381,26 @@ describe('RequestPage', () => {
         verifyingContract: '0xVerifyingContract',
         chainId: 137
       })
+      // A preview with something to check: the user's own transfer.
       mockSimulateTransaction.mockResolvedValue({
         status: 'success',
-        assetChanges: [],
+        assetChanges: [
+          {
+            type: 'transfer',
+            standard: 'erc20',
+            from: '0xabc123',
+            to: '0xrecipient',
+            amount: '5',
+            rawAmount: '5000000000000000000',
+            tokenId: null,
+            contractAddress: '0xmana',
+            symbol: 'MANA',
+            name: 'MANA',
+            decimals: 18,
+            logoUrl: null,
+            dollarValue: null
+          }
+        ],
         approvalChanges: [],
         balanceChanges: [],
         events: []
@@ -1411,7 +1428,7 @@ describe('RequestPage', () => {
       })
     })
 
-    it('should not require acknowledgment when the preview succeeds without dangerous changes and the contract is recognized', async () => {
+    it('should not require acknowledgment when the preview shows the transfer, no dangerous changes and the contract is recognized', async () => {
       renderRequestPage()
       const view = await screen.findByTestId('signature-request')
       await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
@@ -1469,6 +1486,157 @@ describe('RequestPage', () => {
         const view = await screen.findByTestId('signature-request')
         await waitFor(() => expect(view).toHaveAttribute('data-contract-trust', 'unconfirmed'))
         expect(mockCheckMetaTransactionSupport).not.toHaveBeenCalled()
+      })
+    })
+  })
+
+  describe('when a web2 user receives a MetaTransaction signature whose preview shows no visible effects', () => {
+    beforeEach(() => {
+      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.MAGIC }
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockRecover.mockResolvedValue({
+        method: 'eth_signTypedData_v4',
+        params: ['0xabc123', '{"primaryType":"MetaTransaction"}'],
+        sender: '0xabc123',
+        expiration: new Date(Date.now() + 3600000).toISOString()
+      })
+      mockGetAddresses.mockResolvedValue(['0xabc123'])
+      mockExtractSignaturePayload.mockReturnValue({ kind: 'typedData', typedData: { primaryType: 'MetaTransaction' }, raw: '{}' })
+      mockDecodeMetaTransactionTypedData.mockReturnValue({
+        calldataField: 'functionSignature',
+        calldata: '0xdeadbeef',
+        from: '0xabc123',
+        verifyingContract: '0xVerifyingContract',
+        chainId: 137
+      })
+      // e.g. setMinters or transferCreatorship: succeeds, moves nothing, grants no allowance.
+      mockSimulateTransaction.mockResolvedValue({
+        status: 'success',
+        assetChanges: [],
+        approvalChanges: [],
+        balanceChanges: [],
+        events: []
+      })
+      mockCheckMetaTransactionSupport.mockResolvedValue({ willUseMetaTransaction: true, contractName: 'ERC721CollectionV2' })
+    })
+
+    it('should require an acknowledgment even for a recognized contract, because the call may change state the preview cannot show', async () => {
+      renderRequestPage()
+      const view = await screen.findByTestId('signature-request')
+      await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+      await waitFor(() => expect(view).toHaveAttribute('data-contract-trust', 'confirmed'))
+      expect(view).toHaveAttribute('data-requires-acknowledgment', 'true')
+    })
+  })
+
+  describe('when a web2 user receives a transaction whose preview shows no visible effects', () => {
+    beforeEach(() => {
+      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.MAGIC }
+      // A generic transaction. Reset the decoders explicitly so a persistent branded return value cannot leak in.
+      jest.mocked(decodeManaTransferData).mockReturnValue(null)
+      jest.mocked(decodeNftTransferData).mockReturnValue(null)
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockRecover.mockResolvedValue({
+        method: 'eth_sendTransaction',
+        params: [{ to: '0xcontract', data: '0xabcd', value: '0x0' }],
+        sender: '0xabc123',
+        expiration: new Date(Date.now() + 3600000).toISOString()
+      })
+      mockGetAddresses.mockResolvedValue(['0xabc123'])
+      mockGetBalance.mockResolvedValue(BigInt(1))
+      mockGetChainId.mockResolvedValue(1)
+      mockEstimateFeesPerGas.mockResolvedValue({ gasPrice: BigInt(1) })
+      mockEstimateGas.mockResolvedValue(BigInt(1))
+      // Relayed to a recognized Decentraland contract: recognition does not relax this gate.
+      mockCheckMetaTransactionSupport.mockResolvedValue({ willUseMetaTransaction: true, contractName: 'ERC721CollectionV2' })
+    })
+
+    describe('and the preview is empty', () => {
+      beforeEach(() => {
+        mockSimulateTransaction.mockResolvedValue({
+          status: 'success',
+          assetChanges: [],
+          approvalChanges: [],
+          balanceChanges: [],
+          events: []
+        })
+      })
+
+      it('should require an acknowledgment instead of a single click', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('wallet-interaction')
+        await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+        expect(view).toHaveAttribute('data-requires-acknowledgment', 'true')
+      })
+    })
+
+    describe('and only third parties move assets', () => {
+      beforeEach(() => {
+        mockSimulateTransaction.mockResolvedValue({
+          status: 'success',
+          assetChanges: [
+            {
+              type: 'transfer',
+              standard: 'erc20',
+              from: '0xthird',
+              to: '0xother',
+              amount: '5',
+              rawAmount: '5000000000000000000',
+              tokenId: null,
+              contractAddress: '0xmana',
+              symbol: 'MANA',
+              name: 'MANA',
+              decimals: 18,
+              logoUrl: null,
+              dollarValue: null
+            }
+          ],
+          approvalChanges: [],
+          balanceChanges: [],
+          events: []
+        })
+      })
+
+      it('should require an acknowledgment because nothing shown involves the user', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('wallet-interaction')
+        await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+        expect(view).toHaveAttribute('data-requires-acknowledgment', 'true')
+      })
+    })
+
+    describe('and the user receives an asset', () => {
+      beforeEach(() => {
+        mockSimulateTransaction.mockResolvedValue({
+          status: 'success',
+          assetChanges: [
+            {
+              type: 'transfer',
+              standard: 'erc721',
+              from: '0xother',
+              to: '0xabc123',
+              amount: null,
+              rawAmount: null,
+              tokenId: '7',
+              contractAddress: '0xcollection',
+              symbol: null,
+              name: 'Wearable',
+              decimals: null,
+              logoUrl: null,
+              dollarValue: null
+            }
+          ],
+          approvalChanges: [],
+          balanceChanges: [],
+          events: []
+        })
+      })
+
+      it('should not require an acknowledgment because the preview shows what the user gets', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('wallet-interaction')
+        await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+        expect(view).toHaveAttribute('data-requires-acknowledgment', 'false')
       })
     })
   })
