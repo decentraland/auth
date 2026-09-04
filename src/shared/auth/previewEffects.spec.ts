@@ -100,6 +100,42 @@ describe('hasNoVisibleEffects', () => {
     })
   })
 
+  describe('when the server reports a net dollar change for the user without an asset change', () => {
+    let result: SimulationResponseBody
+
+    beforeEach(() => {
+      result = buildResult({ balanceChanges: [{ address: USER, dollarValue: '-5.00' }] })
+    })
+
+    it('should return false because the summary renders that net change', () => {
+      expect(hasNoVisibleEffects(result, USER)).toBe(false)
+    })
+  })
+
+  describe('when the net change reported for the user has no dollar value', () => {
+    let result: SimulationResponseBody
+
+    beforeEach(() => {
+      result = buildResult({ balanceChanges: [{ address: USER, dollarValue: null }] })
+    })
+
+    it('should return true because nothing is rendered for it', () => {
+      expect(hasNoVisibleEffects(result, USER)).toBe(true)
+    })
+  })
+
+  describe('when the only net change reported is for another address', () => {
+    let result: SimulationResponseBody
+
+    beforeEach(() => {
+      result = buildResult({ balanceChanges: [{ address: OTHER, dollarValue: '-5.00' }] })
+    })
+
+    it('should return true', () => {
+      expect(hasNoVisibleEffects(result, USER)).toBe(true)
+    })
+  })
+
   describe('when a permission changes', () => {
     let result: SimulationResponseBody
 

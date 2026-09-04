@@ -2,8 +2,9 @@ import { SimulationResponseBody } from './types'
 
 /**
  * Whether a preview that ran shows the user nothing to check: no asset moving into or out of their
- * account and no permission change. Movements between third parties are not shown by the summary, so
- * they do not count as visible either. A reverted preview is judged by its revert, not by this.
+ * account, no net dollar change reported for them, and no permission change. Movements between third
+ * parties are not shown by the summary, so they do not count as visible either. A reverted preview is
+ * judged by its revert, not by this.
  *
  * "Nothing to show" is not "nothing happens". A call can change state the preview does not model — an
  * update operator on LAND, a collection's minters, managers or creator, a name's resolver — so the
@@ -16,7 +17,11 @@ function hasNoVisibleEffects(result: SimulationResponseBody, userAddress: string
   }
   const user = userAddress.toLowerCase()
   const involvesUser = result.assetChanges.some(change => change.from?.toLowerCase() === user || change.to?.toLowerCase() === user)
-  return !involvesUser && result.approvalChanges.length === 0
+  // The summary also renders the user's net dollar change when the server reports one. Tenderly derives
+  // it from the asset changes, so it should never stand alone, but this mirrors what is rendered rather
+  // than what is expected: the note and the checkbox must never contradict a line on the same screen.
+  const hasNetChange = (result.balanceChanges ?? []).some(change => change.address.toLowerCase() === user && change.dollarValue !== null)
+  return !involvesUser && !hasNetChange && result.approvalChanges.length === 0
 }
 
 export { hasNoVisibleEffects }
