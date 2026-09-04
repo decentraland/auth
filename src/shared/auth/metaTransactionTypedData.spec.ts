@@ -145,6 +145,64 @@ describe('resolveMetaTransactionTypedData', () => {
     })
   })
 
+  describe('when the domain type omits a field the domain carries', () => {
+    let typedData: MutableTypedData
+
+    beforeEach(() => {
+      typedData = buildOffchainTypedData()
+      // The salt names the chain the preview runs on; left out of the struct, the wallet never signs it.
+      typedData.types.EIP712Domain = DOMAIN_TYPE.filter(field => field.name !== 'salt')
+    })
+
+    it('should reject the request because the wallet would not sign every domain field', () => {
+      expect(() => resolveMetaTransactionTypedData(typedData, METHOD)).toThrow(MalformedSignatureRequestError)
+    })
+
+    it('should say the domain type does not match the domain', () => {
+      expect(() => resolveMetaTransactionTypedData(typedData, METHOD)).toThrow('domain type does not match the domain fields')
+    })
+  })
+
+  describe('when the domain type declares a field the domain lacks', () => {
+    let typedData: MutableTypedData
+
+    beforeEach(() => {
+      typedData = buildOffchainTypedData()
+      typedData.types.EIP712Domain = [...DOMAIN_TYPE, { name: 'chainId', type: 'uint256' }]
+    })
+
+    it('should reject the request', () => {
+      expect(() => resolveMetaTransactionTypedData(typedData, METHOD)).toThrow('domain type does not match the domain fields')
+    })
+  })
+
+  describe('when the domain type repeats one field in place of another', () => {
+    let typedData: MutableTypedData
+
+    beforeEach(() => {
+      typedData = buildOffchainTypedData()
+      // Same length as the domain, but `version` is never signed.
+      typedData.types.EIP712Domain = [DOMAIN_TYPE[0], DOMAIN_TYPE[0], DOMAIN_TYPE[2], DOMAIN_TYPE[3]]
+    })
+
+    it('should reject the request', () => {
+      expect(() => resolveMetaTransactionTypedData(typedData, METHOD)).toThrow('domain type does not match the domain fields')
+    })
+  })
+
+  describe('when the domain type lists the domain fields in another order', () => {
+    let typedData: MutableTypedData
+
+    beforeEach(() => {
+      typedData = buildOffchainTypedData()
+      typedData.types.EIP712Domain = [...DOMAIN_TYPE].reverse()
+    })
+
+    it('should resolve the inner call because every field is still signed; the order is between the wallet and the contract', () => {
+      expect(resolveMetaTransactionTypedData(typedData, METHOD).calldata).toBe(ACCEPT_CALLDATA)
+    })
+  })
+
   describe('when the types declare an extra struct the MetaTransaction does not reference', () => {
     let typedData: MutableTypedData
 
@@ -163,6 +221,8 @@ describe('resolveMetaTransactionTypedData', () => {
 
     beforeEach(() => {
       typedData = buildOffchainTypedData()
+      // Declared in the struct as well, so the wallet signs it alongside the salt.
+      typedData.types.EIP712Domain = [...DOMAIN_TYPE, { name: 'chainId', type: 'uint256' }]
       typedData.domain.chainId = 137
     })
 
@@ -176,6 +236,8 @@ describe('resolveMetaTransactionTypedData', () => {
 
     beforeEach(() => {
       typedData = buildOffchainTypedData()
+      // Declared in the struct as well, so the wallet signs it alongside the salt.
+      typedData.types.EIP712Domain = [...DOMAIN_TYPE, { name: 'chainId', type: 'uint256' }]
       typedData.domain.chainId = 80002
     })
 
