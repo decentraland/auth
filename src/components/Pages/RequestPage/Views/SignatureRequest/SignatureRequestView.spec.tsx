@@ -485,6 +485,55 @@ describe('when rendering the SignatureRequestView', () => {
       })
     })
 
+    describe('and the same request re-simulates to a different preview after the user ticked it', () => {
+      let changedSimulation: SimulationState
+
+      beforeEach(() => {
+        const result = simulation.status === 'ready' ? simulation.result : undefined
+        changedSimulation = {
+          status: 'ready',
+          result: {
+            ...(result as SimulationResponseBody),
+            assetChanges: [{ ...(result as SimulationResponseBody).assetChanges[0], amount: '500', rawAmount: '500000000000000000000' }]
+          }
+        }
+      })
+
+      it('should clear the tick because it was given to the previous preview', async () => {
+        const { rerender } = render(
+          <SignatureRequestView
+            requestId="r1"
+            method="eth_signTypedData_v4"
+            payload={payload}
+            simulation={simulation}
+            userAddress={USER}
+            isMetaTransaction={true}
+            contractTrust="unconfirmed"
+            requiresAcknowledgment
+            onDeny={onDeny}
+            onApprove={onApprove}
+          />
+        )
+        await userEvent.click(screen.getByRole('checkbox'))
+        expect(screen.getByRole('checkbox')).toBeChecked()
+        rerender(
+          <SignatureRequestView
+            requestId="r1"
+            method="eth_signTypedData_v4"
+            payload={payload}
+            simulation={changedSimulation}
+            userAddress={USER}
+            isMetaTransaction={true}
+            contractTrust="unconfirmed"
+            requiresAcknowledgment
+            onDeny={onDeny}
+            onApprove={onApprove}
+          />
+        )
+        expect(screen.getByRole('checkbox')).not.toBeChecked()
+      })
+    })
+
     it('should keep approval disabled while the contract is still being recognized', () => {
       render(
         <SignatureRequestView

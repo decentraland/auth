@@ -342,6 +342,10 @@ export const RequestPage = () => {
       hasCompletedRef.current = false
       requestRef.current = undefined
       metaTxCheckRef.current = null
+      // Deep-link handoff state is per request as well: a new id is a new identity handoff.
+      clientLoginPromiseRef.current = null
+      hasTrackedDeepLinkRef.current = false
+      setIdentityId(undefined)
       setLoadedRequestId(requestId)
       setView(View.LOADING_REQUEST)
       setIsLoading(false)
