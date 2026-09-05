@@ -218,6 +218,7 @@ const mockCheckMetaTransactionSupport = jest.fn()
 const mockIsKnownDecentralandContractOnChain = jest.fn()
 const mockIsDecentralandContractAddress = jest.fn()
 const mockIsApprovalGrantingTypedData = jest.fn()
+const mockIsExactNftTransferSimulation = jest.fn()
 jest.mock('./utils', () => ({
   checkMetaTransactionSupport: (...args: any[]) => mockCheckMetaTransactionSupport(...args),
   decodeManaTransferData: jest.fn().mockReturnValue(null),
@@ -233,6 +234,7 @@ jest.mock('./utils', () => ({
   isKnownDecentralandContractOnChain: (...args: any[]) => mockIsKnownDecentralandContractOnChain(...args),
   isDecentralandContractAddress: (...args: any[]) => mockIsDecentralandContractAddress(...args),
   isApprovalGrantingTypedData: (...args: any[]) => mockIsApprovalGrantingTypedData(...args),
+  isExactNftTransferSimulation: (...args: any[]) => mockIsExactNftTransferSimulation(...args),
   extractSignaturePayload: (...args: any[]) => mockExtractSignaturePayload(...args),
   decodeMetaTransactionTypedData: (...args: any[]) => mockDecodeMetaTransactionTypedData(...args),
   isOpaqueSignatureMessage: (...args: any[]) => mockIsOpaqueSignatureMessage(...args),
@@ -260,6 +262,31 @@ jest.mock('@dcl/hooks', () => ({
 }))
 
 const REQUEST_ID = 'test-request-123'
+// A simulation that matches the branded gift exactly: the connected account's token #1 leaves for the
+// recipient on the called collection, and nothing else happens.
+const exactGiftSimulation = {
+  status: 'success',
+  assetChanges: [
+    {
+      type: 'transfer',
+      standard: 'erc721',
+      from: '0xabc123',
+      to: '0xrecipient',
+      amount: null,
+      rawAmount: null,
+      tokenId: '1',
+      contractAddress: '0xcollection',
+      symbol: null,
+      name: 'Wearable',
+      decimals: null,
+      logoUrl: null,
+      dollarValue: null
+    }
+  ],
+  approvalChanges: [],
+  balanceChanges: [],
+  events: []
+}
 // The deep-link handoff requires a valid UUID v4 route id (the client's correlation id).
 const DEEP_LINK_REQUEST_ID = '123e4567-e89b-42d3-a456-426614174000'
 const DEEP_LINK_REQUEST_PATH = `/auth/requests/${DEEP_LINK_REQUEST_ID}?targetConfigId=default&flow=deeplink`
@@ -307,6 +334,7 @@ describe('RequestPage', () => {
     mockIsDecentralandContractAddress.mockResolvedValue(false)
     mockIsChainMismatchRejection.mockReturnValue(false)
     mockIsApprovalGrantingTypedData.mockReturnValue(false)
+    mockIsExactNftTransferSimulation.mockReturnValue(true)
     mockIsOpaqueSignatureMessage.mockReturnValue(false)
     mockExtractSignaturePayload.mockReturnValue({ kind: 'message', message: 'hello' })
     mockDecodeMetaTransactionTypedData.mockReturnValue(null)
@@ -1986,13 +2014,14 @@ describe('RequestPage', () => {
       mockGetChainId.mockResolvedValue(1)
       mockEstimateFeesPerGas.mockResolvedValue({ gasPrice: BigInt(1) })
       mockEstimateGas.mockResolvedValue(BigInt(1))
-      jest.mocked(decodeNftTransferData).mockReturnValue({ tokenId: '1', toAddress: '0xrecipient' })
+      jest.mocked(decodeNftTransferData).mockReturnValue({ fromAddress: '0xabc123', tokenId: '1', toAddress: '0xrecipient' })
       jest.mocked(fetchProfile).mockResolvedValue(null)
     })
 
     describe('and the target is a verified Decentraland collection', () => {
       beforeEach(() => {
         mockCheckMetaTransactionSupport.mockResolvedValue({ willUseMetaTransaction: true, contractName: 'ERC721CollectionV2' })
+        mockSimulateTransaction.mockResolvedValue(exactGiftSimulation)
         jest
           .mocked(fetchNftMetadata)
           .mockResolvedValue({ imageUrl: 'x', tokenId: '1', name: 'n', description: 'd', rarity: 'common' } as any)
@@ -2001,6 +2030,93 @@ describe('RequestPage', () => {
       it('should show the branded gift confirmation view', async () => {
         renderRequestPage()
         expect(await screen.findByTestId('transfer-confirm')).toBeInTheDocument()
+      })
+
+      it('should judge the fetched simulation against the decoded transfer for the connected signer', async () => {
+        renderRequestPage()
+        await screen.findByTestId('transfer-confirm')
+
+        expect(mockIsExactNftTransferSimulation).toHaveBeenCalledWith(exactGiftSimulation, '0xabc123', '0xcollection', {
+          fromAddress: '0xabc123',
+          tokenId: '1',
+          toAddress: '0xrecipient'
+        })
+      })
+
+      describe('and the simulation is still running', () => {
+        let resolveSimulation: (result: unknown) => void
+
+        beforeEach(() => {
+          resolveSimulation = () => undefined
+          mockSimulateTransaction.mockImplementationOnce(
+            () =>
+              new Promise(resolve => {
+                resolveSimulation = resolve
+              })
+          )
+        })
+
+        it('should show the generic review with the preview loading rather than the branded view or a bare spinner', async () => {
+          renderRequestPage()
+          const review = await screen.findByTestId('wallet-interaction')
+          expect(review).toHaveAttribute('data-sim', 'loading')
+          expect(screen.queryByTestId('transfer-confirm')).not.toBeInTheDocument()
+        })
+
+        it('should upgrade to the branded view only once the simulation matches the gift', async () => {
+          renderRequestPage()
+          await screen.findByTestId('wallet-interaction')
+          resolveSimulation(exactGiftSimulation)
+          expect(await screen.findByTestId('transfer-confirm')).toBeInTheDocument()
+        })
+
+        it('should keep the denial when the user denies before the simulation matches', async () => {
+          mockSendFailedOutcome.mockResolvedValue({})
+          renderRequestPage()
+          await userEvent.click(await screen.findByTestId('wallet-interaction-deny'))
+          await screen.findByTestId('denied-wallet-interaction')
+          resolveSimulation(exactGiftSimulation)
+          await waitFor(() => expect(mockIsExactNftTransferSimulation).not.toHaveBeenCalled())
+          expect(screen.getByTestId('denied-wallet-interaction')).toBeInTheDocument()
+          expect(screen.queryByTestId('transfer-confirm')).not.toBeInTheDocument()
+        })
+      })
+
+      describe('and the receiver callback produces additional asset effects', () => {
+        beforeEach(() => {
+          mockIsExactNftTransferSimulation.mockReturnValue(false)
+        })
+
+        it('should fall back to the generic simulation summary', async () => {
+          renderRequestPage()
+
+          expect(await screen.findByTestId('wallet-interaction')).toHaveAttribute('data-sim', 'ready')
+        })
+
+        it('should not hide the additional effects behind the branded view', async () => {
+          renderRequestPage()
+          await screen.findByTestId('wallet-interaction')
+
+          expect(screen.queryByTestId('transfer-confirm')).not.toBeInTheDocument()
+        })
+      })
+
+      describe('and the transfer cannot be simulated', () => {
+        beforeEach(() => {
+          mockSimulateTransaction.mockRejectedValue(new Error('simulation unavailable'))
+        })
+
+        it('should fall back to the generic review', async () => {
+          renderRequestPage()
+
+          expect(await screen.findByTestId('wallet-interaction')).toHaveAttribute('data-sim', 'unavailable')
+        })
+
+        it('should require acknowledgment before the unpreviewed transfer can continue', async () => {
+          renderRequestPage()
+
+          expect(await screen.findByTestId('wallet-interaction')).toHaveAttribute('data-requires-acknowledgment', 'true')
+        })
       })
 
       describe('and the token metadata cannot be fetched', () => {
@@ -2016,8 +2132,15 @@ describe('RequestPage', () => {
 
         it('should still preview the transaction so approval is not a bare confirm', async () => {
           renderRequestPage()
-          await screen.findByTestId('wallet-interaction')
-          await waitFor(() => expect(mockSimulateTransaction).toHaveBeenCalled())
+          const review = await screen.findByTestId('wallet-interaction')
+          await waitFor(() => expect(review).toHaveAttribute('data-sim', 'ready'))
+        })
+
+        it('should reuse the simulation already shown instead of running it again', async () => {
+          renderRequestPage()
+          const review = await screen.findByTestId('wallet-interaction')
+          await waitFor(() => expect(review).toHaveAttribute('data-sim', 'ready'))
+          expect(mockSimulateTransaction).toHaveBeenCalledTimes(1)
         })
       })
     })
@@ -2068,7 +2191,7 @@ describe('RequestPage', () => {
       mockGetChainId.mockResolvedValue(1)
       mockEstimateFeesPerGas.mockResolvedValue({ gasPrice: BigInt(1) })
       mockEstimateGas.mockResolvedValue(BigInt(1))
-      jest.mocked(decodeNftTransferData).mockReturnValue({ tokenId: '1', toAddress: '0xrecipient' })
+      jest.mocked(decodeNftTransferData).mockReturnValue({ fromAddress: '0xabc123', tokenId: '1', toAddress: '0xrecipient' })
       jest.mocked(fetchProfile).mockResolvedValue(null)
       jest.mocked(fetchNftMetadata).mockResolvedValue({ imageUrl: 'x', tokenId: '1', name: 'n', description: 'd', rarity: 'common' } as any)
     })
@@ -2082,11 +2205,62 @@ describe('RequestPage', () => {
     describe('and the target is a verified Decentraland collection', () => {
       beforeEach(() => {
         mockCheckMetaTransactionSupport.mockResolvedValue({ willUseMetaTransaction: true, contractName: 'ERC721CollectionV2' })
+        mockSimulateTransaction.mockResolvedValue(exactGiftSimulation)
       })
 
       it('should show the branded gift confirmation view', async () => {
         renderRequestPage()
         expect(await screen.findByTestId('transfer-confirm')).toBeInTheDocument()
+      })
+
+      it('should judge the fetched simulation against the decoded transfer for the connected signer', async () => {
+        renderRequestPage()
+        await screen.findByTestId('transfer-confirm')
+
+        expect(mockIsExactNftTransferSimulation).toHaveBeenCalledWith(exactGiftSimulation, '0xabc123', '0xcollection', {
+          fromAddress: '0xabc123',
+          tokenId: '1',
+          toAddress: '0xrecipient'
+        })
+      })
+
+      describe('and the simulation is still running', () => {
+        let resolveSimulation: (result: unknown) => void
+
+        beforeEach(() => {
+          resolveSimulation = () => undefined
+          mockSimulateTransaction.mockImplementationOnce(
+            () =>
+              new Promise(resolve => {
+                resolveSimulation = resolve
+              })
+          )
+        })
+
+        it('should show the generic review with the preview loading rather than the branded view or a bare spinner', async () => {
+          renderRequestPage()
+          const review = await screen.findByTestId('wallet-interaction')
+          expect(review).toHaveAttribute('data-sim', 'loading')
+          expect(screen.queryByTestId('transfer-confirm')).not.toBeInTheDocument()
+        })
+
+        it('should upgrade to the branded view only once the simulation matches the gift', async () => {
+          renderRequestPage()
+          await screen.findByTestId('wallet-interaction')
+          resolveSimulation(exactGiftSimulation)
+          expect(await screen.findByTestId('transfer-confirm')).toBeInTheDocument()
+        })
+
+        it('should keep the denial when the user denies before the simulation matches', async () => {
+          mockSendFailedOutcome.mockResolvedValue({})
+          renderRequestPage()
+          await userEvent.click(await screen.findByTestId('wallet-interaction-deny'))
+          await screen.findByTestId('denied-wallet-interaction')
+          resolveSimulation(exactGiftSimulation)
+          await waitFor(() => expect(mockIsExactNftTransferSimulation).not.toHaveBeenCalled())
+          expect(screen.getByTestId('denied-wallet-interaction')).toBeInTheDocument()
+          expect(screen.queryByTestId('transfer-confirm')).not.toBeInTheDocument()
+        })
       })
     })
 
