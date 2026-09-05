@@ -12,6 +12,7 @@ interface TrackingData {
   eth_address?: string
   type?: string
   authRequestId?: string
+  requestId?: string
   reason?: string
   feature?: string
   account?: string
