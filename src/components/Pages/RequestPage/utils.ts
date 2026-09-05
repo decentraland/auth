@@ -8,6 +8,7 @@ import { config } from '../../../modules/config'
 import {
   MetaTransactionTypedData,
   SimulationRequestBody,
+  SimulationResponseBody,
   buildMetaTransactionSimulationPayload,
   isMetaTransactionTypedData,
   resolveMetaTransactionTypedData
@@ -464,15 +465,14 @@ async function checkMetaTransactionSupport(
 const NFT_TRANSFER_FUNCTIONS = new Set(['transferFrom', 'safeTransferFrom'])
 
 /**
- * Decodes an ERC-721 transfer to extract the sender, the recipient and the token id. Only
- * `transferFrom` and `safeTransferFrom` qualify: the branded gift view previews exactly those, so any
- * other call, even one that decodes with the same ABI, is left to the generic review and its simulation.
+ * Decodes an ERC-721 transfer to extract the sender, the recipient and the token id. Only `transferFrom` and
+ * `safeTransferFrom` qualify: the branded gift view previews exactly those, so any other call, even one
+ * that decodes with the same ABI, is left to the generic review and its simulation.
  * @param data The transaction data
  * @param contractABI The contract ABI to use for decoding
- * @returns Object containing tokenId, fromAddress and toAddress, or null when the data is not a
- * single-token transfer
+ * @returns The transfer source, destination and token id, or null when the data is not a single-token transfer
  */
-function decodeNftTransferData(data: string, contractABI: object[]): { tokenId: string; fromAddress: string; toAddress: string } | null {
+function decodeNftTransferData(data: string, contractABI: object[]): { fromAddress: string; tokenId: string; toAddress: string } | null {
   try {
     if (!data || data.length < 10) return null
 
@@ -494,11 +494,64 @@ function decodeNftTransferData(data: string, contractABI: object[]): { tokenId: 
       return null
     }
 
-    return { tokenId: tokenId.toString(), fromAddress, toAddress }
+    return { fromAddress, tokenId: tokenId.toString(), toAddress }
   } catch (error) {
     console.error('Error decoding NFT transfer data:', error)
     return null
   }
+}
+
+/** Whether two token ids name the same token, whatever notation each side uses (decimal, hex). */
+function isSameTokenId(left: string | null, right: string): boolean {
+  if (left === null) {
+    return false
+  }
+  try {
+    return BigInt(left) === BigInt(right)
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Whether a simulation shows the branded NFT view to describe every visible effect of the transaction.
+ * `safeTransferFrom` can invoke an arbitrary receiver callback, so recognizing the collection and the
+ * selector is not enough: any additional transfer, approval, or event from a contract other than the
+ * collection must use the generic summary instead of being hidden behind the specialized gift screen.
+ * A receiver acting on a permission it already holds emits only its own events, which is why those are
+ * judged too. Net dollar changes are not: the token leaving the account is one, and it is expected.
+ *
+ * The token id is compared numerically because the two sides come from different sources: the decoder
+ * prints the calldata's uint256 in decimal, while the preview server passes the simulator's notation
+ * through. A notation difference must not silently hide the gift view for every transfer.
+ */
+function isExactNftTransferSimulation(
+  result: SimulationResponseBody,
+  signerAddress: string,
+  contractAddress: string,
+  transfer: { fromAddress: string; tokenId: string; toAddress: string }
+): boolean {
+  const signer = signerAddress.toLowerCase()
+  const collection = contractAddress.toLowerCase()
+  if (
+    result.status !== 'success' ||
+    transfer.fromAddress.toLowerCase() !== signer ||
+    result.assetChanges.length !== 1 ||
+    result.approvalChanges.length !== 0 ||
+    (result.events ?? []).some(event => event.address.toLowerCase() !== collection)
+  ) {
+    return false
+  }
+
+  const [change] = result.assetChanges
+  return (
+    change.type === 'transfer' &&
+    change.standard === 'erc721' &&
+    change.from?.toLowerCase() === signer &&
+    change.to?.toLowerCase() === transfer.toAddress.toLowerCase() &&
+    change.contractAddress?.toLowerCase() === collection &&
+    isSameTokenId(change.tokenId, transfer.tokenId)
+  )
 }
 
 // The factories every Decentraland collection on the meta-transaction chain was deployed through. Not
@@ -841,6 +894,7 @@ export {
   getMetaTransactionChainId,
   checkMetaTransactionSupport,
   decodeNftTransferData,
+  isExactNftTransferSimulation,
   decodeManaTransferData,
   fetchNftMetadata,
   fetchPlaceByCreatorAddress,
