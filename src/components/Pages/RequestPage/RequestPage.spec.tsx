@@ -214,6 +214,7 @@ const mockIsOpaqueSignatureMessage = jest.fn()
 const mockCheckMetaTransactionSupport = jest.fn()
 const mockIsKnownDecentralandContractOnChain = jest.fn()
 const mockIsDecentralandContractAddress = jest.fn()
+const mockIsDecentralandCollection = jest.fn()
 const mockIsApprovalGrantingTypedData = jest.fn()
 jest.mock('./utils', () => ({
   checkMetaTransactionSupport: (...args: any[]) => mockCheckMetaTransactionSupport(...args),
@@ -229,6 +230,7 @@ jest.mock('./utils', () => ({
   isSignatureMethod: (...args: any[]) => mockIsSignatureMethod(...args),
   isKnownDecentralandContractOnChain: (...args: any[]) => mockIsKnownDecentralandContractOnChain(...args),
   isDecentralandContractAddress: (...args: any[]) => mockIsDecentralandContractAddress(...args),
+  isDecentralandCollection: (...args: any[]) => mockIsDecentralandCollection(...args),
   isApprovalGrantingTypedData: (...args: any[]) => mockIsApprovalGrantingTypedData(...args),
   extractSignaturePayload: (...args: any[]) => mockExtractSignaturePayload(...args),
   decodeMetaTransactionTypedData: (...args: any[]) => mockDecodeMetaTransactionTypedData(...args),
@@ -295,6 +297,7 @@ describe('RequestPage', () => {
     )
     mockIsKnownDecentralandContractOnChain.mockReturnValue(false)
     mockIsDecentralandContractAddress.mockResolvedValue(false)
+    mockIsDecentralandCollection.mockResolvedValue(false)
     mockIsApprovalGrantingTypedData.mockReturnValue(false)
     mockIsOpaqueSignatureMessage.mockReturnValue(false)
     mockExtractSignaturePayload.mockReturnValue({ kind: 'message', message: 'hello' })
@@ -1798,13 +1801,14 @@ describe('RequestPage', () => {
       mockGetChainId.mockResolvedValue(1)
       mockEstimateFeesPerGas.mockResolvedValue({ gasPrice: BigInt(1) })
       mockEstimateGas.mockResolvedValue(BigInt(1))
-      jest.mocked(decodeNftTransferData).mockReturnValue({ tokenId: '1', toAddress: '0xrecipient' })
+      jest.mocked(decodeNftTransferData).mockReturnValue({ tokenId: '1', fromAddress: '0xabc123', toAddress: '0xrecipient' })
       jest.mocked(fetchProfile).mockResolvedValue(null)
     })
 
     describe('and the target is a verified Decentraland collection', () => {
       beforeEach(() => {
         mockCheckMetaTransactionSupport.mockResolvedValue({ willUseMetaTransaction: true, contractName: 'ERC721CollectionV2' })
+        mockIsDecentralandCollection.mockResolvedValue(true)
         jest
           .mocked(fetchNftMetadata)
           .mockResolvedValue({ imageUrl: 'x', tokenId: '1', name: 'n', description: 'd', rarity: 'common' } as any)
@@ -1863,6 +1867,60 @@ describe('RequestPage', () => {
         expect(fetchNftMetadata).not.toHaveBeenCalled()
       })
     })
+
+    describe('and the relay vouches for the contract but no collection factory deployed it', () => {
+      beforeEach(() => {
+        // The transactions server vouches for every contract in its address book, not only collections,
+        // and the page labels every such answer a collection. Only the chain knows.
+        mockCheckMetaTransactionSupport.mockResolvedValue({ willUseMetaTransaction: true, contractName: 'ERC721CollectionV2' })
+        mockIsDecentralandCollection.mockResolvedValue(false)
+      })
+
+      it('should fall through to the generic review instead of the branded gift view', async () => {
+        renderRequestPage()
+        expect(await screen.findByTestId('wallet-interaction')).toBeInTheDocument()
+        expect(screen.queryByTestId('transfer-confirm')).not.toBeInTheDocument()
+      })
+
+      it('should not fetch token metadata from it', async () => {
+        renderRequestPage()
+        await screen.findByTestId('wallet-interaction')
+        expect(fetchNftMetadata).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and the token is leaving another account the user operates for', () => {
+      beforeEach(() => {
+        mockCheckMetaTransactionSupport.mockResolvedValue({ willUseMetaTransaction: true, contractName: 'ERC721CollectionV2' })
+        mockIsDecentralandCollection.mockResolvedValue(true)
+        jest.mocked(decodeNftTransferData).mockReturnValue({ tokenId: '1', fromAddress: '0xsomeoneelse', toAddress: '0xrecipient' })
+      })
+
+      it("should fall through to the generic review instead of presenting it as the user's own gift", async () => {
+        renderRequestPage()
+        expect(await screen.findByTestId('wallet-interaction')).toBeInTheDocument()
+        expect(screen.queryByTestId('transfer-confirm')).not.toBeInTheDocument()
+      })
+    })
+
+    describe('and the collection lookup fails', () => {
+      beforeEach(() => {
+        mockCheckMetaTransactionSupport.mockResolvedValue({ willUseMetaTransaction: true, contractName: 'ERC721CollectionV2' })
+        mockIsDecentralandCollection.mockRejectedValue(new Error('rpc down'))
+      })
+
+      it('should fall through to the generic review instead of the branded gift view', async () => {
+        renderRequestPage()
+        expect(await screen.findByTestId('wallet-interaction')).toBeInTheDocument()
+        expect(screen.queryByTestId('transfer-confirm')).not.toBeInTheDocument()
+      })
+
+      it('should still preview the transaction so approval is not a bare confirm', async () => {
+        renderRequestPage()
+        await screen.findByTestId('wallet-interaction')
+        await waitFor(() => expect(mockSimulateTransaction).toHaveBeenCalled())
+      })
+    })
   })
 
   describe('when an external (web3) wallet receives an NFT transfer', () => {
@@ -1880,7 +1938,7 @@ describe('RequestPage', () => {
       mockGetChainId.mockResolvedValue(1)
       mockEstimateFeesPerGas.mockResolvedValue({ gasPrice: BigInt(1) })
       mockEstimateGas.mockResolvedValue(BigInt(1))
-      jest.mocked(decodeNftTransferData).mockReturnValue({ tokenId: '1', toAddress: '0xrecipient' })
+      jest.mocked(decodeNftTransferData).mockReturnValue({ tokenId: '1', fromAddress: '0xabc123', toAddress: '0xrecipient' })
       jest.mocked(fetchProfile).mockResolvedValue(null)
       jest.mocked(fetchNftMetadata).mockResolvedValue({ imageUrl: 'x', tokenId: '1', name: 'n', description: 'd', rarity: 'common' } as any)
     })
@@ -1894,6 +1952,7 @@ describe('RequestPage', () => {
     describe('and the target is a verified Decentraland collection', () => {
       beforeEach(() => {
         mockCheckMetaTransactionSupport.mockResolvedValue({ willUseMetaTransaction: true, contractName: 'ERC721CollectionV2' })
+        mockIsDecentralandCollection.mockResolvedValue(true)
       })
 
       it('should show the branded gift confirmation view', async () => {

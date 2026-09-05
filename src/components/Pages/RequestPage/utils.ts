@@ -451,14 +451,15 @@ async function checkMetaTransactionSupport(
 const NFT_TRANSFER_FUNCTIONS = new Set(['transferFrom', 'safeTransferFrom'])
 
 /**
- * Decodes an ERC-721 transfer to extract the recipient and the token id. Only `transferFrom` and
- * `safeTransferFrom` qualify: the branded gift view previews exactly those, so any other call, even one
- * that decodes with the same ABI, is left to the generic review and its simulation.
+ * Decodes an ERC-721 transfer to extract the sender, the recipient and the token id. Only
+ * `transferFrom` and `safeTransferFrom` qualify: the branded gift view previews exactly those, so any
+ * other call, even one that decodes with the same ABI, is left to the generic review and its simulation.
  * @param data The transaction data
  * @param contractABI The contract ABI to use for decoding
- * @returns Object containing tokenId and toAddress, or null when the data is not a single-token transfer
+ * @returns Object containing tokenId, fromAddress and toAddress, or null when the data is not a
+ * single-token transfer
  */
-function decodeNftTransferData(data: string, contractABI: object[]): { tokenId: string; toAddress: string } | null {
+function decodeNftTransferData(data: string, contractABI: object[]): { tokenId: string; fromAddress: string; toAddress: string } | null {
   try {
     if (!data || data.length < 10) return null
 
@@ -474,17 +475,63 @@ function decodeNftTransferData(data: string, contractABI: object[]): { tokenId: 
     // transferFrom(address from, address to, uint256 tokenId)
     // safeTransferFrom(address from, address to, uint256 tokenId)
     // safeTransferFrom(address from, address to, uint256 tokenId, bytes data)
-    const [, toAddress, tokenId] = args ?? []
-    if (typeof toAddress !== 'string' || typeof tokenId !== 'bigint') {
+    const [fromAddress, toAddress, tokenId] = args ?? []
+    if (typeof fromAddress !== 'string' || typeof toAddress !== 'string' || typeof tokenId !== 'bigint') {
       console.error('Failed to decode transaction data')
       return null
     }
 
-    return { tokenId: tokenId.toString(), toAddress }
+    return { tokenId: tokenId.toString(), fromAddress, toAddress }
   } catch (error) {
     console.error('Error decoding NFT transfer data:', error)
     return null
   }
+}
+
+// The factories every Decentraland collection on the meta-transaction chain was deployed through. Not
+// every generation exists on every chain (Amoy only has the V3 factory), so the ones missing from the
+// registry are skipped.
+const COLLECTION_FACTORIES = [ContractName.CollectionFactory, ContractName.CollectionFactoryV3]
+
+/**
+ * Whether a contract is a Decentraland collection: one of the collection factories on the
+ * meta-transaction chain records having deployed it, answered by the chain itself with a read-only call.
+ *
+ * Asking the transactions server whether it would relay the address is not the same question — it
+ * vouches for every Decentraland contract in its address book, not only collections — and the branded
+ * gift view needs the exact answer: it presents the call as one collection token moving and nothing
+ * else, which only Decentraland's collection code guarantees.
+ * @param contractAddress The contract the transaction targets
+ * @returns true when a factory deployed it; false when none did, or none exists on this chain
+ * @throws when the chain could not be asked, so an outage is never read as a verdict
+ */
+async function isDecentralandCollection(contractAddress: string): Promise<boolean> {
+  const chainId = getMetaTransactionChainId()
+  const factories = COLLECTION_FACTORIES.flatMap(name => {
+    try {
+      return [getContract(name, chainId)]
+    } catch {
+      return []
+    }
+  })
+  if (factories.length === 0) {
+    return false
+  }
+
+  const networkProvider = await getNetworkProvider(chainId)
+  const publicClient = createPublicClient({ transport: custom(networkProvider) })
+  const answers = await Promise.all(
+    factories.map(
+      factory =>
+        publicClient.readContract({
+          address: factory.address as `0x${string}`,
+          abi: factory.abi as readonly unknown[],
+          functionName: 'isCollectionFromFactory',
+          args: [contractAddress]
+        }) as Promise<boolean>
+    )
+  )
+  return answers.some(answer => answer === true)
 }
 
 /**
@@ -703,6 +750,7 @@ export {
   getConnectedProvider,
   getNetworkProvider,
   isDecentralandContractAddress,
+  isDecentralandCollection,
   isApprovalGrantingTypedData,
   getMetaTransactionChainId,
   checkMetaTransactionSupport,

@@ -25,6 +25,7 @@ import {
   getNetworkProvider,
   getSigninDeeplink,
   isApprovalGrantingTypedData,
+  isDecentralandCollection,
   isDecentralandContractAddress,
   isKnownDecentralandContractOnChain,
   isOpaqueSignatureMessage,
@@ -377,10 +378,11 @@ describe('when testing decodeNftTransferData', () => {
       })
     })
 
-    it('should return the tokenId and toAddress', () => {
+    it('should return the tokenId, fromAddress and toAddress', () => {
       const result = decodeNftTransferData(transactionData, contractABI)
       expect(result).toEqual({
         tokenId: '123',
+        fromAddress: '0xfrom',
         toAddress: '0xto'
       })
     })
@@ -430,9 +432,9 @@ describe('when testing decodeNftTransferData', () => {
       })
     })
 
-    it('should return the tokenId and toAddress', () => {
+    it('should return the tokenId, fromAddress and toAddress', () => {
       const result = decodeNftTransferData(transactionData, contractABI)
-      expect(result).toEqual({ tokenId: '9', toAddress: '0xto' })
+      expect(result).toEqual({ tokenId: '9', fromAddress: '0xfrom', toAddress: '0xto' })
     })
   })
 
@@ -463,6 +465,20 @@ describe('when testing decodeNftTransferData', () => {
     })
 
     it('should return null instead of presenting it as a gift', () => {
+      const result = decodeNftTransferData(transactionData, contractABI)
+      expect(result).toBeNull()
+    })
+  })
+
+  describe('and a transfer decodes with a sender that is not an address', () => {
+    beforeEach(() => {
+      jest.mocked(decodeFunctionData).mockReturnValueOnce({
+        functionName: 'transferFrom',
+        args: [BigInt(7), '0xto', BigInt(9)]
+      })
+    })
+
+    it('should return null', () => {
       const result = decodeNftTransferData(transactionData, contractABI)
       expect(result).toBeNull()
     })
@@ -658,6 +674,78 @@ describe('when testing decodeManaTransferData', () => {
         manaAmount: '1000.0',
         toAddress: '0xabcdef1234567890abcdef1234567890abcdef12'
       })
+    })
+  })
+})
+
+describe('when testing isDecentralandCollection', () => {
+  let contractAddress: string
+  let mockNetworkProvider: any
+  let mockReadContract: jest.Mock
+
+  beforeEach(() => {
+    contractAddress = '0xcollection'
+    jest.mocked(config.get).mockReturnValue('production')
+    jest.mocked(getContract).mockImplementation((name: string) => ({ address: `0xfactory-${name}`, abi: [] }) as any)
+    mockNetworkProvider = { isNetworkProvider: true }
+    jest.mocked(connection.getProvider).mockRejectedValue(new Error('Not connected'))
+    jest.mocked(connection.tryPreviousConnection).mockRejectedValue(new Error('No previous'))
+    jest.mocked(connection.createProvider).mockReturnValue(mockNetworkProvider)
+    mockReadContract = jest.fn()
+    jest.mocked(createPublicClient).mockReturnValue({ readContract: mockReadContract } as any)
+  })
+
+  afterEach(() => {
+    jest.resetAllMocks()
+  })
+
+  describe('and one of the collection factories deployed the contract', () => {
+    beforeEach(() => {
+      mockReadContract.mockResolvedValueOnce(false).mockResolvedValueOnce(true)
+    })
+
+    it('should return true', async () => {
+      await expect(isDecentralandCollection(contractAddress)).resolves.toBe(true)
+    })
+
+    it('should ask each factory whether it deployed that contract', async () => {
+      await isDecentralandCollection(contractAddress)
+      expect(mockReadContract).toHaveBeenCalledWith(
+        expect.objectContaining({ functionName: 'isCollectionFromFactory', args: [contractAddress] })
+      )
+    })
+  })
+
+  describe('and no collection factory deployed the contract', () => {
+    beforeEach(() => {
+      mockReadContract.mockResolvedValue(false)
+    })
+
+    it('should return false', async () => {
+      await expect(isDecentralandCollection(contractAddress)).resolves.toBe(false)
+    })
+  })
+
+  describe('and the chain cannot be asked', () => {
+    beforeEach(() => {
+      mockReadContract.mockRejectedValue(new Error('rpc down'))
+    })
+
+    it('should throw instead of answering, so an outage is not read as a verdict', async () => {
+      await expect(isDecentralandCollection(contractAddress)).rejects.toThrow('rpc down')
+    })
+  })
+
+  describe('and no collection factory exists on the meta-transaction chain', () => {
+    beforeEach(() => {
+      jest.mocked(getContract).mockImplementation(() => {
+        throw new Error('not deployed')
+      })
+    })
+
+    it('should return false without asking the chain', async () => {
+      await expect(isDecentralandCollection(contractAddress)).resolves.toBe(false)
+      expect(mockReadContract).not.toHaveBeenCalled()
     })
   })
 })

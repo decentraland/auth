@@ -72,6 +72,7 @@ import {
   getNetworkProvider,
   getSigninDeeplink,
   isApprovalGrantingTypedData,
+  isDecentralandCollection,
   isKnownDecentralandContractOnChain,
   isOpaqueSignatureMessage,
   isSignatureMethod
@@ -678,11 +679,19 @@ export const RequestPage = () => {
                     const nftContractCheck = await checkMetaTransactionSupport(contractAddress)
                     if (cancelled) return
                     metaTxCheckRef.current = { address: contractAddress.toLowerCase(), ...nftContractCheck }
-                    // Relayed is not enough: MANA and the marketplaces are relayed too, and an ERC-20
-                    // transferFrom shares the ERC-721 selector, so a transfer aimed at one of them would
-                    // decode like a gift. Only a collection is one.
+                    // The branded view claims exactly one thing: the connected account's token #X goes to Y,
+                    // gas covered. Two facts make that claim hold without a simulation. The relay check says
+                    // gas is covered, but it is not proof of a collection: the transactions server also
+                    // vouches for every contract in its address book, and an ERC-20 transferFrom shares the
+                    // ERC-721 selector, so a transfer aimed at MANA decodes like a gift. The chain itself says
+                    // whether a collection factory deployed the contract, and only Decentraland's collection
+                    // code guarantees that a transfer moves one token and nothing else. And the token must be
+                    // leaving the connected account, not one it merely operates for. Anything else takes the
+                    // generic review and its simulation; so does a failing factory lookup, through the catch.
+                    const isOwnTransfer = transferData.fromAddress.toLowerCase() === signerAddress.toLowerCase()
                     const isVerifiedCollection =
-                      nftContractCheck.willUseMetaTransaction && nftContractCheck.contractName === ContractName.ERC721CollectionV2
+                      nftContractCheck.willUseMetaTransaction && isOwnTransfer && (await isDecentralandCollection(contractAddress))
+                    if (cancelled) return
 
                     if (isVerifiedCollection) {
                       const [metadata, recipientProfile] = await Promise.all([
