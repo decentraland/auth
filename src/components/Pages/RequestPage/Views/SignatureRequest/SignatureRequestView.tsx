@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from '@dcl/hooks'
 import { Box, Button, Checkbox, CircularProgress, FormControlLabel } from 'decentraland-ui2'
 import { getPreviewFingerprint, hasNoVisibleEffects } from '../../../../../shared/auth'
+import { resolveTypedDataReview } from '../../../../../shared/auth/typedDataReview'
 import { getExplorerAddressUrl, getExplorerName, getNetworkName } from '../../../../../shared/explorer'
 import { Container } from '../../Container'
 import { ButtonsContainer } from '../../RequestPage.styled'
@@ -47,7 +48,15 @@ export const SignatureRequestView = ({
   // The statement the user ticked, if any (see acknowledgmentStatement below).
   const [acknowledgedStatement, setAcknowledgedStatement] = useState<string | null>(null)
 
-  const domain = payload?.kind === 'typedData' ? payload.typedData.domain : undefined
+  const { review, reviewError } = useMemo(() => {
+    if (payload?.kind !== 'typedData' || isMetaTransaction) return {}
+    try {
+      return { review: resolveTypedDataReview(payload.typedData, method) }
+    } catch (error) {
+      return { reviewError: error instanceof Error ? error.message : 'Invalid typed data' }
+    }
+  }, [payload, isMetaTransaction, method])
+  const domain = isMetaTransaction && payload?.kind === 'typedData' ? payload.typedData.domain : review?.domain
   const domainChainId = chainId ?? (domain?.chainId !== undefined ? Number(domain.chainId) : undefined)
   const contractUrl = typeof domain?.verifyingContract === 'string' ? getExplorerAddressUrl(domainChainId, domain.verifyingContract) : null
   const isReverted = simulation.status === 'ready' && simulation.result.status === 'reverted'
@@ -71,6 +80,7 @@ export const SignatureRequestView = ({
   // changes (another request, the lookup resolving to unrecognized, a different reason), ask again.
   const acknowledgmentStatement = [
     requestId,
+    review?.hash ?? '',
     isUnverifiable ? 'unverified' : 'risk',
     unverifiableReason ?? '',
     isReverted ? 'reverted' : '',
@@ -91,6 +101,8 @@ export const SignatureRequestView = ({
       <Box className={styles.description}>{t('request.signature.description')}</Box>
       <Content>
         <MethodChip>{method}</MethodChip>
+        {review ? <MethodChip>{review.primaryType}</MethodChip> : null}
+        {reviewError ? <Notice role="alert">{reviewError}</Notice> : null}
 
         {payload?.kind === 'message' ? (
           <Section>
@@ -120,7 +132,7 @@ export const SignatureRequestView = ({
           </>
         ) : null}
 
-        {payload?.kind === 'typedData' && !isMetaTransaction ? (
+        {review ? (
           <>
             {domain ? (
               <Section>
@@ -129,6 +141,14 @@ export const SignatureRequestView = ({
                     <DomainKey>{domain.name}</DomainKey>
                   </DomainRow>
                 ) : null}
+                {['version', 'salt'].map(field =>
+                  domain[field] !== undefined ? (
+                    <DomainRow key={field}>
+                      <DomainKey>{field}</DomainKey>
+                      <DomainValue>{String(domain[field])}</DomainValue>
+                    </DomainRow>
+                  ) : null
+                )}
                 {domain.chainId !== undefined ? (
                   <DomainRow>
                     <DomainKey>{t('request.signature.network')}</DomainKey>
@@ -156,7 +176,7 @@ export const SignatureRequestView = ({
             ) : null}
             <Section>
               <FieldLabel>{t('request.signature.typed_data_label')}</FieldLabel>
-              {payload.typedData.message ? <TypedDataTree data={payload.typedData.message} /> : <MessageBlock>{payload.raw}</MessageBlock>}
+              <TypedDataTree fields={review.fields} />
             </Section>
           </>
         ) : null}
@@ -198,7 +218,13 @@ export const SignatureRequestView = ({
         <Button
           variant="contained"
           color={isReverted ? 'error' : 'primary'}
-          disabled={isLoading || simulation.status === 'loading' || isContractTrustPending || (requiresAcknowledgment && !acknowledged)}
+          disabled={
+            Boolean(reviewError) ||
+            isLoading ||
+            simulation.status === 'loading' ||
+            isContractTrustPending ||
+            (requiresAcknowledgment && !acknowledged)
+          }
           onClick={onApprove}
           data-testid="signature-approve-button"
         >

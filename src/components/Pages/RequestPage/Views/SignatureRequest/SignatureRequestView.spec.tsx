@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { SimulationResponseBody } from '../../../../../shared/auth'
 import { SignaturePayload, SimulationState } from '../../types'
 import { SignatureRequestView } from './SignatureRequestView'
+import { SignatureRequestViewProps } from './SignatureRequest.types'
 
 jest.mock('@dcl/hooks', () => ({
   useTranslation: () => ({ t: (key: string) => key })
@@ -14,6 +15,86 @@ jest.mock('../../Container', () => ({
 }))
 
 const USER = '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd'
+
+describe('when reviewing a schema-bound signature', () => {
+  let props: SignatureRequestViewProps
+  let typedData: {
+    primaryType: string
+    domain: Record<string, unknown>
+    types: Record<string, { name: string; type: string }[]>
+    message: Record<string, unknown>
+  }
+
+  beforeEach(() => {
+    typedData = {
+      primaryType: 'Order',
+      domain: { name: 'Marketplace', version: '1', salt: `0x${'01'.repeat(32)}` },
+      // eslint-disable-next-line @typescript-eslint/naming-convention
+      types: { Order: [{ name: 'price', type: 'uint256' }] },
+      message: { price: '100' }
+    }
+    props = {
+      requestId: 'r1',
+      method: 'eth_signTypedData_v4',
+      payload: { kind: 'typedData', typedData, raw: JSON.stringify(typedData) },
+      simulation: { status: 'idle' },
+      userAddress: USER,
+      isMetaTransaction: false,
+      requiresAcknowledgment: true,
+      onApprove: jest.fn(),
+      onDeny: jest.fn()
+    }
+  })
+
+  afterEach(() => {
+    jest.clearAllMocks()
+  })
+
+  it('should display the signed primary type', () => {
+    render(<SignatureRequestView {...props} />)
+    expect(screen.getByText('Order')).toBeInTheDocument()
+  })
+
+  it('should display the signed domain salt', () => {
+    render(<SignatureRequestView {...props} />)
+    expect(screen.getByText(String(typedData.domain.salt))).toBeInTheDocument()
+  })
+
+  describe('and an unsigned field is supplied', () => {
+    beforeEach(() => {
+      typedData.message.description = 'Additional description'
+      render(<SignatureRequestView {...props} />)
+    })
+
+    it('should not display the unsigned text as signed content', () => {
+      expect(screen.queryByText('Additional description')).not.toBeInTheDocument()
+    })
+
+    it('should explain that the fields do not match', () => {
+      expect(screen.getByRole('alert')).toHaveTextContent('does not match its declared fields')
+    })
+
+    it('should not enable approval even after acknowledgment', async () => {
+      await userEvent.click(screen.getByRole('checkbox'))
+      expect(screen.getByRole('button', { name: 'common.allow' })).toBeDisabled()
+    })
+  })
+
+  describe('and the signed value changes after acknowledgment', () => {
+    let rerender: ReturnType<typeof render>['rerender']
+
+    beforeEach(async () => {
+      rerender = render(<SignatureRequestView {...props} />).rerender
+      await userEvent.click(screen.getByRole('checkbox'))
+      props.payload = { kind: 'typedData', typedData: { ...typedData, message: { price: '200' } }, raw: '{}' }
+      rerender(<SignatureRequestView {...props} />)
+    })
+
+    it('should require a new acknowledgment for the changed digest', () => {
+      expect(screen.getByRole('button', { name: 'common.allow' })).toBeDisabled()
+    })
+  })
+})
 
 describe('when rendering the SignatureRequestView', () => {
   let onApprove: jest.Mock
@@ -143,6 +224,8 @@ describe('when rendering the SignatureRequestView', () => {
         raw: '{}',
         typedData: {
           primaryType: 'Order',
+          // eslint-disable-next-line @typescript-eslint/naming-convention
+          types: { Order: [{ name: 'price', type: 'uint256' }] },
           domain: { name: 'Marketplace', chainId: 137, verifyingContract: '0x480a0f4e360e8964e68858dd231c2922f1df45ef' },
           message: { price: '1000000000000000000' }
         }
@@ -248,7 +331,7 @@ describe('when rendering the SignatureRequestView', () => {
           onApprove={onApprove}
         />
       )
-      expect(screen.getByText('price:')).toBeInTheDocument()
+      expect(screen.getByText('price (uint256):')).toBeInTheDocument()
     })
   })
 
