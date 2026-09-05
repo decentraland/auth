@@ -628,6 +628,9 @@ export const RequestPage = () => {
 
               // Check if this is an NFT transfer or MANA transfer by analyzing the transaction data
               const txParams = request.params?.[0] as Record<string, unknown> | undefined
+              // The simulation the gift gate already ran and showed, if any, so the generic block does
+              // not run it again when the branded lookups fail after a passing gate.
+              let giftSimulation: SimulationResponseBody | null = null
               const transactionData = txParams?.data as string | undefined
               const contractAddress = txParams?.to as string | undefined
 
@@ -687,12 +690,18 @@ export const RequestPage = () => {
                       nftContractCheck.willUseMetaTransaction && nftContractCheck.contractName === ContractName.ERC721CollectionV2
 
                     if (isVerifiedCollection) {
-                      // A recognized selector is not a complete preview: safeTransferFrom invokes
-                      // the receiver, whose callback may move other assets through existing
-                      // allowances. Simulate first and retain the branded view only when the sole
-                      // asset effect is exactly the NFT transfer shown below. Every other result
-                      // falls back to the generic summary and its acknowledgment gates.
+                      // A recognized selector is not a complete preview: safeTransferFrom invokes the
+                      // receiver, whose callback may move other assets through existing allowances.
+                      // Simulate first and keep the branded view only when the sole visible effect is
+                      // exactly the transfer it shows; anything else takes the generic summary and its
+                      // acknowledgment gates. The generic review is shown while the simulation runs, so
+                      // Deny is available and Allow is blocked from the first frame, and it is upgraded
+                      // to the branded view once the result matches. A simulation is a point-in-time run
+                      // in a frame the receiver can detect (the relayed self-call has the collection as
+                      // tx.origin, which a live execution never has), so this raises the bar rather than
+                      // proving completeness.
                       const body = txParams ? buildSendTransactionSimulationPayload(txParams, signerAddress, currentChainId, true) : null
+                      // Relayed as a meta-transaction, gas covered, whichever view ends up shown.
                       setIsMetaTransaction(true)
                       if (!body) {
                         setSimulationState({ status: 'unavailable' })
@@ -702,11 +711,14 @@ export const RequestPage = () => {
 
                       setSimulationChainId(body.chainId)
                       setSimulationState({ status: 'loading' })
+                      setView(View.WALLET_INTERACTION)
                       const simulation = await fetchSimulation(body)
-
+                      if (cancelled) return
+                      giftSimulation = simulation ?? null
+                      // The user may have answered from the generic review while the simulation ran;
+                      // their answer stands.
+                      if (hasCompletedRef.current) break
                       if (!simulation || !isExactNftTransferSimulation(simulation, signerAddress, contractAddress, transferData)) {
-                        if (cancelled) return
-                        setView(View.WALLET_INTERACTION)
                         break
                       }
 
@@ -716,6 +728,7 @@ export const RequestPage = () => {
                       ])
 
                       if (cancelled) return
+                      if (hasCompletedRef.current) break
 
                       setNftTransferData({
                         imageUrl: metadata.imageUrl,
@@ -727,10 +740,6 @@ export const RequestPage = () => {
                         rarity: metadata.rarity,
                         recipientProfile: recipientProfile || undefined
                       })
-                      // The branded gift view is only shown for a verified DCL collection, which is
-                      // relayed as a meta-transaction (gas covered). Mark it so the web2 confirm
-                      // dialog says "gas covered" instead of showing a 0-ETH cost.
-                      setIsMetaTransaction(true)
                       setView(View.WALLET_NFT_INTERACTION)
                       break
                     }
@@ -760,7 +769,10 @@ export const RequestPage = () => {
               // call does: an unlimited MANA approve or a setApprovalForAll looks like any other hex
               // blob. The preview and its acknowledgment gates therefore apply to everyone when the
               // call is relayed, and the relay decision has to be known before Allow is enabled.
-              if (contractAddress) {
+              // When the gift gate already simulated this transaction and showed the result, the branded
+              // lookups failed after it; the preview on screen is the right one, so do not run it again
+              // (a retry could fail and downgrade a preview the user has already seen).
+              if (contractAddress && !giftSimulation) {
                 setSimulationState({ status: 'loading' })
                 // Reuse the meta-transaction check if the NFT-gift gate already resolved it for this
                 // same contract (it falls through to here for non-DCL contracts), so we don't repeat

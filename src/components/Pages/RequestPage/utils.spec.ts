@@ -605,6 +605,122 @@ describe('when checking whether an NFT simulation exactly matches the branded gi
       expect(isExactNftTransferSimulation(result, signerAddress, contractAddress, transfer)).toBe(false)
     })
   })
+
+  describe('and the token goes to a recipient other than the one on screen', () => {
+    beforeEach(() => {
+      result.assetChanges[0].to = '0x0000000000000000000000000000000000000009'
+    })
+
+    it('should require the generic simulation summary', () => {
+      expect(isExactNftTransferSimulation(result, signerAddress, contractAddress, transfer)).toBe(false)
+    })
+  })
+
+  describe('and the token moves on a contract other than the one being called', () => {
+    beforeEach(() => {
+      result.assetChanges[0].contractAddress = '0x0000000000000000000000000000000000000009'
+    })
+
+    it('should require the generic simulation summary', () => {
+      expect(isExactNftTransferSimulation(result, signerAddress, contractAddress, transfer)).toBe(false)
+    })
+  })
+
+  describe('and a different token than the one on screen moves', () => {
+    beforeEach(() => {
+      result.assetChanges[0].tokenId = '8'
+    })
+
+    it('should require the generic simulation summary', () => {
+      expect(isExactNftTransferSimulation(result, signerAddress, contractAddress, transfer)).toBe(false)
+    })
+  })
+
+  describe('and the server reports the same token id in another notation', () => {
+    beforeEach(() => {
+      result.assetChanges[0].tokenId = '0x7'
+    })
+
+    it('should still allow the specialized gift view', () => {
+      expect(isExactNftTransferSimulation(result, signerAddress, contractAddress, transfer)).toBe(true)
+    })
+  })
+
+  describe('and the server reports a token id that is not a number', () => {
+    beforeEach(() => {
+      result.assetChanges[0].tokenId = 'seven'
+    })
+
+    it('should require the generic simulation summary', () => {
+      expect(isExactNftTransferSimulation(result, signerAddress, contractAddress, transfer)).toBe(false)
+    })
+  })
+
+  describe.each<['mint' | 'burn']>([['mint'], ['burn']])('and the only change is a %s rather than a transfer', type => {
+    beforeEach(() => {
+      result.assetChanges[0].type = type
+    })
+
+    it('should require the generic simulation summary', () => {
+      expect(isExactNftTransferSimulation(result, signerAddress, contractAddress, transfer)).toBe(false)
+    })
+  })
+
+  describe('and the asset is not an ERC-721 token', () => {
+    beforeEach(() => {
+      result.assetChanges[0].standard = 'erc1155'
+    })
+
+    it('should require the generic simulation summary', () => {
+      expect(isExactNftTransferSimulation(result, signerAddress, contractAddress, transfer)).toBe(false)
+    })
+  })
+
+  describe('and the receiver emitted an event of its own', () => {
+    beforeEach(() => {
+      // e.g. a receiver acting on a permission it already holds, which moves no asset but logs.
+      result.events = [
+        { name: 'Transfer', address: contractAddress },
+        { name: 'UpdateOperator', address: '0x0000000000000000000000000000000000000009' }
+      ]
+    })
+
+    it('should require the generic simulation summary', () => {
+      expect(isExactNftTransferSimulation(result, signerAddress, contractAddress, transfer)).toBe(false)
+    })
+  })
+
+  describe("and the only events are the collection's own", () => {
+    beforeEach(() => {
+      result.events = [
+        { name: 'Approval', address: contractAddress },
+        { name: 'Transfer', address: contractAddress.toUpperCase() }
+      ]
+    })
+
+    it('should allow the specialized gift view', () => {
+      expect(isExactNftTransferSimulation(result, signerAddress, contractAddress, transfer)).toBe(true)
+    })
+  })
+
+  describe('and the addresses only differ in casing between the calldata and the simulation', () => {
+    beforeEach(() => {
+      // The decoder returns EIP-55 checksummed addresses; the preview server lowercases.
+      signerAddress = '0x0000000000000000000000000000000000000AbC'
+      contractAddress = '0x0000000000000000000000000000000000000DeF'
+      transfer = { fromAddress: signerAddress, tokenId: '7', toAddress: '0x0000000000000000000000000000000000000FeD' }
+      result.assetChanges[0] = {
+        ...result.assetChanges[0],
+        from: signerAddress.toLowerCase(),
+        to: transfer.toAddress.toLowerCase(),
+        contractAddress: contractAddress.toLowerCase()
+      }
+    })
+
+    it('should allow the specialized gift view', () => {
+      expect(isExactNftTransferSimulation(result, signerAddress, contractAddress, transfer)).toBe(true)
+    })
+  })
 })
 
 describe('when testing decodeManaTransferData', () => {
