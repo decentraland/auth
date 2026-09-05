@@ -74,6 +74,7 @@ import {
   isApprovalGrantingTypedData,
   isDecentralandCollection,
   isKnownDecentralandContractOnChain,
+  isNftOwnedBy,
   isOpaqueSignatureMessage,
   isSignatureMethod
 } from './utils'
@@ -676,22 +677,29 @@ export const RequestPage = () => {
                     // know. Anything else falls through to the generic review. The result is cached in
                     // metaTxCheckRef so the generic fall-through and the approve path don't repeat the (networked)
                     // lookup for the same contract.
-                    const nftContractCheck = await checkMetaTransactionSupport(contractAddress)
-                    if (cancelled) return
-                    metaTxCheckRef.current = { address: contractAddress.toLowerCase(), ...nftContractCheck }
                     // The branded view claims exactly one thing: the connected account's token #X goes to Y,
-                    // gas covered. Two facts make that claim hold without a simulation. The relay check says
-                    // gas is covered, but it is not proof of a collection: the transactions server also
+                    // gas covered. Three facts make that claim hold without a simulation. The relay check
+                    // says gas is covered, but it is not proof of a collection: the transactions server also
                     // vouches for every contract in its address book, and an ERC-20 transferFrom shares the
                     // ERC-721 selector, so a transfer aimed at MANA decodes like a gift. The chain itself says
                     // whether a collection factory deployed the contract, and only Decentraland's collection
-                    // code guarantees that a transfer moves one token and nothing else. And the token must be
-                    // leaving the connected account, not one it merely operates for. Anything else takes the
-                    // generic review and its simulation; so does a failing factory lookup, through the catch.
+                    // code guarantees that a transfer moves one token and nothing else. And the token must
+                    // be the connected account's: the calldata's `from` says who the requester claims holds
+                    // it, the chain says who does. Provenance and ownership are read through Decentraland's
+                    // RPC, never the wallet's, and all three lookups run together so a slow answer costs one
+                    // wait. Anything else takes the generic review and its simulation; so does a failing
+                    // lookup, through the catch.
                     const isOwnTransfer = transferData.fromAddress.toLowerCase() === signerAddress.toLowerCase()
-                    const isVerifiedCollection =
-                      nftContractCheck.willUseMetaTransaction && isOwnTransfer && (await isDecentralandCollection(contractAddress))
+                    const [nftContractCheck, isCollection, isHeldBySigner] = await Promise.all([
+                      checkMetaTransactionSupport(contractAddress),
+                      isOwnTransfer ? isDecentralandCollection(contractAddress) : Promise.resolve(false),
+                      isOwnTransfer
+                        ? isNftOwnedBy(contractAddress, contract.abi, transferData.tokenId, signerAddress)
+                        : Promise.resolve(false)
+                    ])
                     if (cancelled) return
+                    metaTxCheckRef.current = { address: contractAddress.toLowerCase(), ...nftContractCheck }
+                    const isVerifiedCollection = nftContractCheck.willUseMetaTransaction && isOwnTransfer && isCollection && isHeldBySigner
 
                     if (isVerifiedCollection) {
                       const [metadata, recipientProfile] = await Promise.all([
