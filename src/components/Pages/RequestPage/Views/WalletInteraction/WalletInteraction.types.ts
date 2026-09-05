@@ -24,6 +24,11 @@ export interface WalletInteractionProps {
   balance?: bigint
   /** True when the simulation predicts the transaction would revert. */
   isReverted?: boolean
+  /**
+   * True when this review replaced one that was invalidated because the wallet's network changed or
+   * could not be verified. Shown as a notice so the user knows why the page reloaded.
+   */
+  reviewRestarted?: boolean
   onDeny: () => void
   onApprove: () => void
 }

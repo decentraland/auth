@@ -8,7 +8,7 @@ import { ButtonsContainer } from '../../RequestPage.styled'
 import { SimulationSummary } from '../SimulationSummary'
 import styles from '../Views.module.css'
 import { WalletInteractionProps } from './WalletInteraction.types'
-import { PreviewUnavailableWarning, SummaryBody } from './WalletInteraction.styled'
+import { PreviewUnavailableWarning, ReviewRestartedNotice, SummaryBody } from './WalletInteraction.styled'
 
 export const WalletInteraction = ({
   requestId,
@@ -25,6 +25,7 @@ export const WalletInteraction = ({
   transactionCost = BigInt(0),
   balance = BigInt(0),
   isReverted = false,
+  reviewRestarted = false,
   onDeny,
   onApprove
 }: WalletInteractionProps) => {
@@ -73,6 +74,11 @@ export const WalletInteraction = ({
             gas={{ covered: gasCovered, cost: formatEther(transactionCost), balance: formatEther(balance) }}
           />
         </SummaryBody>
+        {reviewRestarted ? (
+          <ReviewRestartedNotice severity="info" role="status" data-testid="review-restarted-notice">
+            {t('request.wallet_interaction.review_restarted_notice')}
+          </ReviewRestartedNotice>
+        ) : null}
         {isPreviewUnavailable ? (
           <PreviewUnavailableWarning severity="warning" role="alert" data-testid="preview-unavailable-warning">
             {t('request.wallet_interaction.preview_unavailable_warning')}
@@ -121,6 +127,11 @@ export const WalletInteraction = ({
         {isWeb2Wallet ? t('request.wallet_interaction.title_web2') : t('request.wallet_interaction.title_web3', { explorerText })}
       </Box>
       <Box className={styles.description}>{t('request.wallet_interaction.description')}</Box>
+      {reviewRestarted ? (
+        <ReviewRestartedNotice severity="info" role="status" data-testid="review-restarted-notice">
+          {t('request.wallet_interaction.review_restarted_notice')}
+        </ReviewRestartedNotice>
+      ) : null}
       <ButtonsContainer>
         <Button variant="outlined" disabled={isLoading} onClick={onDeny} data-testid="wallet-interaction-deny-button">
           {t('common.deny')}
