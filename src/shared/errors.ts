@@ -123,6 +123,37 @@ function isExpectedWalletError(error: unknown): boolean {
   return false
 }
 
+/**
+ * Detects a wallet refusing an eth_sendTransaction because the request's `chainId` does not match its
+ * active network: EIP-1474 invalid params, code -32602, with a message that names the chain. viem
+ * wraps provider errors, so the code and message may sit on the error itself, on its `cause`, or on a
+ * nested `error` object. Such a refusal is not the user's decision: the request stays unanswered and
+ * is reviewed again on the live network.
+ */
+function isChainMismatchRejection(error: unknown): boolean {
+  const seen = new Set<unknown>()
+  let current: unknown = error
+  for (let depth = 0; depth < 4 && current !== null && typeof current === 'object' && !seen.has(current); depth++) {
+    seen.add(current)
+    const record = current as {
+      code?: unknown
+      message?: unknown
+      details?: unknown
+      shortMessage?: unknown
+      cause?: unknown
+      error?: unknown
+    }
+    const text = [record.message, record.details, record.shortMessage]
+      .filter((value): value is string => typeof value === 'string')
+      .join(' ')
+    if (record.code === -32602 && /chain/i.test(text)) {
+      return true
+    }
+    current = record.cause ?? record.error
+  }
+  return false
+}
+
 export type { RPCError }
 export {
   isErrorWithMessage,
@@ -131,5 +162,6 @@ export {
   isMagicRpcError,
   isMagicExtensionError,
   isUserRejectedTransaction,
-  isExpectedWalletError
+  isExpectedWalletError,
+  isChainMismatchRejection
 }

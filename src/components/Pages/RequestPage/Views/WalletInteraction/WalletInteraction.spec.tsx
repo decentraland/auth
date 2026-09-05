@@ -323,4 +323,33 @@ describe('when rendering the WalletInteraction view', () => {
       expect(screen.getByText('request.transaction_dialog.acknowledge_no_visible_effects')).toBeInTheDocument()
     })
   })
+
+  describe('and the review replaced one invalidated by a network change', () => {
+    it('should tell the user why the page reloaded, on the summary screen', () => {
+      render(
+        <WalletInteraction
+          requestId="r1"
+          isWeb2Wallet
+          simulation={{ status: 'ready', result: successResult }}
+          userAddress={USER}
+          reviewRestarted
+          onDeny={onDeny}
+          onApprove={onApprove}
+        />
+      )
+      expect(screen.getByTestId('review-restarted-notice')).toHaveTextContent('request.wallet_interaction.review_restarted_notice')
+    })
+
+    it('should tell the user why the page reloaded, on the classic screen', () => {
+      render(<WalletInteraction requestId="r1" reviewRestarted onDeny={onDeny} onApprove={onApprove} />)
+      expect(screen.getByTestId('review-restarted-notice')).toBeInTheDocument()
+    })
+  })
+
+  describe('and the review is the first one for the request', () => {
+    it('should not show the restart notice', () => {
+      render(<WalletInteraction requestId="r1" onDeny={onDeny} onApprove={onApprove} />)
+      expect(screen.queryByTestId('review-restarted-notice')).not.toBeInTheDocument()
+    })
+  })
 })
