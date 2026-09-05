@@ -33,7 +33,7 @@ import {
 import { isRetiredSignInMethod } from '../../../shared/auth/signMethodGuard'
 import { isSocialProviderType, useCurrentConnectionData } from '../../../shared/connection'
 import { isSessionMismatch } from '../../../shared/connection/sessionMismatch'
-import { isErrorWithMessage, isRpcError, isUserRejectedTransaction } from '../../../shared/errors'
+import { isChainMismatchRejection, isErrorWithMessage, isRpcError, isUserRejectedTransaction } from '../../../shared/errors'
 import {
   buildRequestPageUrl,
   extractReferrerFromSearchParameters,
@@ -142,6 +142,9 @@ const TERMINAL_VIEWS = new Set([
 const RPC_METHOD_NOT_SUPPORTED = -32601
 const RPC_INVALID_PARAMS = -32602
 
+// Why a transaction review was discarded and started over (see restartTransactionReview).
+type ReviewRestartReason = 'network_changed' | 'network_unreadable' | 'network_unrecorded' | 'wallet_rejected_chain'
+
 export const RequestPage = () => {
   const params = useParams()
   const [searchParams] = useSearchParams()
@@ -205,6 +208,10 @@ export const RequestPage = () => {
   // Incremented when an approval discovers that its transaction review is no longer bound to a
   // verifiable live chain. This deliberately re-runs the load effect for the same route/account.
   const [reviewAttempt, setReviewAttempt] = useState(0)
+  // The reason a restart is pending, consumed by the load effect's reset so the re-reviewed page can
+  // say why it reloaded. A genuinely new request or account starts with no reason.
+  const pendingReviewRestartRef = useRef<ReviewRestartReason>()
+  const [reviewRestartReason, setReviewRestartReason] = useState<ReviewRestartReason | null>(null)
   // The route id the recovered request in requestRef belongs to.
   const recoveredRequestIdRef = useRef<string>()
   // The lowercased account that recovered, and is reviewing, the request in requestRef. Only that
@@ -367,6 +374,9 @@ export const RequestPage = () => {
       recoveredRequestIdRef.current = undefined
       recoveredSignerRef.current = undefined
       reviewedWalletChainIdRef.current = undefined
+      // A restart carries its reason into the fresh review; anything else starts clean.
+      setReviewRestartReason(pendingReviewRestartRef.current ?? null)
+      pendingReviewRestartRef.current = undefined
       hasCompletedRef.current = false
       requestRef.current = undefined
       metaTxCheckRef.current = null
@@ -1017,18 +1027,26 @@ export const RequestPage = () => {
     }
   }, [nftTransferData, manaTransferData, requestId])
 
-  const restartTransactionReview = useCallback(() => {
-    // Make the stale review non-actionable immediately, then let the load effect's existing reset
-    // clear every derived preview/classification and recover the same request again. No outcome is
-    // sent: a missing, changed, or temporarily unreadable chain says nothing about the user's
-    // decision and the request must remain available for the fresh review.
-    recoveredRequestIdRef.current = undefined
-    reviewedWalletChainIdRef.current = undefined
-    loadedRequestIdRef.current = undefined
-    setLoadedRequestId(undefined)
-    setView(View.LOADING_REQUEST)
-    setReviewAttempt(attempt => attempt + 1)
-  }, [])
+  const restartTransactionReview = useCallback(
+    (reason: ReviewRestartReason) => {
+      // Make the stale review non-actionable immediately, then let the load effect's existing reset
+      // clear every derived preview/classification and recover the same request again. No outcome is
+      // sent: a missing, changed, or temporarily unreadable chain says nothing about the user's
+      // decision and the request must remain available for the fresh review. The restart is neither
+      // silent nor invisible: it is reported so the frequency of a security-relevant invalidation is
+      // visible in production, and the re-reviewed page says why it reloaded, so an Allow that seems
+      // not to take is explained.
+      trackEvent(TrackingEvents.TRANSACTION_REVIEW_RESTARTED, { requestId, reason })
+      pendingReviewRestartRef.current = reason
+      recoveredRequestIdRef.current = undefined
+      reviewedWalletChainIdRef.current = undefined
+      loadedRequestIdRef.current = undefined
+      setLoadedRequestId(undefined)
+      setView(View.LOADING_REQUEST)
+      setReviewAttempt(attempt => attempt + 1)
+    },
+    [requestId]
+  )
 
   const onApproveWalletInteraction = useCallback(async () => {
     // Only the request this page recovered can be executed. If the route has moved on to another
@@ -1111,14 +1129,19 @@ export const RequestPage = () => {
             // The address and calldata may refer to entirely different code on another chain, and
             // an unreadable chain cannot be compared safely. Discard the stale review and recover
             // the still-unconsumed request so it is previewed on a verified live chain.
-            restartTransactionReview()
+            restartTransactionReview(
+              reviewedChainId === undefined ? 'network_unrecorded' : currentChainId === undefined ? 'network_unreadable' : 'network_changed'
+            )
             return
           }
           result = await walletClient.request({
             method: 'eth_sendTransaction',
-            // Bind the wallet request to the chain that was reviewed as well as checking it above.
-            // Providers that validate the standard JSON-RPC chainId reject a last-moment switch
-            // between the check and eth_sendTransaction rather than broadcasting on the new chain.
+            // Also bind the request to the reviewed chain. This is defense in depth for injected
+            // wallets, which validate the standard JSON-RPC chainId and refuse a last-moment switch
+            // between the check above and the send instead of broadcasting on the new chain (that
+            // refusal is routed back into the review, see the catch). Embedded wallets ignore it —
+            // thirdweb rebuilds the transaction from its own chain and Magic is unverified — so for
+            // them the check above is the whole guard.
             params: [{ ...transactionParams, from: signerAddress, chainId: `0x${reviewedChainId.toString(16)}` }]
           })
         }
@@ -1156,6 +1179,10 @@ export const RequestPage = () => {
         })
         hasCompletedRef.current = true
         showInteractionCompleteView()
+      } else if (isChainMismatchRejection(e)) {
+        // The wallet refused the send because its network no longer matches the reviewed chain: the
+        // binding above fired. That is not the user's decision, so answer nothing and review again.
+        restartTransactionReview('wallet_rejected_chain')
       } else if (isUserRejectedTransaction(e)) {
         console.info('User rejected wallet interaction in wallet — not reporting to Sentry')
         try {
@@ -1422,6 +1449,7 @@ export const RequestPage = () => {
             transactionCost={transactionGasCost ?? BigInt(0)}
             balance={walletInfo?.balance ?? BigInt(0)}
             isReverted={isSimulationReverted}
+            reviewRestarted={reviewRestartReason !== null}
             onDeny={onDenyWalletInteraction}
             onApprove={hasSimulationSummary ? onApproveWalletInteraction : handleApproveWalletInteraction}
           />

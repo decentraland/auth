@@ -103,10 +103,12 @@ jest.mock('../../../shared/utils/analytics', () => ({
 jest.mock('../../../shared/utils/errorHandler', () => ({
   handleError: jest.fn().mockReturnValue('An error occurred')
 }))
+const mockIsChainMismatchRejection = jest.fn()
 jest.mock('../../../shared/errors', () => ({
   isErrorWithMessage: jest.fn().mockReturnValue(true),
   isRpcError: jest.fn().mockReturnValue(false),
-  isUserRejectedTransaction: jest.fn().mockReturnValue(false)
+  isUserRejectedTransaction: jest.fn().mockReturnValue(false),
+  isChainMismatchRejection: (...args: any[]) => mockIsChainMismatchRejection(...args)
 }))
 jest.mock('../../../modules/profile', () => ({
   fetchProfile: jest.fn()
@@ -163,6 +165,7 @@ jest.mock('./Views', () => ({
       data-requires-acknowledgment={String(props.requiresAcknowledgment)}
       data-gas-covered={String(props.gasCovered)}
       data-profiles={JSON.stringify(props.profiles ?? {})}
+      data-review-restarted={String(props.reviewRestarted)}
     >
       <button data-testid="wallet-interaction-approve" onClick={props.onApprove}>
         approve
@@ -302,6 +305,7 @@ describe('RequestPage', () => {
     )
     mockIsKnownDecentralandContractOnChain.mockReturnValue(false)
     mockIsDecentralandContractAddress.mockResolvedValue(false)
+    mockIsChainMismatchRejection.mockReturnValue(false)
     mockIsApprovalGrantingTypedData.mockReturnValue(false)
     mockIsOpaqueSignatureMessage.mockReturnValue(false)
     mockExtractSignaturePayload.mockReturnValue({ kind: 'message', message: 'hello' })
@@ -1039,6 +1043,75 @@ describe('RequestPage', () => {
 
       expect(mockSendFailedOutcome).not.toHaveBeenCalled()
     })
+
+    it('should tell the user on the fresh review that the network changed', async () => {
+      renderRequestPage()
+      await userEvent.click(await screen.findByTestId('wallet-interaction-approve'))
+      await waitForRecoverCalls(2)
+
+      const view = await screen.findByTestId('wallet-interaction')
+      expect(view).toHaveAttribute('data-review-restarted', 'true')
+    })
+
+    it('should report the restart and its reason to analytics', async () => {
+      renderRequestPage()
+      await userEvent.click(await screen.findByTestId('wallet-interaction-approve'))
+      await waitForRecoverCalls(2)
+
+      expect(jest.mocked(trackEvent)).toHaveBeenCalledWith(TrackingEvents.TRANSACTION_REVIEW_RESTARTED, {
+        requestId: REQUEST_ID,
+        reason: 'network_changed'
+      })
+    })
+  })
+
+  describe('when the wallet refuses the send because its network changed after the check', () => {
+    beforeEach(() => {
+      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.INJECTED }
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockRecover.mockResolvedValue({
+        method: 'eth_sendTransaction',
+        params: [{ to: '0x0000000000000000000000000000000000000001', data: '0x', value: '0x0' }],
+        sender: '0xabc123',
+        expiration: new Date(Date.now() + 3600000).toISOString()
+      })
+      mockGetAddresses.mockResolvedValue(['0xabc123'])
+      mockGetChainId.mockResolvedValue(137)
+      mockGetBalance.mockResolvedValue(1n)
+      mockEstimateFeesPerGas.mockResolvedValue({ gasPrice: 1n })
+      mockEstimateGas.mockResolvedValue(21000n)
+      // The chain matched at the check; the wallet switched in the last moment and rejected the bound request.
+      mockWalletRequest.mockRejectedValueOnce(Object.assign(new Error('Invalid transaction params: chainId mismatch'), { code: -32602 }))
+      mockIsChainMismatchRejection.mockReturnValue(true)
+      mockSendFailedOutcome.mockResolvedValue({})
+    })
+
+    it('should recover the request again instead of consuming it as a failure', async () => {
+      renderRequestPage()
+      await userEvent.click(await screen.findByTestId('wallet-interaction-approve'))
+      await waitForRecoverCalls(2)
+
+      expect(mockSendFailedOutcome).not.toHaveBeenCalled()
+    })
+
+    it('should not show the signing error view', async () => {
+      renderRequestPage()
+      await userEvent.click(await screen.findByTestId('wallet-interaction-approve'))
+      await waitForRecoverCalls(2)
+
+      expect(screen.queryByTestId('signing-error')).not.toBeInTheDocument()
+    })
+
+    it('should report the restart with the wallet rejection as its reason', async () => {
+      renderRequestPage()
+      await userEvent.click(await screen.findByTestId('wallet-interaction-approve'))
+      await waitForRecoverCalls(2)
+
+      expect(jest.mocked(trackEvent)).toHaveBeenCalledWith(TrackingEvents.TRANSACTION_REVIEW_RESTARTED, {
+        requestId: REQUEST_ID,
+        reason: 'wallet_rejected_chain'
+      })
+    })
   })
 
   describe('when the wallet network cannot be read at approval time', () => {
@@ -1065,6 +1138,7 @@ describe('RequestPage', () => {
       await waitForRecoverCalls(2)
 
       expect(mockSendFailedOutcome).not.toHaveBeenCalled()
+      expect(mockWalletRequest).not.toHaveBeenCalled()
     })
   })
 
@@ -1091,6 +1165,8 @@ describe('RequestPage', () => {
       await userEvent.click(await screen.findByTestId('wallet-interaction-approve'))
 
       await waitFor(() => expect(mockRecover).toHaveBeenCalledTimes(2))
+      expect(screen.queryByTestId('signing-error')).not.toBeInTheDocument()
+      expect(mockWalletRequest).not.toHaveBeenCalled()
     })
   })
 

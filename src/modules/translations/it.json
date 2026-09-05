@@ -73,7 +73,8 @@
       "description": "Procedi solo se sei a conoscenza di tutti i dettagli della transazione e ti fidi di questa scena.",
       "review_title": "Rivedi questa transazione",
       "preview_unavailable_warning": "Non è stato possibile verificare cosa fa questa transazione perché il servizio di anteprima è temporaneamente non disponibile. Approva solo se ti fidi della scena che l'ha richiesta.",
-      "acknowledge_preview_unavailable": "Capisco che l'anteprima non è disponibile e sto approvando senza vedere cosa fa questa transazione"
+      "acknowledge_preview_unavailable": "Capisco che l'anteprima non è disponibile e sto approvando senza vedere cosa fa questa transazione",
+      "review_restarted_notice": "La rete del tuo wallet è cambiata o non è stato possibile verificarla, quindi questa transazione è stata riesaminata sulla rete attuale."
     },
     "transaction_dialog": {
       "title": "Conferma transazione",

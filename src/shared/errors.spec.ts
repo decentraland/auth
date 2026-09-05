@@ -1,4 +1,4 @@
-import { isExpectedWalletError, isUserRejectedTransaction } from './errors'
+import { isChainMismatchRejection, isExpectedWalletError, isUserRejectedTransaction } from './errors'
 
 /**
  * `@web3-react/injected-connector` throws this when the user dismisses the wallet prompt during
@@ -114,6 +114,46 @@ describe('isExpectedWalletError', () => {
       expect(isExpectedWalletError(null)).toBe(false)
       expect(isExpectedWalletError(undefined)).toBe(false)
       expect(isExpectedWalletError('User closed the modal without connecting')).toBe(false)
+    })
+  })
+
+  describe('isChainMismatchRejection', () => {
+    describe('when the wallet returned invalid params naming the chain', () => {
+      it('should recognize a raw provider error', () => {
+        expect(isChainMismatchRejection({ code: -32602, message: 'Invalid transaction params: chainId mismatch' })).toBe(true)
+      })
+
+      it('should recognize a viem error that carries the provider message in details', () => {
+        const error = Object.assign(new Error('Invalid parameters were provided to the RPC method.'), {
+          code: -32602,
+          details: 'Invalid transaction params: Invalid chainId "0x89": must match the active network'
+        })
+
+        expect(isChainMismatchRejection(error)).toBe(true)
+      })
+
+      it('should recognize the provider error nested as the cause of a wrapper', () => {
+        const error = Object.assign(new Error('Request failed'), {
+          cause: { code: -32602, message: 'chainId does not match the current network' }
+        })
+
+        expect(isChainMismatchRejection(error)).toBe(true)
+      })
+    })
+
+    describe('when the failure is something else', () => {
+      it('should not classify invalid params about another field', () => {
+        expect(isChainMismatchRejection({ code: -32602, message: 'Invalid transaction params: must provide a "to" address' })).toBe(false)
+      })
+
+      it('should not classify a user rejection', () => {
+        expect(isChainMismatchRejection({ code: 4001, message: 'User rejected the request. chain' })).toBe(false)
+      })
+
+      it('should not classify non-object values', () => {
+        expect(isChainMismatchRejection(null)).toBe(false)
+        expect(isChainMismatchRejection('chainId mismatch')).toBe(false)
+      })
     })
   })
 })

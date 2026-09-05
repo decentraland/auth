@@ -73,7 +73,8 @@
       "description": "Solo procede si estás al tanto de todos los detalles de la transacción y confías en esta escena.",
       "review_title": "Revisa esta transacción",
       "preview_unavailable_warning": "No pudimos verificar qué hace esta transacción porque el servicio de vista previa no está disponible temporalmente. Aprueba solo si confías en la escena que la solicitó.",
-      "acknowledge_preview_unavailable": "Entiendo que la vista previa no está disponible y estoy aprobando sin ver qué hace esta transacción"
+      "acknowledge_preview_unavailable": "Entiendo que la vista previa no está disponible y estoy aprobando sin ver qué hace esta transacción",
+      "review_restarted_notice": "La red de tu wallet cambió o no pudo verificarse, así que esta transacción se revisó de nuevo en la red actual."
     },
     "transaction_dialog": {
       "title": "Confirmar transacción",
