@@ -492,6 +492,25 @@ function decodeNftTransferData(data: string, contractABI: object[]): { tokenId: 
 // every generation exists on every chain (Amoy only has the V3 factory), so the ones missing from the
 // registry are skipped.
 const COLLECTION_FACTORIES = [ContractName.CollectionFactory, ContractName.CollectionFactoryV3]
+// A hung RPC must fail closed into the generic review promptly, not hold the request page on its spinner.
+const COLLECTION_LOOKUP_TIMEOUT_MS = 10_000
+
+/** Rejects when `promise` has not settled within `timeoutMs`. */
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs)
+    promise.then(
+      value => {
+        clearTimeout(timer)
+        resolve(value)
+      },
+      error => {
+        clearTimeout(timer)
+        reject(error)
+      }
+    )
+  })
+}
 
 /**
  * Whether a contract is a Decentraland collection: one of the collection factories on the
@@ -501,9 +520,14 @@ const COLLECTION_FACTORIES = [ContractName.CollectionFactory, ContractName.Colle
  * vouches for every Decentraland contract in its address book, not only collections — and the branded
  * gift view needs the exact answer: it presents the call as one collection token moving and nothing
  * else, which only Decentraland's collection code guarantees.
+ *
+ * The answer is a trust decision, so it is read through Decentraland's own RPC and never through the
+ * connected wallet: a wallet pointed at a hostile RPC (a custom network the user was talked into adding)
+ * could otherwise answer "yes" for any contract and dress it as a gift.
  * @param contractAddress The contract the transaction targets
  * @returns true when a factory deployed it; false when none did, or none exists on this chain
- * @throws when the chain could not be asked, so an outage is never read as a verdict
+ * @throws when the chain could not be asked, or did not answer in time, so an outage is never read as
+ * a verdict
  */
 async function isDecentralandCollection(contractAddress: string): Promise<boolean> {
   const chainId = getMetaTransactionChainId()
@@ -518,17 +542,20 @@ async function isDecentralandCollection(contractAddress: string): Promise<boolea
     return false
   }
 
-  const networkProvider = await getNetworkProvider(chainId)
+  const networkProvider = await connection.createProvider(ProviderType.NETWORK, chainId)
   const publicClient = createPublicClient({ transport: custom(networkProvider) })
   const answers = await Promise.all(
-    factories.map(
-      factory =>
+    factories.map(factory =>
+      withTimeout(
         publicClient.readContract({
           address: factory.address as `0x${string}`,
           abi: factory.abi as readonly unknown[],
           functionName: 'isCollectionFromFactory',
           args: [contractAddress]
-        }) as Promise<boolean>
+        }) as Promise<boolean>,
+        COLLECTION_LOOKUP_TIMEOUT_MS,
+        'Collection factory lookup'
+      )
     )
   )
   return answers.some(answer => answer === true)

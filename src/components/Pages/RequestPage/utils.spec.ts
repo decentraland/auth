@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/naming-convention */
 /* eslint-disable @typescript-eslint/unbound-method */
-import { createPublicClient, decodeFunctionData, formatEther } from 'viem'
+import { createPublicClient, custom, decodeFunctionData, formatEther } from 'viem'
 import { Rarity } from '@dcl/schemas'
 import { ChainId } from '@dcl/schemas/dist/dapps/chain-id'
 import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
@@ -681,22 +681,59 @@ describe('when testing decodeManaTransferData', () => {
 describe('when testing isDecentralandCollection', () => {
   let contractAddress: string
   let mockNetworkProvider: any
+  let mockWalletProvider: any
   let mockReadContract: jest.Mock
 
   beforeEach(() => {
     contractAddress = '0xcollection'
     jest.mocked(config.get).mockReturnValue('production')
     jest.mocked(getContract).mockImplementation((name: string) => ({ address: `0xfactory-${name}`, abi: [] }) as any)
+    // A connected wallet is available and already on the meta-transaction chain: the one case where
+    // getNetworkProvider would hand back the wallet's own RPC instead of Decentraland's.
+    mockWalletProvider = { isWalletProvider: true }
     mockNetworkProvider = { isNetworkProvider: true }
-    jest.mocked(connection.getProvider).mockRejectedValue(new Error('Not connected'))
-    jest.mocked(connection.tryPreviousConnection).mockRejectedValue(new Error('No previous'))
+    jest.mocked(connection.getProvider).mockResolvedValue(mockWalletProvider)
     jest.mocked(connection.createProvider).mockReturnValue(mockNetworkProvider)
     mockReadContract = jest.fn()
-    jest.mocked(createPublicClient).mockReturnValue({ readContract: mockReadContract } as any)
+    jest.mocked(createPublicClient).mockReturnValue({ readContract: mockReadContract, getChainId: jest.fn().mockResolvedValue(137) } as any)
   })
 
   afterEach(() => {
     jest.resetAllMocks()
+    jest.useRealTimers()
+  })
+
+  describe('and a connected wallet reports the same chain', () => {
+    beforeEach(() => {
+      mockReadContract.mockResolvedValue(true)
+    })
+
+    it("should read the factories through Decentraland's own RPC for the meta-transaction chain", async () => {
+      await isDecentralandCollection(contractAddress)
+      expect(connection.createProvider).toHaveBeenCalledWith(ProviderType.NETWORK, ChainId.MATIC_MAINNET)
+      expect(custom).toHaveBeenCalledWith(mockNetworkProvider)
+    })
+
+    it('should never consult the connected wallet, whose RPC the user may have been talked into replacing', async () => {
+      await isDecentralandCollection(contractAddress)
+      expect(connection.getProvider).not.toHaveBeenCalled()
+      expect(connection.tryPreviousConnection).not.toHaveBeenCalled()
+      expect(custom).not.toHaveBeenCalledWith(mockWalletProvider)
+    })
+  })
+
+  describe('and the chain does not answer', () => {
+    beforeEach(() => {
+      jest.useFakeTimers()
+      mockReadContract.mockImplementation(() => new Promise(() => undefined))
+    })
+
+    it('should give up after the lookup timeout so the review falls back instead of hanging', async () => {
+      const lookup = isDecentralandCollection(contractAddress)
+      const outcome = expect(lookup).rejects.toThrow('timed out')
+      await jest.advanceTimersByTimeAsync(10_000)
+      await outcome
+    })
   })
 
   describe('and one of the collection factories deployed the contract', () => {
