@@ -12,4 +12,10 @@ const PreviewUnavailableWarning = styled(Alert)(({ theme }) => ({
   width: '100%'
 }))
 
-export { PreviewUnavailableWarning, SummaryBody }
+const ReviewRestartedNotice = styled(Alert)(({ theme }) => ({
+  marginTop: theme.spacing(2),
+  textAlign: 'left',
+  width: '100%'
+}))
+
+export { PreviewUnavailableWarning, ReviewRestartedNotice, SummaryBody }

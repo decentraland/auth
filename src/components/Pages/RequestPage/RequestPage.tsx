@@ -34,7 +34,7 @@ import { isRetiredSignInMethod } from '../../../shared/auth/signMethodGuard'
 import { resolveTypedDataReview } from '../../../shared/auth/typedDataReview'
 import { isSocialProviderType, useCurrentConnectionData } from '../../../shared/connection'
 import { isSessionMismatch } from '../../../shared/connection/sessionMismatch'
-import { isErrorWithMessage, isRpcError, isUserRejectedTransaction } from '../../../shared/errors'
+import { isChainMismatchRejection, isErrorWithMessage, isRpcError, isUserRejectedTransaction } from '../../../shared/errors'
 import {
   buildRequestPageUrl,
   extractReferrerFromSearchParameters,
@@ -73,6 +73,7 @@ import {
   getNetworkProvider,
   getSigninDeeplink,
   isApprovalGrantingTypedData,
+  isExactNftTransferSimulation,
   isKnownDecentralandContractOnChain,
   isOpaqueSignatureMessage,
   isSignatureMethod
@@ -143,6 +144,9 @@ const TERMINAL_VIEWS = new Set([
 const RPC_METHOD_NOT_SUPPORTED = -32601
 const RPC_INVALID_PARAMS = -32602
 
+// Why a transaction review was discarded and started over (see restartTransactionReview).
+type ReviewRestartReason = 'network_changed' | 'network_unreadable' | 'network_unrecorded' | 'wallet_rejected_chain'
+
 export const RequestPage = () => {
   const params = useParams()
   const [searchParams] = useSearchParams()
@@ -203,12 +207,25 @@ export const RequestPage = () => {
   const [loadedRequestId, setLoadedRequestId] = useState<string>()
   const loadedAccountRef = useRef<string>()
   const [loadedAccount, setLoadedAccount] = useState<string>()
+  // Incremented when an approval discovers that its transaction review is no longer bound to a
+  // verifiable live chain. This deliberately re-runs the load effect for the same route/account.
+  const [reviewAttempt, setReviewAttempt] = useState(0)
+  // The reason a restart is pending, consumed by the load effect's reset so the re-reviewed page can
+  // say why it reloaded. A genuinely new request or account starts with no reason.
+  const pendingReviewRestartRef = useRef<ReviewRestartReason>()
+  const [reviewRestartReason, setReviewRestartReason] = useState<ReviewRestartReason | null>(null)
   // The route id the recovered request in requestRef belongs to.
   const recoveredRequestIdRef = useRef<string>()
   // The lowercased account that recovered, and is reviewing, the request in requestRef. Only that
   // account may execute it: an external wallet can switch accounts while the page is open, and the
   // wallet would then run the reviewed request from an account that never saw it.
   const recoveredSignerRef = useRef<string>()
+  // The connected chain on which an eth_sendTransaction request was reviewed. A wallet can change
+  // networks while this page remains mounted without changing its account, so the plain-send
+  // approve path must compare the live chain with this value before sending. Relayed
+  // meta-transactions are excluded from that check: their execution chain is fixed by
+  // getMetaTransactionChainId rather than by the wallet's active chain.
+  const reviewedWalletChainIdRef = useRef<number>()
   // Guards against re-entrant approvals (e.g. a fast double-click on the confirm dialog),
   // which would otherwise fire two transactions before `isLoading` re-renders the buttons.
   const isApprovingRef = useRef(false)
@@ -350,13 +367,18 @@ export const RequestPage = () => {
     // account, and the wallet would now execute it from the new one, so nothing of that review may
     // stay actionable until the new account has recovered the request itself (and the sender check
     // has had its say). The reset is keyed to these two so re-runs of this effect for other
-    // dependencies leave in-flight state untouched.
+    // dependencies leave in-flight state untouched. Approval can also explicitly invalidate the
+    // current review by clearing the request ref and incrementing reviewAttempt below.
     const isNewRequest = loadedRequestIdRef.current !== requestId || loadedAccountRef.current !== account
     if (isNewRequest) {
       loadedRequestIdRef.current = requestId
       loadedAccountRef.current = account
       recoveredRequestIdRef.current = undefined
       recoveredSignerRef.current = undefined
+      reviewedWalletChainIdRef.current = undefined
+      // A restart carries its reason into the fresh review; anything else starts clean.
+      setReviewRestartReason(pendingReviewRestartRef.current ?? null)
+      pendingReviewRestartRef.current = undefined
       hasCompletedRef.current = false
       requestRef.current = undefined
       metaTxCheckRef.current = null
@@ -594,6 +616,7 @@ export const RequestPage = () => {
             setSimulationState({ status: 'ready', result })
             setSimulationVerified(collectVerifiedContracts(result, body.chainId))
             void resolveSimulationProfiles(result)
+            return result
           } catch (e) {
             if (cancelled) return
             // Nothing to reject once the user has already answered (e.g. denied while loading).
@@ -624,9 +647,13 @@ export const RequestPage = () => {
                 balance: userBalance,
                 chainId: currentChainId
               })
+              reviewedWalletChainIdRef.current = currentChainId
 
               // Check if this is an NFT transfer or MANA transfer by analyzing the transaction data
               const txParams = request.params?.[0] as Record<string, unknown> | undefined
+              // The simulation the gift gate already ran and showed, if any, so the generic block does
+              // not run it again when the branded lookups fail after a passing gate.
+              let giftSimulation: SimulationResponseBody | null = null
               const transactionData = txParams?.data as string | undefined
               const contractAddress = txParams?.to as string | undefined
 
@@ -686,12 +713,45 @@ export const RequestPage = () => {
                       nftContractCheck.willUseMetaTransaction && nftContractCheck.contractName === ContractName.ERC721CollectionV2
 
                     if (isVerifiedCollection) {
+                      // A recognized selector is not a complete preview: safeTransferFrom invokes the
+                      // receiver, whose callback may move other assets through existing allowances.
+                      // Simulate first and keep the branded view only when the sole visible effect is
+                      // exactly the transfer it shows; anything else takes the generic summary and its
+                      // acknowledgment gates. The generic review is shown while the simulation runs, so
+                      // Deny is available and Allow is blocked from the first frame, and it is upgraded
+                      // to the branded view once the result matches. A simulation is a point-in-time run
+                      // in a frame the receiver can detect (the relayed self-call has the collection as
+                      // tx.origin, which a live execution never has), so this raises the bar rather than
+                      // proving completeness.
+                      const body = txParams ? buildSendTransactionSimulationPayload(txParams, signerAddress, currentChainId, true) : null
+                      // Relayed as a meta-transaction, gas covered, whichever view ends up shown.
+                      setIsMetaTransaction(true)
+                      if (!body) {
+                        setSimulationState({ status: 'unavailable' })
+                        setView(View.WALLET_INTERACTION)
+                        break
+                      }
+
+                      setSimulationChainId(body.chainId)
+                      setSimulationState({ status: 'loading' })
+                      setView(View.WALLET_INTERACTION)
+                      const simulation = await fetchSimulation(body)
+                      if (cancelled) return
+                      giftSimulation = simulation ?? null
+                      // The user may have answered from the generic review while the simulation ran;
+                      // their answer stands.
+                      if (hasCompletedRef.current) break
+                      if (!simulation || !isExactNftTransferSimulation(simulation, signerAddress, contractAddress, transferData)) {
+                        break
+                      }
+
                       const [metadata, recipientProfile] = await Promise.all([
                         fetchNftMetadata(contractAddress, contract.abi, transferData.tokenId),
                         fetchProfile(transferData.toAddress)
                       ])
 
                       if (cancelled) return
+                      if (hasCompletedRef.current) break
 
                       setNftTransferData({
                         imageUrl: metadata.imageUrl,
@@ -703,10 +763,6 @@ export const RequestPage = () => {
                         rarity: metadata.rarity,
                         recipientProfile: recipientProfile || undefined
                       })
-                      // The branded gift view is only shown for a verified DCL collection, which is
-                      // relayed as a meta-transaction (gas covered). Mark it so the web2 confirm
-                      // dialog says "gas covered" instead of showing a 0-ETH cost.
-                      setIsMetaTransaction(true)
                       setView(View.WALLET_NFT_INTERACTION)
                       break
                     }
@@ -736,7 +792,10 @@ export const RequestPage = () => {
               // call does: an unlimited MANA approve or a setApprovalForAll looks like any other hex
               // blob. The preview and its acknowledgment gates therefore apply to everyone when the
               // call is relayed, and the relay decision has to be known before Allow is enabled.
-              if (contractAddress) {
+              // When the gift gate already simulated this transaction and showed the result, the branded
+              // lookups failed after it; the preview on screen is the right one, so do not run it again
+              // (a retry could fail and downgrade a preview the user has already seen).
+              if (contractAddress && !giftSimulation) {
                 setSimulationState({ status: 'loading' })
                 // Reuse the meta-transaction check if the NFT-gift gate already resolved it for this
                 // same contract (it falls through to here for non-DCL contracts), so we don't repeat
@@ -941,7 +1000,8 @@ export const RequestPage = () => {
     requestId,
     isDeepLinkFlow,
     isInvalidDeepLinkId,
-    skipSetup
+    skipSetup,
+    reviewAttempt
   ])
 
   useEffect(() => {
@@ -1011,6 +1071,27 @@ export const RequestPage = () => {
       setView(View.WALLET_INTERACTION_DENIED)
     }
   }, [nftTransferData, manaTransferData, requestId])
+
+  const restartTransactionReview = useCallback(
+    (reason: ReviewRestartReason) => {
+      // Make the stale review non-actionable immediately, then let the load effect's existing reset
+      // clear every derived preview/classification and recover the same request again. No outcome is
+      // sent: a missing, changed, or temporarily unreadable chain says nothing about the user's
+      // decision and the request must remain available for the fresh review. The restart is neither
+      // silent nor invisible: it is reported so the frequency of a security-relevant invalidation is
+      // visible in production, and the re-reviewed page says why it reloaded, so an Allow that seems
+      // not to take is explained.
+      trackEvent(TrackingEvents.TRANSACTION_REVIEW_RESTARTED, { requestId, reason })
+      pendingReviewRestartRef.current = reason
+      recoveredRequestIdRef.current = undefined
+      reviewedWalletChainIdRef.current = undefined
+      loadedRequestIdRef.current = undefined
+      setLoadedRequestId(undefined)
+      setView(View.LOADING_REQUEST)
+      setReviewAttempt(attempt => attempt + 1)
+    },
+    [requestId]
+  )
 
   const onApproveWalletInteraction = useCallback(async () => {
     // Only the request this page recovered can be executed. If the route has moved on to another
@@ -1087,9 +1168,26 @@ export const RequestPage = () => {
             serverURL: `${config.get('META_TRANSACTION_SERVER_URL')}/v1`
           })
         } else {
+          const reviewedChainId = reviewedWalletChainIdRef.current
+          const currentChainId = await publicClientRef.current?.getChainId().catch(() => undefined)
+          if (reviewedChainId === undefined || currentChainId !== reviewedChainId) {
+            // The address and calldata may refer to entirely different code on another chain, and
+            // an unreadable chain cannot be compared safely. Discard the stale review and recover
+            // the still-unconsumed request so it is previewed on a verified live chain.
+            restartTransactionReview(
+              reviewedChainId === undefined ? 'network_unrecorded' : currentChainId === undefined ? 'network_unreadable' : 'network_changed'
+            )
+            return
+          }
           result = await walletClient.request({
             method: 'eth_sendTransaction',
-            params: [{ ...transactionParams, from: signerAddress }]
+            // Also bind the request to the reviewed chain. This is defense in depth for injected
+            // wallets, which validate the standard JSON-RPC chainId and refuse a last-moment switch
+            // between the check above and the send instead of broadcasting on the new chain (that
+            // refusal is routed back into the review, see the catch). Embedded wallets ignore it —
+            // thirdweb rebuilds the transaction from its own chain and Magic is unverified — so for
+            // them the check above is the whole guard.
+            params: [{ ...transactionParams, from: signerAddress, chainId: `0x${reviewedChainId.toString(16)}` }]
           })
         }
       }
@@ -1126,6 +1224,10 @@ export const RequestPage = () => {
         })
         hasCompletedRef.current = true
         showInteractionCompleteView()
+      } else if (isChainMismatchRejection(e)) {
+        // The wallet refused the send because its network no longer matches the reviewed chain: the
+        // binding above fired. That is not the user's decision, so answer nothing and review again.
+        restartTransactionReview('wallet_rejected_chain')
       } else if (isUserRejectedTransaction(e)) {
         console.info('User rejected wallet interaction in wallet — not reporting to Sentry')
         try {
@@ -1182,7 +1284,7 @@ export const RequestPage = () => {
       setIsLoading(false)
       isApprovingRef.current = false
     }
-  }, [isUserUsingWeb2Wallet, nftTransferData, manaTransferData, requestId, identity, showInteractionCompleteView])
+  }, [isUserUsingWeb2Wallet, nftTransferData, manaTransferData, requestId, identity, showInteractionCompleteView, restartTransactionReview])
 
   const handleApproveWalletInteraction = useCallback(async () => {
     if (isUserUsingWeb2Wallet) {
@@ -1392,6 +1494,7 @@ export const RequestPage = () => {
             transactionCost={transactionGasCost ?? BigInt(0)}
             balance={walletInfo?.balance ?? BigInt(0)}
             isReverted={isSimulationReverted}
+            reviewRestarted={reviewRestartReason !== null}
             onDeny={onDenyWalletInteraction}
             onApprove={hasSimulationSummary ? onApproveWalletInteraction : handleApproveWalletInteraction}
           />
