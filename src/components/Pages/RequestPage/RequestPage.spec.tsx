@@ -2247,6 +2247,13 @@ describe('RequestPage', () => {
         mockIsNftOwnedBy.mockResolvedValue(true)
       })
 
+      it('should keep the relay answer it already had instead of asking the transactions server again', async () => {
+        renderRequestPage()
+        await screen.findByTestId('wallet-interaction')
+        await waitFor(() => expect(mockSimulateTransaction).toHaveBeenCalled())
+        expect(mockCheckMetaTransactionSupport).toHaveBeenCalledTimes(1)
+      })
+
       it('should fall through to the generic review instead of the branded gift view', async () => {
         renderRequestPage()
         expect(await screen.findByTestId('wallet-interaction')).toBeInTheDocument()
@@ -2440,6 +2447,13 @@ describe('RequestPage', () => {
         mockCheckMetaTransactionSupport.mockResolvedValue({ willUseMetaTransaction: true, contractName: 'ERC721CollectionV2' })
         mockIsDecentralandCollection.mockRejectedValue(new Error('rpc down'))
         mockIsNftOwnedBy.mockResolvedValue(true)
+      })
+
+      it('should keep the relay answer it already had instead of asking the transactions server again', async () => {
+        renderRequestPage()
+        await screen.findByTestId('wallet-interaction')
+        await waitFor(() => expect(mockSimulateTransaction).toHaveBeenCalled())
+        expect(mockCheckMetaTransactionSupport).toHaveBeenCalledTimes(1)
       })
 
       it('should fall through to the generic review instead of the branded gift view', async () => {

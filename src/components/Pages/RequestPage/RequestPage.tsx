@@ -145,6 +145,15 @@ const TERMINAL_VIEWS = new Set([
 const RPC_METHOD_NOT_SUPPORTED = -32601
 const RPC_INVALID_PARAMS = -32602
 
+// Unwraps a settled promise: its value, or its rejection rethrown. Lets several lookups be awaited
+// together and their outcomes consumed in a chosen order afterwards.
+function settledValue<T>(outcome: PromiseSettledResult<T>): T {
+  if (outcome.status === 'rejected') {
+    throw outcome.reason
+  }
+  return outcome.value
+}
+
 // Why a transaction review was discarded and started over (see restartTransactionReview).
 type ReviewRestartReason = 'network_changed' | 'network_unreadable' | 'network_unrecorded' | 'wallet_rejected_chain'
 
@@ -717,7 +726,7 @@ export const RequestPage = () => {
                     // answer costs one wait. Anything else takes the generic review and its simulation; so
                     // does a failing lookup, through the catch. What passes is then simulated as well, below.
                     const isOwnTransfer = transferData.fromAddress.toLowerCase() === signerAddress.toLowerCase()
-                    const [nftContractCheck, isCollection, isHeldBySigner] = await Promise.all([
+                    const [relayOutcome, collectionOutcome, holderOutcome] = await Promise.allSettled([
                       checkMetaTransactionSupport(contractAddress),
                       isOwnTransfer ? isDecentralandCollection(contractAddress) : Promise.resolve(false),
                       isOwnTransfer
@@ -725,7 +734,14 @@ export const RequestPage = () => {
                         : Promise.resolve(false)
                     ])
                     if (cancelled) return
-                    metaTxCheckRef.current = { address: contractAddress.toLowerCase(), ...nftContractCheck }
+                    // The relay answer is cached before any verification failure is raised, so the generic
+                    // review this falls to does not ask the transactions server the same question again.
+                    if (relayOutcome.status === 'fulfilled') {
+                      metaTxCheckRef.current = { address: contractAddress.toLowerCase(), ...relayOutcome.value }
+                    }
+                    const nftContractCheck = settledValue(relayOutcome)
+                    const isCollection = settledValue(collectionOutcome)
+                    const isHeldBySigner = settledValue(holderOutcome)
                     const isVerifiedCollection = nftContractCheck.willUseMetaTransaction && isOwnTransfer && isCollection && isHeldBySigner
 
                     if (isVerifiedCollection) {
