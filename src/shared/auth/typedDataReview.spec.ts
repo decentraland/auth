@@ -132,10 +132,63 @@ describe('when reviewing generic typed data', () => {
       }
     })
 
-    it('should reject the request at the signing boundary', () => {
-      expect(() => assertSignatureParamsAreCanonical(method, [signer, JSON.stringify(payload)], signer)).toThrow(
-        MalformedSignatureRequestError
-      )
+    it('should reject the payload', () => {
+      expect(() => resolveTypedDataReview(payload, method)).toThrow(MalformedSignatureRequestError)
+    })
+
+    it('should not turn the request away at recover, where an external wallet would show the payload itself', () => {
+      expect(() => assertSignatureParamsAreCanonical(method, [signer, JSON.stringify(payload)], signer)).not.toThrow()
+    })
+  })
+
+  describe('and the types carry a malformed struct the primary type never reaches', () => {
+    beforeEach(() => {
+      payload.types.Unused = [
+        { name: 'a', type: 'uint256' },
+        { name: 'a', type: 'uint256' }
+      ]
+    })
+
+    it('should ignore it because it is not signed', () => {
+      expect(() => resolveTypedDataReview(payload, method)).not.toThrow()
+    })
+  })
+
+  describe('and an unreached struct uses an array under eth_signTypedData_v3', () => {
+    beforeEach(() => {
+      method = 'eth_signTypedData_v3'
+      payload.types.Unused = [{ name: 'items', type: 'uint256[]' }]
+    })
+
+    it('should not reject a signature that never reaches the array', () => {
+      expect(() => resolveTypedDataReview(payload, method)).not.toThrow()
+    })
+  })
+
+  describe('and a reached struct is named like a built-in type', () => {
+    beforeEach(() => {
+      payload.types.address = [{ name: 'inner', type: 'uint256' }]
+      payload.message.spender = { inner: '1' }
+    })
+
+    it('should reject the payload because encoders disagree on what such a field is', () => {
+      expect(() => resolveTypedDataReview(payload, method)).toThrow('shadows a built-in type')
+    })
+  })
+
+  describe('and a signed string carries characters that would reorder or hide their neighbours', () => {
+    beforeEach(() => {
+      payload.types.Permit.push({ name: 'memo', type: 'string' })
+      payload.message.memo = 'Send 1 MANA to \u202e0xattacker'
+    })
+
+    it('should show them as visible escapes instead of letting them act on the display', () => {
+      const memo = resolveTypedDataReview(payload, method).fields.find(field => field.name === 'memo')
+      expect(memo?.value).toBe('Send 1 MANA to \\u{202e}0xattacker')
+    })
+
+    it('should leave the signed digest untouched', () => {
+      expect(resolveTypedDataReview(payload, method).hash).toBe(hashTypedData(payload as Parameters<typeof hashTypedData>[0]))
     })
   })
 

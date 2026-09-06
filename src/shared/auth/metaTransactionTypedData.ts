@@ -1,21 +1,12 @@
 import { hashTypedData } from 'viem'
 import { META_TRANSACTION_TYPE, OFFCHAIN_META_TRANSACTION_TYPE } from 'decentraland-transactions'
 import { ADDRESS_REGEX } from './address'
+import { EIP712_DOMAIN_FIELD_TYPES } from './eip712Domain'
 import { MalformedSignatureRequestError } from './errors'
 
 const META_TRANSACTION_PRIMARY_TYPE = 'MetaTransaction'
 // A 4-byte function selector followed by whole bytes of arguments.
 const CALLDATA_REGEX = /^0x[0-9a-fA-F]{8}([0-9a-fA-F]{2})*$/
-// The fields EIP-712 defines for a domain, with the types the standard gives them. A Decentraland
-// contract hashes its domain with exactly these types, and a wallet asked to derive the struct from the
-// domain (when `types.EIP712Domain` is absent) knows these names and no other.
-const EIP712_DOMAIN_FIELD_TYPES: ReadonlyMap<string, string> = new Map([
-  ['name', 'string'],
-  ['version', 'string'],
-  ['chainId', 'uint256'],
-  ['verifyingContract', 'address'],
-  ['salt', 'bytes32']
-])
 
 type TypedDataField = { name: string; type: string }
 

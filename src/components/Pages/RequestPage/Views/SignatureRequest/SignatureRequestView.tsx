@@ -48,12 +48,14 @@ export const SignatureRequestView = ({
   // The statement the user ticked, if any (see acknowledgmentStatement below).
   const [acknowledgedStatement, setAcknowledgedStatement] = useState<string | null>(null)
 
-  const { review, reviewError } = useMemo(() => {
+  // The request page has already held a web2 typed-data payload to this review, so a failure here is a
+  // defensive fallback: say the fields could not be checked and keep approval closed.
+  const { review, isReviewUnavailable } = useMemo(() => {
     if (payload?.kind !== 'typedData' || isMetaTransaction) return {}
     try {
       return { review: resolveTypedDataReview(payload.typedData, method) }
-    } catch (error) {
-      return { reviewError: error instanceof Error ? error.message : 'Invalid typed data' }
+    } catch {
+      return { isReviewUnavailable: true }
     }
   }, [payload, isMetaTransaction, method])
   const domain = isMetaTransaction && payload?.kind === 'typedData' ? payload.typedData.domain : review?.domain
@@ -102,7 +104,11 @@ export const SignatureRequestView = ({
       <Content>
         <MethodChip>{method}</MethodChip>
         {review ? <MethodChip>{review.primaryType}</MethodChip> : null}
-        {reviewError ? <Notice role="alert">{reviewError}</Notice> : null}
+        {isReviewUnavailable ? (
+          <Notice role="alert" data-testid="signature-review-unavailable">
+            {t('request.signature.review_unavailable')}
+          </Notice>
+        ) : null}
 
         {payload?.kind === 'message' ? (
           <Section>
@@ -219,7 +225,7 @@ export const SignatureRequestView = ({
           variant="contained"
           color={isReverted ? 'error' : 'primary'}
           disabled={
-            Boolean(reviewError) ||
+            Boolean(isReviewUnavailable) ||
             isLoading ||
             simulation.status === 'loading' ||
             isContractTrustPending ||

@@ -1,5 +1,6 @@
 import { getTypesForEIP712Domain, hashTypedData } from 'viem'
 import { ADDRESS_REGEX } from './address'
+import { EIP712_DOMAIN_FIELD_TYPES } from './eip712Domain'
 import { MalformedSignatureRequestError } from './errors'
 
 type Field = { name: string; type: string }
@@ -11,27 +12,33 @@ type TypedDataReview = {
   hash: string
 }
 
-const DOMAIN_TYPES = new Map([
-  ['name', 'string'],
-  ['version', 'string'],
-  ['chainId', 'uint256'],
-  ['verifyingContract', 'address'],
-  ['salt', 'bytes32']
-])
 const IDENTIFIER = /^[a-zA-Z_][a-zA-Z0-9_]*$/
 const INTEGER =
   /^(u?int)(8|16|24|32|40|48|56|64|72|80|88|96|104|112|120|128|136|144|152|160|168|176|184|192|200|208|216|224|232|240|248|256)$/
 const BYTES = /^bytes([1-9]|[12][0-9]|3[0-2])?$/
 const ARRAY = /^(.*)\[([1-9][0-9]*)?\]$/
+// Characters a rendered string cannot show faithfully: controls, format characters such as the bidi
+// overrides that reorder their neighbours, separators, unassigned code points and U+FFFD. Tab, newline and
+// carriage return are the only controls a value may carry as-is.
+const UNREADABLE_CHARACTER = /(?![\t\n\r])[\p{C}\p{Zl}\p{Zp}�]/gu
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
 const isScalar = (type: string): boolean => ['address', 'bool', 'string'].includes(type) || INTEGER.test(type) || BYTES.test(type)
+/**
+ * Shows every character of a signed string, including the ones that would otherwise reorder or hide
+ * their neighbours, as a visible escape. Only the display changes; the signed bytes are untouched.
+ */
+const escapeUnreadable = (text: string): string =>
+  text.replace(UNREADABLE_CHARACTER, character => `\\u{${(character.codePointAt(0) ?? 0).toString(16)}}`)
 
 /**
- * Validates generic EIP-712 data and builds its review from the signed schema, never arbitrary
- * message properties. Rejects unsigned/missing fields recursively, ambiguous scalar coercions,
- * and domains the encoder would only partially sign. This does not establish a permit/order's
- * safety; existing signature-risk acknowledgments still apply. The original request is not rewritten.
- * Depth/work limits bound traversal of untrusted structures before hashing or rendering them.
+ * Validates generic EIP-712 data and builds its review from the signed schema, never from arbitrary
+ * message properties. Only what the signature reaches is held to the rules: the primary type, every
+ * struct it references, and the domain. A struct the primary type never reaches is not signed, so it is
+ * neither validated nor shown. Within what is signed, undeclared or missing fields, ambiguous scalar
+ * coercions and a domain the encoder would only partially sign are rejected, because the review could
+ * not then show exactly what is signed. This does not establish a permit's or an order's safety; the
+ * signature-risk acknowledgments still apply. The original request is never rewritten.
+ * Depth and work limits bound the traversal of untrusted structures before hashing or rendering them.
  */
 function resolveTypedDataReview(typedData: unknown, method: string): TypedDataReview {
   const reject = (reason: string): never => {
@@ -44,18 +51,20 @@ function resolveTypedDataReview(typedData: unknown, method: string): TypedDataRe
   if (typeof primaryType !== 'string' || primaryType === 'EIP712Domain') {
     return reject('typed data must declare a message primaryType')
   }
-  const types = new Map<string, Field[]>()
   let budget = 10000
   const spend = (depth: number) => {
     if (depth > 32 || --budget < 0) reject('typed data is too complex to review')
   }
+
+  // Definitions are read leniently: one that is malformed is left out, and only matters if the
+  // signature reaches it, which the walk below detects as a reference to a type that does not exist.
+  const types = new Map<string, Field[]>()
   for (const [name, fields] of Object.entries(typedData.types)) {
     spend(0)
-    if (!IDENTIFIER.test(name) || isScalar(name) || !Array.isArray(fields)) {
-      return reject('typed data contains an invalid struct definition')
-    }
+    if (!IDENTIFIER.test(name) || !Array.isArray(fields)) continue
     const names = new Set<string>()
     const definition: Field[] = []
+    let isWellFormed = true
     for (const field of fields) {
       spend(0)
       if (
@@ -65,38 +74,48 @@ function resolveTypedDataReview(typedData: unknown, method: string): TypedDataRe
         typeof field.type !== 'string' ||
         names.has(field.name)
       ) {
-        return reject('typed data contains an invalid or duplicate field definition')
+        isWellFormed = false
+        break
       }
       names.add(field.name)
       definition.push({ name: field.name, type: field.type })
     }
-    types.set(name, definition)
+    if (isWellFormed) types.set(name, definition)
   }
-  // Check references even in empty arrays or unused structs. EIP-712 v3 cannot sign arrays.
-  const validateType = (type: string, depth: number): void => {
+
+  // Walk the types the signature covers, from the primary type down. EIP-712 v3 cannot sign arrays, and
+  // a struct named like a built-in type would be encoded as a struct by some encoders and as the
+  // built-in by others, so neither may appear where the signature reaches.
+  const reachable = new Set<string>()
+  const visitType = (type: string, depth: number): void => {
     spend(depth)
     const array = ARRAY.exec(type)
     if (array) {
       if (method.toLowerCase() === 'eth_signtypeddata_v3') reject('typed-data arrays require eth_signTypedData_v4')
       if (array[2] && !Number.isSafeInteger(Number(array[2]))) reject('typed data has an invalid array length')
-      validateType(array[1], depth + 1)
-    } else if (!isScalar(type) && !types.has(type)) {
-      reject('typed data references an undefined type')
+      return visitType(array[1], depth + 1)
     }
+    if (isScalar(type)) {
+      if (types.has(type)) reject('a typed-data struct shadows a built-in type')
+      return
+    }
+    const fields = types.get(type)
+    if (!fields) return reject('typed data references an undefined or malformed type')
+    if (reachable.has(type)) return
+    reachable.add(type)
+    for (const field of fields) visitType(field.type, depth + 1)
   }
-  for (const fields of types.values()) {
-    for (const field of fields) validateType(field.type, 0)
-  }
-  if (!types.has(primaryType)) return reject('typed data has no definition for its primaryType')
+  visitType(primaryType, 0)
 
   const domainKeys = Object.keys(domain)
-  if (domainKeys.some(key => !DOMAIN_TYPES.has(key))) return reject('the domain contains a non-standard field')
+  if (domainKeys.some(key => !EIP712_DOMAIN_FIELD_TYPES.has(key))) return reject('the domain contains a non-standard field')
+  if ('EIP712Domain' in typedData.types && !types.has('EIP712Domain')) return reject('the domain type is malformed')
   // Match the actual encoder's derivation when EIP712Domain is omitted. It can omit a string
   // chainId, so do not display such a value as if it bound the signature to a network.
-  const domainFields = types.get('EIP712Domain') ?? getTypesForEIP712Domain({ domain })
+  const domainFields: Field[] = types.get('EIP712Domain') ?? [...getTypesForEIP712Domain({ domain })]
   if (
     domainFields.length !== domainKeys.length ||
-    domainFields.some(field => !domainKeys.includes(field.name) || DOMAIN_TYPES.get(field.name) !== field.type)
+    domainFields.some(field => !domainKeys.includes(field.name) || EIP712_DOMAIN_FIELD_TYPES.get(field.name) !== field.type)
   ) {
     return reject('the domain type does not match the domain fields')
   }
@@ -138,10 +157,13 @@ function resolveTypedDataReview(typedData: unknown, method: string): TypedDataRe
       if (number < (signed ? -limit : 0n) || number >= limit) return reject('a typed-data integer is out of range')
       return { name, type, value: number.toString() }
     }
+    if (type === 'string') {
+      if (typeof value !== 'string') return reject('a typed-data value does not match its declared scalar type')
+      return { name, type, value: escapeUnreadable(value) }
+    }
     const bytes = BYTES.exec(type)
     if (
       (type === 'bool' && typeof value !== 'boolean') ||
-      (type === 'string' && typeof value !== 'string') ||
       (type === 'address' && (typeof value !== 'string' || !ADDRESS_REGEX.test(value))) ||
       (bytes &&
         (typeof value !== 'string' || !/^0x(?:[0-9a-fA-F]{2})*$/.test(value) || (bytes[1] && value.length !== 2 + Number(bytes[1]) * 2)))
@@ -151,7 +173,7 @@ function resolveTypedDataReview(typedData: unknown, method: string): TypedDataRe
     return { name, type, value: String(value) }
   }
   reviewValue('domain', 'EIP712Domain', domain, 0)
-  const fields = reviewValue('message', primaryType, message, 0).children!
+  const fields = reviewValue('message', primaryType, message, 0).children ?? []
   let hash: string
   try {
     hash = hashTypedData(typedData as unknown as Parameters<typeof hashTypedData>[0])

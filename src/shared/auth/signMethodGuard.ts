@@ -2,7 +2,6 @@ import { hexToString } from 'viem'
 import { ADDRESS_REGEX } from './address'
 import { ImpersonatedSignInError, MalformedSignatureRequestError, MalformedTransactionRequestError, UnsupportedMethodError } from './errors'
 import { isMetaTransactionTypedData, resolveMetaTransactionTypedData } from './metaTransactionTypedData'
-import { resolveTypedDataReview } from './typedDataReview'
 
 // The only methods the auth site is willing to forward to the connected wallet. Anything
 // outside this set is rejected at recover time (see {@link assertMethodIsAllowed}).
@@ -174,8 +173,9 @@ function hasPrimaryType(typedData: unknown): boolean {
 /**
  * Rejects signature params that are not in the canonical EIP-1193 order for their method.
  * Typed data must be `[signer, typedData]`; personal_sign must be `[message, signer]`.
- * Generic typed data is validated recursively against its signed schema, including its domain;
- * undeclared display fields and malformed values are rejected, not forwarded to the wallet.
+ * Other typed data is not held to its schema here: an external wallet shows the payload itself, so a
+ * request it can sign must not be turned away for a quirk the review cannot render. The request page
+ * runs that review (resolveTypedDataReview) for web2 wallets only, where this site is the confirmation.
  *
  * A typed-data MetaTransaction is additionally held to the exact struct, message and domain a
  * Decentraland contract signs (see {@link resolveMetaTransactionTypedData}): its preview simulates
@@ -208,8 +208,6 @@ function assertSignatureParamsAreCanonical(method: string, params: unknown[] | u
   if (isMetaTransactionTypedData(typedData)) {
     // Validation only: the request page resolves the call again when it simulates.
     resolveMetaTransactionTypedData(typedData, method)
-  } else {
-    resolveTypedDataReview(typedData, method)
   }
 }
 

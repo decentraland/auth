@@ -70,8 +70,9 @@ describe('when reviewing a schema-bound signature', () => {
       expect(screen.queryByText('Additional description')).not.toBeInTheDocument()
     })
 
-    it('should explain that the fields do not match', () => {
-      expect(screen.getByRole('alert')).toHaveTextContent('does not match its declared fields')
+    it("should say the fields could not be checked, in the user's language rather than as a raw error", () => {
+      expect(screen.getByTestId('signature-review-unavailable')).toHaveTextContent('request.signature.review_unavailable')
+      expect(screen.queryByText(/does not match its declared fields/)).not.toBeInTheDocument()
     })
 
     it('should not enable approval even after acknowledgment', async () => {
