@@ -2,6 +2,7 @@ import { useLayoutEffect } from 'react'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { SimulationResponseBody } from '../../../../../shared/auth'
+import { DAPP_USER, DappTypedData, SIGNED_BY_DAPPS } from '../../../../../shared/auth/__fixtures__/decentralandTypedData'
 import { SignaturePayload, SimulationState } from '../../types'
 import { SignatureRequestView } from './SignatureRequestView'
 import { SignatureRequestViewProps } from './SignatureRequest.types'
@@ -58,6 +59,36 @@ describe('when reviewing a schema-bound signature', () => {
   it('should display the signed domain salt', () => {
     render(<SignatureRequestView {...props} />)
     expect(screen.getByText(String(typedData.domain.salt))).toBeInTheDocument()
+  })
+
+  describe('and the payload is the Trade the marketplace asks a seller to sign', () => {
+    let trade: DappTypedData
+
+    beforeEach(() => {
+      trade = SIGNED_BY_DAPPS['off-chain marketplace Trade'].payload
+      props.payload = { kind: 'typedData', typedData: trade, raw: JSON.stringify(trade) }
+      props.requiresAcknowledgment = false
+    })
+
+    it('should render the whole signed trade as a tree, down to the external check', () => {
+      render(<SignatureRequestView {...props} />)
+      expect(screen.getByText('Trade')).toBeInTheDocument()
+      expect(screen.getByText(String(trade.domain.salt))).toBeInTheDocument()
+      expect(screen.getByText('checks (Checks):')).toBeInTheDocument()
+      expect(screen.getByText('externalChecks (ExternalCheck[]):')).toBeInTheDocument()
+      expect(screen.getByText('[0] (ExternalCheck):')).toBeInTheDocument()
+      expect(screen.getByText('0x70a08231')).toBeInTheDocument()
+      expect(screen.getByText('sent (AssetWithoutBeneficiary[]):')).toBeInTheDocument()
+      expect(screen.getByText(String((trade.message.sent as { value: string }[])[0].value))).toBeInTheDocument()
+      expect(screen.getByText('received (Asset[]):')).toBeInTheDocument()
+      expect(screen.getByText(DAPP_USER)).toBeInTheDocument()
+    })
+
+    it('should let the user approve it', () => {
+      render(<SignatureRequestView {...props} />)
+      expect(screen.queryByTestId('signature-review-unavailable')).not.toBeInTheDocument()
+      expect(screen.getByTestId('signature-approve-button')).toBeEnabled()
+    })
   })
 
   describe('and an unsigned field is supplied', () => {
