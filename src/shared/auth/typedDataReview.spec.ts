@@ -2,7 +2,7 @@ import { hashTypedData } from 'viem'
 import { DAPP_USER, SIGNED_BY_DAPPS, SignedByDapp } from './__fixtures__/decentralandTypedData'
 import { MalformedSignatureRequestError } from './errors'
 import { assertSignatureParamsAreCanonical } from './signMethodGuard'
-import { MAX_SCALAR_LENGTH, MAX_TOTAL_LENGTH, TypedDataReviewNode, resolveTypedDataReview } from './typedDataReview'
+import { MAX_SCALAR_LENGTH, MAX_TOTAL_LENGTH, MAX_TYPE_DEFINITIONS, TypedDataReviewNode, resolveTypedDataReview } from './typedDataReview'
 
 type Payload = {
   primaryType: string
@@ -167,6 +167,13 @@ describe('when reviewing generic typed data', () => {
         { name: 'a', type: 'uint256' },
         { name: 'a', type: 'uint256' }
       ]
+    })
+
+    it('should sign the same digest as a request without it', () => {
+      const { Junk: _unreached, ...signedTypes } = payload.types
+      expect(resolveTypedDataReview(payload, method).hash).toBe(
+        hashTypedData({ ...payload, types: signedTypes } as Parameters<typeof hashTypedData>[0])
+      )
     })
 
     it('should ignore it because it is not signed', () => {
@@ -459,6 +466,29 @@ describe('when reviewing generic typed data', () => {
 
     it('should reject the request by what the tree would render, not by the declaration alone', () => {
       expect(() => resolveTypedDataReview(payload, method)).toThrow('too large to review')
+    })
+  })
+
+  describe('and the types declare more definitions than any schema needs', () => {
+    beforeEach(() => {
+      for (let index = 0; index <= MAX_TYPE_DEFINITIONS; index++) {
+        payload.types[`Unused${index}`] = [{ name: 'x', type: 'uint8' }]
+      }
+    })
+
+    it('should reject the request before reading the definitions', () => {
+      expect(() => resolveTypedDataReview(payload, method)).toThrow('too many types')
+    })
+  })
+
+  describe.each(['message', 'domain'] as const)('and the %s carries thousands of keys the schema does not declare', container => {
+    beforeEach(() => {
+      const target = payload[container]
+      for (let index = 0; index < 5000; index++) target[`extra${index}`] = index
+    })
+
+    it('should reject the request with the typed error', () => {
+      expect(() => resolveTypedDataReview(payload, method)).toThrow(MalformedSignatureRequestError)
     })
   })
 

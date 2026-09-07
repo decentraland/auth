@@ -40,3 +40,26 @@ describe('when displaying schema-bound typed data', () => {
     expect(screen.getByText('[]')).toBeInTheDocument()
   })
 })
+
+describe('when a signed field has a long identifier', () => {
+  let longName: string
+
+  beforeEach(() => {
+    longName = 'field'.padEnd(300, 'x')
+    const { fields } = resolveTypedDataReview(
+      {
+        primaryType: 'Order',
+        domain: {},
+        // eslint-disable-next-line @typescript-eslint/naming-convention
+        types: { Order: [{ name: longName, type: 'uint8' }] },
+        message: { [longName]: 1 }
+      },
+      'eth_signTypedData_v4'
+    )
+    render(<TypedDataTree fields={fields} />)
+  })
+
+  it('should wrap the key instead of letting it overflow the review', () => {
+    expect(screen.getByText(`${longName} (uint8):`)).toHaveStyle({ overflowWrap: 'anywhere', minWidth: 0 })
+  })
+})

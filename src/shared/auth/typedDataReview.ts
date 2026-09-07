@@ -23,6 +23,8 @@ const ARRAY = /^(.*)\[([1-9][0-9]*)?\]$/
 // keep escaping, rendering and hashing bounded before the user can decline.
 const MAX_SCALAR_LENGTH = 64 * 1024
 const MAX_TOTAL_LENGTH = 512 * 1024
+// More struct definitions than any schema needs; the largest in the wild declare a dozen or two.
+const MAX_TYPE_DEFINITIONS = 256
 // Characters a rendered string cannot show faithfully: controls (tab, newline and carriage return among
 // them, which the page would otherwise collapse into plain spacing), format characters such as the bidi
 // overrides that reorder their neighbours, separators, unassigned code points and U+FFFD. The backslash is
@@ -35,6 +37,15 @@ const SHORT_ESCAPES: ReadonlyMap<string, string> = new Map([
   ['\r', '\\r']
 ])
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
+// Counts an object's own keys only up to a limit, so one with far more keys than the review could accept
+// is turned away without first listing them all.
+const hasMoreKeysThan = (value: object, limit: number): boolean => {
+  let count = 0
+  for (const key in value) {
+    if (Object.prototype.hasOwnProperty.call(value, key) && ++count > limit) return true
+  }
+  return false
+}
 const isScalar = (type: string): boolean => ['address', 'bool', 'string'].includes(type) || INTEGER.test(type) || BYTES.test(type)
 /**
  * Shows every character of a signed string, including the ones that would otherwise reorder, hide or
@@ -54,7 +65,9 @@ const escapeUnreadable = (text: string): string =>
  * signature-risk acknowledgments still apply. The original request is never rewritten.
  * The domain comes back in the same display form as the fields, never as the payload's own object: its
  * name and version are what a request would forge to look like a trusted application.
- * Depth, work and size limits bound the traversal, escaping, rendering and hashing of untrusted structures.
+ * Depth, work and size limits bound the traversal, escaping, rendering and hashing of untrusted structures:
+ * every container is bounded before it is enumerated, and the digest is taken over the validated
+ * representation rather than the request object as received.
  */
 function resolveTypedDataReview(typedData: unknown, method: string): TypedDataReview {
   const reject = (reason: string): never => {
@@ -84,6 +97,7 @@ function resolveTypedDataReview(typedData: unknown, method: string): TypedDataRe
 
   // Definitions are read leniently: one that is malformed is left out, and only matters if the
   // signature reaches it, which the walk below detects as a reference to a type that does not exist.
+  if (hasMoreKeysThan(typedData.types, MAX_TYPE_DEFINITIONS)) return reject('typed data declares too many types')
   const types = new Map<string, Field[]>()
   for (const [name, fields] of Object.entries(typedData.types)) {
     spend(0)
@@ -139,6 +153,7 @@ function resolveTypedDataReview(typedData: unknown, method: string): TypedDataRe
   }
   visitType(primaryType, 0)
 
+  if (hasMoreKeysThan(domain, EIP712_DOMAIN_FIELD_TYPES.size)) return reject('the domain contains a non-standard field')
   const domainKeys = Object.keys(domain)
   if (domainKeys.some(key => !EIP712_DOMAIN_FIELD_TYPES.has(key))) return reject('the domain contains a non-standard field')
   if ('EIP712Domain' in typedData.types && !types.has('EIP712Domain')) return reject('the domain type is malformed')
@@ -175,8 +190,7 @@ function resolveTypedDataReview(typedData: unknown, method: string): TypedDataRe
     const fields = types.get(type)
     if (fields) {
       if (!isRecord(value)) return reject('a typed-data struct must be an object')
-      const keys = Object.keys(value)
-      if (keys.length !== fields.length || fields.some(field => !Object.prototype.hasOwnProperty.call(value, field.name))) {
+      if (hasMoreKeysThan(value, fields.length) || fields.some(field => !Object.prototype.hasOwnProperty.call(value, field.name))) {
         return reject('a typed-data object does not match its declared fields')
       }
       return { name, type, children: fields.map(field => reviewValue(field.name, field.type, value[field.name], depth + 1)) }
@@ -225,14 +239,19 @@ function resolveTypedDataReview(typedData: unknown, method: string): TypedDataRe
     (reviewValue('domain', 'EIP712Domain', domain, 0).children ?? []).map(node => [node.name, node.value ?? ''])
   )
   const fields = reviewValue('message', primaryType, message, 0).children ?? []
+  // The digest is taken over what was validated, never the request object as received: the definitions
+  // the signature reaches, the domain type as it is signed, and a domain and message whose every key has
+  // been checked. EIP-712 hashes exactly that, so it equals the digest a wallet computes over the request.
+  const signedTypes: Record<string, Field[]> = Object.fromEntries([...reachable].map(name => [name, types.get(name) ?? []]))
+  signedTypes.EIP712Domain = domainFields
   let hash: string
   try {
-    hash = hashTypedData(typedData as unknown as Parameters<typeof hashTypedData>[0])
+    hash = hashTypedData({ primaryType, domain, message, types: signedTypes } as unknown as Parameters<typeof hashTypedData>[0])
   } catch {
     return reject('typed data cannot be encoded for signing')
   }
   return { primaryType, domain: reviewedDomain, fields, hash }
 }
 
-export { MAX_SCALAR_LENGTH, MAX_TOTAL_LENGTH, resolveTypedDataReview }
+export { MAX_SCALAR_LENGTH, MAX_TOTAL_LENGTH, MAX_TYPE_DEFINITIONS, resolveTypedDataReview }
 export type { TypedDataReview, TypedDataReviewNode }

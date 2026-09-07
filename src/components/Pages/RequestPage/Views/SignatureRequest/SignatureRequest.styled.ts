@@ -122,7 +122,9 @@ const Section = styled(Box)(({ theme }) => ({
   gap: theme.spacing(1)
 }))
 
+// Keys are signed identifiers too, and may be long: they wrap like any other signed text.
 const TreeKey = styled('span')(({ theme }) => ({
+  ...signedText,
   color: theme.palette.text.secondary,
   fontWeight: 600
 }))
@@ -138,8 +140,8 @@ const TreeNode = styled(Box)<{ depth: number }>(({ theme, depth }) => ({
 // Signed text is shown with its spacing intact: runs of spaces are part of what is signed, and the review
 // escapes every character that could break a line or hide itself, so nothing here can wrap by surprise.
 const TreeValue = styled('span')(({ theme }) => ({
+  ...signedText,
   color: theme.palette.text.primary,
-  whiteSpace: 'pre-wrap',
   wordBreak: 'break-word'
 }))
 
