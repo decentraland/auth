@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/naming-convention */
 /* eslint-disable @typescript-eslint/unbound-method */
-import { createPublicClient, decodeFunctionData, formatEther } from 'viem'
+import { createPublicClient, custom, decodeFunctionData, formatEther } from 'viem'
 import { Rarity } from '@dcl/schemas'
 import { ChainId } from '@dcl/schemas/dist/dapps/chain-id'
 import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
@@ -26,9 +26,11 @@ import {
   getNetworkProvider,
   getSigninDeeplink,
   isApprovalGrantingTypedData,
+  isDecentralandCollection,
   isDecentralandContractAddress,
   isExactNftTransferSimulation,
   isKnownDecentralandContractOnChain,
+  isNftOwnedBy,
   isOpaqueSignatureMessage,
   isSignatureMethod
 } from './utils'
@@ -473,6 +475,20 @@ describe('when testing decodeNftTransferData', () => {
     })
   })
 
+  describe('and a transfer decodes with a sender that is not an address', () => {
+    beforeEach(() => {
+      jest.mocked(decodeFunctionData).mockReturnValueOnce({
+        functionName: 'transferFrom',
+        args: [BigInt(7), '0xto', BigInt(9)]
+      })
+    })
+
+    it('should return null', () => {
+      const result = decodeNftTransferData(transactionData, contractABI)
+      expect(result).toBeNull()
+    })
+  })
+
   describe('and a transfer decodes with a token id that is not a single uint256', () => {
     beforeEach(() => {
       jest.mocked(decodeFunctionData).mockReturnValueOnce({
@@ -891,6 +907,233 @@ describe('when testing decodeManaTransferData', () => {
   })
 })
 
+describe('when testing isDecentralandCollection', () => {
+  let contractAddress: string
+  let mockNetworkProvider: any
+  let mockWalletProvider: any
+  let mockReadContract: jest.Mock
+
+  beforeEach(() => {
+    contractAddress = '0xcollection'
+    jest.mocked(config.get).mockReturnValue('production')
+    jest.mocked(getContract).mockImplementation((name: string) => ({ address: `0xfactory-${name}`, abi: [] }) as any)
+    // A connected wallet is available and already on the meta-transaction chain: the one case where
+    // getNetworkProvider would hand back the wallet's own RPC instead of Decentraland's.
+    mockWalletProvider = { isWalletProvider: true }
+    mockNetworkProvider = { isNetworkProvider: true }
+    jest.mocked(connection.getProvider).mockResolvedValue(mockWalletProvider)
+    jest.mocked(connection.createProvider).mockReturnValue(mockNetworkProvider)
+    mockReadContract = jest.fn()
+    jest.mocked(createPublicClient).mockReturnValue({ readContract: mockReadContract, getChainId: jest.fn().mockResolvedValue(137) } as any)
+  })
+
+  afterEach(() => {
+    jest.resetAllMocks()
+    jest.useRealTimers()
+  })
+
+  describe('and a connected wallet reports the same chain', () => {
+    beforeEach(() => {
+      mockReadContract.mockResolvedValue(true)
+    })
+
+    it("should read the factories through Decentraland's own RPC for the meta-transaction chain", async () => {
+      await isDecentralandCollection(contractAddress)
+      expect(connection.createProvider).toHaveBeenCalledWith(ProviderType.NETWORK, ChainId.MATIC_MAINNET)
+      expect(custom).toHaveBeenCalledWith(mockNetworkProvider)
+    })
+
+    it('should never consult the connected wallet, whose RPC the user may have been talked into replacing', async () => {
+      await isDecentralandCollection(contractAddress)
+      expect(connection.getProvider).not.toHaveBeenCalled()
+      expect(connection.tryPreviousConnection).not.toHaveBeenCalled()
+      expect(custom).not.toHaveBeenCalledWith(mockWalletProvider)
+    })
+  })
+
+  describe('and one of the collection factories deployed the contract', () => {
+    beforeEach(() => {
+      mockReadContract.mockResolvedValueOnce(false).mockResolvedValueOnce(true)
+    })
+
+    it('should return true', async () => {
+      await expect(isDecentralandCollection(contractAddress)).resolves.toBe(true)
+    })
+
+    it('should ask each factory whether it deployed that contract', async () => {
+      await isDecentralandCollection(contractAddress)
+      expect(mockReadContract).toHaveBeenCalledTimes(2)
+      expect(mockReadContract).toHaveBeenCalledWith(
+        expect.objectContaining({
+          address: '0xfactory-CollectionFactory',
+          functionName: 'isCollectionFromFactory',
+          args: [contractAddress]
+        })
+      )
+      expect(mockReadContract).toHaveBeenCalledWith(
+        expect.objectContaining({
+          address: '0xfactory-CollectionFactoryV3',
+          functionName: 'isCollectionFromFactory',
+          args: [contractAddress]
+        })
+      )
+    })
+  })
+
+  describe('and one factory read fails while the other factory says it deployed the contract', () => {
+    beforeEach(() => {
+      mockReadContract.mockImplementation(({ address }: { address: string }) =>
+        address === '0xfactory-CollectionFactory' ? Promise.reject(new Error('rpc down')) : Promise.resolve(true)
+      )
+    })
+
+    it('should return true because one yes is the whole answer', async () => {
+      await expect(isDecentralandCollection(contractAddress)).resolves.toBe(true)
+    })
+  })
+
+  describe('and one factory read fails while the other factory says it did not deploy the contract', () => {
+    beforeEach(() => {
+      mockReadContract.mockImplementation(({ address }: { address: string }) =>
+        address === '0xfactory-CollectionFactory' ? Promise.reject(new Error('rpc down')) : Promise.resolve(false)
+      )
+    })
+
+    it('should throw because nothing vouched for the contract and nothing ruled it out', async () => {
+      await expect(isDecentralandCollection(contractAddress)).rejects.toThrow('rpc down')
+    })
+  })
+
+  describe('and no collection factory deployed the contract', () => {
+    beforeEach(() => {
+      mockReadContract.mockResolvedValue(false)
+    })
+
+    it('should return false', async () => {
+      await expect(isDecentralandCollection(contractAddress)).resolves.toBe(false)
+    })
+  })
+
+  describe('and the chain cannot be asked', () => {
+    beforeEach(() => {
+      mockReadContract.mockRejectedValue(new Error('rpc down'))
+    })
+
+    it('should throw instead of answering, so an outage is not read as a verdict', async () => {
+      await expect(isDecentralandCollection(contractAddress)).rejects.toThrow('rpc down')
+    })
+  })
+
+  describe('and the chain does not answer', () => {
+    beforeEach(() => {
+      jest.useFakeTimers()
+      mockReadContract.mockImplementation(() => new Promise(() => undefined))
+    })
+
+    it('should give up after the lookup timeout so the review falls back instead of hanging', async () => {
+      const lookup = isDecentralandCollection(contractAddress)
+      const outcome = expect(lookup).rejects.toThrow('timed out')
+      await jest.advanceTimersByTimeAsync(10_000)
+      await outcome
+    })
+  })
+
+  describe('and no collection factory exists on the meta-transaction chain', () => {
+    beforeEach(() => {
+      jest.mocked(getContract).mockImplementation(() => {
+        throw new Error('not deployed')
+      })
+    })
+
+    it('should return false without asking the chain', async () => {
+      await expect(isDecentralandCollection(contractAddress)).resolves.toBe(false)
+      expect(mockReadContract).not.toHaveBeenCalled()
+    })
+  })
+})
+
+describe('when testing isNftOwnedBy', () => {
+  let contractAddress: string
+  let contractABI: object[]
+  let owner: string
+  let mockNetworkProvider: any
+  let mockWalletProvider: any
+  let mockReadContract: jest.Mock
+
+  beforeEach(() => {
+    contractAddress = '0xcollection'
+    contractABI = [{ type: 'function', name: 'ownerOf' }]
+    owner = '0x0000000000000000000000000000000000000AbC'
+    jest.mocked(config.get).mockReturnValue('production')
+    mockWalletProvider = { isWalletProvider: true }
+    mockNetworkProvider = { isNetworkProvider: true }
+    jest.mocked(connection.getProvider).mockResolvedValue(mockWalletProvider)
+    jest.mocked(connection.createProvider).mockReturnValue(mockNetworkProvider)
+    mockReadContract = jest.fn()
+    jest.mocked(createPublicClient).mockReturnValue({ readContract: mockReadContract, getChainId: jest.fn().mockResolvedValue(137) } as any)
+  })
+
+  afterEach(() => {
+    jest.resetAllMocks()
+    jest.useRealTimers()
+  })
+
+  describe('and the chain reports the expected owner, in another casing', () => {
+    beforeEach(() => {
+      mockReadContract.mockResolvedValue(owner.toLowerCase())
+    })
+
+    it('should return true', async () => {
+      await expect(isNftOwnedBy(contractAddress, contractABI, '7', owner)).resolves.toBe(true)
+    })
+
+    it("should ask the collection who holds that token, through Decentraland's own RPC", async () => {
+      await isNftOwnedBy(contractAddress, contractABI, '7', owner)
+      expect(mockReadContract).toHaveBeenCalledWith(
+        expect.objectContaining({ address: contractAddress, functionName: 'ownerOf', args: [BigInt(7)] })
+      )
+      expect(connection.createProvider).toHaveBeenCalledWith(ProviderType.NETWORK, ChainId.MATIC_MAINNET)
+      expect(connection.getProvider).not.toHaveBeenCalled()
+      expect(custom).toHaveBeenCalledWith(mockNetworkProvider)
+      expect(custom).not.toHaveBeenCalledWith(mockWalletProvider)
+    })
+  })
+
+  describe('and the chain reports another holder', () => {
+    beforeEach(() => {
+      mockReadContract.mockResolvedValue('0x0000000000000000000000000000000000000009')
+    })
+
+    it('should return false', async () => {
+      await expect(isNftOwnedBy(contractAddress, contractABI, '7', owner)).resolves.toBe(false)
+    })
+  })
+
+  describe('and the token does not exist', () => {
+    beforeEach(() => {
+      mockReadContract.mockRejectedValue(new Error('ERC721: owner query for nonexistent token'))
+    })
+
+    it('should throw so the caller falls back to the generic review', async () => {
+      await expect(isNftOwnedBy(contractAddress, contractABI, '7', owner)).rejects.toThrow('nonexistent token')
+    })
+  })
+
+  describe('and the chain does not answer', () => {
+    beforeEach(() => {
+      jest.useFakeTimers()
+      mockReadContract.mockImplementation(() => new Promise(() => undefined))
+    })
+
+    it('should give up after the lookup timeout', async () => {
+      const lookup = isNftOwnedBy(contractAddress, contractABI, '7', owner)
+      const outcome = expect(lookup).rejects.toThrow('timed out')
+      await jest.advanceTimersByTimeAsync(10_000)
+      await outcome
+    })
+  })
+})
+
 describe('when testing fetchNftMetadata', () => {
   let contractAddress: string
   let contractABI: object[]
@@ -948,6 +1191,13 @@ describe('when testing fetchNftMetadata', () => {
         description: 'A test NFT',
         rarity: Rarity.COMMON
       })
+    })
+
+    it("should read the token URI through Decentraland's own RPC and never the connected wallet", async () => {
+      await fetchNftMetadata(contractAddress, contractABI, tokenId)
+      expect(connection.createProvider).toHaveBeenCalledWith(ProviderType.NETWORK, ChainId.MATIC_MAINNET)
+      expect(connection.getProvider).not.toHaveBeenCalled()
+      expect(connection.tryPreviousConnection).not.toHaveBeenCalled()
     })
   })
 
