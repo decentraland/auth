@@ -2,6 +2,9 @@ import { TransferType } from '../../../types'
 import type { MANATransferData, NFTTransferData } from '../../../types'
 
 type BaseProps = {
+  showPreviewLimitations?: boolean
+  targetAddress?: string
+  targetChainId?: number
   isLoading: boolean
   onApprove: () => Promise<void>
   onDeny: () => void

@@ -33,6 +33,9 @@ test.describe('Web2 transaction simulation & signature preview views', () => {
       await expect(page.getByText('Permissions granted')).toBeVisible()
       await expect(page.getByText(/unlimited/i)).toBeVisible()
       await expect(page.getByText('Gas fees are covered by Decentraland.')).toBeVisible()
+      await expect(
+        page.getByText('This preview estimates asset movements and token permissions. Other changes may not be shown.')
+      ).toBeVisible()
       await expect(page.getByRole('button', { name: 'Allow' })).toBeVisible()
       await expect(page.getByRole('button', { name: 'Deny' })).toBeVisible()
     })
@@ -60,6 +63,21 @@ test.describe('Web2 transaction simulation & signature preview views', () => {
   })
 
   test.describe('when a preview of the transaction is unavailable', () => {
+    test('should offer retry and explicit acknowledged approval without a preview on mobile', async ({ page }) => {
+      await page.setViewportSize({ width: 390, height: 844 })
+      await page.goto(testView('walletInteractionUnavailable'))
+
+      await expect(page.getByRole('button', { name: 'Retry preview' })).toBeVisible({ timeout: 15_000 })
+      await expect(page.getByRole('button', { name: 'Approve without preview' })).toBeDisabled()
+      await expect(
+        page.getByText('This request targets a known Decentraland contract on Polygon. This does not guarantee the action is safe.')
+      ).toBeVisible()
+      await page.getByRole('checkbox').check()
+      await expect(page.getByRole('button', { name: 'Approve without preview' })).toBeEnabled()
+      await page.getByRole('button', { name: 'Retry preview' }).click()
+      await expect(page.getByRole('button', { name: 'Approve without preview' })).toBeDisabled()
+    })
+
     test('should show a neutral note rather than an error', async ({ page }) => {
       await page.goto(testView('simulationSummaryUnavailable'))
 

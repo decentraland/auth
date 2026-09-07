@@ -479,6 +479,8 @@ export const SimulationSummary = ({
 
       {hasNoChanges ? <UnavailableNote>{t('request.transaction_dialog.no_changes')}</UnavailableNote> : null}
 
+      {result.status === 'success' ? <UnavailableNote>{t('request.transaction_dialog.preview_limitations')}</UnavailableNote> : null}
+
       {gasFooter}
 
       <TechnicalDetails events={result.events ?? []} verified={verified} chainId={chainId} t={t} />

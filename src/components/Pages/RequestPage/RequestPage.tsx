@@ -144,7 +144,7 @@ const RPC_METHOD_NOT_SUPPORTED = -32601
 const RPC_INVALID_PARAMS = -32602
 
 // Why a transaction review was discarded and started over (see restartTransactionReview).
-type ReviewRestartReason = 'network_changed' | 'network_unreadable' | 'network_unrecorded' | 'wallet_rejected_chain'
+type ReviewRestartReason = 'network_changed' | 'network_unreadable' | 'network_unrecorded' | 'wallet_rejected_chain' | 'preview_retry'
 
 export const RequestPage = () => {
   const params = useParams()
@@ -1085,6 +1085,20 @@ export const RequestPage = () => {
     [requestId]
   )
 
+  const onRetryPreview = useCallback(() => {
+    if (
+      simulationState.status !== 'unavailable' ||
+      isApprovingRef.current ||
+      hasCompletedRef.current ||
+      recoveredRequestIdRef.current !== requestId
+    )
+      return
+    // Recover again so expiry, account, network, relay classification and branded-transfer checks
+    // all run for the new review. Invalidating the refs immediately also prevents a queued Allow
+    // click from executing the previous review. No signing, submission or outcome occurs here.
+    restartTransactionReview('preview_retry')
+  }, [simulationState.status, requestId, restartTransactionReview])
+
   const onApproveWalletInteraction = useCallback(async () => {
     // Only the request this page recovered can be executed. If the route has moved on to another
     // id, requestRef still holds the previous request and its outcome would be reported under the
@@ -1312,6 +1326,23 @@ export const RequestPage = () => {
   // resolved. In that case approval is a single step (gas shown inline, no confirm modal); without
   // a summary it keeps the classic two-step confirm dialog for the gas check.
   const hasSimulationSummary = simulationState.status !== 'idle'
+  // Use the execution target, never a token/spender seen in simulation or a relayer's generic
+  // accepted-address response. Generic typed signatures are excluded: only MetaTransaction has a
+  // domain-to-execution binding checked by the current signature guard.
+  const targetAddress =
+    requestRef.current?.method === 'eth_sendTransaction'
+      ? (requestRef.current.params?.[0] as { to?: string } | undefined)?.to
+      : isSignatureMetaTx && signaturePayload?.kind === 'typedData'
+        ? (signaturePayload.typedData.domain?.verifyingContract as string | undefined)
+        : undefined
+  const targetChainId =
+    requestRef.current?.method === 'eth_sendTransaction'
+      ? isMetaTransaction
+        ? getMetaTransactionChainId()
+        : walletInfo?.chainId
+      : isSignatureMetaTx
+        ? simulationChainId
+        : undefined
   // The simulation resolved and grants a permission the user should not approve on a single click
   // (see isDangerousApproval). Spenders are recognized from the same chain-aware verified set the
   // summary uses for its badge and warning, so the checkbox and the icon always agree.
@@ -1424,6 +1455,9 @@ export const RequestPage = () => {
           />
           <TransferConfirmView
             type={TransferType.GIFT}
+            targetAddress={targetAddress}
+            targetChainId={targetChainId}
+            showPreviewLimitations={simulationState.status === 'ready' && simulationState.result.status === 'success'}
             transferData={nftTransferData}
             isLoading={isLoading}
             onDeny={onDenyWalletInteraction}
@@ -1446,6 +1480,8 @@ export const RequestPage = () => {
           />
           <TransferConfirmView
             type={TransferType.TIP}
+            targetAddress={targetAddress}
+            targetChainId={targetChainId}
             transferData={manaTransferData}
             isLoading={isLoading}
             onDeny={onDenyWalletInteraction}
@@ -1486,7 +1522,10 @@ export const RequestPage = () => {
             transactionCost={transactionGasCost ?? BigInt(0)}
             balance={walletInfo?.balance ?? BigInt(0)}
             isReverted={isSimulationReverted}
-            reviewRestarted={reviewRestartReason !== null}
+            reviewRestarted={reviewRestartReason !== null && reviewRestartReason !== 'preview_retry'}
+            targetAddress={targetAddress}
+            targetChainId={targetChainId}
+            onRetryPreview={onRetryPreview}
             onDeny={onDenyWalletInteraction}
             onApprove={hasSimulationSummary ? onApproveWalletInteraction : handleApproveWalletInteraction}
           />
@@ -1507,6 +1546,9 @@ export const RequestPage = () => {
           requiresAcknowledgment={requiresApprovalAcknowledgment}
           isMetaTransaction={isSignatureMetaTx}
           contractTrust={signatureContractTrust}
+          targetAddress={targetAddress}
+          targetChainId={targetChainId}
+          onRetryPreview={onRetryPreview}
           unverifiableReason={unverifiableSignatureReason}
           isLoading={isLoading}
           onDeny={onDenyWalletInteraction}

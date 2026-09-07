@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-rou
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ProviderType } from '@dcl/schemas'
+import { sendMetaTransaction } from 'decentraland-transactions'
 import { TrackingEvents } from '../../../modules/analytics/types'
 import { fetchProfile } from '../../../modules/profile'
 import {
@@ -166,12 +167,17 @@ jest.mock('./Views', () => ({
       data-gas-covered={String(props.gasCovered)}
       data-profiles={JSON.stringify(props.profiles ?? {})}
       data-review-restarted={String(props.reviewRestarted)}
+      data-target={props.targetAddress}
+      data-target-chain={props.targetChainId}
     >
       <button data-testid="wallet-interaction-approve" onClick={props.onApprove}>
         approve
       </button>
       <button data-testid="wallet-interaction-deny" onClick={props.onDeny}>
         deny
+      </button>
+      <button data-testid="wallet-interaction-retry" onClick={props.onRetryPreview}>
+        retry
       </button>
     </div>
   ),
@@ -203,6 +209,9 @@ jest.mock('./Views', () => ({
       </button>
       <button data-testid="signature-deny" onClick={props.onDeny}>
         deny
+      </button>
+      <button data-testid="signature-retry" onClick={props.onRetryPreview}>
+        retry
       </button>
     </div>
   )
@@ -1393,6 +1402,12 @@ describe('RequestPage', () => {
       await waitFor(() => expect(view).toHaveAttribute('data-gas-covered', 'true'))
     })
 
+    it('should identify the target on the relay execution chain rather than the wallet network', async () => {
+      renderRequestPage()
+      await waitFor(() => expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-target-chain', '137'))
+      expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-target', '0xcontract')
+    })
+
     describe('and the simulation is unavailable', () => {
       beforeEach(() => {
         mockSimulateTransaction.mockRejectedValue(new SimulationUnavailableError('status 502', 502))
@@ -1403,6 +1418,57 @@ describe('RequestPage', () => {
         const view = await screen.findByTestId('wallet-interaction')
         await waitFor(() => expect(view).toHaveAttribute('data-sim', 'unavailable'))
         expect(view).toHaveAttribute('data-requires-acknowledgment', 'true')
+      })
+
+      describe('and the user retries the preview', () => {
+        beforeEach(async () => {
+          renderRequestPage()
+          await waitFor(() => expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-sim', 'unavailable'))
+          mockSimulateTransaction.mockResolvedValueOnce({
+            status: 'success',
+            assetChanges: [],
+            approvalChanges: [],
+            balanceChanges: [],
+            events: []
+          })
+          await userEvent.click(screen.getByTestId('wallet-interaction-retry'))
+          await waitFor(() => expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-sim', 'ready'))
+        })
+
+        it('should recover and simulate the request again', () => {
+          expect(mockRecover).toHaveBeenCalledTimes(2)
+          expect(mockSimulateTransaction).toHaveBeenCalledTimes(2)
+        })
+
+        it('should not sign, submit or report an outcome', () => {
+          expect(mockWalletRequest).not.toHaveBeenCalled()
+          expect(sendMetaTransaction).not.toHaveBeenCalled()
+          expect(mockSendSuccessfulOutcome).not.toHaveBeenCalled()
+          expect(mockSendFailedOutcome).not.toHaveBeenCalled()
+        })
+
+        it('should not claim that a preview retry was caused by a network change', () => {
+          expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-review-restarted', 'false')
+        })
+
+        it('should ignore another retry once a preview is available', async () => {
+          await userEvent.click(screen.getByTestId('wallet-interaction-retry'))
+          expect(mockRecover).toHaveBeenCalledTimes(2)
+        })
+      })
+
+      describe('and the request has expired before retry', () => {
+        beforeEach(async () => {
+          renderRequestPage()
+          await waitFor(() => expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-sim', 'unavailable'))
+          mockRecover.mockRejectedValueOnce(new ExpiredRequestError('request-123'))
+          await userEvent.click(screen.getByTestId('wallet-interaction-retry'))
+        })
+
+        it('should show expiry without running another simulation', async () => {
+          await screen.findByTestId('timeout-error')
+          expect(mockSimulateTransaction).toHaveBeenCalledTimes(1)
+        })
       })
     })
   })
@@ -1567,6 +1633,28 @@ describe('RequestPage', () => {
         chainId: 137
       })
       mockSimulateTransaction.mockRejectedValue(new Error('tenderly down'))
+    })
+
+    describe('and the user retries the preview', () => {
+      beforeEach(async () => {
+        renderRequestPage()
+        await waitFor(() => expect(screen.getByTestId('signature-request')).toHaveAttribute('data-sim', 'unavailable'))
+        mockSimulateTransaction.mockResolvedValueOnce({
+          status: 'success',
+          assetChanges: [],
+          approvalChanges: [],
+          balanceChanges: [],
+          events: []
+        })
+        await userEvent.click(screen.getByTestId('signature-retry'))
+        await waitFor(() => expect(screen.getByTestId('signature-request')).toHaveAttribute('data-sim', 'ready'))
+      })
+
+      it('should re-simulate without producing a signature or an outcome', () => {
+        expect(mockSimulateTransaction).toHaveBeenCalledTimes(2)
+        expect(mockWalletRequest).not.toHaveBeenCalled()
+        expect(mockSendSuccessfulOutcome).not.toHaveBeenCalled()
+      })
     })
 
     it('should require acknowledgment when the verifying contract is NOT a Decentraland contract', async () => {

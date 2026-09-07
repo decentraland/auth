@@ -27,6 +27,11 @@ export interface SignatureRequestViewProps {
    */
   unverifiableReason?: UnverifiableSignatureReason | null
   isLoading?: boolean
+  /** Exact meta-transaction target and signed execution chain. */
+  targetAddress?: string
+  targetChainId?: number
+  /** Starts a fresh review, never submits or signs the request. */
+  onRetryPreview?: () => void
   onDeny: () => void
   onApprove: () => void
 }

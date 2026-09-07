@@ -5,6 +5,7 @@ import { Box, Button, Checkbox, CircularProgress, FormControlLabel } from 'decen
 import { getPreviewFingerprint, hasNoVisibleEffects } from '../../../../../shared/auth'
 import { Container } from '../../Container'
 import { ButtonsContainer } from '../../RequestPage.styled'
+import { KnownContractNotice } from '../KnownContractNotice'
 import { SimulationSummary } from '../SimulationSummary'
 import styles from '../Views.module.css'
 import { WalletInteractionProps } from './WalletInteraction.types'
@@ -26,6 +27,9 @@ export const WalletInteraction = ({
   balance = BigInt(0),
   isReverted = false,
   reviewRestarted = false,
+  targetAddress,
+  targetChainId,
+  onRetryPreview,
   onDeny,
   onApprove
 }: WalletInteractionProps) => {
@@ -33,6 +37,7 @@ export const WalletInteraction = ({
   // The preview could not be produced (simulation service down, or the call could not be simulated).
   // The effects can't be shown, so warn explicitly and word the acknowledgment for that case.
   const isPreviewUnavailable = simulation?.status === 'unavailable'
+  const needsAcknowledgment = requiresAcknowledgment || isPreviewUnavailable
   // The preview resolved but shows nothing the user can check. The call may still change state the
   // summary cannot show, so the acknowledgment says that instead of talking about approvals.
   const isPreviewWithoutVisibleEffects = simulation?.status === 'ready' && hasNoVisibleEffects(simulation.result, userAddress)
@@ -53,7 +58,7 @@ export const WalletInteraction = ({
   // Block approval while the request is submitting, while the simulation is still resolving (so a
   // user can't approve before the summary and any high-risk warnings render), and until any
   // required acknowledgment is given.
-  const approveBlocked = isLoading || simulation?.status === 'loading' || (requiresAcknowledgment && !acknowledged)
+  const approveBlocked = isLoading || simulation?.status === 'loading' || (needsAcknowledgment && !acknowledged)
 
   // When a simulation is available, present the asset-change summary in the classic left-aligned
   // Container layout (matching the signature and generic interaction views, including the
@@ -65,6 +70,7 @@ export const WalletInteraction = ({
         <Box className={styles.logo}></Box>
         <Box className={styles.title}>{t('request.wallet_interaction.review_title')}</Box>
         <SummaryBody>
+          <KnownContractNotice address={targetAddress} chainId={targetChainId} />
           <SimulationSummary
             simulation={simulation}
             userAddress={userAddress}
@@ -84,7 +90,7 @@ export const WalletInteraction = ({
             {t('request.wallet_interaction.preview_unavailable_warning')}
           </PreviewUnavailableWarning>
         ) : null}
-        {requiresAcknowledgment ? (
+        {needsAcknowledgment ? (
           <FormControlLabel
             control={
               <Checkbox
@@ -106,6 +112,18 @@ export const WalletInteraction = ({
           <Button variant="outlined" disabled={isLoading} onClick={onDeny} data-testid="transfer-cancel-button">
             {t('common.deny')}
           </Button>
+          {isPreviewUnavailable && onRetryPreview ? (
+            <Button
+              variant="outlined"
+              disabled={isLoading}
+              onClick={() => {
+                setAcknowledgedStatement(null)
+                onRetryPreview()
+              }}
+            >
+              {t('request.transaction_dialog.retry_preview')}
+            </Button>
+          ) : null}
           <Button
             variant="contained"
             color={isReverted ? 'error' : 'primary'}
@@ -113,7 +131,11 @@ export const WalletInteraction = ({
             onClick={onApprove}
             data-testid="transfer-confirm-button"
           >
-            {isLoading ? <CircularProgress size={20} color="inherit" /> : t('common.allow')}
+            {isLoading ? (
+              <CircularProgress size={20} color="inherit" />
+            ) : (
+              t(isPreviewUnavailable ? 'request.transaction_dialog.approve_without_preview' : 'common.allow')
+            )}
           </Button>
         </ButtonsContainer>
       </Container>
@@ -127,6 +149,7 @@ export const WalletInteraction = ({
         {isWeb2Wallet ? t('request.wallet_interaction.title_web2') : t('request.wallet_interaction.title_web3', { explorerText })}
       </Box>
       <Box className={styles.description}>{t('request.wallet_interaction.description')}</Box>
+      <KnownContractNotice address={targetAddress} chainId={targetChainId} />
       {reviewRestarted ? (
         <ReviewRestartedNotice severity="info" role="status" data-testid="review-restarted-notice">
           {t('request.wallet_interaction.review_restarted_notice')}

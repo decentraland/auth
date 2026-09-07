@@ -141,6 +141,11 @@ describe('when rendering the SimulationSummary', () => {
       expect(screen.getByText('100 MANA')).toBeInTheDocument()
     })
 
+    it('should keep the preview limitation visible alongside transfers and approvals', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} />)
+      expect(screen.getByText('request.transaction_dialog.preview_limitations')).toBeInTheDocument()
+    })
+
     it('should render the received NFT with its name and token id', () => {
       render(<SimulationSummary simulation={simulation} userAddress={USER} />)
       expect(screen.getByText('Fancy Hat #512')).toBeInTheDocument()

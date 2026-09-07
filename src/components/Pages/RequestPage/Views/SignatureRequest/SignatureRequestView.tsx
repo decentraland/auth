@@ -5,6 +5,7 @@ import { getPreviewFingerprint, hasNoVisibleEffects } from '../../../../../share
 import { getExplorerAddressUrl, getExplorerName, getNetworkName } from '../../../../../shared/explorer'
 import { Container } from '../../Container'
 import { ButtonsContainer } from '../../RequestPage.styled'
+import { KnownContractNotice } from '../KnownContractNotice'
 import { SimulationSummary } from '../SimulationSummary'
 import styles from '../Views.module.css'
 import { TypedDataTree } from './TypedDataTree'
@@ -39,6 +40,9 @@ export const SignatureRequestView = ({
   contractTrust,
   unverifiableReason = null,
   isLoading = false,
+  targetAddress,
+  targetChainId,
+  onRetryPreview,
   onDeny,
   onApprove
 }: SignatureRequestViewProps) => {
@@ -51,6 +55,8 @@ export const SignatureRequestView = ({
   const domainChainId = chainId ?? (domain?.chainId !== undefined ? Number(domain.chainId) : undefined)
   const contractUrl = typeof domain?.verifyingContract === 'string' ? getExplorerAddressUrl(domainChainId, domain.verifyingContract) : null
   const isReverted = simulation.status === 'ready' && simulation.result.status === 'reverted'
+  const isPreviewUnavailable = isMetaTransaction && simulation.status === 'unavailable'
+  const needsAcknowledgment = requiresAcknowledgment || isPreviewUnavailable
   // Approval waits for the contract lookup the same way it waits for the simulation, so the
   // unrecognized-contract acknowledgment cannot be skipped by clicking before it resolves.
   const isContractTrustPending = isMetaTransaction && contractTrust === 'pending'
@@ -101,6 +107,7 @@ export const SignatureRequestView = ({
 
         {payload?.kind === 'typedData' && isMetaTransaction ? (
           <>
+            <KnownContractNotice address={targetAddress} chainId={targetChainId} />
             <SimulationSummary
               simulation={simulation}
               userAddress={userAddress}
@@ -171,7 +178,7 @@ export const SignatureRequestView = ({
           </Notice>
         ) : null}
 
-        {requiresAcknowledgment ? (
+        {needsAcknowledgment ? (
           <FormControlLabel
             control={
               <Checkbox
@@ -195,14 +202,30 @@ export const SignatureRequestView = ({
         <Button variant="outlined" disabled={isLoading} onClick={onDeny} data-testid="signature-deny-button">
           {t('common.deny')}
         </Button>
+        {isPreviewUnavailable && onRetryPreview ? (
+          <Button
+            variant="outlined"
+            disabled={isLoading}
+            onClick={() => {
+              setAcknowledgedStatement(null)
+              onRetryPreview()
+            }}
+          >
+            {t('request.transaction_dialog.retry_preview')}
+          </Button>
+        ) : null}
         <Button
           variant="contained"
           color={isReverted ? 'error' : 'primary'}
-          disabled={isLoading || simulation.status === 'loading' || isContractTrustPending || (requiresAcknowledgment && !acknowledged)}
+          disabled={isLoading || simulation.status === 'loading' || isContractTrustPending || (needsAcknowledgment && !acknowledged)}
           onClick={onApprove}
           data-testid="signature-approve-button"
         >
-          {isLoading ? <CircularProgress size={20} color="inherit" /> : t('common.allow')}
+          {isLoading ? (
+            <CircularProgress size={20} color="inherit" />
+          ) : (
+            t(isPreviewUnavailable ? 'request.transaction_dialog.approve_without_preview' : 'common.allow')
+          )}
         </Button>
       </ButtonsContainer>
     </Container>

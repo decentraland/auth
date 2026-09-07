@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { SimulationResponseBody } from '../../../../../shared/auth'
 import { SignaturePayload, SimulationState } from '../../types'
 import { SignatureRequestView } from './SignatureRequestView'
+import { SignatureRequestViewProps } from './SignatureRequest.types'
 
 jest.mock('@dcl/hooks', () => ({
   useTranslation: () => ({ t: (key: string) => key })
@@ -14,6 +15,55 @@ jest.mock('../../Container', () => ({
 }))
 
 const USER = '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd'
+
+describe('when a meta-transaction signature preview is unavailable', () => {
+  let props: SignatureRequestViewProps
+
+  beforeEach(() => {
+    props = {
+      requestId: 'r1',
+      method: 'eth_signTypedData_v4',
+      payload: { kind: 'typedData', typedData: { primaryType: 'MetaTransaction' }, raw: '{}' },
+      simulation: { status: 'unavailable' },
+      userAddress: USER,
+      isMetaTransaction: true,
+      contractTrust: 'confirmed',
+      onApprove: jest.fn(),
+      onDeny: jest.fn(),
+      onRetryPreview: jest.fn()
+    }
+  })
+
+  afterEach(() => {
+    jest.clearAllMocks()
+  })
+
+  it('should explicitly label approval without a preview and require acknowledgment', () => {
+    render(<SignatureRequestView {...props} />)
+    expect(screen.getByRole('button', { name: 'request.transaction_dialog.approve_without_preview' })).toBeDisabled()
+  })
+
+  it('should retry without signing and clear the previous acknowledgment', async () => {
+    render(<SignatureRequestView {...props} />)
+    await userEvent.click(screen.getByRole('checkbox'))
+    await userEvent.click(screen.getByRole('button', { name: 'request.transaction_dialog.retry_preview' }))
+    expect(props.onRetryPreview).toHaveBeenCalledTimes(1)
+    expect(props.onApprove).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'request.transaction_dialog.approve_without_preview' })).toBeDisabled()
+  })
+
+  describe('and the signature has no transaction simulation', () => {
+    beforeEach(() => {
+      props.isMetaTransaction = false
+      props.simulation = { status: 'idle' }
+    })
+
+    it('should not offer a simulation retry for an ordinary signature', () => {
+      render(<SignatureRequestView {...props} />)
+      expect(screen.queryByRole('button', { name: 'request.transaction_dialog.retry_preview' })).not.toBeInTheDocument()
+    })
+  })
+})
 
 describe('when rendering the SignatureRequestView', () => {
   let onApprove: jest.Mock

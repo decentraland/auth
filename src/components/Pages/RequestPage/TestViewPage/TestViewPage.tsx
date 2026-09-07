@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { ContractName, getContract } from 'decentraland-transactions'
 import { MenuItem } from 'decentraland-ui2'
 import { TransferType } from '../types'
 import {
@@ -93,6 +94,22 @@ export const TestViewPage = () => {
         element: <WalletInteraction requestId={DEFAULT_REQUEST_ID} onDeny={noop} onApprove={noop} />
       },
       walletInteractionComplete: { label: 'WalletInteractionComplete', element: <WalletInteractionComplete /> },
+      walletInteractionUnavailable: {
+        label: 'Wallet Interaction (Preview unavailable)',
+        element: (
+          <WalletInteraction
+            requestId={DEFAULT_REQUEST_ID}
+            simulation={{ status: 'unavailable' }}
+            userAddress={USER_ADDRESS}
+            targetAddress={getContract(ContractName.MANAToken, 137).address}
+            targetChainId={137}
+            gasCovered
+            onRetryPreview={noop}
+            onDeny={noop}
+            onApprove={noop}
+          />
+        )
+      },
       walletNftInteraction: {
         label: 'Wallet NFT Interaction',
         element: (

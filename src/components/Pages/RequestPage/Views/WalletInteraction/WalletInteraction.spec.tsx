@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { SimulationResponseBody } from '../../../../../shared/auth'
 import { WalletInteraction } from './WalletInteraction'
+import { WalletInteractionProps } from './WalletInteraction.types'
 
 jest.mock('@dcl/hooks', () => ({
   useTranslation: () => ({ t: (key: string) => key })
@@ -13,6 +14,55 @@ jest.mock('../../Container', () => ({
 }))
 
 const USER = '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd'
+
+describe('when a transaction preview is unavailable', () => {
+  let props: WalletInteractionProps
+
+  beforeEach(() => {
+    props = { requestId: 'r1', simulation: { status: 'unavailable' }, onApprove: jest.fn(), onDeny: jest.fn(), onRetryPreview: jest.fn() }
+  })
+
+  afterEach(() => {
+    jest.clearAllMocks()
+  })
+
+  it('should explicitly label approval without a preview and require acknowledgment', () => {
+    render(<WalletInteraction {...props} />)
+    expect(screen.getByRole('button', { name: 'request.transaction_dialog.approve_without_preview' })).toBeDisabled()
+  })
+
+  it('should allow the explicit approval after acknowledgment', async () => {
+    render(<WalletInteraction {...props} />)
+    await userEvent.click(screen.getByRole('checkbox'))
+    await userEvent.click(screen.getByRole('button', { name: 'request.transaction_dialog.approve_without_preview' }))
+    expect(props.onApprove).toHaveBeenCalledTimes(1)
+  })
+
+  it('should retry without approving', async () => {
+    render(<WalletInteraction {...props} />)
+    await userEvent.click(screen.getByRole('button', { name: 'request.transaction_dialog.retry_preview' }))
+    expect(props.onRetryPreview).toHaveBeenCalledTimes(1)
+    expect(props.onApprove).not.toHaveBeenCalled()
+  })
+
+  it('should discard the acknowledgment even if retry leaves the preview unavailable', async () => {
+    render(<WalletInteraction {...props} />)
+    await userEvent.click(screen.getByRole('checkbox'))
+    await userEvent.click(screen.getByRole('button', { name: 'request.transaction_dialog.retry_preview' }))
+    expect(screen.getByRole('button', { name: 'request.transaction_dialog.approve_without_preview' })).toBeDisabled()
+  })
+
+  describe('and approval is already processing', () => {
+    beforeEach(() => {
+      props.isLoading = true
+    })
+
+    it('should disable retry', () => {
+      render(<WalletInteraction {...props} />)
+      expect(screen.getByRole('button', { name: 'request.transaction_dialog.retry_preview' })).toBeDisabled()
+    })
+  })
+})
 
 const successResult: SimulationResponseBody = {
   status: 'success',

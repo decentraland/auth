@@ -29,6 +29,11 @@ export interface WalletInteractionProps {
    * could not be verified. Shown as a notice so the user knows why the page reloaded.
    */
   reviewRestarted?: boolean
+  /** Exact target and execution chain; used only for a positive deployment-registry match. */
+  targetAddress?: string
+  targetChainId?: number
+  /** Starts a fresh review, never submits or signs the request. */
+  onRetryPreview?: () => void
   onDeny: () => void
   onApprove: () => void
 }

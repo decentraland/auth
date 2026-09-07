@@ -6,6 +6,7 @@ import { TransferActionButtons, TransferAssetImage, TransferLayout, TransferLoad
 import { CenteredContent, ItemName, Label, Title, WarningAlert } from '../../../../../Transfer/Transfer.styled'
 import { TransferType } from '../../../types'
 import type { MANATransferData, NFTTransferData, ProfileAvatar } from '../../../types'
+import { KnownContractNotice } from '../../KnownContractNotice'
 import { SceneName } from '../TransferTipComponents.styled'
 import { TransferConfirmViewProps } from './TransferConfirmView.types'
 
@@ -35,6 +36,7 @@ const TransferConfirmView = (props: TransferConfirmViewProps) => {
             <>{isProcessing ? t('transfer.confirm.sending_gift') : t('transfer.confirm.confirm_gift')}</>
           )}
         </Title>
+        <KnownContractNotice address={props.targetAddress} chainId={props.targetChainId} />
         {isTip ? (
           <>
             <Profile
@@ -63,6 +65,9 @@ const TransferConfirmView = (props: TransferConfirmViewProps) => {
             {!isProcessing && <WarningAlert severity="info">{t('transfer.confirm.gifting_warning')}</WarningAlert>}
           </>
         )}
+        {!isProcessing && props.showPreviewLimitations ? (
+          <WarningAlert severity="info">{t('request.transaction_dialog.preview_limitations')}</WarningAlert>
+        ) : null}
         {isProcessing ? (
           <TransferLoadingState text={t('transfer.confirm.processing_authorization')} />
         ) : (
