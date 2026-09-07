@@ -95,6 +95,28 @@ describe('when reviewing a schema-bound signature', () => {
     })
   })
 
+  describe('and the domain name carries repeated spaces and the version is long', () => {
+    let longVersion: string
+
+    beforeEach(() => {
+      longVersion = '1.0.0-'.padEnd(160, 'x')
+      typedData.domain.name = 'Trusted   App'
+      typedData.domain.version = longVersion
+      render(<SignatureRequestView {...props} />)
+    })
+
+    it('should keep the spaces as signed instead of collapsing them', () => {
+      const name = screen.getByText('Trusted   App', { normalizer: text => text })
+      expect(name).toHaveStyle({ whiteSpace: 'pre-wrap' })
+    })
+
+    it('should wrap the long version rather than clip it', () => {
+      const version = screen.getByText(longVersion)
+      expect(version).toHaveStyle({ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' })
+      expect(version).not.toHaveStyle({ textOverflow: 'ellipsis' })
+    })
+  })
+
   describe('and a signed value carries line breaks', () => {
     beforeEach(() => {
       typedData.types.Order.push({ name: 'terms', type: 'string' })
@@ -300,7 +322,7 @@ describe('when rendering the SignatureRequestView', () => {
       }
     })
 
-    it('should render the verifying contract shortened', () => {
+    it('should render the verifying contract in full', () => {
       render(
         <SignatureRequestView
           requestId="r1"
@@ -313,7 +335,7 @@ describe('when rendering the SignatureRequestView', () => {
           onApprove={onApprove}
         />
       )
-      expect(screen.getByText('0x480a…45ef')).toBeInTheDocument()
+      expect(screen.getByText('0x480a0f4e360e8964e68858dd231c2922f1df45ef')).toBeInTheDocument()
     })
 
     describe('and Auth does not recognize the struct', () => {

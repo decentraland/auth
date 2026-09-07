@@ -10,9 +10,26 @@ const Content = styled(Box)(({ theme }) => ({
   width: '100%'
 }))
 
+// Signed domain values are shown whole: spacing kept as signed, wrapped rather than clipped, since a
+// name with a run of spaces or a long version is part of what the user signs.
+const signedText = {
+  minWidth: 0,
+  overflowWrap: 'anywhere',
+  whiteSpace: 'pre-wrap'
+} as const
+
+// Labels the page adds itself, never signed content.
 const DomainKey = styled(Typography)(({ theme }) => ({
   color: theme.palette.text.secondary,
+  flexShrink: 0,
   fontSize: theme.typography.pxToRem(13)
+}))
+
+const DomainName = styled(Typography)(({ theme }) => ({
+  ...signedText,
+  color: theme.palette.text.primary,
+  fontSize: theme.typography.pxToRem(13),
+  fontWeight: 600
 }))
 
 const DomainRow = styled(Box)(({ theme }) => ({
@@ -22,17 +39,19 @@ const DomainRow = styled(Box)(({ theme }) => ({
 }))
 
 const DomainValue = styled(Typography)(({ theme }) => ({
+  ...signedText,
   color: theme.palette.text.primary,
   fontFamily: 'monospace',
   fontSize: theme.typography.pxToRem(13),
-  overflow: 'hidden',
-  textOverflow: 'ellipsis'
+  textAlign: 'right'
 }))
 
 const ContractLink = styled('a')(({ theme }) => ({
+  ...signedText,
   color: theme.palette.text.primary,
   fontFamily: 'monospace',
   fontSize: theme.typography.pxToRem(13),
+  textAlign: 'right',
   textDecoration: 'underline',
   textDecorationStyle: 'dotted',
   textUnderlineOffset: 2,
@@ -128,6 +147,7 @@ export {
   ContractLink,
   Content,
   DomainKey,
+  DomainName,
   DomainRow,
   DomainValue,
   FieldLabel,

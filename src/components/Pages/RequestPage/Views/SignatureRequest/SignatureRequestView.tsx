@@ -14,6 +14,7 @@ import {
   Content,
   ContractLink,
   DomainKey,
+  DomainName,
   DomainRow,
   DomainValue,
   FieldLabel,
@@ -23,8 +24,6 @@ import {
   RawToggle,
   Section
 } from './SignatureRequest.styled'
-
-const shortenAddress = (address: string): string => (address.length > 12 ? `${address.slice(0, 6)}…${address.slice(-4)}` : address)
 
 export const SignatureRequestView = ({
   requestId,
@@ -144,7 +143,7 @@ export const SignatureRequestView = ({
               <Section>
                 {typeof domain.name === 'string' ? (
                   <DomainRow>
-                    <DomainKey>{domain.name}</DomainKey>
+                    <DomainName>{domain.name}</DomainName>
                   </DomainRow>
                 ) : null}
                 {['version', 'salt'].map(field =>
@@ -171,10 +170,10 @@ export const SignatureRequestView = ({
                         rel="noopener noreferrer"
                         title={t('request.transaction_dialog.view_on_explorer', { explorer: getExplorerName(domainChainId) })}
                       >
-                        {shortenAddress(domain.verifyingContract)}
+                        {domain.verifyingContract}
                       </ContractLink>
                     ) : (
-                      <DomainValue>{shortenAddress(domain.verifyingContract)}</DomainValue>
+                      <DomainValue>{domain.verifyingContract}</DomainValue>
                     )}
                   </DomainRow>
                 ) : null}
