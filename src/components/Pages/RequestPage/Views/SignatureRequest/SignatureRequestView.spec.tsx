@@ -95,6 +95,21 @@ describe('when reviewing a schema-bound signature', () => {
     })
   })
 
+  describe('and a signed value carries line breaks', () => {
+    beforeEach(() => {
+      typedData.types.Order.push({ name: 'terms', type: 'string' })
+      typedData.message.terms = 'allow\n\nall'
+      typedData.domain.name = 'Market\nplace'
+      render(<SignatureRequestView {...props} />)
+    })
+
+    it('should show the breaks as escapes rather than as spacing', () => {
+      expect(screen.getByText('allow\\n\\nall')).toBeInTheDocument()
+      expect(screen.getByText('Market\\nplace')).toBeInTheDocument()
+      expect(screen.queryByText('allow all')).not.toBeInTheDocument()
+    })
+  })
+
   describe('and the domain name and version carry characters that would reorder their neighbours', () => {
     beforeEach(() => {
       typedData.domain.name = 'Marketplace\u202e'

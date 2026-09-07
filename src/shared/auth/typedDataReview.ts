@@ -23,18 +23,26 @@ const ARRAY = /^(.*)\[([1-9][0-9]*)?\]$/
 // keep escaping, rendering and hashing bounded before the user can decline.
 const MAX_SCALAR_LENGTH = 64 * 1024
 const MAX_TOTAL_LENGTH = 512 * 1024
-// Characters a rendered string cannot show faithfully: controls, format characters such as the bidi
-// overrides that reorder their neighbours, separators, unassigned code points and U+FFFD. Tab, newline and
-// carriage return are the only controls a value may carry as-is.
-const UNREADABLE_CHARACTER = /(?![\t\n\r])[\p{C}\p{Zl}\p{Zp}�]/gu
+// Characters a rendered string cannot show faithfully: controls (tab, newline and carriage return among
+// them, which the page would otherwise collapse into plain spacing), format characters such as the bidi
+// overrides that reorder their neighbours, separators, unassigned code points and U+FFFD. The backslash is
+// escaped too, so a signed string cannot spell out an escape of its own and the display stays unambiguous.
+const UNREADABLE_CHARACTER = /[\\\p{C}\p{Zl}\p{Zp}�]/gu
+const SHORT_ESCAPES: ReadonlyMap<string, string> = new Map([
+  ['\\', '\\\\'],
+  ['\t', '\\t'],
+  ['\n', '\\n'],
+  ['\r', '\\r']
+])
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
 const isScalar = (type: string): boolean => ['address', 'bool', 'string'].includes(type) || INTEGER.test(type) || BYTES.test(type)
 /**
- * Shows every character of a signed string, including the ones that would otherwise reorder or hide
- * their neighbours, as a visible escape. Only the display changes; the signed bytes are untouched.
+ * Shows every character of a signed string, including the ones that would otherwise reorder, hide or
+ * merge with their neighbours, as a visible escape: the usual short forms for backslash, tab, newline and
+ * carriage return, `\\u{…}` for the rest. Only the display changes; the signed bytes are untouched.
  */
 const escapeUnreadable = (text: string): string =>
-  text.replace(UNREADABLE_CHARACTER, character => `\\u{${(character.codePointAt(0) ?? 0).toString(16)}}`)
+  text.replace(UNREADABLE_CHARACTER, character => SHORT_ESCAPES.get(character) ?? `\\u{${(character.codePointAt(0) ?? 0).toString(16)}}`)
 
 /**
  * Validates generic EIP-712 data and builds its review from the signed schema, never from arbitrary

@@ -212,6 +212,24 @@ describe('when reviewing generic typed data', () => {
     })
   })
 
+  describe('and a signed string carries line breaks, tabs or backslashes', () => {
+    beforeEach(() => {
+      payload.types.Permit.push({ name: 'memo', type: 'string' })
+      payload.message.memo = 'allow\n\nall\tnow\r\\done'
+      payload.domain.name = 'Token\nMarket'
+    })
+
+    it('should show them as the usual short escapes instead of letting the page merge them into spacing', () => {
+      const review = resolveTypedDataReview(payload, method)
+      expect(review.fields.find(field => field.name === 'memo')?.value).toBe('allow\\n\\nall\\tnow\\r\\\\done')
+      expect(review.domain.name).toBe('Token\\nMarket')
+    })
+
+    it('should leave the signed digest untouched', () => {
+      expect(resolveTypedDataReview(payload, method).hash).toBe(hashTypedData(payload as Parameters<typeof hashTypedData>[0]))
+    })
+  })
+
   describe('and the domain name and version carry characters that would reorder or hide their neighbours', () => {
     beforeEach(() => {
       payload.domain.name = 'Decentraland\u202e Marketplace'

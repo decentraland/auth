@@ -116,8 +116,11 @@ const TreeNode = styled(Box)<{ depth: number }>(({ theme, depth }) => ({
   paddingLeft: theme.spacing(depth * 2)
 }))
 
+// Signed text is shown with its spacing intact: runs of spaces are part of what is signed, and the review
+// escapes every character that could break a line or hide itself, so nothing here can wrap by surprise.
 const TreeValue = styled('span')(({ theme }) => ({
   color: theme.palette.text.primary,
+  whiteSpace: 'pre-wrap',
   wordBreak: 'break-word'
 }))
 
