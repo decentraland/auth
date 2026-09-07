@@ -1,5 +1,6 @@
 export * from './address'
 export * from './approvalRisk'
+export * from './eip712Domain'
 export * from './errors'
 export * from './httpClient'
 export * from './metaTransactionSimulation'

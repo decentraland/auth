@@ -31,6 +31,7 @@ import {
   isDangerousApproval
 } from '../../../shared/auth'
 import { isRetiredSignInMethod } from '../../../shared/auth/signMethodGuard'
+import { resolveTypedDataReview } from '../../../shared/auth/typedDataReview'
 import { isSocialProviderType, useCurrentConnectionData } from '../../../shared/connection'
 import { isSessionMismatch } from '../../../shared/connection/sessionMismatch'
 import { isChainMismatchRejection, isErrorWithMessage, isRpcError, isUserRejectedTransaction } from '../../../shared/errors'
@@ -886,6 +887,13 @@ export const RequestPage = () => {
             if (!isSignature || (!isUserUsingWeb2Wallet && !metaTx)) {
               setView(View.WALLET_INTERACTION)
               break
+            }
+            if (payload?.kind === 'typedData' && !metaTx) {
+              // This page is the only confirmation a web2 user gets, and the review can show only what the
+              // schema signs. Typed data the schema cannot account for is rejected here, through the same
+              // invalid-params path as a malformed MetaTransaction, rather than shown in part or signed
+              // blind. External wallets never reach this branch: their own prompt shows the payload.
+              resolveTypedDataReview(payload.typedData, request.method)
             }
             setSignaturePayload(payload)
             if (payload?.kind === 'typedData') {

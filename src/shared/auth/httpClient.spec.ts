@@ -193,7 +193,11 @@ describe('createAuthServerClient', () => {
     describe('when a typed-data request has the canonical [signer, typed data] params', () => {
       beforeEach(() => {
         mockResponse.method = 'eth_signTypedData_v4'
-        mockResponse.params = [mockSignerAddress, JSON.stringify({ primaryType: 'Statement', domain: {}, types: {}, message: {} })]
+        mockResponse.params = [
+          mockSignerAddress,
+          // eslint-disable-next-line @typescript-eslint/naming-convention
+          JSON.stringify({ primaryType: 'Statement', domain: {}, types: { Statement: [] }, message: {} })
+        ]
         mockFetch.mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve(mockResponse)

@@ -44,8 +44,10 @@ jest.mock('viem', () => ({
   custom: jest.fn((provider: any) => provider),
   decodeFunctionData: jest.fn(),
   formatEther: jest.fn(),
-  // Use the real hexToString so signature-message decoding can be exercised.
-  hexToString: jest.requireActual('viem').hexToString
+  // Keep signature decoding and schema validation real; only chain interaction is mocked.
+  hexToString: jest.requireActual('viem').hexToString,
+  getTypesForEIP712Domain: jest.requireActual('viem').getTypesForEIP712Domain,
+  hashTypedData: jest.requireActual('viem').hashTypedData
 }))
 
 describe('when testing getConnectedProvider', () => {
@@ -1661,11 +1663,17 @@ describe('when testing extractSignaturePayload', () => {
   })
 
   describe('and the typed-data params pass the canonical guard', () => {
-    const signer = '0x1234567890abcdef1234567890abcdef12345678'
-    const permit = JSON.stringify({ primaryType: 'Permit', domain: {}, types: {}, message: {} })
+    let signer: string
+    let permit: string
+    let params: string[]
+
+    beforeEach(() => {
+      signer = '0x1234567890abcdef1234567890abcdef12345678'
+      permit = JSON.stringify({ primaryType: 'Permit', domain: {}, types: { Permit: [] }, message: {} })
+      params = [signer, permit]
+    })
 
     it('should preview exactly the payload the wallet signs, the second param', () => {
-      const params = [signer, permit]
       expect(() => assertSignatureParamsAreCanonical('eth_signTypedData_v4', params, signer)).not.toThrow()
       expect(extractSignaturePayload('eth_signTypedData_v4', params, signer)).toEqual({
         kind: 'typedData',
@@ -1694,7 +1702,12 @@ describe('when testing extractSignaturePayload', () => {
 
     beforeEach(() => {
       signer = '0x1234567890abcdef1234567890abcdef12345678'
-      permit = JSON.stringify({ primaryType: 'Permit', domain: {}, types: {}, message: { value: '1' } })
+      permit = JSON.stringify({
+        primaryType: 'Permit',
+        domain: {},
+        types: { Permit: [{ name: 'value', type: 'uint256' }] },
+        message: { value: '1' }
+      })
       // params[0] uses the uppercase-X prefix that the case-insensitive guard (isSigner) accepts as
       // the signer. A case-sensitive parser used to misread it as the content and drop the real
       // typed data in params[1], letting the wallet sign something never shown to the user.

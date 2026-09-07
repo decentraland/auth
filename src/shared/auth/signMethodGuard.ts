@@ -173,6 +173,9 @@ function hasPrimaryType(typedData: unknown): boolean {
 /**
  * Rejects signature params that are not in the canonical EIP-1193 order for their method.
  * Typed data must be `[signer, typedData]`; personal_sign must be `[message, signer]`.
+ * Other typed data is not held to its schema here: an external wallet shows the payload itself, so a
+ * request it can sign must not be turned away for a quirk the review cannot render. The request page
+ * runs that review (resolveTypedDataReview) for web2 wallets only, where this site is the confirmation.
  *
  * A typed-data MetaTransaction is additionally held to the exact struct, message and domain a
  * Decentraland contract signs (see {@link resolveMetaTransactionTypedData}): its preview simulates

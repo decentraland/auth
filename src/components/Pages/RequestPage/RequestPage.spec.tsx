@@ -245,6 +245,11 @@ jest.mock('./utils', () => ({
   buildSendTransactionSimulationPayload: (...args: any[]) => mockBuildSendTransactionSimulationPayload(...args)
 }))
 
+const mockResolveTypedDataReview = jest.fn()
+jest.mock('../../../shared/auth/typedDataReview', () => ({
+  resolveTypedDataReview: (...args: any[]) => mockResolveTypedDataReview(...args)
+}))
+
 // Mock decentraland-transactions
 jest.mock('decentraland-transactions', () => ({
   ContractName: { ERC721CollectionV2: 'ERC721CollectionV2', ERC20: 'ERC20' },
@@ -344,6 +349,7 @@ describe('RequestPage', () => {
     mockIsOpaqueSignatureMessage.mockReturnValue(false)
     mockExtractSignaturePayload.mockReturnValue({ kind: 'message', message: 'hello' })
     mockDecodeMetaTransactionTypedData.mockReturnValue(null)
+    mockResolveTypedDataReview.mockReturnValue({ primaryType: 'Statement', domain: {}, fields: [], hash: '0x00' })
     mockCheckMetaTransactionSupport.mockResolvedValue({ willUseMetaTransaction: false, contractName: null })
     mockBuildSendTransactionSimulationPayload.mockReturnValue({
       chainId: 137,
@@ -1521,6 +1527,71 @@ describe('RequestPage', () => {
       renderRequestPage()
       const view = await screen.findByTestId('signature-request')
       expect(view).toHaveAttribute('data-unverifiable', 'unrecognized_typed_data')
+    })
+  })
+
+  describe('when a web2 user receives typed data whose fields do not match the schema it signs', () => {
+    beforeEach(() => {
+      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.MAGIC }
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockRecover.mockResolvedValue({
+        method: 'eth_signTypedData_v4',
+        params: ['0xabc123', '{"primaryType":"Permit"}'],
+        sender: '0xabc123',
+        expiration: new Date(Date.now() + 3600000).toISOString()
+      })
+      mockGetAddresses.mockResolvedValue(['0xabc123'])
+      mockExtractSignaturePayload.mockReturnValue({ kind: 'typedData', typedData: { primaryType: 'Permit' }, raw: '{}' })
+      mockDecodeMetaTransactionTypedData.mockReturnValue(null)
+      mockResolveTypedDataReview.mockImplementation(() => {
+        throw new MalformedSignatureRequestError('eth_signTypedData_v4', 'a typed-data object does not match its declared fields')
+      })
+      mockSendFailedOutcome.mockResolvedValue({})
+    })
+
+    it('should reject the request instead of previewing part of it', async () => {
+      renderRequestPage()
+      expect(await screen.findByTestId('signing-error')).toBeInTheDocument()
+      expect(screen.queryByTestId('signature-request')).not.toBeInTheDocument()
+    })
+
+    it('should answer the client with invalid params', async () => {
+      renderRequestPage()
+      await screen.findByTestId('signing-error')
+      await waitFor(() =>
+        expect(mockSendFailedOutcome).toHaveBeenCalledWith(REQUEST_ID, '0xabc123', expect.objectContaining({ code: -32602 }))
+      )
+    })
+  })
+
+  describe('when an external wallet receives typed data whose fields do not match the schema it signs', () => {
+    beforeEach(() => {
+      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.INJECTED }
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockRecover.mockResolvedValue({
+        method: 'eth_signTypedData_v4',
+        params: ['0xabc123', '{"primaryType":"Permit"}'],
+        sender: '0xabc123',
+        expiration: new Date(Date.now() + 3600000).toISOString()
+      })
+      mockGetAddresses.mockResolvedValue(['0xabc123'])
+      mockExtractSignaturePayload.mockReturnValue({ kind: 'typedData', typedData: { primaryType: 'Permit' }, raw: '{}' })
+      mockDecodeMetaTransactionTypedData.mockReturnValue(null)
+      mockResolveTypedDataReview.mockImplementation(() => {
+        throw new MalformedSignatureRequestError('eth_signTypedData_v4', 'a typed-data object does not match its declared fields')
+      })
+    })
+
+    it('should keep the classic confirmation because the wallet shows the payload itself', async () => {
+      renderRequestPage()
+      expect(await screen.findByTestId('wallet-interaction')).toBeInTheDocument()
+      expect(mockResolveTypedDataReview).not.toHaveBeenCalled()
+    })
+
+    it("should not answer the request on the review's behalf", async () => {
+      renderRequestPage()
+      await screen.findByTestId('wallet-interaction')
+      expect(mockSendFailedOutcome).not.toHaveBeenCalled()
     })
   })
 
