@@ -431,8 +431,9 @@ describe('when reviewing generic typed data', () => {
 
   describe('and a long struct name is repeated across an array of small values', () => {
     beforeEach(() => {
-      // One declaration within the caps, shown again in the label of every element.
-      const longName = 'Struct'.padEnd(MAX_SCALAR_LENGTH, 'x')
+      // One declaration within the caps (the array type appends two characters), shown again in the label
+      // of every element.
+      const longName = 'Struct'.padEnd(MAX_SCALAR_LENGTH - 2, 'x')
       payload.types.Permit.push({ name: 'items', type: `${longName}[]` })
       payload.types[longName] = [{ name: 'amount', type: 'uint8' }]
       payload.message.items = Array.from({ length: Math.ceil(MAX_TOTAL_LENGTH / MAX_SCALAR_LENGTH) + 1 }, () => ({ amount: 1 }))
