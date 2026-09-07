@@ -12,6 +12,7 @@ import {
   RequestNotFoundError,
   SimulationUnavailableError
 } from './errors'
+import { assertOutcomeIdentity, signOutcome } from './outcomeSignature'
 import {
   assertMethodIsAllowed,
   assertRequestIsNotImpersonatingSignIn,
@@ -21,7 +22,7 @@ import {
 import { IdentityResponse, OutcomeError, OutcomeResponse, RecoverResponse, SimulationRequestBody, SimulationResponseBody } from './types'
 
 const SIMULATION_TIMEOUT_MS = 10_000
-export const createAuthServerHttpClient = (authServerUrl?: string) => {
+export const createAuthServerHttpClient = (authServerUrl?: string, getIdentity: () => AuthIdentity | undefined = () => undefined) => {
   const baseUrl = authServerUrl ?? config.get('AUTH_SERVER_URL')
 
   const extractError = async (response: Response, requestId: string) => {
@@ -58,10 +59,7 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
           // eslint-disable-next-line @typescript-eslint/naming-convention
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          sender,
-          result
-        })
+        body: JSON.stringify(signOutcome(getIdentity(), requestId, sender, { result }))
       })
 
       if (!response.ok) {
@@ -124,10 +122,7 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
           // eslint-disable-next-line @typescript-eslint/naming-convention
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          sender,
-          error
-        })
+        body: JSON.stringify(signOutcome(getIdentity(), requestId, sender, { error }))
       })
 
       if (!response.ok) {
@@ -262,5 +257,6 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
     }
   }
 
-  return { recover, sendSuccessfulOutcome, sendFailedOutcome, checkHealth, postIdentity, simulateTransaction }
+  const assertCanSendOutcome = (sender: string) => assertOutcomeIdentity(getIdentity(), sender)
+  return { recover, sendSuccessfulOutcome, sendFailedOutcome, checkHealth, postIdentity, simulateTransaction, assertCanSendOutcome }
 }

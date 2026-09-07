@@ -18,6 +18,7 @@ import {
   SimulationUnavailableError,
   UnsupportedMethodError
 } from '../../../shared/auth'
+import { OutcomeIdentityError } from '../../../shared/auth/outcomeSignature'
 import { extractReferrerFromSearchParameters, getAuthRequestId, isBridgeOnlyEnabled } from '../../../shared/locations'
 import { trackEvent } from '../../../shared/utils/analytics'
 import { FeatureFlagsContext } from '../../FeatureFlagsProvider'
@@ -75,6 +76,7 @@ jest.mock('../../../modules/analytics/segment', () => ({
 const mockRecover = jest.fn()
 const mockSendSuccessfulOutcome = jest.fn()
 const mockSendFailedOutcome = jest.fn()
+const mockAssertCanSendOutcome = jest.fn()
 const mockPostIdentity = jest.fn()
 const mockSimulateTransaction = jest.fn()
 jest.mock('../../../shared/auth', () => {
@@ -85,6 +87,7 @@ jest.mock('../../../shared/auth', () => {
       recover: mockRecover,
       sendSuccessfulOutcome: mockSendSuccessfulOutcome,
       sendFailedOutcome: mockSendFailedOutcome,
+      assertCanSendOutcome: mockAssertCanSendOutcome,
       postIdentity: mockPostIdentity,
       simulateTransaction: mockSimulateTransaction
     })
@@ -1263,6 +1266,27 @@ describe('RequestPage', () => {
       renderRequestPage()
       await userEvent.click(await screen.findByTestId('wallet-interaction-approve'))
       expect(await screen.findByTestId('wallet-interaction-complete')).toBeInTheDocument()
+    })
+
+    describe('and no valid identity is available to authenticate the outcome', () => {
+      beforeEach(async () => {
+        mockAssertCanSendOutcome.mockImplementationOnce(() => {
+          throw new OutcomeIdentityError()
+        })
+        renderRequestPage()
+        await userEvent.click(await screen.findByTestId('wallet-interaction-approve'))
+      })
+
+      it('should return to login before signing or submitting', () => {
+        expect(mockNavigate).toHaveBeenCalledWith(expect.stringContaining('/login'))
+        expect(mockWalletRequest).not.toHaveBeenCalled()
+        expect(sendMetaTransaction).not.toHaveBeenCalled()
+      })
+
+      it('should not consume the request with an unauthenticated outcome', () => {
+        expect(mockSendSuccessfulOutcome).not.toHaveBeenCalled()
+        expect(mockSendFailedOutcome).not.toHaveBeenCalled()
+      })
     })
   })
 

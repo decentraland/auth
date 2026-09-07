@@ -30,6 +30,7 @@ import {
   hasNoVisibleEffects,
   isDangerousApproval
 } from '../../../shared/auth'
+import { OutcomeIdentityError } from '../../../shared/auth/outcomeSignature'
 import { sendMetaTransactionWithSigner } from '../../../shared/auth/sendMetaTransactionWithSigner'
 import { isRetiredSignInMethod } from '../../../shared/auth/signMethodGuard'
 import { isSocialProviderType, useCurrentConnectionData } from '../../../shared/connection'
@@ -259,7 +260,7 @@ export const RequestPage = () => {
   // which reach the wallet as an EIP-712 struct with opaque calldata and are previewed for everyone
   // (see the eth_sendTransaction and signature branches of the load effect).
   const isUserUsingWeb2Wallet = isSocialProviderType(providerType)
-  const authServerClient = useRef(createAuthServerHttpClient())
+  const authServerClient = useRef(createAuthServerHttpClient(undefined, () => identityRef.current))
   // The deep-link flow (opted in via `?flow=deeplink`, compared case-insensitively) has no
   // backing auth-server request: skip the whole recover/verify flow and hand the signed identity
   // to the client via the `open?signin=<identityId>` deep link, the same way the standalone mobile
@@ -1122,6 +1123,8 @@ export const RequestPage = () => {
         setView(View.DIFFERENT_ACCOUNT)
         return
       }
+      // Do not execute a request whose result we cannot authenticate back to the server.
+      authServerClient.current.assertCanSendOutcome(signerAddress)
       const method = requestRef.current.method
 
       let result: string | null = null
@@ -1224,6 +1227,8 @@ export const RequestPage = () => {
         })
         hasCompletedRef.current = true
         showInteractionCompleteView()
+      } else if (e instanceof OutcomeIdentityError) {
+        toLoginPage()
       } else if (e instanceof DifferentSenderError) {
         setView(View.DIFFERENT_ACCOUNT)
       } else if (isChainMismatchRejection(e)) {
@@ -1286,7 +1291,16 @@ export const RequestPage = () => {
       setIsLoading(false)
       isApprovingRef.current = false
     }
-  }, [isUserUsingWeb2Wallet, nftTransferData, manaTransferData, requestId, identity, showInteractionCompleteView, restartTransactionReview])
+  }, [
+    isUserUsingWeb2Wallet,
+    nftTransferData,
+    manaTransferData,
+    requestId,
+    identity,
+    showInteractionCompleteView,
+    restartTransactionReview,
+    toLoginPage
+  ])
 
   const handleApproveWalletInteraction = useCallback(async () => {
     if (isUserUsingWeb2Wallet) {
