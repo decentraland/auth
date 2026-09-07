@@ -704,27 +704,13 @@ export const RequestPage = () => {
                   const transferData = decodeNftTransferData(transactionData, contract.abi)
 
                   if (transferData) {
-                    // Only show the branded Decentraland "gift" view when the target is a verified DCL collection.
-                    // Otherwise an arbitrary contract could impersonate a DCL wearable (spoofed name/image/rarity
-                    // from its own tokenURI) to socially-engineer the transfer of the user's own NFT, and the page
-                    // would fetch that contract's metadata URL, handing the user's IP to whoever runs it. This holds
-                    // for external wallets too: their prompt shows the authoritative transaction, but the branded
-                    // view is what the user reads first, and it must not vouch for a contract Decentraland does not
-                    // know. Anything else falls through to the generic review. The result is cached in
-                    // metaTxCheckRef so the generic fall-through and the approve path don't repeat the (networked)
-                    // lookup for the same contract.
-                    // The branded view claims exactly one thing: the connected account's token #X goes to Y,
-                    // gas covered. Three facts make that claim hold before anything is simulated. The relay
-                    // check says gas is covered, but it is not proof of a collection: the transactions server
-                    // also vouches for every contract in its address book, and an ERC-20 transferFrom shares
-                    // the ERC-721 selector, so a transfer aimed at MANA decodes like a gift. The chain itself
-                    // says whether a collection factory deployed the contract, and only Decentraland's
-                    // collection code guarantees that a transfer moves one token and nothing else. And the
-                    // token must be the connected account's: the calldata's `from` says who the requester
-                    // claims holds it, the chain says who does. Provenance and ownership are read through
-                    // Decentraland's RPC, never the wallet's, and all three lookups run together so a slow
-                    // answer costs one wait. Anything else takes the generic review and its simulation; so
-                    // does a failing lookup, through the catch. What passes is then simulated as well, below.
+                    // The branded gift view says "your token #X goes to Y, gas covered", so it is shown only when
+                    // three checks agree: the transactions server relays the contract (gas covered), a Decentraland
+                    // collection factory deployed it (address-book contracts and ERC-20 transferFrom, which shares
+                    // the ERC-721 selector, pass the relay check alone), and the connected account holds the token
+                    // (the calldata's `from` is only what the requester claims). The chain lookups use
+                    // Decentraland's RPC, never the wallet's. Anything else, including a failed lookup, takes the
+                    // generic review; what passes is simulated below before the view is shown.
                     const isOwnTransfer = transferData.fromAddress.toLowerCase() === signerAddress.toLowerCase()
                     const [relayOutcome, collectionOutcome, holderOutcome] = await Promise.allSettled([
                       checkMetaTransactionSupport(contractAddress),
@@ -745,16 +731,11 @@ export const RequestPage = () => {
                     const isVerifiedCollection = nftContractCheck.willUseMetaTransaction && isOwnTransfer && isCollection && isHeldBySigner
 
                     if (isVerifiedCollection) {
-                      // Even a verified collection and holder are not a complete preview: safeTransferFrom
-                      // invokes the receiver, whose callback may move other assets through existing allowances.
-                      // Simulate first and keep the branded view only when the sole visible effect is
-                      // exactly the transfer it shows; anything else takes the generic summary and its
-                      // acknowledgment gates. The generic review is shown while the simulation runs, so
-                      // Deny is available and Allow is blocked from the first frame, and it is upgraded
-                      // to the branded view once the result matches. A simulation is a point-in-time run
-                      // in a frame the receiver can detect (the relayed self-call has the collection as
-                      // tx.origin, which a live execution never has), so this raises the bar rather than
-                      // proving completeness.
+                      // A verified collection is still not a complete preview: safeTransferFrom calls the receiver,
+                      // whose callback may move other assets through existing allowances. Simulate first, showing
+                      // the generic review meanwhile (Deny works, Allow is blocked), and upgrade to the branded view
+                      // only when the sole visible effect is exactly the transfer it shows. A receiver can detect
+                      // the simulation frame, so this raises the bar rather than proving completeness.
                       const body = txParams ? buildSendTransactionSimulationPayload(txParams, signerAddress, currentChainId, true) : null
                       // Relayed as a meta-transaction, gas covered, whichever view ends up shown.
                       setIsMetaTransaction(true)
