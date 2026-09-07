@@ -72,8 +72,10 @@ import {
   getNetworkProvider,
   getSigninDeeplink,
   isApprovalGrantingTypedData,
+  isDecentralandCollection,
   isExactNftTransferSimulation,
   isKnownDecentralandContractOnChain,
+  isNftOwnedBy,
   isOpaqueSignatureMessage,
   isSignatureMethod
 } from './utils'
@@ -142,6 +144,15 @@ const TERMINAL_VIEWS = new Set([
 // Reported to the client when a request is rejected at recover time, before it reaches the wallet.
 const RPC_METHOD_NOT_SUPPORTED = -32601
 const RPC_INVALID_PARAMS = -32602
+
+// Unwraps a settled promise: its value, or its rejection rethrown. Lets several lookups be awaited
+// together and their outcomes consumed in a chosen order afterwards.
+function settledValue<T>(outcome: PromiseSettledResult<T>): T {
+  if (outcome.status === 'rejected') {
+    throw outcome.reason
+  }
+  return outcome.value
+}
 
 // A string field of an object, or nothing: the recover-time guards already reject any other shape, but a
 // render path must be safe on its own rather than through that distant invariant.
@@ -701,35 +712,38 @@ export const RequestPage = () => {
                   const transferData = decodeNftTransferData(transactionData, contract.abi)
 
                   if (transferData) {
-                    // Only show the branded Decentraland "gift" view when the target is a verified DCL collection.
-                    // Otherwise an arbitrary contract could impersonate a DCL wearable (spoofed name/image/rarity
-                    // from its own tokenURI) to socially-engineer the transfer of the user's own NFT, and the page
-                    // would fetch that contract's metadata URL, handing the user's IP to whoever runs it. This holds
-                    // for external wallets too: their prompt shows the authoritative transaction, but the branded
-                    // view is what the user reads first, and it must not vouch for a contract Decentraland does not
-                    // know. Anything else falls through to the generic review. The result is cached in
-                    // metaTxCheckRef so the generic fall-through and the approve path don't repeat the (networked)
-                    // lookup for the same contract.
-                    const nftContractCheck = await checkMetaTransactionSupport(contractAddress)
+                    // The branded gift view says "your token #X goes to Y, gas covered", so it is shown only when
+                    // three checks agree: the transactions server relays the contract (gas covered), a Decentraland
+                    // collection factory deployed it (address-book contracts and ERC-20 transferFrom, which shares
+                    // the ERC-721 selector, pass the relay check alone), and the connected account holds the token
+                    // (the calldata's `from` is only what the requester claims). The chain lookups use
+                    // Decentraland's RPC, never the wallet's. Anything else, including a failed lookup, takes the
+                    // generic review; what passes is simulated below before the view is shown.
+                    const isOwnTransfer = transferData.fromAddress.toLowerCase() === signerAddress.toLowerCase()
+                    const [relayOutcome, collectionOutcome, holderOutcome] = await Promise.allSettled([
+                      checkMetaTransactionSupport(contractAddress),
+                      isOwnTransfer ? isDecentralandCollection(contractAddress) : Promise.resolve(false),
+                      isOwnTransfer
+                        ? isNftOwnedBy(contractAddress, contract.abi, transferData.tokenId, signerAddress)
+                        : Promise.resolve(false)
+                    ])
                     if (cancelled) return
-                    metaTxCheckRef.current = { address: contractAddress.toLowerCase(), ...nftContractCheck }
-                    // Relayed is not enough: MANA and the marketplaces are relayed too, and an ERC-20
-                    // transferFrom shares the ERC-721 selector, so a transfer aimed at one of them would
-                    // decode like a gift. Only a collection is one.
-                    const isVerifiedCollection =
-                      nftContractCheck.willUseMetaTransaction && nftContractCheck.contractName === ContractName.ERC721CollectionV2
+                    // The relay answer is cached before any verification failure is raised, so the generic
+                    // review this falls to does not ask the transactions server the same question again.
+                    if (relayOutcome.status === 'fulfilled') {
+                      metaTxCheckRef.current = { address: contractAddress.toLowerCase(), ...relayOutcome.value }
+                    }
+                    const nftContractCheck = settledValue(relayOutcome)
+                    const isCollection = settledValue(collectionOutcome)
+                    const isHeldBySigner = settledValue(holderOutcome)
+                    const isVerifiedCollection = nftContractCheck.willUseMetaTransaction && isOwnTransfer && isCollection && isHeldBySigner
 
                     if (isVerifiedCollection) {
-                      // A recognized selector is not a complete preview: safeTransferFrom invokes the
-                      // receiver, whose callback may move other assets through existing allowances.
-                      // Simulate first and keep the branded view only when the sole visible effect is
-                      // exactly the transfer it shows; anything else takes the generic summary and its
-                      // acknowledgment gates. The generic review is shown while the simulation runs, so
-                      // Deny is available and Allow is blocked from the first frame, and it is upgraded
-                      // to the branded view once the result matches. A simulation is a point-in-time run
-                      // in a frame the receiver can detect (the relayed self-call has the collection as
-                      // tx.origin, which a live execution never has), so this raises the bar rather than
-                      // proving completeness.
+                      // A verified collection is still not a complete preview: safeTransferFrom calls the receiver,
+                      // whose callback may move other assets through existing allowances. Simulate first, showing
+                      // the generic review meanwhile (Deny works, Allow is blocked), and upgrade to the branded view
+                      // only when the sole visible effect is exactly the transfer it shows. A receiver can detect
+                      // the simulation frame, so this raises the bar rather than proving completeness.
                       const body = txParams ? buildSendTransactionSimulationPayload(txParams, signerAddress, currentChainId, true) : null
                       // Relayed as a meta-transaction, gas covered, whichever view ends up shown.
                       setIsMetaTransaction(true)
