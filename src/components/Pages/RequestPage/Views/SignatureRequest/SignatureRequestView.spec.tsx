@@ -67,7 +67,9 @@ describe('when reviewing a schema-bound signature', () => {
     beforeEach(() => {
       trade = SIGNED_BY_DAPPS['off-chain marketplace Trade'].payload
       props.payload = { kind: 'typedData', typedData: trade, raw: JSON.stringify(trade) }
-      props.requiresAcknowledgment = false
+      // A Trade grants the marketplace the right to move the listed asset, so the page always gates it
+      // behind the risk acknowledgment; the review must not add a block of its own.
+      props.requiresAcknowledgment = true
     })
 
     it('should render the whole signed trade as a tree, down to the external check', () => {
@@ -84,9 +86,11 @@ describe('when reviewing a schema-bound signature', () => {
       expect(screen.getByText(DAPP_USER)).toBeInTheDocument()
     })
 
-    it('should let the user approve it', () => {
+    it('should gate approval behind the risk acknowledgment alone, with nothing left unchecked', async () => {
       render(<SignatureRequestView {...props} />)
       expect(screen.queryByTestId('signature-review-unavailable')).not.toBeInTheDocument()
+      expect(screen.getByTestId('signature-approve-button')).toBeDisabled()
+      await userEvent.click(screen.getByTestId('risk-acknowledgment'))
       expect(screen.getByTestId('signature-approve-button')).toBeEnabled()
     })
   })
