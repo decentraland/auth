@@ -122,6 +122,13 @@ function resolveTypedDataReview(typedData: unknown, method: string): TypedDataRe
   ) {
     return reject('the domain type does not match the domain fields')
   }
+  // Encoders disagree on a declaration in any order but the standard's: some hash the domain fields as
+  // declared, others as EIP-712 lists them. Such a declaration could sign a digest other than the one
+  // shown and acknowledged here, so only the order every encoder agrees on is accepted.
+  const canonicalOrder = [...EIP712_DOMAIN_FIELD_TYPES.keys()].filter(name => domainKeys.includes(name))
+  if (domainFields.some((field, index) => field.name !== canonicalOrder[index])) {
+    return reject('the domain type does not list its fields in the order EIP-712 defines')
+  }
   types.set('EIP712Domain', domainFields)
 
   const reviewValue = (name: string, type: string, value: unknown, depth: number): TypedDataReviewNode => {

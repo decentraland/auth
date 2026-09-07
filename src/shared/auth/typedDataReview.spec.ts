@@ -88,6 +88,7 @@ describe('when reviewing generic typed data', () => {
     'missing domain field',
     'unknown domain field',
     'wrong domain type',
+    'reordered domain type',
     'derived unsigned chain',
     'unsafe integer',
     'out of range integer'
@@ -130,6 +131,14 @@ describe('when reviewing generic typed data', () => {
         case 'wrong domain type':
           payload.domain = { chainId: 137 }
           payload.types.EIP712Domain = [{ name: 'chainId', type: 'uint8' }]
+          break
+        case 'reordered domain type':
+          payload.types.EIP712Domain = [
+            { name: 'chainId', type: 'uint256' },
+            { name: 'name', type: 'string' },
+            { name: 'version', type: 'string' },
+            { name: 'verifyingContract', type: 'address' }
+          ]
           break
         case 'derived unsigned chain':
           payload.domain.chainId = '137'
@@ -238,6 +247,34 @@ describe('when reviewing generic typed data', () => {
         chainId: '137',
         verifyingContract: signer
       })
+    })
+  })
+
+  describe('and the domain type is declared in the order EIP-712 defines', () => {
+    let derivedOnly: Payload
+
+    beforeEach(() => {
+      derivedOnly = { ...payload, types: { ...payload.types } }
+      payload.types.EIP712Domain = [
+        { name: 'name', type: 'string' },
+        { name: 'version', type: 'string' },
+        { name: 'chainId', type: 'uint256' },
+        { name: 'verifyingContract', type: 'address' }
+      ]
+    })
+
+    it('should sign the same digest as the declaration every encoder derives', () => {
+      expect(resolveTypedDataReview(payload, method).hash).toBe(hashTypedData(derivedOnly as Parameters<typeof hashTypedData>[0]))
+    })
+  })
+
+  describe.each(['-0x1', '1e3', ' 1', '1.0', '0x'])('and an integer is written as %s', written => {
+    beforeEach(() => {
+      payload.message.value = written
+    })
+
+    it('should reject the request with the typed error, not a parsing error', () => {
+      expect(() => resolveTypedDataReview(payload, method)).toThrow(MalformedSignatureRequestError)
     })
   })
 
