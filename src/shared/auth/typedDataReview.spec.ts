@@ -2,7 +2,7 @@ import { hashTypedData } from 'viem'
 import { DAPP_USER, SIGNED_BY_DAPPS, SignedByDapp } from './__fixtures__/decentralandTypedData'
 import { MalformedSignatureRequestError } from './errors'
 import { assertSignatureParamsAreCanonical } from './signMethodGuard'
-import { TypedDataReviewNode, resolveTypedDataReview } from './typedDataReview'
+import { MAX_SCALAR_LENGTH, MAX_TOTAL_LENGTH, TypedDataReviewNode, resolveTypedDataReview } from './typedDataReview'
 
 type Payload = {
   primaryType: string
@@ -375,6 +375,44 @@ describe('when reviewing generic typed data', () => {
       it('should reject the request', () => {
         expect(() => resolveTypedDataReview(payload, method)).toThrow(MalformedSignatureRequestError)
       })
+    })
+  })
+
+  describe.each([
+    ['string', 'a'.repeat(MAX_SCALAR_LENGTH + 1)],
+    ['bytes', `0x${'00'.repeat(MAX_SCALAR_LENGTH / 2)}`]
+  ])('and a signed %s value is longer than a person could be asked to read', (type, value) => {
+    beforeEach(() => {
+      payload.types.Permit.push({ name: 'blob', type })
+      payload.message.blob = value
+    })
+
+    it('should reject the request before escaping, rendering or hashing it', () => {
+      expect(() => resolveTypedDataReview(payload, method)).toThrow('too long to review')
+    })
+  })
+
+  describe('and the signed values together exceed what the review holds', () => {
+    beforeEach(() => {
+      payload.types.Permit.push({ name: 'notes', type: 'string[]' })
+      payload.message.notes = Array.from({ length: Math.ceil(MAX_TOTAL_LENGTH / MAX_SCALAR_LENGTH) + 1 }, () =>
+        'a'.repeat(MAX_SCALAR_LENGTH)
+      )
+    })
+
+    it('should reject the request', () => {
+      expect(() => resolveTypedDataReview(payload, method)).toThrow('too large to review')
+    })
+  })
+
+  describe('and a signed string is long but within what a person could read', () => {
+    beforeEach(() => {
+      payload.types.Permit.push({ name: 'terms', type: 'string' })
+      payload.message.terms = 'terms '.repeat(2000)
+    })
+
+    it('should review it in full', () => {
+      expect(resolveTypedDataReview(payload, method).fields.find(field => field.name === 'terms')?.value).toBe('terms '.repeat(2000))
     })
   })
 

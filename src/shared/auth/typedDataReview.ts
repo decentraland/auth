@@ -18,6 +18,11 @@ const INTEGER =
   /^(u?int)(8|16|24|32|40|48|56|64|72|80|88|96|104|112|120|128|136|144|152|160|168|176|184|192|200|208|216|224|232|240|248|256)$/
 const BYTES = /^bytes([1-9]|[12][0-9]|3[0-2])?$/
 const ARRAY = /^(.*)\[([1-9][0-9]*)?\]$/
+// Sizes past which a value is not reviewed. No string or bytes a person is asked to read is this long, and the
+// request transport carries at most a megabyte. They keep escaping, rendering and hashing bounded before the
+// user can decline.
+const MAX_SCALAR_LENGTH = 64 * 1024
+const MAX_TOTAL_LENGTH = 512 * 1024
 // Characters a rendered string cannot show faithfully: controls, format characters such as the bidi
 // overrides that reorder their neighbours, separators, unassigned code points and U+FFFD. Tab, newline and
 // carriage return are the only controls a value may carry as-is.
@@ -41,7 +46,7 @@ const escapeUnreadable = (text: string): string =>
  * signature-risk acknowledgments still apply. The original request is never rewritten.
  * The domain comes back in the same display form as the fields, never as the payload's own object: its
  * name and version are what a request would forge to look like a trusted application.
- * Depth and work limits bound the traversal of untrusted structures before hashing or rendering them.
+ * Depth, work and size limits bound the traversal, escaping, rendering and hashing of untrusted structures.
  */
 function resolveTypedDataReview(typedData: unknown, method: string): TypedDataReview {
   const reject = (reason: string): never => {
@@ -58,18 +63,31 @@ function resolveTypedDataReview(typedData: unknown, method: string): TypedDataRe
   const spend = (depth: number) => {
     if (depth > 32 || --budget < 0) reject('typed data is too complex to review')
   }
+  let remainingLength = MAX_TOTAL_LENGTH
+  // Every string the payload carries, names and values alike, is measured before it is examined further.
+  const measure = (text: string) => {
+    if (text.length > MAX_SCALAR_LENGTH) reject('a typed-data value is too long to review')
+    remainingLength -= text.length
+    if (remainingLength < 0) reject('typed data is too large to review')
+  }
 
   // Definitions are read leniently: one that is malformed is left out, and only matters if the
   // signature reaches it, which the walk below detects as a reference to a type that does not exist.
   const types = new Map<string, Field[]>()
   for (const [name, fields] of Object.entries(typedData.types)) {
     spend(0)
+    measure(name)
     if (!IDENTIFIER.test(name) || !Array.isArray(fields)) continue
     const names = new Set<string>()
     const definition: Field[] = []
     let isWellFormed = true
     for (const field of fields) {
       spend(0)
+      if (isRecord(field)) {
+        for (const part of [field.name, field.type]) {
+          if (typeof part === 'string') measure(part)
+        }
+      }
       if (
         !isRecord(field) ||
         typeof field.name !== 'string' ||
@@ -149,6 +167,7 @@ function resolveTypedDataReview(typedData: unknown, method: string): TypedDataRe
       }
       return { name, type, children: fields.map(field => reviewValue(field.name, field.type, value[field.name], depth + 1)) }
     }
+    if (typeof value === 'string') measure(value)
     const integer = INTEGER.exec(type)
     if (integer) {
       if (
@@ -196,5 +215,5 @@ function resolveTypedDataReview(typedData: unknown, method: string): TypedDataRe
   return { primaryType, domain: reviewedDomain, fields, hash }
 }
 
-export { resolveTypedDataReview }
+export { MAX_SCALAR_LENGTH, MAX_TOTAL_LENGTH, resolveTypedDataReview }
 export type { TypedDataReview, TypedDataReviewNode }
