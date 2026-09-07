@@ -381,6 +381,19 @@ async function getNetworkProvider(chainId: ChainId): Promise<Provider> {
 }
 
 /**
+ * Decentraland's own RPC for a chain, never the connected wallet's.
+ *
+ * `getNetworkProvider` prefers the wallet's provider when it reports the same chain, which is fine for
+ * reads whose only cost is a wrong display. It is wrong for anything the page trusts: a wallet pointed at
+ * a hostile RPC (a custom network the user was talked into adding) could otherwise answer whatever
+ * dresses a call as safe. Everything that decides on, or draws, the branded gift view reads through this,
+ * so keep the two apart on purpose; they are not duplicates of each other.
+ */
+function getTrustedNetworkProvider(chainId: ChainId): Promise<Provider> {
+  return connection.createProvider(ProviderType.NETWORK, chainId)
+}
+
+/**
  * Validates if an address corresponds to a Decentraland contract address (including collections).
  * @param address The Ethereum address to validate
  * @returns true if the address is a valid Decentraland contract address, false otherwise
@@ -541,6 +554,122 @@ function isExactNftTransferSimulation(
   )
 }
 
+// The factories every Decentraland collection on the meta-transaction chain was deployed through. Not
+// every generation exists on every chain (Amoy only has the V3 factory), so the ones missing from the
+// registry are skipped.
+const COLLECTION_FACTORIES = [ContractName.CollectionFactory, ContractName.CollectionFactoryV3]
+// A hung RPC must not hold the request page on its spinner. After this long the lookup is given up (the
+// RPC call itself is not aborted; the provider offers no handle for that) and the review falls back to the
+// generic path. The lookups that share this budget run in parallel, so it bounds the wait as a whole.
+const COLLECTION_LOOKUP_TIMEOUT_MS = 10_000
+
+/** Rejects when `promise` has not settled within `timeoutMs`. */
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs)
+    promise.then(
+      value => {
+        clearTimeout(timer)
+        resolve(value)
+      },
+      error => {
+        clearTimeout(timer)
+        reject(error)
+      }
+    )
+  })
+}
+
+/**
+ * Whether a contract is a Decentraland collection: one of the collection factories on the
+ * meta-transaction chain records having deployed it, answered by the chain itself with a read-only call.
+ *
+ * Asking the transactions server whether it would relay the address is not the same question — it
+ * vouches for every Decentraland contract in its address book, not only collections — and the branded
+ * gift view needs the exact answer: it presents the call as one collection token moving and nothing
+ * else, which only Decentraland's collection code guarantees.
+ *
+ * The answer is a trust decision, so it is read through Decentraland's own RPC and never through the
+ * connected wallet: a wallet pointed at a hostile RPC (a custom network the user was talked into adding)
+ * could otherwise answer "yes" for any contract and dress it as a gift.
+ * @param contractAddress The contract the transaction targets
+ * @returns true when a factory deployed it; false when none did, or none exists on this chain
+ * @throws when the chain could not be asked, or did not answer in time, so an outage is never read as
+ * a verdict
+ */
+async function isDecentralandCollection(contractAddress: string): Promise<boolean> {
+  const chainId = getMetaTransactionChainId()
+  const factories = COLLECTION_FACTORIES.flatMap(name => {
+    try {
+      return [getContract(name, chainId)]
+    } catch {
+      return []
+    }
+  })
+  if (factories.length === 0) {
+    return false
+  }
+
+  // Note what "a factory deployed it" covers: every curated collection, third-party creators' included.
+  // The branded frame is therefore available to any approved creator's collection, and what it says
+  // stays true for all of them — exactly one token the signer holds leaves their account.
+  const networkProvider = await getTrustedNetworkProvider(chainId)
+  const publicClient = createPublicClient({ transport: custom(networkProvider) })
+  const answers = await Promise.allSettled(
+    factories.map(factory =>
+      withTimeout(
+        publicClient.readContract({
+          address: factory.address as `0x${string}`,
+          abi: factory.abi as readonly unknown[],
+          functionName: 'isCollectionFromFactory',
+          args: [contractAddress]
+        }) as Promise<boolean>,
+        COLLECTION_LOOKUP_TIMEOUT_MS,
+        'Collection factory lookup'
+      )
+    )
+  )
+  // One factory saying yes is the whole answer, whatever happened to the other lookup. Only when no
+  // factory said yes does a failed lookup matter: then nothing vouched for the contract and nothing
+  // ruled it out either, and an outage must not be read as a verdict.
+  if (answers.some(answer => answer.status === 'fulfilled' && answer.value === true)) {
+    return true
+  }
+  const failure = answers.find((answer): answer is PromiseRejectedResult => answer.status === 'rejected')
+  if (failure) {
+    throw failure.reason
+  }
+  return false
+}
+
+/**
+ * Whether `owner` holds token `tokenId` on `contractAddress`, read through Decentraland's own RPC.
+ *
+ * The branded gift view claims the connected account's token is leaving. The calldata's `from` only
+ * says who the requester claims that is; this says who actually holds it. A token that does not exist
+ * reverts, which surfaces like any other read failure: the caller falls back to the generic review.
+ * @param contractAddress The collection
+ * @param contractABI The collection ABI, which declares `ownerOf`
+ * @param tokenId The token, in decimal
+ * @param owner The account expected to hold it
+ * @throws when the chain could not be asked, did not answer in time, or the token does not exist
+ */
+async function isNftOwnedBy(contractAddress: string, contractABI: object[], tokenId: string, owner: string): Promise<boolean> {
+  const networkProvider = await getTrustedNetworkProvider(getMetaTransactionChainId())
+  const publicClient = createPublicClient({ transport: custom(networkProvider) })
+  const holder = await withTimeout(
+    publicClient.readContract({
+      address: contractAddress as `0x${string}`,
+      abi: contractABI as readonly unknown[],
+      functionName: 'ownerOf',
+      args: [BigInt(tokenId)]
+    }) as Promise<string>,
+    COLLECTION_LOOKUP_TIMEOUT_MS,
+    'Token owner lookup'
+  )
+  return typeof holder === 'string' && holder.toLowerCase() === owner.toLowerCase()
+}
+
 /**
  * Decodes MANA (ERC20) transfer data to extract amount and destination address.
  * Only decodes when the transaction targets the canonical MANA token contract, so an
@@ -608,10 +737,11 @@ async function fetchNftMetadata(
   contractABI: object[],
   tokenId: string
 ): Promise<{ imageUrl: string; name: string; description: string; rarity: Rarity }> {
-  // Get the correct network provider for NFT collections (Polygon/Amoy)
-  // This is necessary because the user's browser provider may be connected to a different network
+  // Read through Decentraland's own RPC for the collections chain (Polygon/Amoy). Not the wallet's: it
+  // may be on another network, and what it returns here is drawn on the branded view as the token's
+  // name, image and rarity, so a hostile RPC could dress the genuine token in whatever it likes.
   const chainId = getMetaTransactionChainId()
-  const networkProvider = await getNetworkProvider(chainId)
+  const networkProvider = await getTrustedNetworkProvider(chainId)
   const publicClient = createPublicClient({ transport: custom(networkProvider) })
 
   // Use the provided contract ABI to interact with the NFT contract
@@ -757,6 +887,9 @@ export {
   getConnectedProvider,
   getNetworkProvider,
   isDecentralandContractAddress,
+  isDecentralandCollection,
+  isNftOwnedBy,
+  getTrustedNetworkProvider,
   isApprovalGrantingTypedData,
   getMetaTransactionChainId,
   checkMetaTransactionSupport,
