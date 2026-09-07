@@ -405,6 +405,30 @@ describe('when reviewing generic typed data', () => {
     })
   })
 
+  describe('and a signed string is short but full of characters that are shown as escapes', () => {
+    beforeEach(() => {
+      payload.types.Permit.push({ name: 'blob', type: 'string' })
+      // Eight characters of escape per character: over the cap once shown, well under it as signed.
+      payload.message.blob = '\u202e'.repeat(MAX_SCALAR_LENGTH / 8 + 1)
+    })
+
+    it('should reject the request by what it would show, not by what was signed', () => {
+      expect(() => resolveTypedDataReview(payload, method)).toThrow('too long to review')
+    })
+  })
+
+  describe('and the signed strings are short but together fill the review once shown as escapes', () => {
+    beforeEach(() => {
+      payload.types.Permit.push({ name: 'notes', type: 'string[]' })
+      const shownLength = MAX_SCALAR_LENGTH - 8
+      payload.message.notes = Array.from({ length: Math.ceil(MAX_TOTAL_LENGTH / shownLength) + 1 }, () => '\u202e'.repeat(shownLength / 8))
+    })
+
+    it('should reject the request', () => {
+      expect(() => resolveTypedDataReview(payload, method)).toThrow('too large to review')
+    })
+  })
+
   describe('and a signed string is long but within what a person could read', () => {
     beforeEach(() => {
       payload.types.Permit.push({ name: 'terms', type: 'string' })

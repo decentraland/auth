@@ -18,9 +18,9 @@ const INTEGER =
   /^(u?int)(8|16|24|32|40|48|56|64|72|80|88|96|104|112|120|128|136|144|152|160|168|176|184|192|200|208|216|224|232|240|248|256)$/
 const BYTES = /^bytes([1-9]|[12][0-9]|3[0-2])?$/
 const ARRAY = /^(.*)\[([1-9][0-9]*)?\]$/
-// Sizes past which a value is not reviewed. No string or bytes a person is asked to read is this long, and the
-// request transport carries at most a megabyte. They keep escaping, rendering and hashing bounded before the
-// user can decline.
+// Sizes past which a value is not reviewed, measured on the text as it will be shown, escapes included. No string
+// or bytes a person is asked to read is this long, and the request transport carries at most a megabyte. They
+// keep escaping, rendering and hashing bounded before the user can decline.
 const MAX_SCALAR_LENGTH = 64 * 1024
 const MAX_TOTAL_LENGTH = 512 * 1024
 // Characters a rendered string cannot show faithfully: controls, format characters such as the bidi
@@ -64,11 +64,14 @@ function resolveTypedDataReview(typedData: unknown, method: string): TypedDataRe
     if (depth > 32 || --budget < 0) reject('typed data is too complex to review')
   }
   let remainingLength = MAX_TOTAL_LENGTH
+  const charge = (length: number) => {
+    remainingLength -= length
+    if (remainingLength < 0) reject('typed data is too large to review')
+  }
   // Every string the payload carries, names and values alike, is measured before it is examined further.
   const measure = (text: string) => {
     if (text.length > MAX_SCALAR_LENGTH) reject('a typed-data value is too long to review')
-    remainingLength -= text.length
-    if (remainingLength < 0) reject('typed data is too large to review')
+    charge(text.length)
   }
 
   // Definitions are read leniently: one that is malformed is left out, and only matters if the
@@ -188,7 +191,12 @@ function resolveTypedDataReview(typedData: unknown, method: string): TypedDataRe
     }
     if (type === 'string') {
       if (typeof value !== 'string') return reject('a typed-data value does not match its declared scalar type')
-      return { name, type, value: escapeUnreadable(value) }
+      // An escape is several characters long, and it is the escaped text that is held and rendered, so the
+      // value is held to the caps again as shown.
+      const shown = escapeUnreadable(value)
+      if (shown.length > MAX_SCALAR_LENGTH) return reject('a typed-data value is too long to review')
+      charge(shown.length - value.length)
+      return { name, type, value: shown }
     }
     const bytes = BYTES.exec(type)
     if (
