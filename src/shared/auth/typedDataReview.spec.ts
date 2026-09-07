@@ -170,7 +170,7 @@ describe('when reviewing generic typed data', () => {
     })
 
     it('should sign the same digest as a request without it', () => {
-      const { Junk: _unreached, ...signedTypes } = payload.types
+      const { Unused: _unreached, ...signedTypes } = payload.types
       expect(resolveTypedDataReview(payload, method).hash).toBe(
         hashTypedData({ ...payload, types: signedTypes } as Parameters<typeof hashTypedData>[0])
       )
@@ -212,6 +212,24 @@ describe('when reviewing generic typed data', () => {
     it('should show them as visible escapes instead of letting them act on the display', () => {
       const memo = resolveTypedDataReview(payload, method).fields.find(field => field.name === 'memo')
       expect(memo?.value).toBe('Send 1 MANA to \\u{202e}0xattacker')
+    })
+
+    it('should leave the signed digest untouched', () => {
+      expect(resolveTypedDataReview(payload, method).hash).toBe(hashTypedData(payload as Parameters<typeof hashTypedData>[0]))
+    })
+  })
+
+  describe('and a signed string carries spaces that are not the ordinary space', () => {
+    beforeEach(() => {
+      payload.types.Permit.push({ name: 'memo', type: 'string' })
+      payload.message.memo = 'Send\u00a01 MANA to\u2007you'
+      payload.domain.name = 'Trusted\u202fApp'
+    })
+
+    it('should show them as escapes, since they look like a space and sign differently', () => {
+      const review = resolveTypedDataReview(payload, method)
+      expect(review.fields.find(field => field.name === 'memo')?.value).toBe('Send\\u{a0}1 MANA to\\u{2007}you')
+      expect(review.domain.name).toBe('Trusted\\u{202f}App')
     })
 
     it('should leave the signed digest untouched', () => {

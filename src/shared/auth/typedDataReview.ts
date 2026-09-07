@@ -27,9 +27,10 @@ const MAX_TOTAL_LENGTH = 512 * 1024
 const MAX_TYPE_DEFINITIONS = 256
 // Characters a rendered string cannot show faithfully: controls (tab, newline and carriage return among
 // them, which the page would otherwise collapse into plain spacing), format characters such as the bidi
-// overrides that reorder their neighbours, separators, unassigned code points and U+FFFD. The backslash is
-// escaped too, so a signed string cannot spell out an escape of its own and the display stays unambiguous.
-const UNREADABLE_CHARACTER = /[\\\p{C}\p{Zl}\p{Zp}�]/gu
+// overrides that reorder their neighbours, every separator but the ordinary space (a no-break or figure
+// space looks identical to one and signs differently), unassigned code points and U+FFFD. The backslash
+// is escaped too, so a signed string cannot spell out an escape of its own and the display stays unambiguous.
+const UNREADABLE_CHARACTER = /(?! )[\\\p{C}\p{Z}�]/gu
 const SHORT_ESCAPES: ReadonlyMap<string, string> = new Map([
   ['\\', '\\\\'],
   ['\t', '\\t'],

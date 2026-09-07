@@ -117,6 +117,21 @@ describe('when reviewing a schema-bound signature', () => {
     })
   })
 
+  describe('and a signed value carries a no-break space', () => {
+    beforeEach(() => {
+      typedData.types.Order.push({ name: 'terms', type: 'string' })
+      typedData.message.terms = 'allow\u00a0all'
+      typedData.domain.name = 'Trusted\u00a0App'
+      render(<SignatureRequestView {...props} />)
+    })
+
+    it('should show it as an escape rather than as a space', () => {
+      expect(screen.getByText('allow\\u{a0}all')).toBeInTheDocument()
+      expect(screen.getByText('Trusted\\u{a0}App')).toBeInTheDocument()
+      expect(screen.queryByText('allow all')).not.toBeInTheDocument()
+    })
+  })
+
   describe('and a signed value carries line breaks', () => {
     beforeEach(() => {
       typedData.types.Order.push({ name: 'terms', type: 'string' })
