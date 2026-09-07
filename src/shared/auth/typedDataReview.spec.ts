@@ -429,6 +429,20 @@ describe('when reviewing generic typed data', () => {
     })
   })
 
+  describe('and a long struct name is repeated across an array of small values', () => {
+    beforeEach(() => {
+      // One declaration within the caps, shown again in the label of every element.
+      const longName = 'Struct'.padEnd(MAX_SCALAR_LENGTH, 'x')
+      payload.types.Permit.push({ name: 'items', type: `${longName}[]` })
+      payload.types[longName] = [{ name: 'amount', type: 'uint8' }]
+      payload.message.items = Array.from({ length: Math.ceil(MAX_TOTAL_LENGTH / MAX_SCALAR_LENGTH) + 1 }, () => ({ amount: 1 }))
+    })
+
+    it('should reject the request by what the tree would render, not by the declaration alone', () => {
+      expect(() => resolveTypedDataReview(payload, method)).toThrow('too large to review')
+    })
+  })
+
   describe('and a signed string is long but within what a person could read', () => {
     beforeEach(() => {
       payload.types.Permit.push({ name: 'terms', type: 'string' })

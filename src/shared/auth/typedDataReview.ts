@@ -154,6 +154,9 @@ function resolveTypedDataReview(typedData: unknown, method: string): TypedDataRe
 
   const reviewValue = (name: string, type: string, value: unknown, depth: number): TypedDataReviewNode => {
     spend(depth)
+    // Every node is rendered with its name and type, however many nodes reuse one declaration, so each
+    // node's label counts toward what is held, not only the declaration that was measured once.
+    charge(name.length + type.length)
     const array = ARRAY.exec(type)
     if (array) {
       if (!Array.isArray(value) || (array[2] !== undefined && value.length !== Number(array[2]))) {
