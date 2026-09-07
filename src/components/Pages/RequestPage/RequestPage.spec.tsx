@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-rou
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ProviderType } from '@dcl/schemas'
+import { sendMetaTransaction } from 'decentraland-transactions'
 import { TrackingEvents } from '../../../modules/analytics/types'
 import { fetchProfile } from '../../../modules/profile'
 import {
@@ -21,7 +22,14 @@ import { extractReferrerFromSearchParameters, getAuthRequestId, isBridgeOnlyEnab
 import { trackEvent } from '../../../shared/utils/analytics'
 import { FeatureFlagsContext } from '../../FeatureFlagsProvider'
 import { RequestPage } from './RequestPage'
-import { decodeManaTransferData, decodeNftTransferData, fetchNftMetadata, getSigninDeeplink } from './utils'
+import {
+  decodeManaTransferData,
+  decodeNftTransferData,
+  fetchNftMetadata,
+  getConnectedProvider,
+  getNetworkProvider,
+  getSigninDeeplink
+} from './utils'
 
 // --- Navigation ---
 const mockNavigate = jest.fn()
@@ -143,6 +151,8 @@ const mockWalletClient = {
 }
 
 jest.mock('viem', () => ({
+  isAddress: jest.requireActual('viem').isAddress,
+  verifyTypedData: jest.requireActual('viem').verifyTypedData,
   createPublicClient: jest.fn(() => mockPublicClient),
   createWalletClient: jest.fn(() => mockWalletClient),
   custom: jest.fn((p: any) => p),
@@ -1391,6 +1401,48 @@ describe('RequestPage', () => {
       renderRequestPage()
       const view = await screen.findByTestId('wallet-interaction')
       await waitFor(() => expect(view).toHaveAttribute('data-gas-covered', 'true'))
+    })
+
+    describe('and the relay provider switches away from the reviewed account', () => {
+      let reviewedSigner: string
+      let walletRequest: jest.Mock
+
+      beforeEach(async () => {
+        reviewedSigner = '0x1111111111111111111111111111111111111111'
+        mockConnectionData.account = reviewedSigner
+        mockGetAddresses.mockResolvedValue([reviewedSigner])
+        mockRecover.mockResolvedValue({
+          method: 'eth_sendTransaction',
+          params: [{ to: '0x2222222222222222222222222222222222222222', data: '0xabcd', value: '0x0' }],
+          sender: reviewedSigner,
+          expiration: new Date(Date.now() + 3600000).toISOString()
+        })
+        walletRequest = jest.fn().mockResolvedValue(['0x3333333333333333333333333333333333333333'])
+        jest.mocked(getConnectedProvider).mockResolvedValueOnce({ request: walletRequest } as any)
+        jest.mocked(getNetworkProvider).mockResolvedValueOnce({ request: jest.fn() } as any)
+        jest.mocked(sendMetaTransaction).mockImplementationOnce(async boundProvider => {
+          await (boundProvider as { request: jest.Mock }).request({ method: 'eth_requestAccounts', params: [] })
+          return '0xunexpected'
+        })
+        renderRequestPage()
+        await userEvent.click(await screen.findByTestId('wallet-interaction-approve'))
+        await screen.findByTestId('different-account')
+      })
+
+      afterEach(() => {
+        jest.mocked(getConnectedProvider).mockReset()
+        jest.mocked(getNetworkProvider).mockReset()
+        jest.mocked(sendMetaTransaction).mockReset()
+      })
+
+      it('should return to account review without signing', () => {
+        expect(walletRequest).not.toHaveBeenCalledWith(expect.objectContaining({ method: 'eth_signTypedData_v4' }))
+      })
+
+      it('should leave the request unconsumed without reporting an outcome', () => {
+        expect(mockSendSuccessfulOutcome).not.toHaveBeenCalled()
+        expect(mockSendFailedOutcome).not.toHaveBeenCalled()
+      })
     })
 
     describe('and the simulation is unavailable', () => {

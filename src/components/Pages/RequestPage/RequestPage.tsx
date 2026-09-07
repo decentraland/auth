@@ -2,7 +2,7 @@ import { useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { createPublicClient, createWalletClient, custom } from 'viem'
 import { mainnet } from 'viem/chains'
-import { ContractName, getContract, sendMetaTransaction } from 'decentraland-transactions'
+import { ContractName, getContract } from 'decentraland-transactions'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import { useAnalytics } from '../../../hooks/useAnalytics'
@@ -30,6 +30,7 @@ import {
   hasNoVisibleEffects,
   isDangerousApproval
 } from '../../../shared/auth'
+import { sendMetaTransactionWithSigner } from '../../../shared/auth/sendMetaTransactionWithSigner'
 import { isRetiredSignInMethod } from '../../../shared/auth/signMethodGuard'
 import { isSocialProviderType, useCurrentConnectionData } from '../../../shared/connection'
 import { isSessionMismatch } from '../../../shared/connection/sessionMismatch'
@@ -1156,9 +1157,16 @@ export const RequestPage = () => {
           // session (poisoning later getContractName/isKnownDecentralandContractOnChain lookups). Clone it.
           const contract = { ...getContract(contractName, chainId), address: toAddress }
 
-          result = await sendMetaTransaction(connectedProvider, networkProvider, transactionParams.data as string, contract, {
-            serverURL: `${config.get('META_TRANSACTION_SERVER_URL')}/v1`
-          })
+          result = await sendMetaTransactionWithSigner(
+            signerAddress,
+            connectedProvider,
+            networkProvider,
+            transactionParams.data as string,
+            contract,
+            {
+              serverURL: `${config.get('META_TRANSACTION_SERVER_URL')}/v1`
+            }
+          )
         } else {
           const reviewedChainId = reviewedWalletChainIdRef.current
           const currentChainId = await publicClientRef.current?.getChainId().catch(() => undefined)
@@ -1216,6 +1224,8 @@ export const RequestPage = () => {
         })
         hasCompletedRef.current = true
         showInteractionCompleteView()
+      } else if (e instanceof DifferentSenderError) {
+        setView(View.DIFFERENT_ACCOUNT)
       } else if (isChainMismatchRejection(e)) {
         // The wallet refused the send because its network no longer matches the reviewed chain: the
         // binding above fired. That is not the user's decision, so answer nothing and review again.
