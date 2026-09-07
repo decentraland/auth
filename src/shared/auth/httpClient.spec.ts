@@ -1,4 +1,5 @@
-import { AuthIdentity } from '@dcl/crypto'
+import { AuthIdentity, Authenticator } from '@dcl/crypto'
+import { createUnsafeIdentity } from '@dcl/crypto/dist/crypto'
 import signedFetchMock from 'decentraland-crypto-fetch'
 import { getAnalytics } from '../../modules/analytics/segment'
 import { TrackingEvents } from '../../modules/analytics/types'
@@ -28,7 +29,8 @@ describe('createAuthServerClient', () => {
   // Common test variables
   const mockUrl = 'http://mock-auth-server.com'
   const mockRequestId = 'mock-request-id'
-  const mockSender = '0xmocksender'
+  let mockSender: string
+  let outcomeIdentity: AuthIdentity
   const mockSignerAddress = '0xMockSignerAddress'
   const mockSignerAddressLower = '0xmocksigneraddress'
 
@@ -37,9 +39,14 @@ describe('createAuthServerClient', () => {
   // Mock analytics track (module-scoped so tests can assert the events sent)
   let mockTrack: jest.Mock
 
-  beforeEach(() => {
+  beforeEach(async () => {
     // Reset all mocks
     jest.clearAllMocks()
+    const wallet = createUnsafeIdentity()
+    mockSender = wallet.address
+    outcomeIdentity = await Authenticator.initializeAuthChain(wallet.address, createUnsafeIdentity(), 10, async message =>
+      Authenticator.createSignature(wallet, message)
+    )
 
     // Mock analytics
     mockTrack = jest.fn()
@@ -304,7 +311,7 @@ describe('createAuthServerClient', () => {
     const mockResult = 'someResult'
 
     beforeEach(() => {
-      client = createAuthServerHttpClient()
+      client = createAuthServerHttpClient(undefined, () => outcomeIdentity)
     })
 
     describe('when the request is successful', () => {
@@ -324,10 +331,13 @@ describe('createAuthServerClient', () => {
             // eslint-disable-next-line @typescript-eslint/naming-convention
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({
-            sender: mockSender,
-            result: mockResult
-          })
+          body: expect.any(String)
+        })
+        expect(JSON.parse(mockFetch.mock.calls[0][1].body)).toEqual({
+          sender: mockSender,
+          result: mockResult,
+          expiresAt: expect.any(Number),
+          authChain: expect.any(Array)
         })
       })
     })
@@ -411,7 +421,7 @@ describe('createAuthServerClient', () => {
     let mockError: { code: number; message: string }
 
     beforeEach(() => {
-      client = createAuthServerHttpClient()
+      client = createAuthServerHttpClient(undefined, () => outcomeIdentity)
       mockError = { code: 400, message: 'Bad request' }
     })
 
@@ -431,10 +441,13 @@ describe('createAuthServerClient', () => {
             // eslint-disable-next-line @typescript-eslint/naming-convention
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({
-            sender: mockSender,
-            error: mockError
-          })
+          body: expect.any(String)
+        })
+        expect(JSON.parse(mockFetch.mock.calls[0][1].body)).toEqual({
+          sender: mockSender,
+          error: mockError,
+          expiresAt: expect.any(Number),
+          authChain: expect.any(Array)
         })
       })
     })
