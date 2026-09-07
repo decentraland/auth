@@ -7,7 +7,8 @@ type Field = { name: string; type: string }
 type TypedDataReviewNode = Field & { value?: string; children?: TypedDataReviewNode[] }
 type TypedDataReview = {
   primaryType: string
-  domain: Record<string, unknown>
+  /** The signed domain fields in the form the review shows: strings escaped, integers decimal. */
+  domain: Record<string, string>
   fields: TypedDataReviewNode[]
   hash: string
 }
@@ -38,6 +39,8 @@ const escapeUnreadable = (text: string): string =>
  * coercions and a domain the encoder would only partially sign are rejected, because the review could
  * not then show exactly what is signed. This does not establish a permit's or an order's safety; the
  * signature-risk acknowledgments still apply. The original request is never rewritten.
+ * The domain comes back in the same display form as the fields, never as the payload's own object: its
+ * name and version are what a request would forge to look like a trusted application.
  * Depth and work limits bound the traversal of untrusted structures before hashing or rendering them.
  */
 function resolveTypedDataReview(typedData: unknown, method: string): TypedDataReview {
@@ -172,7 +175,10 @@ function resolveTypedDataReview(typedData: unknown, method: string): TypedDataRe
     }
     return { name, type, value: String(value) }
   }
-  reviewValue('domain', 'EIP712Domain', domain, 0)
+  // Every domain field is a scalar, so each reviewed node carries its display value.
+  const reviewedDomain = Object.fromEntries(
+    (reviewValue('domain', 'EIP712Domain', domain, 0).children ?? []).map(node => [node.name, node.value ?? ''])
+  )
   const fields = reviewValue('message', primaryType, message, 0).children ?? []
   let hash: string
   try {
@@ -180,7 +186,7 @@ function resolveTypedDataReview(typedData: unknown, method: string): TypedDataRe
   } catch {
     return reject('typed data cannot be encoded for signing')
   }
-  return { primaryType, domain, fields, hash }
+  return { primaryType, domain: reviewedDomain, fields, hash }
 }
 
 export { resolveTypedDataReview }

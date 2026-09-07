@@ -95,6 +95,23 @@ describe('when reviewing a schema-bound signature', () => {
     })
   })
 
+  describe('and the domain name and version carry characters that would reorder their neighbours', () => {
+    beforeEach(() => {
+      typedData.domain.name = 'Marketplace\u202e'
+      typedData.domain.version = '1\u202d'
+      render(<SignatureRequestView {...props} />)
+    })
+
+    it('should show the characters as visible escapes', () => {
+      expect(screen.getByText('Marketplace\\u{202e}')).toBeInTheDocument()
+      expect(screen.getByText('1\\u{202d}')).toBeInTheDocument()
+    })
+
+    it('should not let them reach the page', () => {
+      expect(document.body.textContent).not.toMatch(/[\u202d\u202e]/)
+    })
+  })
+
   describe('and an unsigned field is supplied', () => {
     beforeEach(() => {
       typedData.message.description = 'Additional description'

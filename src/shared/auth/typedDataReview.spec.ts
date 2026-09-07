@@ -203,6 +203,44 @@ describe('when reviewing generic typed data', () => {
     })
   })
 
+  describe('and the domain name and version carry characters that would reorder or hide their neighbours', () => {
+    beforeEach(() => {
+      payload.domain.name = 'Decentraland\u202e Marketplace'
+      payload.domain.version = '1\u200b'
+    })
+
+    it('should show them as visible escapes, as it does for message strings', () => {
+      const { domain } = resolveTypedDataReview(payload, method)
+      expect(domain.name).toBe('Decentraland\\u{202e} Marketplace')
+      expect(domain.version).toBe('1\\u{200b}')
+    })
+
+    it('should leave the signed digest untouched', () => {
+      expect(resolveTypedDataReview(payload, method).hash).toBe(hashTypedData(payload as Parameters<typeof hashTypedData>[0]))
+    })
+  })
+
+  describe('and the domain chainId is signed as a hex quantity', () => {
+    beforeEach(() => {
+      payload.domain.chainId = '0x89'
+      payload.types.EIP712Domain = [
+        { name: 'name', type: 'string' },
+        { name: 'version', type: 'string' },
+        { name: 'chainId', type: 'uint256' },
+        { name: 'verifyingContract', type: 'address' }
+      ]
+    })
+
+    it('should present the domain chainId as the exact decimal it signs', () => {
+      expect(resolveTypedDataReview(payload, method).domain).toEqual({
+        name: 'Token',
+        version: '1',
+        chainId: '137',
+        verifyingContract: signer
+      })
+    })
+  })
+
   describe('and the domain schema is explicit', () => {
     beforeEach(() => {
       payload.domain = { chainId: '137', salt: `0x${'00'.repeat(32)}`, version: '1' }
