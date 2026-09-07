@@ -6,6 +6,7 @@ import { getPreviewFingerprint, hasNoVisibleEffects } from '../../../../../share
 import { Container } from '../../Container'
 import { ButtonsContainer } from '../../RequestPage.styled'
 import { KnownContractNotice } from '../KnownContractNotice'
+import { RetryPreviewButton } from '../RetryPreviewButton'
 import { SimulationSummary } from '../SimulationSummary'
 import styles from '../Views.module.css'
 import { WalletInteractionProps } from './WalletInteraction.types'
@@ -87,7 +88,12 @@ export const WalletInteraction = ({
         ) : null}
         {isPreviewUnavailable ? (
           <PreviewUnavailableWarning severity="warning" role="alert" data-testid="preview-unavailable-warning">
-            {t('request.wallet_interaction.preview_unavailable_warning')}
+            {/* The retry is promised only where it is offered. */}
+            {t(
+              onRetryPreview
+                ? 'request.wallet_interaction.preview_unavailable_warning_retry'
+                : 'request.wallet_interaction.preview_unavailable_warning'
+            )}
           </PreviewUnavailableWarning>
         ) : null}
         {needsAcknowledgment ? (
@@ -113,16 +119,13 @@ export const WalletInteraction = ({
             {t('common.deny')}
           </Button>
           {isPreviewUnavailable && onRetryPreview ? (
-            <Button
-              variant="outlined"
+            <RetryPreviewButton
               disabled={isLoading}
-              onClick={() => {
+              onRetry={() => {
                 setAcknowledgedStatement(null)
                 onRetryPreview()
               }}
-            >
-              {t('request.transaction_dialog.retry_preview')}
-            </Button>
+            />
           ) : null}
           <Button
             variant="contained"
@@ -149,7 +152,9 @@ export const WalletInteraction = ({
         {isWeb2Wallet ? t('request.wallet_interaction.title_web2') : t('request.wallet_interaction.title_web3', { explorerText })}
       </Box>
       <Box className={styles.description}>{t('request.wallet_interaction.description')}</Box>
-      <KnownContractNotice address={targetAddress} chainId={targetChainId} />
+      {/* No provenance notice on this screen: nothing else here describes the call, so a true "known
+          contract" line would only prime a single-click Allow (an unlimited approve to MANA targets a
+          known contract too). It is shown where a preview or an acknowledgment stands beside it. */}
       {reviewRestarted ? (
         <ReviewRestartedNotice severity="info" role="status" data-testid="review-restarted-notice">
           {t('request.wallet_interaction.review_restarted_notice')}

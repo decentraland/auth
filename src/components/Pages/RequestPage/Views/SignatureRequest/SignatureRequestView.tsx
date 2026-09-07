@@ -6,6 +6,7 @@ import { getExplorerAddressUrl, getExplorerName, getNetworkName } from '../../..
 import { Container } from '../../Container'
 import { ButtonsContainer } from '../../RequestPage.styled'
 import { KnownContractNotice } from '../KnownContractNotice'
+import { RetryPreviewButton } from '../RetryPreviewButton'
 import { SimulationSummary } from '../SimulationSummary'
 import styles from '../Views.module.css'
 import { TypedDataTree } from './TypedDataTree'
@@ -203,16 +204,13 @@ export const SignatureRequestView = ({
           {t('common.deny')}
         </Button>
         {isPreviewUnavailable && onRetryPreview ? (
-          <Button
-            variant="outlined"
+          <RetryPreviewButton
             disabled={isLoading}
-            onClick={() => {
+            onRetry={() => {
               setAcknowledgedStatement(null)
               onRetryPreview()
             }}
-          >
-            {t('request.transaction_dialog.retry_preview')}
-          </Button>
+          />
         ) : null}
         <Button
           variant="contained"

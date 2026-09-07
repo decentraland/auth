@@ -72,7 +72,8 @@
       "title_web3": "El {explorerText} quiere interactuar con tu billetera",
       "description": "Solo procede si estás al tanto de todos los detalles de la transacción y confías en esta escena.",
       "review_title": "Revisa esta transacción",
-      "preview_unavailable_warning": "No pudimos obtener una vista previa de esta transacción. Puedes reintentarlo o aprobar sin vista previa si confías en la escena que la solicitó.",
+      "preview_unavailable_warning": "No pudimos obtener una vista previa de esta transacción. Aprueba sin vista previa solo si confías en la escena que la solicitó.",
+      "preview_unavailable_warning_retry": "No pudimos obtener una vista previa de esta transacción. Puedes reintentarlo o aprobar sin vista previa si confías en la escena que la solicitó.",
       "acknowledge_preview_unavailable": "Entiendo que la vista previa no está disponible y estoy aprobando sin ver qué hace esta transacción",
       "review_restarted_notice": "La red de tu wallet cambió o no pudo verificarse, así que esta transacción se revisó de nuevo en la red actual."
     },

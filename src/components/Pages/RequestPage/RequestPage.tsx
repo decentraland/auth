@@ -143,6 +143,14 @@ const TERMINAL_VIEWS = new Set([
 const RPC_METHOD_NOT_SUPPORTED = -32601
 const RPC_INVALID_PARAMS = -32602
 
+// A string field of an object, or nothing: the recover-time guards already reject any other shape, but a
+// render path must be safe on its own rather than through that distant invariant.
+function readStringField(value: unknown, field: string): string | undefined {
+  if (typeof value !== 'object' || value === null) return undefined
+  const candidate = (value as Record<string, unknown>)[field]
+  return typeof candidate === 'string' ? candidate : undefined
+}
+
 // Why a transaction review was discarded and started over (see restartTransactionReview).
 type ReviewRestartReason = 'network_changed' | 'network_unreadable' | 'network_unrecorded' | 'wallet_rejected_chain' | 'preview_retry'
 
@@ -726,7 +734,7 @@ export const RequestPage = () => {
                       // Relayed as a meta-transaction, gas covered, whichever view ends up shown.
                       setIsMetaTransaction(true)
                       if (!body) {
-                        setSimulationState({ status: 'unavailable' })
+                        setSimulationState({ status: 'unavailable', reason: 'unsimulatable' })
                         setView(View.WALLET_INTERACTION)
                         break
                       }
@@ -821,7 +829,7 @@ export const RequestPage = () => {
                         setSimulationChainId(body.chainId)
                         return fetchSimulation(body)
                       }
-                      setSimulationState({ status: 'unavailable' })
+                      setSimulationState({ status: 'unavailable', reason: 'unsimulatable' })
                     }
                     return undefined
                   })
@@ -1088,6 +1096,7 @@ export const RequestPage = () => {
   const onRetryPreview = useCallback(() => {
     if (
       simulationState.status !== 'unavailable' ||
+      simulationState.reason === 'unsimulatable' ||
       isApprovingRef.current ||
       hasCompletedRef.current ||
       recoveredRequestIdRef.current !== requestId
@@ -1097,7 +1106,7 @@ export const RequestPage = () => {
     // all run for the new review. Invalidating the refs immediately also prevents a queued Allow
     // click from executing the previous review. No signing, submission or outcome occurs here.
     restartTransactionReview('preview_retry')
-  }, [simulationState.status, requestId, restartTransactionReview])
+  }, [simulationState, requestId, restartTransactionReview])
 
   const onApproveWalletInteraction = useCallback(async () => {
     // Only the request this page recovered can be executed. If the route has moved on to another
@@ -1326,20 +1335,29 @@ export const RequestPage = () => {
   // resolved. In that case approval is a single step (gas shown inline, no confirm modal); without
   // a summary it keeps the classic two-step confirm dialog for the gas check.
   const hasSimulationSummary = simulationState.status !== 'idle'
+  // A preview the payload itself rules out will not appear on a retry, so none is offered; a service
+  // failure may clear, so that one is.
+  const canRetryPreview = !(simulationState.status === 'unavailable' && simulationState.reason === 'unsimulatable')
   // Use the execution target, never a token/spender seen in simulation or a relayer's generic
   // accepted-address response. Generic typed signatures are excluded: only MetaTransaction has a
   // domain-to-execution binding checked by the current signature guard.
   const targetAddress =
     requestRef.current?.method === 'eth_sendTransaction'
-      ? (requestRef.current.params?.[0] as { to?: string } | undefined)?.to
+      ? readStringField(requestRef.current.params?.[0], 'to')
       : isSignatureMetaTx && signaturePayload?.kind === 'typedData'
-        ? (signaturePayload.typedData.domain?.verifyingContract as string | undefined)
+        ? readStringField(signaturePayload.typedData.domain, 'verifyingContract')
         : undefined
+  // The relay decision fixes a transaction's execution network. Until it is known for this target the
+  // wallet's chain would be a guess (one address can be deployed on several chains), so no network is
+  // claimed and the notice waits, as approval already waits on that same check.
+  const isRelayClassified = targetAddress !== undefined && metaTxCheckRef.current?.address === targetAddress.toLowerCase()
   const targetChainId =
     requestRef.current?.method === 'eth_sendTransaction'
       ? isMetaTransaction
         ? getMetaTransactionChainId()
-        : walletInfo?.chainId
+        : isRelayClassified
+          ? walletInfo?.chainId
+          : undefined
       : isSignatureMetaTx
         ? simulationChainId
         : undefined
@@ -1525,7 +1543,7 @@ export const RequestPage = () => {
             reviewRestarted={reviewRestartReason !== null && reviewRestartReason !== 'preview_retry'}
             targetAddress={targetAddress}
             targetChainId={targetChainId}
-            onRetryPreview={onRetryPreview}
+            onRetryPreview={canRetryPreview ? onRetryPreview : undefined}
             onDeny={onDenyWalletInteraction}
             onApprove={hasSimulationSummary ? onApproveWalletInteraction : handleApproveWalletInteraction}
           />
@@ -1548,7 +1566,7 @@ export const RequestPage = () => {
           contractTrust={signatureContractTrust}
           targetAddress={targetAddress}
           targetChainId={targetChainId}
-          onRetryPreview={onRetryPreview}
+          onRetryPreview={canRetryPreview ? onRetryPreview : undefined}
           unverifiableReason={unverifiableSignatureReason}
           isLoading={isLoading}
           onDeny={onDenyWalletInteraction}

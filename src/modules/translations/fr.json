@@ -72,7 +72,8 @@
       "title_web3": "Le {explorerText} souhaite interagir avec votre portefeuille",
       "description": "Ne continuez que si vous êtes au courant de tous les détails de la transaction et faites confiance à cette scène.",
       "review_title": "Vérifiez cette transaction",
-      "preview_unavailable_warning": "Nous n’avons pas pu afficher un aperçu de cette transaction. Vous pouvez réessayer ou approuver sans aperçu si vous faites confiance à la scène qui l’a demandée.",
+      "preview_unavailable_warning": "Nous n’avons pas pu afficher un aperçu de cette transaction. N’approuvez sans aperçu que si vous faites confiance à la scène qui l’a demandée.",
+      "preview_unavailable_warning_retry": "Nous n’avons pas pu afficher un aperçu de cette transaction. Vous pouvez réessayer ou approuver sans aperçu si vous faites confiance à la scène qui l’a demandée.",
       "acknowledge_preview_unavailable": "Je comprends que l'aperçu est indisponible et j'approuve sans voir ce que fait cette transaction",
       "review_restarted_notice": "Le réseau de votre portefeuille a changé ou n'a pas pu être vérifié, cette transaction a donc été réexaminée sur le réseau actuel."
     },

@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { ContractName, getContract } from 'decentraland-transactions'
 import { SimulationResponseBody } from '../../../../../shared/auth'
 import { WalletInteraction } from './WalletInteraction'
 import { WalletInteractionProps } from './WalletInteraction.types'
@@ -40,9 +41,29 @@ describe('when a transaction preview is unavailable', () => {
 
   it('should retry without approving', async () => {
     render(<WalletInteraction {...props} />)
-    await userEvent.click(screen.getByRole('button', { name: 'request.transaction_dialog.retry_preview' }))
+    await userEvent.click(screen.getByTestId('retry-preview-button'))
     expect(props.onRetryPreview).toHaveBeenCalledTimes(1)
     expect(props.onApprove).not.toHaveBeenCalled()
+  })
+
+  it('should promise the retry in the warning only because it offers one', () => {
+    render(<WalletInteraction {...props} />)
+    expect(screen.getByTestId('preview-unavailable-warning')).toHaveTextContent(
+      'request.wallet_interaction.preview_unavailable_warning_retry'
+    )
+  })
+
+  describe('and no retry could produce a preview', () => {
+    beforeEach(() => {
+      delete props.onRetryPreview
+    })
+
+    it('should neither offer a retry nor promise one', () => {
+      render(<WalletInteraction {...props} />)
+      expect(screen.queryByTestId('retry-preview-button')).not.toBeInTheDocument()
+      expect(screen.getByTestId('preview-unavailable-warning')).toHaveTextContent('request.wallet_interaction.preview_unavailable_warning')
+      expect(screen.getByTestId('preview-unavailable-warning')).not.toHaveTextContent('preview_unavailable_warning_retry')
+    })
   })
 
   it('should discard the acknowledgment even if retry leaves the preview unavailable', async () => {
@@ -393,6 +414,34 @@ describe('when rendering the WalletInteraction view', () => {
     it('should tell the user why the page reloaded, on the classic screen', () => {
       render(<WalletInteraction requestId="r1" reviewRestarted onDeny={onDeny} onApprove={onApprove} />)
       expect(screen.getByTestId('review-restarted-notice')).toBeInTheDocument()
+    })
+  })
+
+  describe('and the target is a published Decentraland contract on the execution network', () => {
+    let target: { targetAddress: string; targetChainId: number }
+
+    beforeEach(() => {
+      target = { targetAddress: getContract(ContractName.MANAToken, 137).address, targetChainId: 137 }
+    })
+
+    it('should identify it beside the preview', () => {
+      render(
+        <WalletInteraction
+          requestId="r1"
+          isWeb2Wallet
+          simulation={{ status: 'ready', result: successResult }}
+          userAddress={USER}
+          {...target}
+          onDeny={onDeny}
+          onApprove={onApprove}
+        />
+      )
+      expect(screen.getByText('request.transaction_dialog.known_contract')).toBeInTheDocument()
+    })
+
+    it('should not identify it on the classic confirmation, where nothing else describes the call', () => {
+      render(<WalletInteraction requestId="r1" {...target} onDeny={onDeny} onApprove={onApprove} />)
+      expect(screen.queryByText('request.transaction_dialog.known_contract')).not.toBeInTheDocument()
     })
   })
 

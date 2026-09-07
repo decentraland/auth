@@ -72,7 +72,8 @@
       "title_web3": "The {explorerText} wants to interact with your wallet",
       "description": "Only proceed if you are aware of all transaction details and trust this scene.",
       "review_title": "Review this transaction",
-      "preview_unavailable_warning": "We couldn't preview what this transaction does. You can retry the preview, or approve without it if you trust the scene that requested it.",
+      "preview_unavailable_warning": "We couldn't preview what this transaction does. Only approve without a preview if you trust the scene that requested it.",
+      "preview_unavailable_warning_retry": "We couldn't preview what this transaction does. You can retry the preview, or approve without it if you trust the scene that requested it.",
       "acknowledge_preview_unavailable": "I understand the preview is unavailable and I'm approving without seeing what this transaction does",
       "review_restarted_notice": "Your wallet's network changed or couldn't be verified, so this transaction was reviewed again on the current network."
     },

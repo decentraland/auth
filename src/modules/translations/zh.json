@@ -72,7 +72,8 @@
       "title_web3": "{explorerText} 想要与您的钱包交互",
       "description": "只有在您了解所有交易详情并信任此场景时才继续。",
       "review_title": "查看此交易",
-      "preview_unavailable_warning": "我们无法预览此交易的作用。你可以重试预览，或在信任发起请求的场景时选择无预览批准。",
+      "preview_unavailable_warning": "我们无法预览此交易的作用。只有在信任发起请求的场景时才选择无预览批准。",
+      "preview_unavailable_warning_retry": "我们无法预览此交易的作用。你可以重试预览，或在信任发起请求的场景时选择无预览批准。",
       "acknowledge_preview_unavailable": "我了解预览不可用，并且我在未查看此交易作用的情况下进行批准",
       "review_restarted_notice": "你的钱包网络已更改或无法验证，因此此交易已在当前网络上重新审核。"
     },

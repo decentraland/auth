@@ -20,33 +20,18 @@ describe('when identifying a transaction target', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('request.transaction_dialog.known_contract Polygon')
   })
 
-  describe.each(['different network', 'missing network', 'unknown address', 'missing address', 'empty address'])(
-    'and the target has a %s',
-    condition => {
-      beforeEach(() => {
-        switch (condition) {
-          case 'different network':
-            chainId = 1
-            break
-          case 'missing network':
-            chainId = undefined
-            break
-          case 'unknown address':
-            address = '0x1234567890abcdef1234567890abcdef12345678'
-            break
-          case 'missing address':
-            address = undefined
-            break
-          case 'empty address':
-            address = ''
-            break
-        }
-      })
+  const unmatched: { condition: string; override: { address?: string; chainId?: number } }[] = [
+    { condition: 'different network', override: { chainId: 1 } },
+    { condition: 'missing network', override: { chainId: undefined } },
+    { condition: 'unknown address', override: { address: '0x1234567890abcdef1234567890abcdef12345678' } },
+    { condition: 'missing address', override: { address: undefined } },
+    { condition: 'empty address', override: { address: '' } }
+  ]
 
-      it('should make no claim about Decentraland provenance', () => {
-        render(<KnownContractNotice address={address} chainId={chainId} />)
-        expect(screen.queryByRole('alert')).not.toBeInTheDocument()
-      })
-    }
-  )
+  describe.each(unmatched)('and the target has a $condition', ({ override }) => {
+    it('should make no claim about Decentraland provenance', () => {
+      render(<KnownContractNotice address={address} chainId={chainId} {...override} />)
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    })
+  })
 })

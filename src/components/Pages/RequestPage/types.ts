@@ -58,7 +58,11 @@ type SimulationState =
   | { status: 'idle' }
   | { status: 'loading' }
   | { status: 'ready'; result: SimulationResponseBody }
-  | { status: 'unavailable' }
+  /**
+   * `unsimulatable`: the payload itself cannot be previewed (no target, or calldata under an alias the
+   * simulator does not read), so a retry cannot help. Without a reason the service failed and a retry may.
+   */
+  | { status: 'unavailable'; reason?: 'unsimulatable' }
 
 export { TransferType }
 export type {

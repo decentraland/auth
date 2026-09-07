@@ -72,7 +72,8 @@
       "title_web3": "Il {explorerText} vuole interagire con il tuo portafoglio",
       "description": "Procedi solo se sei a conoscenza di tutti i dettagli della transazione e ti fidi di questa scena.",
       "review_title": "Rivedi questa transazione",
-      "preview_unavailable_warning": "Non è stato possibile mostrare un’anteprima di questa transazione. Puoi riprovare o approvare senza anteprima se ti fidi della scena che l’ha richiesta.",
+      "preview_unavailable_warning": "Non è stato possibile mostrare un’anteprima di questa transazione. Approva senza anteprima solo se ti fidi della scena che l’ha richiesta.",
+      "preview_unavailable_warning_retry": "Non è stato possibile mostrare un’anteprima di questa transazione. Puoi riprovare o approvare senza anteprima se ti fidi della scena che l’ha richiesta.",
       "acknowledge_preview_unavailable": "Capisco che l'anteprima non è disponibile e sto approvando senza vedere cosa fa questa transazione",
       "review_restarted_notice": "La rete del tuo wallet è cambiata o non è stato possibile verificarla, quindi questa transazione è stata riesaminata sulla rete attuale."
     },

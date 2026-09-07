@@ -176,9 +176,11 @@ jest.mock('./Views', () => ({
       <button data-testid="wallet-interaction-deny" onClick={props.onDeny}>
         deny
       </button>
-      <button data-testid="wallet-interaction-retry" onClick={props.onRetryPreview}>
-        retry
-      </button>
+      {props.onRetryPreview ? (
+        <button data-testid="wallet-interaction-retry" onClick={props.onRetryPreview}>
+          retry
+        </button>
+      ) : null}
     </div>
   ),
   WalletInteractionComplete: () => <div data-testid="wallet-interaction-complete">Wallet Complete</div>,
@@ -210,9 +212,11 @@ jest.mock('./Views', () => ({
       <button data-testid="signature-deny" onClick={props.onDeny}>
         deny
       </button>
-      <button data-testid="signature-retry" onClick={props.onRetryPreview}>
-        retry
-      </button>
+      {props.onRetryPreview ? (
+        <button data-testid="signature-retry" onClick={props.onRetryPreview}>
+          retry
+        </button>
+      ) : null}
     </div>
   )
 }))
@@ -1406,6 +1410,36 @@ describe('RequestPage', () => {
       renderRequestPage()
       await waitFor(() => expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-target-chain', '137'))
       expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-target', '0xcontract')
+    })
+
+    it('should claim no network for the target until the relay decision is known', async () => {
+      let resolveRelayCheck: (value: { willUseMetaTransaction: boolean; contractName: string }) => void = () => undefined
+      mockCheckMetaTransactionSupport.mockReturnValue(
+        new Promise(resolve => {
+          resolveRelayCheck = resolve
+        })
+      )
+      renderRequestPage()
+      const view = await screen.findByTestId('wallet-interaction')
+      expect(view).toHaveAttribute('data-target', '0xcontract')
+      expect(view).not.toHaveAttribute('data-target-chain')
+      resolveRelayCheck({ willUseMetaTransaction: true, contractName: 'ERC721CollectionV2' })
+      await waitFor(() => expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-target-chain', '137'))
+    })
+
+    describe('and the payload cannot be previewed at all', () => {
+      beforeEach(() => {
+        mockBuildSendTransactionSimulationPayload.mockReturnValue(null)
+      })
+
+      it('should still require the acknowledgment but offer no retry, since none could succeed', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('wallet-interaction')
+        await waitFor(() => expect(view).toHaveAttribute('data-sim', 'unavailable'))
+        expect(view).toHaveAttribute('data-requires-acknowledgment', 'true')
+        expect(screen.queryByTestId('wallet-interaction-retry')).not.toBeInTheDocument()
+        expect(mockSimulateTransaction).not.toHaveBeenCalled()
+      })
     })
 
     describe('and the simulation is unavailable', () => {
