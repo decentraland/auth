@@ -311,11 +311,25 @@ const messageSignaturePayload: SignaturePayload = {
   message: 'Sign this message to prove you own this wallet.\nNonce: 12345'
 }
 
+// A schema-complete payload: the review renders only fields the signed struct declares, so the
+// gallery must carry the types a real request would.
 const typedDataSignaturePayload: SignaturePayload = {
   kind: 'typedData',
-  raw: '{"types":{},"primaryType":"Order","domain":{"name":"Decentraland Marketplace","chainId":137,"verifyingContract":"0x480a0f4e360e8964e68858dd231c2922f1df45ef"},"message":{"price":"1000000000000000000","expiration":"1700000000"}}',
+  raw: '{"types":{"EIP712Domain":[{"name":"name","type":"string"},{"name":"chainId","type":"uint256"},{"name":"verifyingContract","type":"address"}],"Order":[{"name":"price","type":"uint256"},{"name":"expiration","type":"uint256"}]},"primaryType":"Order","domain":{"name":"Decentraland Marketplace","chainId":137,"verifyingContract":"0x480a0f4e360e8964e68858dd231c2922f1df45ef"},"message":{"price":"1000000000000000000","expiration":"1700000000"}}',
   typedData: {
-    types: {},
+    types: {
+      // eslint-disable-next-line @typescript-eslint/naming-convention
+      EIP712Domain: [
+        { name: 'name', type: 'string' },
+        { name: 'chainId', type: 'uint256' },
+        { name: 'verifyingContract', type: 'address' }
+      ],
+      // eslint-disable-next-line @typescript-eslint/naming-convention
+      Order: [
+        { name: 'price', type: 'uint256' },
+        { name: 'expiration', type: 'uint256' }
+      ]
+    },
     primaryType: 'Order',
     domain: { name: 'Decentraland Marketplace', chainId: 137, verifyingContract: '0x480a0f4e360e8964e68858dd231c2922f1df45ef' },
     message: { price: '1000000000000000000', expiration: '1700000000' }

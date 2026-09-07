@@ -486,13 +486,22 @@ describe('assertSignatureParamsAreCanonical', () => {
             { name: 'checks', type: 'Checks' },
             { name: 'sent', type: 'AssetWithoutBeneficiary[]' },
             { name: 'received', type: 'Asset[]' }
-          ]
+          ],
+          // eslint-disable-next-line @typescript-eslint/naming-convention
+          Checks: [
+            { name: 'uses', type: 'uint256' },
+            { name: 'expiration', type: 'uint256' }
+          ],
+          // eslint-disable-next-line @typescript-eslint/naming-convention
+          AssetWithoutBeneficiary: [{ name: 'value', type: 'uint256' }],
+          // eslint-disable-next-line @typescript-eslint/naming-convention
+          Asset: [{ name: 'value', type: 'uint256' }]
         },
         message: { checks: { uses: 1, expiration: 1 }, sent: [], received: [] }
       })
     })
 
-    it('should not throw because the MetaTransaction checks do not apply to other structs', () => {
+    it('should accept a complete generic schema without imposing the MetaTransaction struct', () => {
       expect(() => assertSignatureParamsAreCanonical('eth_signTypedData_v4', [signerAddress, trade], signerAddress)).not.toThrow()
     })
   })

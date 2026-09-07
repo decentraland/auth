@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from '@dcl/hooks'
 import { Box, Button, Checkbox, CircularProgress, FormControlLabel } from 'decentraland-ui2'
 import { getPreviewFingerprint, hasNoVisibleEffects } from '../../../../../shared/auth'
+import { resolveTypedDataReview } from '../../../../../shared/auth/typedDataReview'
 import { getExplorerAddressUrl, getExplorerName, getNetworkName } from '../../../../../shared/explorer'
 import { Container } from '../../Container'
 import { ButtonsContainer } from '../../RequestPage.styled'
@@ -15,6 +16,7 @@ import {
   Content,
   ContractLink,
   DomainKey,
+  DomainName,
   DomainRow,
   DomainValue,
   FieldLabel,
@@ -24,8 +26,6 @@ import {
   RawToggle,
   Section
 } from './SignatureRequest.styled'
-
-const shortenAddress = (address: string): string => (address.length > 12 ? `${address.slice(0, 6)}…${address.slice(-4)}` : address)
 
 export const SignatureRequestView = ({
   requestId,
@@ -52,7 +52,17 @@ export const SignatureRequestView = ({
   // The statement the user ticked, if any (see acknowledgmentStatement below).
   const [acknowledgedStatement, setAcknowledgedStatement] = useState<string | null>(null)
 
-  const domain = payload?.kind === 'typedData' ? payload.typedData.domain : undefined
+  // The request page has already held a web2 typed-data payload to this review, so a failure here is a
+  // defensive fallback: say the fields could not be checked and keep approval closed.
+  const { review, isReviewUnavailable } = useMemo(() => {
+    if (payload?.kind !== 'typedData' || isMetaTransaction) return {}
+    try {
+      return { review: resolveTypedDataReview(payload.typedData, method) }
+    } catch {
+      return { isReviewUnavailable: true }
+    }
+  }, [payload, isMetaTransaction, method])
+  const domain = isMetaTransaction && payload?.kind === 'typedData' ? payload.typedData.domain : review?.domain
   const domainChainId = chainId ?? (domain?.chainId !== undefined ? Number(domain.chainId) : undefined)
   const contractUrl = typeof domain?.verifyingContract === 'string' ? getExplorerAddressUrl(domainChainId, domain.verifyingContract) : null
   const isReverted = simulation.status === 'ready' && simulation.result.status === 'reverted'
@@ -78,6 +88,7 @@ export const SignatureRequestView = ({
   // changes (another request, the lookup resolving to unrecognized, a different reason), ask again.
   const acknowledgmentStatement = [
     requestId,
+    review?.hash ?? '',
     isUnverifiable ? 'unverified' : 'risk',
     unverifiableReason ?? '',
     isReverted ? 'reverted' : '',
@@ -98,6 +109,12 @@ export const SignatureRequestView = ({
       <Box className={styles.description}>{t('request.signature.description')}</Box>
       <Content>
         <MethodChip>{method}</MethodChip>
+        {review ? <MethodChip>{review.primaryType}</MethodChip> : null}
+        {isReviewUnavailable ? (
+          <Notice role="alert" data-testid="signature-review-unavailable">
+            {t('request.signature.review_unavailable')}
+          </Notice>
+        ) : null}
 
         {payload?.kind === 'message' ? (
           <Section>
@@ -128,15 +145,23 @@ export const SignatureRequestView = ({
           </>
         ) : null}
 
-        {payload?.kind === 'typedData' && !isMetaTransaction ? (
+        {review ? (
           <>
             {domain ? (
               <Section>
                 {typeof domain.name === 'string' ? (
                   <DomainRow>
-                    <DomainKey>{domain.name}</DomainKey>
+                    <DomainName>{domain.name}</DomainName>
                   </DomainRow>
                 ) : null}
+                {['version', 'salt'].map(field =>
+                  domain[field] !== undefined ? (
+                    <DomainRow key={field}>
+                      <DomainKey>{field}</DomainKey>
+                      <DomainValue>{String(domain[field])}</DomainValue>
+                    </DomainRow>
+                  ) : null
+                )}
                 {domain.chainId !== undefined ? (
                   <DomainRow>
                     <DomainKey>{t('request.signature.network')}</DomainKey>
@@ -153,10 +178,10 @@ export const SignatureRequestView = ({
                         rel="noopener noreferrer"
                         title={t('request.transaction_dialog.view_on_explorer', { explorer: getExplorerName(domainChainId) })}
                       >
-                        {shortenAddress(domain.verifyingContract)}
+                        {domain.verifyingContract}
                       </ContractLink>
                     ) : (
-                      <DomainValue>{shortenAddress(domain.verifyingContract)}</DomainValue>
+                      <DomainValue>{domain.verifyingContract}</DomainValue>
                     )}
                   </DomainRow>
                 ) : null}
@@ -164,7 +189,7 @@ export const SignatureRequestView = ({
             ) : null}
             <Section>
               <FieldLabel>{t('request.signature.typed_data_label')}</FieldLabel>
-              {payload.typedData.message ? <TypedDataTree data={payload.typedData.message} /> : <MessageBlock>{payload.raw}</MessageBlock>}
+              <TypedDataTree fields={review.fields} />
             </Section>
           </>
         ) : null}
@@ -215,7 +240,13 @@ export const SignatureRequestView = ({
         <Button
           variant="contained"
           color={isReverted ? 'error' : 'primary'}
-          disabled={isLoading || simulation.status === 'loading' || isContractTrustPending || (needsAcknowledgment && !acknowledged)}
+          disabled={
+            Boolean(isReviewUnavailable) ||
+            isLoading ||
+            simulation.status === 'loading' ||
+            isContractTrustPending ||
+            (needsAcknowledgment && !acknowledged)
+          }
           onClick={onApprove}
           data-testid="signature-approve-button"
         >

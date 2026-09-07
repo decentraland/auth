@@ -2,6 +2,7 @@ import { useLayoutEffect } from 'react'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { SimulationResponseBody } from '../../../../../shared/auth'
+import { DAPP_USER, DappTypedData, SIGNED_BY_DAPPS } from '../../../../../shared/auth/__fixtures__/decentralandTypedData'
 import { SignaturePayload, SimulationState } from '../../types'
 import { SignatureRequestView } from './SignatureRequestView'
 import { SignatureRequestViewProps } from './SignatureRequest.types'
@@ -61,6 +62,190 @@ describe('when a meta-transaction signature preview is unavailable', () => {
     it('should not offer a simulation retry for an ordinary signature', () => {
       render(<SignatureRequestView {...props} />)
       expect(screen.queryByRole('button', { name: 'request.transaction_dialog.retry_preview' })).not.toBeInTheDocument()
+    })
+  })
+})
+
+describe('when reviewing a schema-bound signature', () => {
+  let props: SignatureRequestViewProps
+  let typedData: {
+    primaryType: string
+    domain: Record<string, unknown>
+    types: Record<string, { name: string; type: string }[]>
+    message: Record<string, unknown>
+  }
+
+  beforeEach(() => {
+    typedData = {
+      primaryType: 'Order',
+      domain: { name: 'Marketplace', version: '1', salt: `0x${'01'.repeat(32)}` },
+      // eslint-disable-next-line @typescript-eslint/naming-convention
+      types: { Order: [{ name: 'price', type: 'uint256' }] },
+      message: { price: '100' }
+    }
+    props = {
+      requestId: 'r1',
+      method: 'eth_signTypedData_v4',
+      payload: { kind: 'typedData', typedData, raw: JSON.stringify(typedData) },
+      simulation: { status: 'idle' },
+      userAddress: USER,
+      isMetaTransaction: false,
+      requiresAcknowledgment: true,
+      onApprove: jest.fn(),
+      onDeny: jest.fn()
+    }
+  })
+
+  afterEach(() => {
+    jest.clearAllMocks()
+  })
+
+  it('should display the signed primary type', () => {
+    render(<SignatureRequestView {...props} />)
+    expect(screen.getByText('Order')).toBeInTheDocument()
+  })
+
+  it('should display the signed domain salt', () => {
+    render(<SignatureRequestView {...props} />)
+    expect(screen.getByText(String(typedData.domain.salt))).toBeInTheDocument()
+  })
+
+  describe('and the payload is the Trade the marketplace asks a seller to sign', () => {
+    let trade: DappTypedData
+
+    beforeEach(() => {
+      trade = SIGNED_BY_DAPPS['off-chain marketplace Trade'].payload
+      props.payload = { kind: 'typedData', typedData: trade, raw: JSON.stringify(trade) }
+      // A Trade grants the marketplace the right to move the listed asset, so the page always gates it
+      // behind the risk acknowledgment; the review must not add a block of its own.
+      props.requiresAcknowledgment = true
+    })
+
+    it('should render the whole signed trade as a tree, down to the external check', () => {
+      render(<SignatureRequestView {...props} />)
+      expect(screen.getByText('Trade')).toBeInTheDocument()
+      expect(screen.getByText(String(trade.domain.salt))).toBeInTheDocument()
+      expect(screen.getByText('checks (Checks):')).toBeInTheDocument()
+      expect(screen.getByText('externalChecks (ExternalCheck[]):')).toBeInTheDocument()
+      expect(screen.getByText('[0] (ExternalCheck):')).toBeInTheDocument()
+      expect(screen.getByText('0x70a08231')).toBeInTheDocument()
+      expect(screen.getByText('sent (AssetWithoutBeneficiary[]):')).toBeInTheDocument()
+      expect(screen.getByText(String((trade.message.sent as { value: string }[])[0].value))).toBeInTheDocument()
+      expect(screen.getByText('received (Asset[]):')).toBeInTheDocument()
+      expect(screen.getByText(DAPP_USER)).toBeInTheDocument()
+    })
+
+    it('should gate approval behind the risk acknowledgment alone, with nothing left unchecked', async () => {
+      render(<SignatureRequestView {...props} />)
+      expect(screen.queryByTestId('signature-review-unavailable')).not.toBeInTheDocument()
+      expect(screen.getByTestId('signature-approve-button')).toBeDisabled()
+      await userEvent.click(screen.getByTestId('risk-acknowledgment'))
+      expect(screen.getByTestId('signature-approve-button')).toBeEnabled()
+    })
+  })
+
+  describe('and the domain name carries repeated spaces and the version is long', () => {
+    let longVersion: string
+
+    beforeEach(() => {
+      longVersion = '1.0.0-'.padEnd(160, 'x')
+      typedData.domain.name = 'Trusted   App'
+      typedData.domain.version = longVersion
+      render(<SignatureRequestView {...props} />)
+    })
+
+    it('should keep the spaces as signed instead of collapsing them', () => {
+      const name = screen.getByText('Trusted   App', { normalizer: text => text })
+      expect(name).toHaveStyle({ whiteSpace: 'pre-wrap' })
+    })
+
+    it('should wrap the long version rather than clip it', () => {
+      const version = screen.getByText(longVersion)
+      expect(version).toHaveStyle({ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' })
+      expect(version).not.toHaveStyle({ textOverflow: 'ellipsis' })
+    })
+  })
+
+  describe('and a signed value carries a no-break space', () => {
+    beforeEach(() => {
+      typedData.types.Order.push({ name: 'terms', type: 'string' })
+      typedData.message.terms = 'allow\u00a0all'
+      typedData.domain.name = 'Trusted\u00a0App'
+      render(<SignatureRequestView {...props} />)
+    })
+
+    it('should show it as an escape rather than as a space', () => {
+      expect(screen.getByText('allow\\u{a0}all')).toBeInTheDocument()
+      expect(screen.getByText('Trusted\\u{a0}App')).toBeInTheDocument()
+      expect(screen.queryByText('allow all')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('and a signed value carries line breaks', () => {
+    beforeEach(() => {
+      typedData.types.Order.push({ name: 'terms', type: 'string' })
+      typedData.message.terms = 'allow\n\nall'
+      typedData.domain.name = 'Market\nplace'
+      render(<SignatureRequestView {...props} />)
+    })
+
+    it('should show the breaks as escapes rather than as spacing', () => {
+      expect(screen.getByText('allow\\n\\nall')).toBeInTheDocument()
+      expect(screen.getByText('Market\\nplace')).toBeInTheDocument()
+      expect(screen.queryByText('allow all')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('and the domain name and version carry characters that would reorder their neighbours', () => {
+    beforeEach(() => {
+      typedData.domain.name = 'Marketplace\u202e'
+      typedData.domain.version = '1\u202d'
+      render(<SignatureRequestView {...props} />)
+    })
+
+    it('should show the characters as visible escapes', () => {
+      expect(screen.getByText('Marketplace\\u{202e}')).toBeInTheDocument()
+      expect(screen.getByText('1\\u{202d}')).toBeInTheDocument()
+    })
+
+    it('should not let them reach the page', () => {
+      expect(document.body.textContent).not.toMatch(/[\u202d\u202e]/)
+    })
+  })
+
+  describe('and an unsigned field is supplied', () => {
+    beforeEach(() => {
+      typedData.message.description = 'Additional description'
+      render(<SignatureRequestView {...props} />)
+    })
+
+    it('should not display the unsigned text as signed content', () => {
+      expect(screen.queryByText('Additional description')).not.toBeInTheDocument()
+    })
+
+    it("should say the fields could not be checked, in the user's language rather than as a raw error", () => {
+      expect(screen.getByTestId('signature-review-unavailable')).toHaveTextContent('request.signature.review_unavailable')
+      expect(screen.queryByText(/does not match its declared fields/)).not.toBeInTheDocument()
+    })
+
+    it('should not enable approval even after acknowledgment', async () => {
+      await userEvent.click(screen.getByRole('checkbox'))
+      expect(screen.getByRole('button', { name: 'common.allow' })).toBeDisabled()
+    })
+  })
+
+  describe('and the signed value changes after acknowledgment', () => {
+    let rerender: ReturnType<typeof render>['rerender']
+
+    beforeEach(async () => {
+      rerender = render(<SignatureRequestView {...props} />).rerender
+      await userEvent.click(screen.getByRole('checkbox'))
+      props.payload = { kind: 'typedData', typedData: { ...typedData, message: { price: '200' } }, raw: '{}' }
+      rerender(<SignatureRequestView {...props} />)
+    })
+
+    it('should require a new acknowledgment for the changed digest', () => {
+      expect(screen.getByRole('button', { name: 'common.allow' })).toBeDisabled()
     })
   })
 })
@@ -193,13 +378,15 @@ describe('when rendering the SignatureRequestView', () => {
         raw: '{}',
         typedData: {
           primaryType: 'Order',
+          // eslint-disable-next-line @typescript-eslint/naming-convention
+          types: { Order: [{ name: 'price', type: 'uint256' }] },
           domain: { name: 'Marketplace', chainId: 137, verifyingContract: '0x480a0f4e360e8964e68858dd231c2922f1df45ef' },
           message: { price: '1000000000000000000' }
         }
       }
     })
 
-    it('should render the verifying contract shortened', () => {
+    it('should render the verifying contract in full', () => {
       render(
         <SignatureRequestView
           requestId="r1"
@@ -212,7 +399,7 @@ describe('when rendering the SignatureRequestView', () => {
           onApprove={onApprove}
         />
       )
-      expect(screen.getByText('0x480a…45ef')).toBeInTheDocument()
+      expect(screen.getByText('0x480a0f4e360e8964e68858dd231c2922f1df45ef')).toBeInTheDocument()
     })
 
     describe('and Auth does not recognize the struct', () => {
@@ -298,7 +485,7 @@ describe('when rendering the SignatureRequestView', () => {
           onApprove={onApprove}
         />
       )
-      expect(screen.getByText('price:')).toBeInTheDocument()
+      expect(screen.getByText('price (uint256):')).toBeInTheDocument()
     })
   })
 
