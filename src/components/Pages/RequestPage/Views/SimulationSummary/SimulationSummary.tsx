@@ -11,6 +11,7 @@ import {
   isZeroAddress
 } from '../../../../../shared/auth'
 import { getExplorerAddressUrl, getExplorerName, getNetworkName } from '../../../../../shared/explorer'
+import { shortenAddress } from '../../../../../shared/text'
 import { SimulationSummaryProps } from './SimulationSummary.types'
 import {
   AmountUsd,
@@ -47,11 +48,6 @@ type Translate = (key: string, opts?: Record<string, string | number>) => string
 // Defensive ceiling on decoded events rendered in the technical-details section. The server already
 // caps events at 50; this guards the UI against an unexpectedly large or malformed response.
 const MAX_DISPLAYED_EVENTS = 100
-
-const shortenAddress = (address: string | null): string => {
-  if (!address) return ''
-  return address.length > 12 ? `${address.slice(0, 6)}…${address.slice(-4)}` : address
-}
 
 const counterpartyLabel = (address: string | null, profiles: Record<string, string>): string => {
   if (!address) return ''

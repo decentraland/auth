@@ -56,9 +56,9 @@ import {
   classifyRequest,
   describeClassification,
   getPayloadFingerprint,
-  getTypedDataDigest
+  isDecentralandClassification,
+  isTransactionClassification
 } from './classifyRequest'
-import { buildTransactionParams } from './transactionParams'
 import { GasEstimateState, MANATransferData, NFTTransferData, SimulationState, TransferType } from './types'
 import {
   buildSendTransactionSimulationPayload,
@@ -71,6 +71,7 @@ import {
   getMetaTransactionChainId,
   getNetworkProvider,
   getSigninDeeplink,
+  isAddressWithoutCode,
   isDecentralandCollection,
   isExactNftTransferSimulation
 } from './utils'
@@ -184,25 +185,19 @@ function getUnverifiedRequestProps(
         nativeValue: classification.value,
         payload: { kind: 'transaction', to: classification.to, data: '0x', value: classification.value }
       }
-    case 'unknown_meta_transaction': {
-      const message = classification.typedData.message
-      const declaredCalldata = message?.functionSignature ?? message?.functionData
+    case 'unknown_meta_transaction':
       return {
         kind: classification.kind,
         targetAddress: classification.verifyingContract,
         chainId: classification.chainId,
-        payload: {
-          kind: 'typed_data',
-          raw: classification.raw,
-          calldata: typeof declaredCalldata === 'string' ? declaredCalldata : null,
-          digest: getTypedDataDigest(classification.typedData)
-        }
+        // Unverified schemas can carry unsigned decoy fields and take exponential work to hash.
+        // Show only the original JSON; do not infer a call or compute a digest during rendering.
+        payload: { kind: 'typed_data', raw: classification.raw }
       }
-    }
     case 'unknown_typed_data':
       return {
         kind: classification.kind,
-        payload: { kind: 'typed_data', raw: classification.raw, calldata: null, digest: getTypedDataDigest(classification.typedData) }
+        payload: { kind: 'typed_data', raw: classification.raw }
       }
     case 'personal_sign':
       return { kind: classification.kind, payload: { kind: 'message', hex: classification.hex, text: classification.text } }
@@ -290,11 +285,18 @@ export const RequestPage = () => {
   // with the account that initiated the action.
   const identityRef = useRef(identity)
   identityRef.current = identity
-  const [isProfileReady, setIsProfileReady] = useState(false)
+  // Which (request id, account) the profile check has cleared. Scoped rather than a boolean on purpose:
+  // on the commit where the route id or the account changes, the load effect runs in the same pass as
+  // the profile effect, before the profile reset has rendered. A boolean would still read `true` from
+  // the previous request there and start loading the new one at once, to be cancelled and loaded
+  // again when the check completes. A mismatch on the pair waits for the new check instead.
+  const [profileReadyFor, setProfileReadyFor] = useState<{ requestId: string; account: string } | null>(null)
   const [error, setError] = useState<string>()
   const [identityId, setIdentityId] = useState<string>()
   const timeoutRef = useRef<NodeJS.Timeout>()
   const requestId = params.requestId ?? ''
+  // Whether the profile check has cleared this very (request id, account); see profileReadyFor.
+  const isProfileReady = profileReadyFor !== null && profileReadyFor.requestId === requestId && profileReadyFor.account === account
   const [targetConfig, targetConfigId] = useTargetConfig()
   const skipSetup = useSkipSetup()
   // Social / web2 wallets (Magic and Thirdweb) sign without their own confirmation UI. Every review
@@ -338,7 +340,7 @@ export const RequestPage = () => {
 
   // Effect 1: Ensure profile consistency before allowing request loading.
   // Navigates to setup if the profile is incomplete or missing.
-  // Sets isProfileReady=true once the profile is confirmed complete (or skipped).
+  // Records the (request id, account) the profile is confirmed complete for (or skipped).
   useEffect(() => {
     // A deep-link handoff with a malformed id short-circuits to the error view (see the load
     // effect below); skip the profile work so it can't navigate to setup for a request we reject.
@@ -346,12 +348,11 @@ export const RequestPage = () => {
     if (isConnecting || !account || !provider || !providerType) return
     if (!initializedFlags) return
 
-    // Reset profile readiness when the account changes so loadRequest
-    // doesn't fire with stale profile state.
-    setIsProfileReady(false)
+    // Clear whatever was cleared before, so loadRequest never fires on stale profile state.
+    setProfileReadyFor(null)
 
     if (skipSetup) {
-      setIsProfileReady(true)
+      setProfileReadyFor({ requestId, account })
       return
     }
 
@@ -364,7 +365,7 @@ export const RequestPage = () => {
         const profile = await ensureProfile(account, identityRef.current, { redirectTo, referrer })
 
         if (!cancelled && profile) {
-          setIsProfileReady(true)
+          setProfileReadyFor({ requestId, account })
         }
       } catch (e) {
         // ensureProfile throws when the catalysts couldn't be reached (profile state unknown).
@@ -624,11 +625,10 @@ export const RequestPage = () => {
         // permission to a Decentraland contract from one handed to anyone else. Recognition is per
         // chain: the addresses are judged against the registry deployments on the chain the
         // simulation ran on, never against the registry as a whole. The contract being called is
-        // included too: a wearable collection is verified by the transactions-server, not the registry.
+        // included too: a wearable collection is vouched for by the collection factories, not the registry.
         const collectVerifiedContracts = (result: SimulationResponseBody, chainId: number): string[] => {
           const reviewed = classificationRef.current
-          const calledContract =
-            reviewed && (reviewed.kind === 'dcl_transaction' || reviewed.kind === 'dcl_meta_transaction') ? reviewed.contract.address : null
+          const calledContract = reviewed && isDecentralandClassification(reviewed) ? reviewed.contract.address : null
           const verified = new Set<string>()
           const consider = (address: string | null) => {
             if (!address) return
@@ -807,6 +807,7 @@ export const RequestPage = () => {
           signerAddress,
           connectedChainId: connectedChainId ?? metaTransactionChainId,
           metaTransactionChainId,
+          isAddressWithoutCode,
           resolveContract: (address, chainId) =>
             resolveKnownDecentralandContract(address, chainId, { metaTransactionChainId, isCollection: isDecentralandCollection })
         })
@@ -1074,8 +1075,13 @@ export const RequestPage = () => {
           serverURL: `${config.get('META_TRANSACTION_SERVER_URL')}/v1`
         })
       } else if (reviewed.kind === 'dcl_transaction' || reviewed.kind === 'unknown_transaction' || reviewed.kind === 'native_transfer') {
-        // A plain send on the connected chain, of exactly the reviewed fields.
-        const [transactionParams] = buildTransactionParams(requestRef.current.params)
+        // A plain send on the connected chain, of exactly the fields that were reviewed and fingerprinted:
+        // the classification's, never a fresh reading of the request.
+        const transactionParams = {
+          to: reviewed.to,
+          data: reviewed.kind === 'native_transfer' ? '0x' : reviewed.data,
+          value: reviewed.value
+        }
         const reviewedChainId = reviewedWalletChainIdRef.current
         const currentChainId = await publicClientRef.current?.getChainId().catch(() => undefined)
         if (reviewedChainId === undefined || currentChainId !== reviewedChainId) {
@@ -1228,7 +1234,7 @@ export const RequestPage = () => {
     window.location.reload()
   }, [])
 
-  const isDecentralandRequest = classification?.kind === 'dcl_transaction' || classification?.kind === 'dcl_meta_transaction'
+  const isDecentralandRequest = classification !== null && isDecentralandClassification(classification)
   const isSimulationReverted = simulationState.status === 'ready' && simulationState.result.status === 'reverted'
   // The simulation resolved and grants a permission the user should not approve on a single click
   // (see isDangerousApproval). Spenders are recognized from the same chain-aware verified set the
@@ -1272,10 +1278,8 @@ export const RequestPage = () => {
 
   // What the confirmation dialog says the request will cost: covered by the relay, or the wallet's own
   // estimate for a plain send. Signatures are gasless and show no line.
-  const isPlainSend =
-    (classification?.kind === 'dcl_transaction' && !classification.relayed) ||
-    classification?.kind === 'unknown_transaction' ||
-    classification?.kind === 'native_transfer'
+  const isTransactionRequest = classification !== null && isTransactionClassification(classification)
+  const isPlainSend = isTransactionRequest && !(classification.kind === 'dcl_transaction' && classification.relayed)
   const confirmGas: ConfirmRequestGas | undefined =
     classification?.kind === 'dcl_transaction' && classification.relayed
       ? { covered: true }
@@ -1286,10 +1290,6 @@ export const RequestPage = () => {
             ? { covered: false, status: 'unavailable' }
             : { covered: false, status: 'loading' }
         : undefined
-  const isTransactionRequest =
-    classification?.kind === 'dcl_transaction' ||
-    classification?.kind === 'unknown_transaction' ||
-    classification?.kind === 'native_transfer'
   const confirmDialog = (
     <ConfirmRequestDialog
       open={isTransactionModalOpen}
@@ -1433,7 +1433,7 @@ export const RequestPage = () => {
     case View.WALLET_UNVERIFIED_INTERACTION: {
       const unverified = classification ? getUnverifiedRequestProps(classification) : null
       if (!classification || !unverified) return null
-      const isTransactionKind = unverified.kind === 'unknown_transaction' || unverified.kind === 'native_transfer'
+      const isTransactionKind = isTransactionClassification(classification)
       return (
         <>
           {confirmDialog}

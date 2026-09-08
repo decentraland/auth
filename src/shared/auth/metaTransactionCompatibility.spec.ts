@@ -168,7 +168,13 @@ describe('when decentraland-transactions builds a meta-transaction request', () 
           }
           classification = await classifyRequest(
             { sender: USER, expiration: '', method: METHOD, params: signParams },
-            { signerAddress: USER, connectedChainId: chainId, metaTransactionChainId: chainId, resolveContract }
+            {
+              signerAddress: USER,
+              connectedChainId: chainId,
+              metaTransactionChainId: chainId,
+              resolveContract,
+              isAddressWithoutCode: jest.fn()
+            }
           )
         })
 

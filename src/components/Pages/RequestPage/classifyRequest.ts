@@ -1,4 +1,4 @@
-import { hashTypedData, hexToString, stringToHex } from 'viem'
+import { hexToString, stringToHex } from 'viem'
 import { ContractName, DOMAIN_TYPE } from 'decentraland-transactions'
 import {
   ContractLookupUnavailableError,
@@ -9,14 +9,13 @@ import {
   UnsupportedMethodError,
   decodeKnownContractCall,
   getMetaTransactionSalt,
+  isHexBytes,
   isMetaTransactionTypedData,
   resolveMetaTransactionTypedData
 } from '../../../shared/auth'
+import { isRecord } from '../../../shared/utils/isRecord'
 import { buildTransactionParams } from './transactionParams'
 import { TypedDataPayload } from './types'
-
-// Hex-encoded bytes: `0x` and at least one whole byte. Case-insensitive on the prefix, like the guard.
-const HEX_BYTES_REGEX = /^0x([0-9a-fA-F]{2})+$/i
 
 // Anything the user cannot see or read as text, defined by Unicode category rather than by
 // enumerated ranges: controls (C0 and C1), format characters such as zero-width and bidi controls,
@@ -25,15 +24,22 @@ const HEX_BYTES_REGEX = /^0x([0-9a-fA-F]{2})+$/i
 // are the only controls a message may contain.
 const UNREADABLE_CHARACTER_REGEX = /(?![\t\n\r])[\p{C}\p{Zl}\p{Zp}�]/u
 
-// The collection calls the branded gift view may stand in for. Other CollectionV2 functions also take
-// a recipient and a token id, so the check is on the name, not the shape.
-const GIFT_FUNCTIONS = new Set(['transferFrom', 'safeTransferFrom'])
+// The only collection calls the branded gift view may stand in for. Other functions on the CollectionV2
+// ABI also take three or more arguments — batchTransferFrom, safeBatchTransferFrom, setItemsMinters,
+// setItemsManagers, editItemsData — and would decode into a "to" and a "token id" as well, so without
+// this check they would be shown as the gift of one token while doing something else. Shared with the
+// decoder that reads the transfer out of the call, so the two cannot drift.
+const NFT_TRANSFER_FUNCTIONS: ReadonlySet<string> = new Set(['transferFrom', 'safeTransferFrom'])
+
+// The kinds whose request is an eth_sendTransaction: they carry a target and a value, and the user may
+// pay gas for them. The one definition the page and the unverified view both read.
+const TRANSACTION_KINDS: ReadonlySet<string> = new Set(['dcl_transaction', 'unknown_transaction', 'native_transfer'])
 
 /** Which branded screen a Decentraland transaction may use instead of the generic simulation review. */
 type BrandedTransaction = 'tip' | 'gift_candidate' | null
 
 /** Why a transaction to a known-looking target was still classified as unknown. Analytics only. */
-type UnknownTransactionReason = 'unknown_contract' | 'undecodable_call' | 'payable_call' | 'value_attached'
+type UnknownTransactionReason = 'unknown_contract' | 'undecodable_call' | 'payable_call' | 'value_attached' | 'unverified_recipient'
 
 /** Why a MetaTransaction was not classified as a Decentraland one. Analytics only. */
 type UnknownMetaTransactionReason =
@@ -98,16 +104,30 @@ type ClassificationContext = {
   connectedChainId: number
   /** The chain meta-transactions are relayed on (Polygon, or Amoy outside production). */
   metaTransactionChainId: number
+  /** True only when a trusted RPC confirms the recipient has no code on the execution chain. */
+  isAddressWithoutCode: (address: string, chainId: number) => Promise<boolean>
   resolveContract: (address: string, chainId: number) => Promise<ContractResolution>
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
+/** The two previewed kinds: a call to a Decentraland contract, simulated and decoded. */
+type DecentralandClassification = Extract<RequestClassification, { kind: 'dcl_transaction' | 'dcl_meta_transaction' }>
+
+/** The kinds that send a transaction, whatever the target. */
+type TransactionClassification = Extract<RequestClassification, { kind: 'dcl_transaction' | 'unknown_transaction' | 'native_transfer' }>
+
+/** Whether the classification is one of the previewed Decentraland kinds. */
+function isDecentralandClassification(classification: RequestClassification): classification is DecentralandClassification {
+  return classification.kind === 'dcl_transaction' || classification.kind === 'dcl_meta_transaction'
 }
 
-/** Whether `kind` is one of the previewed Decentraland kinds. */
-function isDecentralandClassification(classification: RequestClassification): boolean {
-  return classification.kind === 'dcl_transaction' || classification.kind === 'dcl_meta_transaction'
+/** Whether a kind sends a transaction (as opposed to producing a signature). */
+function isTransactionKind(kind: RequestClassification['kind']): boolean {
+  return TRANSACTION_KINDS.has(kind)
+}
+
+/** Whether the classification sends a transaction (as opposed to producing a signature). */
+function isTransactionClassification(classification: RequestClassification): classification is TransactionClassification {
+  return isTransactionKind(classification.kind)
 }
 
 /**
@@ -157,6 +177,18 @@ async function classifyTransaction(params: unknown[], context: ClassificationCon
   const connectedChainId = context.connectedChainId
 
   if (data === '0x') {
+    // Empty calldata still executes a contract's receive/fallback function (including delegated
+    // EIP-7702 code). Only a confirmed account without code gets the simple-transfer review.
+    // A failed lookup retains the unknown-contract warnings and never changes the execution chain.
+    let withoutCode = false
+    try {
+      withoutCode = await context.isAddressWithoutCode(to, connectedChainId)
+    } catch {
+      // The recipient could not be checked; its effects remain unknown.
+    }
+    if (withoutCode !== true) {
+      return { kind: 'unknown_transaction', to, data, value, chainId: connectedChainId, reason: 'unverified_recipient' }
+    }
     return {
       kind: 'native_transfer',
       to,
@@ -180,6 +212,11 @@ async function classifyTransaction(params: unknown[], context: ClassificationCon
     candidate = { contract: onRelayChain.contract, relayed: false, chainId: connectedChainId }
   } else if (connectedChainId !== context.metaTransactionChainId) {
     const onConnectedChain = await context.resolveContract(to, connectedChainId)
+    // Registry-only today, so never unavailable; kept explicit so the invariant that a failed lookup
+    // is not a verdict holds if this path ever asks a network.
+    if (onConnectedChain.status === 'unavailable') {
+      throw new ContractLookupUnavailableError(to)
+    }
     if (onConnectedChain.status === 'found') {
       candidate = { contract: onConnectedChain.contract, relayed: false, chainId: connectedChainId }
     }
@@ -202,7 +239,11 @@ async function classifyTransaction(params: unknown[], context: ClassificationCon
   let branded: BrandedTransaction = null
   if (candidate.relayed && candidate.contract.name === ContractName.MANAToken && call.functionName === 'transfer') {
     branded = 'tip'
-  } else if (candidate.relayed && candidate.contract.name === ContractName.ERC721CollectionV2 && GIFT_FUNCTIONS.has(call.functionName)) {
+  } else if (
+    candidate.relayed &&
+    candidate.contract.name === ContractName.ERC721CollectionV2 &&
+    NFT_TRANSFER_FUNCTIONS.has(call.functionName)
+  ) {
     branded = 'gift_candidate'
   }
   return {
@@ -296,9 +337,12 @@ function classifyPersonalSign(params: unknown[]): RequestClassification {
   const message = typeof params[0] === 'string' ? params[0] : ''
   let hex: string
   let text: string | null
-  if (HEX_BYTES_REGEX.test(message)) {
-    // Wallets sign hex as bytes, so the text is what those bytes decode to, if they are text at all.
-    hex = `0x${message.slice(2).toLowerCase()}`
+  if (isHexBytes(message)) {
+    // Wallets sign `0x…` as bytes, so the text is what those bytes decode to, if they are text at all.
+    // Anything else — plain text, a `0X…` string, the bare `0x` — a wallet signs as the UTF-8 of its
+    // characters, and the same predicate decides that in toWalletSignatureRequest, so what is shown
+    // here is what is signed.
+    hex = message.toLowerCase()
     try {
       text = hexToString(hex as `0x${string}`)
     } catch {
@@ -355,15 +399,6 @@ function getPayloadFingerprint(classification: RequestClassification): string {
   }
 }
 
-/** The EIP-712 digest the wallet signs for `typedData`, or null when it cannot be hashed. */
-function getTypedDataDigest(typedData: TypedDataPayload): string | null {
-  try {
-    return hashTypedData(typedData as unknown as Parameters<typeof hashTypedData>[0])
-  } catch {
-    return null
-  }
-}
-
 /** The analytics-safe summary of a classification: kinds, contract and function names and reasons, never payloads. */
 function describeClassification(classification: RequestClassification): Record<string, string | boolean | null> {
   switch (classification.kind) {
@@ -386,12 +421,20 @@ function describeClassification(classification: RequestClassification): Record<s
 }
 
 export {
-  UNREADABLE_CHARACTER_REGEX,
+  NFT_TRANSFER_FUNCTIONS,
   classifyRequest,
   describeClassification,
   getPayloadFingerprint,
-  getTypedDataDigest,
   isDecentralandClassification,
-  isDecentralandDomain
+  isTransactionClassification,
+  isTransactionKind
 }
-export type { BrandedTransaction, ClassificationContext, RequestClassification, UnknownMetaTransactionReason, UnknownTransactionReason }
+export type {
+  BrandedTransaction,
+  ClassificationContext,
+  DecentralandClassification,
+  RequestClassification,
+  TransactionClassification,
+  UnknownMetaTransactionReason,
+  UnknownTransactionReason
+}

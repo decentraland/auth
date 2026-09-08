@@ -1,14 +1,14 @@
-import { useState } from 'react'
 import { formatEther } from 'viem'
 import { useTranslation } from '@dcl/hooks'
 import { Box, Button, Checkbox, CircularProgress, FormControlLabel } from 'decentraland-ui2'
 import { getPreviewFingerprint, hasNoVisibleEffects } from '../../../../../shared/auth'
 import { Container } from '../../Container'
-import { ButtonsContainer } from '../../RequestPage.styled'
+import { ButtonsContainer, ReviewRestartedNotice } from '../../RequestPage.styled'
 import { SimulationSummary } from '../SimulationSummary'
+import { useAcknowledgment } from '../useAcknowledgment'
 import styles from '../Views.module.css'
 import { WalletInteractionProps } from './WalletInteraction.types'
-import { CallLine, PreviewUnavailableWarning, ReviewRestartedNotice, SummaryBody } from './WalletInteraction.styled'
+import { CallLine, PreviewUnavailableWarning, SummaryBody } from './WalletInteraction.styled'
 
 /**
  * The review of a transaction to a Decentraland contract: the decoded call, the simulated asset and
@@ -40,9 +40,7 @@ export const WalletInteraction = ({
   // summary cannot show, so the acknowledgment says that instead of talking about approvals.
   const isPreviewWithoutVisibleEffects = simulation.status === 'ready' && hasNoVisibleEffects(simulation.result, userAddress)
   // The statement being acknowledged: this request and exactly this preview — outcome, movements
-  // and approvals. Stored as a key and derived, never synced, so a tick cannot carry over to another
-  // request, another outcome or a re-simulation that showed something else, and the button is right
-  // in the same render the statement changes.
+  // and approvals (see useAcknowledgment).
   const acknowledgmentStatement = [
     requestId,
     simulation.status,
@@ -50,8 +48,7 @@ export const WalletInteraction = ({
     isPreviewWithoutVisibleEffects ? 'no-visible-effects' : '',
     getPreviewFingerprint(simulation.status === 'ready' ? simulation.result : undefined)
   ].join('|')
-  const [acknowledgedStatement, setAcknowledgedStatement] = useState<string | null>(null)
-  const acknowledged = acknowledgedStatement === acknowledgmentStatement
+  const { acknowledged, setAcknowledged } = useAcknowledgment(acknowledgmentStatement)
   // The user pays gas and the estimate has not resolved: the cost must be seen before approving.
   const isGasPending = !gas.covered && gas.status === 'loading'
   // Block approval while the request is submitting, while the simulation or the fee estimate is
@@ -97,11 +94,7 @@ export const WalletInteraction = ({
       {requiresAcknowledgment ? (
         <FormControlLabel
           control={
-            <Checkbox
-              checked={acknowledged}
-              onChange={event => setAcknowledgedStatement(event.target.checked ? acknowledgmentStatement : null)}
-              data-testid="risk-acknowledgment"
-            />
+            <Checkbox checked={acknowledged} onChange={event => setAcknowledged(event.target.checked)} data-testid="risk-acknowledgment" />
           }
           label={
             isPreviewUnavailable

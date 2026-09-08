@@ -103,7 +103,7 @@ function isDecentralandIdentityAuthMessage(message: unknown): boolean {
 }
 
 // `personal_sign` params are routinely hex-encoded UTF-8 rather than plaintext — the approval UI
-// decodes them the same way (see extractSignaturePayload). The wallet signs the DECODED bytes, so a
+// decodes them the same way (see classifyRequest). The wallet signs the DECODED bytes, so a
 // hex-wrapped identity payload produces exactly the same usable auth chain as a plaintext one.
 // Detection therefore has to look through the encoding instead of only at the literal param.
 const HEX_STRING_REGEX = /^0x([0-9a-fA-F]{2})+$/i
@@ -172,10 +172,6 @@ function hasPrimaryType(typedData: unknown): boolean {
 /**
  * Rejects signature params that are not in the canonical EIP-1193 order for their method.
  * Typed data must be `[signer, typedData]`; personal_sign must be `[message, signer]`.
- * Other typed data is not held to its schema here: an external wallet shows the payload itself, so a
- * request it can sign must not be turned away for a quirk the review cannot render. The request page
- * runs that review (resolveTypedDataReview) for web2 wallets only, where this site is the confirmation.
- *
  * The shape of the typed data itself is not judged here. Whether it is a Decentraland
  * MetaTransaction the page can preview, or anything else, is decided by the request classifier:
  * a struct that does not match what a Decentraland contract signs is shown as an unverified

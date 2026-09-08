@@ -62,11 +62,6 @@
     "error_contact_support": "Or contact support with the following error message:"
   },
   "request": {
-    "verification_match": "Does the verification number below match the one in the {explorerText}?",
-    "no_it_doesnt": "No, it doesn't",
-    "yes_same": "Yes, they are the same",
-    "timeout_logged_out": "You might be logged out of your wallet extension.",
-    "timeout_check_login": "Please check that you're logged in and try again.",
     "wallet_interaction": {
       "review_title": "Review this transaction",
       "preview_unavailable_warning": "We couldn't check what this transaction does because the preview service is temporarily unavailable. Only approve if you trust the scene that requested it.",
@@ -171,7 +166,10 @@
       "acknowledge_transaction": "I understand Decentraland can't check this transaction and I'm sending it anyway",
       "acknowledge_native_transfer": "I understand I'm sending {amount} {symbol} and this can't be undone",
       "acknowledge_meta_transaction": "I understand this signature lets the contract act for me at any time and its effects can't be checked",
-      "acknowledge_signature": "I understand Decentraland can't check what this signature authorizes"
+      "acknowledge_signature": "I understand Decentraland can't check what this signature authorizes",
+      "tabs_label": "Request details",
+      "unknown_network": "Chain {chainId} (unknown network)",
+      "native_currency": "native currency"
     }
   },
   "request_views": {

@@ -1,7 +1,8 @@
+import type { RequestClassification } from '../../classifyRequest'
 import { GasEstimateState } from '../../types'
 
 /** The request kinds shown by the unverified view: everything that is not a Decentraland contract call. */
-type UnverifiedRequestKind = 'unknown_transaction' | 'native_transfer' | 'unknown_meta_transaction' | 'unknown_typed_data' | 'personal_sign'
+type UnverifiedRequestKind = Exclude<RequestClassification['kind'], 'dcl_transaction' | 'dcl_meta_transaction'>
 
 /** What the wallet will be handed, verbatim, for the Advanced tab. */
 type UnverifiedRequestPayload =
@@ -10,10 +11,6 @@ type UnverifiedRequestPayload =
       kind: 'typed_data'
       /** The typed data exactly as the request sent it. */
       raw: string
-      /** The inner call a MetaTransaction carries, when the struct names one. */
-      calldata: string | null
-      /** The EIP-712 digest the wallet signs, when the typed data can be hashed. */
-      digest: string | null
     }
   | {
       kind: 'message'

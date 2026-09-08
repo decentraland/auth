@@ -7,7 +7,7 @@ import { ContractName, getContract } from 'decentraland-transactions'
 import { config } from '../../../modules/config'
 import { DecodedCall, SimulationRequestBody, SimulationResponseBody, buildMetaTransactionSimulationPayload } from '../../../shared/auth'
 import { isMobile } from '../LoginPage/utils'
-import { RequestClassification } from './classifyRequest'
+import { NFT_TRANSFER_FUNCTIONS, RequestClassification } from './classifyRequest'
 
 /**
  * Builds the simulation request body for a Decentraland transaction. A relayed call is previewed the way
@@ -191,6 +191,22 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): 
 }
 
 /**
+ * Confirms that a recipient has no code using Decentraland's RPC on the transaction's chain.
+ * Only the exact empty-code response is a positive answer; deployed and delegated code, malformed
+ * responses and lookup failures must not produce a simple-transfer review. The deadline covers
+ * provider creation as well as the RPC request so classification cannot hang on either step.
+ */
+async function isAddressWithoutCode(address: string, chainId: number): Promise<boolean> {
+  const lookup = async () => {
+    const networkProvider = await getTrustedNetworkProvider(chainId as ChainId)
+    const publicClient = createPublicClient({ transport: custom(networkProvider) })
+    const code = await publicClient.request({ method: 'eth_getCode', params: [address as `0x${string}`, 'latest'] })
+    return code === '0x'
+  }
+  return withTimeout(lookup(), COLLECTION_LOOKUP_TIMEOUT_MS, 'Recipient code lookup')
+}
+
+/**
  * Whether a Decentraland collection factory on the meta-transaction chain deployed `contractAddress`,
  * asked of the factories themselves through Decentraland's own RPC. This is the whitelist for wearable
  * collections, which are deployed per collection and are not in the static registry: a factory-deployed
@@ -251,12 +267,6 @@ async function isDecentralandCollection(contractAddress: string): Promise<boolea
 function getMetaTransactionChainId(): ChainId {
   return ['production', 'staging'].includes(config.get('ENVIRONMENT').toLowerCase()) ? ChainId.MATIC_MAINNET : ChainId.MATIC_AMOY
 }
-
-// The only collection calls the branded "gift" view may stand in for. Other functions on the
-// CollectionV2 ABI also take three or more arguments — batchTransferFrom, safeBatchTransferFrom,
-// setItemsMinters, setItemsManagers, editItemsData — and would decode into a "to" and a "token id" as
-// well, so without this check they would be shown as the gift of one token while doing something else.
-const NFT_TRANSFER_FUNCTIONS = new Set(['transferFrom', 'safeTransferFrom'])
 
 /**
  * Reads the sender, the recipient and the token id out of a decoded ERC-721 transfer. Only `transferFrom`
@@ -404,6 +414,8 @@ async function fetchNftMetadata(
   // Fetch the metadata JSON
   const metadataResponse = await fetch(metadataUrl)
   if (!metadataResponse.ok) {
+    // Drain the body so the connection can be reused; ignore failures doing so.
+    await metadataResponse.body?.cancel().catch(() => undefined)
     throw new Error(`Failed to fetch metadata from ${metadataUrl}: ${metadataResponse.status} ${metadataResponse.statusText}`)
   }
 
@@ -485,6 +497,8 @@ async function fetchPlaceByCreatorAddress(creatorAddress: string): Promise<{ sce
 
     if (!response.ok) {
       console.error(`Failed to fetch place info from Places API: ${response.status} ${response.statusText}`)
+      // Drain the body so the connection can be reused; ignore failures doing so.
+      await response.body?.cancel().catch(() => undefined)
       return null
     }
 
@@ -517,6 +531,7 @@ export {
   getSigninDeeplink,
   getConnectedProvider,
   getNetworkProvider,
+  isAddressWithoutCode,
   isDecentralandCollection,
   getMetaTransactionChainId,
   decodeNftTransferData,

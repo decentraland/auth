@@ -1,16 +1,9 @@
 import { Abi, AbiFunction, decodeFunctionData, encodeFunctionData, toFunctionSelector } from 'viem'
 import { ChainId } from '@dcl/schemas/dist/dapps/chain-id'
 import { ContractData, ContractName, getContract } from 'decentraland-transactions'
+import { SUPPORTED_CHAIN_IDS } from '../chains'
+import { CALLDATA_REGEX } from './hex'
 import { MetaTransactionCalldataField } from './metaTransactionTypedData'
-
-/**
- * Chains the auth-server simulator can preview a call on. The contract index covers exactly these:
- * a Decentraland contract on any other chain cannot be previewed, so it is not "known" here either.
- */
-const SUPPORTED_CHAIN_IDS: readonly number[] = [1, 11155111, 137, 80002]
-
-// A 4-byte function selector followed by whole bytes of arguments.
-const CALLDATA_REGEX = /^0x[0-9a-fA-F]{8}([0-9a-fA-F]{2})*$/
 
 /** A Decentraland contract deployment the auth site is willing to preview calls to. */
 type KnownContract = {
@@ -97,7 +90,9 @@ let staticContractIndex: Map<number, Map<string, KnownContract>> | null = null
 
 /**
  * Every Decentraland contract with a fixed address, indexed by chain and then by lowercased address.
- * Built once from the decentraland-transactions registry. Per chain on purpose: the same address is a
+ * Built once from the decentraland-transactions registry, for the chains the auth-server simulator can
+ * preview a call on: a Decentraland contract on any other chain cannot be previewed, so it is not
+ * "known" here either. Per chain on purpose: the same address is a
  * different contract on other chains (e.g. the Polygon CollectionFactoryV3 address is the Mumbai
  * ChainlinkOracle), so the chain-agnostic `getContractName` must never be used for recognition.
  * Registry entries without an address (`ERC20`, `ERC721`, `ERC721CollectionV2`) are ABI templates
@@ -214,7 +209,6 @@ function decodeKnownContractCall(contract: KnownContract, data: string): Decoded
 }
 
 export {
-  SUPPORTED_CHAIN_IDS,
   decodeKnownContractCall,
   getCollectionContract,
   getKnownDecentralandContract,

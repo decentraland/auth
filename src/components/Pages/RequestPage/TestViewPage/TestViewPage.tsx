@@ -265,12 +265,7 @@ export const TestViewPage = () => {
             method="eth_signTypedData_v4"
             targetAddress="0xabcdefabcdefabcdefabcdefabcdefabcdefef01"
             chainId={137}
-            payload={{
-              kind: 'typed_data',
-              raw: unknownMetaTxRaw,
-              calldata: (JSON.parse(unknownMetaTxRaw) as { message: { functionSignature: string } }).message.functionSignature,
-              digest: `0x${'7c1e5b0f9a2d4c6e'.repeat(4)}`
-            }}
+            payload={{ kind: 'typed_data', raw: unknownMetaTxRaw }}
             payloadFingerprint="unknown-meta-tx"
             onDeny={noop}
             onApprove={noop}
@@ -284,7 +279,7 @@ export const TestViewPage = () => {
             requestId={DEFAULT_REQUEST_ID}
             kind="unknown_typed_data"
             method="eth_signTypedData_v4"
-            payload={{ kind: 'typed_data', raw: permitRaw, calldata: null, digest: `0x${'3f9a1c7e5b2d8f4a'.repeat(4)}` }}
+            payload={{ kind: 'typed_data', raw: permitRaw }}
             payloadFingerprint="permit"
             onDeny={noop}
             onApprove={noop}

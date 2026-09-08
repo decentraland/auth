@@ -3,9 +3,11 @@ import { useTranslation } from '@dcl/hooks'
 import { Box, Button, Checkbox, CircularProgress, FormControlLabel } from 'decentraland-ui2'
 import { getPreviewFingerprint, hasNoVisibleEffects } from '../../../../../shared/auth'
 import { getExplorerAddressUrl, getExplorerName } from '../../../../../shared/explorer'
+import { shortenAddress } from '../../../../../shared/text'
 import { Container } from '../../Container'
 import { ButtonsContainer } from '../../RequestPage.styled'
 import { SimulationSummary } from '../SimulationSummary'
+import { useAcknowledgment } from '../useAcknowledgment'
 import styles from '../Views.module.css'
 import { SignatureRequestViewProps } from './SignatureRequest.types'
 import {
@@ -20,8 +22,6 @@ import {
   Notice,
   RawToggle
 } from './SignatureRequest.styled'
-
-const shortenAddress = (address: string): string => (address.length > 12 ? `${address.slice(0, 6)}…${address.slice(-4)}` : address)
 
 /**
  * The review of a MetaTransaction signature for a Decentraland contract. Only a signature the
@@ -47,8 +47,6 @@ export const SignatureRequestView = ({
 }: SignatureRequestViewProps) => {
   const { t } = useTranslation()
   const [showRaw, setShowRaw] = useState(false)
-  // The statement the user ticked, if any (see acknowledgmentStatement below).
-  const [acknowledgedStatement, setAcknowledgedStatement] = useState<string | null>(null)
 
   const contractUrl = getExplorerAddressUrl(chainId, verifyingContract)
   const isReverted = simulation.status === 'ready' && simulation.result.status === 'reverted'
@@ -60,8 +58,7 @@ export const SignatureRequestView = ({
   const isPreviewWithoutVisibleEffects = simulation.status === 'ready' && hasNoVisibleEffects(simulation.result, userAddress)
 
   // The exact statement the user is asked to acknowledge: the request it belongs to, the label, and
-  // every notice shown alongside it. A tick is given to that statement only — when any part of it
-  // changes (another request, a different reason), ask again.
+  // every notice shown alongside it (see useAcknowledgment).
   const acknowledgmentStatement = [
     requestId,
     isUnverifiable ? 'unverified' : 'risk',
@@ -71,9 +68,7 @@ export const SignatureRequestView = ({
     // Exactly this preview: a re-simulation that showed something else is another statement.
     getPreviewFingerprint(simulation.status === 'ready' ? simulation.result : undefined)
   ].join('|')
-  // Derived, not synced: an effect would clear a stale tick one render late, and for that one commit
-  // the Allow button would be enabled against a statement the user never acknowledged.
-  const acknowledged = acknowledgedStatement === acknowledgmentStatement
+  const { acknowledged, setAcknowledged } = useAcknowledgment(acknowledgmentStatement)
 
   return (
     <Container canChangeAccount requestId={requestId}>
@@ -118,7 +113,7 @@ export const SignatureRequestView = ({
             control={
               <Checkbox
                 checked={acknowledged}
-                onChange={event => setAcknowledgedStatement(event.target.checked ? acknowledgmentStatement : null)}
+                onChange={event => setAcknowledged(event.target.checked)}
                 data-testid="risk-acknowledgment"
               />
             }

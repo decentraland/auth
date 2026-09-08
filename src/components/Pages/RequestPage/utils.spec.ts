@@ -20,6 +20,7 @@ import {
   getMetaTransactionChainId,
   getNetworkProvider,
   getSigninDeeplink,
+  isAddressWithoutCode,
   isDecentralandCollection,
   isExactNftTransferSimulation
 } from './utils'
@@ -137,6 +138,86 @@ describe('when testing getNetworkProvider', () => {
       const result = await getNetworkProvider(ChainId.MATIC_MAINNET)
       expect(result).toBe(mockNetworkProvider)
       expect(connection.createProvider).toHaveBeenCalledWith(ProviderType.NETWORK, ChainId.MATIC_MAINNET)
+    })
+  })
+})
+
+describe('when checking whether a recipient has no code', () => {
+  let address: string
+  let chainId: number
+  let networkProvider: Record<string, boolean>
+  let request: jest.Mock
+
+  beforeEach(() => {
+    address = '0x1234567890abcdef1234567890abcdef12345678'
+    chainId = ChainId.ETHEREUM_MAINNET
+    networkProvider = { isTrustedNetworkProvider: true }
+    request = jest.fn()
+    jest.mocked(connection.createProvider).mockReturnValueOnce(networkProvider as any)
+    jest.mocked(custom).mockImplementationOnce(provider => provider as any)
+    jest.mocked(createPublicClient).mockReturnValueOnce({ request } as any)
+  })
+
+  afterEach(() => {
+    jest.resetAllMocks()
+    jest.useRealTimers()
+  })
+
+  describe('and the RPC confirms empty code', () => {
+    beforeEach(() => {
+      request.mockResolvedValueOnce('0x')
+    })
+
+    it('should confirm that the recipient has no code', async () => {
+      await expect(isAddressWithoutCode(address, chainId)).resolves.toBe(true)
+    })
+
+    it('should ask Decentraland’s RPC on the execution chain', async () => {
+      await isAddressWithoutCode(address, chainId)
+      expect(connection.createProvider).toHaveBeenCalledWith(ProviderType.NETWORK, chainId)
+      expect(custom).toHaveBeenCalledWith(networkProvider)
+      expect(request).toHaveBeenCalledWith({ method: 'eth_getCode', params: [address, 'latest'] })
+      expect(connection.getProvider).not.toHaveBeenCalled()
+    })
+  })
+
+  describe.each([
+    ['deployed code', '0x60006000'],
+    ['delegated code', '0xef01001234567890abcdef1234567890abcdef12345678'],
+    ['a missing response', undefined],
+    ['a malformed response', '']
+  ])('and the RPC returns %s', (_label, code) => {
+    beforeEach(() => {
+      request.mockResolvedValueOnce(code)
+    })
+
+    it('should not confirm an account without code', async () => {
+      await expect(isAddressWithoutCode(address, chainId)).resolves.toBe(false)
+    })
+  })
+
+  describe('and the RPC fails', () => {
+    beforeEach(() => {
+      request.mockRejectedValueOnce(new Error('RPC unavailable'))
+    })
+
+    it('should leave the recipient unverified', async () => {
+      await expect(isAddressWithoutCode(address, chainId)).rejects.toThrow('RPC unavailable')
+    })
+  })
+
+  describe('and the RPC does not answer', () => {
+    let outcome: Promise<void>
+
+    beforeEach(() => {
+      jest.useFakeTimers()
+      request.mockReturnValueOnce(new Promise(() => undefined))
+      outcome = expect(isAddressWithoutCode(address, chainId)).rejects.toThrow('Recipient code lookup timed out')
+    })
+
+    it('should stop waiting so classification can show the unverified review', async () => {
+      await jest.advanceTimersByTimeAsync(10_000)
+      await outcome
     })
   })
 })

@@ -62,11 +62,6 @@
     "error_contact_support": "或联系支持团队并提供以下错误信息："
   },
   "request": {
-    "verification_match": "下方的验证号码是否与 {explorerText} 中的匹配？",
-    "no_it_doesnt": "不，不匹配",
-    "yes_same": "是的，它们相同",
-    "timeout_logged_out": "您可能已从钱包扩展程序中登出。",
-    "timeout_check_login": "请检查您是否已登录后重试。",
     "wallet_interaction": {
       "review_title": "查看此交易",
       "preview_unavailable_warning": "由于预览服务暂时不可用，我们无法检查此交易的作用。请仅在您信任发起该请求的场景时批准。",
@@ -171,7 +166,10 @@
       "acknowledge_transaction": "我理解 Decentraland 无法检查此交易，我仍然选择发送",
       "acknowledge_native_transfer": "我理解我正在发送 {amount} {symbol}，且此操作无法撤销",
       "acknowledge_meta_transaction": "我理解此签名允许该合约随时代表我执行操作，且其效果无法检查",
-      "acknowledge_signature": "我理解 Decentraland 无法检查此签名授权了什么"
+      "acknowledge_signature": "我理解 Decentraland 无法检查此签名授权了什么",
+      "tabs_label": "请求详情",
+      "unknown_network": "链 {chainId}（未知网络）",
+      "native_currency": "原生代币"
     }
   },
   "request_views": {

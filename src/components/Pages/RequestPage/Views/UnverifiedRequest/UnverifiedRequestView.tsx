@@ -3,8 +3,11 @@ import { formatEther } from 'viem'
 import { useTranslation } from '@dcl/hooks'
 import { Box, Button, Checkbox, CircularProgress, FormControlLabel, Tab } from 'decentraland-ui2'
 import { getExplorerAddressUrl, getExplorerName, getNativeSymbol, getNetworkName } from '../../../../../shared/explorer'
+import { shortenAddress } from '../../../../../shared/text'
+import { isTransactionKind } from '../../classifyRequest'
 import { Container } from '../../Container'
-import { ButtonsContainer } from '../../RequestPage.styled'
+import { ButtonsContainer, ReviewRestartedNotice } from '../../RequestPage.styled'
+import { useAcknowledgment } from '../useAcknowledgment'
 import styles from '../Views.module.css'
 import { UnverifiedRequestKind, UnverifiedRequestViewProps } from './UnverifiedRequest.types'
 import {
@@ -18,7 +21,6 @@ import {
   Panel,
   RawBlock,
   RawLabel,
-  ReviewRestartedNotice,
   SelfNote,
   TabBar,
   WarningsAlert,
@@ -26,16 +28,6 @@ import {
 } from './UnverifiedRequest.styled'
 
 type TabId = 'summary' | 'advanced'
-
-const TRANSACTION_KINDS: ReadonlySet<UnverifiedRequestKind> = new Set(['unknown_transaction', 'native_transfer'])
-
-const shortenAddress = (address: string): string => (address.length > 12 ? `${address.slice(0, 6)}…${address.slice(-4)}` : address)
-
-/** Formats a hex wei quantity as a decimal amount with the chain's native symbol. */
-const formatNative = (value: string, chainId: number | null | undefined): { amount: string; symbol: string } => ({
-  amount: formatEther(BigInt(value)),
-  symbol: getNativeSymbol(chainId ?? undefined)
-})
 
 const SIGNATURE_WARNINGS = [
   'request.unverified.warning_signature_login',
@@ -133,15 +125,17 @@ export const UnverifiedRequestView = ({
   const { t } = useTranslation()
   const [tab, setTab] = useState<TabId>('summary')
   // The statement the user ticked: this request, this kind, this chain and exactly this payload. A
-  // tick given to one payload never carries over to another (see the acknowledgment below).
+  // tick given to one payload never carries over to another (see useAcknowledgment).
   const acknowledgmentStatement = [requestId, kind, chainId ?? '', payloadFingerprint].join('|')
-  const [acknowledgedStatement, setAcknowledgedStatement] = useState<string | null>(null)
-  const acknowledged = acknowledgedStatement === acknowledgmentStatement
+  const { acknowledged, setAcknowledged } = useAcknowledgment(acknowledgmentStatement)
 
-  const isTransaction = TRANSACTION_KINDS.has(kind)
-  const native = nativeValue !== undefined ? formatNative(nativeValue, chainId) : null
+  const isTransaction = isTransactionKind(kind)
+  // A wallet can be on a chain this page does not know. That is exactly a case this view exists for,
+  // so the chain is still named (by its id) and amounts still say what they are in.
+  const nativeSymbol = getNativeSymbol(chainId ?? undefined) || t('request.unverified.native_currency')
+  const native = nativeValue !== undefined ? { amount: formatEther(BigInt(nativeValue)), symbol: nativeSymbol } : null
   const showsAmount = native !== null && (kind === 'native_transfer' || BigInt(nativeValue ?? '0x0') !== 0n)
-  const networkName = getNetworkName(chainId ?? undefined)
+  const networkName = getNetworkName(chainId ?? undefined) || (chainId !== null ? t('request.unverified.unknown_network', { chainId }) : '')
   const explorerUrl = getExplorerAddressUrl(chainId ?? undefined, targetAddress)
   const explorerName = getExplorerName(chainId ?? undefined)
   // The user always sees the cost before sending: on a transaction, Allow waits for the estimate.
@@ -182,13 +176,25 @@ export const UnverifiedRequestView = ({
             : t(getIntroKey(kind))}
         </Intro>
 
-        <TabBar value={tab} onChange={(_event, value: TabId) => setTab(value)} aria-label={t('request.unverified.tab_summary')}>
-          <Tab value="summary" label={t('request.unverified.tab_summary')} data-testid="unverified-tab-summary" />
-          <Tab value="advanced" label={t('request.unverified.tab_advanced')} data-testid="unverified-tab-advanced" />
+        <TabBar value={tab} onChange={(_event, value: TabId) => setTab(value)} aria-label={t('request.unverified.tabs_label')}>
+          <Tab
+            value="summary"
+            id="unverified-tab-summary"
+            aria-controls="unverified-panel-summary"
+            label={t('request.unverified.tab_summary')}
+            data-testid="unverified-tab-summary"
+          />
+          <Tab
+            value="advanced"
+            id="unverified-tab-advanced"
+            aria-controls="unverified-panel-advanced"
+            label={t('request.unverified.tab_advanced')}
+            data-testid="unverified-tab-advanced"
+          />
         </TabBar>
 
         {tab === 'summary' ? (
-          <Panel role="tabpanel" data-testid="unverified-summary">
+          <Panel role="tabpanel" id="unverified-panel-summary" aria-labelledby="unverified-tab-summary" data-testid="unverified-summary">
             <Facts>
               {target ? (
                 <>
@@ -220,7 +226,7 @@ export const UnverifiedRequestView = ({
                       ? t('request.unverified.fact_fee_loading')
                       : gas.status === 'unavailable'
                         ? t('request.unverified.fact_fee_unavailable')
-                        : `${formatEther(gas.cost)} ${native?.symbol ?? getNativeSymbol(chainId ?? undefined)}`}
+                        : `${formatEther(gas.cost)} ${nativeSymbol}`}
                   </FactValue>
                 </>
               ) : null}
@@ -228,7 +234,7 @@ export const UnverifiedRequestView = ({
                 <>
                   <FactKey>{t('request.unverified.fact_balance')}</FactKey>
                   <FactValue>
-                    {formatEther(balance)} {getNativeSymbol(chainId ?? undefined)}
+                    {formatEther(balance)} {nativeSymbol}
                   </FactValue>
                 </>
               ) : null}
@@ -258,7 +264,7 @@ export const UnverifiedRequestView = ({
             </WarningsAlert>
           </Panel>
         ) : (
-          <Panel role="tabpanel" data-testid="unverified-advanced">
+          <Panel role="tabpanel" id="unverified-panel-advanced" aria-labelledby="unverified-tab-advanced" data-testid="unverified-advanced">
             <Hint>{t(isTransaction ? 'request.unverified.advanced_hint_transaction' : 'request.unverified.advanced_hint_signature')}</Hint>
             {payload.kind === 'transaction' ? (
               <>
@@ -283,18 +289,6 @@ export const UnverifiedRequestView = ({
               <>
                 <RawLabel>{t('request.unverified.raw_typed_data')}</RawLabel>
                 <RawBlock data-testid="unverified-raw-typed-data">{payload.raw}</RawBlock>
-                {payload.calldata ? (
-                  <>
-                    <RawLabel>{t('request.unverified.raw_calldata')}</RawLabel>
-                    <RawBlock data-testid="unverified-raw-calldata">{payload.calldata}</RawBlock>
-                  </>
-                ) : null}
-                {payload.digest ? (
-                  <>
-                    <RawLabel>{t('request.unverified.raw_digest')}</RawLabel>
-                    <RawBlock data-testid="unverified-raw-digest">{payload.digest}</RawBlock>
-                  </>
-                ) : null}
               </>
             ) : null}
             {payload.kind === 'message' ? (
@@ -320,11 +314,7 @@ export const UnverifiedRequestView = ({
 
         <FormControlLabel
           control={
-            <Checkbox
-              checked={acknowledged}
-              onChange={event => setAcknowledgedStatement(event.target.checked ? acknowledgmentStatement : null)}
-              data-testid="risk-acknowledgment"
-            />
+            <Checkbox checked={acknowledged} onChange={event => setAcknowledged(event.target.checked)} data-testid="risk-acknowledgment" />
           }
           label={acknowledgmentLabel}
         />

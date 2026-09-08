@@ -62,11 +62,6 @@
     "error_contact_support": "O contacta a soporte con el siguiente mensaje de error:"
   },
   "request": {
-    "verification_match": "¿El número de verificación de abajo coincide con el del {explorerText}?",
-    "no_it_doesnt": "No, no coincide",
-    "yes_same": "Sí, son iguales",
-    "timeout_logged_out": "Es posible que hayas cerrado sesión en la extensión de tu billetera.",
-    "timeout_check_login": "Por favor, verifica que has iniciado sesión e inténtalo de nuevo.",
     "wallet_interaction": {
       "review_title": "Revisa esta transacción",
       "preview_unavailable_warning": "No pudimos verificar qué hace esta transacción porque el servicio de vista previa no está disponible temporalmente. Aprueba solo si confías en la escena que la solicitó.",
@@ -171,7 +166,10 @@
       "acknowledge_transaction": "Entiendo que Decentraland no puede comprobar esta transacción y la envío de todas formas",
       "acknowledge_native_transfer": "Entiendo que estoy enviando {amount} {symbol} y que esto no se puede deshacer",
       "acknowledge_meta_transaction": "Entiendo que esta firma permite que el contrato actúe por mí en cualquier momento y que sus efectos no se pueden comprobar",
-      "acknowledge_signature": "Entiendo que Decentraland no puede comprobar qué autoriza esta firma"
+      "acknowledge_signature": "Entiendo que Decentraland no puede comprobar qué autoriza esta firma",
+      "tabs_label": "Detalles de la solicitud",
+      "unknown_network": "Cadena {chainId} (red desconocida)",
+      "native_currency": "moneda nativa"
     }
   },
   "request_views": {

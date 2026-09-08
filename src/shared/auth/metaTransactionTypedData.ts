@@ -1,12 +1,12 @@
 import { hashTypedData } from 'viem'
 import { META_TRANSACTION_TYPE, OFFCHAIN_META_TRANSACTION_TYPE } from 'decentraland-transactions'
+import { isRecord } from '../utils/isRecord'
 import { ADDRESS_REGEX } from './address'
 import { EIP712_DOMAIN_FIELD_TYPES } from './eip712Domain'
 import { MalformedSignatureRequestError } from './errors'
+import { CALLDATA_REGEX } from './hex'
 
 const META_TRANSACTION_PRIMARY_TYPE = 'MetaTransaction'
-// A 4-byte function selector followed by whole bytes of arguments.
-const CALLDATA_REGEX = /^0x[0-9a-fA-F]{8}([0-9a-fA-F]{2})*$/
 
 type TypedDataField = { name: string; type: string }
 
@@ -37,10 +37,6 @@ type MetaTransactionTypedData = {
 }
 
 type TypedDataLike = { types?: unknown; domain?: unknown; primaryType?: unknown; message?: unknown }
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
 
 /**
  * Returns whether the typed data declares the Decentraland meta-transaction struct. The match is

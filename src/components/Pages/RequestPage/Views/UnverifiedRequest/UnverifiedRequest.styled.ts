@@ -113,12 +113,6 @@ const Hint = styled(Typography)(({ theme }) => ({
   fontSize: theme.typography.pxToRem(13)
 }))
 
-const ReviewRestartedNotice = styled(Alert)(({ theme }) => ({
-  marginTop: theme.spacing(2),
-  textAlign: 'left',
-  width: '100%'
-}))
-
 export {
   Content,
   ExplorerLink,
@@ -130,7 +124,6 @@ export {
   Panel,
   RawBlock,
   RawLabel,
-  ReviewRestartedNotice,
   SelfNote,
   TabBar,
   WarningsAlert,

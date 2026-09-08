@@ -1,5 +1,5 @@
-import { Address, Hex, isHex, stringToHex } from 'viem'
-import { ADDRESS_REGEX, MalformedSignatureRequestError, UnsupportedMethodError } from '../../../shared/auth'
+import { Address, Hex, stringToHex } from 'viem'
+import { ADDRESS_REGEX, MalformedSignatureRequestError, UnsupportedMethodError, isHexBytes } from '../../../shared/auth'
 
 /**
  * A signature request in the exact shape the wallet's EIP-1193 schema gives each method. Modelled as
@@ -20,9 +20,10 @@ type SignatureWalletClient = {
  * Turns a recovered signature request into the request the wallet is handed. The recover guard has
  * already pinned the params to the canonical order for each method; this re-checks the shapes it
  * relies on and normalizes the two forms the guard accepts into the one the wallet schema defines:
- * a `personal_sign` message is sent as the bytes it signs (plain text becomes its UTF-8 hex, which is
- * the same signature and what the review shows under Advanced), and typed data handed over as an
- * object is sent as its JSON. Any other method is refused rather than forwarded.
+ * a `personal_sign` message is sent as the bytes it signs — `0x…` hex as those bytes, anything else
+ * (plain text, a `0X…` string, the bare `0x`) as the UTF-8 of its characters, decided by the same
+ * predicate the classifier displays it with, so the review and the wallet cannot disagree — and typed
+ * data handed over as an object is sent as its JSON. Any other method is refused rather than forwarded.
  */
 function toWalletSignatureRequest(method: string, params: unknown[] | undefined): WalletSignatureRequest {
   switch (method) {
@@ -31,7 +32,7 @@ function toWalletSignatureRequest(method: string, params: unknown[] | undefined)
       if (typeof message !== 'string' || typeof signer !== 'string' || !ADDRESS_REGEX.test(signer)) {
         throw new MalformedSignatureRequestError(method)
       }
-      return { method, params: [isHex(message) ? message : stringToHex(message), signer as Address] }
+      return { method, params: [isHexBytes(message) ? (message.toLowerCase() as Hex) : stringToHex(message), signer as Address] }
     }
     case 'eth_signTypedData_v3':
     case 'eth_signTypedData_v4': {

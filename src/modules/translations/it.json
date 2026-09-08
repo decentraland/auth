@@ -62,11 +62,6 @@
     "error_contact_support": "Oppure contatta il supporto con il seguente messaggio di errore:"
   },
   "request": {
-    "verification_match": "Il numero di verifica qui sotto corrisponde a quello nel {explorerText}?",
-    "no_it_doesnt": "No, non corrisponde",
-    "yes_same": "Sì, sono uguali",
-    "timeout_logged_out": "Potresti essere disconnesso dalla tua estensione del portafoglio.",
-    "timeout_check_login": "Verifica di essere connesso e riprova.",
     "wallet_interaction": {
       "review_title": "Rivedi questa transazione",
       "preview_unavailable_warning": "Non è stato possibile verificare cosa fa questa transazione perché il servizio di anteprima è temporaneamente non disponibile. Approva solo se ti fidi della scena che l'ha richiesta.",
@@ -171,7 +166,10 @@
       "acknowledge_transaction": "Capisco che Decentraland non può verificare questa transazione e la invio comunque",
       "acknowledge_native_transfer": "Capisco che sto inviando {amount} {symbol} e che non può essere annullato",
       "acknowledge_meta_transaction": "Capisco che questa firma permette al contratto di agire per me in qualsiasi momento e che i suoi effetti non possono essere verificati",
-      "acknowledge_signature": "Capisco che Decentraland non può verificare cosa autorizza questa firma"
+      "acknowledge_signature": "Capisco che Decentraland non può verificare cosa autorizza questa firma",
+      "tabs_label": "Dettagli della richiesta",
+      "unknown_network": "Catena {chainId} (rete sconosciuta)",
+      "native_currency": "valuta nativa"
     }
   },
   "request_views": {

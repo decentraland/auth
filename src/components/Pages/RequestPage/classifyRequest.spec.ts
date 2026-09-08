@@ -72,7 +72,13 @@ describe('when classifying a request', () => {
 
   beforeEach(() => {
     resolveContract = jest.fn()
-    context = { signerAddress: USER, connectedChainId: POLYGON, metaTransactionChainId: POLYGON, resolveContract }
+    context = {
+      signerAddress: USER,
+      connectedChainId: POLYGON,
+      metaTransactionChainId: POLYGON,
+      resolveContract,
+      isAddressWithoutCode: jest.fn()
+    }
   })
 
   afterEach(() => {
@@ -257,6 +263,20 @@ describe('when classifying a request', () => {
       })
     })
 
+    describe('and the connected-chain lookup could not answer', () => {
+      let request: RecoverResponse
+
+      beforeEach(() => {
+        resolveContract.mockResolvedValueOnce(notFound).mockResolvedValueOnce(unavailable)
+        context.connectedChainId = ETHEREUM
+        request = transactionRequest({ to: UNKNOWN_CONTRACT, data: approveCalldata, value: '0x0' })
+      })
+
+      it('should throw a contract lookup unavailable error rather than treat the target as unknown', async () => {
+        await expect(classifyRequest(request, context)).rejects.toBeInstanceOf(ContractLookupUnavailableError)
+      })
+    })
+
     describe('and the collection lookup could not answer', () => {
       let request: RecoverResponse
 
@@ -273,6 +293,7 @@ describe('when classifying a request', () => {
     describe('and the transaction carries no calldata', () => {
       describe('and the recipient is another account', () => {
         beforeEach(async () => {
+          jest.mocked(context.isAddressWithoutCode).mockResolvedValueOnce(true)
           classification = await classifyRequest(transactionRequest({ to: RECIPIENT, value: '0xde0b6b3a7640000' }), context)
         })
 
@@ -289,15 +310,65 @@ describe('when classifying a request', () => {
         it('should not resolve any contract', () => {
           expect(resolveContract).not.toHaveBeenCalled()
         })
+
+        it('should check the recipient code on the connected chain', () => {
+          expect(context.isAddressWithoutCode).toHaveBeenCalledWith(RECIPIENT, POLYGON)
+        })
       })
 
       describe('and the recipient is the signer in another casing', () => {
         beforeEach(async () => {
+          jest.mocked(context.isAddressWithoutCode).mockResolvedValueOnce(true)
           classification = await classifyRequest(transactionRequest({ to: getAddress(USER), value: '1000' }), context)
         })
 
         it('should flag the transfer as a self-send with the value normalized to hex', () => {
           expect(classification).toEqual(expect.objectContaining({ kind: 'native_transfer', toSelf: true, value: '0x3e8' }))
+        })
+      })
+
+      describe.each(['0x0', '0xde0b6b3a7640000'])('and the recipient has code with value %s', value => {
+        beforeEach(async () => {
+          context.connectedChainId = ETHEREUM
+          jest.mocked(context.isAddressWithoutCode).mockResolvedValueOnce(false)
+          classification = await classifyRequest(transactionRequest({ to: RECIPIENT, data: '0x', value }), context)
+        })
+
+        it('should retain the unknown-contract review on the execution chain', () => {
+          expect(classification).toEqual({
+            kind: 'unknown_transaction',
+            to: RECIPIENT,
+            data: '0x',
+            value,
+            chainId: ETHEREUM,
+            reason: 'unverified_recipient'
+          })
+        })
+
+        it('should inspect the connected chain even though the relay chain differs', () => {
+          expect(context.isAddressWithoutCode).toHaveBeenCalledWith(RECIPIENT, ETHEREUM)
+        })
+      })
+
+      describe('and the signer has delegated code', () => {
+        beforeEach(async () => {
+          jest.mocked(context.isAddressWithoutCode).mockResolvedValueOnce(false)
+          classification = await classifyRequest(transactionRequest({ to: USER, data: '0x', value: '0x0' }), context)
+        })
+
+        it('should retain the unknown-contract warnings even for a self-send', () => {
+          expect(classification).toEqual(expect.objectContaining({ kind: 'unknown_transaction', reason: 'unverified_recipient' }))
+        })
+      })
+
+      describe('and the recipient code lookup fails', () => {
+        beforeEach(async () => {
+          jest.mocked(context.isAddressWithoutCode).mockRejectedValueOnce(new Error('RPC unavailable'))
+          classification = await classifyRequest(transactionRequest({ to: RECIPIENT, value: '0x0' }), context)
+        })
+
+        it('should offer the unknown-contract review instead of a simple transfer', () => {
+          expect(classification).toEqual(expect.objectContaining({ kind: 'unknown_transaction', reason: 'unverified_recipient' }))
         })
       })
     })
@@ -581,7 +652,7 @@ describe('when classifying a request', () => {
   describe('and it is a personal_sign', () => {
     describe('and the message is hex-encoded text', () => {
       beforeEach(async () => {
-        classification = await classifyRequest(personalSignRequest(`0X${stringToHex('Hello, world').slice(2).toUpperCase()}`), context)
+        classification = await classifyRequest(personalSignRequest(`0x${stringToHex('Hello, world').slice(2).toUpperCase()}`), context)
       })
 
       it('should decode the text and keep the bytes lowercased', () => {
@@ -603,6 +674,29 @@ describe('when classifying a request', () => {
       })
     })
 
+    describe('and the message is hex with an uppercase 0X prefix', () => {
+      let message: string
+
+      beforeEach(async () => {
+        message = `0X${stringToHex('Hello, world').slice(2)}`
+        classification = await classifyRequest(personalSignRequest(message), context)
+      })
+
+      it('should treat it as text, since a wallet signs a 0X-prefixed string as its characters', () => {
+        expect(classification).toEqual({ kind: 'personal_sign', text: message, hex: stringToHex(message) })
+      })
+    })
+
+    describe('and the message is the bare 0x prefix', () => {
+      beforeEach(async () => {
+        classification = await classifyRequest(personalSignRequest('0x'), context)
+      })
+
+      it('should treat it as the text "0x" rather than as empty bytes', () => {
+        expect(classification).toEqual({ kind: 'personal_sign', text: '0x', hex: stringToHex('0x') })
+      })
+    })
+
     describe('and the message is a 32-byte digest', () => {
       let digest: string
 
@@ -618,7 +712,7 @@ describe('when classifying a request', () => {
 
     describe('and the text contains a bidi override character', () => {
       beforeEach(async () => {
-        classification = await classifyRequest(personalSignRequest('Send 1 MANA to ‮0xabc'), context)
+        classification = await classifyRequest(personalSignRequest('Send 1 MANA to \u202e0xabc'), context)
       })
 
       it('should treat the message as unreadable', () => {
@@ -644,7 +738,13 @@ describe('when fingerprinting a classification', () => {
   let context: ClassificationContext
 
   beforeEach(() => {
-    context = { signerAddress: USER, connectedChainId: POLYGON, metaTransactionChainId: POLYGON, resolveContract: jest.fn() }
+    context = {
+      signerAddress: USER,
+      connectedChainId: POLYGON,
+      metaTransactionChainId: POLYGON,
+      resolveContract: jest.fn(),
+      isAddressWithoutCode: jest.fn()
+    }
   })
 
   describe('and two transactions differ only in the casing of their target', () => {

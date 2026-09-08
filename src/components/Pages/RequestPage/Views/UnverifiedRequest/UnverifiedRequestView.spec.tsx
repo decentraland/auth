@@ -96,7 +96,33 @@ describe('when rendering the UnverifiedRequestView', () => {
       expect(onApprove).toHaveBeenCalledTimes(1)
     })
 
+    describe('and the wallet is on a chain Decentraland does not know', () => {
+      beforeEach(() => {
+        props = { ...props, chainId: 56, nativeValue: '0xb1a2bc2ec50000' }
+      })
+
+      it('should name the chain by its id and the amounts in native-currency wording', () => {
+        render(<UnverifiedRequestView {...props} />)
+        expect(screen.getByText('request.unverified.unknown_network {"chainId":56}')).toBeInTheDocument()
+        expect(screen.getByTestId('unverified-amount')).toHaveTextContent('0.05 request.unverified.native_currency')
+        expect(screen.getByTestId('unverified-fee')).toHaveTextContent('0.0042 request.unverified.native_currency')
+      })
+
+      it('should not link the contract to an explorer it has no address for', () => {
+        render(<UnverifiedRequestView {...props} />)
+        expect(screen.queryByRole('link')).not.toBeInTheDocument()
+      })
+    })
+
     describe('and the Advanced tab is opened', () => {
+      it('should label the tab list and wire each panel to its tab', async () => {
+        render(<UnverifiedRequestView {...props} />)
+        expect(screen.getByRole('tablist', { name: 'request.unverified.tabs_label' })).toBeInTheDocument()
+        expect(screen.getByRole('tabpanel')).toHaveAttribute('aria-labelledby', 'unverified-tab-summary')
+        await userEvent.click(screen.getByRole('tab', { name: 'request.unverified.tab_advanced' }))
+        expect(screen.getByRole('tabpanel')).toHaveAttribute('aria-labelledby', 'unverified-tab-advanced')
+      })
+
       it('should show the exact to, value and data the wallet will send', async () => {
         render(<UnverifiedRequestView {...props} />)
         await userEvent.click(screen.getByRole('tab', { name: 'request.unverified.tab_advanced' }))
@@ -243,7 +269,7 @@ describe('when rendering the UnverifiedRequestView', () => {
         method: 'eth_signTypedData_v4',
         targetAddress: CONTRACT,
         chainId: 137,
-        payload: { kind: 'typed_data', raw: '{"primaryType":"MetaTransaction"}', calldata: '0xa9059cbb', digest: '0xd1ge57' },
+        payload: { kind: 'typed_data', raw: '{"primaryType":"MetaTransaction"}' },
         payloadFingerprint: '{"primaryType":"MetaTransaction"}',
         onDeny,
         onApprove
@@ -271,12 +297,12 @@ describe('when rendering the UnverifiedRequestView', () => {
     })
 
     describe('and the Advanced tab is opened', () => {
-      it('should show the typed data verbatim, the inner call and the digest', async () => {
+      it('should show only the typed data verbatim without inferring a call or digest', async () => {
         render(<UnverifiedRequestView {...props} />)
         await userEvent.click(screen.getByRole('tab', { name: 'request.unverified.tab_advanced' }))
         expect(screen.getByTestId('unverified-raw-typed-data')).toHaveTextContent('{"primaryType":"MetaTransaction"}')
-        expect(screen.getByTestId('unverified-raw-calldata')).toHaveTextContent('0xa9059cbb')
-        expect(screen.getByTestId('unverified-raw-digest')).toHaveTextContent('0xd1ge57')
+        expect(screen.queryByTestId('unverified-raw-calldata')).not.toBeInTheDocument()
+        expect(screen.queryByTestId('unverified-raw-digest')).not.toBeInTheDocument()
       })
     })
   })
@@ -287,7 +313,7 @@ describe('when rendering the UnverifiedRequestView', () => {
         requestId: 'r1',
         kind: 'unknown_typed_data',
         method: 'eth_signTypedData_v4',
-        payload: { kind: 'typed_data', raw: '{"primaryType":"Permit"}', calldata: null, digest: null },
+        payload: { kind: 'typed_data', raw: '{"primaryType":"Permit"}' },
         payloadFingerprint: '{"primaryType":"Permit"}',
         onDeny,
         onApprove

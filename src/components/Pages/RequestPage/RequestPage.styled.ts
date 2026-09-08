@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/naming-convention -- CSS selectors, keyframes, and pseudo-elements use non-camelCase */
-import { Box, Button, styled } from 'decentraland-ui2'
+import { Alert, Box, Button, styled } from 'decentraland-ui2'
 
 const VerificationCode = styled(Box)(({ theme }) => ({
   fontSize: '100px',
@@ -58,4 +58,11 @@ const TimeoutMessage = styled(Box)(({ theme }) => ({
   gap: theme.spacing(1)
 }))
 
-export { VerificationCode, ButtonsContainer, NoButton, YesButton, TimeoutMessage }
+// Shown on every review when it replaced one invalidated by a network change (see restartTransactionReview).
+const ReviewRestartedNotice = styled(Alert)(({ theme }) => ({
+  marginTop: theme.spacing(2),
+  textAlign: 'left',
+  width: '100%'
+}))
+
+export { VerificationCode, ButtonsContainer, NoButton, YesButton, TimeoutMessage, ReviewRestartedNotice }

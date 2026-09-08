@@ -1,3 +1,4 @@
+import { stringToHex } from 'viem'
 import { MalformedSignatureRequestError, UnsupportedMethodError } from '../../../shared/auth'
 import { WalletSignatureRequest, forwardSignatureRequest, toWalletSignatureRequest } from './walletSignatureRequest'
 
@@ -24,6 +25,26 @@ describe('when building the wallet request for a signature', () => {
 
       it('should send the bytes as they are', () => {
         expect(request).toEqual({ method: 'personal_sign', params: ['0x68656c6c6f', SIGNER] })
+      })
+    })
+
+    describe('and the message is hex with an uppercase 0X prefix', () => {
+      beforeEach(() => {
+        request = toWalletSignatureRequest('personal_sign', ['0X68656c6c6f', SIGNER])
+      })
+
+      it('should send the UTF-8 bytes of the literal string, as the review displayed it', () => {
+        expect(request).toEqual({ method: 'personal_sign', params: [stringToHex('0X68656c6c6f'), SIGNER] })
+      })
+    })
+
+    describe('and the message is the bare 0x prefix', () => {
+      beforeEach(() => {
+        request = toWalletSignatureRequest('personal_sign', ['0x', SIGNER])
+      })
+
+      it('should send the UTF-8 bytes of "0x" rather than empty bytes', () => {
+        expect(request).toEqual({ method: 'personal_sign', params: ['0x3078', SIGNER] })
       })
     })
 

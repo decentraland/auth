@@ -4,6 +4,7 @@ import { useLayoutEffect } from 'react'
 import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import * as viem from 'viem'
 import { ProviderType } from '@dcl/schemas'
 import { sendMetaTransaction } from 'decentraland-transactions'
 import { TrackingEvents } from '../../../modules/analytics/types'
@@ -26,6 +27,7 @@ import { trackEvent } from '../../../shared/utils/analytics'
 import { FeatureFlagsContext } from '../../FeatureFlagsProvider'
 import { RequestClassification } from './classifyRequest'
 import { RequestPage } from './RequestPage'
+import { TypedDataPayload } from './types'
 import { decodeManaTransferData, decodeNftTransferData, fetchNftMetadata, getSigninDeeplink } from './utils'
 
 // --- Navigation ---
@@ -277,6 +279,7 @@ jest.mock('./utils', () => ({
   getSigninDeeplink: jest.fn().mockReturnValue('decentraland://open?signin=anIdentityId'),
   getMetaTransactionChainId: jest.fn().mockReturnValue(137),
   getNetworkProvider: jest.fn().mockResolvedValue({ isNetworkProvider: true }),
+  isAddressWithoutCode: jest.fn(),
   isDecentralandCollection: jest.fn().mockResolvedValue(false),
   isExactNftTransferSimulation: (...args: any[]) => mockIsExactNftTransferSimulation(...args),
   buildSendTransactionSimulationPayload: (...args: any[]) => mockBuildSendTransactionSimulationPayload(...args)
@@ -1362,13 +1365,13 @@ describe('RequestPage', () => {
         })
       })
 
-      it('should show the unverified view for an unknown meta-transaction naming the contract and the inner call', async () => {
+      it('should show the unverified view naming the contract with only the original typed data', async () => {
         renderRequestPage()
-        const view = await screen.findByTestId('unverified-request')
-        expect(view).toHaveAttribute('data-kind', 'unknown_meta_transaction')
-        expect(view).toHaveAttribute('data-target', '0xunknown')
-        expect(JSON.parse(view.getAttribute('data-payload') ?? '{}')).toEqual(
-          expect.objectContaining({ kind: 'typed_data', calldata: '0xdeadbeef' })
+        expect(await screen.findByTestId('unverified-request')).toHaveAttribute('data-kind', 'unknown_meta_transaction')
+        expect(screen.getByTestId('unverified-request')).toHaveAttribute('data-target', '0xunknown')
+        expect(screen.getByTestId('unverified-request')).toHaveAttribute(
+          'data-payload',
+          JSON.stringify({ kind: 'typed_data', raw: '{"primaryType":"MetaTransaction"}' })
         )
       })
 
@@ -1376,6 +1379,85 @@ describe('RequestPage', () => {
         renderRequestPage()
         await screen.findByTestId('unverified-request')
         expect(mockSimulateTransaction).not.toHaveBeenCalled()
+      })
+
+      describe('and it carries an unsigned decoy call', () => {
+        let raw: string
+        let typedData: TypedDataPayload
+
+        beforeEach(() => {
+          typedData = {
+            types: { MetaTransaction: [{ name: 'functionData', type: 'bytes' }] },
+            domain: {},
+            primaryType: 'MetaTransaction',
+            message: { functionData: '0xceefad9f', functionSignature: '0x18160ddd' }
+          }
+          raw = JSON.stringify(typedData)
+          mockRecover.mockResolvedValueOnce(recovered('eth_signTypedData_v4', [SIGNER, raw]))
+          mockClassifyRequest.mockResolvedValueOnce({
+            kind: 'unknown_meta_transaction',
+            typedData,
+            raw,
+            verifyingContract: CONTRACT,
+            chainId: 137,
+            reason: 'malformed'
+          })
+        })
+
+        it('should pass only the original JSON to the view without endorsing the decoy', async () => {
+          renderRequestPage()
+          expect(await screen.findByTestId('unverified-request')).toHaveAttribute(
+            'data-payload',
+            JSON.stringify({ kind: 'typed_data', raw })
+          )
+        })
+
+        it('should forward the original payload on approval', async () => {
+          renderRequestPage()
+          await userEvent.click(await screen.findByTestId('unverified-approve'))
+          await waitFor(() => expect(mockWalletRequest).toHaveBeenCalledWith({ method: 'eth_signTypedData_v4', params: [SIGNER, raw] }))
+        })
+      })
+    })
+
+    describe('and nested duplicate fields make hashing exponentially expensive', () => {
+      let raw: string
+      let typedData: TypedDataPayload
+      let hash: jest.SpyInstance
+
+      beforeEach(() => {
+        typedData = { types: { Leaf: [{ name: 'value', type: 'uint256' }] }, domain: {}, primaryType: 'T0', message: { value: 1 } }
+        for (let index = 24; index >= 0; index--) {
+          typedData.types![`T${index}`] = [
+            { name: 'x', type: index === 24 ? 'Leaf' : `T${index + 1}` },
+            { name: 'x', type: index === 24 ? 'Leaf' : `T${index + 1}` }
+          ]
+          typedData.message = { x: typedData.message }
+        }
+        raw = JSON.stringify(typedData)
+        // Fail safely if hashing is reintroduced: the real payload would stall the test runner.
+        hash = jest.spyOn(viem, 'hashTypedData').mockImplementation(() => {
+          throw new Error('Unvalidated data must not be hashed')
+        })
+        mockRecover.mockResolvedValueOnce(recovered('eth_signTypedData_v4', [SIGNER, raw]))
+        mockClassifyRequest.mockImplementationOnce(jest.requireActual('./classifyRequest').classifyRequest)
+      })
+
+      afterEach(() => {
+        hash.mockRestore()
+      })
+
+      it('should show the original JSON without hashing it during classification or rendering', async () => {
+        renderRequestPage()
+        expect(await screen.findByTestId('unverified-request')).toHaveAttribute('data-payload', JSON.stringify({ kind: 'typed_data', raw }))
+        expect(hash).not.toHaveBeenCalled()
+      })
+
+      it('should keep the request deniable without hashing on a rerender', async () => {
+        renderRequestPage()
+        await userEvent.click(await screen.findByTestId('unverified-deny'))
+        expect(await screen.findByTestId('denied-wallet-interaction')).toBeInTheDocument()
+        expect(hash).not.toHaveBeenCalled()
       })
     })
   })
@@ -2461,6 +2543,19 @@ describe('RequestPage', () => {
         const fresh = await screen.findByTestId('wallet-interaction')
         expect(mockRecover.mock.calls.some(call => call[0] === otherRequestId)).toBe(true)
         expect(fresh).toHaveAttribute('data-sim', 'loading')
+      })
+
+      it('should recover the new request exactly once, after its own profile check', async () => {
+        renderMountedPage()
+        const view = await screen.findByTestId('wallet-interaction')
+        await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+        await userEvent.click(screen.getByTestId('go-to-other'))
+        // The profile check re-runs for the new id; a duplicate load would fire around its completion.
+        await waitFor(() => expect(mockEnsureProfile).toHaveBeenCalledTimes(2))
+        await screen.findByTestId('wallet-interaction')
+        await waitFor(() => expect(mockRecover.mock.calls.filter(call => call[0] === otherRequestId)).toHaveLength(1))
+        expect(mockRecover.mock.calls.filter(call => call[0] === REQUEST_ID)).toHaveLength(1)
+        expect(mockRecover).toHaveBeenCalledTimes(2)
       })
 
       it('should load the new request even though the previous one was completed', async () => {
