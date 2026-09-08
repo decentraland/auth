@@ -57,7 +57,11 @@ function matchesSchema(fields: unknown, schema: readonly TypedDataField[]): bool
   })
 }
 
-/** Parses a positive chain id from a domain field (hex or decimal string, number or bigint). */
+/**
+ * Parses a positive chain id from a domain field (hex or decimal string, number or bigint). Shared with the
+ * classifier, which reads the chain a MetaTransaction names before the payload is validated, so both read it
+ * the same way.
+ */
 function parseChainId(value: unknown): number | undefined {
   if (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'bigint') {
     return undefined
@@ -201,5 +205,5 @@ function resolveMetaTransactionTypedData(typedData: unknown, method: string): Me
   return { calldataField: schema.calldataField, calldata, from, verifyingContract, chainId }
 }
 
-export { isMetaTransactionTypedData, resolveMetaTransactionTypedData }
+export { isMetaTransactionTypedData, parseChainId, resolveMetaTransactionTypedData }
 export type { MetaTransactionCalldataField, MetaTransactionTypedData }

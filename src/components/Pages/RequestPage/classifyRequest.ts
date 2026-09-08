@@ -14,6 +14,7 @@ import {
   getMetaTransactionSalt,
   isHexBytes,
   isMetaTransactionTypedData,
+  parseChainId,
   resolveMetaTransactionTypedData
 } from '../../../shared/auth'
 import { HIDDEN_CHARACTER_PATTERN } from '../../../shared/text'
@@ -321,14 +322,27 @@ async function classifyTypedData(method: string, params: unknown[], context: Cla
   // cannot check. For a contract it does, a deviating payload is broken or hostile, and since EIP-712 signs
   // only what the struct declares it may still verify on that contract, so it is refused rather than shown
   // under the unverified warnings, whose copy ("a contract Decentraland doesn't recognize") would be false
-  // for it. A lookup that cannot answer is not a verdict either way.
+  // for it. The contract is looked up on the chain the domain names as well as on the relay chain: the
+  // Ethereum Rentals contract verifies meta-transactions too, and a signature for it is one Decentraland
+  // recognizes even though the relay never submits there. A lookup that cannot answer is not a verdict.
+  const domain: unknown = typedData.domain
+  const claimedChainId = isRecord(domain) ? (parseChainId(domain.salt) ?? parseChainId(domain.chainId) ?? null) : null
   let knownContract: KnownContract | null = null
   if (claimedContract) {
-    const resolution = await context.resolveContract(claimedContract, context.metaTransactionChainId)
-    if (resolution.status === 'unavailable') {
-      throw new ContractLookupUnavailableError(claimedContract)
+    const chainsToCheck =
+      claimedChainId !== null && claimedChainId !== context.metaTransactionChainId
+        ? [claimedChainId, context.metaTransactionChainId]
+        : [context.metaTransactionChainId]
+    for (const chainId of chainsToCheck) {
+      const resolution = await context.resolveContract(claimedContract, chainId)
+      if (resolution.status === 'unavailable') {
+        throw new ContractLookupUnavailableError(claimedContract)
+      }
+      if (resolution.status === 'found') {
+        knownContract = resolution.contract
+        break
+      }
     }
-    knownContract = resolution.status === 'found' ? resolution.contract : null
   }
 
   const unknown = (reason: UnknownMetaTransactionReason, chainId: number | null = null): RequestClassification => ({
@@ -356,7 +370,7 @@ async function classifyTypedData(method: string, params: unknown[], context: Cla
   }
   if (resolved.chainId !== context.metaTransactionChainId) {
     return knownContract
-      ? reject('the MetaTransaction domain names a chain the relay does not serve')
+      ? reject(`Decentraland does not relay meta-transactions on chain ${resolved.chainId}`)
       : unknown('other_chain', resolved.chainId)
   }
   if (resolved.from.toLowerCase() !== context.signerAddress.toLowerCase()) {

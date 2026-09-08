@@ -161,8 +161,6 @@
       "raw_message_text": "消息（文本）",
       "raw_message_hex": "消息（十六进制）",
       "raw_typed_data": "类型化数据（EIP-712）",
-      "raw_calldata": "合约将执行的调用",
-      "raw_digest": "EIP-712 摘要",
       "message_unreadable": "此消息不是可读文本。确切的字节在“高级”中。",
       "acknowledge_transaction": "我理解 Decentraland 无法检查此交易，我仍然选择发送",
       "acknowledge_native_transfer": "我理解我正在发送 {amount} {symbol}，且此操作无法撤销",

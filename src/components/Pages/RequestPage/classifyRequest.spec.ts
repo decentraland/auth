@@ -559,19 +559,25 @@ describe('when classifying a request', () => {
         request = typedDataRequest(buildMetaTransaction(polygonMana, transferCalldata, AMOY))
       })
 
-      describe('and the contract is a Decentraland one', () => {
+      describe('and the contract is a Decentraland one on the relay chain', () => {
         beforeEach(() => {
-          resolveContract.mockResolvedValueOnce(found(polygonMana))
+          resolveContract.mockResolvedValueOnce(notFound).mockResolvedValueOnce(found(polygonMana))
         })
 
         it('should refuse it', async () => {
-          await expect(classifyRequest(request, context)).rejects.toThrow('names a chain the relay does not serve')
+          await expect(classifyRequest(request, context)).rejects.toThrow('does not relay meta-transactions on chain 80002')
+        })
+
+        it('should look the contract up on the named chain and then on the relay chain', async () => {
+          await classifyRequest(request, context).catch(() => undefined)
+          expect(resolveContract).toHaveBeenNthCalledWith(1, polygonMana.address, AMOY)
+          expect(resolveContract).toHaveBeenNthCalledWith(2, polygonMana.address, POLYGON)
         })
       })
 
-      describe('and the contract is not a Decentraland one', () => {
+      describe('and the contract is not a Decentraland one on either chain', () => {
         beforeEach(async () => {
-          resolveContract.mockResolvedValueOnce(notFound)
+          resolveContract.mockResolvedValue(notFound)
           classification = await classifyRequest(request, context)
         })
 
@@ -580,6 +586,25 @@ describe('when classifying a request', () => {
             expect.objectContaining({ kind: 'unknown_meta_transaction', reason: 'other_chain', chainId: AMOY })
           )
         })
+      })
+    })
+
+    describe('and it is the MetaTransaction the SDK builds for a Decentraland contract on a chain the relay does not serve', () => {
+      let request: RecoverResponse
+
+      beforeEach(() => {
+        const ethereumRentals = getKnownDecentralandContract(getContract(ContractName.Rentals, ETHEREUM).address, ETHEREUM)!
+        resolveContract.mockResolvedValueOnce(found(ethereumRentals))
+        request = typedDataRequest(buildMetaTransaction(ethereumRentals, transferCalldata, ETHEREUM))
+      })
+
+      it('should refuse it rather than show it as a signature for a contract Decentraland does not recognize', async () => {
+        await expect(classifyRequest(request, context)).rejects.toThrow('does not relay meta-transactions on chain 1')
+      })
+
+      it('should recognize the contract on the chain the domain names', async () => {
+        await classifyRequest(request, context).catch(() => undefined)
+        expect(resolveContract).toHaveBeenNthCalledWith(1, getContract(ContractName.Rentals, ETHEREUM).address.toLowerCase(), ETHEREUM)
       })
     })
 

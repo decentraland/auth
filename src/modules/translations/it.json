@@ -161,8 +161,6 @@
       "raw_message_text": "Messaggio (testo)",
       "raw_message_hex": "Messaggio (hex)",
       "raw_typed_data": "Dati tipizzati (EIP-712)",
-      "raw_calldata": "Chiamata che il contratto eseguirà",
-      "raw_digest": "Digest EIP-712",
       "message_unreadable": "Questo messaggio non è testo leggibile. I byte esatti sono in Avanzato.",
       "acknowledge_transaction": "Capisco che Decentraland non può verificare questa transazione e la invio comunque",
       "acknowledge_native_transfer": "Capisco che sto inviando {amount} {symbol} e che non può essere annullato",
