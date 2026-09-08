@@ -85,10 +85,12 @@ function parseChainId(value: unknown): number | undefined {
  * `EIP712Domain` struct does not declare names a chain the signature is not bound to. The struct
  * therefore decides which field is the calldata, the message may hold nothing but the declared
  * fields, the domain may carry only the standard fields and its struct must be declared, exactly
- * those fields with their standard types, and the request is finally
- * hashed the way the wallet will and compared with a payload rebuilt from the resolved fields
- * alone — equality proves the bytes handed to the simulation are the bytes the signature covers.
- * (Thirdweb signs through ox, which shares viem's EIP-712 encoding.)
+ * those fields with their standard types, and the request is finally hashed the way the wallet
+ * will and compared with a payload rebuilt from the resolved fields alone. Equality proves the
+ * structure: no unsigned field rides along and the declared calldata is the one hashed. It does not
+ * judge how a value is spelled (viem hashes a non-hex salt or a `0X` prefix rather than throwing),
+ * so the value checks above and the exact domain comparison the classifier adds are what pin the
+ * accepted set to what the SDK builds. (Thirdweb signs through ox, which shares viem's EIP-712 encoding.)
  *
  * This is deliberately strict: every legitimate payload is built by decentraland-transactions with
  * exactly these shapes, so anything that deviates is either broken or hostile, and neither should
@@ -178,8 +180,9 @@ function resolveMetaTransactionTypedData(typedData: unknown, method: string): Me
     return reject('the MetaTransaction domain type does not match the domain fields')
   }
 
-  // 3. Prove the binding: hash the request as received and a payload rebuilt from nothing but the
-  //    resolved fields. The wallet signs the former; the simulation runs the latter.
+  // 3. Prove the structure: hash the request as received and a payload rebuilt from nothing but the
+  //    resolved fields. The wallet signs the former; the simulation runs the latter. Equal hashes mean
+  //    no unsigned field rides along; the spelling of each value is judged by the checks above.
   const canonical = {
     domain,
     primaryType: META_TRANSACTION_PRIMARY_TYPE,

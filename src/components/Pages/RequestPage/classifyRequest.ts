@@ -17,6 +17,7 @@ import {
   parseChainId,
   resolveMetaTransactionTypedData
 } from '../../../shared/auth'
+import { SUPPORTED_CHAIN_IDS } from '../../../shared/chains'
 import { HIDDEN_CHARACTER_PATTERN } from '../../../shared/text'
 import { isRecord } from '../../../shared/utils/isRecord'
 import { buildTransactionParams } from './transactionParams'
@@ -49,10 +50,12 @@ type BrandedTransaction = 'tip' | 'gift_candidate' | null
 type UnknownTransactionReason = 'unknown_contract' | 'unverified_recipient'
 
 /**
- * Why a MetaTransaction was not previewed. Analytics only. A MetaTransaction for a Decentraland contract that
- * deviates from the shape the SDK builds is not among these: it is refused (see classifyTypedData).
+ * Why a well-formed MetaTransaction was not previewed. Analytics only. A MetaTransaction for a Decentraland
+ * contract that deviates from the shape the SDK builds is not among these: it is refused (see
+ * classifyTypedData); one for an unknown contract that is not even shaped like a MetaTransaction is plain
+ * unknown typed data.
  */
-type UnknownMetaTransactionReason = 'malformed' | 'other_chain' | 'from_mismatch' | 'unknown_contract'
+type UnknownMetaTransactionReason = 'other_chain' | 'from_mismatch' | 'unknown_contract'
 
 // What a MetaTransaction payload built by decentraland-transactions carries, and nothing else: the four EIP-712
 // members, and the domain and MetaTransaction structs. EIP-712 signs neither an extra top-level key nor a struct
@@ -324,15 +327,19 @@ async function classifyTypedData(method: string, params: unknown[], context: Cla
   // under the unverified warnings, whose copy ("a contract Decentraland doesn't recognize") would be false
   // for it. The contract is looked up on the chain the domain names as well as on the relay chain: the
   // Ethereum Rentals contract verifies meta-transactions too, and a signature for it is one Decentraland
-  // recognizes even though the relay never submits there. A lookup that cannot answer is not a verdict.
+  // recognizes even though the relay never submits there. A domain that names no chain is checked against
+  // every chain the page knows, so such an address is recognized wherever it is deployed. A lookup that
+  // cannot answer is not a verdict.
   const domain: unknown = typedData.domain
   const claimedChainId = isRecord(domain) ? (parseChainId(domain.salt) ?? parseChainId(domain.chainId) ?? null) : null
   let knownContract: KnownContract | null = null
   if (claimedContract) {
     const chainsToCheck =
-      claimedChainId !== null && claimedChainId !== context.metaTransactionChainId
-        ? [claimedChainId, context.metaTransactionChainId]
-        : [context.metaTransactionChainId]
+      claimedChainId === null
+        ? [...SUPPORTED_CHAIN_IDS.filter(chainId => chainId !== context.metaTransactionChainId), context.metaTransactionChainId]
+        : claimedChainId !== context.metaTransactionChainId
+          ? [claimedChainId, context.metaTransactionChainId]
+          : [context.metaTransactionChainId]
     for (const chainId of chainsToCheck) {
       const resolution = await context.resolveContract(claimedContract, chainId)
       if (resolution.status === 'unavailable') {
@@ -345,14 +352,6 @@ async function classifyTypedData(method: string, params: unknown[], context: Cla
     }
   }
 
-  const unknown = (reason: UnknownMetaTransactionReason, chainId: number | null = null): RequestClassification => ({
-    kind: 'unknown_meta_transaction',
-    typedData,
-    raw,
-    verifyingContract: claimedContract,
-    chainId,
-    reason
-  })
   const reject = (reason: string): never => {
     throw new MalformedSignatureRequestError(method, reason)
   }
@@ -366,18 +365,28 @@ async function classifyTypedData(method: string, params: unknown[], context: Cla
         ? error
         : new MalformedSignatureRequestError(method, 'the MetaTransaction is malformed')
     }
-    return unknown('malformed')
+    // Not shaped like the MetaTransaction any Decentraland contract signs, for a contract Decentraland does
+    // not know. Nothing about it is a meta-transaction Auth can describe, not even which contract it binds
+    // to, so it is shown as the typed data it is, raw, rather than under meta-transaction facts.
+    return { kind: 'unknown_typed_data', typedData, raw }
   }
+  // Well-formed, so the resolved contract and chain are what the signature covers, and can be shown as facts.
+  const unknown = (reason: UnknownMetaTransactionReason): RequestClassification => ({
+    kind: 'unknown_meta_transaction',
+    typedData,
+    raw,
+    verifyingContract: resolved.verifyingContract,
+    chainId: resolved.chainId,
+    reason
+  })
   if (resolved.chainId !== context.metaTransactionChainId) {
-    return knownContract
-      ? reject(`Decentraland does not relay meta-transactions on chain ${resolved.chainId}`)
-      : unknown('other_chain', resolved.chainId)
+    return knownContract ? reject(`Decentraland does not relay meta-transactions on chain ${resolved.chainId}`) : unknown('other_chain')
   }
   if (resolved.from.toLowerCase() !== context.signerAddress.toLowerCase()) {
-    return knownContract ? reject('the MetaTransaction is for another account') : unknown('from_mismatch', resolved.chainId)
+    return knownContract ? reject('the MetaTransaction is for another account') : unknown('from_mismatch')
   }
   if (!knownContract) {
-    return unknown('unknown_contract', resolved.chainId)
+    return unknown('unknown_contract')
   }
   if (!knownContract.supportsMetaTransactions) {
     return reject(`the Decentraland ${knownContract.name} contract does not execute meta-transactions`)

@@ -1431,7 +1431,7 @@ describe('RequestPage', () => {
             raw,
             verifyingContract: CONTRACT,
             chainId: 137,
-            reason: 'malformed'
+            reason: 'unknown_contract'
           })
         })
 

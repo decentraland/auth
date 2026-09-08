@@ -40,7 +40,16 @@ function buildTransactionParams(params: unknown[] | undefined): [Record<string, 
   if (typeof to !== 'string' || to.length === 0) {
     throw new Error(`Transaction parameters are missing a "to" address: ${JSON.stringify(source)}`)
   }
-  return [{ to, data: source.data ?? '0x', value: toHexQuantity(source.value ?? '0x0') }]
+  const data = source.data ?? '0x'
+  if (typeof data !== 'string') {
+    throw new Error(`Transaction "data" must be hex-encoded bytes, received ${describeType(data)}: ${JSON.stringify(data)}`)
+  }
+  // One spelling of the address and the calldata for everything downstream. Hex is case-insensitive, but the
+  // preview server, the relay and the explorers require a lowercase `0x` prefix, and the guard accepts `0X`:
+  // left as sent, a `0X…` address would be recognized here, fail the preview, and be refused by the relay
+  // after the wallet signed. Lowercased once, the fingerprint, the display, the wallet and the relay all
+  // see the same bytes the same way.
+  return [{ to: to.toLowerCase(), data: data.toLowerCase(), value: toHexQuantity(source.value ?? '0x0') }]
 }
 
 export { buildTransactionParams, getUnsupportedCalldataAlias, toHexQuantity }

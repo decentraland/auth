@@ -54,7 +54,14 @@ export const WalletInteraction = ({
   // Block approval while the request is submitting, while the simulation or the fee estimate is
   // still resolving (so a user can't approve before the summary, the cost and any high-risk warnings
   // render), and until any required acknowledgment is given.
-  const approveBlocked = isLoading || simulation.status === 'loading' || isGasPending || (requiresAcknowledgment && !acknowledged)
+  // Nothing to approve before the preview has settled: idle is the initial state and only ordering keeps
+  // it off this view, so it blocks like loading does.
+  const approveBlocked =
+    isLoading ||
+    simulation.status === 'idle' ||
+    simulation.status === 'loading' ||
+    isGasPending ||
+    (requiresAcknowledgment && !acknowledged)
 
   const summaryGas = gas.covered
     ? { covered: true, cost: '0', balance: '0' }

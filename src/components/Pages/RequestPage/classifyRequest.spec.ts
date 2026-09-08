@@ -497,10 +497,8 @@ describe('when classifying a request', () => {
           classification = await classifyRequest(request, context)
         })
 
-        it('should classify it as an unknown meta-transaction naming the claimed contract', () => {
-          expect(classification).toEqual(
-            expect.objectContaining({ kind: 'unknown_meta_transaction', reason: 'malformed', verifyingContract: polygonMana.address })
-          )
+        it('should classify it as unknown typed data, since nothing about it is a meta-transaction Auth can describe', () => {
+          expect(classification).toEqual(expect.objectContaining({ kind: 'unknown_typed_data' }))
         })
       })
     })
@@ -541,14 +539,83 @@ describe('when classifying a request', () => {
         )
       })
 
-      it('should classify it as an unknown meta-transaction without a target rather than show the text as the contract', () => {
-        expect(classification).toEqual(
-          expect.objectContaining({ kind: 'unknown_meta_transaction', reason: 'malformed', verifyingContract: null })
-        )
+      it('should classify it as unknown typed data rather than show the text as the contract', () => {
+        expect(classification).toEqual(expect.objectContaining({ kind: 'unknown_typed_data' }))
       })
 
       it('should not resolve any contract', () => {
         expect(resolveContract).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and the domain names no chain at all', () => {
+      let request: RecoverResponse
+      let ethereumRentals: KnownContract
+
+      beforeEach(() => {
+        ethereumRentals = getKnownDecentralandContract(getContract(ContractName.Rentals, ETHEREUM).address, ETHEREUM)!
+        const typedData = buildMetaTransaction(ethereumRentals, transferCalldata)
+        const { salt: _salt, ...domainWithoutChain } = typedData.domain
+        request = typedDataRequest({
+          ...typedData,
+          types: { ...typedData.types, EIP712Domain: DOMAIN_TYPE.filter(field => field.name !== 'salt') },
+          domain: domainWithoutChain
+        })
+      })
+
+      describe('and the address is a Decentraland contract on some chain', () => {
+        beforeEach(() => {
+          resolveContract.mockImplementation(async (_address: string, chainId: number) =>
+            chainId === ETHEREUM ? found(ethereumRentals) : notFound
+          )
+        })
+
+        it('should refuse it rather than show it as a signature for a contract Decentraland does not recognize', async () => {
+          await expect(classifyRequest(request, context)).rejects.toThrow('domain has no chain id')
+        })
+
+        it('should look the address up on the chain it is deployed on', async () => {
+          await classifyRequest(request, context).catch(() => undefined)
+          expect(resolveContract).toHaveBeenCalledWith(ethereumRentals.address, ETHEREUM)
+        })
+      })
+
+      describe('and the address is not a Decentraland contract on any chain', () => {
+        beforeEach(async () => {
+          resolveContract.mockResolvedValue(notFound)
+          classification = await classifyRequest(request, context)
+        })
+
+        it('should classify it as unknown typed data', () => {
+          expect(classification).toEqual(expect.objectContaining({ kind: 'unknown_typed_data' }))
+        })
+      })
+    })
+
+    describe('and the calldata carries an uppercase 0X prefix', () => {
+      let request: RecoverResponse
+
+      beforeEach(() => {
+        resolveContract.mockResolvedValueOnce(found(polygonMana))
+        request = typedDataRequest(buildMetaTransaction(polygonMana, `0X${transferCalldata.slice(2)}`))
+      })
+
+      it('should refuse it, since the spelling is judged by the calldata rule and not by the hash', async () => {
+        await expect(classifyRequest(request, context)).rejects.toThrow('calldata is not a contract call')
+      })
+    })
+
+    describe('and the salt is not hex', () => {
+      let request: RecoverResponse
+
+      beforeEach(() => {
+        resolveContract.mockResolvedValueOnce(found(polygonMana))
+        const typedData = buildMetaTransaction(polygonMana, transferCalldata)
+        request = typedDataRequest({ ...typedData, domain: { ...typedData.domain, salt: `0x${'zz'.repeat(32)}` } })
+      })
+
+      it('should refuse it, since a value viem would hash silently still names no chain', async () => {
+        await expect(classifyRequest(request, context)).rejects.toThrow(MalformedSignatureRequestError)
       })
     })
 

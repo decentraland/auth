@@ -36,21 +36,20 @@ function toWalletSignatureRequest(method: string, reviewed: RequestClassificatio
       }
       return { method, params: [reviewed.hex as Hex, signerAddress] }
     case 'eth_signTypedData_v3':
-    case 'eth_signTypedData_v4': {
-      if (
-        reviewed.kind !== 'dcl_meta_transaction' &&
-        reviewed.kind !== 'unknown_meta_transaction' &&
-        reviewed.kind !== 'unknown_typed_data'
-      ) {
-        throw new MalformedSignatureRequestError(method, 'the review is not of typed data')
-      }
-      return method === 'eth_signTypedData_v3'
-        ? { method, params: [signerAddress, reviewed.raw] }
-        : { method, params: [signerAddress, reviewed.raw] }
-    }
+      return { method, params: [signerAddress, getReviewedTypedData(method, reviewed)] }
+    case 'eth_signTypedData_v4':
+      return { method, params: [signerAddress, getReviewedTypedData(method, reviewed)] }
     default:
       throw new UnsupportedMethodError(method)
   }
+}
+
+/** The JSON a typed-data review displayed, or a refusal when the review is of something else. */
+function getReviewedTypedData(method: string, reviewed: RequestClassification): string {
+  if (reviewed.kind !== 'dcl_meta_transaction' && reviewed.kind !== 'unknown_meta_transaction' && reviewed.kind !== 'unknown_typed_data') {
+    throw new MalformedSignatureRequestError(method, 'the review is not of typed data')
+  }
+  return reviewed.raw
 }
 
 /** Forwards a signature request to the wallet, one typed call per method. */

@@ -136,7 +136,9 @@ export const SignatureRequestView = ({
         <Button
           variant="contained"
           color={isReverted ? 'error' : 'primary'}
-          disabled={isLoading || simulation.status === 'loading' || (requiresAcknowledgment && !acknowledged)}
+          disabled={
+            isLoading || simulation.status === 'idle' || simulation.status === 'loading' || (requiresAcknowledgment && !acknowledged)
+          }
           onClick={onApprove}
           data-testid="signature-approve-button"
         >

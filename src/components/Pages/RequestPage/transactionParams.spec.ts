@@ -9,6 +9,22 @@ describe('buildTransactionParams', () => {
     })
   })
 
+  describe('when the address and the calldata carry uppercase hex and a 0X prefix', () => {
+    it('should lowercase both so the preview, the wallet and the relay see one spelling', () => {
+      const params = [{ to: '0XABCDEFabcdefABCDEFabcdefABCDEFabcdefABCD', data: '0XA9059CBB00' }]
+
+      expect(buildTransactionParams(params)).toEqual([
+        { to: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd', data: '0xa9059cbb00', value: '0x0' }
+      ])
+    })
+  })
+
+  describe('when the calldata is not a string', () => {
+    it('should reject it instead of passing it through', () => {
+      expect(() => buildTransactionParams([{ to: '0xdef', data: 42 }])).toThrow(/"data" must be hex-encoded bytes/)
+    })
+  })
+
   describe('when the request carries extra fee, gas or nonce fields', () => {
     it('should keep only to, data and value', () => {
       const params = [{ to: '0xdef', data: '0x', value: '0x0', maxFeePerGas: '0xffffffffff', gas: '0x5208', nonce: '0x1' }]

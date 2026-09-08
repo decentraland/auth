@@ -60,9 +60,9 @@ describe('when building the wallet request for a reviewed signature', () => {
           kind: 'unknown_meta_transaction',
           typedData: { primaryType: 'MetaTransaction' },
           raw: RAW,
-          verifyingContract: null,
-          chainId: null,
-          reason: 'malformed'
+          verifyingContract: '0x1234567890abcdef1234567890abcdef12345678',
+          chainId: 137,
+          reason: 'unknown_contract'
         }
         request = toWalletSignatureRequest(method, reviewed, SIGNER)
       })
