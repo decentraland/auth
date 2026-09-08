@@ -4,6 +4,7 @@ import { MenuItem } from 'decentraland-ui2'
 import { TransferType } from '../types'
 import {
   CloseWindow,
+  ConfirmRequestDialog,
   ContinueInApp,
   DeniedWalletInteraction,
   DifferentAccountError,
@@ -14,7 +15,6 @@ import {
   SigningError,
   SimulationSummary,
   TimeoutError,
-  TransactionConfirmDialog,
   TransferCanceledView,
   TransferCompletedView,
   TransferConfirmView,
@@ -174,9 +174,25 @@ export const TestViewPage = () => {
           />
         )
       },
-      transactionDialogGasCovered: {
-        label: 'TransactionConfirmDialog (Gas covered)',
-        element: <TransactionConfirmDialog open onCancel={noop} onConfirm={noop} />
+      confirmRequestGasCovered: {
+        label: 'ConfirmRequestDialog (Transaction, gas covered)',
+        element: <ConfirmRequestDialog open kind="transaction" gas={{ covered: true }} onCancel={noop} onConfirm={noop} />
+      },
+      confirmRequestUserPaysGas: {
+        label: 'ConfirmRequestDialog (Transaction, user pays gas)',
+        element: (
+          <ConfirmRequestDialog
+            open
+            kind="transaction"
+            gas={{ covered: false, status: 'ready', cost: BigInt('4200000000000000'), chainId: 137 }}
+            onCancel={noop}
+            onConfirm={noop}
+          />
+        )
+      },
+      confirmRequestSignature: {
+        label: 'ConfirmRequestDialog (Signature)',
+        element: <ConfirmRequestDialog open kind="signature" onCancel={noop} onConfirm={noop} />
       },
       signatureMetaTx: {
         label: 'SignatureRequest (Decentraland meta-tx)',

@@ -1,5 +1,5 @@
 import { encodeFunctionData, getAddress } from 'viem'
-import { ContractName, getContract } from 'decentraland-transactions'
+import { ContractData, ContractName, getContract } from 'decentraland-transactions'
 import {
   ContractResolution,
   DecodedCall,
@@ -20,13 +20,14 @@ const COLLECTION_ADDRESS = '0xFEF5c99885c3036e591b6e6dB52482891834A5f4'
 
 describe('when building the static contract index', () => {
   let index: Map<number, Map<string, KnownContract>>
+  let mana: ContractData
 
   beforeEach(() => {
     index = getStaticContractIndex()
+    mana = getContract(ContractName.MANAToken, POLYGON)
   })
 
   it('should index the Polygon MANA token by its lowercased address', () => {
-    const mana = getContract(ContractName.MANAToken, POLYGON)
     expect(index.get(POLYGON)?.get(mana.address.toLowerCase())).toEqual(
       expect.objectContaining({ name: ContractName.MANAToken, chainId: POLYGON, domainName: mana.name, domainVersion: mana.version })
     )
@@ -43,7 +44,6 @@ describe('when building the static contract index', () => {
   })
 
   it('should hand out a copy of the registry ABI rather than the live one', () => {
-    const mana = getContract(ContractName.MANAToken, POLYGON)
     const known = index.get(POLYGON)?.get(mana.address.toLowerCase())
     expect(known?.abi).not.toBe(mana.abi)
     expect(known?.abi).toEqual(mana.abi)
@@ -51,61 +51,94 @@ describe('when building the static contract index', () => {
 })
 
 describe('when looking up a known contract', () => {
-  describe('and the address is deployed on the given chain', () => {
+  let result: KnownContract | null
+
+  describe('and the address is deployed on the given chain, in another casing', () => {
+    beforeEach(() => {
+      result = getKnownDecentralandContract(getAddress(getContract(ContractName.MANAToken, POLYGON).address), POLYGON)
+    })
+
     it('should return the contract with its meta-transaction support', () => {
-      const mana = getContract(ContractName.MANAToken, POLYGON)
-      expect(getKnownDecentralandContract(mana.address.toUpperCase().replace('0X', '0x'), POLYGON)).toEqual(
+      expect(result).toEqual(
         expect.objectContaining({ name: ContractName.MANAToken, supportsMetaTransactions: true, calldataField: 'functionSignature' })
       )
     })
   })
 
   describe('and the address is a Decentraland contract on another chain only', () => {
+    beforeEach(() => {
+      result = getKnownDecentralandContract(getContract(ContractName.MANAToken, ETHEREUM).address, POLYGON)
+    })
+
     it('should return null', () => {
-      const ethereumMana = getContract(ContractName.MANAToken, ETHEREUM)
-      expect(getKnownDecentralandContract(ethereumMana.address, POLYGON)).toBeNull()
+      expect(result).toBeNull()
     })
   })
 
   describe('and the chain is not one the simulator supports', () => {
+    beforeEach(() => {
+      result = getKnownDecentralandContract(getContract(ContractName.MANAToken, POLYGON).address, 56)
+    })
+
     it('should return null', () => {
-      const mana = getContract(ContractName.MANAToken, POLYGON)
-      expect(getKnownDecentralandContract(mana.address, 56)).toBeNull()
+      expect(result).toBeNull()
     })
   })
 
   describe('and the address is not a Decentraland contract', () => {
+    beforeEach(() => {
+      result = getKnownDecentralandContract(RECIPIENT, POLYGON)
+    })
+
     it('should return null', () => {
-      expect(getKnownDecentralandContract(RECIPIENT, POLYGON)).toBeNull()
+      expect(result).toBeNull()
     })
   })
 })
 
 describe('when reading the meta-transaction support of an ABI', () => {
-  it('should report the legacy functionSignature field for the MANA token', () => {
-    expect(
-      getMetaTransactionCalldataField(getKnownDecentralandContract(getContract(ContractName.MANAToken, POLYGON).address, POLYGON)!.abi)
-    ).toBe('functionSignature')
+  let contract: KnownContract
+
+  describe('and the contract executes the legacy functionSignature struct', () => {
+    beforeEach(() => {
+      contract = getKnownDecentralandContract(getContract(ContractName.MANAToken, POLYGON).address, POLYGON)!
+    })
+
+    it('should report the functionSignature field', () => {
+      expect(getMetaTransactionCalldataField(contract.abi)).toBe('functionSignature')
+    })
   })
 
-  it('should report the functionData field for the off-chain marketplace on Polygon', () => {
-    expect(
-      getMetaTransactionCalldataField(
-        getKnownDecentralandContract(getContract(ContractName.OffChainMarketplace, POLYGON).address, POLYGON)!.abi
-      )
-    ).toBe('functionData')
+  describe('and the contract executes the functionData struct', () => {
+    beforeEach(() => {
+      contract = getKnownDecentralandContract(getContract(ContractName.OffChainMarketplace, POLYGON).address, POLYGON)!
+    })
+
+    it('should report the functionData field', () => {
+      expect(getMetaTransactionCalldataField(contract.abi)).toBe('functionData')
+    })
   })
 
-  it('should report no support for a contract without executeMetaTransaction', () => {
-    expect(getKnownDecentralandContract(getContract(ContractName.BidV2, POLYGON).address, POLYGON)).toEqual(
-      expect.objectContaining({ supportsMetaTransactions: false, calldataField: null })
-    )
+  describe('and the contract has no executeMetaTransaction', () => {
+    beforeEach(() => {
+      contract = getKnownDecentralandContract(getContract(ContractName.BidV2, POLYGON).address, POLYGON)!
+    })
+
+    it('should report no support and no calldata field', () => {
+      expect(contract).toEqual(expect.objectContaining({ supportsMetaTransactions: false, calldataField: null }))
+    })
   })
 })
 
 describe('when building the meta-transaction salt', () => {
+  let salt: string
+
+  beforeEach(() => {
+    salt = getMetaTransactionSalt(POLYGON)
+  })
+
   it('should encode the chain id as a 32-byte hex word', () => {
-    expect(getMetaTransactionSalt(POLYGON)).toBe('0x0000000000000000000000000000000000000000000000000000000000000089')
+    expect(salt).toBe('0x0000000000000000000000000000000000000000000000000000000000000089')
   })
 })
 
@@ -221,7 +254,7 @@ describe('when decoding a call against a known contract', () => {
   beforeEach(() => {
     mana = getKnownDecentralandContract(getContract(ContractName.MANAToken, POLYGON).address, POLYGON)!
     collection = {
-      ...getKnownDecentralandContract(mana.address, POLYGON)!,
+      ...mana,
       name: ContractName.ERC721CollectionV2,
       abi: getContract(ContractName.ERC721CollectionV2, POLYGON).abi as KnownContract['abi']
     }

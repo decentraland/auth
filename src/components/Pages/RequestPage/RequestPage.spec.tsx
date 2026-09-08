@@ -15,7 +15,9 @@ import {
   ImpersonatedSignInError,
   MalformedSignatureRequestError,
   MalformedTransactionRequestError,
+  RecoverResponse,
   RequestFulfilledError,
+  SimulationResponseBody,
   SimulationUnavailableError,
   UnsupportedMethodError
 } from '../../../shared/auth'
@@ -206,11 +208,19 @@ jest.mock('./Views', () => ({
   ),
   TransferCompletedView: () => <div data-testid="transfer-completed">Transfer Completed</div>,
   TransferCanceledView: () => <div data-testid="transfer-canceled">Transfer Canceled</div>,
-  TransactionConfirmDialog: (props: any) =>
+  ConfirmRequestDialog: (props: any) =>
     props.open ? (
-      <div data-testid="transaction-confirm-dialog">
-        <button data-testid="transaction-confirm-dialog-confirm" onClick={props.onConfirm}>
+      <div
+        data-testid="confirm-request-dialog"
+        data-kind={props.kind}
+        data-gas-covered={String(props.gas?.covered)}
+        data-gas-status={props.gas?.status ?? ''}
+      >
+        <button data-testid="confirm-request-confirm" onClick={props.onConfirm}>
           confirm
+        </button>
+        <button data-testid="confirm-request-cancel" onClick={props.onCancel}>
+          cancel
         </button>
       </div>
     ) : null,
@@ -293,40 +303,42 @@ jest.mock('@dcl/hooks', () => ({
 }))
 
 const REQUEST_ID = 'test-request-123'
-const SIGNER = '0xabc123'
+const SIGNER = '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd'
 const CONTRACT = '0xcontract'
 const COLLECTION = '0xcollection'
-// A simulation that matches the branded gift exactly: the connected account's token #1 leaves for the
-// recipient on the called collection, and nothing else happens.
-const exactGiftSimulation = {
-  status: 'success',
-  assetChanges: [
-    {
-      type: 'transfer',
-      standard: 'erc721',
-      from: SIGNER,
-      to: '0xrecipient',
-      amount: null,
-      rawAmount: null,
-      tokenId: '1',
-      contractAddress: COLLECTION,
-      symbol: null,
-      name: 'Wearable',
-      decimals: null,
-      logoUrl: null,
-      dollarValue: null
-    }
-  ],
-  approvalChanges: [],
-  balanceChanges: [],
-  events: []
-}
-const emptySimulation = { status: 'success', assetChanges: [], approvalChanges: [], balanceChanges: [], events: [] }
+const HELLO_HEX = '0x68656c6c6f'
 // The deep-link handoff requires a valid UUID v4 route id (the client's correlation id).
 const DEEP_LINK_REQUEST_ID = '123e4567-e89b-42d3-a456-426614174000'
 const DEEP_LINK_REQUEST_PATH = `/auth/requests/${DEEP_LINK_REQUEST_ID}?targetConfigId=default&flow=deeplink`
 
-// --- Classification fixtures ---
+// --- Fixtures. Pure builders: every scenario assigns what it needs in its own beforeEach. ---
+const erc721Transfer = (overrides: Partial<SimulationResponseBody['assetChanges'][number]> = {}) => ({
+  type: 'transfer' as const,
+  standard: 'erc721' as const,
+  from: SIGNER,
+  to: '0xrecipient',
+  amount: null,
+  rawAmount: null,
+  tokenId: '1',
+  contractAddress: COLLECTION,
+  symbol: null,
+  name: 'Wearable',
+  decimals: null,
+  logoUrl: null,
+  dollarValue: null,
+  ...overrides
+})
+const simulationOf = (overrides: Partial<SimulationResponseBody> = {}): SimulationResponseBody => ({
+  status: 'success',
+  assetChanges: [],
+  approvalChanges: [],
+  balanceChanges: [],
+  events: [],
+  ...overrides
+})
+// A simulation that matches the branded gift exactly: the connected account's token #1 leaves for the
+// recipient on the called collection, and nothing else happens.
+const exactGiftSimulation = simulationOf({ assetChanges: [erc721Transfer()] })
 const knownContract = (overrides: Record<string, unknown> = {}) => ({
   name: 'MANAToken',
   address: CONTRACT,
@@ -372,6 +384,12 @@ const unknownTransaction = (overrides: Record<string, unknown> = {}): RequestCla
     reason: 'unknown_contract',
     ...overrides
   }) as RequestClassification
+const recovered = (method: string, params: unknown[]): RecoverResponse => ({
+  method,
+  params,
+  sender: SIGNER,
+  expiration: new Date(Date.now() + 3600000).toISOString()
+})
 
 // What the classifier says by default, per method, so most scenarios only override the kind they need.
 const defaultClassification = async (request: { method: string; params?: unknown[] }, context: { connectedChainId: number }) => {
@@ -386,7 +404,7 @@ const defaultClassification = async (request: { method: string; params?: unknown
       })
     }
     case 'personal_sign':
-      return { kind: 'personal_sign', text: 'hello', hex: '0x68656c6c6f' }
+      return { kind: 'personal_sign', text: 'hello', hex: HELLO_HEX }
     default:
       return { kind: 'unknown_typed_data', typedData: { primaryType: 'Permit' }, raw: '{"primaryType":"Permit"}' }
   }
@@ -408,19 +426,23 @@ const renderRequestPage = (path = `/auth/requests/${REQUEST_ID}?targetConfigId=d
   )
 }
 
+const rerenderRequestPage = (rerender: (ui: React.ReactElement) => void) =>
+  rerender(
+    <MemoryRouter initialEntries={[`/auth/requests/${REQUEST_ID}?targetConfigId=default`]}>
+      <FeatureFlagsContext.Provider value={{ flags: mockFlags as any, variants: {} as any, initialized: mockFlagsInitialized }}>
+        <Routes>
+          <Route path="/auth/requests/:requestId" element={<RequestPage />} />
+        </Routes>
+      </FeatureFlagsContext.Provider>
+    </MemoryRouter>
+  )
+
 const waitForRecoverCalls = (count: number) =>
   waitFor(() => {
     if (mockRecover.mock.calls.length !== count) {
       throw new Error(`Expected recover to be called ${count} times, received ${mockRecover.mock.calls.length}`)
     }
   })
-
-const recovered = (method: string, params: unknown[]) => ({
-  method,
-  params,
-  sender: SIGNER,
-  expiration: new Date(Date.now() + 3600000).toISOString()
-})
 
 describe('RequestPage', () => {
   beforeEach(() => {
@@ -443,14 +465,8 @@ describe('RequestPage', () => {
     mockGetChainId.mockResolvedValue(1)
     mockEstimateFeesPerGas.mockResolvedValue({ gasPrice: BigInt(1) })
     mockEstimateGas.mockResolvedValue(BigInt(21000))
-    mockBuildSendTransactionSimulationPayload.mockReturnValue({
-      chainId: 137,
-      from: SIGNER,
-      to: CONTRACT,
-      data: '0x',
-      value: '0'
-    })
-    mockSimulateTransaction.mockResolvedValue(emptySimulation)
+    mockBuildSendTransactionSimulationPayload.mockReturnValue({ chainId: 137, from: SIGNER, to: CONTRACT, data: '0x', value: '0' })
+    mockSimulateTransaction.mockResolvedValue(simulationOf())
   })
 
   afterEach(() => {
@@ -487,10 +503,11 @@ describe('RequestPage', () => {
     })
 
     describe('and the request URL carries a referrer', () => {
-      const REFERRER = '0x24e5f44999c151f08609f8e27b2238c773c4d020'
+      let referrer: string
 
       beforeEach(() => {
-        ;(extractReferrerFromSearchParameters as jest.Mock).mockReturnValue(REFERRER)
+        referrer = '0x24e5f44999c151f08609f8e27b2238c773c4d020'
+        ;(extractReferrerFromSearchParameters as jest.Mock).mockReturnValue(referrer)
       })
 
       afterEach(() => {
@@ -498,9 +515,9 @@ describe('RequestPage', () => {
       })
 
       it('should preserve the referrer inside the login redirectTo so it survives the round-trip', async () => {
-        renderRequestPage(`/auth/requests/${REQUEST_ID}?targetConfigId=default&referrer=${REFERRER}`)
+        renderRequestPage(`/auth/requests/${REQUEST_ID}?targetConfigId=default&referrer=${referrer}`)
         await waitFor(() => {
-          expect(mockNavigate).toHaveBeenCalledWith(expect.stringContaining(`referrer%3D${REFERRER}`))
+          expect(mockNavigate).toHaveBeenCalledWith(expect.stringContaining(`referrer%3D${referrer}`))
         })
       })
 
@@ -508,9 +525,9 @@ describe('RequestPage', () => {
         // LoginPage reads the referrer from its OWN url (not from inside redirectTo) when
         // routing a new user to profile setup — without the top-level param the referral
         // POST never fires for a not-yet-connected wallet user.
-        renderRequestPage(`/auth/requests/${REQUEST_ID}?targetConfigId=default&referrer=${REFERRER}`)
+        renderRequestPage(`/auth/requests/${REQUEST_ID}?targetConfigId=default&referrer=${referrer}`)
         await waitFor(() => {
-          expect(mockNavigate).toHaveBeenCalledWith(expect.stringContaining(`&referrer=${REFERRER}`))
+          expect(mockNavigate).toHaveBeenCalledWith(expect.stringContaining(`&referrer=${referrer}`))
         })
       })
     })
@@ -529,10 +546,13 @@ describe('RequestPage', () => {
   })
 
   describe('when the user is connected and flags are initialized', () => {
+    beforeEach(() => {
+      mockGetAddresses.mockResolvedValue([SIGNER])
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'User' }] })
+    })
+
     describe('and recovery fails with an UnsupportedMethodError (the retired dcl_personal_sign sign-in)', () => {
       beforeEach(() => {
-        mockGetAddresses.mockResolvedValue([SIGNER])
-        mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'User' }] })
         mockRecover.mockRejectedValue(new UnsupportedMethodError('dcl_personal_sign'))
         mockSendFailedOutcome.mockResolvedValue({})
       })
@@ -559,8 +579,6 @@ describe('RequestPage', () => {
 
     describe('and recovery fails with an UnsupportedMethodError for any other method', () => {
       beforeEach(() => {
-        mockGetAddresses.mockResolvedValue([SIGNER])
-        mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'User' }] })
         mockRecover.mockRejectedValue(new UnsupportedMethodError('eth_sign'))
         mockSendFailedOutcome.mockResolvedValue({})
       })
@@ -586,15 +604,12 @@ describe('RequestPage', () => {
 
     describe("and the request is a transaction to a contract that is not Decentraland's", () => {
       beforeEach(() => {
-        mockGetAddresses.mockResolvedValue([SIGNER])
-        mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'User' }] })
         mockRecover.mockResolvedValue(recovered('eth_sendTransaction', [{ to: CONTRACT, data: '0x1234', value: '0' }]))
       })
 
       it('should show the unverified request view for an unknown transaction', async () => {
         renderRequestPage()
-        const view = await screen.findByTestId('unverified-request')
-        expect(view).toHaveAttribute('data-kind', 'unknown_transaction')
+        expect(await screen.findByTestId('unverified-request')).toHaveAttribute('data-kind', 'unknown_transaction')
       })
 
       it('should classify the request for the connected signer and chain', async () => {
@@ -625,8 +640,6 @@ describe('RequestPage', () => {
 
     describe('and the wallet network cannot be read while reviewing a transaction', () => {
       beforeEach(() => {
-        mockGetAddresses.mockResolvedValue([SIGNER])
-        mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'User' }] })
         mockRecover.mockResolvedValue(recovered('eth_sendTransaction', [{ to: CONTRACT, data: '0x1234', value: '0' }]))
         mockGetChainId.mockRejectedValue(new Error('rpc down'))
       })
@@ -638,10 +651,8 @@ describe('RequestPage', () => {
       })
     })
 
-    describe('and the transactions-server cannot say whether the target is a Decentraland collection', () => {
+    describe('and the collection factories cannot say whether the target is a Decentraland collection', () => {
       beforeEach(() => {
-        mockGetAddresses.mockResolvedValue([SIGNER])
-        mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'User' }] })
         mockRecover.mockResolvedValue(recovered('eth_sendTransaction', [{ to: COLLECTION, data: '0x1234', value: '0' }]))
         mockClassifyRequest.mockRejectedValue(new ContractLookupUnavailableError(COLLECTION))
         mockSendFailedOutcome.mockResolvedValue({})
@@ -662,8 +673,6 @@ describe('RequestPage', () => {
 
     describe('and recovery fails with a DifferentSenderError', () => {
       beforeEach(() => {
-        mockGetAddresses.mockResolvedValue([SIGNER])
-        mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'User' }] })
         mockRecover.mockRejectedValue(new DifferentSenderError(SIGNER, '0xother'))
         mockSendFailedOutcome.mockResolvedValue({})
       })
@@ -686,8 +695,6 @@ describe('RequestPage', () => {
 
     describe('and recovery fails with an ExpiredRequestError', () => {
       beforeEach(() => {
-        mockGetAddresses.mockResolvedValue([SIGNER])
-        mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'User' }] })
         mockRecover.mockRejectedValue(new ExpiredRequestError(REQUEST_ID))
       })
 
@@ -701,8 +708,6 @@ describe('RequestPage', () => {
 
     describe('and recovery fails with a RequestFulfilledError', () => {
       beforeEach(() => {
-        mockGetAddresses.mockResolvedValue([SIGNER])
-        mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'User' }] })
         mockRecover.mockRejectedValue(new RequestFulfilledError(REQUEST_ID))
       })
 
@@ -719,8 +724,6 @@ describe('RequestPage', () => {
 
     describe('and recovery fails with an unexpected error', () => {
       beforeEach(() => {
-        mockGetAddresses.mockResolvedValue([SIGNER])
-        mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'User' }] })
         mockRecover.mockRejectedValue(new Error('Network failure'))
       })
 
@@ -734,8 +737,6 @@ describe('RequestPage', () => {
 
     describe('and recovery fails with an ImpersonatedSignInError', () => {
       beforeEach(() => {
-        mockGetAddresses.mockResolvedValue([SIGNER])
-        mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'User' }] })
         mockRecover.mockRejectedValue(new ImpersonatedSignInError('personal_sign'))
         mockSendFailedOutcome.mockResolvedValue({})
       })
@@ -760,8 +761,6 @@ describe('RequestPage', () => {
 
     describe('and recovery fails with a MalformedTransactionRequestError', () => {
       beforeEach(() => {
-        mockGetAddresses.mockResolvedValue([SIGNER])
-        mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'User' }] })
         mockRecover.mockRejectedValue(new MalformedTransactionRequestError('eth_sendTransaction', '"to" must be an address'))
         mockSendFailedOutcome.mockResolvedValue({})
       })
@@ -784,8 +783,6 @@ describe('RequestPage', () => {
 
     describe('and recovery fails with a MalformedSignatureRequestError', () => {
       beforeEach(() => {
-        mockGetAddresses.mockResolvedValue([SIGNER])
-        mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'User' }] })
         mockRecover.mockRejectedValue(new MalformedSignatureRequestError('eth_signTypedData_v4'))
         mockSendFailedOutcome.mockResolvedValue({})
       })
@@ -831,7 +828,6 @@ describe('RequestPage', () => {
 
     describe('and the profile is incomplete (navigated to setup)', () => {
       beforeEach(() => {
-        mockGetAddresses.mockResolvedValue([SIGNER])
         mockEnsureProfile.mockResolvedValue(null)
       })
 
@@ -848,7 +844,6 @@ describe('RequestPage', () => {
       beforeEach(() => {
         mockSkipSetup = true
         mockTargetConfig = { skipSetup: true, explorerText: 'Explorer' }
-        mockGetAddresses.mockResolvedValue([SIGNER])
         mockRecover.mockResolvedValue(recovered('personal_sign', ['hello', SIGNER]))
       })
 
@@ -862,10 +857,6 @@ describe('RequestPage', () => {
     })
 
     describe('and the flow is a deep-link handoff (flow=deeplink with a UUID v4 id)', () => {
-      beforeEach(() => {
-        mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'User' }] })
-      })
-
       describe('and the connected user has an identity', () => {
         beforeEach(() => {
           mockPostIdentity.mockResolvedValueOnce({ identityId: 'anIdentityId' })
@@ -980,8 +971,14 @@ describe('RequestPage', () => {
       })
 
       describe('and the route id is not a valid UUID v4', () => {
+        let path: string
+
+        beforeEach(() => {
+          path = '/auth/requests/not-a-uuid?targetConfigId=default&flow=deeplink'
+        })
+
         it('should show the error view without posting an identity or recovering a request', async () => {
-          renderRequestPage('/auth/requests/not-a-uuid?targetConfigId=default&flow=deeplink')
+          renderRequestPage(path)
           await waitFor(() => {
             expect(screen.getByTestId('client-login-error')).toBeInTheDocument()
           })
@@ -990,7 +987,7 @@ describe('RequestPage', () => {
         })
 
         it('should not run the profile consistency check', async () => {
-          renderRequestPage('/auth/requests/not-a-uuid?targetConfigId=default&flow=deeplink')
+          renderRequestPage(path)
           await waitFor(() => {
             expect(screen.getByTestId('client-login-error')).toBeInTheDocument()
           })
@@ -998,14 +995,14 @@ describe('RequestPage', () => {
         })
 
         it('should explain that the sign-in link is invalid', async () => {
-          renderRequestPage('/auth/requests/not-a-uuid?targetConfigId=default&flow=deeplink')
+          renderRequestPage(path)
           await waitFor(() => {
             expect(screen.getByTestId('client-login-error')).toHaveTextContent('The sign-in link is invalid.')
           })
         })
 
         it('should track the failure with an invalid_request_id reason', async () => {
-          renderRequestPage('/auth/requests/not-a-uuid?targetConfigId=default&flow=deeplink')
+          renderRequestPage(path)
           await waitFor(() => {
             expect(jest.mocked(trackEvent)).toHaveBeenCalledWith(TrackingEvents.DEEP_LINK_AUTH_FAILED, {
               authRequestId: 'not-a-uuid',
@@ -1020,8 +1017,6 @@ describe('RequestPage', () => {
       // The handoff is gated on flow=deeplink, not on the id shape: a UUID alone must NOT trigger
       // the identity post — it goes through the normal recover flow like any other request.
       beforeEach(() => {
-        mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'User' }] })
-        mockGetAddresses.mockResolvedValue([SIGNER])
         mockRecover.mockResolvedValue(recovered('personal_sign', ['hello', SIGNER]))
       })
 
@@ -1036,6 +1031,7 @@ describe('RequestPage', () => {
 
     describe('and the wallet changes while profile consistency is loading', () => {
       let resolveProfile: (value: any) => void
+      let newConnectionData: Record<string, any>
 
       beforeEach(() => {
         // Make ensureProfile hang until we resolve it manually
@@ -1052,6 +1048,12 @@ describe('RequestPage', () => {
           method: 'personal_sign',
           params: ['Sign this', '0xnewwallet']
         })
+        newConnectionData = {
+          ...mockConnectionData,
+          account: '0xnewwallet',
+          provider: { isMagic: false, isNewProvider: true },
+          providerType: ProviderType.INJECTED
+        }
       })
 
       it('should cancel the stale request and not set state from the old wallet', async () => {
@@ -1063,22 +1065,8 @@ describe('RequestPage', () => {
         })
 
         // Simulate wallet change: update the mock and re-render with new connection data
-        mockConnectionData = {
-          ...mockConnectionData,
-          account: '0xnewwallet',
-          provider: { isMagic: false, isNewProvider: true },
-          providerType: ProviderType.INJECTED
-        }
-
-        rerender(
-          <MemoryRouter initialEntries={[`/auth/requests/${REQUEST_ID}?targetConfigId=default`]}>
-            <FeatureFlagsContext.Provider value={{ flags: mockFlags as any, variants: {} as any, initialized: mockFlagsInitialized }}>
-              <Routes>
-                <Route path="/auth/requests/:requestId" element={<RequestPage />} />
-              </Routes>
-            </FeatureFlagsContext.Provider>
-          </MemoryRouter>
-        )
+        mockConnectionData = newConnectionData
+        rerenderRequestPage(rerender)
 
         // Now resolve the old profile check — it should be cancelled and not proceed to recover
         resolveProfile({ avatars: [{ name: 'OldUser' }] })
@@ -1093,29 +1081,22 @@ describe('RequestPage', () => {
 
   describe('when the wallet switches account after the request was recovered', () => {
     beforeEach(() => {
-      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.INJECTED }
       mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
       mockRecover.mockResolvedValue(recovered('personal_sign', ['hello', SIGNER]))
-      mockGetAddresses.mockResolvedValue([SIGNER])
+      // The first recovery is the reviewing account's; the new account's own recovery is held so the
+      // state in between is observable.
+      mockGetAddresses.mockResolvedValueOnce([SIGNER]).mockResolvedValue(['0xnewwallet'])
+      mockRecover
+        .mockResolvedValueOnce(recovered('personal_sign', ['hello', SIGNER]))
+        .mockImplementation(() => new Promise(() => undefined))
     })
 
     it('should drop the previous review and show the loading view until the new account has recovered the request', async () => {
       const { rerender } = renderRequestPage()
       expect(await screen.findByTestId('unverified-request')).toBeInTheDocument()
 
-      // The new account's own recovery is held so the state in between is observable.
-      mockRecover.mockImplementationOnce(() => new Promise(() => undefined))
-      mockGetAddresses.mockResolvedValue(['0xnewwallet'])
       mockConnectionData = { ...mockConnectionData, account: '0xnewwallet' }
-      rerender(
-        <MemoryRouter initialEntries={[`/auth/requests/${REQUEST_ID}?targetConfigId=default`]}>
-          <FeatureFlagsContext.Provider value={{ flags: mockFlags as any, variants: {} as any, initialized: mockFlagsInitialized }}>
-            <Routes>
-              <Route path="/auth/requests/:requestId" element={<RequestPage />} />
-            </Routes>
-          </FeatureFlagsContext.Provider>
-        </MemoryRouter>
-      )
+      rerenderRequestPage(rerender)
 
       expect(await screen.findByTestId('loading-request')).toBeInTheDocument()
       expect(screen.queryByTestId('unverified-approve')).not.toBeInTheDocument()
@@ -1124,7 +1105,6 @@ describe('RequestPage', () => {
 
   describe('when the wallet reports a different active account at approval time than the one that reviewed the request', () => {
     beforeEach(() => {
-      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.INJECTED }
       mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
       mockRecover.mockResolvedValue(recovered('personal_sign', ['hello', SIGNER]))
       // The request is recovered by the reviewing account; by the time Allow is clicked the wallet has
@@ -1158,7 +1138,6 @@ describe('RequestPage', () => {
 
   describe('when the wallet changes network after a plain transaction was reviewed', () => {
     beforeEach(() => {
-      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.INJECTED }
       mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
       mockRecover.mockResolvedValue(
         recovered('eth_sendTransaction', [{ to: '0x0000000000000000000000000000000000000001', data: '0x', value: '0x0' }])
@@ -1206,8 +1185,7 @@ describe('RequestPage', () => {
       await userEvent.click(await screen.findByTestId('unverified-approve'))
       await waitForRecoverCalls(2)
 
-      const view = await screen.findByTestId('unverified-request')
-      await waitFor(() => expect(view).toHaveAttribute('data-review-restarted', 'true'))
+      await waitFor(() => expect(screen.getByTestId('unverified-request')).toHaveAttribute('data-review-restarted', 'true'))
     })
 
     it('should report the restart and its reason to analytics', async () => {
@@ -1224,7 +1202,6 @@ describe('RequestPage', () => {
 
   describe('when the wallet refuses the send because its network changed after the check', () => {
     beforeEach(() => {
-      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.INJECTED }
       mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
       mockRecover.mockResolvedValue(
         recovered('eth_sendTransaction', [{ to: '0x0000000000000000000000000000000000000001', data: '0x', value: '0x0' }])
@@ -1267,7 +1244,6 @@ describe('RequestPage', () => {
 
   describe('when the wallet network cannot be read at approval time', () => {
     beforeEach(() => {
-      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.INJECTED }
       mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
       mockRecover.mockResolvedValue(
         recovered('eth_sendTransaction', [{ to: '0x0000000000000000000000000000000000000001', data: '0x', value: '0x0' }])
@@ -1289,7 +1265,6 @@ describe('RequestPage', () => {
 
   describe('when the wallet reports a different active account at denial time than the one that reviewed the request', () => {
     beforeEach(() => {
-      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.INJECTED }
       mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
       mockRecover.mockResolvedValue(recovered('personal_sign', ['hello', SIGNER]))
       mockGetAddresses.mockResolvedValueOnce([SIGNER]).mockResolvedValue(['0xnewwallet'])
@@ -1312,7 +1287,6 @@ describe('RequestPage', () => {
 
   describe('when the request is a signature Decentraland cannot check', () => {
     beforeEach(() => {
-      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.INJECTED }
       mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
       mockGetAddresses.mockResolvedValue([SIGNER])
       mockWalletRequest.mockResolvedValue('0xsignature')
@@ -1328,14 +1302,14 @@ describe('RequestPage', () => {
         renderRequestPage()
         const view = await screen.findByTestId('unverified-request')
         expect(view).toHaveAttribute('data-kind', 'personal_sign')
-        expect(view).toHaveAttribute('data-payload', JSON.stringify({ kind: 'message', hex: '0x68656c6c6f', text: 'hello' }))
+        expect(view).toHaveAttribute('data-payload', JSON.stringify({ kind: 'message', hex: HELLO_HEX, text: 'hello' }))
       })
 
-      it('should forward the request to the wallet verbatim on approval', async () => {
+      it('should hand the wallet the message bytes and the signer on approval', async () => {
         renderRequestPage()
         await userEvent.click(await screen.findByTestId('unverified-approve'))
         await waitFor(() => {
-          expect(mockWalletRequest).toHaveBeenCalledWith({ method: 'personal_sign', params: ['hello', SIGNER] })
+          expect(mockWalletRequest).toHaveBeenCalledWith({ method: 'personal_sign', params: [HELLO_HEX, SIGNER] })
         })
       })
 
@@ -1366,7 +1340,7 @@ describe('RequestPage', () => {
         )
       })
 
-      it('should forward the request to the wallet verbatim on approval', async () => {
+      it('should hand the wallet the signer and the typed data on approval', async () => {
         renderRequestPage()
         await userEvent.click(await screen.findByTestId('unverified-approve'))
         await waitFor(() => {
@@ -1408,7 +1382,6 @@ describe('RequestPage', () => {
 
   describe('when the wallet executed the request but delivering its outcome fails', () => {
     beforeEach(() => {
-      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.INJECTED }
       mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
       mockRecover.mockResolvedValue(recovered('personal_sign', ['hello', SIGNER]))
       mockGetAddresses.mockResolvedValue([SIGNER])
@@ -1450,7 +1423,6 @@ describe('RequestPage', () => {
 
   describe("when the request is a transaction to a contract that is not Decentraland's", () => {
     beforeEach(() => {
-      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.THIRDWEB }
       mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
       mockRecover.mockResolvedValue(recovered('eth_sendTransaction', [{ to: CONTRACT, data: '0xabcd', value: '0x0' }]))
       mockGetAddresses.mockResolvedValue([SIGNER])
@@ -1520,9 +1492,124 @@ describe('RequestPage', () => {
     })
   })
 
+  describe('when a web2 user approves a request', () => {
+    beforeEach(() => {
+      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.THIRDWEB }
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockGetAddresses.mockResolvedValue([SIGNER])
+      mockWalletRequest.mockResolvedValue('0xhash')
+      mockSendSuccessfulOutcome.mockResolvedValue({})
+    })
+
+    describe('and it is a transaction the user pays gas for', () => {
+      beforeEach(() => {
+        mockRecover.mockResolvedValue(recovered('eth_sendTransaction', [{ to: CONTRACT, data: '0xabcd', value: '0x0' }]))
+      })
+
+      it('should ask for a confirmation that names the transaction and its fee instead of sending immediately', async () => {
+        renderRequestPage()
+        await userEvent.click(await screen.findByTestId('unverified-approve'))
+        const dialog = await screen.findByTestId('confirm-request-dialog')
+        expect(dialog).toHaveAttribute('data-kind', 'transaction')
+        await waitFor(() => expect(dialog).toHaveAttribute('data-gas-status', 'ready'))
+        expect(mockWalletRequest).not.toHaveBeenCalled()
+      })
+
+      it('should send the transaction once the confirmation is given', async () => {
+        renderRequestPage()
+        await userEvent.click(await screen.findByTestId('unverified-approve'))
+        await userEvent.click(await screen.findByTestId('confirm-request-confirm'))
+        await screen.findByTestId('wallet-interaction-complete')
+        expect(mockWalletRequest).toHaveBeenCalledWith({
+          method: 'eth_sendTransaction',
+          params: [{ to: CONTRACT, data: '0xabcd', value: '0x0', from: SIGNER, chainId: '0x1' }]
+        })
+      })
+
+      it('should close the confirmation on cancel without sending', async () => {
+        renderRequestPage()
+        await userEvent.click(await screen.findByTestId('unverified-approve'))
+        await userEvent.click(await screen.findByTestId('confirm-request-cancel'))
+        expect(screen.queryByTestId('confirm-request-dialog')).not.toBeInTheDocument()
+        expect(screen.getByTestId('unverified-request')).toBeInTheDocument()
+        expect(mockWalletRequest).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and it is a relayed Decentraland transaction', () => {
+      beforeEach(() => {
+        mockRecover.mockResolvedValue(recovered('eth_sendTransaction', [{ to: CONTRACT, data: '0xabcd', value: '0x0' }]))
+        mockClassifyRequest.mockResolvedValue(dclTransaction())
+        jest.mocked(sendMetaTransaction).mockResolvedValue('0xrelayedhash')
+      })
+
+      it('should ask for a confirmation that says gas is covered', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('wallet-interaction')
+        await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+        await userEvent.click(screen.getByTestId('wallet-interaction-approve'))
+        const dialog = await screen.findByTestId('confirm-request-dialog')
+        expect(dialog).toHaveAttribute('data-kind', 'transaction')
+        expect(dialog).toHaveAttribute('data-gas-covered', 'true')
+        expect(sendMetaTransaction).not.toHaveBeenCalled()
+      })
+
+      it('should relay once the confirmation is given', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('wallet-interaction')
+        await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+        await userEvent.click(screen.getByTestId('wallet-interaction-approve'))
+        await userEvent.click(await screen.findByTestId('confirm-request-confirm'))
+        await screen.findByTestId('wallet-interaction-complete')
+        expect(sendMetaTransaction).toHaveBeenCalledTimes(1)
+      })
+    })
+
+    describe('and it is a signature', () => {
+      beforeEach(() => {
+        mockRecover.mockResolvedValue(recovered('personal_sign', ['hello', SIGNER]))
+      })
+
+      it('should ask for a confirmation that names the signature and shows no fee', async () => {
+        renderRequestPage()
+        await userEvent.click(await screen.findByTestId('unverified-approve'))
+        const dialog = await screen.findByTestId('confirm-request-dialog')
+        expect(dialog).toHaveAttribute('data-kind', 'signature')
+        expect(dialog).toHaveAttribute('data-gas-covered', 'undefined')
+        expect(mockWalletRequest).not.toHaveBeenCalled()
+      })
+
+      it('should sign once the confirmation is given', async () => {
+        renderRequestPage()
+        await userEvent.click(await screen.findByTestId('unverified-approve'))
+        await userEvent.click(await screen.findByTestId('confirm-request-confirm'))
+        await screen.findByTestId('wallet-interaction-complete')
+        expect(mockWalletRequest).toHaveBeenCalledWith({ method: 'personal_sign', params: [HELLO_HEX, SIGNER] })
+      })
+    })
+
+    describe('and it is a Decentraland meta-transaction signature', () => {
+      beforeEach(() => {
+        mockRecover.mockResolvedValue(recovered('eth_signTypedData_v4', [SIGNER, '{"primaryType":"MetaTransaction"}']))
+        mockClassifyRequest.mockResolvedValue(dclMetaTransaction())
+        mockSimulateTransaction.mockResolvedValue(
+          simulationOf({ assetChanges: [erc721Transfer({ standard: 'erc20', contractAddress: '0xmana' })] })
+        )
+      })
+
+      it('should ask for a confirmation before signing', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('signature-request')
+        await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+        await userEvent.click(screen.getByTestId('signature-approve'))
+        expect(await screen.findByTestId('confirm-request-dialog')).toHaveAttribute('data-kind', 'signature')
+        expect(mockWalletRequest).not.toHaveBeenCalled()
+      })
+    })
+  })
+
   describe('when the request is a plain value transfer', () => {
     beforeEach(() => {
-      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.INJECTED }
       mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
       mockRecover.mockResolvedValue(recovered('eth_sendTransaction', [{ to: '0xrecipient', value: '0xde0b6b3a7640000' }]))
       mockGetAddresses.mockResolvedValue([SIGNER])
@@ -1571,7 +1658,6 @@ describe('RequestPage', () => {
 
   describe('when the request is a transaction to a Decentraland contract that is relayed', () => {
     beforeEach(() => {
-      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.MAGIC }
       mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
       mockRecover.mockResolvedValue(recovered('eth_sendTransaction', [{ to: CONTRACT, data: '0xabcd', value: '0x0' }]))
       mockGetAddresses.mockResolvedValue([SIGNER])
@@ -1605,16 +1691,6 @@ describe('RequestPage', () => {
       expect(mockEstimateGas).not.toHaveBeenCalled()
     })
 
-    it('should treat the called contract as verified in the preview', async () => {
-      mockSimulateTransaction.mockResolvedValue({
-        ...emptySimulation,
-        assetChanges: [{ ...exactGiftSimulation.assetChanges[0], contractAddress: CONTRACT, to: '0xother' }]
-      })
-      renderRequestPage()
-      const view = await screen.findByTestId('wallet-interaction')
-      await waitFor(() => expect(view).toHaveAttribute('data-verified', JSON.stringify([CONTRACT])))
-    })
-
     it('should relay the reviewed calldata through the classified contract on approval', async () => {
       renderRequestPage()
       const view = await screen.findByTestId('wallet-interaction')
@@ -1632,15 +1708,31 @@ describe('RequestPage', () => {
       expect(mockSendSuccessfulOutcome).toHaveBeenCalledWith(REQUEST_ID, SIGNER, '0xrelayedhash')
     })
 
-    it('should not require an acknowledgment when the preview shows what the user gets', async () => {
-      mockSimulateTransaction.mockResolvedValue({
-        ...emptySimulation,
-        assetChanges: [{ ...exactGiftSimulation.assetChanges[0], from: '0xother', to: SIGNER }]
+    describe('and the preview moves an asset of the called contract', () => {
+      beforeEach(() => {
+        mockSimulateTransaction.mockResolvedValue(
+          simulationOf({ assetChanges: [erc721Transfer({ contractAddress: CONTRACT, to: '0xother' })] })
+        )
       })
-      renderRequestPage()
-      const view = await screen.findByTestId('wallet-interaction')
-      await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
-      expect(view).toHaveAttribute('data-requires-acknowledgment', 'false')
+
+      it('should treat the called contract as verified in the preview', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('wallet-interaction')
+        await waitFor(() => expect(view).toHaveAttribute('data-verified', JSON.stringify([CONTRACT])))
+      })
+    })
+
+    describe('and the preview shows what the user gets', () => {
+      beforeEach(() => {
+        mockSimulateTransaction.mockResolvedValue(simulationOf({ assetChanges: [erc721Transfer({ from: '0xother', to: SIGNER })] }))
+      })
+
+      it('should not require an acknowledgment', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('wallet-interaction')
+        await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+        expect(view).toHaveAttribute('data-requires-acknowledgment', 'false')
+      })
     })
 
     describe('and the preview shows no visible effects', () => {
@@ -1654,10 +1746,7 @@ describe('RequestPage', () => {
 
     describe('and only third parties move assets', () => {
       beforeEach(() => {
-        mockSimulateTransaction.mockResolvedValue({
-          ...emptySimulation,
-          assetChanges: [{ ...exactGiftSimulation.assetChanges[0], from: '0xthird', to: '0xother' }]
-        })
+        mockSimulateTransaction.mockResolvedValue(simulationOf({ assetChanges: [erc721Transfer({ from: '0xthird', to: '0xother' })] }))
       })
 
       it('should require an acknowledgment because nothing shown involves the user', async () => {
@@ -1682,13 +1771,13 @@ describe('RequestPage', () => {
     })
 
     describe('and the simulation names a counterparty with a Decentraland profile', () => {
-      const counterparty = '0x1111111111111111111111111111111111111234'
+      let counterparty: string
 
       beforeEach(() => {
-        mockSimulateTransaction.mockResolvedValue({
-          ...emptySimulation,
-          assetChanges: [{ ...exactGiftSimulation.assetChanges[0], standard: 'erc20', to: counterparty, amount: '500' }]
-        })
+        counterparty = '0x1111111111111111111111111111111111111234'
+        mockSimulateTransaction.mockResolvedValue(
+          simulationOf({ assetChanges: [erc721Transfer({ standard: 'erc20', to: counterparty, amount: '500' })] })
+        )
       })
 
       afterEach(() => {
@@ -1721,25 +1810,28 @@ describe('RequestPage', () => {
     })
 
     describe('and the simulation grants an approval', () => {
-      const approval = {
-        kind: 'approval',
-        standard: 'erc20',
-        owner: SIGNER,
-        spender: '0xspender',
-        amount: '100',
-        rawAmount: '100000000000000000000',
-        isUnlimited: false,
-        tokenId: null,
-        approved: null,
-        contractAddress: '0xmana',
-        symbol: 'MANA',
-        name: 'MANA'
-      }
-      const simulationWith = (approvalChanges: unknown[]) => ({ ...emptySimulation, approvalChanges })
+      let approval: SimulationResponseBody['approvalChanges'][number]
+
+      beforeEach(() => {
+        approval = {
+          kind: 'approval',
+          standard: 'erc20',
+          owner: SIGNER,
+          spender: '0xspender',
+          amount: '100',
+          rawAmount: '100000000000000000000',
+          isUnlimited: false,
+          tokenId: null,
+          approved: null,
+          contractAddress: '0xmana',
+          symbol: 'MANA',
+          name: 'MANA'
+        }
+      })
 
       describe('and it is a limited allowance to a spender that is not a recognized Decentraland contract', () => {
         beforeEach(() => {
-          mockSimulateTransaction.mockResolvedValue(simulationWith([approval]))
+          mockSimulateTransaction.mockResolvedValue(simulationOf({ approvalChanges: [approval] }))
         })
 
         it('should require an acknowledgment because a limited allowance hands the asset over just as surely', async () => {
@@ -1753,7 +1845,7 @@ describe('RequestPage', () => {
       describe('and it is a limited allowance to a recognized Decentraland contract', () => {
         beforeEach(() => {
           mockGetKnownDecentralandContract.mockImplementation((address: string) => (address === '0xspender' ? knownContract() : null))
-          mockSimulateTransaction.mockResolvedValue(simulationWith([approval]))
+          mockSimulateTransaction.mockResolvedValue(simulationOf({ approvalChanges: [approval] }))
         })
 
         it('should not require an acknowledgment because such approvals are routine', async () => {
@@ -1775,7 +1867,7 @@ describe('RequestPage', () => {
       describe('and it is a single token approved to a spender that is not a recognized Decentraland contract', () => {
         beforeEach(() => {
           mockSimulateTransaction.mockResolvedValue(
-            simulationWith([{ ...approval, standard: 'erc721', amount: null, rawAmount: null, tokenId: '7' }])
+            simulationOf({ approvalChanges: [{ ...approval, standard: 'erc721', amount: null, rawAmount: null, tokenId: '7' }] })
           )
         })
 
@@ -1789,7 +1881,7 @@ describe('RequestPage', () => {
 
       describe('and it is a tiny allowance whose display amount rounds to zero, to an unrecognized spender', () => {
         beforeEach(() => {
-          mockSimulateTransaction.mockResolvedValue(simulationWith([{ ...approval, amount: '0', rawAmount: '1' }]))
+          mockSimulateTransaction.mockResolvedValue(simulationOf({ approvalChanges: [{ ...approval, amount: '0', rawAmount: '1' }] }))
         })
 
         it('should still require an acknowledgment because the base units say it is a grant', async () => {
@@ -1803,16 +1895,18 @@ describe('RequestPage', () => {
       describe('and it clears a single-token approval with the zero address', () => {
         beforeEach(() => {
           mockSimulateTransaction.mockResolvedValue(
-            simulationWith([
-              {
-                ...approval,
-                standard: 'erc721',
-                spender: '0x0000000000000000000000000000000000000000',
-                amount: null,
-                rawAmount: null,
-                tokenId: '7'
-              }
-            ])
+            simulationOf({
+              approvalChanges: [
+                {
+                  ...approval,
+                  standard: 'erc721',
+                  spender: '0x0000000000000000000000000000000000000000',
+                  amount: null,
+                  rawAmount: null,
+                  tokenId: '7'
+                }
+              ]
+            })
           )
         })
 
@@ -1826,7 +1920,7 @@ describe('RequestPage', () => {
 
       describe('and it revokes an allowance from an unrecognized spender', () => {
         beforeEach(() => {
-          mockSimulateTransaction.mockResolvedValue(simulationWith([{ ...approval, amount: '0', rawAmount: '0' }]))
+          mockSimulateTransaction.mockResolvedValue(simulationOf({ approvalChanges: [{ ...approval, amount: '0', rawAmount: '0' }] }))
         })
 
         it('should not require an acknowledgment because nothing is granted', async () => {
@@ -1840,7 +1934,9 @@ describe('RequestPage', () => {
       describe('and it revokes ApprovalForAll from an unrecognized operator', () => {
         beforeEach(() => {
           mockSimulateTransaction.mockResolvedValue(
-            simulationWith([{ ...approval, kind: 'approvalForAll', standard: 'erc721', amount: null, rawAmount: null, approved: false }])
+            simulationOf({
+              approvalChanges: [{ ...approval, kind: 'approvalForAll', standard: 'erc721', amount: null, rawAmount: null, approved: false }]
+            })
           )
         })
 
@@ -1855,17 +1951,19 @@ describe('RequestPage', () => {
       describe('and it grants collection-wide access to an unrecognized operator', () => {
         beforeEach(() => {
           mockSimulateTransaction.mockResolvedValue(
-            simulationWith([
-              {
-                ...approval,
-                kind: 'approvalForAll',
-                standard: 'erc721',
-                spender: '0xattacker',
-                amount: null,
-                rawAmount: null,
-                approved: true
-              }
-            ])
+            simulationOf({
+              approvalChanges: [
+                {
+                  ...approval,
+                  kind: 'approvalForAll',
+                  standard: 'erc721',
+                  spender: '0xattacker',
+                  amount: null,
+                  rawAmount: null,
+                  approved: true
+                }
+              ]
+            })
           )
         })
 
@@ -1881,7 +1979,6 @@ describe('RequestPage', () => {
 
   describe('when the request is a transaction to a Decentraland contract the wallet sends itself', () => {
     beforeEach(() => {
-      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.INJECTED }
       mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
       mockRecover.mockResolvedValue(recovered('eth_sendTransaction', [{ to: CONTRACT, data: '0xabcd', value: '0x0' }]))
       mockGetAddresses.mockResolvedValue([SIGNER])
@@ -1945,9 +2042,9 @@ describe('RequestPage', () => {
     it('should ask a web2 user to confirm once more before relaying', async () => {
       renderRequestPage()
       await userEvent.click(await screen.findByTestId('transfer-confirm-approve'))
-      expect(await screen.findByTestId('transaction-confirm-dialog')).toBeInTheDocument()
+      expect(await screen.findByTestId('confirm-request-dialog')).toHaveAttribute('data-gas-covered', 'true')
       expect(sendMetaTransaction).not.toHaveBeenCalled()
-      await userEvent.click(screen.getByTestId('transaction-confirm-dialog-confirm'))
+      await userEvent.click(screen.getByTestId('confirm-request-confirm'))
       await screen.findByTestId('transfer-completed')
       expect(sendMetaTransaction).toHaveBeenCalledTimes(1)
     })
@@ -1971,7 +2068,6 @@ describe('RequestPage', () => {
 
   describe('when the request is a transfer on a verified Decentraland collection', () => {
     beforeEach(() => {
-      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.INJECTED }
       mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
       mockRecover.mockResolvedValue(recovered('eth_sendTransaction', [{ to: COLLECTION, data: '0x23b872dd', value: '0x0' }]))
       mockGetAddresses.mockResolvedValue([SIGNER])
@@ -1995,6 +2091,7 @@ describe('RequestPage', () => {
       mockSimulateTransaction.mockResolvedValue(exactGiftSimulation)
       jest.mocked(sendMetaTransaction).mockResolvedValue('0xrelayedhash')
       mockSendSuccessfulOutcome.mockResolvedValue({})
+      mockSendFailedOutcome.mockResolvedValue({})
     })
 
     afterEach(() => {
@@ -2059,8 +2156,7 @@ describe('RequestPage', () => {
         expect(await screen.findByTestId('transfer-confirm')).toBeInTheDocument()
       })
 
-      it('should keep the denial when the user denies before the simulation matches', async () => {
-        mockSendFailedOutcome.mockResolvedValue({})
+      it('should keep a denial given before the simulation matches', async () => {
         renderRequestPage()
         await userEvent.click(await screen.findByTestId('wallet-interaction-deny'))
         await screen.findByTestId('denied-wallet-interaction')
@@ -2132,7 +2228,6 @@ describe('RequestPage', () => {
 
   describe('when a transfer decodes on a Decentraland contract that is not a collection', () => {
     beforeEach(() => {
-      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.INJECTED }
       mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
       mockRecover.mockResolvedValue(recovered('eth_sendTransaction', [{ to: CONTRACT, data: '0x23b872dd', value: '0x0' }]))
       mockGetAddresses.mockResolvedValue([SIGNER])
@@ -2161,18 +2256,17 @@ describe('RequestPage', () => {
 
   describe('when the request is a MetaTransaction signature for a Decentraland contract', () => {
     beforeEach(() => {
-      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.INJECTED }
       mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
       mockRecover.mockResolvedValue(recovered('eth_signTypedData_v4', [SIGNER, '{"primaryType":"MetaTransaction"}']))
       mockGetAddresses.mockResolvedValue([SIGNER])
       mockClassifyRequest.mockResolvedValue(dclMetaTransaction())
       // A preview with something to check: the user's own transfer.
-      mockSimulateTransaction.mockResolvedValue({
-        ...emptySimulation,
-        assetChanges: [{ ...exactGiftSimulation.assetChanges[0], standard: 'erc20', contractAddress: '0xmana', amount: '5' }]
-      })
+      mockSimulateTransaction.mockResolvedValue(
+        simulationOf({ assetChanges: [erc721Transfer({ standard: 'erc20', contractAddress: '0xmana', amount: '5' })] })
+      )
       mockWalletRequest.mockResolvedValue('0xsignature')
       mockSendSuccessfulOutcome.mockResolvedValue({})
+      mockSendFailedOutcome.mockResolvedValue({})
     })
 
     it('should render the signature review naming the decoded call and the contract', async () => {
@@ -2191,19 +2285,19 @@ describe('RequestPage', () => {
         chainId: 137,
         from: CONTRACT,
         to: CONTRACT,
-        data: '0xdeadbeefabc123',
+        data: `0xdeadbeef${SIGNER.slice(2)}`,
         value: '0'
       })
     })
 
-    it('should not require acknowledgment when the preview shows the transfer and no dangerous changes', async () => {
+    it('should not require acknowledgment for a preview that shows the transfer and no dangerous changes', async () => {
       renderRequestPage()
       const view = await screen.findByTestId('signature-request')
       await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
       expect(view).toHaveAttribute('data-requires-acknowledgment', 'false')
     })
 
-    it('should forward the signature request to the wallet verbatim on approval', async () => {
+    it('should hand the wallet the signer and the typed data on approval', async () => {
       renderRequestPage()
       const view = await screen.findByTestId('signature-request')
       await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
@@ -2219,7 +2313,7 @@ describe('RequestPage', () => {
     describe('and the preview shows no visible effects', () => {
       beforeEach(() => {
         // e.g. setMinters or transferCreatorship: succeeds, moves nothing, grants no allowance.
-        mockSimulateTransaction.mockResolvedValue(emptySimulation)
+        mockSimulateTransaction.mockResolvedValue(simulationOf())
       })
 
       it('should require an acknowledgment because the call may change state the preview cannot show', async () => {
@@ -2232,7 +2326,7 @@ describe('RequestPage', () => {
 
     describe('and the inner call reverts', () => {
       beforeEach(() => {
-        mockSimulateTransaction.mockResolvedValue({ ...emptySimulation, status: 'reverted', error: 'Trade not effective yet' })
+        mockSimulateTransaction.mockResolvedValue(simulationOf({ status: 'reverted', error: 'Trade not effective yet' }))
       })
 
       it('should require acknowledgment because the call can be relayed once it stops reverting', async () => {
@@ -2259,7 +2353,6 @@ describe('RequestPage', () => {
     describe('and the server rejects the call itself', () => {
       beforeEach(() => {
         mockSimulateTransaction.mockRejectedValue(new SimulationUnavailableError('status 400', 400))
-        mockSendFailedOutcome.mockResolvedValue({})
       })
 
       it('should show the signing error view instead of an unpreviewable signature', async () => {
@@ -2288,7 +2381,6 @@ describe('RequestPage', () => {
               rejectSimulation = reject
             })
         )
-        mockSendFailedOutcome.mockResolvedValue({})
       })
 
       describe('and the server then rejects the call', () => {
@@ -2306,95 +2398,21 @@ describe('RequestPage', () => {
   })
 
   describe('when the request id changes while the page stays mounted', () => {
-    const OTHER_REQUEST_ID = 'other-request-456'
-    const NavigateToOther = () => {
-      const navigate = useNavigate()
-      return (
-        <button data-testid="go-to-other" onClick={() => navigate(`/auth/requests/${OTHER_REQUEST_ID}?targetConfigId=default`)}>
-          other
-        </button>
-      )
-    }
-    const renderMountedPage = () =>
-      render(
-        <MemoryRouter initialEntries={[`/auth/requests/${REQUEST_ID}?targetConfigId=default`]}>
-          <FeatureFlagsContext.Provider value={{ flags: mockFlags as any, variants: {} as any, initialized: mockFlagsInitialized }}>
-            <Routes>
-              <Route
-                path="/auth/requests/:requestId"
-                element={
-                  <>
-                    <RequestPage />
-                    <NavigateToOther />
-                  </>
-                }
-              />
-            </Routes>
-          </FeatureFlagsContext.Provider>
-        </MemoryRouter>
-      )
+    let otherRequestId: string
+    let NavigateToOther: () => JSX.Element
+    let renderMountedPage: () => ReturnType<typeof render>
 
     beforeEach(() => {
-      // These tests queue one-shot values; clearAllMocks does not drain unused queues, so start clean.
-      mockRecover.mockReset()
-      mockSimulateTransaction.mockReset()
-      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.MAGIC }
-      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
-      mockRecover.mockResolvedValue(recovered('eth_sendTransaction', [{ to: CONTRACT, data: '0xabcd', value: '0x0' }]))
-      mockGetAddresses.mockResolvedValue([SIGNER])
-      mockClassifyRequest.mockResolvedValue(dclTransaction())
-      jest.mocked(sendMetaTransaction).mockResolvedValue('0xrelayedhash')
-      // The first request previews; the second never resolves, so any "ready" state seen after the
-      // change can only be stale.
-      mockSimulateTransaction.mockResolvedValueOnce(emptySimulation).mockImplementationOnce(() => new Promise(() => undefined))
-    })
-
-    afterEach(() => {
-      mockRecover.mockReset()
-      mockSimulateTransaction.mockReset()
-    })
-
-    it('should drop the previous preview and show the loading view before anything of the new request', async () => {
-      renderMountedPage()
-      const view = await screen.findByTestId('wallet-interaction')
-      await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
-      // Hold the new request's recovery so the state between the change and the new preview is observable.
-      mockRecover.mockImplementationOnce(() => new Promise(() => undefined))
-      await userEvent.click(screen.getByTestId('go-to-other'))
-      expect(await screen.findByTestId('loading-request')).toBeInTheDocument()
-      expect(screen.queryByTestId('wallet-interaction')).not.toBeInTheDocument()
-    })
-
-    it('should recover the new request and preview it from scratch instead of reusing the old summary', async () => {
-      renderMountedPage()
-      const view = await screen.findByTestId('wallet-interaction')
-      await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
-      await userEvent.click(screen.getByTestId('go-to-other'))
-      const fresh = await screen.findByTestId('wallet-interaction')
-      expect(mockRecover.mock.calls.some(call => call[0] === OTHER_REQUEST_ID)).toBe(true)
-      expect(fresh).toHaveAttribute('data-sim', 'loading')
-    })
-
-    describe('and the change is observed commit by commit', () => {
-      let approvalUiAtCommit: boolean[]
-      let CommitProbe: ({ children }: { children: React.ReactNode }) => JSX.Element
-
-      beforeEach(() => {
-        approvalUiAtCommit = []
-        // A layout effect runs in the same commit as the DOM update, before any passive effect, so it
-        // sees exactly what the user would see on that render.
-        CommitProbe = ({ children }: { children: React.ReactNode }) => {
-          // The route element is a stable reference, so the probe must subscribe to the location
-          // itself to be re-rendered, and thus record, on the commit that changes the route.
-          useLocation()
-          useLayoutEffect(() => {
-            approvalUiAtCommit.push(screen.queryByTestId('wallet-interaction-approve') !== null)
-          })
-          return <>{children}</>
-        }
-      })
-
-      it('should show no approval UI on the very commit the route id changes, before any effect runs', async () => {
+      otherRequestId = 'other-request-456'
+      NavigateToOther = () => {
+        const navigate = useNavigate()
+        return (
+          <button data-testid="go-to-other" onClick={() => navigate(`/auth/requests/${otherRequestId}?targetConfigId=default`)}>
+            other
+          </button>
+        )
+      }
+      renderMountedPage = () =>
         render(
           <MemoryRouter initialEntries={[`/auth/requests/${REQUEST_ID}?targetConfigId=default`]}>
             <FeatureFlagsContext.Provider value={{ flags: mockFlags as any, variants: {} as any, initialized: mockFlagsInitialized }}>
@@ -2402,37 +2420,125 @@ describe('RequestPage', () => {
                 <Route
                   path="/auth/requests/:requestId"
                   element={
-                    <CommitProbe>
+                    <>
                       <RequestPage />
                       <NavigateToOther />
-                    </CommitProbe>
+                    </>
                   }
                 />
               </Routes>
             </FeatureFlagsContext.Provider>
           </MemoryRouter>
         )
+      // These tests queue one-shot values; clearAllMocks does not drain unused queues, so start clean.
+      mockRecover.mockReset()
+      mockSimulateTransaction.mockReset()
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockGetAddresses.mockResolvedValue([SIGNER])
+      mockClassifyRequest.mockResolvedValue(dclTransaction())
+      jest.mocked(sendMetaTransaction).mockResolvedValue('0xrelayedhash')
+      mockSendSuccessfulOutcome.mockResolvedValue({})
+      // The first request previews; the second never resolves, so any "ready" state seen after the
+      // change can only be stale.
+      mockSimulateTransaction.mockResolvedValueOnce(simulationOf()).mockImplementationOnce(() => new Promise(() => undefined))
+    })
+
+    afterEach(() => {
+      mockRecover.mockReset()
+      mockSimulateTransaction.mockReset()
+    })
+
+    describe('and the new request is recovered normally', () => {
+      beforeEach(() => {
+        mockRecover.mockResolvedValue(recovered('eth_sendTransaction', [{ to: CONTRACT, data: '0xabcd', value: '0x0' }]))
+      })
+
+      it('should recover the new request and preview it from scratch instead of reusing the old summary', async () => {
+        renderMountedPage()
         const view = await screen.findByTestId('wallet-interaction')
         await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
-        expect(screen.getByTestId('wallet-interaction-approve')).toBeInTheDocument()
-        mockRecover.mockImplementationOnce(() => new Promise(() => undefined))
-        const commitsBefore = approvalUiAtCommit.length
         await userEvent.click(screen.getByTestId('go-to-other'))
-        expect(approvalUiAtCommit.length).toBeGreaterThan(commitsBefore)
-        expect(approvalUiAtCommit.slice(commitsBefore).some(present => present)).toBe(false)
+        const fresh = await screen.findByTestId('wallet-interaction')
+        expect(mockRecover.mock.calls.some(call => call[0] === otherRequestId)).toBe(true)
+        expect(fresh).toHaveAttribute('data-sim', 'loading')
+      })
+
+      it('should load the new request even though the previous one was completed', async () => {
+        renderMountedPage()
+        const view = await screen.findByTestId('wallet-interaction')
+        await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+        await userEvent.click(screen.getByTestId('wallet-interaction-approve'))
+        await screen.findByTestId('wallet-interaction-complete')
+        await userEvent.click(screen.getByTestId('go-to-other'))
+        await waitFor(() => expect(mockRecover.mock.calls.some(call => call[0] === otherRequestId)).toBe(true))
+        expect(screen.queryByTestId('wallet-interaction-complete')).not.toBeInTheDocument()
       })
     })
 
-    it('should load the new request even though the previous one was completed', async () => {
-      mockSendSuccessfulOutcome.mockResolvedValue({})
-      renderMountedPage()
-      const view = await screen.findByTestId('wallet-interaction')
-      await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
-      await userEvent.click(screen.getByTestId('wallet-interaction-approve'))
-      await screen.findByTestId('wallet-interaction-complete')
-      await userEvent.click(screen.getByTestId('go-to-other'))
-      await waitFor(() => expect(mockRecover.mock.calls.some(call => call[0] === OTHER_REQUEST_ID)).toBe(true))
-      expect(screen.queryByTestId('wallet-interaction-complete')).not.toBeInTheDocument()
+    describe("and the new request's recovery is held", () => {
+      beforeEach(() => {
+        // The first recovery resolves; the second is held so the state between the change and the new
+        // preview is observable.
+        mockRecover
+          .mockResolvedValueOnce(recovered('eth_sendTransaction', [{ to: CONTRACT, data: '0xabcd', value: '0x0' }]))
+          .mockImplementation(() => new Promise(() => undefined))
+      })
+
+      it('should drop the previous preview and show the loading view before anything of the new request', async () => {
+        renderMountedPage()
+        const view = await screen.findByTestId('wallet-interaction')
+        await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+        await userEvent.click(screen.getByTestId('go-to-other'))
+        expect(await screen.findByTestId('loading-request')).toBeInTheDocument()
+        expect(screen.queryByTestId('wallet-interaction')).not.toBeInTheDocument()
+      })
+
+      describe('and the change is observed commit by commit', () => {
+        let approvalUiAtCommit: boolean[]
+        let CommitProbe: ({ children }: { children: React.ReactNode }) => JSX.Element
+
+        beforeEach(() => {
+          approvalUiAtCommit = []
+          // A layout effect runs in the same commit as the DOM update, before any passive effect, so it
+          // sees exactly what the user would see on that render.
+          CommitProbe = ({ children }: { children: React.ReactNode }) => {
+            // The route element is a stable reference, so the probe must subscribe to the location
+            // itself to be re-rendered, and thus record, on the commit that changes the route.
+            useLocation()
+            useLayoutEffect(() => {
+              approvalUiAtCommit.push(screen.queryByTestId('wallet-interaction-approve') !== null)
+            })
+            return <>{children}</>
+          }
+        })
+
+        it('should show no approval UI on the very commit the route id changes, before any effect runs', async () => {
+          render(
+            <MemoryRouter initialEntries={[`/auth/requests/${REQUEST_ID}?targetConfigId=default`]}>
+              <FeatureFlagsContext.Provider value={{ flags: mockFlags as any, variants: {} as any, initialized: mockFlagsInitialized }}>
+                <Routes>
+                  <Route
+                    path="/auth/requests/:requestId"
+                    element={
+                      <CommitProbe>
+                        <RequestPage />
+                        <NavigateToOther />
+                      </CommitProbe>
+                    }
+                  />
+                </Routes>
+              </FeatureFlagsContext.Provider>
+            </MemoryRouter>
+          )
+          const view = await screen.findByTestId('wallet-interaction')
+          await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+          expect(screen.getByTestId('wallet-interaction-approve')).toBeInTheDocument()
+          const commitsBefore = approvalUiAtCommit.length
+          await userEvent.click(screen.getByTestId('go-to-other'))
+          expect(approvalUiAtCommit.length).toBeGreaterThan(commitsBefore)
+          expect(approvalUiAtCommit.slice(commitsBefore).some(present => present)).toBe(false)
+        })
+      })
     })
   })
 })

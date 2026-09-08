@@ -1104,18 +1104,23 @@ describe('when building the signin deep link', () => {
 })
 
 describe('when testing buildSendTransactionSimulationPayload', () => {
-  const signerAddress = '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd'
-  const contract: KnownContract = {
-    name: 'MANAToken' as KnownContract['name'],
-    address: '0xa1c57f48f0deb89f569dfbe6e2b7f46d33606fd4',
-    chainId: 137,
-    abi: [],
-    domainName: '(PoS) Decentraland MANA',
-    domainVersion: '1',
-    supportsMetaTransactions: true,
-    calldataField: 'functionSignature'
-  }
+  let signerAddress: string
+  let contract: KnownContract
   let transaction: Extract<RequestClassification, { kind: 'dcl_transaction' }>
+
+  beforeEach(() => {
+    signerAddress = '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd'
+    contract = {
+      name: 'MANAToken' as KnownContract['name'],
+      address: '0xa1c57f48f0deb89f569dfbe6e2b7f46d33606fd4',
+      chainId: 137,
+      abi: [],
+      domainName: '(PoS) Decentraland MANA',
+      domainVersion: '1',
+      supportsMetaTransactions: true,
+      calldataField: 'functionSignature'
+    }
+  })
 
   describe('and the transaction will be relayed as a meta-transaction', () => {
     beforeEach(() => {

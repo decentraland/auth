@@ -109,7 +109,11 @@
       "approval_can_spend_symbol": "可以使用 {symbol}",
       "approval_can_no_longer_spend": "不再可以使用 {symbol}",
       "approval_allowance_revoked": "已撤销 {symbol} 的使用授权",
-      "approval_token_approval_revoked": "已撤销 {token} #{tokenId} 的转移授权"
+      "approval_token_approval_revoked": "已撤销 {token} #{tokenId} 的转移授权",
+      "title_signature": "确认签名",
+      "summary_transaction": "您的钱包现在将发送此交易。",
+      "summary_signature": "您的钱包现在将签署此请求。",
+      "fee_estimate": "预估费用：{cost} {symbol}"
     },
     "signature": {
       "title": "确认签名",

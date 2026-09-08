@@ -1,7 +1,7 @@
 import { AbiFunction, encodeFunctionData } from 'viem'
 import { ChainId } from '@dcl/schemas/dist/dapps/chain-id'
 import { ContractName, ErrorCode, MetaTransactionError, getContract, sendMetaTransaction } from 'decentraland-transactions'
-import { classifyRequest } from '../../components/Pages/RequestPage/classifyRequest'
+import { RequestClassification, classifyRequest } from '../../components/Pages/RequestPage/classifyRequest'
 import { ContractResolution, getCollectionContract, getKnownDecentralandContract } from './decentralandContracts'
 import { buildMetaTransactionSimulationPayload } from './metaTransactionSimulation'
 import { resolveMetaTransactionTypedData } from './metaTransactionTypedData'
@@ -152,30 +152,37 @@ describe('when decentraland-transactions builds a meta-transaction request', () 
         })
       })
 
-      it('should classify as a Decentraland meta-transaction with the relayed call decoded', async () => {
-        // Registry contracts resolve statically; the collection resolves the way the page resolves one
-        // the transactions-server vouches for.
-        const resolveContract = async (address: string, chain: number): Promise<ContractResolution> => {
-          const known = getKnownDecentralandContract(address, chain)
-          if (known) return { status: 'found', contract: known }
-          const collection = getCollectionContract(address, chain)
-          return address.toLowerCase() === COLLECTION_ADDRESS && collection
-            ? { status: 'found', contract: collection }
-            : { status: 'not_found' }
-        }
-        const classification = await classifyRequest(
-          { sender: USER, expiration: '', method: METHOD, params: signParams },
-          { signerAddress: USER, connectedChainId: chainId, metaTransactionChainId: chainId, resolveContract }
-        )
-        expect(classification).toEqual(
-          expect.objectContaining({
-            kind: 'dcl_meta_transaction',
-            calldata,
-            chainId,
-            contract: expect.objectContaining({ address: contract.address.toLowerCase(), calldataField }),
-            call: expect.objectContaining({ functionName, payable: false })
-          })
-        )
+      describe('and the captured request is classified', () => {
+        let classification: RequestClassification
+
+        beforeEach(async () => {
+          // Registry contracts resolve statically; the collection resolves the way the page resolves one a
+          // collection factory deployed.
+          const resolveContract = async (address: string, chain: number): Promise<ContractResolution> => {
+            const known = getKnownDecentralandContract(address, chain)
+            if (known) return { status: 'found', contract: known }
+            const collection = getCollectionContract(address, chain)
+            return address.toLowerCase() === COLLECTION_ADDRESS && collection
+              ? { status: 'found', contract: collection }
+              : { status: 'not_found' }
+          }
+          classification = await classifyRequest(
+            { sender: USER, expiration: '', method: METHOD, params: signParams },
+            { signerAddress: USER, connectedChainId: chainId, metaTransactionChainId: chainId, resolveContract }
+          )
+        })
+
+        it('should classify it as a Decentraland meta-transaction with the relayed call decoded', () => {
+          expect(classification).toEqual(
+            expect.objectContaining({
+              kind: 'dcl_meta_transaction',
+              calldata,
+              chainId,
+              contract: expect.objectContaining({ address: contract.address.toLowerCase(), calldataField }),
+              call: expect.objectContaining({ functionName, payable: false })
+            })
+          )
+        })
       })
     }
   )

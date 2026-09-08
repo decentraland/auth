@@ -76,6 +76,7 @@ import {
 } from './utils'
 import {
   ClientLoginError,
+  ConfirmRequestDialog,
   ContinueInApp,
   DeniedWalletInteraction,
   DifferentAccountError,
@@ -85,7 +86,6 @@ import {
   SignatureRequestView,
   SigningError,
   TimeoutError,
-  TransactionConfirmDialog,
   TransferCanceledView,
   TransferCompletedView,
   TransferConfirmView,
@@ -93,7 +93,9 @@ import {
   WalletInteraction,
   WalletInteractionComplete
 } from './Views'
+import { ConfirmRequestGas } from './Views/ConfirmRequestDialog'
 import { UnverifiedRequestViewProps } from './Views/UnverifiedRequest'
+import { forwardSignatureRequest, toWalletSignatureRequest } from './walletSignatureRequest'
 
 enum View {
   TIMEOUT,
@@ -234,7 +236,7 @@ export const RequestPage = () => {
   const [gasEstimate, setGasEstimate] = useState<GasEstimateState | null>(null)
   const [nftTransferData, setNftTransferData] = useState<NFTTransferData | null>(null)
   const [manaTransferData, setManaTransferData] = useState<MANATransferData | null>(null)
-  // The web2 second confirmation step of the branded tip and gift screens.
+  // The confirmation dialog web2 users get on every Allow (see handleApproveWalletInteraction).
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false)
   const [simulationState, setSimulationState] = useState<SimulationState>({ status: 'idle' })
   // Resolved counterparty display names (lowercased address → name), filled in progressively.
@@ -297,8 +299,8 @@ export const RequestPage = () => {
   const skipSetup = useSkipSetup()
   // Social / web2 wallets (Magic and Thirdweb) sign without their own confirmation UI. Every review
   // screen is the same for them and for external wallets; the one place the distinction survives is
-  // the branded tip and gift screens, where web2 users get a second confirmation modal before the
-  // relay because nothing else will ask them again.
+  // Allow itself, where web2 users get a confirmation dialog before the request executes because
+  // nothing else will ask them again.
   const isUserUsingWeb2Wallet = isSocialProviderType(providerType)
   const authServerClient = useRef(createAuthServerHttpClient())
   // The deep-link flow (opted in via `?flow=deeplink`, compared case-insensitively) has no
@@ -1096,13 +1098,9 @@ export const RequestPage = () => {
           params: [{ ...transactionParams, from: signerAddress, chainId: `0x${reviewedChainId.toString(16)}` }]
         })
       } else {
-        // Signatures carry no `to` address and are never relayed — forward them straight to the
-        // wallet. The `as` casts satisfy viem's typed request signature; the real method and params
-        // are passed through unchanged at runtime.
-        result = await walletClient.request({
-          method: method as 'eth_sendTransaction',
-          params: requestRef.current.params as [Record<string, unknown>]
-        })
+        // Signatures carry no `to` address and are never relayed — forward them to the wallet in the
+        // exact shape its schema gives the method (see toWalletSignatureRequest).
+        result = await forwardSignatureRequest(walletClient, toWalletSignatureRequest(method, requestRef.current.params))
       }
 
       hasWalletResult = true
@@ -1199,9 +1197,9 @@ export const RequestPage = () => {
     }
   }, [isUserUsingWeb2Wallet, nftTransferData, manaTransferData, requestId, identity, showInteractionCompleteView, restartTransactionReview])
 
-  // The branded tip and gift screens: web2 users get a second confirmation modal before the relay,
-  // external wallets go straight to their own prompt.
-  const handleApproveBrandedTransfer = useCallback(async () => {
+  // Allow, on every review: web2 users get a confirmation dialog first, since their wallet has no
+  // prompt of its own; external wallets go straight to theirs.
+  const handleApproveWalletInteraction = useCallback(async () => {
     if (isUserUsingWeb2Wallet) {
       setIsTransactionModalOpen(true)
     } else {
@@ -1272,6 +1270,37 @@ export const RequestPage = () => {
   // records together with its reset.
   const renderedView = loadedRequestId === requestId && loadedAccount === account ? view : View.LOADING_REQUEST
 
+  // What the confirmation dialog says the request will cost: covered by the relay, or the wallet's own
+  // estimate for a plain send. Signatures are gasless and show no line.
+  const isPlainSend =
+    (classification?.kind === 'dcl_transaction' && !classification.relayed) ||
+    classification?.kind === 'unknown_transaction' ||
+    classification?.kind === 'native_transfer'
+  const confirmGas: ConfirmRequestGas | undefined =
+    classification?.kind === 'dcl_transaction' && classification.relayed
+      ? { covered: true }
+      : isPlainSend
+        ? gasEstimate?.status === 'ready'
+          ? { covered: false, status: 'ready', cost: gasEstimate.cost, chainId: classification.chainId }
+          : gasEstimate?.status === 'unavailable'
+            ? { covered: false, status: 'unavailable' }
+            : { covered: false, status: 'loading' }
+        : undefined
+  const isTransactionRequest =
+    classification?.kind === 'dcl_transaction' ||
+    classification?.kind === 'unknown_transaction' ||
+    classification?.kind === 'native_transfer'
+  const confirmDialog = (
+    <ConfirmRequestDialog
+      open={isTransactionModalOpen}
+      kind={isTransactionRequest ? 'transaction' : 'signature'}
+      gas={confirmGas}
+      isLoading={isLoading}
+      onCancel={() => setIsTransactionModalOpen(false)}
+      onConfirm={onApproveWalletInteraction}
+    />
+  )
+
   switch (renderedView) {
     case View.TIMEOUT:
       return <TimeoutError requestId={requestId} />
@@ -1320,36 +1349,26 @@ export const RequestPage = () => {
     case View.WALLET_NFT_INTERACTION:
       return nftTransferData ? (
         <>
-          <TransactionConfirmDialog
-            open={isTransactionModalOpen}
-            isLoading={isLoading}
-            onCancel={onDenyWalletInteraction}
-            onConfirm={onApproveWalletInteraction}
-          />
+          {confirmDialog}
           <TransferConfirmView
             type={TransferType.GIFT}
             transferData={nftTransferData}
             isLoading={isLoading}
             onDeny={onDenyWalletInteraction}
-            onApprove={handleApproveBrandedTransfer}
+            onApprove={handleApproveWalletInteraction}
           />
         </>
       ) : null
     case View.WALLET_MANA_INTERACTION:
       return manaTransferData ? (
         <>
-          <TransactionConfirmDialog
-            open={isTransactionModalOpen}
-            isLoading={isLoading}
-            onCancel={onDenyWalletInteraction}
-            onConfirm={onApproveWalletInteraction}
-          />
+          {confirmDialog}
           <TransferConfirmView
             type={TransferType.TIP}
             transferData={manaTransferData}
             isLoading={isLoading}
             onDeny={onDenyWalletInteraction}
-            onApprove={handleApproveBrandedTransfer}
+            onApprove={handleApproveWalletInteraction}
           />
         </>
       ) : null
@@ -1363,66 +1382,75 @@ export const RequestPage = () => {
             ? ({ covered: false, status: 'unavailable' } as const)
             : ({ covered: false, status: 'loading' } as const)
       return (
-        <WalletInteraction
-          key={requestId}
-          requestId={requestId}
-          functionName={classification.call.functionName}
-          contractName={classification.contract.domainName}
-          isLoading={isLoading}
-          simulation={simulationState}
-          userAddress={account ?? ''}
-          profiles={simulationProfiles}
-          verifiedContracts={simulationVerified}
-          chainId={simulationChainId}
-          requiresAcknowledgment={requiresApprovalAcknowledgment}
-          gas={gas}
-          isReverted={isSimulationReverted}
-          reviewRestarted={reviewRestartReason !== null}
-          onDeny={onDenyWalletInteraction}
-          onApprove={onApproveWalletInteraction}
-        />
+        <>
+          {confirmDialog}
+          <WalletInteraction
+            key={requestId}
+            requestId={requestId}
+            functionName={classification.call.functionName}
+            contractName={classification.contract.domainName}
+            isLoading={isLoading}
+            simulation={simulationState}
+            userAddress={account ?? ''}
+            profiles={simulationProfiles}
+            verifiedContracts={simulationVerified}
+            chainId={simulationChainId}
+            requiresAcknowledgment={requiresApprovalAcknowledgment}
+            gas={gas}
+            isReverted={isSimulationReverted}
+            reviewRestarted={reviewRestartReason !== null}
+            onDeny={onDenyWalletInteraction}
+            onApprove={handleApproveWalletInteraction}
+          />
+        </>
       )
     }
     case View.WALLET_SIGNATURE_INTERACTION:
       if (classification?.kind !== 'dcl_meta_transaction') return null
       return (
-        <SignatureRequestView
-          key={requestId}
-          requestId={requestId}
-          method={requestRef.current?.method ?? ''}
-          raw={classification.raw}
-          verifyingContract={classification.contract.address}
-          functionName={classification.call.functionName}
-          contractName={classification.contract.domainName}
-          simulation={simulationState}
-          userAddress={account ?? ''}
-          profiles={simulationProfiles}
-          verifiedContracts={simulationVerified}
-          chainId={simulationChainId}
-          requiresAcknowledgment={requiresApprovalAcknowledgment}
-          isLoading={isLoading}
-          onDeny={onDenyWalletInteraction}
-          onApprove={onApproveWalletInteraction}
-        />
+        <>
+          {confirmDialog}
+          <SignatureRequestView
+            key={requestId}
+            requestId={requestId}
+            method={requestRef.current?.method ?? ''}
+            raw={classification.raw}
+            verifyingContract={classification.contract.address}
+            functionName={classification.call.functionName}
+            contractName={classification.contract.domainName}
+            simulation={simulationState}
+            userAddress={account ?? ''}
+            profiles={simulationProfiles}
+            verifiedContracts={simulationVerified}
+            chainId={simulationChainId}
+            requiresAcknowledgment={requiresApprovalAcknowledgment}
+            isLoading={isLoading}
+            onDeny={onDenyWalletInteraction}
+            onApprove={handleApproveWalletInteraction}
+          />
+        </>
       )
     case View.WALLET_UNVERIFIED_INTERACTION: {
       const unverified = classification ? getUnverifiedRequestProps(classification) : null
       if (!classification || !unverified) return null
       const isTransactionKind = unverified.kind === 'unknown_transaction' || unverified.kind === 'native_transfer'
       return (
-        <UnverifiedRequestView
-          key={requestId}
-          requestId={requestId}
-          method={requestRef.current?.method ?? ''}
-          {...unverified}
-          gas={isTransactionKind ? (gasEstimate ?? { status: 'loading' }) : undefined}
-          balance={isTransactionKind ? walletInfo?.balance : undefined}
-          payloadFingerprint={getPayloadFingerprint(classification)}
-          isLoading={isLoading}
-          reviewRestarted={reviewRestartReason !== null}
-          onDeny={onDenyWalletInteraction}
-          onApprove={onApproveWalletInteraction}
-        />
+        <>
+          {confirmDialog}
+          <UnverifiedRequestView
+            key={requestId}
+            requestId={requestId}
+            method={requestRef.current?.method ?? ''}
+            {...unverified}
+            gas={isTransactionKind ? (gasEstimate ?? { status: 'loading' }) : undefined}
+            balance={isTransactionKind ? walletInfo?.balance : undefined}
+            payloadFingerprint={getPayloadFingerprint(classification)}
+            isLoading={isLoading}
+            reviewRestarted={reviewRestartReason !== null}
+            onDeny={onDenyWalletInteraction}
+            onApprove={handleApproveWalletInteraction}
+          />
+        </>
       )
     }
     default:

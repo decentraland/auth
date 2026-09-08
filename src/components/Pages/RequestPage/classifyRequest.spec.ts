@@ -258,14 +258,15 @@ describe('when classifying a request', () => {
     })
 
     describe('and the collection lookup could not answer', () => {
+      let request: RecoverResponse
+
       beforeEach(() => {
         resolveContract.mockResolvedValueOnce(unavailable)
+        request = transactionRequest({ to: COLLECTION_ADDRESS, data: approveCalldata, value: '0x0' })
       })
 
       it('should throw a contract lookup unavailable error instead of classifying', async () => {
-        await expect(
-          classifyRequest(transactionRequest({ to: COLLECTION_ADDRESS, data: approveCalldata, value: '0x0' }), context)
-        ).rejects.toBeInstanceOf(ContractLookupUnavailableError)
+        await expect(classifyRequest(request, context)).rejects.toBeInstanceOf(ContractLookupUnavailableError)
       })
     })
 
@@ -580,7 +581,7 @@ describe('when classifying a request', () => {
   describe('and it is a personal_sign', () => {
     describe('and the message is hex-encoded text', () => {
       beforeEach(async () => {
-        classification = await classifyRequest(personalSignRequest(stringToHex('Hello, world').toUpperCase().replace('0X', '0X')), context)
+        classification = await classifyRequest(personalSignRequest(`0X${stringToHex('Hello, world').slice(2).toUpperCase()}`), context)
       })
 
       it('should decode the text and keep the bytes lowercased', () => {
@@ -627,10 +628,14 @@ describe('when classifying a request', () => {
   })
 
   describe('and the method is not one the page handles', () => {
-    it('should throw', async () => {
-      await expect(classifyRequest({ sender: USER, expiration: '', method: 'eth_sign', params: [] }, context)).rejects.toThrow(
-        'not supported'
-      )
+    let request: RecoverResponse
+
+    beforeEach(() => {
+      request = { sender: USER, expiration: '', method: 'eth_sign', params: [] }
+    })
+
+    it('should throw an unsupported method error', async () => {
+      await expect(classifyRequest(request, context)).rejects.toThrow('not supported')
     })
   })
 })

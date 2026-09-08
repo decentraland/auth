@@ -42,12 +42,12 @@ const transferResult: SimulationResponseBody = {
 describe('when rendering the SignatureRequestView', () => {
   let onApprove: jest.Mock
   let onDeny: jest.Mock
-  let baseProps: SignatureRequestViewProps
+  let props: SignatureRequestViewProps
 
   beforeEach(() => {
     onApprove = jest.fn()
     onDeny = jest.fn()
-    baseProps = {
+    props = {
       requestId: 'r1',
       method: 'eth_signTypedData_v4',
       raw: '{"primaryType":"MetaTransaction"}',
@@ -68,113 +68,134 @@ describe('when rendering the SignatureRequestView', () => {
 
   describe('and the simulation is ready', () => {
     it('should render the simulated asset summary instead of the raw payload', () => {
-      render(<SignatureRequestView {...baseProps} />)
+      render(<SignatureRequestView {...props} />)
       expect(screen.getByText('5 MANA')).toBeInTheDocument()
       expect(screen.queryByTestId('signature-raw')).not.toBeInTheDocument()
     })
 
     it('should name the decoded call and the contract', () => {
-      render(<SignatureRequestView {...baseProps} />)
+      render(<SignatureRequestView {...props} />)
       expect(screen.getByTestId('signature-call')).toHaveTextContent('request.wallet_interaction.calls_function')
     })
 
     it('should link the verifying contract to the block explorer of its chain', () => {
-      render(<SignatureRequestView {...baseProps} />)
+      render(<SignatureRequestView {...props} />)
       expect(screen.getByRole('link', { name: '0xa1c5…6fd4' })).toHaveAttribute('href', `https://polygonscan.com/address/${CONTRACT}`)
     })
 
     it('should explain that the signature can be submitted later', () => {
-      render(<SignatureRequestView {...baseProps} />)
+      render(<SignatureRequestView {...props} />)
       expect(screen.getByTestId('signature-meta-tx-notice')).toHaveTextContent('request.signature.meta_tx_notice')
     })
 
-    it('should reveal the raw payload when the raw toggle is clicked', async () => {
-      render(<SignatureRequestView {...baseProps} />)
-      const toggle = screen.getByText('request.signature.view_raw')
-      expect(toggle).toHaveAttribute('aria-expanded', 'false')
-      await userEvent.click(toggle)
+    it('should reveal the raw payload on the raw toggle click', async () => {
+      render(<SignatureRequestView {...props} />)
+      expect(screen.getByText('request.signature.view_raw')).toHaveAttribute('aria-expanded', 'false')
+      await userEvent.click(screen.getByText('request.signature.view_raw'))
       expect(screen.getByTestId('signature-raw')).toHaveTextContent('{"primaryType":"MetaTransaction"}')
       expect(screen.getByText('request.signature.hide_raw')).toHaveAttribute('aria-expanded', 'true')
     })
 
-    it('should approve on a single click when no acknowledgment is required', async () => {
-      render(<SignatureRequestView {...baseProps} />)
+    it('should approve on a single click without an acknowledgment', async () => {
+      render(<SignatureRequestView {...props} />)
       await userEvent.click(screen.getByTestId('signature-approve-button'))
       expect(onApprove).toHaveBeenCalledTimes(1)
     })
 
-    it('should call onDeny when the deny button is clicked', async () => {
-      render(<SignatureRequestView {...baseProps} />)
+    it('should call onDeny on the deny button click', async () => {
+      render(<SignatureRequestView {...props} />)
       await userEvent.click(screen.getByTestId('signature-deny-button'))
       expect(onDeny).toHaveBeenCalledTimes(1)
     })
   })
 
   describe('and the simulation is still loading', () => {
+    beforeEach(() => {
+      props = { ...props, simulation: { status: 'loading' } }
+    })
+
     it('should keep approval disabled until it resolves', () => {
-      render(<SignatureRequestView {...baseProps} simulation={{ status: 'loading' }} />)
+      render(<SignatureRequestView {...props} />)
       expect(screen.getByTestId('signature-approve-button')).toBeDisabled()
     })
   })
 
   describe('and an acknowledgment is required', () => {
+    beforeEach(() => {
+      props = { ...props, requiresAcknowledgment: true }
+    })
+
     it('should keep approval disabled until the acknowledgment is checked', async () => {
-      render(<SignatureRequestView {...baseProps} requiresAcknowledgment />)
+      render(<SignatureRequestView {...props} />)
       expect(screen.getByTestId('signature-approve-button')).toBeDisabled()
       await userEvent.click(screen.getByRole('checkbox'))
       expect(screen.getByTestId('signature-approve-button')).toBeEnabled()
     })
 
-    it('should word the acknowledgment for the granted access when the preview shows changes', () => {
-      render(<SignatureRequestView {...baseProps} requiresAcknowledgment />)
+    it('should word the acknowledgment for the granted access since the preview shows changes', () => {
+      render(<SignatureRequestView {...props} />)
       expect(screen.getByText('request.transaction_dialog.acknowledge_risk')).toBeInTheDocument()
     })
 
-    it('should clear the tick when the request changes', async () => {
-      const { rerender } = render(<SignatureRequestView {...baseProps} requiresAcknowledgment />)
-      await userEvent.click(screen.getByRole('checkbox'))
-      expect(screen.getByTestId('signature-approve-button')).toBeEnabled()
-      rerender(<SignatureRequestView {...baseProps} requestId="r2" requiresAcknowledgment />)
-      expect(screen.getByRole('checkbox')).not.toBeChecked()
-      expect(screen.getByTestId('signature-approve-button')).toBeDisabled()
-    })
-  })
+    describe('and the request changes after the user ticked it', () => {
+      let nextProps: SignatureRequestViewProps
 
-  describe('and the preview is unavailable', () => {
-    it('should word the acknowledgment for effects that could not be verified', () => {
-      render(<SignatureRequestView {...baseProps} simulation={{ status: 'unavailable' }} requiresAcknowledgment />)
-      expect(screen.getByText('request.signature.acknowledge_unverified')).toBeInTheDocument()
-    })
-  })
+      beforeEach(() => {
+        nextProps = { ...props, requestId: 'r2' }
+      })
 
-  describe('and the inner call reverts', () => {
-    let revertedResult: SimulationResponseBody
-
-    beforeEach(() => {
-      revertedResult = { ...transferResult, status: 'reverted', error: 'Trade not effective yet', assetChanges: [] }
+      it('should clear the tick in the same render', async () => {
+        const { rerender } = render(<SignatureRequestView {...props} />)
+        await userEvent.click(screen.getByRole('checkbox'))
+        expect(screen.getByTestId('signature-approve-button')).toBeEnabled()
+        rerender(<SignatureRequestView {...nextProps} />)
+        expect(screen.getByRole('checkbox')).not.toBeChecked()
+        expect(screen.getByTestId('signature-approve-button')).toBeDisabled()
+      })
     })
 
-    it('should explain that the action fails right now', () => {
-      render(<SignatureRequestView {...baseProps} simulation={{ status: 'ready', result: revertedResult }} requiresAcknowledgment />)
-      expect(screen.getByTestId('signature-meta-tx-reverted')).toBeInTheDocument()
+    describe('and the preview is unavailable', () => {
+      beforeEach(() => {
+        props = { ...props, simulation: { status: 'unavailable' } }
+      })
+
+      it('should word the acknowledgment for effects that could not be verified', () => {
+        render(<SignatureRequestView {...props} />)
+        expect(screen.getByText('request.signature.acknowledge_unverified')).toBeInTheDocument()
+      })
     })
 
-    it('should word the acknowledgment for effects that could not be verified', () => {
-      render(<SignatureRequestView {...baseProps} simulation={{ status: 'ready', result: revertedResult }} requiresAcknowledgment />)
-      expect(screen.getByText('request.signature.acknowledge_unverified')).toBeInTheDocument()
+    describe('and the inner call reverts', () => {
+      beforeEach(() => {
+        props = {
+          ...props,
+          simulation: {
+            status: 'ready',
+            result: { ...transferResult, status: 'reverted', error: 'Trade not effective yet', assetChanges: [] }
+          }
+        }
+      })
+
+      it('should explain that the action fails right now', () => {
+        render(<SignatureRequestView {...props} />)
+        expect(screen.getByTestId('signature-meta-tx-reverted')).toBeInTheDocument()
+      })
+
+      it('should word the acknowledgment for effects that could not be verified', () => {
+        render(<SignatureRequestView {...props} />)
+        expect(screen.getByText('request.signature.acknowledge_unverified')).toBeInTheDocument()
+      })
     })
-  })
 
-  describe('and the preview shows no visible effects', () => {
-    let emptyResult: SimulationResponseBody
+    describe('and the preview shows no visible effects', () => {
+      beforeEach(() => {
+        props = { ...props, simulation: { status: 'ready', result: { ...transferResult, assetChanges: [] } } }
+      })
 
-    beforeEach(() => {
-      emptyResult = { ...transferResult, assetChanges: [] }
-    })
-
-    it('should word the acknowledgment for a call whose effects the preview cannot show', () => {
-      render(<SignatureRequestView {...baseProps} simulation={{ status: 'ready', result: emptyResult }} requiresAcknowledgment />)
-      expect(screen.getByText('request.transaction_dialog.acknowledge_no_visible_effects')).toBeInTheDocument()
+      it('should word the acknowledgment for a call whose effects the preview cannot show', () => {
+        render(<SignatureRequestView {...props} />)
+        expect(screen.getByText('request.transaction_dialog.acknowledge_no_visible_effects')).toBeInTheDocument()
+      })
     })
   })
 })

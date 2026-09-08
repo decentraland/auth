@@ -109,7 +109,11 @@
       "approval_can_spend_symbol": "peut dépenser {symbol}",
       "approval_can_no_longer_spend": "ne peut plus dépenser {symbol}",
       "approval_allowance_revoked": "Autorisation de dépense de {symbol} révoquée",
-      "approval_token_approval_revoked": "Autorisation de transfert de {token} #{tokenId} révoquée"
+      "approval_token_approval_revoked": "Autorisation de transfert de {token} #{tokenId} révoquée",
+      "title_signature": "Confirmer la signature",
+      "summary_transaction": "Votre portefeuille va envoyer cette transaction maintenant.",
+      "summary_signature": "Votre portefeuille va signer cette demande maintenant.",
+      "fee_estimate": "Frais estimés : {cost} {symbol}"
     },
     "signature": {
       "title": "Confirmer la signature",

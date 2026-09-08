@@ -109,7 +109,11 @@
       "approval_can_spend_symbol": "puede gastar {symbol}",
       "approval_can_no_longer_spend": "ya no puede gastar {symbol}",
       "approval_allowance_revoked": "Permiso de gasto de {symbol} revocado",
-      "approval_token_approval_revoked": "Permiso de transferencia de {token} #{tokenId} revocado"
+      "approval_token_approval_revoked": "Permiso de transferencia de {token} #{tokenId} revocado",
+      "title_signature": "Confirmar firma",
+      "summary_transaction": "Tu wallet enviará esta transacción ahora.",
+      "summary_signature": "Tu wallet firmará esta solicitud ahora.",
+      "fee_estimate": "Comisión estimada: {cost} {symbol}"
     },
     "signature": {
       "title": "Confirmar firma",

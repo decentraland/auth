@@ -109,7 +109,11 @@
       "approval_can_spend_symbol": "can spend {symbol}",
       "approval_can_no_longer_spend": "can no longer spend {symbol}",
       "approval_allowance_revoked": "Spending allowance for {symbol} revoked",
-      "approval_token_approval_revoked": "Transfer approval for {token} #{tokenId} revoked"
+      "approval_token_approval_revoked": "Transfer approval for {token} #{tokenId} revoked",
+      "title_signature": "Confirm Signature",
+      "summary_transaction": "Your wallet will send this transaction now.",
+      "summary_signature": "Your wallet will sign this request now.",
+      "fee_estimate": "Estimated fee: {cost} {symbol}"
     },
     "signature": {
       "title": "Confirm signature",
