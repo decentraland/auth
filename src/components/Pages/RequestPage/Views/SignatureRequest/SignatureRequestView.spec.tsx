@@ -44,6 +44,13 @@ describe('when a meta-transaction signature preview is unavailable', () => {
     expect(screen.getByRole('button', { name: 'request.transaction_dialog.approve_without_preview' })).toBeDisabled()
   })
 
+  it('should word the acknowledgment as approving without a preview, not as a generic risk or an unverified effect', () => {
+    render(<SignatureRequestView {...props} />)
+    expect(screen.getByText('request.wallet_interaction.acknowledge_preview_unavailable')).toBeInTheDocument()
+    expect(screen.queryByText('request.signature.acknowledge_unverified')).not.toBeInTheDocument()
+    expect(screen.queryByText('request.transaction_dialog.acknowledge_risk')).not.toBeInTheDocument()
+  })
+
   it('should retry without signing and clear the previous acknowledgment', async () => {
     render(<SignatureRequestView {...props} />)
     await userEvent.click(screen.getByRole('checkbox'))
@@ -1041,7 +1048,7 @@ describe('when rendering the SignatureRequestView', () => {
       }
     })
 
-    it('should ask the user to acknowledge unverified effects', () => {
+    it('should ask the user to acknowledge that no preview was produced, in those words', () => {
       render(
         <SignatureRequestView
           requestId="r1"
@@ -1055,7 +1062,8 @@ describe('when rendering the SignatureRequestView', () => {
           onApprove={onApprove}
         />
       )
-      expect(screen.getByText('request.signature.acknowledge_unverified')).toBeInTheDocument()
+      expect(screen.getByText('request.wallet_interaction.acknowledge_preview_unavailable')).toBeInTheDocument()
+      expect(screen.queryByText('request.signature.acknowledge_unverified')).not.toBeInTheDocument()
     })
   })
 

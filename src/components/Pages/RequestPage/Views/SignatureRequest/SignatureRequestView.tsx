@@ -214,11 +214,15 @@ export const SignatureRequestView = ({
               />
             }
             label={
-              isUnverifiable
-                ? t('request.signature.acknowledge_unverified')
-                : isPreviewWithoutVisibleEffects
-                  ? t('request.transaction_dialog.acknowledge_no_visible_effects')
-                  : t('request.transaction_dialog.acknowledge_risk')
+              // A missing preview is said in so many words, ahead of every other case: the signer is
+              // approving without having seen what the call does, and the statement must say that.
+              isPreviewUnavailable
+                ? t('request.wallet_interaction.acknowledge_preview_unavailable')
+                : isUnverifiable
+                  ? t('request.signature.acknowledge_unverified')
+                  : isPreviewWithoutVisibleEffects
+                    ? t('request.transaction_dialog.acknowledge_no_visible_effects')
+                    : t('request.transaction_dialog.acknowledge_risk')
             }
           />
         ) : null}
