@@ -1419,11 +1419,13 @@ export const RequestPage = () => {
   // off-chain approval signature (permit/order), which grants asset control but is never simulated;
   // (e) Auth cannot tell what the signature authorizes at all (an unrecognized typed-data struct
   // or a message that is not readable text); or (f) the preview ran but shows no change the user
-  // can check, so whatever the call does happens outside what this page can show.
+  // can check, so whatever the call does happens outside what this page can show; or (g) the preview
+  // shows the call failing today, which a relayed call can outlive once the state it depends on changes.
   const requiresApprovalAcknowledgment =
     hasDangerousApprovalChange ||
     hasPreviewWithoutVisibleEffects ||
     simulationState.status === 'unavailable' ||
+    isSimulationReverted ||
     isSignatureWithoutVerifiedEffects ||
     isSignatureToUnrecognizedContract ||
     isHighRiskSignature ||

@@ -6,6 +6,7 @@ import { resolveTypedDataReview } from '../../../../../shared/auth/typedDataRevi
 import { getExplorerAddressUrl, getExplorerName, getNetworkName } from '../../../../../shared/explorer'
 import { Container } from '../../Container'
 import { ButtonsContainer } from '../../RequestPage.styled'
+import { isApprovalGrantingTypedData } from '../../utils'
 import { KnownContractNotice } from '../KnownContractNotice'
 import { RetryPreviewButton } from '../RetryPreviewButton'
 import { SimulationSummary } from '../SimulationSummary'
@@ -82,6 +83,10 @@ export const SignatureRequestView = ({
   // the summary cannot show, so the acknowledgment says that instead of talking about approvals.
   const isPreviewWithoutVisibleEffects =
     isMetaTransaction && simulation.status === 'ready' && hasNoVisibleEffects(simulation.result, userAddress)
+  // What the signature is for, said plainly where the page can tell: a permit or an order hands the app a
+  // standing permission over assets, and a readable message proves control of the account.
+  const isApprovalGranting = payload?.kind === 'typedData' && !isMetaTransaction && isApprovalGrantingTypedData(payload.typedData)
+  const isReadableMessage = payload?.kind === 'message' && unverifiableReason === null
 
   // The exact statement the user is asked to acknowledge: the request it belongs to, the label, and
   // every notice shown alongside it. A tick is given to that statement only — when any part of it
@@ -122,6 +127,8 @@ export const SignatureRequestView = ({
             <MessageBlock data-testid="signature-message">{payload.message}</MessageBlock>
           </Section>
         ) : null}
+        {isReadableMessage ? <Notice data-testid="signature-message-notice">{t('request.signature.message_notice')}</Notice> : null}
+        {isApprovalGranting ? <Notice data-testid="signature-approval-notice">{t('request.signature.approval_notice')}</Notice> : null}
 
         {payload?.kind === 'typedData' && isMetaTransaction ? (
           <>

@@ -75,6 +75,7 @@
       "preview_unavailable_warning": "No pudimos obtener una vista previa de esta transacción. Aprueba sin vista previa solo si confías en la escena que la solicitó.",
       "preview_unavailable_warning_retry": "No pudimos obtener una vista previa de esta transacción. Puedes reintentarlo o aprobar sin vista previa si confías en la escena que la solicitó.",
       "acknowledge_preview_unavailable": "Entiendo que la vista previa no está disponible y estoy aprobando sin ver qué hace esta transacción",
+      "wallet_shows_details": "Tu wallet mostrará los detalles de esta solicitud. Revísalos allí antes de confirmar.",
       "review_restarted_notice": "La red de tu wallet cambió o no pudo verificarse, así que esta transacción se revisó de nuevo en la red actual."
     },
     "transaction_dialog": {
@@ -83,7 +84,7 @@
       "approve_without_preview": "Aprobar sin vista previa",
       "known_contract": "Esta solicitud está dirigida a un contrato conocido de Decentraland en {network}. Esto no garantiza que la acción sea segura.",
       "title": "Confirmar transacción",
-      "transaction_cost": "Costo de transacción: {cost} ETH",
+      "transaction_cost": "Costo estimado de transacción: {cost} ETH",
       "your_balance": "Tu saldo: {balance} ETH",
       "simulation_loading": "Comprobando qué hará esta transacción…",
       "details_unavailable": "No hay una vista previa disponible para esta transacción. Continúa solo si confías en la escena.",
@@ -112,6 +113,7 @@
       "verified_contract": "Contrato de Decentraland verificado",
       "on_network": "en {network}",
       "acknowledge_risk": "Entiendo que esto otorga acceso a mis activos",
+      "acknowledge_reverted": "Entiendo que la vista previa muestra que esta llamada falla hoy y que aún podría ejecutarse si las condiciones cambian",
       "acknowledge_no_visible_effects": "Entiendo que la vista previa no muestra cambios en mis activos y que esto aun así puede cambiar configuraciones o roles que no veo aquí",
       "approval_can_spend_symbol": "puede gastar {symbol}",
       "approval_can_no_longer_spend": "ya no puede gastar {symbol}",
@@ -131,6 +133,8 @@
       "meta_tx_reverted": "Esta acción falla ahora mismo, por lo que no se pudieron previsualizar sus efectos. Fírmala solo si esperas que funcione más adelante.",
       "acknowledge_unverified": "Entiendo que no se pudieron verificar los efectos de esta firma",
       "meta_tx_unrecognized_contract": "Este no es un contrato reconocido de Decentraland, por lo que Decentraland no puede garantizar lo que hará esta firma.",
+      "message_notice": "Firmar este mensaje demuestra que controlas esta cuenta. Las apps lo usan para iniciar sesión o autorizar una acción. Por sí mismo no mueve activos.",
+      "approval_notice": "Esta firma es un permiso, no una transacción. La app puede usarla para mover o gastar en tu nombre los activos que indica, sin volver a preguntarte, hasta que se use, expire o se revoque.",
       "unrecognized_typed_data": "Decentraland no reconoce este tipo de firma, por lo que no puede previsualizar lo que autoriza. Fírmala solo si confías en la aplicación que la solicitó.",
       "opaque_message": "Este mensaje no parece texto legible, por lo que no puedes comprobar lo que estás firmando. Podría ser un hash que autoriza una acción en un contrato. Fírmalo solo si confías en la aplicación que lo solicitó.",
       "review_unavailable": "Los campos de esta firma no pueden verificarse contra lo que realmente firma, así que no puede aprobarse aquí."
@@ -193,6 +197,8 @@
       "confirm_gift": "Confirmar regalo para",
       "creator_of": "CREADOR DE",
       "processing_authorization": "Procesando autorización",
+      "tip_warning": "Estás enviando {manaAmount} a {recipient}. Esto no se puede deshacer.",
+      "acknowledge_gift": "Estoy regalando {item} a {recipient} y entiendo que esto no se puede deshacer",
       "gifting_warning": "Regalar un artículo no se puede deshacer."
     },
     "completed": {

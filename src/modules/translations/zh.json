@@ -75,6 +75,7 @@
       "preview_unavailable_warning": "我们无法预览此交易的作用。只有在信任发起请求的场景时才选择无预览批准。",
       "preview_unavailable_warning_retry": "我们无法预览此交易的作用。你可以重试预览，或在信任发起请求的场景时选择无预览批准。",
       "acknowledge_preview_unavailable": "我了解预览不可用，并且我在未查看此交易作用的情况下进行批准",
+      "wallet_shows_details": "你的钱包将显示此请求的详细信息。请在确认前在钱包中核对。",
       "review_restarted_notice": "你的钱包网络已更改或无法验证，因此此交易已在当前网络上重新审核。"
     },
     "transaction_dialog": {
@@ -83,7 +84,7 @@
       "approve_without_preview": "无预览批准",
       "known_contract": "此请求的目标是 {network} 上已知的 Decentraland 合约。这并不保证该操作安全。",
       "title": "确认交易",
-      "transaction_cost": "交易费用：{cost} ETH",
+      "transaction_cost": "预估交易费用：{cost} ETH",
       "your_balance": "您的余额：{balance} ETH",
       "simulation_loading": "正在检查此交易将执行的操作…",
       "details_unavailable": "此交易暂无预览。只有在您信任该场景时才继续。",
@@ -112,6 +113,7 @@
       "verified_contract": "已验证的 Decentraland 合约",
       "on_network": "在 {network} 上",
       "acknowledge_risk": "我了解这会授予对我资产的访问权限",
+      "acknowledge_reverted": "我了解预览显示此调用目前会失败，且在条件变化后仍可能被执行",
       "acknowledge_no_visible_effects": "我了解预览未显示我的资产有任何变化，而此交易仍可能更改我在此处看不到的设置或角色",
       "approval_can_spend_symbol": "可以使用 {symbol}",
       "approval_can_no_longer_spend": "不再可以使用 {symbol}",
@@ -131,6 +133,8 @@
       "meta_tx_reverted": "此操作当前会失败，因此无法预览其效果。只有在你预计它稍后能成功时才签名。",
       "acknowledge_unverified": "我了解无法验证此签名的效果",
       "meta_tx_unrecognized_contract": "这不是一个已识别的 Decentraland 合约，因此 Decentraland 无法保证此签名将执行的操作。",
+      "message_notice": "签署此消息可证明你控制此账户。应用会用它来登录或授权某项操作。它本身不会转移任何资产。",
+      "approval_notice": "此签名是一项授权，而不是一笔交易。应用可以用它代表你转移或花费其中指定的资产，无需再次询问你，直到它被使用、过期或被撤销。",
       "unrecognized_typed_data": "Decentraland 无法识别此类签名，因此无法预览它授权的内容。只有在你信任请求它的应用时才签名。",
       "opaque_message": "此消息看起来不像可读文本，因此你无法核对正在签署的内容。它可能是一个授权合约中某项操作的哈希。只有在你信任请求它的应用时才签名。",
       "review_unavailable": "无法根据此签名实际签署的内容核对其字段，因此无法在此批准。"
@@ -193,6 +197,8 @@
       "confirm_gift": "确认礼物给",
       "creator_of": "创作者",
       "processing_authorization": "正在处理授权",
+      "tip_warning": "你正在向 {recipient} 发送 {manaAmount}。此操作无法撤销。",
+      "acknowledge_gift": "我正在将 {item} 赠送给 {recipient}，我了解此操作无法撤销",
       "gifting_warning": "赠送物品无法撤销。"
     },
     "completed": {

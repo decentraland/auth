@@ -145,6 +145,42 @@ describe('when rendering the WalletInteraction view', () => {
       expect(screen.getByText('request.wallet_interaction.description')).toBeInTheDocument()
       expect(screen.queryByText('request.transaction_dialog.you_send')).not.toBeInTheDocument()
     })
+
+    it('should tell an external-wallet user that the wallet shows the details', () => {
+      render(<WalletInteraction requestId="r1" onDeny={onDeny} onApprove={onApprove} />)
+      expect(screen.getByTestId('wallet-shows-details')).toHaveTextContent('request.wallet_interaction.wallet_shows_details')
+    })
+
+    it('should not promise wallet details to a web2 user, whose wallet shows none', () => {
+      render(<WalletInteraction requestId="r1" isWeb2Wallet onDeny={onDeny} onApprove={onApprove} />)
+      expect(screen.queryByTestId('wallet-shows-details')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('and the simulated call reverts', () => {
+    let revertedResult: SimulationResponseBody
+
+    beforeEach(() => {
+      revertedResult = { ...successResult, status: 'reverted', error: 'Trade not effective yet', assetChanges: [] }
+    })
+
+    it('should ask the user to acknowledge that the call fails today, in those words, before allowing it', async () => {
+      render(
+        <WalletInteraction
+          requestId="r1"
+          isWeb2Wallet
+          simulation={{ status: 'ready', result: revertedResult }}
+          userAddress={USER}
+          isReverted
+          onDeny={onDeny}
+          onApprove={onApprove}
+        />
+      )
+      expect(screen.getByText('request.transaction_dialog.acknowledge_reverted')).toBeInTheDocument()
+      expect(screen.getByTestId('transfer-confirm-button')).toBeDisabled()
+      await userEvent.click(screen.getByRole('checkbox'))
+      expect(screen.getByTestId('transfer-confirm-button')).toBeEnabled()
+    })
   })
 
   describe('and the simulation is still loading', () => {

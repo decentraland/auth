@@ -1454,6 +1454,26 @@ describe('RequestPage', () => {
       })
     })
 
+    describe('and the simulated call reverts', () => {
+      beforeEach(() => {
+        mockSimulateTransaction.mockResolvedValue({
+          status: 'reverted',
+          error: 'Trade not effective yet',
+          assetChanges: [],
+          approvalChanges: [],
+          balanceChanges: [],
+          events: []
+        })
+      })
+
+      it('should require an acknowledgment, since a relayed call may run once it stops reverting', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('wallet-interaction')
+        await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+        expect(view).toHaveAttribute('data-requires-acknowledgment', 'true')
+      })
+    })
+
     describe('and the simulation is unavailable', () => {
       beforeEach(() => {
         mockSimulateTransaction.mockRejectedValue(new SimulationUnavailableError('status 502', 502))

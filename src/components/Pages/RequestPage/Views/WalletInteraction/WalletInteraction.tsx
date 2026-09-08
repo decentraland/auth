@@ -38,7 +38,9 @@ export const WalletInteraction = ({
   // The preview could not be produced (simulation service down, or the call could not be simulated).
   // The effects can't be shown, so warn explicitly and word the acknowledgment for that case.
   const isPreviewUnavailable = simulation?.status === 'unavailable'
-  const needsAcknowledgment = requiresAcknowledgment || isPreviewUnavailable
+  // A preview that shows the call failing is acknowledged as such: a relayed call may still run once the
+  // state it depends on changes, so "it fails today" is not a reason to wave it through.
+  const needsAcknowledgment = requiresAcknowledgment || isPreviewUnavailable || isReverted
   // The preview resolved but shows nothing the user can check. The call may still change state the
   // summary cannot show, so the acknowledgment says that instead of talking about approvals.
   const isPreviewWithoutVisibleEffects = simulation?.status === 'ready' && hasNoVisibleEffects(simulation.result, userAddress)
@@ -108,9 +110,11 @@ export const WalletInteraction = ({
             label={
               isPreviewUnavailable
                 ? t('request.wallet_interaction.acknowledge_preview_unavailable')
-                : isPreviewWithoutVisibleEffects
-                  ? t('request.transaction_dialog.acknowledge_no_visible_effects')
-                  : t('request.transaction_dialog.acknowledge_risk')
+                : isReverted
+                  ? t('request.transaction_dialog.acknowledge_reverted')
+                  : isPreviewWithoutVisibleEffects
+                    ? t('request.transaction_dialog.acknowledge_no_visible_effects')
+                    : t('request.transaction_dialog.acknowledge_risk')
             }
           />
         ) : null}
@@ -152,6 +156,12 @@ export const WalletInteraction = ({
         {isWeb2Wallet ? t('request.wallet_interaction.title_web2') : t('request.wallet_interaction.title_web3', { explorerText })}
       </Box>
       <Box className={styles.description}>{t('request.wallet_interaction.description')}</Box>
+      {/* This page shows nothing of the call here; the wallet's own prompt does, so say where to look. */}
+      {!isWeb2Wallet ? (
+        <Box className={styles.description} data-testid="wallet-shows-details">
+          {t('request.wallet_interaction.wallet_shows_details')}
+        </Box>
+      ) : null}
       {/* No provenance notice on this screen: nothing else here describes the call, so a true "known
           contract" line would only prime a single-click Allow (an unlimited approve to MANA targets a
           known contract too). It is shown where a preview or an acknowledgment stands beside it. */}

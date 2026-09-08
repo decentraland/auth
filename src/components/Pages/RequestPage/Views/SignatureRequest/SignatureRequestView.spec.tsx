@@ -51,6 +51,11 @@ describe('when a meta-transaction signature preview is unavailable', () => {
     expect(screen.queryByText('request.transaction_dialog.acknowledge_risk')).not.toBeInTheDocument()
   })
 
+  it('should not describe a MetaTransaction as a standing permission', () => {
+    render(<SignatureRequestView {...props} />)
+    expect(screen.queryByTestId('signature-approval-notice')).not.toBeInTheDocument()
+  })
+
   it('should retry without signing and clear the previous acknowledgment', async () => {
     render(<SignatureRequestView {...props} />)
     await userEvent.click(screen.getByRole('checkbox'))
@@ -115,6 +120,11 @@ describe('when reviewing a schema-bound signature', () => {
   it('should display the signed domain salt', () => {
     render(<SignatureRequestView {...props} />)
     expect(screen.getByText(String(typedData.domain.salt))).toBeInTheDocument()
+  })
+
+  it('should explain that an order is a standing permission over assets, not a transaction', () => {
+    render(<SignatureRequestView {...props} />)
+    expect(screen.getByTestId('signature-approval-notice')).toHaveTextContent('request.signature.approval_notice')
   })
 
   describe('and the payload is the Trade the marketplace asks a seller to sign', () => {
@@ -310,11 +320,45 @@ describe('when rendering the SignatureRequestView', () => {
       expect(onApprove).toHaveBeenCalledTimes(1)
     })
 
+    it('should explain what signing a readable message does', () => {
+      render(
+        <SignatureRequestView
+          requestId="r1"
+          method="personal_sign"
+          payload={payload}
+          simulation={{ status: 'idle' }}
+          userAddress={USER}
+          isMetaTransaction={false}
+          onDeny={onDeny}
+          onApprove={onApprove}
+        />
+      )
+      expect(screen.getByTestId('signature-message-notice')).toHaveTextContent('request.signature.message_notice')
+    })
+
     describe('and the message is not readable text', () => {
       let opaquePayload: SignaturePayload
 
       beforeEach(() => {
         opaquePayload = { kind: 'message', message: `0x${'ab'.repeat(32)}` }
+      })
+
+      it('should not describe it as a readable message', () => {
+        render(
+          <SignatureRequestView
+            requestId="r1"
+            method="personal_sign"
+            payload={opaquePayload}
+            simulation={{ status: 'idle' }}
+            userAddress={USER}
+            isMetaTransaction={false}
+            unverifiableReason="opaque_message"
+            requiresAcknowledgment
+            onDeny={onDeny}
+            onApprove={onApprove}
+          />
+        )
+        expect(screen.queryByTestId('signature-message-notice')).not.toBeInTheDocument()
       })
 
       it('should warn that the message cannot be checked', () => {

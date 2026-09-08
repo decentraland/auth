@@ -75,6 +75,7 @@
       "preview_unavailable_warning": "Nous n’avons pas pu afficher un aperçu de cette transaction. N’approuvez sans aperçu que si vous faites confiance à la scène qui l’a demandée.",
       "preview_unavailable_warning_retry": "Nous n’avons pas pu afficher un aperçu de cette transaction. Vous pouvez réessayer ou approuver sans aperçu si vous faites confiance à la scène qui l’a demandée.",
       "acknowledge_preview_unavailable": "Je comprends que l'aperçu est indisponible et j'approuve sans voir ce que fait cette transaction",
+      "wallet_shows_details": "Votre wallet affichera les détails de cette demande. Vérifiez-les avant de confirmer.",
       "review_restarted_notice": "Le réseau de votre portefeuille a changé ou n'a pas pu être vérifié, cette transaction a donc été réexaminée sur le réseau actuel."
     },
     "transaction_dialog": {
@@ -83,7 +84,7 @@
       "approve_without_preview": "Approuver sans aperçu",
       "known_contract": "Cette demande cible un contrat connu de Decentraland sur {network}. Cela ne garantit pas que l’action est sûre.",
       "title": "Confirmer la transaction",
-      "transaction_cost": "Coût de la transaction : {cost} ETH",
+      "transaction_cost": "Coût estimé de la transaction : {cost} ETH",
       "your_balance": "Votre solde : {balance} ETH",
       "simulation_loading": "Vérification de ce que fera cette transaction…",
       "details_unavailable": "Aucun aperçu n'est disponible pour cette transaction. Ne continuez que si vous faites confiance à la scène.",
@@ -112,6 +113,7 @@
       "verified_contract": "Contrat Decentraland vérifié",
       "on_network": "sur {network}",
       "acknowledge_risk": "Je comprends que cela donne accès à mes actifs",
+      "acknowledge_reverted": "Je comprends que l’aperçu montre que cet appel échoue aujourd’hui et qu’il pourrait tout de même s’exécuter si les conditions changent",
       "acknowledge_no_visible_effects": "Je comprends que l'aperçu ne montre aucun changement sur mes actifs et que cela peut néanmoins modifier des paramètres ou des rôles que je ne vois pas ici",
       "approval_can_spend_symbol": "peut dépenser {symbol}",
       "approval_can_no_longer_spend": "ne peut plus dépenser {symbol}",
@@ -131,6 +133,8 @@
       "meta_tx_reverted": "Cette action échoue pour le moment, ses effets n'ont donc pas pu être prévisualisés. Ne la signez que si vous pensez qu'elle fonctionnera plus tard.",
       "acknowledge_unverified": "Je comprends que les effets de cette signature n'ont pas pu être vérifiés",
       "meta_tx_unrecognized_contract": "Ce contrat n'est pas un contrat Decentraland reconnu, Decentraland ne peut donc pas garantir ce que fera cette signature.",
+      "message_notice": "Signer ce message prouve que vous contrôlez ce compte. Les applications l’utilisent pour vous connecter ou autoriser une action. À lui seul, il ne déplace aucun actif.",
+      "approval_notice": "Cette signature est une permission, pas une transaction. L’application peut l’utiliser pour déplacer ou dépenser en votre nom les actifs qu’elle désigne, sans vous redemander, jusqu’à ce qu’elle soit utilisée, expire ou soit révoquée.",
       "unrecognized_typed_data": "Decentraland ne reconnaît pas ce type de signature et ne peut donc pas prévisualiser ce qu'elle autorise. Ne la signez que si vous faites confiance à l'application qui l'a demandée.",
       "opaque_message": "Ce message ne ressemble pas à un texte lisible, vous ne pouvez donc pas vérifier ce que vous signez. Il pourrait s'agir d'un hash autorisant une action dans un contrat. Ne le signez que si vous faites confiance à l'application qui l'a demandé.",
       "review_unavailable": "Les champs de cette signature ne peuvent pas être vérifiés par rapport à ce qu'elle signe réellement, elle ne peut donc pas être approuvée ici."
@@ -193,6 +197,8 @@
       "confirm_gift": "Confirmer le cadeau pour",
       "creator_of": "CRÉATEUR DE",
       "processing_authorization": "Traitement de l'autorisation",
+      "tip_warning": "Vous envoyez {manaAmount} à {recipient}. Cette action est irréversible.",
+      "acknowledge_gift": "J’offre {item} à {recipient} et je comprends que cette action est irréversible",
       "gifting_warning": "Offrir un objet est irréversible."
     },
     "completed": {
