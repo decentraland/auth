@@ -10,26 +10,14 @@ const Content = styled(Box)(({ theme }) => ({
   width: '100%'
 }))
 
-// Signed domain values are shown whole: spacing kept as signed, wrapped rather than clipped, since a
-// name with a run of spaces or a long version is part of what the user signs.
-const signedText = {
-  minWidth: 0,
-  overflowWrap: 'anywhere',
-  whiteSpace: 'pre-wrap'
-} as const
-
-// Labels the page adds itself, never signed content.
-const DomainKey = styled(Typography)(({ theme }) => ({
-  color: theme.palette.text.secondary,
-  flexShrink: 0,
-  fontSize: theme.typography.pxToRem(13)
+const CallLine = styled(Typography)(({ theme }) => ({
+  color: theme.palette.text.primary,
+  fontSize: theme.typography.pxToRem(15)
 }))
 
-const DomainName = styled(Typography)(({ theme }) => ({
-  ...signedText,
-  color: theme.palette.text.primary,
-  fontSize: theme.typography.pxToRem(13),
-  fontWeight: 600
+const DomainKey = styled(Typography)(({ theme }) => ({
+  color: theme.palette.text.secondary,
+  fontSize: theme.typography.pxToRem(13)
 }))
 
 const DomainRow = styled(Box)(({ theme }) => ({
@@ -39,19 +27,17 @@ const DomainRow = styled(Box)(({ theme }) => ({
 }))
 
 const DomainValue = styled(Typography)(({ theme }) => ({
-  ...signedText,
   color: theme.palette.text.primary,
   fontFamily: 'monospace',
   fontSize: theme.typography.pxToRem(13),
-  textAlign: 'right'
+  overflow: 'hidden',
+  textOverflow: 'ellipsis'
 }))
 
 const ContractLink = styled('a')(({ theme }) => ({
-  ...signedText,
   color: theme.palette.text.primary,
   fontFamily: 'monospace',
   fontSize: theme.typography.pxToRem(13),
-  textAlign: 'right',
   textDecoration: 'underline',
   textDecorationStyle: 'dotted',
   textUnderlineOffset: 2,
@@ -63,14 +49,6 @@ const ContractLink = styled('a')(({ theme }) => ({
     outline: `2px solid ${theme.palette.primary.main}`,
     outlineOffset: 2
   }
-}))
-
-const FieldLabel = styled(Typography)(({ theme }) => ({
-  color: theme.palette.text.secondary,
-  fontSize: theme.typography.pxToRem(12),
-  fontWeight: 600,
-  letterSpacing: '0.06em',
-  textTransform: 'uppercase'
 }))
 
 const MessageBlock = styled(Box)(({ theme }) => ({
@@ -116,49 +94,4 @@ const RawToggle = styled('button')(({ theme }) => ({
   }
 }))
 
-const Section = styled(Box)(({ theme }) => ({
-  display: 'flex',
-  flexDirection: 'column',
-  gap: theme.spacing(1)
-}))
-
-// Keys are signed identifiers too, and may be long: they wrap like any other signed text.
-const TreeKey = styled('span')(({ theme }) => ({
-  ...signedText,
-  color: theme.palette.text.secondary,
-  fontWeight: 600
-}))
-
-const TreeNode = styled(Box)<{ depth: number }>(({ theme, depth }) => ({
-  display: 'flex',
-  fontFamily: 'monospace',
-  fontSize: theme.typography.pxToRem(13),
-  gap: theme.spacing(1),
-  paddingLeft: theme.spacing(depth * 2)
-}))
-
-// Signed text is shown with its spacing intact: runs of spaces are part of what is signed, and the review
-// escapes every character that could break a line or hide itself, so nothing here can wrap by surprise.
-const TreeValue = styled('span')(({ theme }) => ({
-  ...signedText,
-  color: theme.palette.text.primary,
-  wordBreak: 'break-word'
-}))
-
-export {
-  ContractLink,
-  Content,
-  DomainKey,
-  DomainName,
-  DomainRow,
-  DomainValue,
-  FieldLabel,
-  MessageBlock,
-  MethodChip,
-  Notice,
-  RawToggle,
-  Section,
-  TreeKey,
-  TreeNode,
-  TreeValue
-}
+export { CallLine, Content, ContractLink, DomainKey, DomainRow, DomainValue, MessageBlock, MethodChip, Notice, RawToggle }

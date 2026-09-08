@@ -1,257 +1,35 @@
-import { createPublicClient, custom, decodeFunctionData, formatEther, hexToString } from 'viem'
+import { createPublicClient, custom, formatEther } from 'viem'
 import { Rarity } from '@dcl/schemas'
 import { ChainId } from '@dcl/schemas/dist/dapps/chain-id'
 import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
 import { Provider, connection } from 'decentraland-connect'
-import { ContractName, getContract, getContractName } from 'decentraland-transactions'
+import { ContractName, getContract } from 'decentraland-transactions'
 import { config } from '../../../modules/config'
-import {
-  MetaTransactionTypedData,
-  SimulationRequestBody,
-  SimulationResponseBody,
-  buildMetaTransactionSimulationPayload,
-  isMetaTransactionTypedData,
-  resolveMetaTransactionTypedData
-} from '../../../shared/auth'
+import { DecodedCall, SimulationRequestBody, SimulationResponseBody, buildMetaTransactionSimulationPayload } from '../../../shared/auth'
 import { isMobile } from '../LoginPage/utils'
-import { getUnsupportedCalldataAlias, toHexQuantity } from './transactionParams'
-import { SignaturePayload, TypedDataPayload } from './types'
-
-// Case-insensitive on the `0x` prefix so these agree with the recover-time guard, which compares
-// the signer case-insensitively (isSigner in signMethodGuard). A `0X`-prefixed value the guard
-// accepts must be recognized here too, or it is misread as signable content (see extractSignaturePayload).
-const ADDRESS_REGEX = /^0x[0-9a-fA-F]{40}$/i
-const HEX_STRING_REGEX = /^0x([0-9a-fA-F]{2})*$/i
-
-// Wallet-RPC methods that request a signature rather than a transaction. `eth_sign` is kept here
-// (and in extractSignaturePayload) for parser completeness and symmetry only — it is rejected
-// upstream at recover by the method allowlist (assertMethodIsAllowed in signMethodGuard), so it
-// never actually reaches this view-selection logic.
-const SIGNATURE_METHODS = new Set(['personal_sign', 'eth_sign', 'eth_signtypeddata', 'eth_signtypeddata_v3', 'eth_signtypeddata_v4'])
+import { RequestClassification } from './classifyRequest'
 
 /**
- * Returns true when the method is a plain signature request rather than a transaction.
- */
-function isSignatureMethod(method: string): boolean {
-  return SIGNATURE_METHODS.has(method.toLowerCase())
-}
-
-/**
- * Whether an address is a Decentraland contract on the given chain, per the decentraland-transactions
- * registry. Recognition is per deployment on purpose: the same address can hold a Decentraland
- * contract on one chain and something else, or nothing, on another, so a match on any chain would
- * vouch for code that was never Decentraland's on the chain a transaction actually runs on.
- */
-function isKnownDecentralandContractOnChain(address: string, chainId: number): boolean {
-  const normalizedAddress = address.toLowerCase()
-  return Object.values(ContractName).some(contractName => {
-    try {
-      return getContract(contractName, chainId).address.toLowerCase() === normalizedAddress
-    } catch {
-      // Not deployed on that chain.
-      return false
-    }
-  })
-}
-
-/**
- * Extracts what a signature request asks the user to sign: a plain message (decoding
- * hex-encoded UTF-8 when possible) or an EIP-712 typed-data structure. Returns null when the
- * payload can't be interpreted.
- *
- * `signerAddress` (the connected account) is used to tell the message apart from the address
- * parameter: personal_sign is [message, address] and eth_sign is [address, message], but the
- * ordering isn't consistent across providers. Matching the known signer is robust even when the
- * message itself happens to look like an address; when no signer is available we fall back to a
- * shape heuristic (treat a leading address-shaped value as the address).
- */
-function extractSignaturePayload(method: string, params: unknown[] | undefined, signerAddress?: string): SignaturePayload | null {
-  if (!params || params.length === 0) return null
-  const normalizedMethod = method.toLowerCase()
-
-  if (normalizedMethod === 'personal_sign' || normalizedMethod === 'eth_sign') {
-    const [first, second] = params
-    const signer = signerAddress?.toLowerCase()
-    let message: unknown = first
-    if (typeof first === 'string' && typeof second === 'string') {
-      if (signer && first.toLowerCase() === signer) {
-        message = second
-      } else if (signer && second.toLowerCase() === signer) {
-        message = first
-      } else if (ADDRESS_REGEX.test(first)) {
-        message = second
-      }
-    }
-    if (typeof message !== 'string') return null
-
-    let text = message
-    if (HEX_STRING_REGEX.test(message) && message.length > 2) {
-      try {
-        // Normalize a `0X` prefix, which hexToString does not accept.
-        text = hexToString(`0x${message.slice(2)}`)
-      } catch {
-        text = message
-      }
-    }
-    return { kind: 'message', message: text }
-  }
-
-  // eth_signTypedData variants. The canonical shape is [signer, typedData], but the order isn't
-  // consistent across providers and some pass the typed data as an object rather than a JSON string.
-  // Identify the typed data as the param that is NOT the signer, matching the signer the same way
-  // the recover-time guard does (assertSignatureParamsAreCanonical): case-insensitively. A
-  // case-sensitive `0x` test here would misread a signer whose only difference is casing — an
-  // uppercase `0X` prefix, which the guard accepts — as the content, and drop the real typed data in
-  // the other param, leaving the user signing something that was never shown.
-  const signer = signerAddress ? signerAddress.toLowerCase() : undefined
-  const isSignerParam = (param: unknown): boolean =>
-    typeof param === 'string' && (signer !== undefined ? param.toLowerCase() === signer : ADDRESS_REGEX.test(param))
-  const jsonCandidate = params.find((param): param is string => typeof param === 'string' && !isSignerParam(param))
-  if (typeof jsonCandidate === 'string') {
-    try {
-      const parsed = JSON.parse(jsonCandidate) as TypedDataPayload
-      return { kind: 'typedData', typedData: parsed, raw: jsonCandidate }
-    } catch {
-      return { kind: 'message', message: jsonCandidate }
-    }
-  }
-  const objectCandidate = params.find(param => typeof param === 'object' && param !== null)
-  if (objectCandidate) {
-    return { kind: 'typedData', typedData: objectCandidate as TypedDataPayload, raw: JSON.stringify(objectCandidate, null, 2) }
-  }
-  return null
-}
-
-// EIP-712 primaryTypes known to grant a third party the ability to move the user's assets
-// off-chain (token allowances, gasless transfers and marketplace order listings). These carry the
-// same risk as an on-chain `approve`/`setApprovalForAll` but are invisible to a transaction
-// simulation because no transaction is sent — so signing them must be gated behind an explicit
-// acknowledgment. The list only tailors the wording: a primaryType that is neither here nor a
-// MetaTransaction is treated as unrecognized and gated as well (see RequestPage).
-const APPROVAL_GRANTING_PRIMARY_TYPES = new Set([
-  'permit', // EIP-2612 (and DAI-style / ERC-4494 permits, same type name)
-  'permitsingle', // Uniswap Permit2 (AllowanceTransfer)
-  'permitbatch',
-  'permittransferfrom', // Uniswap Permit2 (SignatureTransfer)
-  'permitbatchtransferfrom',
-  'permitwitnesstransferfrom', // Uniswap Permit2 (SignatureTransfer with witness)
-  'permitbatchwitnesstransferfrom',
-  'permitforall',
-  'transferwithauthorization', // EIP-3009 gasless transfer (e.g. USDC): moves tokens outright
-  'receivewithauthorization',
-  'ordercomponents', // Seaport order
-  'bulkorder', // Seaport bulk order
-  'trade', // Decentraland off-chain marketplace order
-  'order', // 0x, Blur, Rarible and other exchange orders
-  'makerorder' // LooksRare order
-])
-
-/**
- * Returns true when a typed-data signature grants a third party control over the user's assets
- * (an off-chain allowance/permit or a marketplace order). Such signatures are not simulated, so
- * the approval UI must surface them as high-risk and require acknowledgment before signing.
- */
-function isApprovalGrantingTypedData(typedData: TypedDataPayload | undefined | null): boolean {
-  const primaryType = typedData?.primaryType
-  return typeof primaryType === 'string' && APPROVAL_GRANTING_PRIMARY_TYPES.has(primaryType.toLowerCase())
-}
-
-// Anything the user cannot see or read as text, defined by Unicode category rather than by
-// enumerated ranges: controls (C0 and C1), format characters such as zero-width and bidi controls,
-// surrogates, private-use and unassigned code points, the line and paragraph separators, and U+FFFD,
-// which is what decoding bytes that are not valid UTF-8 produces. Tab, newline and carriage return
-// are the only controls a message may contain.
-const UNREADABLE_CHARACTER_REGEX = /(?![\t\n\r])[\p{C}\p{Zl}\p{Zp}\uFFFD]/u
-
-// The size of a keccak256 digest — what a contract accepting EIP-191 signatures over a hash expects.
-const DIGEST_BYTE_LENGTH = 32
-// One unbroken run of hex, base64, base64url or dotted-token characters, at least 32 of them and
-// nothing else: unprefixed hex hashes (64), base64 digests (43–44), UUIDs (36), JWT-like tokens.
-// A sentence has spaces and punctuation outside this alphabet; a token does not.
-const TOKEN_SHAPED_REGEX = /^[A-Za-z0-9+/=_.-]{32,}$/
-
-/**
- * Returns true when a personal_sign message is not something the user can read and check:
- * - it is still raw hex (it could not be decoded as text);
- * - it decodes to bytes that are not text;
- * - it is exactly digest-sized (32 bytes), whatever those bytes look like — a hash whose bytes happen
- *   to be (or were ground to be) printable can contain a space as easily as a letter, so whitespace
- *   is no exemption;
- * - it is a single token-shaped run of characters: an unprefixed hex hash, a base64/base64url
- *   digest, a UUID or a JWT-like token. Signing the text form of a digest is not the same bytes as
- *   signing the digest, so this is not an on-chain authorization, but off-chain services do accept a
- *   signature over such a token as authorization, and the user cannot tell what it means either way.
- *
- * Such payloads may authorize something the screen cannot show, so they must not be signed on a
- * single click. The check runs on the decoded message on purpose: the wallet signs bytes, so a
- * hex-encoded message and its plaintext are the same signature, and whether the request arrived as
- * hex says nothing.
- */
-function isOpaqueSignatureMessage(message: string): boolean {
-  if (HEX_STRING_REGEX.test(message) || UNREADABLE_CHARACTER_REGEX.test(message)) {
-    return true
-  }
-  if (new TextEncoder().encode(message).length === DIGEST_BYTE_LENGTH) {
-    return true
-  }
-  return TOKEN_SHAPED_REGEX.test(message.trim())
-}
-
-/**
- * Detects a Decentraland meta-transaction typed-data payload and returns the inner call so it
- * can be simulated (from = message.from, to = domain.verifyingContract, data = the calldata field
- * the signed struct declares). Returns null when the typed data isn't a MetaTransaction.
- *
- * Throws MalformedSignatureRequestError when it is a MetaTransaction shaped in a way no
- * Decentraland contract signs. The recover guard already rejects those, but the check is repeated
- * here so the simulation can never be handed bytes the signature does not cover.
- */
-function decodeMetaTransactionTypedData(typedData: TypedDataPayload | undefined, method: string): MetaTransactionTypedData | null {
-  if (!isMetaTransactionTypedData(typedData)) return null
-  return resolveMetaTransactionTypedData(typedData, method)
-}
-
-/**
- * Builds the simulation request body for an eth_sendTransaction request. When the transaction
- * will be relayed as a meta-transaction it must be simulated on the meta-transaction chain
- * (Polygon/Amoy) rather than the connected chain — simulating a meta-tx on mainnet would
- * revert spuriously. The caller passes `willUseMetaTransaction` (from checkMetaTransactionSupport)
- * so the meta-tx decision is made once and reused for the gas-coverage UI.
+ * Builds the simulation request body for a Decentraland transaction. A relayed call is previewed the way
+ * the contract will execute it on the meta-transaction chain (the contract calling itself with the signer
+ * appended, no value); a plain call is previewed on the connected chain as the connected signer, never as
+ * the request-supplied `from`, which web2 wallets ignore anyway and which would otherwise let the preview
+ * attribute the effects to another account.
  */
 function buildSendTransactionSimulationPayload(
-  txParams: Record<string, unknown>,
-  signerAddress: string,
-  connectedChainId: number,
-  willUseMetaTransaction: boolean
-): SimulationRequestBody | null {
-  const to = txParams.to as string | undefined
-  if (!to) return null
-
-  if (getUnsupportedCalldataAlias(txParams)) return null
-
-  const data = (txParams.data as string | undefined) ?? '0x'
-
-  if (willUseMetaTransaction) {
-    // Relayed through the gas tank: preview the inner self-call the contract will make on the
-    // meta-transaction chain, for the connected signer (the relay executes for the logged-in
-    // account regardless of `params.from`) and without value (the relay forwards none).
-    return buildMetaTransactionSimulationPayload(Number(getMetaTransactionChainId()), to, data, signerAddress)
+  transaction: Extract<RequestClassification, { kind: 'dcl_transaction' }>,
+  signerAddress: string
+): SimulationRequestBody {
+  if (transaction.relayed) {
+    return buildMetaTransactionSimulationPayload(transaction.chainId, transaction.to, transaction.data, signerAddress)
   }
-
   return {
-    chainId: connectedChainId,
-    // Always simulate as the connected signer, never the request-supplied `from`. Web2 wallets
-    // (Magic/Thirdweb) execute the transaction as the logged-in account regardless of
-    // `params.from`, so honoring an attacker-chosen `from` would decouple the preview from what
-    // actually executes: asset movements would be attributed to the other address (rendering the
-    // "You send / You receive" summary empty and benign) while the connected account is what
-    // really pays — and it would suppress approvalChanges, bypassing the high-risk approval gate.
+    chainId: transaction.chainId,
     from: signerAddress,
-    to,
-    data,
-    // The same canonical hex the wallet is dispatched (see buildTransactionParams), so the preview and
-    // the execution read one quantity whatever form the request used.
-    value: toHexQuantity(txParams.value ?? '0x0')
+    to: transaction.to,
+    data: transaction.data,
+    // The same canonical hex the wallet is dispatched (see buildTransactionParams).
+    value: transaction.value
   }
 }
 
@@ -381,41 +159,89 @@ async function getNetworkProvider(chainId: ChainId): Promise<Provider> {
 }
 
 /**
- * Decentraland's own RPC for a chain, never the connected wallet's.
- *
- * `getNetworkProvider` prefers the wallet's provider when it reports the same chain, which is fine for
- * reads whose only cost is a wrong display. It is wrong for anything the page trusts: a wallet pointed at
- * a hostile RPC (a custom network the user was talked into adding) could otherwise answer whatever
- * dresses a call as safe. Everything that decides on, or draws, the branded gift view reads through this,
- * so keep the two apart on purpose; they are not duplicates of each other.
+ * Decentraland's own RPC for a chain, never the connected wallet's. Reads that decide what the page
+ * vouches for (which contracts are collections, what a token looks like) must not go through a provider
+ * the user may have been talked into repointing.
  */
 function getTrustedNetworkProvider(chainId: ChainId): Promise<Provider> {
   return connection.createProvider(ProviderType.NETWORK, chainId)
 }
 
+const COLLECTION_FACTORIES = [ContractName.CollectionFactory, ContractName.CollectionFactoryV3]
+// A hung RPC must not hold the request page on its spinner. After this long the lookup is given up (the
+// RPC call itself is not aborted; the provider offers no handle for that) and the classifier treats the
+// answer as unavailable.
+const COLLECTION_LOOKUP_TIMEOUT_MS = 10_000
+
+/** Rejects when `promise` has not settled within `timeoutMs`. */
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs)
+    promise.then(
+      value => {
+        clearTimeout(timer)
+        resolve(value)
+      },
+      error => {
+        clearTimeout(timer)
+        reject(error)
+      }
+    )
+  })
+}
+
 /**
- * Validates if an address corresponds to a Decentraland contract address (including collections).
- * @param address The Ethereum address to validate
- * @returns true if the address is a valid Decentraland contract address, false otherwise
+ * Whether a Decentraland collection factory on the meta-transaction chain deployed `contractAddress`,
+ * asked of the factories themselves through Decentraland's own RPC. This is the whitelist for wearable
+ * collections, which are deployed per collection and are not in the static registry: a factory-deployed
+ * proxy runs Decentraland's reviewed collection code, so the collection ABI describes exactly what a call
+ * to it does. Throws when no factory said yes and a lookup failed or timed out, so an outage is reported
+ * as unavailable and never read as a verdict.
+ * @param contractAddress The address to check
  */
-async function isDecentralandContractAddress(address: string): Promise<boolean> {
-  try {
-    const transactionApiUrl = `${config.get('META_TRANSACTION_SERVER_URL')}/v1`
-    // Bound the request: this gates the simulation loading state (which disables Approve) and also
-    // runs on the approve path, so a hung meta-transaction server must not block the user forever.
-    // A timeout rejects into the catch below and degrades to `false`, exactly like any fetch error.
-    const response = await fetch(`${transactionApiUrl}/contracts/${address}`, { signal: AbortSignal.timeout(10_000) })
-
-    if (response.status === 200) {
-      const data = await response.json()
-      return data.ok === true
+async function isDecentralandCollection(contractAddress: string): Promise<boolean> {
+  const chainId = getMetaTransactionChainId()
+  const factories = COLLECTION_FACTORIES.flatMap(name => {
+    try {
+      return [getContract(name, chainId)]
+    } catch {
+      return []
     }
-
-    return false
-  } catch (error) {
-    console.error('Error validating Decentraland contract address:', error)
+  })
+  if (factories.length === 0) {
     return false
   }
+
+  // Note what "a factory deployed it" covers: every curated collection, third-party creators' included.
+  // The branded gift frame is therefore available to any approved creator's collection, and what it says
+  // stays true for all of them — exactly one token the signer holds leaves their account.
+  const networkProvider = await getTrustedNetworkProvider(chainId)
+  const publicClient = createPublicClient({ transport: custom(networkProvider) })
+  const answers = await Promise.allSettled(
+    factories.map(factory =>
+      withTimeout(
+        publicClient.readContract({
+          address: factory.address as `0x${string}`,
+          abi: factory.abi as readonly unknown[],
+          functionName: 'isCollectionFromFactory',
+          args: [contractAddress]
+        }) as Promise<boolean>,
+        COLLECTION_LOOKUP_TIMEOUT_MS,
+        'Collection factory lookup'
+      )
+    )
+  )
+  // One factory saying yes is the whole answer, whatever happened to the other lookup. Only when no
+  // factory said yes does a failed lookup matter: then nothing vouched for the contract and nothing
+  // ruled it out either, and an outage must not be read as a verdict.
+  if (answers.some(answer => answer.status === 'fulfilled' && answer.value === true)) {
+    return true
+  }
+  const failure = answers.find((answer): answer is PromiseRejectedResult => answer.status === 'rejected')
+  if (failure) {
+    throw failure.reason
+  }
+  return false
 }
 
 /**
@@ -426,38 +252,6 @@ function getMetaTransactionChainId(): ChainId {
   return ['production', 'staging'].includes(config.get('ENVIRONMENT').toLowerCase()) ? ChainId.MATIC_MAINNET : ChainId.MATIC_AMOY
 }
 
-/**
- * Checks if a contract will use meta transactions and returns the contract name.
- * @param contractAddress The contract address to check
- * @returns Object with willUseMetaTransaction boolean and contractName (or null)
- */
-async function checkMetaTransactionSupport(
-  contractAddress: string
-): Promise<{ willUseMetaTransaction: boolean; contractName: ContractName | null }> {
-  const normalizedAddress = contractAddress.toLowerCase()
-  try {
-    const contractName = getContractName(contractAddress)
-    // getContractName matches a Decentraland contract on ANY chain, but meta-transactions are only
-    // relayed on the meta-tx chain (Polygon). Confirm the match is the deployment on that chain
-    // before routing — otherwise a Decentraland contract address from another network (e.g. the
-    // Ethereum-mainnet MANA/LAND address) would be rerouted as a Polygon meta-tx to a wrong or
-    // nonexistent address and the user's transaction could never execute. If it is not on the
-    // meta-tx chain, fall through to the tx-server collection check below.
-    const contract = getContract(contractName, getMetaTransactionChainId())
-    if (contract.address.toLowerCase() === normalizedAddress) {
-      return { willUseMetaTransaction: true, contractName }
-    }
-  } catch {
-    // Not in the static registry (or not deployed on the meta-tx chain) — fall through.
-  }
-
-  const isAcceptedAddress = await isDecentralandContractAddress(normalizedAddress)
-  if (isAcceptedAddress) {
-    return { willUseMetaTransaction: true, contractName: ContractName.ERC721CollectionV2 }
-  }
-  return { willUseMetaTransaction: false, contractName: null }
-}
-
 // The only collection calls the branded "gift" view may stand in for. Other functions on the
 // CollectionV2 ABI also take three or more arguments — batchTransferFrom, safeBatchTransferFrom,
 // setItemsMinters, setItemsManagers, editItemsData — and would decode into a "to" and a "token id" as
@@ -465,40 +259,27 @@ async function checkMetaTransactionSupport(
 const NFT_TRANSFER_FUNCTIONS = new Set(['transferFrom', 'safeTransferFrom'])
 
 /**
- * Decodes an ERC-721 transfer to extract the sender, the recipient and the token id. Only `transferFrom` and
- * `safeTransferFrom` qualify: the branded gift view previews exactly those, so any other call, even one
- * that decodes with the same ABI, is left to the generic review and its simulation.
- * @param data The transaction data
- * @param contractABI The contract ABI to use for decoding
- * @returns The transfer source, destination and token id, or null when the data is not a single-token transfer
+ * Reads the sender, the recipient and the token id out of a decoded ERC-721 transfer. Only `transferFrom`
+ * and `safeTransferFrom` qualify: the branded gift view previews exactly those, so any other call is left
+ * to the generic review and its simulation.
+ * @param call The call decoded against the collection ABI
+ * @returns The transfer source, destination and token id, or null when the call is not a single-token transfer
  */
-function decodeNftTransferData(data: string, contractABI: object[]): { fromAddress: string; tokenId: string; toAddress: string } | null {
-  try {
-    if (!data || data.length < 10) return null
-
-    const { functionName, args } = decodeFunctionData({
-      abi: contractABI as readonly unknown[],
-      data: data as `0x${string}`
-    })
-
-    if (!NFT_TRANSFER_FUNCTIONS.has(functionName)) {
-      return null
-    }
-
-    // transferFrom(address from, address to, uint256 tokenId)
-    // safeTransferFrom(address from, address to, uint256 tokenId)
-    // safeTransferFrom(address from, address to, uint256 tokenId, bytes data)
-    const [fromAddress, toAddress, tokenId] = args ?? []
-    if (typeof fromAddress !== 'string' || typeof toAddress !== 'string' || typeof tokenId !== 'bigint') {
-      console.error('Failed to decode transaction data')
-      return null
-    }
-
-    return { fromAddress, tokenId: tokenId.toString(), toAddress }
-  } catch (error) {
-    console.error('Error decoding NFT transfer data:', error)
+function decodeNftTransferData(call: DecodedCall): { fromAddress: string; tokenId: string; toAddress: string } | null {
+  if (!NFT_TRANSFER_FUNCTIONS.has(call.functionName)) {
     return null
   }
+
+  // transferFrom(address from, address to, uint256 tokenId)
+  // safeTransferFrom(address from, address to, uint256 tokenId)
+  // safeTransferFrom(address from, address to, uint256 tokenId, bytes data)
+  const [fromAddress, toAddress, tokenId] = call.args
+  if (typeof fromAddress !== 'string' || typeof toAddress !== 'string' || typeof tokenId !== 'bigint') {
+    console.error('Failed to decode transaction data')
+    return null
+  }
+
+  return { fromAddress, tokenId: tokenId.toString(), toAddress }
 }
 
 /** Whether two token ids name the same token, whatever notation each side uses (decimal, hex). */
@@ -554,174 +335,25 @@ function isExactNftTransferSimulation(
   )
 }
 
-// The factories every Decentraland collection on the meta-transaction chain was deployed through. Not
-// every generation exists on every chain (Amoy only has the V3 factory), so the ones missing from the
-// registry are skipped.
-const COLLECTION_FACTORIES = [ContractName.CollectionFactory, ContractName.CollectionFactoryV3]
-// A hung RPC must not hold the request page on its spinner. After this long the lookup is given up (the
-// RPC call itself is not aborted; the provider offers no handle for that) and the review falls back to the
-// generic path. The lookups that share this budget run in parallel, so it bounds the wait as a whole.
-const COLLECTION_LOOKUP_TIMEOUT_MS = 10_000
-
-/** Rejects when `promise` has not settled within `timeoutMs`. */
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs)
-    promise.then(
-      value => {
-        clearTimeout(timer)
-        resolve(value)
-      },
-      error => {
-        clearTimeout(timer)
-        reject(error)
-      }
-    )
-  })
-}
-
 /**
- * Whether a contract is a Decentraland collection: one of the collection factories on the
- * meta-transaction chain records having deployed it, answered by the chain itself with a read-only call.
- *
- * Asking the transactions server whether it would relay the address is not the same question — it
- * vouches for every Decentraland contract in its address book, not only collections — and the branded
- * gift view needs the exact answer: it presents the call as one collection token moving and nothing
- * else, which only Decentraland's collection code guarantees.
- *
- * The answer is a trust decision, so it is read through Decentraland's own RPC and never through the
- * connected wallet: a wallet pointed at a hostile RPC (a custom network the user was talked into adding)
- * could otherwise answer "yes" for any contract and dress it as a gift.
- * @param contractAddress The contract the transaction targets
- * @returns true when a factory deployed it; false when none did, or none exists on this chain
- * @throws when the chain could not be asked, or did not answer in time, so an outage is never read as
- * a verdict
+ * Reads the amount and the destination out of a decoded MANA `transfer`. The caller has already
+ * established that the call targets the canonical MANA token, so this only shapes the arguments.
+ * @param call The call decoded against the MANA ABI
+ * @returns Object containing manaAmount and toAddress, or null when the call is not a transfer
  */
-async function isDecentralandCollection(contractAddress: string): Promise<boolean> {
-  const chainId = getMetaTransactionChainId()
-  const factories = COLLECTION_FACTORIES.flatMap(name => {
-    try {
-      return [getContract(name, chainId)]
-    } catch {
-      return []
-    }
-  })
-  if (factories.length === 0) {
-    return false
-  }
-
-  // Note what "a factory deployed it" covers: every curated collection, third-party creators' included.
-  // The branded frame is therefore available to any approved creator's collection, and what it says
-  // stays true for all of them — exactly one token the signer holds leaves their account.
-  const networkProvider = await getTrustedNetworkProvider(chainId)
-  const publicClient = createPublicClient({ transport: custom(networkProvider) })
-  const answers = await Promise.allSettled(
-    factories.map(factory =>
-      withTimeout(
-        publicClient.readContract({
-          address: factory.address as `0x${string}`,
-          abi: factory.abi as readonly unknown[],
-          functionName: 'isCollectionFromFactory',
-          args: [contractAddress]
-        }) as Promise<boolean>,
-        COLLECTION_LOOKUP_TIMEOUT_MS,
-        'Collection factory lookup'
-      )
-    )
-  )
-  // One factory saying yes is the whole answer, whatever happened to the other lookup. Only when no
-  // factory said yes does a failed lookup matter: then nothing vouched for the contract and nothing
-  // ruled it out either, and an outage must not be read as a verdict.
-  if (answers.some(answer => answer.status === 'fulfilled' && answer.value === true)) {
-    return true
-  }
-  const failure = answers.find((answer): answer is PromiseRejectedResult => answer.status === 'rejected')
-  if (failure) {
-    throw failure.reason
-  }
-  return false
-}
-
-/**
- * Whether `owner` holds token `tokenId` on `contractAddress`, read through Decentraland's own RPC.
- *
- * The branded gift view claims the connected account's token is leaving. The calldata's `from` only
- * says who the requester claims that is; this says who actually holds it. A token that does not exist
- * reverts, which surfaces like any other read failure: the caller falls back to the generic review.
- * @param contractAddress The collection
- * @param contractABI The collection ABI, which declares `ownerOf`
- * @param tokenId The token, in decimal
- * @param owner The account expected to hold it
- * @throws when the chain could not be asked, did not answer in time, or the token does not exist
- */
-async function isNftOwnedBy(contractAddress: string, contractABI: object[], tokenId: string, owner: string): Promise<boolean> {
-  const networkProvider = await getTrustedNetworkProvider(getMetaTransactionChainId())
-  const publicClient = createPublicClient({ transport: custom(networkProvider) })
-  const holder = await withTimeout(
-    publicClient.readContract({
-      address: contractAddress as `0x${string}`,
-      abi: contractABI as readonly unknown[],
-      functionName: 'ownerOf',
-      args: [BigInt(tokenId)]
-    }) as Promise<string>,
-    COLLECTION_LOOKUP_TIMEOUT_MS,
-    'Token owner lookup'
-  )
-  return typeof holder === 'string' && holder.toLowerCase() === owner.toLowerCase()
-}
-
-/**
- * Decodes MANA (ERC20) transfer data to extract amount and destination address.
- * Only decodes when the transaction targets the canonical MANA token contract, so an
- * arbitrary ERC20 transfer can't be presented to the user as a MANA tip.
- * @param data The transaction data
- * @param contractAddress The transaction `to` address (the token contract being called)
- * @returns Object containing manaAmount and toAddress, or null if decoding fails
- */
-function decodeManaTransferData(data: string, contractAddress: string): { manaAmount: string; toAddress: string } | null {
-  try {
-    if (!data || data.length < 10) return null
-    if (!contractAddress) return null
-
-    // ERC20 transfer function signature: transfer(address to, uint256 amount)
-    const transferFunctionSignature = '0xa9059cbb'
-
-    // Check if this is a transfer function call
-    if (!data.startsWith(transferFunctionSignature)) {
-      return null
-    }
-
-    // Only treat this as a MANA transfer if it targets the canonical MANA token contract.
-    // Without this, any ERC20 transfer (`transfer(to, amount)`) would be mislabeled as MANA
-    // and its amount mis-formatted (formatEther assumes 18 decimals).
-    const manaContract = getContract(ContractName.MANAToken, getMetaTransactionChainId())
-    if (contractAddress.toLowerCase() !== manaContract.address.toLowerCase()) {
-      return null
-    }
-
-    const contract = getContract(ContractName.ERC20, getMetaTransactionChainId())
-
-    const { args } = decodeFunctionData({
-      abi: contract.abi as readonly unknown[],
-      data: data as `0x${string}`
-    })
-
-    if (!args || args.length < 2) {
-      console.error('Failed to decode MANA transfer data')
-      return null
-    }
-
-    const toAddress = args[0] as string
-    const amount = args[1] as bigint
-
-    // Convert from wei to MANA (18 decimals)
-    const manaAmount = formatEther(amount)
-
-    return { manaAmount, toAddress }
-  } catch (error) {
-    console.error('Error decoding MANA transfer data:', error)
+function decodeManaTransferData(call: DecodedCall): { manaAmount: string; toAddress: string } | null {
+  // transfer(address to, uint256 amount)
+  if (call.functionName !== 'transfer') {
     return null
   }
+  const [toAddress, amount] = call.args
+  if (typeof toAddress !== 'string' || typeof amount !== 'bigint') {
+    console.error('Failed to decode MANA transfer data')
+    return null
+  }
+
+  // Convert from wei to MANA (18 decimals)
+  return { manaAmount: formatEther(amount), toAddress }
 }
 
 /**
@@ -734,12 +366,11 @@ function decodeManaTransferData(data: string, contractAddress: string): { manaAm
  */
 async function fetchNftMetadata(
   contractAddress: string,
-  contractABI: object[],
+  contractABI: readonly unknown[],
   tokenId: string
 ): Promise<{ imageUrl: string; name: string; description: string; rarity: Rarity }> {
-  // Read through Decentraland's own RPC for the collections chain (Polygon/Amoy). Not the wallet's: it
-  // may be on another network, and what it returns here is drawn on the branded view as the token's
-  // name, image and rarity, so a hostile RPC could dress the genuine token in whatever it likes.
+  // Read through Decentraland's own RPC for the collection chain (Polygon/Amoy): the user's wallet may be
+  // on another network, and a wallet RPC is not a source the branded view should trust for what it shows.
   const chainId = getMetaTransactionChainId()
   const networkProvider = await getTrustedNetworkProvider(chainId)
   const publicClient = createPublicClient({ transport: custom(networkProvider) })
@@ -747,7 +378,7 @@ async function fetchNftMetadata(
   // Use the provided contract ABI to interact with the NFT contract
   const tokenUri = (await publicClient.readContract({
     address: contractAddress as `0x${string}`,
-    abi: contractABI as readonly unknown[],
+    abi: contractABI,
     functionName: 'tokenURI',
     args: [BigInt(tokenId)]
   })) as string
@@ -886,22 +517,12 @@ export {
   getSigninDeeplink,
   getConnectedProvider,
   getNetworkProvider,
-  isDecentralandContractAddress,
   isDecentralandCollection,
-  isNftOwnedBy,
-  getTrustedNetworkProvider,
-  isApprovalGrantingTypedData,
   getMetaTransactionChainId,
-  checkMetaTransactionSupport,
   decodeNftTransferData,
   isExactNftTransferSimulation,
   decodeManaTransferData,
   fetchNftMetadata,
   fetchPlaceByCreatorAddress,
-  isSignatureMethod,
-  isKnownDecentralandContractOnChain,
-  extractSignaturePayload,
-  decodeMetaTransactionTypedData,
-  isOpaqueSignatureMessage,
   buildSendTransactionSimulationPayload
 }

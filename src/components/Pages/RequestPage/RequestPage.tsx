@@ -2,7 +2,8 @@ import { useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { createPublicClient, createWalletClient, custom } from 'viem'
 import { mainnet } from 'viem/chains'
-import { ContractName, getContract, sendMetaTransaction } from 'decentraland-transactions'
+import { ChainId } from '@dcl/schemas/dist/dapps/chain-id'
+import { sendMetaTransaction } from 'decentraland-transactions'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useTargetConfig } from '../../../hooks/targetConfig'
 import { useAnalytics } from '../../../hooks/useAnalytics'
@@ -13,6 +14,7 @@ import { ClickEvents, TrackingEvents } from '../../../modules/analytics/types'
 import { config } from '../../../modules/config'
 import { fetchProfile } from '../../../modules/profile'
 import {
+  ContractLookupUnavailableError,
   DifferentSenderError,
   ExpiredRequestError,
   IdentityResponse,
@@ -27,11 +29,12 @@ import {
   UnsupportedMethodError,
   buildMetaTransactionSimulationPayload,
   createAuthServerHttpClient,
+  getKnownDecentralandContract,
   hasNoVisibleEffects,
-  isDangerousApproval
+  isDangerousApproval,
+  resolveKnownDecentralandContract
 } from '../../../shared/auth'
 import { isRetiredSignInMethod } from '../../../shared/auth/signMethodGuard'
-import { resolveTypedDataReview } from '../../../shared/auth/typedDataReview'
 import { isSocialProviderType, useCurrentConnectionData } from '../../../shared/connection'
 import { isSessionMismatch } from '../../../shared/connection/sessionMismatch'
 import { isChainMismatchRejection, isErrorWithMessage, isRpcError, isUserRejectedTransaction } from '../../../shared/errors'
@@ -48,23 +51,19 @@ import { getProfileDisplayName } from '../../../shared/profile'
 import { identifyUser, trackEvent } from '../../../shared/utils/analytics'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { FeatureFlagsContext } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
-import { buildTransactionParams } from './transactionParams'
 import {
-  MANATransferData,
-  MetaTransactionContractTrust,
-  NFTTransferData,
-  SignaturePayload,
-  SimulationState,
-  TransferType,
-  UnverifiableSignatureReason
-} from './types'
+  RequestClassification,
+  classifyRequest,
+  describeClassification,
+  getPayloadFingerprint,
+  getTypedDataDigest
+} from './classifyRequest'
+import { buildTransactionParams } from './transactionParams'
+import { GasEstimateState, MANATransferData, NFTTransferData, SimulationState, TransferType } from './types'
 import {
   buildSendTransactionSimulationPayload,
-  checkMetaTransactionSupport,
   decodeManaTransferData,
-  decodeMetaTransactionTypedData,
   decodeNftTransferData,
-  extractSignaturePayload,
   fetchNftMetadata,
   fetchPlaceByCreatorAddress,
   getConnectedProvider,
@@ -72,13 +71,8 @@ import {
   getMetaTransactionChainId,
   getNetworkProvider,
   getSigninDeeplink,
-  isApprovalGrantingTypedData,
   isDecentralandCollection,
-  isExactNftTransferSimulation,
-  isKnownDecentralandContractOnChain,
-  isNftOwnedBy,
-  isOpaqueSignatureMessage,
-  isSignatureMethod
+  isExactNftTransferSimulation
 } from './utils'
 import {
   ClientLoginError,
@@ -95,9 +89,11 @@ import {
   TransferCanceledView,
   TransferCompletedView,
   TransferConfirmView,
+  UnverifiedRequestView,
   WalletInteraction,
   WalletInteractionComplete
 } from './Views'
+import { UnverifiedRequestViewProps } from './Views/UnverifiedRequest'
 
 enum View {
   TIMEOUT,
@@ -114,6 +110,7 @@ enum View {
   // Wallet Interaction
   WALLET_INTERACTION,
   WALLET_SIGNATURE_INTERACTION,
+  WALLET_UNVERIFIED_INTERACTION,
   WALLET_NFT_INTERACTION,
   WALLET_MANA_INTERACTION,
   WALLET_INTERACTION_DENIED,
@@ -142,21 +139,75 @@ const TERMINAL_VIEWS = new Set([
   View.DIFFERENT_ACCOUNT
 ])
 
+// The views on which a request is still being reviewed, and whose expiry timer therefore stays armed.
+const INTERACTION_VIEWS = new Set([
+  View.WALLET_INTERACTION,
+  View.WALLET_SIGNATURE_INTERACTION,
+  View.WALLET_UNVERIFIED_INTERACTION,
+  View.WALLET_NFT_INTERACTION,
+  View.WALLET_MANA_INTERACTION
+])
+
 // Reported to the client when a request is rejected at recover time, before it reaches the wallet.
 const RPC_METHOD_NOT_SUPPORTED = -32601
 const RPC_INVALID_PARAMS = -32602
 
-// Unwraps a settled promise: its value, or its rejection rethrown. Lets several lookups be awaited
-// together and their outcomes consumed in a chosen order afterwards.
-function settledValue<T>(outcome: PromiseSettledResult<T>): T {
-  if (outcome.status === 'rejected') {
-    throw outcome.reason
-  }
-  return outcome.value
-}
-
 // Why a transaction review was discarded and started over (see restartTransactionReview).
 type ReviewRestartReason = 'network_changed' | 'network_unreadable' | 'network_unrecorded' | 'wallet_rejected_chain'
+
+type DecentralandTransaction = Extract<RequestClassification, { kind: 'dcl_transaction' }>
+
+/**
+ * The props of the unverified view that follow from the classification alone: what kind of request
+ * it is, what it targets, and exactly what the wallet will be handed. Null for the previewed kinds.
+ */
+function getUnverifiedRequestProps(
+  classification: RequestClassification
+): Pick<UnverifiedRequestViewProps, 'kind' | 'targetAddress' | 'targetIsSelf' | 'chainId' | 'nativeValue' | 'payload'> | null {
+  switch (classification.kind) {
+    case 'unknown_transaction':
+      return {
+        kind: classification.kind,
+        targetAddress: classification.to,
+        chainId: classification.chainId,
+        nativeValue: classification.value,
+        payload: { kind: 'transaction', to: classification.to, data: classification.data, value: classification.value }
+      }
+    case 'native_transfer':
+      return {
+        kind: classification.kind,
+        targetAddress: classification.to,
+        targetIsSelf: classification.toSelf,
+        chainId: classification.chainId,
+        nativeValue: classification.value,
+        payload: { kind: 'transaction', to: classification.to, data: '0x', value: classification.value }
+      }
+    case 'unknown_meta_transaction': {
+      const message = classification.typedData.message
+      const declaredCalldata = message?.functionSignature ?? message?.functionData
+      return {
+        kind: classification.kind,
+        targetAddress: classification.verifyingContract,
+        chainId: classification.chainId,
+        payload: {
+          kind: 'typed_data',
+          raw: classification.raw,
+          calldata: typeof declaredCalldata === 'string' ? declaredCalldata : null,
+          digest: getTypedDataDigest(classification.typedData)
+        }
+      }
+    }
+    case 'unknown_typed_data':
+      return {
+        kind: classification.kind,
+        payload: { kind: 'typed_data', raw: classification.raw, calldata: null, digest: getTypedDataDigest(classification.typedData) }
+      }
+    case 'personal_sign':
+      return { kind: classification.kind, payload: { kind: 'message', hex: classification.hex, text: classification.text } }
+    default:
+      return null
+  }
+}
 
 export const RequestPage = () => {
   const params = useParams()
@@ -174,9 +225,16 @@ export const RequestPage = () => {
     balance: bigint
     chainId: number
   }>()
-  const [transactionGasCost, setTransactionGasCost] = useState<bigint>()
+  // What the recovered request is (see classifyRequest). Null until classification resolves; nothing
+  // is rendered for the request before then, so Allow cannot exist before its kind is known. The ref
+  // is what the approve path reads, so it dispatches on exactly what was reviewed.
+  const [classification, setClassification] = useState<RequestClassification | null>(null)
+  const classificationRef = useRef<RequestClassification | null>(null)
+  // The wallet-side fee estimate of a transaction the user pays gas for. Null when no estimate applies.
+  const [gasEstimate, setGasEstimate] = useState<GasEstimateState | null>(null)
   const [nftTransferData, setNftTransferData] = useState<NFTTransferData | null>(null)
   const [manaTransferData, setManaTransferData] = useState<MANATransferData | null>(null)
+  // The web2 second confirmation step of the branded tip and gift screens.
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false)
   const [simulationState, setSimulationState] = useState<SimulationState>({ status: 'idle' })
   // Resolved counterparty display names (lowercased address → name), filled in progressively.
@@ -185,28 +243,6 @@ export const RequestPage = () => {
   const [simulationChainId, setSimulationChainId] = useState<number>()
   // Lowercased addresses in the simulation that are recognized Decentraland contracts.
   const [simulationVerified, setSimulationVerified] = useState<string[]>([])
-  // Whether the pending eth_sendTransaction will be relayed as a meta-transaction (gas covered
-  // by Decentraland's gas tank), so the confirm dialog can hide the user-facing gas cost.
-  const [isMetaTransaction, setIsMetaTransaction] = useState(false)
-  const [signaturePayload, setSignaturePayload] = useState<SignaturePayload | null>(null)
-  // Whether the pending typed-data signature is a Decentraland MetaTransaction. Unlike a relayed
-  // eth_sendTransaction, the signature leaves Auth, so no contract is ever "trusted" enough to skip
-  // the acknowledgment when its inner call could not be previewed (see requiresApprovalAcknowledgment).
-  const [isSignatureMetaTx, setIsSignatureMetaTx] = useState(false)
-  // Whether the MetaTransaction's verifyingContract is a recognized Decentraland contract (static
-  // registry, or a collection known to the meta-transaction server). Recognition never relaxes a
-  // gate — the signature leaves Auth either way — but an unrecognized contract means Auth cannot
-  // vouch for how it executes the previewed call, so approval needs an acknowledgment; while the
-  // lookup is pending, approval stays disabled so the answer cannot be skipped.
-  const [signatureContractTrust, setSignatureContractTrust] = useState<MetaTransactionContractTrust>('pending')
-  // Whether the typed-data signature grants an off-chain asset approval (EIP-2612 Permit, Permit2,
-  // Seaport order). These aren't simulated, so they must always require an explicit acknowledgment.
-  const [isHighRiskSignature, setIsHighRiskSignature] = useState(false)
-  // Why the signature cannot be checked at all: typed data that is neither a MetaTransaction
-  // (previewed) nor a known approval type (flagged), or a personal_sign message that is not readable
-  // text. Nothing on screen then says what a counterparty can do with the signature, so it fails
-  // closed and requires an acknowledgment instead of a single click.
-  const [unverifiableSignatureReason, setUnverifiableSignatureReason] = useState<UnverifiableSignatureReason | null>(null)
   const requestRef = useRef<RecoverResponse>()
   const viewRef = useRef(view)
   viewRef.current = view
@@ -240,9 +276,6 @@ export const RequestPage = () => {
   // Guards against re-entrant approvals (e.g. a fast double-click on the confirm dialog),
   // which would otherwise fire two transactions before `isLoading` re-renders the buttons.
   const isApprovingRef = useRef(false)
-  // Caches the meta-transaction support check from the prefetch so the approve path can reuse it
-  // for the same contract instead of repeating the (potentially networked) lookup.
-  const metaTxCheckRef = useRef<{ address: string; willUseMetaTransaction: boolean; contractName: ContractName | null } | null>(null)
   // Shares the in-flight identity POST across effect re-runs so the client-login flow
   // creates the identity exactly once; cleared on failure so a retry can re-post.
   const clientLoginPromiseRef = useRef<Promise<IdentityResponse> | null>(null)
@@ -262,13 +295,10 @@ export const RequestPage = () => {
   const requestId = params.requestId ?? ''
   const [targetConfig, targetConfigId] = useTargetConfig()
   const skipSetup = useSkipSetup()
-  // Social / web2 wallets (Magic and Thirdweb) sign without their own confirmation UI, so the
-  // auth site must show what is being approved (transaction simulation + signature preview and
-  // the associated acknowledgment gates). This is always on for web2 users — it is the only
-  // confirmation they get. External wallets keep their own confirmation UI for plain transactions
-  // and signatures, so the informative UI is not shown for those — except for meta-transactions,
-  // which reach the wallet as an EIP-712 struct with opaque calldata and are previewed for everyone
-  // (see the eth_sendTransaction and signature branches of the load effect).
+  // Social / web2 wallets (Magic and Thirdweb) sign without their own confirmation UI. Every review
+  // screen is the same for them and for external wallets; the one place the distinction survives is
+  // the branded tip and gift screens, where web2 users get a second confirmation modal before the
+  // relay because nothing else will ask them again.
   const isUserUsingWeb2Wallet = isSocialProviderType(providerType)
   const authServerClient = useRef(createAuthServerHttpClient())
   // The deep-link flow (opted in via `?flow=deeplink`, compared case-insensitively) has no
@@ -369,8 +399,8 @@ export const RequestPage = () => {
   // Effect 2: Load the request once the user is connected and the profile is ready.
   useEffect(() => {
     // A different request id, or a different account, on a still-mounted page starts over, before
-    // any other branch runs. Everything derived from the previous request — its preview, verified
-    // contracts, classification and completion — must go; otherwise a click on Allow could execute
+    // any other branch runs. Everything derived from the previous request — its classification,
+    // preview, verified contracts and completion — must go; otherwise a click on Allow could execute
     // the new request under the previous request's summary and acknowledgment. `loadedRequestId`
     // and `loadedAccount` are what the render reads: until both match, the page shows the loading
     // view and nothing of the previous review. The account is part of the key because an external
@@ -392,7 +422,7 @@ export const RequestPage = () => {
       pendingReviewRestartRef.current = undefined
       hasCompletedRef.current = false
       requestRef.current = undefined
-      metaTxCheckRef.current = null
+      classificationRef.current = null
       // Deep-link handoff state is per request as well: a new id is a new identity handoff.
       clientLoginPromiseRef.current = null
       hasTrackedDeepLinkRef.current = false
@@ -403,7 +433,8 @@ export const RequestPage = () => {
       setIsLoading(false)
       setError(undefined)
       setWalletInfo(undefined)
-      setTransactionGasCost(undefined)
+      setClassification(null)
+      setGasEstimate(null)
       setNftTransferData(null)
       setManaTransferData(null)
       setIsTransactionModalOpen(false)
@@ -411,12 +442,6 @@ export const RequestPage = () => {
       setSimulationProfiles({})
       setSimulationChainId(undefined)
       setSimulationVerified([])
-      setIsMetaTransaction(false)
-      setSignaturePayload(null)
-      setIsSignatureMetaTx(false)
-      setSignatureContractTrust('pending')
-      setIsHighRiskSignature(false)
-      setUnverifiableSignatureReason(null)
     }
 
     // A deep-link handoff requires a valid UUID v4 id (the client's correlation id). Reject a
@@ -506,7 +531,8 @@ export const RequestPage = () => {
 
     const loadRequest = async () => {
       const timeTheSiteStartedLoading = Date.now()
-      publicClientRef.current = createPublicClient({ transport: custom(provider) })
+      const publicClient = createPublicClient({ transport: custom(provider) })
+      publicClientRef.current = publicClient
       walletClientRef.current = createWalletClient({ chain: mainnet, transport: custom(provider) })
       // Held outside the try so the catch can name a sender when it reports a rejection.
       let connectedAddress: string | undefined
@@ -591,14 +617,21 @@ export const RequestPage = () => {
           }
         }
 
-        // Collects the addresses in the simulation that are recognized Decentraland contracts,
-        // so the summary can show a "verified" badge next to them.
-        // Recognition is per chain: the addresses are judged against the deployments on the chain the
-        // simulation ran on, never against the registry as a whole.
+        // Collects the addresses in the simulation that are recognized Decentraland contracts, so the
+        // summary can show a "verified" badge next to them and the approval gate can tell a routine
+        // permission to a Decentraland contract from one handed to anyone else. Recognition is per
+        // chain: the addresses are judged against the registry deployments on the chain the
+        // simulation ran on, never against the registry as a whole. The contract being called is
+        // included too: a wearable collection is verified by the transactions-server, not the registry.
         const collectVerifiedContracts = (result: SimulationResponseBody, chainId: number): string[] => {
+          const reviewed = classificationRef.current
+          const calledContract =
+            reviewed && (reviewed.kind === 'dcl_transaction' || reviewed.kind === 'dcl_meta_transaction') ? reviewed.contract.address : null
           const verified = new Set<string>()
           const consider = (address: string | null) => {
-            if (address && isKnownDecentralandContractOnChain(address, chainId)) verified.add(address.toLowerCase())
+            if (!address) return
+            const normalized = address.toLowerCase()
+            if (normalized === calledContract || getKnownDecentralandContract(normalized, chainId)) verified.add(normalized)
           }
           for (const change of result.assetChanges) {
             consider(change.from)
@@ -612,7 +645,7 @@ export const RequestPage = () => {
           return [...verified]
         }
 
-        // Best-effort transaction simulation for web2 users. Fires without blocking the view
+        // Best-effort simulation of a Decentraland contract call. Fires without blocking the view
         // render and never throws to the caller — failures surface as "details unavailable".
         //
         // `rejectUnpreviewable` is for signatures that leave Auth as a bearer authorization (a
@@ -644,305 +677,169 @@ export const RequestPage = () => {
           }
         }
 
-        // Show different views depending on the request method.
-        switch (request.method) {
-          case 'eth_sendTransaction': {
-            try {
-              // Get wallet info first
-              const userBalance = await publicClientRef.current.getBalance({ address: signerAddress })
-              const currentChainId = await publicClientRef.current.getChainId()
-
-              if (cancelled) return
-
-              setWalletInfo({
-                balance: userBalance,
-                chainId: currentChainId
-              })
-              reviewedWalletChainIdRef.current = currentChainId
-
-              // Check if this is an NFT transfer or MANA transfer by analyzing the transaction data
-              const txParams = request.params?.[0] as Record<string, unknown> | undefined
-              // The simulation the gift gate already ran and showed, if any, so the generic block does
-              // not run it again when the branded lookups fail after a passing gate.
-              let giftSimulation: SimulationResponseBody | null = null
-              const transactionData = txParams?.data as string | undefined
-              const contractAddress = txParams?.to as string | undefined
-
-              if (transactionData && contractAddress) {
-                try {
-                  const manaData = decodeManaTransferData(transactionData, contractAddress)
-                  if (manaData) {
-                    const [recipientProfile, placeInfo] = await Promise.all([
-                      fetchProfile(manaData.toAddress),
-                      fetchPlaceByCreatorAddress(manaData.toAddress)
-                    ])
-
-                    if (cancelled) return
-
-                    setManaTransferData({
-                      // Show the exact formatted amount (formatEther already trims trailing zeros).
-                      // parseInt truncated fractional MANA, under-displaying what is actually signed.
-                      manaAmount: `${manaData.manaAmount} MANA`,
-                      toAddress: manaData.toAddress,
-                      recipientProfile: recipientProfile || undefined,
-                      sceneName: placeInfo?.sceneName || 'Unknown Place',
-                      sceneImageUrl:
-                        placeInfo?.sceneImageUrl ||
-                        'https://peer.decentraland.org/content/contents/bafkreidj26s7aenyxfthfdibnqonzqm5ptc4iamml744gmcyuokewkr76y'
-                    })
-                    // A MANA tip only decodes when it targets the canonical MANA contract, which is
-                    // always relayed as a meta-transaction (gas covered by the gas tank). Mark it so
-                    // the web2 confirm dialog says "gas covered" instead of showing a 0-ETH cost.
-                    setIsMetaTransaction(true)
-                    setView(View.WALLET_MANA_INTERACTION)
-                    break
-                  }
-
-                  // Try to decode as NFT transfer using CollectionV2 contract
-                  // If it decodes successfully, it's an NFT transfer
-                  const chainId = getMetaTransactionChainId()
-                  const contract = getContract(ContractName.ERC721CollectionV2, chainId)
-                  const transferData = decodeNftTransferData(transactionData, contract.abi)
-
-                  if (transferData) {
-                    // The branded gift view says "your token #X goes to Y, gas covered", so it is shown only when
-                    // three checks agree: the transactions server relays the contract (gas covered), a Decentraland
-                    // collection factory deployed it (address-book contracts and ERC-20 transferFrom, which shares
-                    // the ERC-721 selector, pass the relay check alone), and the connected account holds the token
-                    // (the calldata's `from` is only what the requester claims). The chain lookups use
-                    // Decentraland's RPC, never the wallet's. Anything else, including a failed lookup, takes the
-                    // generic review; what passes is simulated below before the view is shown.
-                    const isOwnTransfer = transferData.fromAddress.toLowerCase() === signerAddress.toLowerCase()
-                    const [relayOutcome, collectionOutcome, holderOutcome] = await Promise.allSettled([
-                      checkMetaTransactionSupport(contractAddress),
-                      isOwnTransfer ? isDecentralandCollection(contractAddress) : Promise.resolve(false),
-                      isOwnTransfer
-                        ? isNftOwnedBy(contractAddress, contract.abi, transferData.tokenId, signerAddress)
-                        : Promise.resolve(false)
-                    ])
-                    if (cancelled) return
-                    // The relay answer is cached before any verification failure is raised, so the generic
-                    // review this falls to does not ask the transactions server the same question again.
-                    if (relayOutcome.status === 'fulfilled') {
-                      metaTxCheckRef.current = { address: contractAddress.toLowerCase(), ...relayOutcome.value }
-                    }
-                    const nftContractCheck = settledValue(relayOutcome)
-                    const isCollection = settledValue(collectionOutcome)
-                    const isHeldBySigner = settledValue(holderOutcome)
-                    const isVerifiedCollection = nftContractCheck.willUseMetaTransaction && isOwnTransfer && isCollection && isHeldBySigner
-
-                    if (isVerifiedCollection) {
-                      // A verified collection is still not a complete preview: safeTransferFrom calls the receiver,
-                      // whose callback may move other assets through existing allowances. Simulate first, showing
-                      // the generic review meanwhile (Deny works, Allow is blocked), and upgrade to the branded view
-                      // only when the sole visible effect is exactly the transfer it shows. A receiver can detect
-                      // the simulation frame, so this raises the bar rather than proving completeness.
-                      const body = txParams ? buildSendTransactionSimulationPayload(txParams, signerAddress, currentChainId, true) : null
-                      // Relayed as a meta-transaction, gas covered, whichever view ends up shown.
-                      setIsMetaTransaction(true)
-                      if (!body) {
-                        setSimulationState({ status: 'unavailable' })
-                        setView(View.WALLET_INTERACTION)
-                        break
-                      }
-
-                      setSimulationChainId(body.chainId)
-                      setSimulationState({ status: 'loading' })
-                      setView(View.WALLET_INTERACTION)
-                      const simulation = await fetchSimulation(body)
-                      if (cancelled) return
-                      giftSimulation = simulation ?? null
-                      // The user may have answered from the generic review while the simulation ran;
-                      // their answer stands.
-                      if (hasCompletedRef.current) break
-                      if (!simulation || !isExactNftTransferSimulation(simulation, signerAddress, contractAddress, transferData)) {
-                        break
-                      }
-
-                      const [metadata, recipientProfile] = await Promise.all([
-                        fetchNftMetadata(contractAddress, contract.abi, transferData.tokenId),
-                        fetchProfile(transferData.toAddress)
-                      ])
-
-                      if (cancelled) return
-                      if (hasCompletedRef.current) break
-
-                      setNftTransferData({
-                        imageUrl: metadata.imageUrl,
-                        tokenId: transferData.tokenId,
-                        toAddress: transferData.toAddress,
-                        contractAddress,
-                        name: metadata.name,
-                        description: metadata.description,
-                        rarity: metadata.rarity,
-                        recipientProfile: recipientProfile || undefined
-                      })
-                      setView(View.WALLET_NFT_INTERACTION)
-                      break
-                    }
-                  }
-                } catch (e) {
-                  if (cancelled) return
-                  // The branded tip and gift views are a convenience over the generic review, not a gate.
-                  // When one of their lookups fails (token metadata, recipient profile, place), fall
-                  // through to the generic review — for a web2 user that still runs the simulation and
-                  // its acknowledgment gates — instead of letting the failure reach the outer catch,
-                  // which would show the bare confirm dialog with no preview at all.
-                  console.error('Error building the branded transfer view, falling back to the generic review', e)
-                }
-              }
-
-              // Generic transaction only — MANA tips and NFT gifts have their own views and
-              // returned above, so they are left untouched. Decide whether this will be relayed as
-              // a meta-transaction (a Decentraland contract call, relayed on Polygon where the gas
-              // tank pays) and prefetch the asset-change simulation of the original transaction.
-              // Non-blocking, but approval stays blocked while it resolves.
-              //
-              // Web2 wallets always get the preview: this page is their only confirmation. External
-              // wallets show a plain eth_sendTransaction themselves, so they keep the classic
-              // confirmation for those — but a relayed transaction never reaches them as a
-              // transaction. The approve path asks them to sign an EIP-712 MetaTransaction whose
-              // calldata is an opaque `functionSignature`, so the wallet prompt cannot show what the
-              // call does: an unlimited MANA approve or a setApprovalForAll looks like any other hex
-              // blob. The preview and its acknowledgment gates therefore apply to everyone when the
-              // call is relayed, and the relay decision has to be known before Allow is enabled.
-              // When the gift gate already simulated this transaction and showed the result, the branded
-              // lookups failed after it; the preview on screen is the right one, so do not run it again
-              // (a retry could fail and downgrade a preview the user has already seen).
-              if (contractAddress && !giftSimulation) {
-                setSimulationState({ status: 'loading' })
-                // Reuse the meta-transaction check if the NFT-gift gate already resolved it for this
-                // same contract (it falls through to here for non-DCL contracts), so we don't repeat
-                // the networked lookup.
-                const cachedCheck = metaTxCheckRef.current
-                const metaTxCheck =
-                  cachedCheck && cachedCheck.address === contractAddress.toLowerCase()
-                    ? Promise.resolve(cachedCheck)
-                    : checkMetaTransactionSupport(contractAddress)
-                metaTxCheck
-                  .then(({ willUseMetaTransaction, contractName }) => {
-                    // Cache the result so the approve path doesn't repeat the lookup for this tx.
-                    metaTxCheckRef.current = { address: contractAddress.toLowerCase(), willUseMetaTransaction, contractName }
-                    if (cancelled) return undefined
-                    setIsMetaTransaction(willUseMetaTransaction)
-                    if (!isUserUsingWeb2Wallet && !willUseMetaTransaction) {
-                      // The wallet will show this transaction itself: back to the classic confirmation.
-                      setSimulationState({ status: 'idle' })
-                      return undefined
-                    }
-                    if (txParams) {
-                      const body = buildSendTransactionSimulationPayload(txParams, signerAddress, currentChainId, willUseMetaTransaction)
-                      if (body) {
-                        setSimulationChainId(body.chainId)
-                        return fetchSimulation(body)
-                      }
-                      setSimulationState({ status: 'unavailable' })
-                    }
-                    return undefined
-                  })
-                  .catch(() => {
-                    if (!cancelled) setSimulationState({ status: 'unavailable' })
-                  })
-              }
-
-              const feeData = await publicClientRef.current.estimateFeesPerGas()
-              const gasPrice = feeData.gasPrice ?? feeData.maxFeePerGas ?? BigInt(0)
-              const gasEstimateTxParams = request.params?.[0] as Record<string, unknown> | undefined
-              const transactionGasEstimate = await publicClientRef.current.estimateGas({
+        // The wallet-side fee estimate for a transaction the user pays gas for (a plain send on the
+        // connected chain). Non-blocking; the views keep Allow disabled until it resolves, so the cost
+        // is always seen before sending, and say so when it cannot be estimated.
+        const estimateTransactionFee = async (transaction: { to: string; data: string; value: string }) => {
+          setGasEstimate({ status: 'loading' })
+          try {
+            const [feeData, gasUnits] = await Promise.all([
+              publicClient.estimateFeesPerGas(),
+              publicClient.estimateGas({
                 account: signerAddress,
-                to: gasEstimateTxParams?.to as `0x${string}` | undefined,
-                data: gasEstimateTxParams?.data as `0x${string}` | undefined,
-                value: gasEstimateTxParams?.value ? BigInt(gasEstimateTxParams.value as string) : undefined
+                to: transaction.to as `0x${string}`,
+                data: transaction.data as `0x${string}`,
+                value: BigInt(transaction.value)
               })
-              const totalGasCost = gasPrice * transactionGasEstimate
-              setTransactionGasCost(totalGasCost)
-            } catch (e) {
-              console.error('Error estimating gas (may be normal for meta transactions)', e)
-              // For a web2 user this page is the only confirmation. When the failure came before the
-              // simulation was requested (the balance or chain lookup), the generic view would otherwise
-              // render with no preview and no acknowledgment, and a single click would execute the
-              // request. Mark the preview unavailable so the acknowledgment gate applies; a preview
-              // already in flight or resolved is left alone.
-              if (!cancelled && isUserUsingWeb2Wallet) {
-                setSimulationState(previous => (previous.status === 'idle' ? { status: 'unavailable' } : previous))
-              }
-            }
+            ])
+            if (cancelled) return
+            const gasPrice = feeData.gasPrice ?? feeData.maxFeePerGas ?? BigInt(0)
+            setGasEstimate({ status: 'ready', cost: gasPrice * gasUnits })
+          } catch (e) {
+            if (cancelled) return
+            console.info('Could not estimate the transaction fee:', e instanceof Error ? e.message : String(e))
+            setGasEstimate({ status: 'unavailable' })
+          }
+        }
 
-            // Show regular wallet interaction view
-            if (!cancelled) {
-              setView(View.WALLET_INTERACTION)
+        // The review of a call to a Decentraland contract: the branded tip and gift screens when the
+        // call is one of those, the generic simulation review otherwise. The branded screens are a
+        // convenience over the generic review, not a gate: when one of their lookups fails (token
+        // metadata, recipient profile, place), the generic review with its simulation and gates stands.
+        const reviewDecentralandTransaction = async (transaction: DecentralandTransaction) => {
+          setSimulationChainId(transaction.chainId)
+
+          if (transaction.branded === 'tip') {
+            try {
+              const manaData = decodeManaTransferData(transaction.call)
+              if (manaData) {
+                const [recipientProfile, placeInfo] = await Promise.all([
+                  fetchProfile(manaData.toAddress),
+                  fetchPlaceByCreatorAddress(manaData.toAddress)
+                ])
+                if (cancelled) return
+                setManaTransferData({
+                  // Show the exact formatted amount (formatEther already trims trailing zeros).
+                  manaAmount: `${manaData.manaAmount} MANA`,
+                  toAddress: manaData.toAddress,
+                  recipientProfile: recipientProfile || undefined,
+                  sceneName: placeInfo?.sceneName || 'Unknown Place',
+                  sceneImageUrl:
+                    placeInfo?.sceneImageUrl ||
+                    'https://peer.decentraland.org/content/contents/bafkreidj26s7aenyxfthfdibnqonzqm5ptc4iamml744gmcyuokewkr76y'
+                })
+                setView(View.WALLET_MANA_INTERACTION)
+                return
+              }
+            } catch (e) {
+              if (cancelled) return
+              console.error('Error building the branded tip view, falling back to the generic review', e)
             }
+          }
+
+          // The generic review is shown while the simulation runs, so Deny is available and Allow is
+          // blocked from the first frame. A gift candidate is upgraded to the branded view only once
+          // the simulation shows exactly the transfer it would display.
+          setSimulationState({ status: 'loading' })
+          setView(View.WALLET_INTERACTION)
+          if (!transaction.relayed) {
+            void estimateTransactionFee(transaction)
+          }
+          const simulationPromise = fetchSimulation(buildSendTransactionSimulationPayload(transaction, signerAddress))
+
+          if (transaction.branded !== 'gift_candidate') return
+          const transferData = decodeNftTransferData(transaction.call)
+          if (!transferData) return
+          try {
+            // A recognized selector is not a complete preview: safeTransferFrom invokes the receiver,
+            // whose callback may move other assets through existing allowances. Keep the branded view
+            // only when the sole visible effect is exactly the transfer it shows; anything else stays
+            // on the generic summary and its acknowledgment gates. The user may also have answered
+            // from the generic review while the simulation ran; their answer stands.
+            const simulation = await simulationPromise
+            if (cancelled || hasCompletedRef.current) return
+            if (!simulation || !isExactNftTransferSimulation(simulation, signerAddress, transaction.to, transferData)) return
+
+            const [metadata, recipientProfile] = await Promise.all([
+              fetchNftMetadata(transaction.to, transaction.contract.abi, transferData.tokenId),
+              fetchProfile(transferData.toAddress)
+            ])
+            if (cancelled || hasCompletedRef.current) return
+
+            setNftTransferData({
+              imageUrl: metadata.imageUrl,
+              tokenId: transferData.tokenId,
+              toAddress: transferData.toAddress,
+              contractAddress: transaction.to,
+              name: metadata.name,
+              description: metadata.description,
+              rarity: metadata.rarity,
+              recipientProfile: recipientProfile || undefined
+            })
+            setView(View.WALLET_NFT_INTERACTION)
+          } catch (e) {
+            if (cancelled) return
+            console.error('Error building the branded gift view, keeping the generic review', e)
+          }
+        }
+
+        // The chain the wallet is on decides where a plain transaction executes and which registry
+        // deployment its target is judged against, so it is read before classifying. The balance is
+        // display only and must not block the review.
+        let connectedChainId: number | undefined
+        if (request.method === 'eth_sendTransaction') {
+          const [currentChainId, userBalance] = await Promise.all([
+            publicClient.getChainId(),
+            publicClient.getBalance({ address: signerAddress }).catch(() => BigInt(0))
+          ])
+          if (cancelled) return
+          connectedChainId = currentChainId
+          reviewedWalletChainIdRef.current = currentChainId
+          setWalletInfo({ balance: userBalance, chainId: currentChainId })
+        }
+
+        // Decide once what this request is. Only a call to a Decentraland contract is previewed;
+        // everything else is shown as exactly what it is, with a warning and an acknowledgment.
+        const metaTransactionChainId = Number(getMetaTransactionChainId())
+        const classified = await classifyRequest(request, {
+          signerAddress,
+          connectedChainId: connectedChainId ?? metaTransactionChainId,
+          metaTransactionChainId,
+          resolveContract: (address, chainId) =>
+            resolveKnownDecentralandContract(address, chainId, { metaTransactionChainId, isCollection: isDecentralandCollection })
+        })
+        if (cancelled) return
+        classificationRef.current = classified
+        setClassification(classified)
+        trackEvent(TrackingEvents.REQUEST_CLASSIFIED, { requestId, ...describeClassification(classified) })
+
+        switch (classified.kind) {
+          case 'dcl_transaction':
+            await reviewDecentralandTransaction(classified)
             break
-          }
-          default: {
-            // Web2 users get an informative preview of every signature they are asked for: this
-            // page is their only confirmation. External wallets show a plain message or a permit
-            // themselves, so they keep the classic confirmation for those — but a Decentraland
-            // MetaTransaction reaches them as an EIP-712 struct whose calldata is an opaque
-            // `functionSignature`, so the wallet prompt cannot show what the signature authorizes.
-            // Its inner call is therefore previewed here for everyone, behind the same gates.
-            const isSignature = isSignatureMethod(request.method)
-            const payload = isSignature ? extractSignaturePayload(request.method, request.params, signerAddress) : null
-            const metaTx = payload?.kind === 'typedData' ? decodeMetaTransactionTypedData(payload.typedData, request.method) : null
-            if (!isSignature || (!isUserUsingWeb2Wallet && !metaTx)) {
-              setView(View.WALLET_INTERACTION)
-              break
-            }
-            if (payload?.kind === 'typedData' && !metaTx) {
-              // This page is the only confirmation a web2 user gets, and the review can show only what the
-              // schema signs. Typed data the schema cannot account for is rejected here, through the same
-              // invalid-params path as a malformed MetaTransaction, rather than shown in part or signed
-              // blind. External wallets never reach this branch: their own prompt shows the payload.
-              resolveTypedDataReview(payload.typedData, request.method)
-            }
-            setSignaturePayload(payload)
-            if (payload?.kind === 'typedData') {
-              // Off-chain approval permits/orders (EIP-2612, Permit2, EIP-3009, Seaport, marketplace
-              // orders) hand control of the user's assets to a third party but are never simulated —
-              // always require an explicit acknowledgment before signing them.
-              const isApprovalGranting = isApprovalGrantingTypedData(payload.typedData)
-              if (isApprovalGranting) {
-                setIsHighRiskSignature(true)
-              }
-              // Anything else is signed blind: its fields are shown, but nothing says what a
-              // counterparty can do with the signature. Fail closed.
-              if (!metaTx && !isApprovalGranting) {
-                setUnverifiableSignatureReason('unrecognized_typed_data')
-              }
-              if (metaTx) {
-                setIsSignatureMetaTx(true)
-                setSimulationChainId(metaTx.chainId)
-                setSimulationState({ status: 'loading' })
-                setSignatureContractTrust('pending')
-                // Recognition is per deployment: the lookup matches the address on the meta-transaction
-                // chain, so the same address under another chain's salt is not that contract.
-                if (metaTx.chainId !== Number(getMetaTransactionChainId())) {
-                  setSignatureContractTrust('unconfirmed')
-                } else {
-                  checkMetaTransactionSupport(metaTx.verifyingContract)
-                    .then(({ willUseMetaTransaction }) => {
-                      if (!cancelled) setSignatureContractTrust(willUseMetaTransaction ? 'confirmed' : 'unconfirmed')
-                    })
-                    .catch(() => {
-                      if (!cancelled) setSignatureContractTrust('unconfirmed')
-                    })
-                }
-                // Preview the inner call the way the contract will make it — calling itself with
-                // the connected signer appended, not the `from` carried in the typed data — using
-                // the calldata field the signed struct declares, which the decoder proved to be the
-                // bytes the signature covers whatever else the message carries.
-                void fetchSimulation(
-                  buildMetaTransactionSimulationPayload(metaTx.chainId, metaTx.verifyingContract, metaTx.calldata, signerAddress),
-                  { rejectUnpreviewable: true }
-                )
-              }
-            } else if (payload?.kind === 'message' && isOpaqueSignatureMessage(payload.message)) {
-              // Not readable text: the user cannot check it, and it may be a hash a contract accepts
-              // as an EIP-191 authorization.
-              setUnverifiableSignatureReason('opaque_message')
-            }
+          case 'dcl_meta_transaction':
+            // Preview the inner call the way the contract will make it — calling itself with the
+            // connected signer appended — using the calldata the classifier proved the signature covers.
+            setSimulationChainId(classified.chainId)
+            setSimulationState({ status: 'loading' })
             setView(View.WALLET_SIGNATURE_INTERACTION)
-          }
+            void fetchSimulation(
+              buildMetaTransactionSimulationPayload(classified.chainId, classified.contract.address, classified.calldata, signerAddress),
+              { rejectUnpreviewable: true }
+            )
+            break
+          case 'native_transfer':
+          case 'unknown_transaction':
+            // A plain send on the connected chain: nothing to preview, but the user pays gas.
+            setView(View.WALLET_UNVERIFIED_INTERACTION)
+            void estimateTransactionFee({
+              to: classified.to,
+              data: classified.kind === 'native_transfer' ? '0x' : classified.data,
+              value: classified.value
+            })
+            break
+          default:
+            setView(View.WALLET_UNVERIFIED_INTERACTION)
         }
       } catch (e) {
         if (cancelled) return
@@ -984,6 +881,14 @@ export const RequestPage = () => {
           setView(isRetiredSignInMethod(e.method) ? View.OUTDATED_CLIENT : View.LOADING_ERROR)
           await reportRejectedRequest(RPC_METHOD_NOT_SUPPORTED, e.message)
           return
+        } else if (e instanceof ContractLookupUnavailableError) {
+          // Whether the target is a Decentraland collection could not be checked. Reading that as
+          // "not Decentraland" would send Polygon calldata as a plain transaction on whatever chain
+          // the wallet is on, so the request is neither reviewed nor answered: the error view offers
+          // a retry and the request stays available for it.
+          setError(e.message)
+          setView(View.LOADING_ERROR)
+          return
         }
 
         // Not reported either: an expired, fulfilled or missing request has nothing left to answer,
@@ -1021,12 +926,7 @@ export const RequestPage = () => {
   useEffect(() => {
     // The timeout is only necessary on the wallet interaction views.
     // We can clear it out when the user is shown another view to prevent the timeout from triggering somewhere not intended.
-    if (
-      view !== View.WALLET_INTERACTION &&
-      view !== View.WALLET_SIGNATURE_INTERACTION &&
-      view !== View.WALLET_NFT_INTERACTION &&
-      view !== View.WALLET_MANA_INTERACTION
-    ) {
+    if (!INTERACTION_VIEWS.has(view)) {
       clearTimeout(timeoutRef.current)
     }
   }, [view])
@@ -1144,66 +1044,65 @@ export const RequestPage = () => {
         return
       }
       const method = requestRef.current.method
+      // Dispatch on what was reviewed, never on a fresh reading of the request.
+      const reviewed = classificationRef.current
+      if (!reviewed) {
+        throw new Error('Request not classified')
+      }
 
       let result: string | null = null
 
-      if (method !== 'eth_sendTransaction') {
-        // Non-transaction methods (e.g. personal_sign, eth_signTypedData_v4) carry no `to`
-        // address and are never relayed as meta-transactions — forward them straight to the
-        // wallet. The `as` casts satisfy viem's typed request signature; the real method and
-        // params are passed through unchanged at runtime.
+      if (reviewed.kind === 'dcl_transaction' && reviewed.relayed) {
+        // Relayed through the gas tank as a meta-transaction on the meta-transaction chain. The
+        // registry entry is the classified contract's, at the address the request calls: a wearable
+        // collection is a per-deployment proxy of the ERC721CollectionV2 template.
+        const connectedProvider = await getConnectedProvider()
+        if (!connectedProvider) {
+          throw new Error('Provider not connected')
+        }
+        const networkProvider = await getNetworkProvider(reviewed.chainId as ChainId)
+        const contract = {
+          abi: reviewed.contract.abi as unknown as object[],
+          address: reviewed.to,
+          name: reviewed.contract.domainName,
+          version: reviewed.contract.domainVersion,
+          chainId: reviewed.chainId as ChainId
+        }
+        result = await sendMetaTransaction(connectedProvider, networkProvider, reviewed.data, contract, {
+          serverURL: `${config.get('META_TRANSACTION_SERVER_URL')}/v1`
+        })
+      } else if (reviewed.kind === 'dcl_transaction' || reviewed.kind === 'unknown_transaction' || reviewed.kind === 'native_transfer') {
+        // A plain send on the connected chain, of exactly the reviewed fields.
+        const [transactionParams] = buildTransactionParams(requestRef.current.params)
+        const reviewedChainId = reviewedWalletChainIdRef.current
+        const currentChainId = await publicClientRef.current?.getChainId().catch(() => undefined)
+        if (reviewedChainId === undefined || currentChainId !== reviewedChainId) {
+          // The address and calldata may refer to entirely different code on another chain, and
+          // an unreadable chain cannot be compared safely. Discard the stale review and recover
+          // the still-unconsumed request so it is previewed on a verified live chain.
+          restartTransactionReview(
+            reviewedChainId === undefined ? 'network_unrecorded' : currentChainId === undefined ? 'network_unreadable' : 'network_changed'
+          )
+          return
+        }
         result = await walletClient.request({
-          method: method as 'eth_sendTransaction',
-          params: requestRef.current?.params as [Record<string, unknown>]
+          method: 'eth_sendTransaction',
+          // Also bind the request to the reviewed chain. This is defense in depth for injected
+          // wallets, which validate the standard JSON-RPC chainId and refuse a last-moment switch
+          // between the check above and the send instead of broadcasting on the new chain (that
+          // refusal is routed back into the review, see the catch). Embedded wallets ignore it —
+          // thirdweb rebuilds the transaction from its own chain and Magic is unverified — so for
+          // them the check above is the whole guard.
+          params: [{ ...transactionParams, from: signerAddress, chainId: `0x${reviewedChainId.toString(16)}` }]
         })
       } else {
-        const [transactionParams] = buildTransactionParams(requestRef.current?.params)
-        const toAddress = transactionParams.to as string
-        const chainId = getMetaTransactionChainId()
-
-        // Check if this contract will use meta transactions, reusing the prefetch result for the
-        // same contract when available to avoid repeating the lookup.
-        const cachedCheck = metaTxCheckRef.current
-        const { willUseMetaTransaction, contractName } =
-          cachedCheck && cachedCheck.address === toAddress.toLowerCase() ? cachedCheck : await checkMetaTransactionSupport(toAddress)
-        if (willUseMetaTransaction && contractName) {
-          const connectedProvider = await getConnectedProvider()
-          if (!connectedProvider) {
-            throw new Error('Provider not connected')
-          }
-
-          const networkProvider = await getNetworkProvider(chainId)
-          // getContract returns the registry entry BY REFERENCE, so mutating .address would
-          // permanently rewrite the shared decentraland-transactions registry for the rest of the
-          // session (poisoning later getContractName/isKnownDecentralandContractOnChain lookups). Clone it.
-          const contract = { ...getContract(contractName, chainId), address: toAddress }
-
-          result = await sendMetaTransaction(connectedProvider, networkProvider, transactionParams.data as string, contract, {
-            serverURL: `${config.get('META_TRANSACTION_SERVER_URL')}/v1`
-          })
-        } else {
-          const reviewedChainId = reviewedWalletChainIdRef.current
-          const currentChainId = await publicClientRef.current?.getChainId().catch(() => undefined)
-          if (reviewedChainId === undefined || currentChainId !== reviewedChainId) {
-            // The address and calldata may refer to entirely different code on another chain, and
-            // an unreadable chain cannot be compared safely. Discard the stale review and recover
-            // the still-unconsumed request so it is previewed on a verified live chain.
-            restartTransactionReview(
-              reviewedChainId === undefined ? 'network_unrecorded' : currentChainId === undefined ? 'network_unreadable' : 'network_changed'
-            )
-            return
-          }
-          result = await walletClient.request({
-            method: 'eth_sendTransaction',
-            // Also bind the request to the reviewed chain. This is defense in depth for injected
-            // wallets, which validate the standard JSON-RPC chainId and refuse a last-moment switch
-            // between the check above and the send instead of broadcasting on the new chain (that
-            // refusal is routed back into the review, see the catch). Embedded wallets ignore it —
-            // thirdweb rebuilds the transaction from its own chain and Magic is unverified — so for
-            // them the check above is the whole guard.
-            params: [{ ...transactionParams, from: signerAddress, chainId: `0x${reviewedChainId.toString(16)}` }]
-          })
-        }
+        // Signatures carry no `to` address and are never relayed — forward them straight to the
+        // wallet. The `as` casts satisfy viem's typed request signature; the real method and params
+        // are passed through unchanged at runtime.
+        result = await walletClient.request({
+          method: method as 'eth_sendTransaction',
+          params: requestRef.current.params as [Record<string, unknown>]
+        })
       }
 
       hasWalletResult = true
@@ -1300,7 +1199,9 @@ export const RequestPage = () => {
     }
   }, [isUserUsingWeb2Wallet, nftTransferData, manaTransferData, requestId, identity, showInteractionCompleteView, restartTransactionReview])
 
-  const handleApproveWalletInteraction = useCallback(async () => {
+  // The branded tip and gift screens: web2 users get a second confirmation modal before the relay,
+  // external wallets go straight to their own prompt.
+  const handleApproveBrandedTransfer = useCallback(async () => {
     if (isUserUsingWeb2Wallet) {
       setIsTransactionModalOpen(true)
     } else {
@@ -1329,11 +1230,8 @@ export const RequestPage = () => {
     window.location.reload()
   }, [])
 
+  const isDecentralandRequest = classification?.kind === 'dcl_transaction' || classification?.kind === 'dcl_meta_transaction'
   const isSimulationReverted = simulationState.status === 'ready' && simulationState.result.status === 'reverted'
-  // The generic transaction view shows the asset summary whenever a simulation is in flight or
-  // resolved. In that case approval is a single step (gas shown inline, no confirm modal); without
-  // a summary it keeps the classic two-step confirm dialog for the gas check.
-  const hasSimulationSummary = simulationState.status !== 'idle'
   // The simulation resolved and grants a permission the user should not approve on a single click
   // (see isDangerousApproval). Spenders are recognized from the same chain-aware verified set the
   // summary uses for its badge and warning, so the checkbox and the icon always agree.
@@ -1346,39 +1244,27 @@ export const RequestPage = () => {
   // and no permission change (see hasNoVisibleEffects). A call can still change state the summary
   // does not model — an update operator on LAND, a collection's minters, managers or creator, a
   // name's resolver — so "nothing to show" is not "nothing happens" and must not be a single click.
-  // Applies to a transaction and to a MetaTransaction signature alike.
   const hasPreviewWithoutVisibleEffects = simulationState.status === 'ready' && hasNoVisibleEffects(simulationState.result, account ?? '')
-  // A typed-data MetaTransaction whose inner call could not be previewed: the simulation was
+  // A MetaTransaction signature whose inner call could not be previewed: the simulation was
   // unavailable, or the call reverts today. Unlike an eth_sendTransaction relayed through the gas
   // tank — which Auth signs and submits in one step, so the signature is consumed the moment it is
   // made — a signed MetaTransaction is handed back to the requester as a bearer authorization: it
   // has no expiry and anyone holding it can submit it until the nonce is used. A call that reverts
   // now can therefore be relayed once the state changes, so "would fail" is not a safe preview.
-  // Being a verified Decentraland contract does not change that, which is why the trusted
-  // exemption below applies to the relay path only.
-  const isSignatureWithoutVerifiedEffects = isSignatureMetaTx && (simulationState.status === 'unavailable' || isSimulationReverted)
-  // A MetaTransaction whose verifying contract is not a recognized Decentraland contract. The
-  // preview models the Decentraland self-call; a contract Auth does not know may execute the
-  // signature any other way, so a clean preview is not something Auth can vouch for.
-  const isSignatureToUnrecognizedContract = isSignatureMetaTx && signatureContractTrust === 'unconfirmed'
-  // Require an explicit acknowledgment before approving when: (a) the simulation shows a high-risk
-  // permission; (b) the simulation could NOT be produced, so the effects can't be shown — this holds
-  // even for a relayed meta-transaction to a known DCL contract, because a gas-covered relay still
-  // executes whatever call it is handed (e.g. setApprovalForAll), so an unpreviewable payload must be
-  // acknowledged, never degraded to a single-click approve; (c) a signed MetaTransaction
-  // has no verified effects or targets a contract Auth cannot vouch for; (d) the request is an
-  // off-chain approval signature (permit/order), which grants asset control but is never simulated;
-  // (e) Auth cannot tell what the signature authorizes at all (an unrecognized typed-data struct
-  // or a message that is not readable text); or (f) the preview ran but shows no change the user
-  // can check, so whatever the call does happens outside what this page can show.
+  const isSignatureWithoutVerifiedEffects =
+    classification?.kind === 'dcl_meta_transaction' && (simulationState.status === 'unavailable' || isSimulationReverted)
+  // Anything that is not a Decentraland contract call is acknowledged, always. A Decentraland call
+  // is acknowledged when: (a) the simulation shows a high-risk permission; (b) the simulation could
+  // NOT be produced, so the effects can't be shown — this holds even for a relayed call, because a
+  // gas-covered relay still executes whatever call it is handed; (c) a signed MetaTransaction has no
+  // verified effects; or (d) the preview ran but shows no change the user can check.
   const requiresApprovalAcknowledgment =
-    hasDangerousApprovalChange ||
-    hasPreviewWithoutVisibleEffects ||
-    simulationState.status === 'unavailable' ||
-    isSignatureWithoutVerifiedEffects ||
-    isSignatureToUnrecognizedContract ||
-    isHighRiskSignature ||
-    unverifiableSignatureReason !== null
+    classification !== null &&
+    (!isDecentralandRequest ||
+      hasDangerousApprovalChange ||
+      hasPreviewWithoutVisibleEffects ||
+      simulationState.status === 'unavailable' ||
+      isSignatureWithoutVerifiedEffects)
 
   // Derived, not synced: on the render where the route id or the account changes, every piece of
   // state still belongs to the previous review. Show none of it — no summary, no Allow — until this
@@ -1436,10 +1322,6 @@ export const RequestPage = () => {
         <>
           <TransactionConfirmDialog
             open={isTransactionModalOpen}
-            transactionCost={transactionGasCost ?? BigInt(0)}
-            balance={walletInfo?.balance ?? BigInt(0)}
-            gasCovered={isMetaTransaction}
-            isReverted={isSimulationReverted}
             isLoading={isLoading}
             onCancel={onDenyWalletInteraction}
             onConfirm={onApproveWalletInteraction}
@@ -1449,7 +1331,7 @@ export const RequestPage = () => {
             transferData={nftTransferData}
             isLoading={isLoading}
             onDeny={onDenyWalletInteraction}
-            onApprove={handleApproveWalletInteraction}
+            onApprove={handleApproveBrandedTransfer}
           />
         </>
       ) : null
@@ -1458,10 +1340,6 @@ export const RequestPage = () => {
         <>
           <TransactionConfirmDialog
             open={isTransactionModalOpen}
-            transactionCost={transactionGasCost ?? BigInt(0)}
-            balance={walletInfo?.balance ?? BigInt(0)}
-            gasCovered={isMetaTransaction}
-            isReverted={isSimulationReverted}
             isLoading={isLoading}
             onCancel={onDenyWalletInteraction}
             onConfirm={onApproveWalletInteraction}
@@ -1471,70 +1349,82 @@ export const RequestPage = () => {
             transferData={manaTransferData}
             isLoading={isLoading}
             onDeny={onDenyWalletInteraction}
-            onApprove={handleApproveWalletInteraction}
+            onApprove={handleApproveBrandedTransfer}
           />
         </>
       ) : null
-    case View.WALLET_INTERACTION:
+    case View.WALLET_INTERACTION: {
+      if (classification?.kind !== 'dcl_transaction') return null
+      const gas = classification.relayed
+        ? ({ covered: true } as const)
+        : gasEstimate?.status === 'ready'
+          ? ({ covered: false, status: 'ready', cost: gasEstimate.cost, balance: walletInfo?.balance ?? BigInt(0) } as const)
+          : gasEstimate?.status === 'unavailable'
+            ? ({ covered: false, status: 'unavailable' } as const)
+            : ({ covered: false, status: 'loading' } as const)
       return (
-        <>
-          {/* With a simulation summary the gas line is shown inline and approval is a single step,
-              so the confirm dialog is only needed for the classic (no-summary) gas check. */}
-          {hasSimulationSummary ? null : (
-            <TransactionConfirmDialog
-              open={isTransactionModalOpen}
-              transactionCost={transactionGasCost ?? BigInt(0)}
-              balance={walletInfo?.balance ?? BigInt(0)}
-              gasCovered={isMetaTransaction}
-              isReverted={isSimulationReverted}
-              isLoading={isLoading}
-              onCancel={onDenyWalletInteraction}
-              onConfirm={onApproveWalletInteraction}
-            />
-          )}
-          <WalletInteraction
-            key={requestId}
-            requestId={requestId}
-            isWeb2Wallet={isUserUsingWeb2Wallet}
-            explorerText={targetConfig.explorerText}
-            isLoading={isLoading}
-            simulation={simulationState}
-            userAddress={account ?? ''}
-            profiles={simulationProfiles}
-            verifiedContracts={simulationVerified}
-            chainId={simulationChainId}
-            requiresAcknowledgment={requiresApprovalAcknowledgment}
-            gasCovered={isMetaTransaction}
-            transactionCost={transactionGasCost ?? BigInt(0)}
-            balance={walletInfo?.balance ?? BigInt(0)}
-            isReverted={isSimulationReverted}
-            reviewRestarted={reviewRestartReason !== null}
-            onDeny={onDenyWalletInteraction}
-            onApprove={hasSimulationSummary ? onApproveWalletInteraction : handleApproveWalletInteraction}
-          />
-        </>
-      )
-    case View.WALLET_SIGNATURE_INTERACTION:
-      return (
-        <SignatureRequestView
+        <WalletInteraction
           key={requestId}
           requestId={requestId}
-          method={requestRef.current?.method ?? ''}
-          payload={signaturePayload}
+          functionName={classification.call.functionName}
+          contractName={classification.contract.domainName}
+          isLoading={isLoading}
           simulation={simulationState}
           userAddress={account ?? ''}
           profiles={simulationProfiles}
           verifiedContracts={simulationVerified}
           chainId={simulationChainId}
           requiresAcknowledgment={requiresApprovalAcknowledgment}
-          isMetaTransaction={isSignatureMetaTx}
-          contractTrust={signatureContractTrust}
-          unverifiableReason={unverifiableSignatureReason}
+          gas={gas}
+          isReverted={isSimulationReverted}
+          reviewRestarted={reviewRestartReason !== null}
+          onDeny={onDenyWalletInteraction}
+          onApprove={onApproveWalletInteraction}
+        />
+      )
+    }
+    case View.WALLET_SIGNATURE_INTERACTION:
+      if (classification?.kind !== 'dcl_meta_transaction') return null
+      return (
+        <SignatureRequestView
+          key={requestId}
+          requestId={requestId}
+          method={requestRef.current?.method ?? ''}
+          raw={classification.raw}
+          verifyingContract={classification.contract.address}
+          functionName={classification.call.functionName}
+          contractName={classification.contract.domainName}
+          simulation={simulationState}
+          userAddress={account ?? ''}
+          profiles={simulationProfiles}
+          verifiedContracts={simulationVerified}
+          chainId={simulationChainId}
+          requiresAcknowledgment={requiresApprovalAcknowledgment}
           isLoading={isLoading}
           onDeny={onDenyWalletInteraction}
           onApprove={onApproveWalletInteraction}
         />
       )
+    case View.WALLET_UNVERIFIED_INTERACTION: {
+      const unverified = classification ? getUnverifiedRequestProps(classification) : null
+      if (!classification || !unverified) return null
+      const isTransactionKind = unverified.kind === 'unknown_transaction' || unverified.kind === 'native_transfer'
+      return (
+        <UnverifiedRequestView
+          key={requestId}
+          requestId={requestId}
+          method={requestRef.current?.method ?? ''}
+          {...unverified}
+          gas={isTransactionKind ? (gasEstimate ?? { status: 'loading' }) : undefined}
+          balance={isTransactionKind ? walletInfo?.balance : undefined}
+          payloadFingerprint={getPayloadFingerprint(classification)}
+          isLoading={isLoading}
+          reviewRestarted={reviewRestartReason !== null}
+          onDeny={onDenyWalletInteraction}
+          onApprove={onApproveWalletInteraction}
+        />
+      )
+    }
     default:
       return null
   }

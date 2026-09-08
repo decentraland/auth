@@ -539,10 +539,10 @@ describe('assertSignatureParamsAreCanonical', () => {
         typedData.message = { ...(typedData.message as Record<string, unknown>), functionSignature: `0x2d0335ab${'00'.repeat(32)}` }
       })
 
-      it('should throw a MalformedSignatureRequestError because the wallet would sign only the declared call', () => {
+      it('should not throw, because the request classifier decides that such a MetaTransaction is shown as unverified', () => {
         expect(() =>
           assertSignatureParamsAreCanonical('eth_signTypedData_v4', [signerAddress, JSON.stringify(typedData)], signerAddress)
-        ).toThrow(MalformedSignatureRequestError)
+        ).not.toThrow()
       })
     })
   })

@@ -1,9 +1,6 @@
-import { useLayoutEffect } from 'react'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { SimulationResponseBody } from '../../../../../shared/auth'
-import { DAPP_USER, DappTypedData, SIGNED_BY_DAPPS } from '../../../../../shared/auth/__fixtures__/decentralandTypedData'
-import { SignaturePayload, SimulationState } from '../../types'
 import { SignatureRequestView } from './SignatureRequestView'
 import { SignatureRequestViewProps } from './SignatureRequest.types'
 
@@ -16,1028 +13,167 @@ jest.mock('../../Container', () => ({
 }))
 
 const USER = '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd'
+const CONTRACT = '0xa1c57f48f0deb89f569dfbe6e2b7f46d33606fd4'
 
-describe('when reviewing a schema-bound signature', () => {
-  let props: SignatureRequestViewProps
-  let typedData: {
-    primaryType: string
-    domain: Record<string, unknown>
-    types: Record<string, { name: string; type: string }[]>
-    message: Record<string, unknown>
-  }
-
-  beforeEach(() => {
-    typedData = {
-      primaryType: 'Order',
-      domain: { name: 'Marketplace', version: '1', salt: `0x${'01'.repeat(32)}` },
-      // eslint-disable-next-line @typescript-eslint/naming-convention
-      types: { Order: [{ name: 'price', type: 'uint256' }] },
-      message: { price: '100' }
+const transferResult: SimulationResponseBody = {
+  status: 'success',
+  assetChanges: [
+    {
+      type: 'transfer',
+      standard: 'erc20',
+      from: USER,
+      to: '0x1234567890abcdef1234567890abcdef12345678',
+      amount: '5',
+      rawAmount: '5000000000000000000',
+      tokenId: null,
+      contractAddress: CONTRACT,
+      symbol: 'MANA',
+      name: 'MANA',
+      decimals: 18,
+      logoUrl: null,
+      dollarValue: null
     }
-    props = {
-      requestId: 'r1',
-      method: 'eth_signTypedData_v4',
-      payload: { kind: 'typedData', typedData, raw: JSON.stringify(typedData) },
-      simulation: { status: 'idle' },
-      userAddress: USER,
-      isMetaTransaction: false,
-      requiresAcknowledgment: true,
-      onApprove: jest.fn(),
-      onDeny: jest.fn()
-    }
-  })
-
-  afterEach(() => {
-    jest.clearAllMocks()
-  })
-
-  it('should display the signed primary type', () => {
-    render(<SignatureRequestView {...props} />)
-    expect(screen.getByText('Order')).toBeInTheDocument()
-  })
-
-  it('should display the signed domain salt', () => {
-    render(<SignatureRequestView {...props} />)
-    expect(screen.getByText(String(typedData.domain.salt))).toBeInTheDocument()
-  })
-
-  describe('and the payload is the Trade the marketplace asks a seller to sign', () => {
-    let trade: DappTypedData
-
-    beforeEach(() => {
-      trade = SIGNED_BY_DAPPS['off-chain marketplace Trade'].payload
-      props.payload = { kind: 'typedData', typedData: trade, raw: JSON.stringify(trade) }
-      // A Trade grants the marketplace the right to move the listed asset, so the page always gates it
-      // behind the risk acknowledgment; the review must not add a block of its own.
-      props.requiresAcknowledgment = true
-    })
-
-    it('should render the whole signed trade as a tree, down to the external check', () => {
-      render(<SignatureRequestView {...props} />)
-      expect(screen.getByText('Trade')).toBeInTheDocument()
-      expect(screen.getByText(String(trade.domain.salt))).toBeInTheDocument()
-      expect(screen.getByText('checks (Checks):')).toBeInTheDocument()
-      expect(screen.getByText('externalChecks (ExternalCheck[]):')).toBeInTheDocument()
-      expect(screen.getByText('[0] (ExternalCheck):')).toBeInTheDocument()
-      expect(screen.getByText('0x70a08231')).toBeInTheDocument()
-      expect(screen.getByText('sent (AssetWithoutBeneficiary[]):')).toBeInTheDocument()
-      expect(screen.getByText(String((trade.message.sent as { value: string }[])[0].value))).toBeInTheDocument()
-      expect(screen.getByText('received (Asset[]):')).toBeInTheDocument()
-      expect(screen.getByText(DAPP_USER)).toBeInTheDocument()
-    })
-
-    it('should gate approval behind the risk acknowledgment alone, with nothing left unchecked', async () => {
-      render(<SignatureRequestView {...props} />)
-      expect(screen.queryByTestId('signature-review-unavailable')).not.toBeInTheDocument()
-      expect(screen.getByTestId('signature-approve-button')).toBeDisabled()
-      await userEvent.click(screen.getByTestId('risk-acknowledgment'))
-      expect(screen.getByTestId('signature-approve-button')).toBeEnabled()
-    })
-  })
-
-  describe('and the domain name carries repeated spaces and the version is long', () => {
-    let longVersion: string
-
-    beforeEach(() => {
-      longVersion = '1.0.0-'.padEnd(160, 'x')
-      typedData.domain.name = 'Trusted   App'
-      typedData.domain.version = longVersion
-      render(<SignatureRequestView {...props} />)
-    })
-
-    it('should keep the spaces as signed instead of collapsing them', () => {
-      const name = screen.getByText('Trusted   App', { normalizer: text => text })
-      expect(name).toHaveStyle({ whiteSpace: 'pre-wrap' })
-    })
-
-    it('should wrap the long version rather than clip it', () => {
-      const version = screen.getByText(longVersion)
-      expect(version).toHaveStyle({ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' })
-      expect(version).not.toHaveStyle({ textOverflow: 'ellipsis' })
-    })
-  })
-
-  describe('and a signed value carries a no-break space', () => {
-    beforeEach(() => {
-      typedData.types.Order.push({ name: 'terms', type: 'string' })
-      typedData.message.terms = 'allow\u00a0all'
-      typedData.domain.name = 'Trusted\u00a0App'
-      render(<SignatureRequestView {...props} />)
-    })
-
-    it('should show it as an escape rather than as a space', () => {
-      expect(screen.getByText('allow\\u{a0}all')).toBeInTheDocument()
-      expect(screen.getByText('Trusted\\u{a0}App')).toBeInTheDocument()
-      expect(screen.queryByText('allow all')).not.toBeInTheDocument()
-    })
-  })
-
-  describe('and a signed value carries line breaks', () => {
-    beforeEach(() => {
-      typedData.types.Order.push({ name: 'terms', type: 'string' })
-      typedData.message.terms = 'allow\n\nall'
-      typedData.domain.name = 'Market\nplace'
-      render(<SignatureRequestView {...props} />)
-    })
-
-    it('should show the breaks as escapes rather than as spacing', () => {
-      expect(screen.getByText('allow\\n\\nall')).toBeInTheDocument()
-      expect(screen.getByText('Market\\nplace')).toBeInTheDocument()
-      expect(screen.queryByText('allow all')).not.toBeInTheDocument()
-    })
-  })
-
-  describe('and the domain name and version carry characters that would reorder their neighbours', () => {
-    beforeEach(() => {
-      typedData.domain.name = 'Marketplace\u202e'
-      typedData.domain.version = '1\u202d'
-      render(<SignatureRequestView {...props} />)
-    })
-
-    it('should show the characters as visible escapes', () => {
-      expect(screen.getByText('Marketplace\\u{202e}')).toBeInTheDocument()
-      expect(screen.getByText('1\\u{202d}')).toBeInTheDocument()
-    })
-
-    it('should not let them reach the page', () => {
-      expect(document.body.textContent).not.toMatch(/[\u202d\u202e]/)
-    })
-  })
-
-  describe('and an unsigned field is supplied', () => {
-    beforeEach(() => {
-      typedData.message.description = 'Additional description'
-      render(<SignatureRequestView {...props} />)
-    })
-
-    it('should not display the unsigned text as signed content', () => {
-      expect(screen.queryByText('Additional description')).not.toBeInTheDocument()
-    })
-
-    it("should say the fields could not be checked, in the user's language rather than as a raw error", () => {
-      expect(screen.getByTestId('signature-review-unavailable')).toHaveTextContent('request.signature.review_unavailable')
-      expect(screen.queryByText(/does not match its declared fields/)).not.toBeInTheDocument()
-    })
-
-    it('should not enable approval even after acknowledgment', async () => {
-      await userEvent.click(screen.getByRole('checkbox'))
-      expect(screen.getByRole('button', { name: 'common.allow' })).toBeDisabled()
-    })
-  })
-
-  describe('and the signed value changes after acknowledgment', () => {
-    let rerender: ReturnType<typeof render>['rerender']
-
-    beforeEach(async () => {
-      rerender = render(<SignatureRequestView {...props} />).rerender
-      await userEvent.click(screen.getByRole('checkbox'))
-      props.payload = { kind: 'typedData', typedData: { ...typedData, message: { price: '200' } }, raw: '{}' }
-      rerender(<SignatureRequestView {...props} />)
-    })
-
-    it('should require a new acknowledgment for the changed digest', () => {
-      expect(screen.getByRole('button', { name: 'common.allow' })).toBeDisabled()
-    })
-  })
-})
+  ],
+  approvalChanges: [],
+  balanceChanges: [],
+  events: []
+}
 
 describe('when rendering the SignatureRequestView', () => {
   let onApprove: jest.Mock
   let onDeny: jest.Mock
+  let baseProps: SignatureRequestViewProps
 
   beforeEach(() => {
     onApprove = jest.fn()
     onDeny = jest.fn()
+    baseProps = {
+      requestId: 'r1',
+      method: 'eth_signTypedData_v4',
+      raw: '{"primaryType":"MetaTransaction"}',
+      verifyingContract: CONTRACT,
+      functionName: 'transfer',
+      contractName: '(PoS) Decentraland MANA',
+      simulation: { status: 'ready', result: transferResult },
+      userAddress: USER,
+      chainId: 137,
+      onDeny,
+      onApprove
+    }
   })
 
   afterEach(() => {
     jest.clearAllMocks()
   })
 
-  describe('and the payload is a plain message', () => {
-    let payload: SignaturePayload
-
-    beforeEach(() => {
-      payload = { kind: 'message', message: 'Sign in to Decentraland' }
-    })
-
-    it('should render the message text', () => {
-      render(
-        <SignatureRequestView
-          requestId="r1"
-          method="personal_sign"
-          payload={payload}
-          simulation={{ status: 'idle' }}
-          userAddress={USER}
-          isMetaTransaction={false}
-          onDeny={onDeny}
-          onApprove={onApprove}
-        />
-      )
-      expect(screen.getByTestId('signature-message')).toHaveTextContent('Sign in to Decentraland')
-    })
-
-    it('should call onApprove when the approve button is clicked', async () => {
-      render(
-        <SignatureRequestView
-          requestId="r1"
-          method="personal_sign"
-          payload={payload}
-          simulation={{ status: 'idle' }}
-          userAddress={USER}
-          isMetaTransaction={false}
-          onDeny={onDeny}
-          onApprove={onApprove}
-        />
-      )
-      await userEvent.click(screen.getByTestId('signature-approve-button'))
-      expect(onApprove).toHaveBeenCalledTimes(1)
-    })
-
-    describe('and the message is not readable text', () => {
-      let opaquePayload: SignaturePayload
-
-      beforeEach(() => {
-        opaquePayload = { kind: 'message', message: `0x${'ab'.repeat(32)}` }
-      })
-
-      it('should warn that the message cannot be checked', () => {
-        render(
-          <SignatureRequestView
-            requestId="r1"
-            method="personal_sign"
-            payload={opaquePayload}
-            simulation={{ status: 'idle' }}
-            userAddress={USER}
-            isMetaTransaction={false}
-            unverifiableReason="opaque_message"
-            requiresAcknowledgment
-            onDeny={onDeny}
-            onApprove={onApprove}
-          />
-        )
-        expect(screen.getByTestId('signature-unverifiable-notice')).toHaveTextContent('request.signature.opaque_message')
-      })
-
-      it('should keep approval disabled until the user acknowledges it', async () => {
-        render(
-          <SignatureRequestView
-            requestId="r1"
-            method="personal_sign"
-            payload={opaquePayload}
-            simulation={{ status: 'idle' }}
-            userAddress={USER}
-            isMetaTransaction={false}
-            unverifiableReason="opaque_message"
-            requiresAcknowledgment
-            onDeny={onDeny}
-            onApprove={onApprove}
-          />
-        )
-        expect(screen.getByTestId('signature-approve-button')).toBeDisabled()
-        await userEvent.click(screen.getByTestId('risk-acknowledgment'))
-        expect(screen.getByTestId('signature-approve-button')).toBeEnabled()
-      })
-    })
-
-    it('should gate approval behind the acknowledgment when required', async () => {
-      render(
-        <SignatureRequestView
-          requestId="r1"
-          method="personal_sign"
-          payload={payload}
-          simulation={{ status: 'idle' }}
-          userAddress={USER}
-          isMetaTransaction={false}
-          requiresAcknowledgment
-          onDeny={onDeny}
-          onApprove={onApprove}
-        />
-      )
-      expect(screen.getByTestId('signature-approve-button')).toBeDisabled()
-      await userEvent.click(screen.getByRole('checkbox'))
-      expect(screen.getByTestId('signature-approve-button')).not.toBeDisabled()
-    })
-  })
-
-  describe('and the payload is typed data that is not a meta-transaction', () => {
-    let payload: SignaturePayload
-
-    beforeEach(() => {
-      payload = {
-        kind: 'typedData',
-        raw: '{}',
-        typedData: {
-          primaryType: 'Order',
-          // eslint-disable-next-line @typescript-eslint/naming-convention
-          types: { Order: [{ name: 'price', type: 'uint256' }] },
-          domain: { name: 'Marketplace', chainId: 137, verifyingContract: '0x480a0f4e360e8964e68858dd231c2922f1df45ef' },
-          message: { price: '1000000000000000000' }
-        }
-      }
-    })
-
-    it('should render the verifying contract in full', () => {
-      render(
-        <SignatureRequestView
-          requestId="r1"
-          method="eth_signTypedData_v4"
-          payload={payload}
-          simulation={{ status: 'idle' }}
-          userAddress={USER}
-          isMetaTransaction={false}
-          onDeny={onDeny}
-          onApprove={onApprove}
-        />
-      )
-      expect(screen.getByText('0x480a0f4e360e8964e68858dd231c2922f1df45ef')).toBeInTheDocument()
-    })
-
-    describe('and Auth does not recognize the struct', () => {
-      it('should explain that it cannot preview what the signature authorizes', () => {
-        render(
-          <SignatureRequestView
-            requestId="r1"
-            method="eth_signTypedData_v4"
-            payload={payload}
-            simulation={{ status: 'idle' }}
-            userAddress={USER}
-            isMetaTransaction={false}
-            unverifiableReason="unrecognized_typed_data"
-            requiresAcknowledgment
-            onDeny={onDeny}
-            onApprove={onApprove}
-          />
-        )
-        expect(screen.getByTestId('signature-unverifiable-notice')).toHaveTextContent('request.signature.unrecognized_typed_data')
-      })
-
-      it('should ask the user to acknowledge unverified effects rather than an approval', () => {
-        render(
-          <SignatureRequestView
-            requestId="r1"
-            method="eth_signTypedData_v4"
-            payload={payload}
-            simulation={{ status: 'idle' }}
-            userAddress={USER}
-            isMetaTransaction={false}
-            unverifiableReason="unrecognized_typed_data"
-            requiresAcknowledgment
-            onDeny={onDeny}
-            onApprove={onApprove}
-          />
-        )
-        expect(screen.getByText('request.signature.acknowledge_unverified')).toBeInTheDocument()
-      })
-    })
-
-    it('should not show an unverifiable notice when the struct is recognized', () => {
-      render(
-        <SignatureRequestView
-          requestId="r1"
-          method="eth_signTypedData_v4"
-          payload={payload}
-          simulation={{ status: 'idle' }}
-          userAddress={USER}
-          isMetaTransaction={false}
-          onDeny={onDeny}
-          onApprove={onApprove}
-        />
-      )
-      expect(screen.queryByTestId('signature-unverifiable-notice')).not.toBeInTheDocument()
-    })
-
-    it('should not show the meta-transaction notice', () => {
-      render(
-        <SignatureRequestView
-          requestId="r1"
-          method="eth_signTypedData_v4"
-          payload={payload}
-          simulation={{ status: 'idle' }}
-          userAddress={USER}
-          isMetaTransaction={false}
-          onDeny={onDeny}
-          onApprove={onApprove}
-        />
-      )
-      expect(screen.queryByTestId('signature-meta-tx-notice')).not.toBeInTheDocument()
-    })
-
-    it('should render the typed-data message fields as a tree', () => {
-      render(
-        <SignatureRequestView
-          requestId="r1"
-          method="eth_signTypedData_v4"
-          payload={payload}
-          simulation={{ status: 'idle' }}
-          userAddress={USER}
-          isMetaTransaction={false}
-          onDeny={onDeny}
-          onApprove={onApprove}
-        />
-      )
-      expect(screen.getByText('price (uint256):')).toBeInTheDocument()
-    })
-  })
-
-  describe('and the payload is a meta-transaction with a ready simulation', () => {
-    let payload: SignaturePayload
-    let simulation: SimulationState
-
-    beforeEach(() => {
-      payload = {
-        kind: 'typedData',
-        raw: '{"primaryType":"MetaTransaction"}',
-        typedData: { primaryType: 'MetaTransaction', domain: {}, message: {} }
-      }
-      const result: SimulationResponseBody = {
-        status: 'success',
-        assetChanges: [
-          {
-            type: 'transfer',
-            standard: 'erc20',
-            from: USER,
-            to: '0x1234567890abcdef1234567890abcdef12345678',
-            amount: '5',
-            rawAmount: '5000000000000000000',
-            tokenId: null,
-            contractAddress: '0x0f5d2fb29fb7d3cfee444a200298f468908cc942',
-            symbol: 'MANA',
-            name: 'MANA',
-            decimals: 18,
-            logoUrl: null,
-            dollarValue: null
-          }
-        ],
-        approvalChanges: [],
-        balanceChanges: [],
-        events: []
-      }
-      simulation = { status: 'ready', result }
-    })
-
+  describe('and the simulation is ready', () => {
     it('should render the simulated asset summary instead of the raw payload', () => {
-      render(
-        <SignatureRequestView
-          requestId="r1"
-          method="eth_signTypedData_v4"
-          payload={payload}
-          simulation={simulation}
-          userAddress={USER}
-          isMetaTransaction={true}
-          onDeny={onDeny}
-          onApprove={onApprove}
-        />
-      )
+      render(<SignatureRequestView {...baseProps} />)
       expect(screen.getByText('5 MANA')).toBeInTheDocument()
       expect(screen.queryByTestId('signature-raw')).not.toBeInTheDocument()
     })
 
-    it('should reveal the raw payload when the raw toggle is clicked', async () => {
-      render(
-        <SignatureRequestView
-          requestId="r1"
-          method="eth_signTypedData_v4"
-          payload={payload}
-          simulation={simulation}
-          userAddress={USER}
-          isMetaTransaction={true}
-          onDeny={onDeny}
-          onApprove={onApprove}
-        />
-      )
-      const toggle = screen.getByText('request.signature.view_raw')
-      expect(toggle).toHaveAttribute('aria-expanded', 'false')
-      await userEvent.click(toggle)
-      expect(screen.getByTestId('signature-raw')).toBeInTheDocument()
-      expect(screen.getByText('request.signature.hide_raw')).toHaveAttribute('aria-expanded', 'true')
+    it('should name the decoded call and the contract', () => {
+      render(<SignatureRequestView {...baseProps} />)
+      expect(screen.getByTestId('signature-call')).toHaveTextContent('request.wallet_interaction.calls_function')
     })
 
-    it('should keep approval disabled while the meta-transaction simulation is loading', () => {
-      render(
-        <SignatureRequestView
-          requestId="r1"
-          method="eth_signTypedData_v4"
-          payload={payload}
-          simulation={{ status: 'loading' }}
-          userAddress={USER}
-          isMetaTransaction={true}
-          onDeny={onDeny}
-          onApprove={onApprove}
-        />
-      )
-      expect(screen.getByTestId('signature-approve-button')).toBeDisabled()
+    it('should link the verifying contract to the block explorer of its chain', () => {
+      render(<SignatureRequestView {...baseProps} />)
+      expect(screen.getByRole('link', { name: '0xa1c5…6fd4' })).toHaveAttribute('href', `https://polygonscan.com/address/${CONTRACT}`)
     })
 
-    it('should explain that the signature is a bearer authorization the requester can submit later', () => {
-      render(
-        <SignatureRequestView
-          requestId="r1"
-          method="eth_signTypedData_v4"
-          payload={payload}
-          simulation={simulation}
-          userAddress={USER}
-          isMetaTransaction={true}
-          onDeny={onDeny}
-          onApprove={onApprove}
-        />
-      )
+    it('should explain that the signature can be submitted later', () => {
+      render(<SignatureRequestView {...baseProps} />)
       expect(screen.getByTestId('signature-meta-tx-notice')).toHaveTextContent('request.signature.meta_tx_notice')
     })
 
-    describe('and the acknowledgment wording changes after the user ticked it', () => {
-      it('should ask again instead of carrying the tick over to the new statement', async () => {
-        const { rerender } = render(
-          <SignatureRequestView
-            requestId="r1"
-            method="eth_signTypedData_v4"
-            payload={payload}
-            simulation={simulation}
-            userAddress={USER}
-            isMetaTransaction={true}
-            contractTrust="pending"
-            requiresAcknowledgment
-            onDeny={onDeny}
-            onApprove={onApprove}
-          />
-        )
-        await userEvent.click(screen.getByRole('checkbox'))
-        expect(screen.getByRole('checkbox')).toBeChecked()
-        rerender(
-          <SignatureRequestView
-            requestId="r1"
-            method="eth_signTypedData_v4"
-            payload={payload}
-            simulation={simulation}
-            userAddress={USER}
-            isMetaTransaction={true}
-            contractTrust="unconfirmed"
-            requiresAcknowledgment
-            onDeny={onDeny}
-            onApprove={onApprove}
-          />
-        )
-        expect(screen.getByRole('checkbox')).not.toBeChecked()
-      })
+    it('should reveal the raw payload when the raw toggle is clicked', async () => {
+      render(<SignatureRequestView {...baseProps} />)
+      const toggle = screen.getByText('request.signature.view_raw')
+      expect(toggle).toHaveAttribute('aria-expanded', 'false')
+      await userEvent.click(toggle)
+      expect(screen.getByTestId('signature-raw')).toHaveTextContent('{"primaryType":"MetaTransaction"}')
+      expect(screen.getByText('request.signature.hide_raw')).toHaveAttribute('aria-expanded', 'true')
     })
 
-    describe('and the statement changes on a render where the previous one had been acknowledged', () => {
-      let disabledAtCommit: boolean[]
-      let CommitProbe: ({ children }: { children: React.ReactNode }) => JSX.Element
-
-      beforeEach(() => {
-        disabledAtCommit = []
-        // A layout effect runs in the same commit as the DOM update, before any passive effect, so
-        // it sees the button exactly as the user would on that render.
-        CommitProbe = ({ children }: { children: React.ReactNode }) => {
-          useLayoutEffect(() => {
-            disabledAtCommit.push(screen.getByTestId('signature-approve-button').hasAttribute('disabled'))
-          })
-          return <>{children}</>
-        }
-      })
-
-      it('should disable approval within that same commit, before any effect can run', async () => {
-        const { rerender } = render(
-          <CommitProbe>
-            <SignatureRequestView
-              requestId="r1"
-              method="eth_signTypedData_v4"
-              payload={payload}
-              simulation={simulation}
-              userAddress={USER}
-              isMetaTransaction={true}
-              contractTrust="confirmed"
-              requiresAcknowledgment
-              onDeny={onDeny}
-              onApprove={onApprove}
-            />
-          </CommitProbe>
-        )
-        await userEvent.click(screen.getByRole('checkbox'))
-        expect(screen.getByTestId('signature-approve-button')).toBeEnabled()
-        const commitsBefore = disabledAtCommit.length
-        rerender(
-          <CommitProbe>
-            <SignatureRequestView
-              requestId="r1"
-              method="eth_signTypedData_v4"
-              payload={payload}
-              simulation={simulation}
-              userAddress={USER}
-              isMetaTransaction={true}
-              contractTrust="unconfirmed"
-              requiresAcknowledgment
-              onDeny={onDeny}
-              onApprove={onApprove}
-            />
-          </CommitProbe>
-        )
-        expect(disabledAtCommit[commitsBefore]).toBe(true)
-      })
+    it('should approve on a single click when no acknowledgment is required', async () => {
+      render(<SignatureRequestView {...baseProps} />)
+      await userEvent.click(screen.getByTestId('signature-approve-button'))
+      expect(onApprove).toHaveBeenCalledTimes(1)
     })
 
-    describe('and the same statement is shown for a different request after the user ticked it', () => {
-      it('should ask again because the tick belonged to the previous request', async () => {
-        const { rerender } = render(
-          <SignatureRequestView
-            requestId="r1"
-            method="eth_signTypedData_v4"
-            payload={payload}
-            simulation={simulation}
-            userAddress={USER}
-            isMetaTransaction={true}
-            contractTrust="unconfirmed"
-            requiresAcknowledgment
-            onDeny={onDeny}
-            onApprove={onApprove}
-          />
-        )
-        await userEvent.click(screen.getByRole('checkbox'))
-        expect(screen.getByRole('checkbox')).toBeChecked()
-        rerender(
-          <SignatureRequestView
-            requestId="r2"
-            method="eth_signTypedData_v4"
-            payload={payload}
-            simulation={simulation}
-            userAddress={USER}
-            isMetaTransaction={true}
-            contractTrust="unconfirmed"
-            requiresAcknowledgment
-            onDeny={onDeny}
-            onApprove={onApprove}
-          />
-        )
-        expect(screen.getByRole('checkbox')).not.toBeChecked()
-      })
-    })
-
-    describe('and the same request re-simulates to a different preview after the user ticked it', () => {
-      let changedSimulation: SimulationState
-
-      beforeEach(() => {
-        const result = simulation.status === 'ready' ? simulation.result : undefined
-        changedSimulation = {
-          status: 'ready',
-          result: {
-            ...(result as SimulationResponseBody),
-            assetChanges: [{ ...(result as SimulationResponseBody).assetChanges[0], amount: '500', rawAmount: '500000000000000000000' }]
-          }
-        }
-      })
-
-      it('should clear the tick because it was given to the previous preview', async () => {
-        const { rerender } = render(
-          <SignatureRequestView
-            requestId="r1"
-            method="eth_signTypedData_v4"
-            payload={payload}
-            simulation={simulation}
-            userAddress={USER}
-            isMetaTransaction={true}
-            contractTrust="unconfirmed"
-            requiresAcknowledgment
-            onDeny={onDeny}
-            onApprove={onApprove}
-          />
-        )
-        await userEvent.click(screen.getByRole('checkbox'))
-        expect(screen.getByRole('checkbox')).toBeChecked()
-        rerender(
-          <SignatureRequestView
-            requestId="r1"
-            method="eth_signTypedData_v4"
-            payload={payload}
-            simulation={changedSimulation}
-            userAddress={USER}
-            isMetaTransaction={true}
-            contractTrust="unconfirmed"
-            requiresAcknowledgment
-            onDeny={onDeny}
-            onApprove={onApprove}
-          />
-        )
-        expect(screen.getByRole('checkbox')).not.toBeChecked()
-      })
-    })
-
-    it('should keep approval disabled while the contract is still being recognized', () => {
-      render(
-        <SignatureRequestView
-          requestId="r1"
-          method="eth_signTypedData_v4"
-          payload={payload}
-          simulation={simulation}
-          userAddress={USER}
-          isMetaTransaction={true}
-          contractTrust="pending"
-          onDeny={onDeny}
-          onApprove={onApprove}
-        />
-      )
-      expect(screen.getByTestId('signature-approve-button')).toBeDisabled()
-    })
-
-    it('should not warn about the contract when it is a recognized Decentraland contract', () => {
-      render(
-        <SignatureRequestView
-          requestId="r1"
-          method="eth_signTypedData_v4"
-          payload={payload}
-          simulation={simulation}
-          userAddress={USER}
-          isMetaTransaction={true}
-          contractTrust="confirmed"
-          onDeny={onDeny}
-          onApprove={onApprove}
-        />
-      )
-      expect(screen.queryByTestId('signature-meta-tx-unrecognized-contract')).not.toBeInTheDocument()
-    })
-
-    it('should not mention a revert when the simulated call succeeds', () => {
-      render(
-        <SignatureRequestView
-          requestId="r1"
-          method="eth_signTypedData_v4"
-          payload={payload}
-          simulation={simulation}
-          userAddress={USER}
-          isMetaTransaction={true}
-          onDeny={onDeny}
-          onApprove={onApprove}
-        />
-      )
-      expect(screen.queryByTestId('signature-meta-tx-reverted')).not.toBeInTheDocument()
-    })
-
-    describe('and an acknowledgment is required for a dangerous approval', () => {
-      it('should use the approval acknowledgment label', () => {
-        render(
-          <SignatureRequestView
-            requestId="r1"
-            method="eth_signTypedData_v4"
-            payload={payload}
-            simulation={simulation}
-            userAddress={USER}
-            isMetaTransaction={true}
-            requiresAcknowledgment
-            onDeny={onDeny}
-            onApprove={onApprove}
-          />
-        )
-        expect(screen.getByText('request.transaction_dialog.acknowledge_risk')).toBeInTheDocument()
-      })
+    it('should call onDeny when the deny button is clicked', async () => {
+      render(<SignatureRequestView {...baseProps} />)
+      await userEvent.click(screen.getByTestId('signature-deny-button'))
+      expect(onDeny).toHaveBeenCalledTimes(1)
     })
   })
 
-  describe('and the payload is a meta-transaction whose simulated call reverts', () => {
-    let payload: SignaturePayload
-    let simulation: SimulationState
-
-    beforeEach(() => {
-      payload = {
-        kind: 'typedData',
-        raw: '{"primaryType":"MetaTransaction"}',
-        typedData: { primaryType: 'MetaTransaction', domain: {}, message: {} }
-      }
-      const result: SimulationResponseBody = {
-        status: 'reverted',
-        error: 'Trade not effective yet',
-        assetChanges: [],
-        approvalChanges: [],
-        balanceChanges: [],
-        events: []
-      }
-      simulation = { status: 'ready', result }
-    })
-
-    it('should warn that the effects could not be previewed because the call fails today', () => {
-      render(
-        <SignatureRequestView
-          requestId="r1"
-          method="eth_signTypedData_v4"
-          payload={payload}
-          simulation={simulation}
-          userAddress={USER}
-          isMetaTransaction={true}
-          requiresAcknowledgment
-          onDeny={onDeny}
-          onApprove={onApprove}
-        />
-      )
-      expect(screen.getByTestId('signature-meta-tx-reverted')).toHaveTextContent('request.signature.meta_tx_reverted')
-    })
-
-    it('should ask the user to acknowledge unverified effects rather than an approval', () => {
-      render(
-        <SignatureRequestView
-          requestId="r1"
-          method="eth_signTypedData_v4"
-          payload={payload}
-          simulation={simulation}
-          userAddress={USER}
-          isMetaTransaction={true}
-          requiresAcknowledgment
-          onDeny={onDeny}
-          onApprove={onApprove}
-        />
-      )
-      expect(screen.getByText('request.signature.acknowledge_unverified')).toBeInTheDocument()
-    })
-
-    it('should keep approval disabled until the unverified effects are acknowledged', async () => {
-      render(
-        <SignatureRequestView
-          requestId="r1"
-          method="eth_signTypedData_v4"
-          payload={payload}
-          simulation={simulation}
-          userAddress={USER}
-          isMetaTransaction={true}
-          requiresAcknowledgment
-          onDeny={onDeny}
-          onApprove={onApprove}
-        />
-      )
+  describe('and the simulation is still loading', () => {
+    it('should keep approval disabled until it resolves', () => {
+      render(<SignatureRequestView {...baseProps} simulation={{ status: 'loading' }} />)
       expect(screen.getByTestId('signature-approve-button')).toBeDisabled()
-      await userEvent.click(screen.getByTestId('risk-acknowledgment'))
-      expect(screen.getByTestId('signature-approve-button')).toBeEnabled()
     })
   })
 
-  describe('and the payload is a meta-transaction to a contract that is not a recognized Decentraland contract', () => {
-    let payload: SignaturePayload
-    let simulation: SimulationState
-
-    beforeEach(() => {
-      payload = {
-        kind: 'typedData',
-        raw: '{"primaryType":"MetaTransaction"}',
-        typedData: { primaryType: 'MetaTransaction', domain: {}, message: {} }
-      }
-      simulation = { status: 'ready', result: { status: 'success', assetChanges: [], approvalChanges: [], balanceChanges: [], events: [] } }
-    })
-
-    it('should warn that Decentraland cannot vouch for the contract', () => {
-      render(
-        <SignatureRequestView
-          requestId="r1"
-          method="eth_signTypedData_v4"
-          payload={payload}
-          simulation={simulation}
-          userAddress={USER}
-          isMetaTransaction={true}
-          contractTrust="unconfirmed"
-          requiresAcknowledgment
-          onDeny={onDeny}
-          onApprove={onApprove}
-        />
-      )
-      expect(screen.getByTestId('signature-meta-tx-unrecognized-contract')).toHaveTextContent(
-        'request.signature.meta_tx_unrecognized_contract'
-      )
-    })
-
-    it('should ask the user to acknowledge unverified effects', () => {
-      render(
-        <SignatureRequestView
-          requestId="r1"
-          method="eth_signTypedData_v4"
-          payload={payload}
-          simulation={simulation}
-          userAddress={USER}
-          isMetaTransaction={true}
-          contractTrust="unconfirmed"
-          requiresAcknowledgment
-          onDeny={onDeny}
-          onApprove={onApprove}
-        />
-      )
-      expect(screen.getByText('request.signature.acknowledge_unverified')).toBeInTheDocument()
-    })
-
-    it('should keep approval disabled until acknowledged', async () => {
-      render(
-        <SignatureRequestView
-          requestId="r1"
-          method="eth_signTypedData_v4"
-          payload={payload}
-          simulation={simulation}
-          userAddress={USER}
-          isMetaTransaction={true}
-          contractTrust="unconfirmed"
-          requiresAcknowledgment
-          onDeny={onDeny}
-          onApprove={onApprove}
-        />
-      )
+  describe('and an acknowledgment is required', () => {
+    it('should keep approval disabled until the acknowledgment is checked', async () => {
+      render(<SignatureRequestView {...baseProps} requiresAcknowledgment />)
       expect(screen.getByTestId('signature-approve-button')).toBeDisabled()
-      await userEvent.click(screen.getByTestId('risk-acknowledgment'))
-      expect(screen.getByTestId('signature-approve-button')).toBeEnabled()
-    })
-  })
-
-  describe('and the reason a signature cannot be checked changes after the user ticked the acknowledgment', () => {
-    let payload: SignaturePayload
-
-    beforeEach(() => {
-      payload = { kind: 'message', message: `0x${'ab'.repeat(32)}` }
-    })
-
-    it('should ask again even though the label wording stays the same', async () => {
-      const { rerender } = render(
-        <SignatureRequestView
-          requestId="r1"
-          method="personal_sign"
-          payload={payload}
-          simulation={{ status: 'idle' }}
-          userAddress={USER}
-          isMetaTransaction={false}
-          unverifiableReason="opaque_message"
-          requiresAcknowledgment
-          onDeny={onDeny}
-          onApprove={onApprove}
-        />
-      )
       await userEvent.click(screen.getByRole('checkbox'))
-      expect(screen.getByRole('checkbox')).toBeChecked()
-      rerender(
-        <SignatureRequestView
-          requestId="r1"
-          method="eth_signTypedData_v4"
-          payload={payload}
-          simulation={{ status: 'idle' }}
-          userAddress={USER}
-          isMetaTransaction={false}
-          unverifiableReason="unrecognized_typed_data"
-          requiresAcknowledgment
-          onDeny={onDeny}
-          onApprove={onApprove}
-        />
-      )
+      expect(screen.getByTestId('signature-approve-button')).toBeEnabled()
+    })
+
+    it('should word the acknowledgment for the granted access when the preview shows changes', () => {
+      render(<SignatureRequestView {...baseProps} requiresAcknowledgment />)
+      expect(screen.getByText('request.transaction_dialog.acknowledge_risk')).toBeInTheDocument()
+    })
+
+    it('should clear the tick when the request changes', async () => {
+      const { rerender } = render(<SignatureRequestView {...baseProps} requiresAcknowledgment />)
+      await userEvent.click(screen.getByRole('checkbox'))
+      expect(screen.getByTestId('signature-approve-button')).toBeEnabled()
+      rerender(<SignatureRequestView {...baseProps} requestId="r2" requiresAcknowledgment />)
       expect(screen.getByRole('checkbox')).not.toBeChecked()
+      expect(screen.getByTestId('signature-approve-button')).toBeDisabled()
     })
   })
 
-  describe('and the payload is a meta-transaction whose simulation is unavailable', () => {
-    let payload: SignaturePayload
-
-    beforeEach(() => {
-      payload = {
-        kind: 'typedData',
-        raw: '{"primaryType":"MetaTransaction"}',
-        typedData: { primaryType: 'MetaTransaction', domain: {}, message: {} }
-      }
-    })
-
-    it('should ask the user to acknowledge unverified effects', () => {
-      render(
-        <SignatureRequestView
-          requestId="r1"
-          method="eth_signTypedData_v4"
-          payload={payload}
-          simulation={{ status: 'unavailable' }}
-          userAddress={USER}
-          isMetaTransaction={true}
-          requiresAcknowledgment
-          onDeny={onDeny}
-          onApprove={onApprove}
-        />
-      )
+  describe('and the preview is unavailable', () => {
+    it('should word the acknowledgment for effects that could not be verified', () => {
+      render(<SignatureRequestView {...baseProps} simulation={{ status: 'unavailable' }} requiresAcknowledgment />)
       expect(screen.getByText('request.signature.acknowledge_unverified')).toBeInTheDocument()
     })
   })
 
-  describe('and the payload is a meta-transaction whose preview shows no visible effects', () => {
-    let payload: SignaturePayload
-    let simulation: SimulationState
+  describe('and the inner call reverts', () => {
+    let revertedResult: SimulationResponseBody
 
     beforeEach(() => {
-      payload = {
-        kind: 'typedData',
-        raw: '{"primaryType":"MetaTransaction"}',
-        typedData: { primaryType: 'MetaTransaction', domain: {}, message: {} }
-      }
-      simulation = { status: 'ready', result: { status: 'success', assetChanges: [], approvalChanges: [], balanceChanges: [], events: [] } }
+      revertedResult = { ...transferResult, status: 'reverted', error: 'Trade not effective yet', assetChanges: [] }
+    })
+
+    it('should explain that the action fails right now', () => {
+      render(<SignatureRequestView {...baseProps} simulation={{ status: 'ready', result: revertedResult }} requiresAcknowledgment />)
+      expect(screen.getByTestId('signature-meta-tx-reverted')).toBeInTheDocument()
+    })
+
+    it('should word the acknowledgment for effects that could not be verified', () => {
+      render(<SignatureRequestView {...baseProps} simulation={{ status: 'ready', result: revertedResult }} requiresAcknowledgment />)
+      expect(screen.getByText('request.signature.acknowledge_unverified')).toBeInTheDocument()
+    })
+  })
+
+  describe('and the preview shows no visible effects', () => {
+    let emptyResult: SimulationResponseBody
+
+    beforeEach(() => {
+      emptyResult = { ...transferResult, assetChanges: [] }
     })
 
     it('should word the acknowledgment for a call whose effects the preview cannot show', () => {
-      render(
-        <SignatureRequestView
-          requestId="r1"
-          method="eth_signTypedData_v4"
-          payload={payload}
-          simulation={simulation}
-          userAddress={USER}
-          isMetaTransaction={true}
-          contractTrust="confirmed"
-          requiresAcknowledgment
-          onDeny={onDeny}
-          onApprove={onApprove}
-        />
-      )
+      render(<SignatureRequestView {...baseProps} simulation={{ status: 'ready', result: emptyResult }} requiresAcknowledgment />)
       expect(screen.getByText('request.transaction_dialog.acknowledge_no_visible_effects')).toBeInTheDocument()
     })
   })

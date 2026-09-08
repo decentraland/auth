@@ -17,5 +17,7 @@ export interface SimulationSummaryProps {
     covered: boolean
     cost: string
     balance: string
+    /** True when the user pays gas but the wallet could not estimate it. */
+    unavailable?: boolean
   }
 }

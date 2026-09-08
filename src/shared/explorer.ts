@@ -20,6 +20,18 @@ const NETWORK_NAMES = new Map<number, string>([
   [80002, 'Polygon Amoy']
 ])
 
+const NATIVE_SYMBOLS = new Map<number, string>([
+  [1, 'ETH'],
+  [11155111, 'ETH'],
+  [137, 'POL'],
+  [80002, 'POL']
+])
+
+/** Symbol of the chain's native currency (e.g. "POL"), or empty when unsupported. */
+function getNativeSymbol(chainId: number | undefined): string {
+  return chainId ? (NATIVE_SYMBOLS.get(chainId) ?? '') : ''
+}
+
 /** Human-readable network name for a chain (e.g. "Polygon"), or empty when unsupported. */
 function getNetworkName(chainId: number | undefined): string {
   return chainId ? (NETWORK_NAMES.get(chainId) ?? '') : ''
@@ -40,4 +52,4 @@ function getExplorerAddressUrl(chainId: number | undefined, address: string | nu
   return base ? `${base}/address/${address}` : null
 }
 
-export { getExplorerAddressUrl, getExplorerName, getNetworkName }
+export { getExplorerAddressUrl, getExplorerName, getNativeSymbol, getNetworkName }

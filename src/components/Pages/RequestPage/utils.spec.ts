@@ -1,53 +1,36 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/naming-convention */
 /* eslint-disable @typescript-eslint/unbound-method */
-import { createPublicClient, custom, decodeFunctionData, formatEther } from 'viem'
+import { createPublicClient, custom, formatEther } from 'viem'
 import { Rarity } from '@dcl/schemas'
 import { ChainId } from '@dcl/schemas/dist/dapps/chain-id'
 import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
 import { connection } from 'decentraland-connect'
-import { ContractName, getContract, getContractName } from 'decentraland-transactions'
+import { getContract } from 'decentraland-transactions'
 import { config } from '../../../modules/config'
-import { SimulationResponseBody } from '../../../shared/auth'
-import { MalformedSignatureRequestError } from '../../../shared/auth/errors'
-import { isMetaTransactionTypedData, resolveMetaTransactionTypedData } from '../../../shared/auth/metaTransactionTypedData'
-import { assertSignatureParamsAreCanonical } from '../../../shared/auth/signMethodGuard'
+import { DecodedCall, KnownContract, SimulationResponseBody } from '../../../shared/auth'
+import { RequestClassification } from './classifyRequest'
 import {
   buildSendTransactionSimulationPayload,
-  checkMetaTransactionSupport,
   decodeManaTransferData,
-  decodeMetaTransactionTypedData,
   decodeNftTransferData,
-  extractSignaturePayload,
   fetchNftMetadata,
   getConnectedProvider,
   getExplorerDeeplink,
   getMetaTransactionChainId,
   getNetworkProvider,
   getSigninDeeplink,
-  isApprovalGrantingTypedData,
   isDecentralandCollection,
-  isDecentralandContractAddress,
-  isExactNftTransferSimulation,
-  isKnownDecentralandContractOnChain,
-  isNftOwnedBy,
-  isOpaqueSignatureMessage,
-  isSignatureMethod
+  isExactNftTransferSimulation
 } from './utils'
 
 jest.mock('decentraland-connect')
 jest.mock('decentraland-transactions')
-jest.mock('../../../shared/auth/metaTransactionTypedData')
 jest.mock('../../../modules/config')
 jest.mock('viem', () => ({
   createPublicClient: jest.fn(),
   custom: jest.fn((provider: any) => provider),
-  decodeFunctionData: jest.fn(),
-  formatEther: jest.fn(),
-  // Keep signature decoding and schema validation real; only chain interaction is mocked.
-  hexToString: jest.requireActual('viem').hexToString,
-  getTypesForEIP712Domain: jest.requireActual('viem').getTypesForEIP712Domain,
-  hashTypedData: jest.requireActual('viem').hashTypedData
+  formatEther: jest.fn()
 }))
 
 describe('when testing getConnectedProvider', () => {
@@ -158,74 +141,147 @@ describe('when testing getNetworkProvider', () => {
   })
 })
 
-describe('when testing isDecentralandContractAddress', () => {
+describe('when testing isDecentralandCollection', () => {
   let contractAddress: string
-  let metaTransactionServerUrl: string
+  let mockNetworkProvider: any
+  let mockWalletProvider: any
+  let mockReadContract: jest.Mock
 
   beforeEach(() => {
-    contractAddress = '0x1234567890abcdef'
-    metaTransactionServerUrl = 'https://meta-transactions.decentraland.org'
-    jest.mocked(config.get).mockReturnValueOnce(metaTransactionServerUrl)
-    global.fetch = jest.fn()
+    contractAddress = '0xcollection'
+    jest.mocked(config.get).mockReturnValue('production')
+    jest.mocked(getContract).mockImplementation((name: string) => ({ address: `0xfactory-${name}`, abi: [] }) as any)
+    // A connected wallet is available and already on the meta-transaction chain: the one case where
+    // getNetworkProvider would hand back the wallet's own RPC instead of Decentraland's.
+    mockWalletProvider = { isWalletProvider: true }
+    mockNetworkProvider = { isNetworkProvider: true }
+    jest.mocked(connection.getProvider).mockResolvedValue(mockWalletProvider)
+    jest.mocked(connection.createProvider).mockReturnValue(mockNetworkProvider)
+    mockReadContract = jest.fn()
+    jest.mocked(createPublicClient).mockReturnValue({ readContract: mockReadContract, getChainId: jest.fn().mockResolvedValue(137) } as any)
   })
 
   afterEach(() => {
     jest.resetAllMocks()
+    jest.useRealTimers()
   })
 
-  describe('and the contract is a valid Decentraland contract', () => {
+  describe('and a connected wallet reports the same chain', () => {
     beforeEach(() => {
-      jest.mocked(fetch).mockResolvedValueOnce({
-        status: 200,
-        json: jest.fn().mockResolvedValueOnce({ ok: true })
-      } as any)
+      mockReadContract.mockResolvedValue(true)
+    })
+
+    it("should read the factories through Decentraland's own RPC for the meta-transaction chain", async () => {
+      await isDecentralandCollection(contractAddress)
+      expect(connection.createProvider).toHaveBeenCalledWith(ProviderType.NETWORK, ChainId.MATIC_MAINNET)
+      expect(custom).toHaveBeenCalledWith(mockNetworkProvider)
+    })
+
+    it('should never consult the connected wallet, whose RPC the user may have been talked into replacing', async () => {
+      await isDecentralandCollection(contractAddress)
+      expect(connection.getProvider).not.toHaveBeenCalled()
+      expect(connection.tryPreviousConnection).not.toHaveBeenCalled()
+      expect(custom).not.toHaveBeenCalledWith(mockWalletProvider)
+    })
+  })
+
+  describe('and one of the collection factories deployed the contract', () => {
+    beforeEach(() => {
+      mockReadContract.mockResolvedValueOnce(false).mockResolvedValueOnce(true)
     })
 
     it('should return true', async () => {
-      const result = await isDecentralandContractAddress(contractAddress)
-      expect(result).toBe(true)
-      expect(fetch).toHaveBeenCalledWith(
-        `${metaTransactionServerUrl}/v1/contracts/${contractAddress}`,
-        expect.objectContaining({ signal: expect.any(AbortSignal) })
+      await expect(isDecentralandCollection(contractAddress)).resolves.toBe(true)
+    })
+
+    it('should ask each factory whether it deployed that contract', async () => {
+      await isDecentralandCollection(contractAddress)
+      expect(mockReadContract).toHaveBeenCalledTimes(2)
+      expect(mockReadContract).toHaveBeenCalledWith(
+        expect.objectContaining({
+          address: '0xfactory-CollectionFactory',
+          functionName: 'isCollectionFromFactory',
+          args: [contractAddress]
+        })
+      )
+      expect(mockReadContract).toHaveBeenCalledWith(
+        expect.objectContaining({
+          address: '0xfactory-CollectionFactoryV3',
+          functionName: 'isCollectionFromFactory',
+          args: [contractAddress]
+        })
       )
     })
   })
 
-  describe('and the contract is not a valid Decentraland contract', () => {
+  describe('and one factory read fails while the other factory says it deployed the contract', () => {
     beforeEach(() => {
-      jest.mocked(fetch).mockResolvedValueOnce({
-        status: 200,
-        json: jest.fn().mockResolvedValueOnce({ ok: false })
-      } as any)
+      mockReadContract.mockImplementation(({ address }: { address: string }) =>
+        address === '0xfactory-CollectionFactory' ? Promise.reject(new Error('rpc down')) : Promise.resolve(true)
+      )
     })
 
-    it('should return false', async () => {
-      const result = await isDecentralandContractAddress(contractAddress)
-      expect(result).toBe(false)
+    it('should return true because one yes is the whole answer', async () => {
+      await expect(isDecentralandCollection(contractAddress)).resolves.toBe(true)
     })
   })
 
-  describe('and the API returns a non-200 status', () => {
+  describe('and one factory read fails while the other factory says it did not deploy the contract', () => {
     beforeEach(() => {
-      jest.mocked(fetch).mockResolvedValueOnce({
-        status: 404
-      } as any)
+      mockReadContract.mockImplementation(({ address }: { address: string }) =>
+        address === '0xfactory-CollectionFactory' ? Promise.reject(new Error('rpc down')) : Promise.resolve(false)
+      )
     })
 
-    it('should return false', async () => {
-      const result = await isDecentralandContractAddress(contractAddress)
-      expect(result).toBe(false)
+    it('should throw because nothing vouched for the contract and nothing ruled it out', async () => {
+      await expect(isDecentralandCollection(contractAddress)).rejects.toThrow('rpc down')
     })
   })
 
-  describe('and the API call fails', () => {
+  describe('and no collection factory deployed the contract', () => {
     beforeEach(() => {
-      jest.mocked(fetch).mockRejectedValueOnce(new Error('Network error'))
+      mockReadContract.mockResolvedValue(false)
     })
 
     it('should return false', async () => {
-      const result = await isDecentralandContractAddress(contractAddress)
-      expect(result).toBe(false)
+      await expect(isDecentralandCollection(contractAddress)).resolves.toBe(false)
+    })
+  })
+
+  describe('and the chain cannot be asked', () => {
+    beforeEach(() => {
+      mockReadContract.mockRejectedValue(new Error('rpc down'))
+    })
+
+    it('should throw instead of answering, so an outage is not read as a verdict', async () => {
+      await expect(isDecentralandCollection(contractAddress)).rejects.toThrow('rpc down')
+    })
+  })
+
+  describe('and the chain does not answer', () => {
+    beforeEach(() => {
+      jest.useFakeTimers()
+      mockReadContract.mockImplementation(() => new Promise(() => undefined))
+    })
+
+    it('should give up after the lookup timeout so the classifier reports the answer as unavailable', async () => {
+      const lookup = isDecentralandCollection(contractAddress)
+      const outcome = expect(lookup).rejects.toThrow('timed out')
+      await jest.advanceTimersByTimeAsync(10_000)
+      await outcome
+    })
+  })
+
+  describe('and no collection factory exists on the meta-transaction chain', () => {
+    beforeEach(() => {
+      jest.mocked(getContract).mockImplementation(() => {
+        throw new Error('not deployed')
+      })
+    })
+
+    it('should return false without asking the chain', async () => {
+      await expect(isDecentralandCollection(contractAddress)).resolves.toBe(false)
+      expect(mockReadContract).not.toHaveBeenCalled()
     })
   })
 })
@@ -269,250 +325,70 @@ describe('when testing getMetaTransactionChainId', () => {
   })
 })
 
-describe('when testing checkMetaTransactionSupport', () => {
-  let contractAddress: string
-
-  beforeEach(() => {
-    contractAddress = '0x1234567890abcdef'
-    // getMetaTransactionChainId() reads ENVIRONMENT and isDecentralandContractAddress() reads the
-    // meta-transaction server URL; resolve both deterministically by key regardless of call order.
-    jest
-      .mocked(config.get)
-      .mockImplementation((key: string) => (key === 'ENVIRONMENT' ? 'dev' : 'https://meta-transactions.decentraland.org'))
-  })
-
-  afterEach(() => {
-    jest.resetAllMocks()
-  })
-
-  describe('and the contract is a known Decentraland contract on the meta-transaction chain', () => {
-    beforeEach(() => {
-      jest.mocked(getContractName).mockReturnValueOnce(ContractName.MANAToken)
-      jest.mocked(getContract).mockReturnValueOnce({ address: contractAddress } as any)
-    })
-
-    it('should return willUseMetaTransaction as true with the contract name', async () => {
-      const result = await checkMetaTransactionSupport(contractAddress)
-      expect(result).toEqual({
-        willUseMetaTransaction: true,
-        contractName: ContractName.MANAToken
-      })
-    })
-  })
-
-  describe('and the address matches a Decentraland contract but on a different chain', () => {
-    beforeEach(() => {
-      // getContractName matches an address on ANY chain, but the deployment on the meta-tx chain
-      // has a different address — so this must NOT be relayed as a meta-transaction.
-      jest.mocked(getContractName).mockReturnValueOnce(ContractName.MANAToken)
-      jest.mocked(getContract).mockReturnValueOnce({ address: '0xdifferentchainaddress' } as any)
-      global.fetch = jest.fn().mockResolvedValueOnce({
-        status: 200,
-        json: jest.fn().mockResolvedValueOnce({ ok: false })
-      } as any)
-    })
-
-    it('should return willUseMetaTransaction as false with null contract name', async () => {
-      const result = await checkMetaTransactionSupport(contractAddress)
-      expect(result).toEqual({
-        willUseMetaTransaction: false,
-        contractName: null
-      })
-    })
-  })
-
-  describe('and the contract is not known but is a valid Decentraland collection contract', () => {
-    beforeEach(() => {
-      jest.mocked(getContractName).mockImplementationOnce(() => {
-        throw new Error('Unknown contract')
-      })
-      global.fetch = jest.fn().mockResolvedValueOnce({
-        status: 200,
-        json: jest.fn().mockResolvedValueOnce({ ok: true })
-      } as any)
-    })
-
-    it('should return willUseMetaTransaction as true with ERC721CollectionV2', async () => {
-      const result = await checkMetaTransactionSupport(contractAddress)
-      expect(result).toEqual({
-        willUseMetaTransaction: true,
-        contractName: ContractName.ERC721CollectionV2
-      })
-    })
-  })
-
-  describe('and the contract is not a Decentraland contract', () => {
-    beforeEach(() => {
-      jest.mocked(getContractName).mockImplementationOnce(() => {
-        throw new Error('Unknown contract')
-      })
-      global.fetch = jest.fn().mockResolvedValueOnce({
-        status: 200,
-        json: jest.fn().mockResolvedValueOnce({ ok: false })
-      } as any)
-    })
-
-    it('should return willUseMetaTransaction as false with null contract name', async () => {
-      const result = await checkMetaTransactionSupport(contractAddress)
-      expect(result).toEqual({
-        willUseMetaTransaction: false,
-        contractName: null
-      })
-    })
-  })
-})
-
 describe('when testing decodeNftTransferData', () => {
-  let contractABI: object[]
-  let transactionData: string
+  let call: DecodedCall
 
-  beforeEach(() => {
-    contractABI = [{ type: 'function', name: 'transferFrom' }]
-    transactionData = '0x23b872dd'
-  })
-
-  afterEach(() => {
-    jest.resetAllMocks()
-  })
-
-  describe('and the transaction data is valid', () => {
+  describe('and the call is a transferFrom', () => {
     beforeEach(() => {
-      jest.mocked(decodeFunctionData).mockReturnValueOnce({
-        functionName: 'transferFrom',
-        args: ['0xfrom', '0xto', BigInt(123)]
-      })
+      call = { functionName: 'transferFrom', args: ['0xfrom', '0xto', BigInt(123)], payable: false }
     })
 
     it('should return the source, tokenId and destination', () => {
-      const result = decodeNftTransferData(transactionData, contractABI)
-      expect(result).toEqual({
-        fromAddress: '0xfrom',
-        tokenId: '123',
-        toAddress: '0xto'
-      })
+      expect(decodeNftTransferData(call)).toEqual({ fromAddress: '0xfrom', tokenId: '123', toAddress: '0xto' })
     })
   })
 
-  describe('and the transaction data is empty', () => {
+  describe('and the call is a safeTransferFrom with a data argument', () => {
     beforeEach(() => {
-      transactionData = ''
-    })
-
-    it('should return null', () => {
-      const result = decodeNftTransferData(transactionData, contractABI)
-      expect(result).toBeNull()
-    })
-  })
-
-  describe('and the transaction data is too short', () => {
-    beforeEach(() => {
-      transactionData = '0x1234'
-    })
-
-    it('should return null', () => {
-      const result = decodeNftTransferData(transactionData, contractABI)
-      expect(result).toBeNull()
-    })
-  })
-
-  describe('and decoding returns insufficient args', () => {
-    beforeEach(() => {
-      jest.mocked(decodeFunctionData).mockReturnValueOnce({
-        functionName: 'transferFrom',
-        args: ['0xfrom']
-      })
-    })
-
-    it('should return null', () => {
-      const result = decodeNftTransferData(transactionData, contractABI)
-      expect(result).toBeNull()
-    })
-  })
-
-  describe('and the calldata is safeTransferFrom with a data argument', () => {
-    beforeEach(() => {
-      jest.mocked(decodeFunctionData).mockReturnValueOnce({
-        functionName: 'safeTransferFrom',
-        args: ['0xfrom', '0xto', BigInt(9), '0x']
-      })
+      call = { functionName: 'safeTransferFrom', args: ['0xfrom', '0xto', BigInt(9), '0x'], payable: false }
     })
 
     it('should return the source, tokenId and destination', () => {
-      const result = decodeNftTransferData(transactionData, contractABI)
-      expect(result).toEqual({ fromAddress: '0xfrom', tokenId: '9', toAddress: '0xto' })
+      expect(decodeNftTransferData(call)).toEqual({ fromAddress: '0xfrom', tokenId: '9', toAddress: '0xto' })
     })
   })
 
-  describe('and the calldata is another collection call that also takes three arguments', () => {
+  describe('and the call is another collection call that also takes three arguments', () => {
     beforeEach(() => {
       // batchTransferFrom(address from, address to, uint256[] tokenIds) decodes into a "to" and a
       // "token id" as well; shown as the gift of one token it would transfer every listed one.
-      jest.mocked(decodeFunctionData).mockReturnValueOnce({
-        functionName: 'batchTransferFrom',
-        args: ['0xfrom', '0xto', [BigInt(1), BigInt(2), BigInt(3)]]
-      })
+      call = { functionName: 'batchTransferFrom', args: ['0xfrom', '0xto', [BigInt(1), BigInt(2), BigInt(3)]], payable: false }
     })
 
     it('should return null so the generic review previews it', () => {
-      const result = decodeNftTransferData(transactionData, contractABI)
-      expect(result).toBeNull()
+      expect(decodeNftTransferData(call)).toBeNull()
     })
   })
 
-  describe('and the calldata is a collection admin call whose second argument is a list of addresses', () => {
+  describe('and the call is a collection admin call whose second argument is a list of addresses', () => {
     beforeEach(() => {
       // setItemsMinters(uint256[] itemIds, address[] minters, uint256[] values) grants minting rights;
       // its single-element lists decode into a plausible "to" and "token id".
-      jest.mocked(decodeFunctionData).mockReturnValueOnce({
-        functionName: 'setItemsMinters',
-        args: [[BigInt(0)], ['0xto'], [BigInt(1)]]
-      })
+      call = { functionName: 'setItemsMinters', args: [[BigInt(0)], ['0xto'], [BigInt(1)]], payable: false }
     })
 
     it('should return null instead of presenting it as a gift', () => {
-      const result = decodeNftTransferData(transactionData, contractABI)
-      expect(result).toBeNull()
-    })
-  })
-
-  describe('and a transfer decodes with a sender that is not an address', () => {
-    beforeEach(() => {
-      jest.mocked(decodeFunctionData).mockReturnValueOnce({
-        functionName: 'transferFrom',
-        args: [BigInt(7), '0xto', BigInt(9)]
-      })
-    })
-
-    it('should return null', () => {
-      const result = decodeNftTransferData(transactionData, contractABI)
-      expect(result).toBeNull()
+      expect(decodeNftTransferData(call)).toBeNull()
     })
   })
 
   describe('and a transfer decodes with a token id that is not a single uint256', () => {
     beforeEach(() => {
-      jest.mocked(decodeFunctionData).mockReturnValueOnce({
-        functionName: 'transferFrom',
-        args: ['0xfrom', '0xto', 'not-a-token-id']
-      })
+      call = { functionName: 'transferFrom', args: ['0xfrom', '0xto', 'not-a-token-id'], payable: false }
     })
 
     it('should return null', () => {
-      const result = decodeNftTransferData(transactionData, contractABI)
-      expect(result).toBeNull()
+      expect(decodeNftTransferData(call)).toBeNull()
     })
   })
 
-  describe('and decoding throws an error', () => {
+  describe('and the call has fewer arguments than a transfer', () => {
     beforeEach(() => {
-      jest.mocked(decodeFunctionData).mockImplementationOnce(() => {
-        throw new Error('Decoding error')
-      })
+      call = { functionName: 'transferFrom', args: ['0xfrom'], payable: false }
     })
 
     it('should return null', () => {
-      const result = decodeNftTransferData(transactionData, contractABI)
-      expect(result).toBeNull()
+      expect(decodeNftTransferData(call)).toBeNull()
     })
   })
 })
@@ -742,394 +618,66 @@ describe('when checking whether an NFT simulation exactly matches the branded gi
 })
 
 describe('when testing decodeManaTransferData', () => {
-  let transactionData: string
-  let manaContractAddress: string
-  let mockContract: any
-
-  beforeEach(() => {
-    jest.mocked(config.get).mockReturnValue('production')
-    manaContractAddress = '0x0f5d2fb29fb7d3cfee444a200298f468908cc942'
-    mockContract = {
-      abi: [{ type: 'function', name: 'transfer' }],
-      address: manaContractAddress
-    }
-    jest.mocked(getContract).mockReturnValue(mockContract)
-  })
+  let call: DecodedCall
 
   afterEach(() => {
     jest.resetAllMocks()
   })
 
-  describe('and the transaction data is a valid MANA transfer', () => {
+  describe('and the call is a transfer', () => {
     beforeEach(() => {
-      transactionData =
-        '0xa9059cbb000000000000000000000000abcdef1234567890abcdef1234567890abcdef12000000000000000000000000000000000000000000000000016345785d8a0000'
-      jest.mocked(decodeFunctionData).mockReturnValueOnce({
+      call = {
         functionName: 'transfer',
-        args: ['0xabcdef1234567890abcdef1234567890abcdef12', BigInt('100000000000000000')]
-      })
+        args: ['0xabcdef1234567890abcdef1234567890abcdef12', BigInt('100000000000000000')],
+        payable: false
+      }
       jest.mocked(formatEther).mockReturnValueOnce('0.1')
     })
 
     it('should return the manaAmount and toAddress', () => {
-      const result = decodeManaTransferData(transactionData, manaContractAddress)
-      expect(result).toEqual({
+      expect(decodeManaTransferData(call)).toEqual({
         manaAmount: '0.1',
         toAddress: '0xabcdef1234567890abcdef1234567890abcdef12'
       })
     })
   })
 
-  describe('and the transaction targets the MANA contract with a differently-cased address', () => {
+  describe('and the call is not a transfer', () => {
     beforeEach(() => {
-      transactionData =
-        '0xa9059cbb000000000000000000000000abcdef1234567890abcdef1234567890abcdef12000000000000000000000000000000000000000000000000016345785d8a0000'
-      jest.mocked(decodeFunctionData).mockReturnValueOnce({
-        functionName: 'transfer',
-        args: ['0xabcdef1234567890abcdef1234567890abcdef12', BigInt('100000000000000000')]
-      })
-      jest.mocked(formatEther).mockReturnValueOnce('0.1')
-    })
-
-    it('should decode the transfer regardless of address casing', () => {
-      const result = decodeManaTransferData(transactionData, manaContractAddress.toUpperCase())
-      expect(result).toEqual({
-        manaAmount: '0.1',
-        toAddress: '0xabcdef1234567890abcdef1234567890abcdef12'
-      })
-    })
-  })
-
-  describe('and the transaction targets a non-MANA token contract', () => {
-    beforeEach(() => {
-      transactionData =
-        '0xa9059cbb000000000000000000000000abcdef1234567890abcdef1234567890abcdef12000000000000000000000000000000000000000000000000016345785d8a0000'
-    })
-
-    it('should return null without decoding the transfer', () => {
-      const result = decodeManaTransferData(transactionData, '0x1111111111111111111111111111111111111111')
-      expect(result).toBeNull()
-    })
-  })
-
-  describe('and the contract address is empty', () => {
-    beforeEach(() => {
-      transactionData =
-        '0xa9059cbb000000000000000000000000abcdef1234567890abcdef1234567890abcdef12000000000000000000000000000000000000000000000000016345785d8a0000'
+      call = { functionName: 'approve', args: ['0xabcdef1234567890abcdef1234567890abcdef12', BigInt(1)], payable: false }
     })
 
     it('should return null', () => {
-      const result = decodeManaTransferData(transactionData, '')
-      expect(result).toBeNull()
+      expect(decodeManaTransferData(call)).toBeNull()
     })
   })
 
-  describe('and the transaction data is empty', () => {
+  describe('and the call has fewer arguments than a transfer', () => {
     beforeEach(() => {
-      transactionData = ''
+      call = { functionName: 'transfer', args: ['0xabcdef1234567890abcdef1234567890abcdef12'], payable: false }
     })
 
     it('should return null', () => {
-      const result = decodeManaTransferData(transactionData, manaContractAddress)
-      expect(result).toBeNull()
+      expect(decodeManaTransferData(call)).toBeNull()
     })
   })
 
-  describe('and the transaction data is too short', () => {
+  describe('and the transfer has a large amount', () => {
     beforeEach(() => {
-      transactionData = '0x1234'
-    })
-
-    it('should return null', () => {
-      const result = decodeManaTransferData(transactionData, manaContractAddress)
-      expect(result).toBeNull()
-    })
-  })
-
-  describe('and the transaction data is not a transfer function', () => {
-    beforeEach(() => {
-      transactionData = '0x12345678000000000000000000000000abcdef1234567890abcdef1234567890abcdef12'
-    })
-
-    it('should return null', () => {
-      const result = decodeManaTransferData(transactionData, manaContractAddress)
-      expect(result).toBeNull()
-    })
-  })
-
-  describe('and decoding returns insufficient args', () => {
-    beforeEach(() => {
-      transactionData = '0xa9059cbb000000000000000000000000abcdef1234567890abcdef1234567890abcdef12'
-      jest.mocked(decodeFunctionData).mockReturnValueOnce({
-        functionName: 'transfer',
-        args: ['0xabcdef1234567890abcdef1234567890abcdef12']
-      })
-    })
-
-    it('should return null', () => {
-      const result = decodeManaTransferData(transactionData, manaContractAddress)
-      expect(result).toBeNull()
-    })
-  })
-
-  describe('and decoding throws an error', () => {
-    beforeEach(() => {
-      transactionData = '0xa9059cbb000000000000000000000000abcdef1234567890abcdef1234567890abcdef12'
-      jest.mocked(decodeFunctionData).mockImplementationOnce(() => {
-        throw new Error('Decoding error')
-      })
-    })
-
-    it('should return null', () => {
-      const result = decodeManaTransferData(transactionData, manaContractAddress)
-      expect(result).toBeNull()
-    })
-  })
-
-  describe('and the transaction has a large amount', () => {
-    beforeEach(() => {
-      transactionData = '0xa9059cbb000000000000000000000000abcdef1234567890abcdef1234567890abcdef12'
       // 1000 MANA in wei (1000 * 10^18)
-      jest.mocked(decodeFunctionData).mockReturnValueOnce({
+      call = {
         functionName: 'transfer',
-        args: ['0xabcdef1234567890abcdef1234567890abcdef12', BigInt('1000000000000000000000')]
-      })
+        args: ['0xabcdef1234567890abcdef1234567890abcdef12', BigInt('1000000000000000000000')],
+        payable: false
+      }
       jest.mocked(formatEther).mockReturnValueOnce('1000.0')
     })
 
     it('should correctly convert large amounts from wei to MANA', () => {
-      const result = decodeManaTransferData(transactionData, manaContractAddress)
-      expect(result).toEqual({
+      expect(decodeManaTransferData(call)).toEqual({
         manaAmount: '1000.0',
         toAddress: '0xabcdef1234567890abcdef1234567890abcdef12'
       })
-    })
-  })
-})
-
-describe('when testing isDecentralandCollection', () => {
-  let contractAddress: string
-  let mockNetworkProvider: any
-  let mockWalletProvider: any
-  let mockReadContract: jest.Mock
-
-  beforeEach(() => {
-    contractAddress = '0xcollection'
-    jest.mocked(config.get).mockReturnValue('production')
-    jest.mocked(getContract).mockImplementation((name: string) => ({ address: `0xfactory-${name}`, abi: [] }) as any)
-    // A connected wallet is available and already on the meta-transaction chain: the one case where
-    // getNetworkProvider would hand back the wallet's own RPC instead of Decentraland's.
-    mockWalletProvider = { isWalletProvider: true }
-    mockNetworkProvider = { isNetworkProvider: true }
-    jest.mocked(connection.getProvider).mockResolvedValue(mockWalletProvider)
-    jest.mocked(connection.createProvider).mockReturnValue(mockNetworkProvider)
-    mockReadContract = jest.fn()
-    jest.mocked(createPublicClient).mockReturnValue({ readContract: mockReadContract, getChainId: jest.fn().mockResolvedValue(137) } as any)
-  })
-
-  afterEach(() => {
-    jest.resetAllMocks()
-    jest.useRealTimers()
-  })
-
-  describe('and a connected wallet reports the same chain', () => {
-    beforeEach(() => {
-      mockReadContract.mockResolvedValue(true)
-    })
-
-    it("should read the factories through Decentraland's own RPC for the meta-transaction chain", async () => {
-      await isDecentralandCollection(contractAddress)
-      expect(connection.createProvider).toHaveBeenCalledWith(ProviderType.NETWORK, ChainId.MATIC_MAINNET)
-      expect(custom).toHaveBeenCalledWith(mockNetworkProvider)
-    })
-
-    it('should never consult the connected wallet, whose RPC the user may have been talked into replacing', async () => {
-      await isDecentralandCollection(contractAddress)
-      expect(connection.getProvider).not.toHaveBeenCalled()
-      expect(connection.tryPreviousConnection).not.toHaveBeenCalled()
-      expect(custom).not.toHaveBeenCalledWith(mockWalletProvider)
-    })
-  })
-
-  describe('and one of the collection factories deployed the contract', () => {
-    beforeEach(() => {
-      mockReadContract.mockResolvedValueOnce(false).mockResolvedValueOnce(true)
-    })
-
-    it('should return true', async () => {
-      await expect(isDecentralandCollection(contractAddress)).resolves.toBe(true)
-    })
-
-    it('should ask each factory whether it deployed that contract', async () => {
-      await isDecentralandCollection(contractAddress)
-      expect(mockReadContract).toHaveBeenCalledTimes(2)
-      expect(mockReadContract).toHaveBeenCalledWith(
-        expect.objectContaining({
-          address: '0xfactory-CollectionFactory',
-          functionName: 'isCollectionFromFactory',
-          args: [contractAddress]
-        })
-      )
-      expect(mockReadContract).toHaveBeenCalledWith(
-        expect.objectContaining({
-          address: '0xfactory-CollectionFactoryV3',
-          functionName: 'isCollectionFromFactory',
-          args: [contractAddress]
-        })
-      )
-    })
-  })
-
-  describe('and one factory read fails while the other factory says it deployed the contract', () => {
-    beforeEach(() => {
-      mockReadContract.mockImplementation(({ address }: { address: string }) =>
-        address === '0xfactory-CollectionFactory' ? Promise.reject(new Error('rpc down')) : Promise.resolve(true)
-      )
-    })
-
-    it('should return true because one yes is the whole answer', async () => {
-      await expect(isDecentralandCollection(contractAddress)).resolves.toBe(true)
-    })
-  })
-
-  describe('and one factory read fails while the other factory says it did not deploy the contract', () => {
-    beforeEach(() => {
-      mockReadContract.mockImplementation(({ address }: { address: string }) =>
-        address === '0xfactory-CollectionFactory' ? Promise.reject(new Error('rpc down')) : Promise.resolve(false)
-      )
-    })
-
-    it('should throw because nothing vouched for the contract and nothing ruled it out', async () => {
-      await expect(isDecentralandCollection(contractAddress)).rejects.toThrow('rpc down')
-    })
-  })
-
-  describe('and no collection factory deployed the contract', () => {
-    beforeEach(() => {
-      mockReadContract.mockResolvedValue(false)
-    })
-
-    it('should return false', async () => {
-      await expect(isDecentralandCollection(contractAddress)).resolves.toBe(false)
-    })
-  })
-
-  describe('and the chain cannot be asked', () => {
-    beforeEach(() => {
-      mockReadContract.mockRejectedValue(new Error('rpc down'))
-    })
-
-    it('should throw instead of answering, so an outage is not read as a verdict', async () => {
-      await expect(isDecentralandCollection(contractAddress)).rejects.toThrow('rpc down')
-    })
-  })
-
-  describe('and the chain does not answer', () => {
-    beforeEach(() => {
-      jest.useFakeTimers()
-      mockReadContract.mockImplementation(() => new Promise(() => undefined))
-    })
-
-    it('should give up after the lookup timeout so the review falls back instead of hanging', async () => {
-      const lookup = isDecentralandCollection(contractAddress)
-      const outcome = expect(lookup).rejects.toThrow('timed out')
-      await jest.advanceTimersByTimeAsync(10_000)
-      await outcome
-    })
-  })
-
-  describe('and no collection factory exists on the meta-transaction chain', () => {
-    beforeEach(() => {
-      jest.mocked(getContract).mockImplementation(() => {
-        throw new Error('not deployed')
-      })
-    })
-
-    it('should return false without asking the chain', async () => {
-      await expect(isDecentralandCollection(contractAddress)).resolves.toBe(false)
-      expect(mockReadContract).not.toHaveBeenCalled()
-    })
-  })
-})
-
-describe('when testing isNftOwnedBy', () => {
-  let contractAddress: string
-  let contractABI: object[]
-  let owner: string
-  let mockNetworkProvider: any
-  let mockWalletProvider: any
-  let mockReadContract: jest.Mock
-
-  beforeEach(() => {
-    contractAddress = '0xcollection'
-    contractABI = [{ type: 'function', name: 'ownerOf' }]
-    owner = '0x0000000000000000000000000000000000000AbC'
-    jest.mocked(config.get).mockReturnValue('production')
-    mockWalletProvider = { isWalletProvider: true }
-    mockNetworkProvider = { isNetworkProvider: true }
-    jest.mocked(connection.getProvider).mockResolvedValue(mockWalletProvider)
-    jest.mocked(connection.createProvider).mockReturnValue(mockNetworkProvider)
-    mockReadContract = jest.fn()
-    jest.mocked(createPublicClient).mockReturnValue({ readContract: mockReadContract, getChainId: jest.fn().mockResolvedValue(137) } as any)
-  })
-
-  afterEach(() => {
-    jest.resetAllMocks()
-    jest.useRealTimers()
-  })
-
-  describe('and the chain reports the expected owner, in another casing', () => {
-    beforeEach(() => {
-      mockReadContract.mockResolvedValue(owner.toLowerCase())
-    })
-
-    it('should return true', async () => {
-      await expect(isNftOwnedBy(contractAddress, contractABI, '7', owner)).resolves.toBe(true)
-    })
-
-    it("should ask the collection who holds that token, through Decentraland's own RPC", async () => {
-      await isNftOwnedBy(contractAddress, contractABI, '7', owner)
-      expect(mockReadContract).toHaveBeenCalledWith(
-        expect.objectContaining({ address: contractAddress, functionName: 'ownerOf', args: [BigInt(7)] })
-      )
-      expect(connection.createProvider).toHaveBeenCalledWith(ProviderType.NETWORK, ChainId.MATIC_MAINNET)
-      expect(connection.getProvider).not.toHaveBeenCalled()
-      expect(custom).toHaveBeenCalledWith(mockNetworkProvider)
-      expect(custom).not.toHaveBeenCalledWith(mockWalletProvider)
-    })
-  })
-
-  describe('and the chain reports another holder', () => {
-    beforeEach(() => {
-      mockReadContract.mockResolvedValue('0x0000000000000000000000000000000000000009')
-    })
-
-    it('should return false', async () => {
-      await expect(isNftOwnedBy(contractAddress, contractABI, '7', owner)).resolves.toBe(false)
-    })
-  })
-
-  describe('and the token does not exist', () => {
-    beforeEach(() => {
-      mockReadContract.mockRejectedValue(new Error('ERC721: owner query for nonexistent token'))
-    })
-
-    it('should throw so the caller falls back to the generic review', async () => {
-      await expect(isNftOwnedBy(contractAddress, contractABI, '7', owner)).rejects.toThrow('nonexistent token')
-    })
-  })
-
-  describe('and the chain does not answer', () => {
-    beforeEach(() => {
-      jest.useFakeTimers()
-      mockReadContract.mockImplementation(() => new Promise(() => undefined))
-    })
-
-    it('should give up after the lookup timeout', async () => {
-      const lookup = isNftOwnedBy(contractAddress, contractABI, '7', owner)
-      const outcome = expect(lookup).rejects.toThrow('timed out')
-      await jest.advanceTimersByTimeAsync(10_000)
-      await outcome
     })
   })
 })
@@ -1191,13 +739,6 @@ describe('when testing fetchNftMetadata', () => {
         description: 'A test NFT',
         rarity: Rarity.COMMON
       })
-    })
-
-    it("should read the token URI through Decentraland's own RPC and never the connected wallet", async () => {
-      await fetchNftMetadata(contractAddress, contractABI, tokenId)
-      expect(connection.createProvider).toHaveBeenCalledWith(ProviderType.NETWORK, ChainId.MATIC_MAINNET)
-      expect(connection.getProvider).not.toHaveBeenCalled()
-      expect(connection.tryPreviousConnection).not.toHaveBeenCalled()
     })
   })
 
@@ -1562,594 +1103,78 @@ describe('when building the signin deep link', () => {
   })
 })
 
-describe('when testing isSignatureMethod', () => {
-  describe.each(['personal_sign', 'eth_sign', 'eth_signTypedData', 'eth_signTypedData_v3', 'eth_signTypedData_v4'])(
-    'and the method is a signature method (%s)',
-    method => {
-      it('should return true', () => {
-        expect(isSignatureMethod(method)).toBe(true)
-      })
-    }
-  )
-
-  describe.each(['eth_sendTransaction', 'dcl_personal_sign', 'wallet_switchEthereumChain'])(
-    'and the method is not a signature method (%s)',
-    method => {
-      it('should return false', () => {
-        expect(isSignatureMethod(method)).toBe(false)
-      })
-    }
-  )
-})
-
-describe('when testing extractSignaturePayload', () => {
-  const userAddress = '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd'
-
-  describe('and the method is personal_sign with a hex-encoded message', () => {
-    it('should decode the hex message to its UTF-8 text', () => {
-      const result = extractSignaturePayload('personal_sign', ['0x48656c6c6f', userAddress])
-      expect(result).toEqual({ kind: 'message', message: 'Hello' })
-    })
-  })
-
-  describe('and the method is personal_sign with a plain-text message', () => {
-    it('should return the message unchanged', () => {
-      const result = extractSignaturePayload('personal_sign', ['just text', userAddress])
-      expect(result).toEqual({ kind: 'message', message: 'just text' })
-    })
-  })
-
-  describe('and the method is eth_sign with the address first', () => {
-    it('should pick the non-address element as the message', () => {
-      const result = extractSignaturePayload('eth_sign', [userAddress, 'sign me'])
-      expect(result).toEqual({ kind: 'message', message: 'sign me' })
-    })
-  })
-
-  describe('and the method is eth_signTypedData_v4 with a JSON string', () => {
-    let json: string
-
-    beforeEach(() => {
-      json = '{"primaryType":"Order","domain":{"chainId":137},"message":{"price":"1"}}'
-    })
-
-    it('should parse the typed data and keep the raw string', () => {
-      const result = extractSignaturePayload('eth_signTypedData_v4', [userAddress, json])
-      expect(result).toEqual({
-        kind: 'typedData',
-        raw: json,
-        typedData: { primaryType: 'Order', domain: { chainId: 137 }, message: { price: '1' } }
-      })
-    })
-  })
-
-  describe('and the typed-data JSON cannot be parsed', () => {
-    it('should fall back to a plain message payload', () => {
-      const result = extractSignaturePayload('eth_signTypedData_v4', [userAddress, 'not-json'])
-      expect(result).toEqual({ kind: 'message', message: 'not-json' })
-    })
-  })
-
-  describe('and the signer address is provided to disambiguate', () => {
-    describe('and personal_sign passes the message first and the signer second', () => {
-      it('should treat the first element as the message', () => {
-        const result = extractSignaturePayload('personal_sign', ['gm', userAddress], userAddress)
-        expect(result).toEqual({ kind: 'message', message: 'gm' })
-      })
-    })
-
-    describe('and eth_sign passes the signer first and the message second', () => {
-      it('should treat the second element as the message', () => {
-        const result = extractSignaturePayload('eth_sign', [userAddress, 'sign me'], userAddress)
-        expect(result).toEqual({ kind: 'message', message: 'sign me' })
-      })
-    })
-
-    describe('and the hex-encoded message is itself address-shaped', () => {
-      it('should decode the message rather than mistaking it for the signer address', () => {
-        // A 20-byte message hex-encodes to `0x` + 40 hex chars, which matches the address shape;
-        // matching the known signer keeps it correctly classified as the message.
-        const hexMessage = '0x' + '61'.repeat(20) // 20 bytes of 'a'
-        const result = extractSignaturePayload('personal_sign', [hexMessage, userAddress], userAddress)
-        expect(result).toEqual({ kind: 'message', message: 'a'.repeat(20) })
-      })
-    })
-  })
-
-  describe('and no params are provided', () => {
-    it('should return null', () => {
-      expect(extractSignaturePayload('personal_sign', undefined)).toBeNull()
-    })
-  })
-
-  describe('and the typed-data params pass the canonical guard', () => {
-    let signer: string
-    let permit: string
-    let params: string[]
-
-    beforeEach(() => {
-      signer = '0x1234567890abcdef1234567890abcdef12345678'
-      permit = JSON.stringify({ primaryType: 'Permit', domain: {}, types: { Permit: [] }, message: {} })
-      params = [signer, permit]
-    })
-
-    it('should preview exactly the payload the wallet signs, the second param', () => {
-      expect(() => assertSignatureParamsAreCanonical('eth_signTypedData_v4', params, signer)).not.toThrow()
-      expect(extractSignaturePayload('eth_signTypedData_v4', params, signer)).toEqual({
-        kind: 'typedData',
-        typedData: JSON.parse(permit),
-        raw: params[1]
-      })
-    })
-  })
-
-  describe('and two typed-data payloads are passed with no signer address', () => {
-    const signer = '0x1234567890abcdef1234567890abcdef12345678'
-    const statement = JSON.stringify({ primaryType: 'Statement', domain: {}, types: {}, message: { text: 'harmless' } })
-    const permit = JSON.stringify({ primaryType: 'Permit', domain: {}, types: {}, message: {} })
-
-    it('should preview the first one while the wallet signs the second, which is why the canonical guard rejects it', () => {
-      const params = [statement, permit]
-      expect(extractSignaturePayload('eth_signTypedData_v4', params, signer)).toMatchObject({ kind: 'typedData', raw: statement })
-      expect(() => assertSignatureParamsAreCanonical('eth_signTypedData_v4', params, signer)).toThrow(MalformedSignatureRequestError)
-    })
-  })
-
-  describe('and the eth_signTypedData_v4 signer uses an uppercase 0X prefix', () => {
-    let signer: string
-    let permit: string
-    let params: unknown[]
-
-    beforeEach(() => {
-      signer = '0x1234567890abcdef1234567890abcdef12345678'
-      permit = JSON.stringify({
-        primaryType: 'Permit',
-        domain: {},
-        types: { Permit: [{ name: 'value', type: 'uint256' }] },
-        message: { value: '1' }
-      })
-      // params[0] uses the uppercase-X prefix that the case-insensitive guard (isSigner) accepts as
-      // the signer. A case-sensitive parser used to misread it as the content and drop the real
-      // typed data in params[1], letting the wallet sign something never shown to the user.
-      params = [`0X${signer.slice(2)}`, permit]
-    })
-
-    it('should classify the second param as the typed data instead of misreading the 0X signer as an opaque message', () => {
-      expect(extractSignaturePayload('eth_signTypedData_v4', params, signer)).toEqual({
-        kind: 'typedData',
-        typedData: JSON.parse(permit),
-        raw: permit
-      })
-    })
-
-    it('should classify it consistently with the canonical guard, which also accepts the 0X-prefixed signer', () => {
-      expect(() => assertSignatureParamsAreCanonical('eth_signTypedData_v4', params, signer)).not.toThrow()
-    })
-  })
-
-  describe('and the eth_signTypedData_v4 signer uses an uppercase 0X prefix with no signer address provided', () => {
-    let signer: string
-    let permit: string
-    let params: unknown[]
-
-    beforeEach(() => {
-      signer = '0x1234567890abcdef1234567890abcdef12345678'
-      permit = JSON.stringify({ primaryType: 'Permit', domain: {}, types: {}, message: { value: '1' } })
-      params = [`0X${signer.slice(2)}`, permit]
-    })
-
-    it('should still recognize the 0X value as the signer address and return the typed data', () => {
-      expect(extractSignaturePayload('eth_signTypedData_v4', params)).toEqual({
-        kind: 'typedData',
-        typedData: JSON.parse(permit),
-        raw: permit
-      })
-    })
-  })
-
-  describe('and the method is personal_sign with an uppercase 0X hex-encoded message', () => {
-    let signer: string
-
-    beforeEach(() => {
-      signer = '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd'
-    })
-
-    it('should decode the 0X-prefixed hex message to its UTF-8 text', () => {
-      expect(extractSignaturePayload('personal_sign', ['0X48656c6c6f', signer], signer)).toEqual({ kind: 'message', message: 'Hello' })
-    })
-  })
-
-  describe('and the typed data is passed as an object instead of a JSON string', () => {
-    let signer: string
-    let typedData: Record<string, unknown>
-    let params: unknown[]
-
-    beforeEach(() => {
-      signer = '0x1234567890abcdef1234567890abcdef12345678'
-      // Some providers pass the typed data as an object rather than a JSON string.
-      typedData = { primaryType: 'Permit', domain: { chainId: 1 }, types: {}, message: { value: '1' } }
-      params = [signer, typedData]
-    })
-
-    it('should classify the object as the typed data and serialize it into raw', () => {
-      expect(extractSignaturePayload('eth_signTypedData_v4', params, signer)).toEqual({
-        kind: 'typedData',
-        typedData,
-        raw: JSON.stringify(typedData, null, 2)
-      })
-    })
-  })
-
-  describe('and the method is eth_signTypedData_v3', () => {
-    let signer: string
-    let json: string
-    let params: unknown[]
-
-    beforeEach(() => {
-      signer = '0x1234567890abcdef1234567890abcdef12345678'
-      json = JSON.stringify({ primaryType: 'Permit', domain: { chainId: 1 }, types: {}, message: { value: '1' } })
-      params = [signer, json]
-    })
-
-    it('should parse the typed data the same way as v4', () => {
-      expect(extractSignaturePayload('eth_signTypedData_v3', params, signer)).toEqual({
-        kind: 'typedData',
-        typedData: JSON.parse(json),
-        raw: json
-      })
-    })
-  })
-})
-
-describe('when testing decodeMetaTransactionTypedData', () => {
-  let method: string
-
-  beforeEach(() => {
-    method = 'eth_signTypedData_v4'
-  })
-
-  afterEach(() => {
-    jest.mocked(isMetaTransactionTypedData).mockReset()
-    jest.mocked(resolveMetaTransactionTypedData).mockReset()
-  })
-
-  describe('and the typed data is a meta-transaction', () => {
-    let typedData: any
-    let resolved: ReturnType<typeof resolveMetaTransactionTypedData>
-
-    beforeEach(() => {
-      typedData = { primaryType: 'MetaTransaction', types: {}, domain: {}, message: {} }
-      resolved = {
-        calldataField: 'functionData',
-        calldata: '0xa9059cbb',
-        from: '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd',
-        verifyingContract: '0xfef5c99885c3036e591b6e6db52482891834a5f4',
-        chainId: 137
-      }
-      jest.mocked(isMetaTransactionTypedData).mockReturnValueOnce(true)
-      jest.mocked(resolveMetaTransactionTypedData).mockReturnValueOnce(resolved)
-    })
-
-    it('should return the inner call the signed struct declares', () => {
-      expect(decodeMetaTransactionTypedData(typedData, method)).toEqual(resolved)
-    })
-
-    it('should resolve the typed data for the request method so a rejection names it', () => {
-      decodeMetaTransactionTypedData(typedData, method)
-      expect(resolveMetaTransactionTypedData).toHaveBeenCalledWith(typedData, method)
-    })
-  })
-
-  describe('and the typed data is a meta-transaction shaped in a way no Decentraland contract signs', () => {
-    let typedData: any
-    let error: MalformedSignatureRequestError
-
-    beforeEach(() => {
-      typedData = { primaryType: 'MetaTransaction', types: {}, domain: {}, message: {} }
-      error = new MalformedSignatureRequestError(
-        'eth_signTypedData_v4',
-        'the MetaTransaction struct is not one a Decentraland contract signs'
-      )
-      jest.mocked(isMetaTransactionTypedData).mockReturnValueOnce(true)
-      jest.mocked(resolveMetaTransactionTypedData).mockImplementationOnce(() => {
-        throw error
-      })
-    })
-
-    it('should throw the resolver rejection instead of returning null', () => {
-      expect(() => decodeMetaTransactionTypedData(typedData, method)).toThrow(error)
-    })
-  })
-
-  describe('and the typed data is not a meta-transaction', () => {
-    let typedData: any
-
-    beforeEach(() => {
-      typedData = { primaryType: 'Order', domain: {}, message: {} }
-      jest.mocked(isMetaTransactionTypedData).mockReturnValueOnce(false)
-    })
-
-    it('should return null', () => {
-      expect(decodeMetaTransactionTypedData(typedData, method)).toBeNull()
-    })
-
-    it('should not try to resolve it', () => {
-      decodeMetaTransactionTypedData(typedData, method)
-      expect(resolveMetaTransactionTypedData).not.toHaveBeenCalled()
-    })
-  })
-
-  describe('and the typed data is undefined', () => {
-    beforeEach(() => {
-      jest.mocked(isMetaTransactionTypedData).mockReturnValueOnce(false)
-    })
-
-    it('should return null', () => {
-      expect(decodeMetaTransactionTypedData(undefined, method)).toBeNull()
-    })
-  })
-})
-
-describe('when testing isApprovalGrantingTypedData', () => {
-  describe.each([
-    'Permit',
-    'PermitSingle',
-    'PermitBatch',
-    'PermitTransferFrom',
-    'PermitBatchTransferFrom',
-    'PermitWitnessTransferFrom',
-    'PermitBatchWitnessTransferFrom',
-    'PermitForAll',
-    'TransferWithAuthorization',
-    'ReceiveWithAuthorization',
-    'OrderComponents',
-    'BulkOrder',
-    'Trade',
-    'Order',
-    'MakerOrder'
-  ])('and the typed data primaryType is the approval-granting type %s', primaryType => {
-    it('should return true', () => {
-      expect(isApprovalGrantingTypedData({ primaryType } as any)).toBe(true)
-    })
-  })
-
-  describe('and the primaryType casing differs', () => {
-    it('should still match case-insensitively', () => {
-      expect(isApprovalGrantingTypedData({ primaryType: 'PERMIT' } as any)).toBe(true)
-    })
-  })
-
-  describe('and the typed data is a benign primaryType', () => {
-    it('should return false', () => {
-      expect(isApprovalGrantingTypedData({ primaryType: 'Mail' } as any)).toBe(false)
-    })
-  })
-
-  describe('and the typed data is a Decentraland MetaTransaction', () => {
-    it('should return false because meta-transactions are handled separately', () => {
-      expect(isApprovalGrantingTypedData({ primaryType: 'MetaTransaction' } as any)).toBe(false)
-    })
-  })
-
-  describe('and the typed data is undefined', () => {
-    it('should return false', () => {
-      expect(isApprovalGrantingTypedData(undefined)).toBe(false)
-    })
-  })
-})
-
-describe('when testing isKnownDecentralandContractOnChain', () => {
-  const manaOnPolygon = '0xa1c57f48f0deb89f569dfbe6e2b7f46d33606fd4'
-  const manaOnMainnet = '0x0f5d2fb29fb7d3cfee444a200298f468908cc942'
-
-  beforeEach(() => {
-    jest.mocked(getContract).mockImplementation((_name, chainId) => {
-      if (Number(chainId) === 137) return { address: manaOnPolygon } as ReturnType<typeof getContract>
-      if (Number(chainId) === 1) return { address: manaOnMainnet } as ReturnType<typeof getContract>
-      throw new Error('not deployed')
-    })
-  })
-
-  afterEach(() => {
-    jest.mocked(getContract).mockReset()
-  })
-
-  describe('and the address is the deployment on the given chain', () => {
-    it('should return true', () => {
-      expect(isKnownDecentralandContractOnChain(manaOnPolygon.toUpperCase().replace('0X', '0x'), 137)).toBe(true)
-    })
-  })
-
-  describe('and the address is a Decentraland deployment on another chain only', () => {
-    it('should return false because recognition is per deployment', () => {
-      expect(isKnownDecentralandContractOnChain(manaOnPolygon, 1)).toBe(false)
-    })
-  })
-
-  describe('and no Decentraland contract is deployed on the chain', () => {
-    it('should return false', () => {
-      expect(isKnownDecentralandContractOnChain(manaOnPolygon, 5)).toBe(false)
-    })
-  })
-
-  describe('and the address is not a Decentraland contract anywhere', () => {
-    it('should return false', () => {
-      expect(isKnownDecentralandContractOnChain('0x000000000000000000000000000000000000dead', 137)).toBe(false)
-    })
-  })
-})
-
-describe('when testing isOpaqueSignatureMessage', () => {
-  describe.each([
-    ['a readable sentence', 'Sign in to Decentraland\nNonce: 1234'],
-    ['emoji and non-latin text', 'Bienvenido 👋 — 欢迎'],
-    [
-      'a long readable sign-in message',
-      'decentraland.org wants you to sign in with your Ethereum account.\n\nURI: https://decentraland.org\nVersion: 1'
-    ],
-    ['a short nonce-like token', 'nonce-1234'],
-    ['text with a non-breaking space', 'Sign\u00A0in to Decentraland today please'],
-    ['a URL with a scheme', 'https://decentraland.org/auth/requests/abc'],
-    ['31 characters with no whitespace', 'a'.repeat(31)],
-    // By design: a hash embedded in an otherwise-readable, multi-line message does not make the
-    // whole message opaque — the user still sees the surrounding text. The specific sign-in
-    // delegation structure is blocked separately by assertRequestIsNotImpersonatingSignIn.
-    [
-      'readable text with a hash on a separate line (the whole message is not a token, so the user sees it)',
-      'Sign in to Decentraland\ne3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
-    ]
-  ])('and the message is %s', (_label, message) => {
-    it('should return false', () => {
-      expect(isOpaqueSignatureMessage(message)).toBe(false)
-    })
-  })
-
-  describe.each([
-    ['still raw hex', `0x${'ab'.repeat(32)}`],
-    ['bytes that are not text', 'abc\u0000\u0007def'],
-    ['the replacement character left by invalid UTF-8', 'abc\uFFFDdef'],
-    ['a C1 control character', 'authorize\u0085withdrawal'],
-    ['the last C1 control character', 'abc\u009Fdef'],
-    ['a zero-width space', 'abc\u200Bdef'],
-    ['a bidi override', 'abc\u202Edef'],
-    ['a byte order mark', '\uFEFFabc'],
-    ['a private-use code point', 'abc\uE000def'],
-    ['an unassigned code point', 'abc\u0378def'],
-    ['a line separator', 'abc\u2028def'],
-    ['32 printable bytes with no whitespace', 'a'.repeat(32)],
-    ['32 printable bytes that include a space', `${'a'.repeat(15)} ${'b'.repeat(16)}`],
-    ['32 printable bytes that include a newline', `${'a'.repeat(31)}\n`],
-    ['32 bytes of multibyte characters', 'é'.repeat(16)],
-    ['a 32-byte sentence with spaces', 'Sign in to Decentraland today!!!'],
-    ['a 64-character unprefixed hex digest', 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'],
-    ['a base64 digest', '47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU='],
-    ['a base64url digest', '47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU'],
-    ['a UUID', '0f8fad5b-d9cb-469f-a165-70867728950e'],
-    ['a JWT-like token', 'eyJhbGciOiJIUzI1NiJ9.eyJhY3Rpb24iOiJ3aXRoZHJhdyJ9.dGhpcy1pcy1ub3QtYS1yZWFsLXNpZ25hdHVyZQ'],
-    ['a token surrounded by whitespace', `  ${'A'.repeat(40)}\n`]
-  ])('and the message is %s', (_label, message) => {
-    it('should return true because the user cannot check what it means', () => {
-      expect(isOpaqueSignatureMessage(message)).toBe(true)
-    })
-  })
-
-  describe('and the request carried hex-encoded bytes that decode to a C1 control character', () => {
-    let message: string
-
-    beforeEach(() => {
-      const toHex = (text: string) =>
-        Array.from(new TextEncoder().encode(text))
-          .map(byte => byte.toString(16).padStart(2, '0'))
-          .join('')
-      // "authorize" + U+0085 (bytes C2 85) + "withdrawal", as a wallet would decode it.
-      const payload = extractSignaturePayload('personal_sign', [
-        `0x${toHex('authorize')}c285${toHex('withdrawal')}`,
-        '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd'
-      ])
-      message = payload?.kind === 'message' ? payload.message : ''
-    })
-
-    it('should return true because the control character is invisible to the user', () => {
-      expect(message).toBe('authorize\u0085withdrawal')
-      expect(isOpaqueSignatureMessage(message)).toBe(true)
-    })
-  })
-
-  describe('and the request carried 32 hex-encoded bytes that all decode to printable characters', () => {
-    let message: string
-
-    beforeEach(() => {
-      const payload = extractSignaturePayload('personal_sign', [`0x${'61'.repeat(32)}`, '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd'])
-      message = payload?.kind === 'message' ? payload.message : ''
-    })
-
-    it('should return true because a digest-sized payload is a hash, however it arrived', () => {
-      expect(isOpaqueSignatureMessage(message)).toBe(true)
-    })
-  })
-})
-
 describe('when testing buildSendTransactionSimulationPayload', () => {
   const signerAddress = '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd'
-
-  afterEach(() => {
-    jest.resetAllMocks()
-  })
+  const contract: KnownContract = {
+    name: 'MANAToken' as KnownContract['name'],
+    address: '0xa1c57f48f0deb89f569dfbe6e2b7f46d33606fd4',
+    chainId: 137,
+    abi: [],
+    domainName: '(PoS) Decentraland MANA',
+    domainVersion: '1',
+    supportsMetaTransactions: true,
+    calldataField: 'functionSignature'
+  }
+  let transaction: Extract<RequestClassification, { kind: 'dcl_transaction' }>
 
   describe('and the transaction will be relayed as a meta-transaction', () => {
-    let txParams: Record<string, unknown>
-
     beforeEach(() => {
-      ;(config.get as jest.Mock).mockReturnValue('production')
-      txParams = { to: '0xfef5c99885c3036e591b6e6db52482891834a5f4', data: '0xa9059cbb', value: '0x0' }
+      transaction = {
+        kind: 'dcl_transaction',
+        contract,
+        call: { functionName: 'transfer', args: [], payable: false },
+        to: contract.address,
+        data: '0xa9059cbb',
+        value: '0x0',
+        chainId: 137,
+        relayed: true,
+        branded: 'tip'
+      }
     })
 
     it('should simulate on the meta-transaction chain', () => {
-      const result = buildSendTransactionSimulationPayload(txParams, signerAddress, 1, true)
-      expect(result?.chainId).toBe(ChainId.MATIC_MAINNET)
+      expect(buildSendTransactionSimulationPayload(transaction, signerAddress).chainId).toBe(ChainId.MATIC_MAINNET)
     })
 
     it('should preview the contract calling itself, as the relay makes the inner call', () => {
-      const result = buildSendTransactionSimulationPayload(txParams, signerAddress, 1, true)
-      expect(result).toMatchObject({ from: txParams.to, to: txParams.to })
+      expect(buildSendTransactionSimulationPayload(transaction, signerAddress)).toMatchObject({
+        from: contract.address,
+        to: contract.address
+      })
     })
 
     it('should append the connected signer to the calldata as the meta-transaction sender', () => {
-      const result = buildSendTransactionSimulationPayload(txParams, signerAddress, 1, true)
-      expect(result?.data).toBe(`0xa9059cbb${signerAddress.slice(2)}`)
-    })
-
-    it('should ignore a request-supplied from address and always append the connected signer', () => {
-      const attackerControlledFrom = '0x000000000000000000000000000000000000dead'
-      const result = buildSendTransactionSimulationPayload({ ...txParams, from: attackerControlledFrom }, signerAddress, 1, true)
-      expect(result?.data).toBe(`0xa9059cbb${signerAddress.slice(2)}`)
+      expect(buildSendTransactionSimulationPayload(transaction, signerAddress).data).toBe(`0xa9059cbb${signerAddress.slice(2)}`)
     })
 
     it('should preview without value because the relay forwards none', () => {
-      const result = buildSendTransactionSimulationPayload({ ...txParams, value: '0x10' }, signerAddress, 1, true)
-      expect(result?.value).toBe('0')
+      expect(buildSendTransactionSimulationPayload(transaction, signerAddress).value).toBe('0')
     })
   })
 
-  describe('and the transaction will not be relayed as a meta-transaction', () => {
-    let txParams: Record<string, unknown>
-
+  describe('and the transaction is sent by the wallet on the connected chain', () => {
     beforeEach(() => {
-      txParams = { to: '0x1111111111111111111111111111111111111111', data: '0x', value: '0x0' }
+      transaction = {
+        kind: 'dcl_transaction',
+        contract: { ...contract, chainId: 1 },
+        call: { functionName: 'approve', args: [], payable: false },
+        to: contract.address,
+        data: '0x095ea7b3',
+        value: '0x0',
+        chainId: 1,
+        relayed: false,
+        branded: null
+      }
     })
 
-    it('should simulate on the connected chain', () => {
-      const result = buildSendTransactionSimulationPayload(txParams, signerAddress, 1, false)
-      expect(result?.chainId).toBe(1)
-    })
-
-    it('should simulate as the connected signer with the request value, since the wallet sends it as is', () => {
-      const result = buildSendTransactionSimulationPayload({ ...txParams, value: '0x10' }, signerAddress, 1, false)
-      expect(result).toMatchObject({ from: signerAddress, to: txParams.to, data: '0x', value: '0x10' })
-    })
-
-    it.each([
-      ['a hex value', '0x3e8', '0x3e8'],
-      ['a decimal value', '1000', '0x3e8']
-    ])('should hand the preview %s as the same hex quantity the wallet is dispatched', (_label, value, expected) => {
-      // The guard accepts both forms, and the wallet is handed the canonical hex (see
-      // buildTransactionParams). The preview must read that same quantity, or the simulated amount
-      // would diverge from what the wallet actually sends.
-      const result = buildSendTransactionSimulationPayload({ ...txParams, value }, signerAddress, 1, false)
-      expect(result?.value).toBe(expected)
-    })
-  })
-
-  describe('and the transaction has no to address', () => {
-    it('should return null', () => {
-      expect(buildSendTransactionSimulationPayload({ data: '0x' }, signerAddress, 1, false)).toBeNull()
-    })
-  })
-
-  describe('and the transaction carries calldata outside the data field', () => {
-    it.each(['input', 'extraCallData'])('should return null for %s so the preview is unavailable', field => {
-      const txParams = { to: '0x1111111111111111111111111111111111111111', data: '0x', value: '0x0', [field]: '0xa9059cbb' }
-      expect(buildSendTransactionSimulationPayload(txParams, signerAddress, 1, false)).toBeNull()
+    it('should simulate on the connected chain as the connected signer with the reviewed fields', () => {
+      expect(buildSendTransactionSimulationPayload(transaction, signerAddress)).toEqual({
+        chainId: 1,
+        from: signerAddress,
+        to: contract.address,
+        data: '0x095ea7b3',
+        value: '0x0'
+      })
     })
   })
 })

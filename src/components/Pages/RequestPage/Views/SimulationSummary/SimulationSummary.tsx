@@ -374,6 +374,8 @@ export const SimulationSummary = ({
     <GasFooter>
       {gas.covered ? (
         <GasNote>{t('request.transaction_dialog.gas_covered')}</GasNote>
+      ) : gas.unavailable ? (
+        <GasNote>{t('request.unverified.fact_fee_unavailable')}</GasNote>
       ) : (
         <>
           <GasNote>{t('request.transaction_dialog.transaction_cost', { cost: gas.cost })}</GasNote>

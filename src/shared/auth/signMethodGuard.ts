@@ -1,7 +1,6 @@
 import { hexToString } from 'viem'
 import { ADDRESS_REGEX } from './address'
 import { ImpersonatedSignInError, MalformedSignatureRequestError, MalformedTransactionRequestError, UnsupportedMethodError } from './errors'
-import { isMetaTransactionTypedData, resolveMetaTransactionTypedData } from './metaTransactionTypedData'
 
 // The only methods the auth site is willing to forward to the connected wallet. Anything
 // outside this set is rejected at recover time (see {@link assertMethodIsAllowed}).
@@ -177,10 +176,10 @@ function hasPrimaryType(typedData: unknown): boolean {
  * request it can sign must not be turned away for a quirk the review cannot render. The request page
  * runs that review (resolveTypedDataReview) for web2 wallets only, where this site is the confirmation.
  *
- * A typed-data MetaTransaction is additionally held to the exact struct, message and domain a
- * Decentraland contract signs (see {@link resolveMetaTransactionTypedData}): its preview simulates
- * the inner call, and EIP-712 signs only the fields the struct declares, so a looser shape could
- * simulate one call while the signature covers another.
+ * The shape of the typed data itself is not judged here. Whether it is a Decentraland
+ * MetaTransaction the page can preview, or anything else, is decided by the request classifier:
+ * a struct that does not match what a Decentraland contract signs is shown as an unverified
+ * signature rather than rejected, since nothing is previewed for it that could diverge.
  */
 function assertSignatureParamsAreCanonical(method: string, params: unknown[] | undefined, signerAddress: string): void {
   const normalizedMethod = method.toLowerCase()
@@ -204,10 +203,6 @@ function assertSignatureParamsAreCanonical(method: string, params: unknown[] | u
   const typedData = parseTypedData(second)
   if (!isSigner(first, signer) || !hasPrimaryType(typedData)) {
     throw new MalformedSignatureRequestError(method)
-  }
-  if (isMetaTransactionTypedData(typedData)) {
-    // Validation only: the request page resolves the call again when it simulates.
-    resolveMetaTransactionTypedData(typedData, method)
   }
 }
 

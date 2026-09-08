@@ -172,7 +172,7 @@ test.describe('Error: user denies a wallet interaction', () => {
 
     await page.goto(`/auth/requests/${MOCK_REQUEST_ID}?loginMethod=METAMASK`)
 
-    await page.locator('[data-testid="wallet-interaction-deny-button"]').click({ timeout: 20_000 })
+    await page.locator('[data-testid="unverified-deny-button"]').click({ timeout: 20_000 })
 
     // Should show denied state — NOT the completion view
     await expect(page.getByText(/Wallet interaction complete/i)).not.toBeVisible()

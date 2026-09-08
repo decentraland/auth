@@ -209,7 +209,7 @@ describe('createAuthServerClient', () => {
       })
     })
 
-    describe('when a typed-data request is a MetaTransaction carrying an undeclared second call', () => {
+    describe('when a typed-data request is a MetaTransaction carrying an undeclared second call (no longer rejected at recover)', () => {
       beforeEach(() => {
         mockResponse.method = 'eth_signTypedData_v4'
         mockResponse.params = [
@@ -244,8 +244,8 @@ describe('createAuthServerClient', () => {
         })
       })
 
-      it('should throw a MalformedSignatureRequestError because the preview would simulate a call the wallet does not sign', async () => {
-        await expect(client.recover(mockRequestId, mockSignerAddress)).rejects.toBeInstanceOf(MalformedSignatureRequestError)
+      it('should recover the request, leaving the classifier to show the malformed MetaTransaction as unverified', async () => {
+        await expect(client.recover(mockRequestId, mockSignerAddress)).resolves.toEqual(mockResponse)
       })
     })
 

@@ -109,7 +109,23 @@ class SimulationUnavailableError extends Error {
   }
 }
 
+/**
+ * Thrown when classifying an eth_sendTransaction needs to know whether its target is a Decentraland
+ * wearable collection and the transactions-server could not answer (timeout, network error). The
+ * page shows a retryable error instead of a review: reading "unavailable" as "not Decentraland"
+ * would send Polygon calldata as a plain transaction on whatever chain the wallet is on. The
+ * request is left unanswered so a retry can review it.
+ */
+class ContractLookupUnavailableError extends Error {
+  readonly skipReporting = true
+  constructor(public readonly address: string) {
+    super(`Could not verify whether ${address} is a Decentraland contract`)
+    this.name = 'ContractLookupUnavailableError'
+  }
+}
+
 export {
+  ContractLookupUnavailableError,
   DifferentSenderError,
   ExpiredRequestError,
   RequestNotFoundError,

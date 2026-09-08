@@ -1,31 +1,27 @@
-import { MetaTransactionContractTrust, SignaturePayload, SimulationState, UnverifiableSignatureReason } from '../../types'
+import { SimulationState } from '../../types'
 
+/** The review of a Decentraland MetaTransaction signature: the decoded inner call and its simulation. */
 export interface SignatureRequestViewProps {
   requestId: string
   method: string
-  payload: SignaturePayload | null
+  /** The typed data exactly as the request sent it, shown behind the raw toggle. */
+  raw: string
+  /** The Decentraland contract that verifies the signature and executes the call (lowercased). */
+  verifyingContract: string
+  /** The function the inner calldata decodes to against the contract's ABI. */
+  functionName: string
+  /** The Decentraland contract, as the registry names it. */
+  contractName: string
   simulation: SimulationState
   userAddress: string
   /** Resolved counterparty display names keyed by lowercased address. */
   profiles?: Record<string, string>
   /** Lowercased addresses recognized as verified Decentraland contracts. */
   verifiedContracts?: string[]
-  /** Chain used for block-explorer links (falls back to the typed-data domain chainId). */
+  /** Chain the meta-transaction is bound to, used for block-explorer links. */
   chainId?: number
-  /** When true, gates approval behind a high-risk acknowledgment checkbox. */
+  /** When true, gates approval behind an acknowledgment checkbox. */
   requiresAcknowledgment?: boolean
-  isMetaTransaction: boolean
-  /**
-   * For a meta-transaction, whether its verifying contract is a recognized Decentraland contract.
-   * Approval stays disabled while `pending`; `unconfirmed` adds a warning and reuses the unverified
-   * acknowledgment wording. Recognition never relaxes anything.
-   */
-  contractTrust?: MetaTransactionContractTrust
-  /**
-   * Set when Auth cannot tell what the signature authorizes (an unrecognized typed-data struct, or
-   * a message that is not readable text). Shows a notice and uses the unverified acknowledgment.
-   */
-  unverifiableReason?: UnverifiableSignatureReason | null
   isLoading?: boolean
   onDeny: () => void
   onApprove: () => void
