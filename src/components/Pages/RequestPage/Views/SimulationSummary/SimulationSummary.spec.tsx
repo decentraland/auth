@@ -880,9 +880,35 @@ describe('when rendering the SimulationSummary', () => {
       expect(screen.getByText(/gas_covered/)).toBeInTheDocument()
     })
 
-    it('should render the transaction cost when the user pays gas', () => {
-      render(<SimulationSummary simulation={simulation} userAddress={USER} gas={{ covered: false, cost: '0.0025', balance: '1.5' }} />)
-      expect(screen.getByText(/transaction_cost 0.0025/)).toBeInTheDocument()
+    it('should render the transaction cost and the balance in the currency of the chain the call runs on', () => {
+      render(
+        <SimulationSummary
+          simulation={simulation}
+          userAddress={USER}
+          chainId={137}
+          gas={{ covered: false, cost: '0.0025', balance: '1.5' }}
+        />
+      )
+      expect(screen.getByText('request.transaction_dialog.transaction_cost 0.0025 POL')).toBeInTheDocument()
+      expect(screen.getByText('request.transaction_dialog.your_balance 1.5 POL')).toBeInTheDocument()
+    })
+
+    it('should name the currency generically on a chain the page does not know', () => {
+      render(
+        <SimulationSummary
+          simulation={simulation}
+          userAddress={USER}
+          chainId={999}
+          gas={{ covered: false, cost: '0.0025', balance: '1.5' }}
+        />
+      )
+      expect(screen.getByText('request.transaction_dialog.transaction_cost 0.0025 request.unverified.native_currency')).toBeInTheDocument()
+    })
+
+    it('should leave the balance out when the wallet could not report it', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} chainId={137} gas={{ covered: false, cost: '0.0025' }} />)
+      expect(screen.getByText('request.transaction_dialog.transaction_cost 0.0025 POL')).toBeInTheDocument()
+      expect(screen.queryByText(/your_balance/)).not.toBeInTheDocument()
     })
   })
 

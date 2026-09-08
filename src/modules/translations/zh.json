@@ -71,8 +71,8 @@
     },
     "transaction_dialog": {
       "title": "确认交易",
-      "transaction_cost": "交易费用：{cost} ETH",
-      "your_balance": "您的余额：{balance} ETH",
+      "transaction_cost": "交易费用：{cost} {symbol}",
+      "your_balance": "您的余额：{balance} {symbol}",
       "simulation_loading": "正在检查此交易将执行的操作…",
       "details_unavailable": "此交易暂无预览。只有在您信任该场景时才继续。",
       "you_send": "您发送",
@@ -153,6 +153,7 @@
       "tab_advanced": "高级",
       "advanced_hint_transaction": "这正是您的钱包将要发送的内容。",
       "advanced_hint_signature": "这正是您的钱包将要签署的内容。",
+      "advanced_hint_typed_data": "这是您的钱包将读取的类型化数据。它只签署类型中声明的字段。",
       "raw_to": "接收地址",
       "raw_value": "数值",
       "raw_data": "数据",

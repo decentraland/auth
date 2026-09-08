@@ -8,6 +8,12 @@ type SupportedChain = {
   explorerName: string
   /** Base URL of the block explorer, without a trailing slash. */
   explorerBaseUrl: string
+  /**
+   * Whether Decentraland's contracts on this chain execute meta-transactions through the relay. Only the
+   * Polygon chains do; the registry hands out the same ABI for a contract on every chain it is deployed on,
+   * so an `executeMetaTransaction` entry alone does not say the deployment has one.
+   */
+  relaysMetaTransactions: boolean
 }
 
 /**
@@ -16,10 +22,46 @@ type SupportedChain = {
  * be previewable but unnamed, or named but not indexed.
  */
 const SUPPORTED_CHAINS: ReadonlyMap<number, SupportedChain> = new Map([
-  [1, { name: 'Ethereum', nativeSymbol: 'ETH', explorerName: 'Etherscan', explorerBaseUrl: 'https://etherscan.io' }],
-  [11155111, { name: 'Ethereum Sepolia', nativeSymbol: 'ETH', explorerName: 'Etherscan', explorerBaseUrl: 'https://sepolia.etherscan.io' }],
-  [137, { name: 'Polygon', nativeSymbol: 'POL', explorerName: 'Polygonscan', explorerBaseUrl: 'https://polygonscan.com' }],
-  [80002, { name: 'Polygon Amoy', nativeSymbol: 'POL', explorerName: 'Polygonscan', explorerBaseUrl: 'https://amoy.polygonscan.com' }]
+  [
+    1,
+    {
+      name: 'Ethereum',
+      nativeSymbol: 'ETH',
+      explorerName: 'Etherscan',
+      explorerBaseUrl: 'https://etherscan.io',
+      relaysMetaTransactions: false
+    }
+  ],
+  [
+    11155111,
+    {
+      name: 'Ethereum Sepolia',
+      nativeSymbol: 'ETH',
+      explorerName: 'Etherscan',
+      explorerBaseUrl: 'https://sepolia.etherscan.io',
+      relaysMetaTransactions: false
+    }
+  ],
+  [
+    137,
+    {
+      name: 'Polygon',
+      nativeSymbol: 'POL',
+      explorerName: 'Polygonscan',
+      explorerBaseUrl: 'https://polygonscan.com',
+      relaysMetaTransactions: true
+    }
+  ],
+  [
+    80002,
+    {
+      name: 'Polygon Amoy',
+      nativeSymbol: 'POL',
+      explorerName: 'Polygonscan',
+      explorerBaseUrl: 'https://amoy.polygonscan.com',
+      relaysMetaTransactions: true
+    }
+  ]
 ])
 
 const SUPPORTED_CHAIN_IDS: readonly number[] = [...SUPPORTED_CHAINS.keys()]

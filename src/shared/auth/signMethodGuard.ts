@@ -174,8 +174,9 @@ function hasPrimaryType(typedData: unknown): boolean {
  * Typed data must be `[signer, typedData]`; personal_sign must be `[message, signer]`.
  * The shape of the typed data itself is not judged here. Whether it is a Decentraland
  * MetaTransaction the page can preview, or anything else, is decided by the request classifier:
- * a struct that does not match what a Decentraland contract signs is shown as an unverified
- * signature rather than rejected, since nothing is previewed for it that could diverge.
+ * a MetaTransaction that deviates from what a Decentraland contract signs is rejected there when
+ * it names a Decentraland contract, and shown as an unverified signature when it names one
+ * Decentraland does not recognize, since nothing is previewed for it that could diverge.
  */
 function assertSignatureParamsAreCanonical(method: string, params: unknown[] | undefined, signerAddress: string): void {
   const normalizedMethod = method.toLowerCase()

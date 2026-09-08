@@ -5,7 +5,7 @@ type WalletInteractionGas =
   | { covered: true }
   | { covered: false; status: 'loading' }
   | { covered: false; status: 'unavailable' }
-  | { covered: false; status: 'ready'; cost: bigint; balance: bigint }
+  | { covered: false; status: 'ready'; cost: bigint; balance?: bigint }
 
 interface WalletInteractionProps {
   requestId: string

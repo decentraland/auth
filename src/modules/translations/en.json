@@ -71,8 +71,8 @@
     },
     "transaction_dialog": {
       "title": "Confirm Transaction",
-      "transaction_cost": "Transaction cost: {cost} ETH",
-      "your_balance": "Your balance: {balance} ETH",
+      "transaction_cost": "Transaction cost: {cost} {symbol}",
+      "your_balance": "Your balance: {balance} {symbol}",
       "simulation_loading": "Checking what this transaction will do…",
       "details_unavailable": "A preview of this transaction isn't available. Only continue if you trust the scene.",
       "you_send": "You send",
@@ -153,6 +153,7 @@
       "tab_advanced": "Advanced",
       "advanced_hint_transaction": "This is exactly what your wallet will send.",
       "advanced_hint_signature": "This is exactly what your wallet will sign.",
+      "advanced_hint_typed_data": "This is the typed data as your wallet will read it. It signs only the fields the types declare.",
       "raw_to": "To",
       "raw_value": "Value",
       "raw_data": "Data",

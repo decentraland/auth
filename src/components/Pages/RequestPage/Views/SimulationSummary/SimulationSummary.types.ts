@@ -11,12 +11,13 @@ export interface SimulationSummaryProps {
   chainId?: number
   /**
    * Optional gas footer, grouped inside the summary. Only transaction reviews pass it; signature
-   * previews (which are gasless) omit it. `cost`/`balance` are pre-formatted ETH strings.
+   * previews (which are gasless) omit it. `cost`/`balance` are pre-formatted amounts in the chain's
+   * native currency; the balance is omitted when the wallet could not report it.
    */
   gas?: {
     covered: boolean
     cost: string
-    balance: string
+    balance?: string
     /** True when the user pays gas but the wallet could not estimate it. */
     unavailable?: boolean
   }

@@ -59,7 +59,7 @@ export const WalletInteraction = ({
   const summaryGas = gas.covered
     ? { covered: true, cost: '0', balance: '0' }
     : gas.status === 'ready'
-      ? { covered: false, cost: formatEther(gas.cost), balance: formatEther(gas.balance) }
+      ? { covered: false, cost: formatEther(gas.cost), balance: gas.balance !== undefined ? formatEther(gas.balance) : undefined }
       : gas.status === 'unavailable'
         ? { covered: false, cost: '', balance: '', unavailable: true }
         : undefined

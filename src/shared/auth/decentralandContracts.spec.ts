@@ -75,6 +75,18 @@ describe('when looking up a known contract', () => {
     })
   })
 
+  describe('and the address is a Decentraland contract on a chain that does not relay meta-transactions', () => {
+    beforeEach(() => {
+      result = getKnownDecentralandContract(getContract(ContractName.MANAToken, ETHEREUM).address, ETHEREUM)
+    })
+
+    it('should report no meta-transaction support although the registry ABI declares executeMetaTransaction', () => {
+      expect(result).toEqual(
+        expect.objectContaining({ name: ContractName.MANAToken, chainId: ETHEREUM, supportsMetaTransactions: false, calldataField: null })
+      )
+    })
+  })
+
   describe('and the chain is not one the simulator supports', () => {
     beforeEach(() => {
       result = getKnownDecentralandContract(getContract(ContractName.MANAToken, POLYGON).address, 56)
@@ -266,8 +278,8 @@ describe('when decoding a call against a known contract', () => {
       decoded = decodeKnownContractCall(mana, transferData)
     })
 
-    it('should return the function name, its arguments and that it is not payable', () => {
-      expect(decoded).toEqual({ functionName: 'transfer', args: [getAddress(RECIPIENT), 1000n], payable: false })
+    it('should return the function name, its arguments and that it neither is payable nor forwards a call', () => {
+      expect(decoded).toEqual({ functionName: 'transfer', args: [getAddress(RECIPIENT), 1000n], payable: false, forwardsCall: false })
     })
   })
 
@@ -352,8 +364,22 @@ describe('when decoding a call against a known contract', () => {
       decoded = decodeKnownContractCall(mana, data)
     })
 
-    it('should decode it as payable', () => {
-      expect(decoded).toEqual(expect.objectContaining({ functionName: 'executeMetaTransaction', payable: true }))
+    it('should decode it as payable and as forwarding a call', () => {
+      expect(decoded).toEqual(expect.objectContaining({ functionName: 'executeMetaTransaction', payable: true, forwardsCall: true }))
+    })
+  })
+
+  describe('and the calldata is a non-payable call that forwards another call', () => {
+    beforeEach(() => {
+      const manager = getKnownDecentralandContract(getContract(ContractName.CollectionManager, POLYGON).address, POLYGON)!
+      decoded = decodeKnownContractCall(
+        manager,
+        encodeFunctionData({ abi: manager.abi, functionName: 'manageCollection', args: [RECIPIENT, RECIPIENT, transferData] })
+      )
+    })
+
+    it('should decode it as forwarding a call although it is not payable', () => {
+      expect(decoded).toEqual(expect.objectContaining({ functionName: 'manageCollection', payable: false, forwardsCall: true }))
     })
   })
 
@@ -364,7 +390,12 @@ describe('when decoding a call against a known contract', () => {
     })
 
     it('should decode it with three arguments', () => {
-      expect(decoded).toEqual({ functionName: 'safeTransferFrom', args: [getAddress(USER), getAddress(RECIPIENT), 7n], payable: false })
+      expect(decoded).toEqual({
+        functionName: 'safeTransferFrom',
+        args: [getAddress(USER), getAddress(RECIPIENT), 7n],
+        payable: false,
+        forwardsCall: false
+      })
     })
   })
 
@@ -378,7 +409,8 @@ describe('when decoding a call against a known contract', () => {
       expect(decoded).toEqual({
         functionName: 'safeTransferFrom',
         args: [getAddress(USER), getAddress(RECIPIENT), 7n, '0x1234'],
-        payable: false
+        payable: false,
+        forwardsCall: false
       })
     })
   })

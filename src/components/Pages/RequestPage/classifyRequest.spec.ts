@@ -5,6 +5,8 @@ import {
   ContractLookupUnavailableError,
   ContractResolution,
   KnownContract,
+  MalformedSignatureRequestError,
+  MalformedTransactionRequestError,
   RecoverResponse,
   getCollectionContract,
   getKnownDecentralandContract,
@@ -88,7 +90,7 @@ describe('when classifying a request', () => {
   describe('and it is a transaction', () => {
     describe('and the target is a Decentraland contract on the meta-transaction chain that supports meta-transactions', () => {
       beforeEach(async () => {
-        resolveContract.mockResolvedValueOnce(found(polygonMana))
+        resolveContract.mockResolvedValueOnce(notFound).mockResolvedValueOnce(found(polygonMana))
         context.connectedChainId = ETHEREUM
         classification = await classifyRequest(
           transactionRequest({ to: polygonMana.address, data: approveCalldata, value: '0x0' }),
@@ -108,9 +110,9 @@ describe('when classifying a request', () => {
         )
       })
 
-      it('should only resolve the target on the meta-transaction chain', () => {
-        expect(resolveContract).toHaveBeenCalledTimes(1)
-        expect(resolveContract).toHaveBeenCalledWith(polygonMana.address, POLYGON)
+      it('should resolve the target on the connected chain before the meta-transaction chain', () => {
+        expect(resolveContract).toHaveBeenNthCalledWith(1, polygonMana.address, ETHEREUM)
+        expect(resolveContract).toHaveBeenNthCalledWith(2, polygonMana.address, POLYGON)
       })
     })
 
@@ -141,53 +143,75 @@ describe('when classifying a request', () => {
     })
 
     describe('and the Decentraland call carries a value', () => {
-      beforeEach(async () => {
+      let request: RecoverResponse
+
+      beforeEach(() => {
         resolveContract.mockResolvedValueOnce(found(polygonMana))
-        classification = await classifyRequest(
-          transactionRequest({ to: polygonMana.address, data: approveCalldata, value: '0x1' }),
-          context
-        )
+        request = transactionRequest({ to: polygonMana.address, data: approveCalldata, value: '0x1' })
       })
 
-      it('should classify it as an unknown transaction on the connected chain', () => {
-        expect(classification).toEqual({
-          kind: 'unknown_transaction',
-          to: polygonMana.address,
-          data: approveCalldata,
-          value: '0x1',
-          chainId: POLYGON,
-          reason: 'value_attached'
-        })
+      it('should refuse it because a Decentraland call never carries one', async () => {
+        await expect(classifyRequest(request, context)).rejects.toThrow(MalformedTransactionRequestError)
+      })
+
+      it('should say why', async () => {
+        await expect(classifyRequest(request, context)).rejects.toThrow('cannot carry a value')
       })
     })
 
     describe('and the Decentraland call is executeMetaTransaction', () => {
-      beforeEach(async () => {
+      let request: RecoverResponse
+
+      beforeEach(() => {
         resolveContract.mockResolvedValueOnce(found(polygonMana))
         const data = encodeFunctionData({
           abi: polygonMana.abi,
           functionName: 'executeMetaTransaction',
           args: [USER, transferCalldata, `0x${'11'.repeat(32)}`, `0x${'22'.repeat(32)}`, 27]
         })
-        classification = await classifyRequest(transactionRequest({ to: polygonMana.address, data, value: '0x0' }), context)
+        request = transactionRequest({ to: polygonMana.address, data, value: '0x0' })
       })
 
-      it('should classify it as an unknown transaction because the call is payable', () => {
-        expect(classification).toEqual(expect.objectContaining({ kind: 'unknown_transaction', reason: 'payable_call' }))
+      it('should refuse it because the call forwards another call', async () => {
+        await expect(classifyRequest(request, context)).rejects.toThrow('forwards another call')
+      })
+    })
+
+    describe('and the Decentraland call is a non-payable forwarder', () => {
+      let request: RecoverResponse
+
+      beforeEach(() => {
+        const manager = getKnownDecentralandContract(getContract(ContractName.CollectionManager, POLYGON).address, POLYGON)!
+        resolveContract.mockResolvedValueOnce(found(manager))
+        const data = encodeFunctionData({
+          abi: manager.abi,
+          functionName: 'manageCollection',
+          args: [RECIPIENT, COLLECTION_ADDRESS, approveCalldata]
+        })
+        request = transactionRequest({ to: manager.address, data, value: '0x0' })
+      })
+
+      it('should refuse it because the decoded arguments do not say what runs', async () => {
+        await expect(classifyRequest(request, context)).rejects.toThrow(
+          'manageCollection on the Decentraland CollectionManager contract forwards another call'
+        )
       })
     })
 
     describe('and the calldata does not decode against the Decentraland ABI', () => {
-      beforeEach(async () => {
+      let request: RecoverResponse
+
+      beforeEach(() => {
         resolveContract.mockResolvedValueOnce(found(polygonMana))
-        classification = await classifyRequest(
-          transactionRequest({ to: polygonMana.address, data: `${approveCalldata}00`, value: '0x0' }),
-          context
-        )
+        request = transactionRequest({ to: polygonMana.address, data: `${approveCalldata}00`, value: '0x0' })
       })
 
-      it('should classify it as an unknown transaction', () => {
-        expect(classification).toEqual(expect.objectContaining({ kind: 'unknown_transaction', reason: 'undecodable_call' }))
+      it('should refuse it rather than show it as a call to an unknown contract', async () => {
+        await expect(classifyRequest(request, context)).rejects.toThrow(MalformedTransactionRequestError)
+      })
+
+      it('should name the contract the calldata does not fit', async () => {
+        await expect(classifyRequest(request, context)).rejects.toThrow('is not a call the Decentraland MANAToken contract declares')
       })
     })
 
@@ -214,7 +238,7 @@ describe('when classifying a request', () => {
 
       describe('and the wallet is on another chain', () => {
         beforeEach(async () => {
-          resolveContract.mockResolvedValueOnce(found(polygonBid)).mockResolvedValueOnce(notFound)
+          resolveContract.mockResolvedValueOnce(notFound).mockResolvedValueOnce(found(polygonBid))
           context.connectedChainId = ETHEREUM
           classification = await classifyRequest(transactionRequest({ to: polygonBid.address, data, value: '0x0' }), context)
         })
@@ -225,15 +249,15 @@ describe('when classifying a request', () => {
           )
         })
 
-        it('should resolve the target on the connected chain after the meta-transaction chain', () => {
-          expect(resolveContract).toHaveBeenNthCalledWith(2, polygonBid.address, ETHEREUM)
+        it('should resolve the target on the connected chain before the meta-transaction chain', () => {
+          expect(resolveContract).toHaveBeenNthCalledWith(1, polygonBid.address, ETHEREUM)
         })
       })
     })
 
-    describe('and the target is a Decentraland contract on the connected chain only', () => {
+    describe('and the target is a Decentraland contract on the connected chain', () => {
       beforeEach(async () => {
-        resolveContract.mockResolvedValueOnce(notFound).mockResolvedValueOnce(found(ethereumMana))
+        resolveContract.mockResolvedValueOnce(found(ethereumMana))
         context.connectedChainId = ETHEREUM
         const data = encodeFunctionData({ abi: ethereumMana.abi, functionName: 'approve', args: [RECIPIENT, 1000n] })
         classification = await classifyRequest(transactionRequest({ to: ethereumMana.address, data, value: '0x0' }), context)
@@ -241,6 +265,10 @@ describe('when classifying a request', () => {
 
       it('should classify it as a plain Decentraland transaction on that chain', () => {
         expect(classification).toEqual(expect.objectContaining({ kind: 'dcl_transaction', relayed: false, chainId: ETHEREUM }))
+      })
+
+      it('should not ask the meta-transaction chain, so the same address there can never re-target the send', () => {
+        expect(resolveContract).toHaveBeenCalledTimes(1)
       })
     })
 
@@ -267,7 +295,7 @@ describe('when classifying a request', () => {
       let request: RecoverResponse
 
       beforeEach(() => {
-        resolveContract.mockResolvedValueOnce(notFound).mockResolvedValueOnce(unavailable)
+        resolveContract.mockResolvedValueOnce(unavailable)
         context.connectedChainId = ETHEREUM
         request = transactionRequest({ to: UNKNOWN_CONTRACT, data: approveCalldata, value: '0x0' })
       })
@@ -393,7 +421,7 @@ describe('when classifying a request', () => {
         )
       })
 
-      it('should keep the typed data string verbatim as the raw payload', () => {
+      it('should hand the wallet the JSON of the parsed typed data as the raw payload', () => {
         expect(classification).toEqual(
           expect.objectContaining({ raw: JSON.stringify(buildMetaTransaction(polygonMana, transferCalldata)) })
         )
@@ -413,6 +441,24 @@ describe('when classifying a request', () => {
       })
     })
 
+    describe('and the typed data string gives a message field twice', () => {
+      let raw: string
+
+      beforeEach(async () => {
+        raw = '{"types":{"Permit":[]},"domain":{},"primaryType":"Permit","message":{"owner":"0xgood","owner":"0xevil"}}'
+        classification = await classifyRequest(typedDataRequest(raw), context)
+      })
+
+      it('should hand the wallet the JSON of what was parsed, with the field once and the value a wallet keeps', () => {
+        expect(classification).toEqual(
+          expect.objectContaining({
+            kind: 'unknown_typed_data',
+            raw: '{"types":{"Permit":[]},"domain":{},"primaryType":"Permit","message":{"owner":"0xevil"}}'
+          })
+        )
+      })
+    })
+
     describe('and the method is eth_signTypedData_v3', () => {
       beforeEach(async () => {
         resolveContract.mockResolvedValueOnce(found(polygonMana))
@@ -428,42 +474,142 @@ describe('when classifying a request', () => {
     })
 
     describe('and the message carries a field the struct does not declare', () => {
+      let request: RecoverResponse
+
+      beforeEach(() => {
+        const typedData = buildMetaTransaction(polygonMana, transferCalldata)
+        request = typedDataRequest({ ...typedData, message: { ...typedData.message, functionData: approveCalldata } })
+      })
+
+      describe('and the contract is a Decentraland one', () => {
+        beforeEach(() => {
+          resolveContract.mockResolvedValueOnce(found(polygonMana))
+        })
+
+        it('should refuse it because the signature would still verify on that contract', async () => {
+          await expect(classifyRequest(request, context)).rejects.toThrow(MalformedSignatureRequestError)
+        })
+      })
+
+      describe('and the contract is not a Decentraland one', () => {
+        beforeEach(async () => {
+          resolveContract.mockResolvedValueOnce(notFound)
+          classification = await classifyRequest(request, context)
+        })
+
+        it('should classify it as an unknown meta-transaction naming the claimed contract', () => {
+          expect(classification).toEqual(
+            expect.objectContaining({ kind: 'unknown_meta_transaction', reason: 'malformed', verifyingContract: polygonMana.address })
+          )
+        })
+      })
+    })
+
+    describe('and the types carry a struct the MetaTransaction does not reach', () => {
+      let request: RecoverResponse
+
+      beforeEach(() => {
+        resolveContract.mockResolvedValueOnce(found(polygonMana))
+        const typedData = buildMetaTransaction(polygonMana, transferCalldata)
+        request = typedDataRequest({ ...typedData, types: { ...typedData.types, Note: [{ name: 'text', type: 'string' }] } })
+      })
+
+      it('should refuse it because the extra struct is unsigned text riding along', async () => {
+        await expect(classifyRequest(request, context)).rejects.toThrow('carries more than the MetaTransaction')
+      })
+    })
+
+    describe('and the typed data carries a top-level field EIP-712 does not define', () => {
+      let request: RecoverResponse
+
+      beforeEach(() => {
+        resolveContract.mockResolvedValueOnce(found(polygonMana))
+        request = typedDataRequest({ ...buildMetaTransaction(polygonMana, transferCalldata), note: 'You pay nothing' })
+      })
+
+      it('should refuse it', async () => {
+        await expect(classifyRequest(request, context)).rejects.toThrow('carries more than the MetaTransaction')
+      })
+    })
+
+    describe('and the domain names a verifying contract that is not an address', () => {
       beforeEach(async () => {
         const typedData = buildMetaTransaction(polygonMana, transferCalldata)
         classification = await classifyRequest(
-          typedDataRequest({ ...typedData, message: { ...typedData.message, functionData: approveCalldata } }),
+          typedDataRequest({ ...typedData, domain: { ...typedData.domain, verifyingContract: 'Decentraland' } }),
           context
         )
       })
 
-      it('should classify it as an unknown meta-transaction rather than reject it', () => {
+      it('should classify it as an unknown meta-transaction without a target rather than show the text as the contract', () => {
         expect(classification).toEqual(
-          expect.objectContaining({ kind: 'unknown_meta_transaction', reason: 'malformed', verifyingContract: polygonMana.address })
+          expect.objectContaining({ kind: 'unknown_meta_transaction', reason: 'malformed', verifyingContract: null })
         )
+      })
+
+      it('should not resolve any contract', () => {
+        expect(resolveContract).not.toHaveBeenCalled()
       })
     })
 
     describe('and the domain names another chain', () => {
-      beforeEach(async () => {
-        classification = await classifyRequest(typedDataRequest(buildMetaTransaction(polygonMana, transferCalldata, AMOY)), context)
+      let request: RecoverResponse
+
+      beforeEach(() => {
+        request = typedDataRequest(buildMetaTransaction(polygonMana, transferCalldata, AMOY))
       })
 
-      it('should classify it as an unknown meta-transaction', () => {
-        expect(classification).toEqual(expect.objectContaining({ kind: 'unknown_meta_transaction', reason: 'other_chain', chainId: AMOY }))
+      describe('and the contract is a Decentraland one', () => {
+        beforeEach(() => {
+          resolveContract.mockResolvedValueOnce(found(polygonMana))
+        })
+
+        it('should refuse it', async () => {
+          await expect(classifyRequest(request, context)).rejects.toThrow('names a chain the relay does not serve')
+        })
+      })
+
+      describe('and the contract is not a Decentraland one', () => {
+        beforeEach(async () => {
+          resolveContract.mockResolvedValueOnce(notFound)
+          classification = await classifyRequest(request, context)
+        })
+
+        it('should classify it as an unknown meta-transaction on that chain', () => {
+          expect(classification).toEqual(
+            expect.objectContaining({ kind: 'unknown_meta_transaction', reason: 'other_chain', chainId: AMOY })
+          )
+        })
       })
     })
 
     describe('and the message is for another account', () => {
-      beforeEach(async () => {
+      let request: RecoverResponse
+
+      beforeEach(() => {
         const typedData = buildMetaTransaction(polygonMana, transferCalldata)
-        classification = await classifyRequest(
-          typedDataRequest({ ...typedData, message: { ...typedData.message, from: RECIPIENT } }),
-          context
-        )
+        request = typedDataRequest({ ...typedData, message: { ...typedData.message, from: RECIPIENT } })
       })
 
-      it('should classify it as an unknown meta-transaction', () => {
-        expect(classification).toEqual(expect.objectContaining({ kind: 'unknown_meta_transaction', reason: 'from_mismatch' }))
+      describe('and the contract is a Decentraland one', () => {
+        beforeEach(() => {
+          resolveContract.mockResolvedValueOnce(found(polygonMana))
+        })
+
+        it('should refuse it', async () => {
+          await expect(classifyRequest(request, context)).rejects.toThrow('is for another account')
+        })
+      })
+
+      describe('and the contract is not a Decentraland one', () => {
+        beforeEach(async () => {
+          resolveContract.mockResolvedValueOnce(notFound)
+          classification = await classifyRequest(request, context)
+        })
+
+        it('should classify it as an unknown meta-transaction', () => {
+          expect(classification).toEqual(expect.objectContaining({ kind: 'unknown_meta_transaction', reason: 'from_mismatch' }))
+        })
       })
     })
 
@@ -487,142 +633,145 @@ describe('when classifying a request', () => {
     })
 
     describe('and the collection lookup could not answer', () => {
-      beforeEach(async () => {
+      let request: RecoverResponse
+
+      beforeEach(() => {
         resolveContract.mockResolvedValueOnce(unavailable)
-        classification = await classifyRequest(typedDataRequest(buildMetaTransaction(collection, transferCalldata)), context)
+        request = typedDataRequest(buildMetaTransaction(collection, transferCalldata))
       })
 
-      it('should classify it as an unknown meta-transaction rather than throw', () => {
-        expect(classification).toEqual(expect.objectContaining({ kind: 'unknown_meta_transaction', reason: 'lookup_unavailable' }))
+      it('should throw a contract lookup unavailable error rather than review a signature it cannot place', async () => {
+        await expect(classifyRequest(request, context)).rejects.toBeInstanceOf(ContractLookupUnavailableError)
       })
     })
 
     describe('and the verifying contract cannot execute meta-transactions', () => {
-      beforeEach(async () => {
+      let request: RecoverResponse
+
+      beforeEach(() => {
         resolveContract.mockResolvedValueOnce(found(polygonBid))
-        classification = await classifyRequest(typedDataRequest(buildMetaTransaction(polygonBid, transferCalldata)), context)
+        request = typedDataRequest(buildMetaTransaction(polygonBid, transferCalldata))
       })
 
-      it('should classify it as an unknown meta-transaction', () => {
-        expect(classification).toEqual(expect.objectContaining({ kind: 'unknown_meta_transaction', reason: 'no_meta_transaction_support' }))
+      it('should refuse it', async () => {
+        await expect(classifyRequest(request, context)).rejects.toThrow('does not execute meta-transactions')
       })
     })
 
     describe('and the struct uses the functionData field against a contract that executes functionSignature', () => {
-      beforeEach(async () => {
+      let request: RecoverResponse
+
+      beforeEach(() => {
         resolveContract.mockResolvedValueOnce(found(polygonMana))
         const typedData = buildMetaTransaction(polygonMana, transferCalldata)
-        classification = await classifyRequest(
-          typedDataRequest({
-            ...typedData,
-            types: { ...typedData.types, MetaTransaction: OFFCHAIN_META_TRANSACTION_TYPE },
-            message: { nonce: 1, from: USER, functionData: transferCalldata }
-          }),
-          context
-        )
+        request = typedDataRequest({
+          ...typedData,
+          types: { ...typedData.types, MetaTransaction: OFFCHAIN_META_TRANSACTION_TYPE },
+          message: { nonce: 1, from: USER, functionData: transferCalldata }
+        })
       })
 
-      it('should classify it as an unknown meta-transaction', () => {
-        expect(classification).toEqual(expect.objectContaining({ kind: 'unknown_meta_transaction', reason: 'calldata_field_mismatch' }))
+      it('should refuse it', async () => {
+        await expect(classifyRequest(request, context)).rejects.toThrow('struct is not the one the contract hashes')
       })
     })
 
     describe('and the domain carries chainId instead of the salt', () => {
-      beforeEach(async () => {
+      let request: RecoverResponse
+
+      beforeEach(() => {
         resolveContract.mockResolvedValueOnce(found(polygonMana))
         const typedData = buildMetaTransaction(polygonMana, transferCalldata)
-        classification = await classifyRequest(
-          typedDataRequest({
-            ...typedData,
-            types: {
-              ...typedData.types,
-              EIP712Domain: DOMAIN_TYPE.map(field => (field.name === 'salt' ? { name: 'chainId', type: 'uint256' } : field))
-            },
-            domain: {
-              name: polygonMana.domainName,
-              version: polygonMana.domainVersion,
-              verifyingContract: polygonMana.address,
-              chainId: POLYGON
-            }
-          }),
-          context
-        )
+        request = typedDataRequest({
+          ...typedData,
+          types: {
+            ...typedData.types,
+            EIP712Domain: DOMAIN_TYPE.map(field => (field.name === 'salt' ? { name: 'chainId', type: 'uint256' } : field))
+          },
+          domain: {
+            name: polygonMana.domainName,
+            version: polygonMana.domainVersion,
+            verifyingContract: polygonMana.address,
+            chainId: POLYGON
+          }
+        })
       })
 
-      it('should classify it as an unknown meta-transaction', () => {
-        expect(classification).toEqual(expect.objectContaining({ kind: 'unknown_meta_transaction', reason: 'domain_mismatch' }))
+      it('should refuse it', async () => {
+        await expect(classifyRequest(request, context)).rejects.toThrow('domain is not the one the contract hashes')
       })
     })
 
     describe('and the domain name is not the one the contract hashes', () => {
-      beforeEach(async () => {
+      let request: RecoverResponse
+
+      beforeEach(() => {
         resolveContract.mockResolvedValueOnce(found(polygonMana))
         const typedData = buildMetaTransaction(polygonMana, transferCalldata)
-        classification = await classifyRequest(
-          typedDataRequest({ ...typedData, domain: { ...typedData.domain, name: 'Not MANA' } }),
-          context
-        )
+        request = typedDataRequest({ ...typedData, domain: { ...typedData.domain, name: 'Not MANA' } })
       })
 
-      it('should classify it as an unknown meta-transaction', () => {
-        expect(classification).toEqual(expect.objectContaining({ kind: 'unknown_meta_transaction', reason: 'domain_mismatch' }))
+      it('should refuse it', async () => {
+        await expect(classifyRequest(request, context)).rejects.toThrow('domain is not the one the contract hashes')
       })
     })
 
     describe('and the domain struct is declared in another order', () => {
-      beforeEach(async () => {
+      let request: RecoverResponse
+
+      beforeEach(() => {
         resolveContract.mockResolvedValueOnce(found(polygonMana))
         const typedData = buildMetaTransaction(polygonMana, transferCalldata)
-        classification = await classifyRequest(
-          typedDataRequest({ ...typedData, types: { ...typedData.types, EIP712Domain: [...DOMAIN_TYPE].reverse() } }),
-          context
-        )
+        request = typedDataRequest({ ...typedData, types: { ...typedData.types, EIP712Domain: [...DOMAIN_TYPE].reverse() } })
       })
 
-      it('should classify it as an unknown meta-transaction', () => {
-        expect(classification).toEqual(expect.objectContaining({ kind: 'unknown_meta_transaction', reason: 'domain_mismatch' }))
+      it('should refuse it', async () => {
+        await expect(classifyRequest(request, context)).rejects.toThrow('domain is not the one the contract hashes')
       })
     })
 
     describe('and the domain struct is absent', () => {
-      beforeEach(async () => {
+      let request: RecoverResponse
+
+      beforeEach(() => {
         resolveContract.mockResolvedValueOnce(found(polygonMana))
         const typedData = buildMetaTransaction(polygonMana, transferCalldata)
-        classification = await classifyRequest(
-          typedDataRequest({ ...typedData, types: { MetaTransaction: META_TRANSACTION_TYPE } }),
-          context
-        )
+        request = typedDataRequest({ ...typedData, types: { MetaTransaction: META_TRANSACTION_TYPE } })
       })
 
-      it('should still classify it as a Decentraland meta-transaction', () => {
-        expect(classification).toEqual(expect.objectContaining({ kind: 'dcl_meta_transaction' }))
+      it('should refuse it because wallets disagree on the digest of an undeclared domain struct', async () => {
+        await expect(classifyRequest(request, context)).rejects.toThrow('does not declare its domain struct')
       })
     })
 
     describe('and the inner call is executeMetaTransaction', () => {
-      beforeEach(async () => {
+      let request: RecoverResponse
+
+      beforeEach(() => {
         resolveContract.mockResolvedValueOnce(found(polygonMana))
         const nested = encodeFunctionData({
           abi: polygonMana.abi,
           functionName: 'executeMetaTransaction',
           args: [RECIPIENT, transferCalldata, `0x${'11'.repeat(32)}`, `0x${'22'.repeat(32)}`, 27]
         })
-        classification = await classifyRequest(typedDataRequest(buildMetaTransaction(polygonMana, nested)), context)
+        request = typedDataRequest(buildMetaTransaction(polygonMana, nested))
       })
 
-      it('should classify it as an unknown meta-transaction', () => {
-        expect(classification).toEqual(expect.objectContaining({ kind: 'unknown_meta_transaction', reason: 'payable_call' }))
+      it('should refuse it because the call forwards another call', async () => {
+        await expect(classifyRequest(request, context)).rejects.toThrow('forwards another call')
       })
     })
 
     describe('and the inner call does not decode against the contract ABI', () => {
-      beforeEach(async () => {
+      let request: RecoverResponse
+
+      beforeEach(() => {
         resolveContract.mockResolvedValueOnce(found(polygonMana))
-        classification = await classifyRequest(typedDataRequest(buildMetaTransaction(polygonMana, `0xdeadbeef${'00'.repeat(32)}`)), context)
+        request = typedDataRequest(buildMetaTransaction(polygonMana, `0xdeadbeef${'00'.repeat(32)}`))
       })
 
-      it('should classify it as an unknown meta-transaction', () => {
-        expect(classification).toEqual(expect.objectContaining({ kind: 'unknown_meta_transaction', reason: 'undecodable_call' }))
+      it('should refuse it rather than show it as a signature for an unknown contract', async () => {
+        await expect(classifyRequest(request, context)).rejects.toThrow('is not a call the Decentraland MANAToken contract declares')
       })
     })
 

@@ -1,7 +1,7 @@
 import { Abi, AbiFunction, decodeFunctionData, encodeFunctionData, toFunctionSelector } from 'viem'
 import { ChainId } from '@dcl/schemas/dist/dapps/chain-id'
 import { ContractData, ContractName, getContract } from 'decentraland-transactions'
-import { SUPPORTED_CHAIN_IDS } from '../chains'
+import { SUPPORTED_CHAIN_IDS, getSupportedChain } from '../chains'
 import { CALLDATA_REGEX } from './hex'
 import { MetaTransactionCalldataField } from './metaTransactionTypedData'
 
@@ -34,7 +34,25 @@ type DecodedCall = {
   args: readonly unknown[]
   /** True for `executeMetaTransaction` and `Forwarder.forwardCall`, the only payable entry points. */
   payable: boolean
+  /**
+   * True when the function hands calldata it receives to another contract (see FORWARDING_FUNCTIONS): the
+   * decoded arguments do not say what runs, so the call cannot be reviewed as a call to this contract.
+   */
+  forwardsCall: boolean
 }
+
+// The registry functions that execute calldata they are given rather than an action of their own: the
+// payable entry points (`executeMetaTransaction` on every meta-transaction contract, `Forwarder.forwardCall`)
+// and the non-payable ones (`CollectionManager.manageCollection` and `Committee.manageCollection` run
+// `_data` on a collection through the forwarder; `DCLRegistrar.forwardToResolver` runs `bytes` on the
+// resolver). The previewed kinds refuse all of them: a function name and a simulation say nothing about
+// the inner selector, and access control is the contract's business, not a reason to review less.
+const FORWARDING_FUNCTIONS: ReadonlySet<string> = new Set([
+  'executeMetaTransaction',
+  'forwardCall',
+  'manageCollection',
+  'forwardToResolver'
+])
 
 /**
  * Asks whether an address is a wearable collection (a Decentraland collection factory deployed it).
@@ -73,7 +91,9 @@ function getMetaTransactionSalt(chainId: number): string {
 function toKnownContract(name: ContractName, chainId: number, entry: ContractData, address = entry.address): KnownContract {
   // getContract hands out the live registry object; copy the ABI so nothing downstream can mutate it.
   const abi = [...entry.abi] as unknown as Abi
-  const calldataField = getMetaTransactionCalldataField(abi)
+  // The registry reuses one ABI per contract across chains (the Ethereum MANAToken entry carries the Polygon
+  // ABI's executeMetaTransaction), so the deployment supports meta-transactions only on a chain that relays them.
+  const calldataField = getSupportedChain(chainId)?.relaysMetaTransactions ? getMetaTransactionCalldataField(abi) : null
   return {
     name,
     address: address.toLowerCase(),
@@ -181,7 +201,9 @@ async function resolveKnownDecentralandContract(
  * Decodes `data` against the contract's ABI and proves the decode is exact: the arguments are
  * re-encoded and must reproduce the input byte for byte. viem alone accepts trailing bytes, extra
  * words and dirty address padding, any of which would let calldata that reads as one call execute
- * as something else. Returns null for anything that is not a canonical call to a known function.
+ * as something else; viem's encoder also range-checks every word, so a value with dirty high bits
+ * (a `uint8` above 255, a `bool` that is not 0 or 1) never re-encodes. Returns null for anything
+ * that is not a canonical call to a known function.
  */
 function decodeKnownContractCall(contract: KnownContract, data: string): DecodedCall | null {
   if (!CALLDATA_REGEX.test(data)) {
@@ -202,7 +224,8 @@ function decodeKnownContractCall(contract: KnownContract, data: string): Decoded
     if (encoded.toLowerCase() !== normalized) {
       return null
     }
-    return { functionName: item.name, args: args ?? [], payable: item.stateMutability === 'payable' }
+    const payable = item.stateMutability === 'payable'
+    return { functionName: item.name, args: args ?? [], payable, forwardsCall: payable || FORWARDING_FUNCTIONS.has(item.name) }
   } catch {
     return null
   }

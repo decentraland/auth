@@ -7,6 +7,7 @@ import { shortenAddress } from '../../../../../shared/text'
 import { isTransactionKind } from '../../classifyRequest'
 import { Container } from '../../Container'
 import { ButtonsContainer, ReviewRestartedNotice } from '../../RequestPage.styled'
+import { formatTypedDataForDisplay } from '../typedDataDisplay'
 import { useAcknowledgment } from '../useAcknowledgment'
 import styles from '../Views.module.css'
 import { UnverifiedRequestKind, UnverifiedRequestViewProps } from './UnverifiedRequest.types'
@@ -265,7 +266,15 @@ export const UnverifiedRequestView = ({
           </Panel>
         ) : (
           <Panel role="tabpanel" id="unverified-panel-advanced" aria-labelledby="unverified-tab-advanced" data-testid="unverified-advanced">
-            <Hint>{t(isTransaction ? 'request.unverified.advanced_hint_transaction' : 'request.unverified.advanced_hint_signature')}</Hint>
+            <Hint>
+              {t(
+                isTransaction
+                  ? 'request.unverified.advanced_hint_transaction'
+                  : payload.kind === 'typed_data'
+                    ? 'request.unverified.advanced_hint_typed_data'
+                    : 'request.unverified.advanced_hint_signature'
+              )}
+            </Hint>
             {payload.kind === 'transaction' ? (
               <>
                 <RawLabel>{t('request.unverified.raw_to')}</RawLabel>
@@ -288,7 +297,7 @@ export const UnverifiedRequestView = ({
             {payload.kind === 'typed_data' ? (
               <>
                 <RawLabel>{t('request.unverified.raw_typed_data')}</RawLabel>
-                <RawBlock data-testid="unverified-raw-typed-data">{payload.raw}</RawBlock>
+                <RawBlock data-testid="unverified-raw-typed-data">{formatTypedDataForDisplay(payload.raw)}</RawBlock>
               </>
             ) : null}
             {payload.kind === 'message' ? (

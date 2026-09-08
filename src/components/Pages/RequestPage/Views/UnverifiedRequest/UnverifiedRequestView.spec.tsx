@@ -297,12 +297,18 @@ describe('when rendering the UnverifiedRequestView', () => {
     })
 
     describe('and the Advanced tab is opened', () => {
-      it('should show only the typed data verbatim without inferring a call or digest', async () => {
+      it('should show only the typed data as the wallet reads it without inferring a call or digest', async () => {
         render(<UnverifiedRequestView {...props} />)
         await userEvent.click(screen.getByRole('tab', { name: 'request.unverified.tab_advanced' }))
-        expect(screen.getByTestId('unverified-raw-typed-data')).toHaveTextContent('{"primaryType":"MetaTransaction"}')
+        expect(screen.getByTestId('unverified-raw-typed-data')).toHaveTextContent('"primaryType": "MetaTransaction"')
         expect(screen.queryByTestId('unverified-raw-calldata')).not.toBeInTheDocument()
         expect(screen.queryByTestId('unverified-raw-digest')).not.toBeInTheDocument()
+      })
+
+      it('should say that only the declared fields are signed', async () => {
+        render(<UnverifiedRequestView {...props} />)
+        await userEvent.click(screen.getByRole('tab', { name: 'request.unverified.tab_advanced' }))
+        expect(screen.getByText('request.unverified.advanced_hint_typed_data')).toBeInTheDocument()
       })
     })
   })
@@ -336,7 +342,7 @@ describe('when rendering the UnverifiedRequestView', () => {
       it('should show the JSON verbatim without a call or a digest block', async () => {
         render(<UnverifiedRequestView {...props} />)
         await userEvent.click(screen.getByRole('tab', { name: 'request.unverified.tab_advanced' }))
-        expect(screen.getByTestId('unverified-raw-typed-data')).toHaveTextContent('{"primaryType":"Permit"}')
+        expect(screen.getByTestId('unverified-raw-typed-data')).toHaveTextContent('"primaryType": "Permit"')
         expect(screen.queryByTestId('unverified-raw-calldata')).not.toBeInTheDocument()
         expect(screen.queryByTestId('unverified-raw-digest')).not.toBeInTheDocument()
       })

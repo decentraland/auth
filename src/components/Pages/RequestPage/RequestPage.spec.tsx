@@ -357,7 +357,7 @@ const dclTransaction = (overrides: Record<string, unknown> = {}): RequestClassif
   ({
     kind: 'dcl_transaction',
     contract: knownContract(),
-    call: { functionName: 'approve', args: [], payable: false },
+    call: { functionName: 'approve', args: [], payable: false, forwardsCall: false },
     to: CONTRACT,
     data: '0xabcd',
     value: '0x0',
@@ -370,7 +370,7 @@ const dclMetaTransaction = (overrides: Record<string, unknown> = {}): RequestCla
   ({
     kind: 'dcl_meta_transaction',
     contract: knownContract(),
-    call: { functionName: 'transfer', args: [], payable: false },
+    call: { functionName: 'transfer', args: [], payable: false, forwardsCall: false },
     calldata: '0xdeadbeef',
     chainId: 137,
     typedData: { primaryType: 'MetaTransaction' },
@@ -671,6 +671,37 @@ describe('RequestPage', () => {
         await screen.findByTestId('recover-error')
         expect(mockSendFailedOutcome).not.toHaveBeenCalled()
         expect(mockSendSuccessfulOutcome).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and the classifier refuses a call to a Decentraland contract that deviates from what the SDK builds', () => {
+      beforeEach(() => {
+        mockRecover.mockResolvedValue(recovered('eth_sendTransaction', [{ to: CONTRACT, data: '0x095ea7b300', value: '0' }]))
+        mockClassifyRequest.mockRejectedValue(
+          new MalformedTransactionRequestError(
+            'eth_sendTransaction',
+            'the calldata is not a call the Decentraland MANAToken contract declares'
+          )
+        )
+        mockSendFailedOutcome.mockResolvedValue({})
+      })
+
+      it('should show the error view instead of the unverified review', async () => {
+        renderRequestPage()
+        expect(await screen.findByTestId('signing-error')).toBeInTheDocument()
+        expect(screen.queryByTestId('unverified-request')).not.toBeInTheDocument()
+      })
+
+      it('should answer the request as invalid so it cannot be retried into a review', async () => {
+        renderRequestPage()
+        await screen.findByTestId('signing-error')
+        await waitFor(() => {
+          expect(mockSendFailedOutcome).toHaveBeenCalledWith(REQUEST_ID, SIGNER, {
+            code: -32602,
+            message:
+              'The "eth_sendTransaction" transaction parameters are malformed: the calldata is not a call the Decentraland MANAToken contract declares'
+          })
+        })
       })
     })
 
@@ -2104,7 +2135,7 @@ describe('RequestPage', () => {
           to: '0xmanacontract',
           data: '0xa9059cbb',
           branded: 'tip',
-          call: { functionName: 'transfer', args: ['0xrecipient', BigInt(10)], payable: false }
+          call: { functionName: 'transfer', args: ['0xrecipient', BigInt(10)], payable: false, forwardsCall: false }
         })
       )
       jest.mocked(sendMetaTransaction).mockResolvedValue('0xrelayedhash')
@@ -2164,7 +2195,7 @@ describe('RequestPage', () => {
             domainName: 'Decentraland Collection',
             domainVersion: '2'
           }),
-          call: { functionName: 'safeTransferFrom', args: [SIGNER, '0xrecipient', BigInt(1)], payable: false }
+          call: { functionName: 'safeTransferFrom', args: [SIGNER, '0xrecipient', BigInt(1)], payable: false, forwardsCall: false }
         })
       )
       jest.mocked(decodeNftTransferData).mockReturnValue({ fromAddress: SIGNER, tokenId: '1', toAddress: '0xrecipient' })
@@ -2318,7 +2349,7 @@ describe('RequestPage', () => {
         dclTransaction({
           data: '0x23b872dd',
           branded: null,
-          call: { functionName: 'transferFrom', args: [SIGNER, '0xrecipient', BigInt(1)], payable: false }
+          call: { functionName: 'transferFrom', args: [SIGNER, '0xrecipient', BigInt(1)], payable: false, forwardsCall: false }
         })
       )
     })

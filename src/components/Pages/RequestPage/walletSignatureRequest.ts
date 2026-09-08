@@ -1,5 +1,6 @@
-import { Address, Hex, stringToHex } from 'viem'
-import { ADDRESS_REGEX, MalformedSignatureRequestError, UnsupportedMethodError, isHexBytes } from '../../../shared/auth'
+import { Address, Hex } from 'viem'
+import { ADDRESS_REGEX, MalformedSignatureRequestError, UnsupportedMethodError } from '../../../shared/auth'
+import { RequestClassification } from './classifyRequest'
 
 /**
  * A signature request in the exact shape the wallet's EIP-1193 schema gives each method. Modelled as
@@ -17,33 +18,35 @@ type SignatureWalletClient = {
 }
 
 /**
- * Turns a recovered signature request into the request the wallet is handed. The recover guard has
- * already pinned the params to the canonical order for each method; this re-checks the shapes it
- * relies on and normalizes the two forms the guard accepts into the one the wallet schema defines:
- * a `personal_sign` message is sent as the bytes it signs — `0x…` hex as those bytes, anything else
- * (plain text, a `0X…` string, the bare `0x`) as the UTF-8 of its characters, decided by the same
- * predicate the classifier displays it with, so the review and the wallet cannot disagree — and typed
- * data handed over as an object is sent as its JSON. Any other method is refused rather than forwarded.
+ * Turns a reviewed signature request into the request the wallet is handed: the classification's own
+ * bytes — the `hex` a personal_sign review displayed, the `raw` JSON a typed-data review displayed — for
+ * the connected signer, under the method the request was recovered with. Nothing is re-derived from the
+ * request params, so what the wallet signs is by construction what the screen showed. A method and a
+ * classification that do not belong together, or any other method, are refused rather than forwarded.
  */
-function toWalletSignatureRequest(method: string, params: unknown[] | undefined): WalletSignatureRequest {
+function toWalletSignatureRequest(method: string, reviewed: RequestClassification, signer: string): WalletSignatureRequest {
+  if (!ADDRESS_REGEX.test(signer)) {
+    throw new MalformedSignatureRequestError(method, 'the signer is not an address')
+  }
+  const signerAddress = signer as Address
   switch (method) {
-    case 'personal_sign': {
-      const [message, signer] = params ?? []
-      if (typeof message !== 'string' || typeof signer !== 'string' || !ADDRESS_REGEX.test(signer)) {
-        throw new MalformedSignatureRequestError(method)
+    case 'personal_sign':
+      if (reviewed.kind !== 'personal_sign') {
+        throw new MalformedSignatureRequestError(method, 'the review is not of a personal_sign message')
       }
-      return { method, params: [isHexBytes(message) ? (message.toLowerCase() as Hex) : stringToHex(message), signer as Address] }
-    }
+      return { method, params: [reviewed.hex as Hex, signerAddress] }
     case 'eth_signTypedData_v3':
     case 'eth_signTypedData_v4': {
-      const [signer, typedData] = params ?? []
-      if (typeof signer !== 'string' || !ADDRESS_REGEX.test(signer) || typedData === undefined || typedData === null) {
-        throw new MalformedSignatureRequestError(method)
+      if (
+        reviewed.kind !== 'dcl_meta_transaction' &&
+        reviewed.kind !== 'unknown_meta_transaction' &&
+        reviewed.kind !== 'unknown_typed_data'
+      ) {
+        throw new MalformedSignatureRequestError(method, 'the review is not of typed data')
       }
-      const serialized = typeof typedData === 'string' ? typedData : JSON.stringify(typedData)
       return method === 'eth_signTypedData_v3'
-        ? { method, params: [signer as Address, serialized] }
-        : { method, params: [signer as Address, serialized] }
+        ? { method, params: [signerAddress, reviewed.raw] }
+        : { method, params: [signerAddress, reviewed.raw] }
     }
     default:
       throw new UnsupportedMethodError(method)

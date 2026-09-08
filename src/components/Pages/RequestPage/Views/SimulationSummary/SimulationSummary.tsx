@@ -10,7 +10,7 @@ import {
   isDangerousApproval,
   isZeroAddress
 } from '../../../../../shared/auth'
-import { getExplorerAddressUrl, getExplorerName, getNetworkName } from '../../../../../shared/explorer'
+import { getExplorerAddressUrl, getExplorerName, getNativeSymbol, getNetworkName } from '../../../../../shared/explorer'
 import { shortenAddress } from '../../../../../shared/text'
 import { SimulationSummaryProps } from './SimulationSummary.types'
 import {
@@ -360,6 +360,9 @@ export const SimulationSummary = ({
 }: SimulationSummaryProps) => {
   const { t } = useTranslation()
   const verified = new Set(verifiedContracts.map(address => address.toLowerCase()))
+  // Gas is paid in the currency of the chain the call runs on: POL for a plain send to a Polygon
+  // contract without meta-transaction support, ETH on Ethereum. Never a fixed symbol.
+  const nativeSymbol = getNativeSymbol(chainId) || t('request.unverified.native_currency')
 
   // The gas footer comes from the wallet/meta-transaction check, not the Tenderly result, so it is
   // shown once the preview resolves (ready or unavailable) so the user always sees the gas cost (or
@@ -374,8 +377,10 @@ export const SimulationSummary = ({
         <GasNote>{t('request.unverified.fact_fee_unavailable')}</GasNote>
       ) : (
         <>
-          <GasNote>{t('request.transaction_dialog.transaction_cost', { cost: gas.cost })}</GasNote>
-          <GasNote>{t('request.transaction_dialog.your_balance', { balance: gas.balance })}</GasNote>
+          <GasNote>{t('request.transaction_dialog.transaction_cost', { cost: gas.cost, symbol: nativeSymbol })}</GasNote>
+          {gas.balance !== undefined ? (
+            <GasNote>{t('request.transaction_dialog.your_balance', { balance: gas.balance, symbol: nativeSymbol })}</GasNote>
+          ) : null}
         </>
       )}
     </GasFooter>

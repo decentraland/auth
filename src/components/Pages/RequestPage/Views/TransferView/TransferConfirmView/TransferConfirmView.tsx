@@ -11,14 +11,22 @@ import { TransferConfirmViewProps } from './TransferConfirmView.types'
 
 const TransferConfirmView = (props: TransferConfirmViewProps) => {
   const { t } = useTranslation()
-  const [isProcessing, setIsProcessing] = useState(false)
+  const [isAwaitingApproval, setIsAwaitingApproval] = useState(false)
   const { type, transferData } = props
   const isTip = type === TransferType.TIP
   const recipientAvatar = transferData.recipientProfile?.avatars?.[0]
+  // Processing while the approval is being asked of the wallet (an external wallet's own prompt is open)
+  // or while the page executes it (a web2 user confirmed their dialog). Not while that dialog is open:
+  // onApprove resolves once it is shown, and cancelling it must hand the buttons back.
+  const isProcessing = isAwaitingApproval || props.isLoading
 
   const handleApprove = async () => {
-    setIsProcessing(true)
-    await props.onApprove()
+    setIsAwaitingApproval(true)
+    try {
+      await props.onApprove()
+    } finally {
+      setIsAwaitingApproval(false)
+    }
   }
 
   return (

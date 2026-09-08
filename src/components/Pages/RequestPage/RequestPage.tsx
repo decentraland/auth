@@ -218,8 +218,10 @@ export const RequestPage = () => {
   const walletClientRef = useRef<ReturnType<typeof createWalletClient>>()
   const [view, setView] = useState(View.LOADING_REQUEST)
   const [isLoading, setIsLoading] = useState(false)
+  // The wallet's chain and, when it could be read, the account's native balance. The balance is display
+  // only: a failed read leaves it out rather than showing a zero the account does not have.
   const [walletInfo, setWalletInfo] = useState<{
-    balance: bigint
+    balance?: bigint
     chainId: number
   }>()
   // What the recovered request is (see classifyRequest). Null until classification resolves; nothing
@@ -792,7 +794,7 @@ export const RequestPage = () => {
         if (request.method === 'eth_sendTransaction') {
           const [currentChainId, userBalance] = await Promise.all([
             publicClient.getChainId(),
-            publicClient.getBalance({ address: signerAddress }).catch(() => BigInt(0))
+            publicClient.getBalance({ address: signerAddress }).catch(() => undefined)
           ])
           if (cancelled) return
           connectedChainId = currentChainId
@@ -869,7 +871,9 @@ export const RequestPage = () => {
           await reportRejectedRequest(RPC_INVALID_PARAMS, e.message)
           return
         } else if (e instanceof MalformedSignatureRequestError || e instanceof MalformedTransactionRequestError) {
-          // The params could preview one payload and sign or execute another. Block it; a retry recovers the same request.
+          // The params could preview one payload and sign or execute another, or the request is aimed at a
+          // Decentraland contract but is not shaped the way the SDK builds one (see classifyRequest). Block
+          // it; a retry recovers the same request.
           hasCompletedRef.current = true
           setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
           setView(View.WALLET_INTERACTION_ERROR)
@@ -887,8 +891,9 @@ export const RequestPage = () => {
         } else if (e instanceof ContractLookupUnavailableError) {
           // Whether the target is a Decentraland collection could not be checked. Reading that as
           // "not Decentraland" would send Polygon calldata as a plain transaction on whatever chain
-          // the wallet is on, so the request is neither reviewed nor answered: the error view offers
-          // a retry and the request stays available for it.
+          // the wallet is on, or show a MetaTransaction for a Decentraland collection as one for a
+          // contract Decentraland does not know, so the request is neither reviewed nor answered:
+          // the error view offers a retry and the request stays available for it.
           setError(e.message)
           setView(View.LOADING_ERROR)
           return
@@ -1104,9 +1109,10 @@ export const RequestPage = () => {
           params: [{ ...transactionParams, from: signerAddress, chainId: `0x${reviewedChainId.toString(16)}` }]
         })
       } else {
-        // Signatures carry no `to` address and are never relayed — forward them to the wallet in the
-        // exact shape its schema gives the method (see toWalletSignatureRequest).
-        result = await forwardSignatureRequest(walletClient, toWalletSignatureRequest(method, requestRef.current.params))
+        // Signatures carry no `to` address and are never relayed. The wallet is handed the reviewed bytes
+        // themselves, never a fresh reading of the request, in the exact shape its schema gives the method
+        // (see toWalletSignatureRequest).
+        result = await forwardSignatureRequest(walletClient, toWalletSignatureRequest(method, reviewed, signerAddress))
       }
 
       hasWalletResult = true
@@ -1377,7 +1383,7 @@ export const RequestPage = () => {
       const gas = classification.relayed
         ? ({ covered: true } as const)
         : gasEstimate?.status === 'ready'
-          ? ({ covered: false, status: 'ready', cost: gasEstimate.cost, balance: walletInfo?.balance ?? BigInt(0) } as const)
+          ? ({ covered: false, status: 'ready', cost: gasEstimate.cost, balance: walletInfo?.balance } as const)
           : gasEstimate?.status === 'unavailable'
             ? ({ covered: false, status: 'unavailable' } as const)
             : ({ covered: false, status: 'loading' } as const)

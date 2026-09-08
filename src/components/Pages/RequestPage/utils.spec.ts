@@ -411,7 +411,7 @@ describe('when testing decodeNftTransferData', () => {
 
   describe('and the call is a transferFrom', () => {
     beforeEach(() => {
-      call = { functionName: 'transferFrom', args: ['0xfrom', '0xto', BigInt(123)], payable: false }
+      call = { functionName: 'transferFrom', args: ['0xfrom', '0xto', BigInt(123)], payable: false, forwardsCall: false }
     })
 
     it('should return the source, tokenId and destination', () => {
@@ -421,7 +421,7 @@ describe('when testing decodeNftTransferData', () => {
 
   describe('and the call is a safeTransferFrom with a data argument', () => {
     beforeEach(() => {
-      call = { functionName: 'safeTransferFrom', args: ['0xfrom', '0xto', BigInt(9), '0x'], payable: false }
+      call = { functionName: 'safeTransferFrom', args: ['0xfrom', '0xto', BigInt(9), '0x'], payable: false, forwardsCall: false }
     })
 
     it('should return the source, tokenId and destination', () => {
@@ -433,7 +433,12 @@ describe('when testing decodeNftTransferData', () => {
     beforeEach(() => {
       // batchTransferFrom(address from, address to, uint256[] tokenIds) decodes into a "to" and a
       // "token id" as well; shown as the gift of one token it would transfer every listed one.
-      call = { functionName: 'batchTransferFrom', args: ['0xfrom', '0xto', [BigInt(1), BigInt(2), BigInt(3)]], payable: false }
+      call = {
+        functionName: 'batchTransferFrom',
+        args: ['0xfrom', '0xto', [BigInt(1), BigInt(2), BigInt(3)]],
+        payable: false,
+        forwardsCall: false
+      }
     })
 
     it('should return null so the generic review previews it', () => {
@@ -445,7 +450,7 @@ describe('when testing decodeNftTransferData', () => {
     beforeEach(() => {
       // setItemsMinters(uint256[] itemIds, address[] minters, uint256[] values) grants minting rights;
       // its single-element lists decode into a plausible "to" and "token id".
-      call = { functionName: 'setItemsMinters', args: [[BigInt(0)], ['0xto'], [BigInt(1)]], payable: false }
+      call = { functionName: 'setItemsMinters', args: [[BigInt(0)], ['0xto'], [BigInt(1)]], payable: false, forwardsCall: false }
     })
 
     it('should return null instead of presenting it as a gift', () => {
@@ -455,7 +460,7 @@ describe('when testing decodeNftTransferData', () => {
 
   describe('and a transfer decodes with a token id that is not a single uint256', () => {
     beforeEach(() => {
-      call = { functionName: 'transferFrom', args: ['0xfrom', '0xto', 'not-a-token-id'], payable: false }
+      call = { functionName: 'transferFrom', args: ['0xfrom', '0xto', 'not-a-token-id'], payable: false, forwardsCall: false }
     })
 
     it('should return null', () => {
@@ -465,7 +470,7 @@ describe('when testing decodeNftTransferData', () => {
 
   describe('and the call has fewer arguments than a transfer', () => {
     beforeEach(() => {
-      call = { functionName: 'transferFrom', args: ['0xfrom'], payable: false }
+      call = { functionName: 'transferFrom', args: ['0xfrom'], payable: false, forwardsCall: false }
     })
 
     it('should return null', () => {
@@ -710,7 +715,8 @@ describe('when testing decodeManaTransferData', () => {
       call = {
         functionName: 'transfer',
         args: ['0xabcdef1234567890abcdef1234567890abcdef12', BigInt('100000000000000000')],
-        payable: false
+        payable: false,
+        forwardsCall: false
       }
       jest.mocked(formatEther).mockReturnValueOnce('0.1')
     })
@@ -725,7 +731,12 @@ describe('when testing decodeManaTransferData', () => {
 
   describe('and the call is not a transfer', () => {
     beforeEach(() => {
-      call = { functionName: 'approve', args: ['0xabcdef1234567890abcdef1234567890abcdef12', BigInt(1)], payable: false }
+      call = {
+        functionName: 'approve',
+        args: ['0xabcdef1234567890abcdef1234567890abcdef12', BigInt(1)],
+        payable: false,
+        forwardsCall: false
+      }
     })
 
     it('should return null', () => {
@@ -735,7 +746,7 @@ describe('when testing decodeManaTransferData', () => {
 
   describe('and the call has fewer arguments than a transfer', () => {
     beforeEach(() => {
-      call = { functionName: 'transfer', args: ['0xabcdef1234567890abcdef1234567890abcdef12'], payable: false }
+      call = { functionName: 'transfer', args: ['0xabcdef1234567890abcdef1234567890abcdef12'], payable: false, forwardsCall: false }
     })
 
     it('should return null', () => {
@@ -749,7 +760,8 @@ describe('when testing decodeManaTransferData', () => {
       call = {
         functionName: 'transfer',
         args: ['0xabcdef1234567890abcdef1234567890abcdef12', BigInt('1000000000000000000000')],
-        payable: false
+        payable: false,
+        forwardsCall: false
       }
       jest.mocked(formatEther).mockReturnValueOnce('1000.0')
     })
@@ -1208,7 +1220,7 @@ describe('when testing buildSendTransactionSimulationPayload', () => {
       transaction = {
         kind: 'dcl_transaction',
         contract,
-        call: { functionName: 'transfer', args: [], payable: false },
+        call: { functionName: 'transfer', args: [], payable: false, forwardsCall: false },
         to: contract.address,
         data: '0xa9059cbb',
         value: '0x0',
@@ -1243,7 +1255,7 @@ describe('when testing buildSendTransactionSimulationPayload', () => {
       transaction = {
         kind: 'dcl_transaction',
         contract: { ...contract, chainId: 1 },
-        call: { functionName: 'approve', args: [], payable: false },
+        call: { functionName: 'approve', args: [], payable: false, forwardsCall: false },
         to: contract.address,
         data: '0x095ea7b3',
         value: '0x0',

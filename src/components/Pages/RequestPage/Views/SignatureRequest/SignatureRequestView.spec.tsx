@@ -92,7 +92,7 @@ describe('when rendering the SignatureRequestView', () => {
       render(<SignatureRequestView {...props} />)
       expect(screen.getByText('request.signature.view_raw')).toHaveAttribute('aria-expanded', 'false')
       await userEvent.click(screen.getByText('request.signature.view_raw'))
-      expect(screen.getByTestId('signature-raw')).toHaveTextContent('{"primaryType":"MetaTransaction"}')
+      expect(screen.getByTestId('signature-raw')).toHaveTextContent('"primaryType": "MetaTransaction"')
       expect(screen.getByText('request.signature.hide_raw')).toHaveAttribute('aria-expanded', 'true')
     })
 

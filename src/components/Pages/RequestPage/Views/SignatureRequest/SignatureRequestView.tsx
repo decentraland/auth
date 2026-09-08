@@ -7,6 +7,7 @@ import { shortenAddress } from '../../../../../shared/text'
 import { Container } from '../../Container'
 import { ButtonsContainer } from '../../RequestPage.styled'
 import { SimulationSummary } from '../SimulationSummary'
+import { formatTypedDataForDisplay } from '../typedDataDisplay'
 import { useAcknowledgment } from '../useAcknowledgment'
 import styles from '../Views.module.css'
 import { SignatureRequestViewProps } from './SignatureRequest.types'
@@ -106,7 +107,7 @@ export const SignatureRequestView = ({
         <RawToggle type="button" aria-expanded={showRaw} onClick={() => setShowRaw(show => !show)}>
           {showRaw ? t('request.signature.hide_raw') : t('request.signature.view_raw')}
         </RawToggle>
-        {showRaw ? <MessageBlock data-testid="signature-raw">{raw}</MessageBlock> : null}
+        {showRaw ? <MessageBlock data-testid="signature-raw">{formatTypedDataForDisplay(raw)}</MessageBlock> : null}
 
         {requiresAcknowledgment ? (
           <FormControlLabel

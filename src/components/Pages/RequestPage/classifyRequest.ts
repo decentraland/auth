@@ -1,10 +1,13 @@
 import { hexToString, stringToHex } from 'viem'
 import { ContractName, DOMAIN_TYPE } from 'decentraland-transactions'
 import {
+  ADDRESS_REGEX,
   ContractLookupUnavailableError,
   ContractResolution,
   DecodedCall,
   KnownContract,
+  MalformedSignatureRequestError,
+  MalformedTransactionRequestError,
   RecoverResponse,
   UnsupportedMethodError,
   decodeKnownContractCall,
@@ -13,16 +16,16 @@ import {
   isMetaTransactionTypedData,
   resolveMetaTransactionTypedData
 } from '../../../shared/auth'
+import { HIDDEN_CHARACTER_PATTERN } from '../../../shared/text'
 import { isRecord } from '../../../shared/utils/isRecord'
 import { buildTransactionParams } from './transactionParams'
 import { TypedDataPayload } from './types'
 
-// Anything the user cannot see or read as text, defined by Unicode category rather than by
-// enumerated ranges: controls (C0 and C1), format characters such as zero-width and bidi controls,
-// surrogates, private-use and unassigned code points, the line and paragraph separators, and U+FFFD,
-// which is what decoding bytes that are not valid UTF-8 produces. Tab, newline and carriage return
-// are the only controls a message may contain.
-const UNREADABLE_CHARACTER_REGEX = /(?![\t\n\r])[\p{C}\p{Zl}\p{Zp}�]/u
+// Anything the user cannot see or read as text: the hidden characters (controls other than tab, newline and
+// carriage return, format characters such as zero-width and bidi controls, surrogates, private-use and
+// unassigned code points, the line and paragraph separators) and U+FFFD, which is what decoding bytes that
+// are not valid UTF-8 produces.
+const UNREADABLE_CHARACTER_REGEX = new RegExp(`${HIDDEN_CHARACTER_PATTERN}|\uFFFD`, 'u')
 
 // The only collection calls the branded gift view may stand in for. Other functions on the CollectionV2
 // ABI also take three or more arguments — batchTransferFrom, safeBatchTransferFrom, setItemsMinters,
@@ -38,21 +41,23 @@ const TRANSACTION_KINDS: ReadonlySet<string> = new Set(['dcl_transaction', 'unkn
 /** Which branded screen a Decentraland transaction may use instead of the generic simulation review. */
 type BrandedTransaction = 'tip' | 'gift_candidate' | null
 
-/** Why a transaction to a known-looking target was still classified as unknown. Analytics only. */
-type UnknownTransactionReason = 'unknown_contract' | 'undecodable_call' | 'payable_call' | 'value_attached' | 'unverified_recipient'
+/**
+ * Why a transaction was not previewed. Analytics only. A call to a Decentraland contract that deviates from
+ * the shape the SDK builds is not among these: it is refused (see classifyTransaction).
+ */
+type UnknownTransactionReason = 'unknown_contract' | 'unverified_recipient'
 
-/** Why a MetaTransaction was not classified as a Decentraland one. Analytics only. */
-type UnknownMetaTransactionReason =
-  | 'malformed'
-  | 'other_chain'
-  | 'from_mismatch'
-  | 'unknown_contract'
-  | 'lookup_unavailable'
-  | 'no_meta_transaction_support'
-  | 'calldata_field_mismatch'
-  | 'domain_mismatch'
-  | 'undecodable_call'
-  | 'payable_call'
+/**
+ * Why a MetaTransaction was not previewed. Analytics only. A MetaTransaction for a Decentraland contract that
+ * deviates from the shape the SDK builds is not among these: it is refused (see classifyTypedData).
+ */
+type UnknownMetaTransactionReason = 'malformed' | 'other_chain' | 'from_mismatch' | 'unknown_contract'
+
+// What a MetaTransaction payload built by decentraland-transactions carries, and nothing else: the four EIP-712
+// members, and the domain and MetaTransaction structs. EIP-712 signs neither an extra top-level key nor a struct
+// the primary type does not reach, so anything more is unsigned text riding along with the request.
+const TYPED_DATA_KEYS: ReadonlySet<string> = new Set(['types', 'domain', 'primaryType', 'message'])
+const META_TRANSACTION_TYPE_NAMES: ReadonlySet<string> = new Set(['EIP712Domain', 'MetaTransaction'])
 
 /**
  * What a recovered request is, decided once before any view renders. The kind chooses the view, the
@@ -130,10 +135,19 @@ function isTransactionClassification(classification: RequestClassification): cla
   return isTransactionKind(classification.kind)
 }
 
+/** Whether the typed data carries the MetaTransaction and nothing else (see TYPED_DATA_KEYS). */
+function carriesOnlyTheMetaTransaction(typedData: TypedDataPayload): boolean {
+  return (
+    Object.keys(typedData).every(key => TYPED_DATA_KEYS.has(key)) &&
+    isRecord(typedData.types) &&
+    Object.keys(typedData.types).every(name => META_TRANSACTION_TYPE_NAMES.has(name))
+  )
+}
+
 /**
  * Whether `domain` is exactly the domain the contract hashes: the four fields decentraland-transactions
  * puts in every domain (`name`, `version`, `verifyingContract`, `salt`) with the registry's values, and
- * nothing else; and, when the struct is declared, exactly the library's `DOMAIN_TYPE`. A domain that
+ * nothing else; and a declared struct that is exactly the library's `DOMAIN_TYPE`. A domain that
  * differs produces a signature the contract rejects, which is harmless, but it must not be shown under
  * a Decentraland preview either.
  */
@@ -156,9 +170,6 @@ function isDecentralandDomain(typedData: TypedDataPayload, contract: KnownContra
     return false
   }
   const domainType: unknown = typedData.types?.EIP712Domain
-  if (domainType === undefined) {
-    return true
-  }
   return (
     Array.isArray(domainType) &&
     domainType.length === DOMAIN_TYPE.length &&
@@ -169,7 +180,7 @@ function isDecentralandDomain(typedData: TypedDataPayload, contract: KnownContra
   )
 }
 
-async function classifyTransaction(params: unknown[], context: ClassificationContext): Promise<RequestClassification> {
+async function classifyTransaction(method: string, params: unknown[], context: ClassificationContext): Promise<RequestClassification> {
   const [transaction] = buildTransactionParams(params)
   const to = transaction.to as string
   const data = transaction.data as string
@@ -198,19 +209,13 @@ async function classifyTransaction(params: unknown[], context: ClassificationCon
     }
   }
 
-  // A Decentraland contract on the meta-transaction chain that can execute meta-transactions is relayed
-  // through the gas tank whatever chain the wallet is on. Anything else executes on the connected chain
-  // and is only Decentraland's if the registry says so for that chain.
-  const onRelayChain = await context.resolveContract(to, context.metaTransactionChainId)
-  if (onRelayChain.status === 'unavailable') {
-    throw new ContractLookupUnavailableError(to)
-  }
+  // An eth_sendTransaction executes on the chain the wallet is on, so a Decentraland contract deployed
+  // at `to` on that chain is what the request means (the registry has the same address on several
+  // chains: OffChainMarketplaceV2 on Sepolia and Amoy). Only when the connected chain has no such
+  // contract is a Decentraland contract on the meta-transaction chain that can execute meta-transactions
+  // relayed through the gas tank instead. Anything else is unknown.
   let candidate: { contract: KnownContract; relayed: boolean; chainId: number } | null = null
-  if (onRelayChain.status === 'found' && onRelayChain.contract.supportsMetaTransactions) {
-    candidate = { contract: onRelayChain.contract, relayed: true, chainId: context.metaTransactionChainId }
-  } else if (onRelayChain.status === 'found' && connectedChainId === context.metaTransactionChainId) {
-    candidate = { contract: onRelayChain.contract, relayed: false, chainId: connectedChainId }
-  } else if (connectedChainId !== context.metaTransactionChainId) {
+  if (connectedChainId !== context.metaTransactionChainId) {
     const onConnectedChain = await context.resolveContract(to, connectedChainId)
     // Registry-only today, so never unavailable; kept explicit so the invariant that a failed lookup
     // is not a verdict holds if this path ever asks a network.
@@ -221,19 +226,40 @@ async function classifyTransaction(params: unknown[], context: ClassificationCon
       candidate = { contract: onConnectedChain.contract, relayed: false, chainId: connectedChainId }
     }
   }
+  if (!candidate) {
+    const onRelayChain = await context.resolveContract(to, context.metaTransactionChainId)
+    if (onRelayChain.status === 'unavailable') {
+      throw new ContractLookupUnavailableError(to)
+    }
+    if (onRelayChain.status === 'found' && onRelayChain.contract.supportsMetaTransactions) {
+      candidate = { contract: onRelayChain.contract, relayed: true, chainId: context.metaTransactionChainId }
+    } else if (onRelayChain.status === 'found' && connectedChainId === context.metaTransactionChainId) {
+      candidate = { contract: onRelayChain.contract, relayed: false, chainId: connectedChainId }
+    }
+  }
 
   if (!candidate) {
     return { kind: 'unknown_transaction', to, data, value, chainId: connectedChainId, reason: 'unknown_contract' }
   }
+
+  // The target is a Decentraland contract. Every legitimate call to one is built by the SDK as a canonical,
+  // non-payable, zero-value call, so a payload that deviates is broken or hostile, and the chain would still
+  // run it (the EVM ignores trailing calldata). It is refused, not shown under the unverified warnings, whose
+  // copy ("not a call to a Decentraland contract") would be false for it.
+  const reject = (reason: string): never => {
+    throw new MalformedTransactionRequestError(method, reason)
+  }
   const call = decodeKnownContractCall(candidate.contract, data)
   if (!call) {
-    return { kind: 'unknown_transaction', to, data, value, chainId: connectedChainId, reason: 'undecodable_call' }
+    return reject(`the calldata is not a call the Decentraland ${candidate.contract.name} contract declares`)
   }
-  if (call.payable) {
-    return { kind: 'unknown_transaction', to, data, value, chainId: connectedChainId, reason: 'payable_call' }
+  if (call.forwardsCall) {
+    return reject(
+      `${call.functionName} on the Decentraland ${candidate.contract.name} contract forwards another call and cannot be reviewed`
+    )
   }
   if (BigInt(value) !== 0n) {
-    return { kind: 'unknown_transaction', to, data, value, chainId: connectedChainId, reason: 'value_attached' }
+    return reject(`a call to the Decentraland ${candidate.contract.name} contract cannot carry a value`)
   }
 
   let branded: BrandedTransaction = null
@@ -262,74 +288,111 @@ async function classifyTransaction(params: unknown[], context: ClassificationCon
 async function classifyTypedData(method: string, params: unknown[], context: ClassificationContext): Promise<RequestClassification> {
   // The recover guard has already pinned the params to [signer, typed data] with a string primaryType.
   const param: unknown = params[1]
-  const raw = typeof param === 'string' ? param : JSON.stringify(param)
-  let typedData: TypedDataPayload
-  try {
-    typedData = (typeof param === 'string' ? JSON.parse(param) : param) as TypedDataPayload
-  } catch {
-    typedData = {}
+  let parsed: unknown = param
+  if (typeof param === 'string') {
+    try {
+      parsed = JSON.parse(param)
+    } catch {
+      parsed = null
+    }
   }
-  if (!isRecord(typedData)) {
-    typedData = {}
-  }
+  const typedData: TypedDataPayload = isRecord(parsed) ? (parsed as TypedDataPayload) : {}
+  // The JSON the wallet is handed and the review displays: the parsed structure serialized once, so the
+  // wallet reads exactly what was checked here (a key the request gave twice reaches it once, with the
+  // value kept here) rather than re-parsing the request's own text. Text that is not JSON stays as sent;
+  // the wallet refuses it.
+  const raw = isRecord(parsed) ? JSON.stringify(parsed) : typeof param === 'string' ? param : JSON.stringify(param)
 
   if (!isMetaTransactionTypedData(typedData)) {
     return { kind: 'unknown_typed_data', typedData, raw }
   }
 
+  // The contract the request claims to sign for. Only an address counts: the domain is unvalidated at this
+  // point, so any other string would put text the scene wrote on the fact line that names the contract.
   const claimedContract =
-    isRecord(typedData.domain) && typeof typedData.domain.verifyingContract === 'string' ? typedData.domain.verifyingContract : null
-  const unknown = (
-    reason: UnknownMetaTransactionReason,
-    verifyingContract = claimedContract,
-    chainId: number | null = null
-  ): RequestClassification => ({
+    isRecord(typedData.domain) &&
+    typeof typedData.domain.verifyingContract === 'string' &&
+    ADDRESS_REGEX.test(typedData.domain.verifyingContract)
+      ? typedData.domain.verifyingContract
+      : null
+
+  // Whether Decentraland vouches for that contract decides what a deviation from the shape the SDK builds
+  // means. For a contract it does not recognize, the signature is shown as what it is: one Decentraland
+  // cannot check. For a contract it does, a deviating payload is broken or hostile, and since EIP-712 signs
+  // only what the struct declares it may still verify on that contract, so it is refused rather than shown
+  // under the unverified warnings, whose copy ("a contract Decentraland doesn't recognize") would be false
+  // for it. A lookup that cannot answer is not a verdict either way.
+  let knownContract: KnownContract | null = null
+  if (claimedContract) {
+    const resolution = await context.resolveContract(claimedContract, context.metaTransactionChainId)
+    if (resolution.status === 'unavailable') {
+      throw new ContractLookupUnavailableError(claimedContract)
+    }
+    knownContract = resolution.status === 'found' ? resolution.contract : null
+  }
+
+  const unknown = (reason: UnknownMetaTransactionReason, chainId: number | null = null): RequestClassification => ({
     kind: 'unknown_meta_transaction',
     typedData,
     raw,
-    verifyingContract,
+    verifyingContract: claimedContract,
     chainId,
     reason
   })
+  const reject = (reason: string): never => {
+    throw new MalformedSignatureRequestError(method, reason)
+  }
 
   let resolved: ReturnType<typeof resolveMetaTransactionTypedData>
   try {
     resolved = resolveMetaTransactionTypedData(typedData, method)
-  } catch {
+  } catch (error) {
+    if (knownContract) {
+      throw error instanceof MalformedSignatureRequestError
+        ? error
+        : new MalformedSignatureRequestError(method, 'the MetaTransaction is malformed')
+    }
     return unknown('malformed')
   }
   if (resolved.chainId !== context.metaTransactionChainId) {
-    return unknown('other_chain', resolved.verifyingContract, resolved.chainId)
+    return knownContract
+      ? reject('the MetaTransaction domain names a chain the relay does not serve')
+      : unknown('other_chain', resolved.chainId)
   }
   if (resolved.from.toLowerCase() !== context.signerAddress.toLowerCase()) {
-    return unknown('from_mismatch', resolved.verifyingContract, resolved.chainId)
+    return knownContract ? reject('the MetaTransaction is for another account') : unknown('from_mismatch', resolved.chainId)
   }
-  const resolution = await context.resolveContract(resolved.verifyingContract, resolved.chainId)
-  if (resolution.status !== 'found') {
-    return unknown(
-      resolution.status === 'unavailable' ? 'lookup_unavailable' : 'unknown_contract',
-      resolved.verifyingContract,
-      resolved.chainId
-    )
+  if (!knownContract) {
+    return unknown('unknown_contract', resolved.chainId)
   }
-  const { contract } = resolution
-  if (!contract.supportsMetaTransactions) {
-    return unknown('no_meta_transaction_support', resolved.verifyingContract, resolved.chainId)
+  if (!knownContract.supportsMetaTransactions) {
+    return reject(`the Decentraland ${knownContract.name} contract does not execute meta-transactions`)
   }
-  if (contract.calldataField !== resolved.calldataField) {
-    return unknown('calldata_field_mismatch', resolved.verifyingContract, resolved.chainId)
+  if (knownContract.calldataField !== resolved.calldataField) {
+    return reject('the MetaTransaction struct is not the one the contract hashes')
   }
-  if (!isDecentralandDomain(typedData, contract, resolved.chainId)) {
-    return unknown('domain_mismatch', resolved.verifyingContract, resolved.chainId)
+  if (!isDecentralandDomain(typedData, knownContract, resolved.chainId)) {
+    return reject('the MetaTransaction domain is not the one the contract hashes')
   }
-  const call = decodeKnownContractCall(contract, resolved.calldata)
+  if (!carriesOnlyTheMetaTransaction(typedData)) {
+    return reject('the typed data carries more than the MetaTransaction')
+  }
+  const call = decodeKnownContractCall(knownContract, resolved.calldata)
   if (!call) {
-    return unknown('undecodable_call', resolved.verifyingContract, resolved.chainId)
+    return reject(`the MetaTransaction calldata is not a call the Decentraland ${knownContract.name} contract declares`)
   }
-  if (call.payable) {
-    return unknown('payable_call', resolved.verifyingContract, resolved.chainId)
+  if (call.forwardsCall) {
+    return reject(`${call.functionName} forwards another call and cannot be reviewed`)
   }
-  return { kind: 'dcl_meta_transaction', contract, call, calldata: resolved.calldata, chainId: resolved.chainId, typedData, raw }
+  return {
+    kind: 'dcl_meta_transaction',
+    contract: knownContract,
+    call,
+    calldata: resolved.calldata,
+    chainId: resolved.chainId,
+    typedData,
+    raw
+  }
 }
 
 function classifyPersonalSign(params: unknown[]): RequestClassification {
@@ -360,14 +423,17 @@ function classifyPersonalSign(params: unknown[]): RequestClassification {
 
 /**
  * Classifies a recovered request. Runs once, after the recover guards and before any view renders.
- * Throws {@link ContractLookupUnavailableError} when a transaction's target could not be checked
- * against the collection registry, so the page can show a retryable error instead of a review.
+ * Throws {@link ContractLookupUnavailableError} when a target could not be checked against the
+ * collection registry, so the page can show a retryable error instead of a review, and
+ * {@link MalformedTransactionRequestError} or {@link MalformedSignatureRequestError} when the request
+ * is aimed at a Decentraland contract but deviates from the shape the SDK builds, so the page rejects
+ * it instead of showing it as a request Decentraland cannot check.
  */
 async function classifyRequest(request: RecoverResponse, context: ClassificationContext): Promise<RequestClassification> {
   const params = request.params ?? []
   switch (request.method) {
     case 'eth_sendTransaction':
-      return classifyTransaction(params, context)
+      return classifyTransaction(request.method, params, context)
     case 'personal_sign':
       return classifyPersonalSign(params)
     case 'eth_signTypedData_v3':

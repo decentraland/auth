@@ -71,8 +71,8 @@
     },
     "transaction_dialog": {
       "title": "Confirmer la transaction",
-      "transaction_cost": "Coût de la transaction : {cost} ETH",
-      "your_balance": "Votre solde : {balance} ETH",
+      "transaction_cost": "Coût de la transaction : {cost} {symbol}",
+      "your_balance": "Votre solde : {balance} {symbol}",
       "simulation_loading": "Vérification de ce que fera cette transaction…",
       "details_unavailable": "Aucun aperçu n'est disponible pour cette transaction. Ne continuez que si vous faites confiance à la scène.",
       "you_send": "Vous envoyez",
@@ -153,6 +153,7 @@
       "tab_advanced": "Avancé",
       "advanced_hint_transaction": "C'est exactement ce que votre portefeuille enverra.",
       "advanced_hint_signature": "C'est exactement ce que votre portefeuille signera.",
+      "advanced_hint_typed_data": "Ce sont les données typées telles que votre portefeuille les lira. Il ne signe que les champs déclarés par les types.",
       "raw_to": "À",
       "raw_value": "Valeur",
       "raw_data": "Données",
