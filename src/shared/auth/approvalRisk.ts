@@ -1,4 +1,4 @@
-import { ApprovalChange } from './types'
+import { ApprovalChange, SimulationResponseBody } from './types'
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
 
@@ -67,4 +67,31 @@ function isDangerousApproval(approval: ApprovalChange, isRecognizedSpender: (add
   return !isRecognizedSpender(approval.spender)
 }
 
-export { isApprovalRevocation, isDangerousApproval, isZeroAddress }
+// The functions through which an account changes its own ERC20 allowance. Only a call to one of these, made
+// by the owner, grants or changes an allowance; every other `Approval(owner, …)` a transaction logs is the
+// token writing the remaining allowance after a `transferFrom` spent part of it.
+const ALLOWANCE_FUNCTIONS: ReadonlySet<string> = new Set(['approve', 'increaseAllowance', 'decreaseAllowance'])
+
+/**
+ * Drops the ERC20 `Approval` events that are allowance consumption rather than grants. An ERC20
+ * `transferFrom` writes the remaining allowance as `Approval(owner, spender, remaining)`; with an unlimited
+ * allowance to the marketplace, every purchase would otherwise read as an unlimited grant and trip the
+ * high-risk gate. Logs alone cannot tell that write from a real grant, but the decoded call can: the
+ * signer's allowance only changes by a grant when the signer's own call is an allowance function. So on
+ * any other call, an ERC20 approval owned by the signer is consumption and is left out; approvals owned
+ * by anyone else, and every approval on an allowance call, stay exactly as reported.
+ */
+function withoutAllowanceConsumption(result: SimulationResponseBody, functionName: string, signerAddress: string): SimulationResponseBody {
+  if (ALLOWANCE_FUNCTIONS.has(functionName)) {
+    return result
+  }
+  const signer = signerAddress.toLowerCase()
+  return {
+    ...result,
+    approvalChanges: result.approvalChanges.filter(
+      approval => !(approval.kind === 'approval' && approval.standard === 'erc20' && approval.owner.toLowerCase() === signer)
+    )
+  }
+}
+
+export { isApprovalRevocation, isDangerousApproval, isZeroAddress, withoutAllowanceConsumption }

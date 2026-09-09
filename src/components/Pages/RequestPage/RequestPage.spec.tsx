@@ -2282,6 +2282,52 @@ describe('RequestPage', () => {
         })
       })
 
+      describe('and the signer called a function that is not an allowance function', () => {
+        let payment: SimulationResponseBody['assetChanges'][number]
+
+        beforeEach(() => {
+          payment = erc721Transfer({
+            standard: 'erc20',
+            to: '0xseller',
+            tokenId: null,
+            amount: '100',
+            rawAmount: '100000000000000000000',
+            name: 'MANA'
+          })
+          mockClassifyRequest.mockResolvedValue(
+            dclTransaction({ call: { functionName: 'executeOrder', args: ['0xnft', BigInt(1)], payable: false, forwardsCall: false } })
+          )
+        })
+
+        describe('and the approval is owned by the signer', () => {
+          beforeEach(() => {
+            mockSimulateTransaction.mockResolvedValue(simulationOf({ assetChanges: [payment], approvalChanges: [approval] }))
+          })
+
+          it('should not require an acknowledgment, since the approval is the remaining allowance the purchase consumed', async () => {
+            renderRequestPage()
+            const view = await screen.findByTestId('wallet-interaction')
+            await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+            expect(view).toHaveAttribute('data-requires-acknowledgment', 'false')
+          })
+        })
+
+        describe('and the approval is owned by another account', () => {
+          beforeEach(() => {
+            mockSimulateTransaction.mockResolvedValue(
+              simulationOf({ assetChanges: [payment], approvalChanges: [{ ...approval, owner: '0xsomeoneelse' }] })
+            )
+          })
+
+          it('should still require an acknowledgment, since only the signer allowance is written by a transfer', async () => {
+            renderRequestPage()
+            const view = await screen.findByTestId('wallet-interaction')
+            await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+            expect(view).toHaveAttribute('data-requires-acknowledgment', 'true')
+          })
+        })
+      })
+
       describe('and it is a limited allowance to a recognized Decentraland contract', () => {
         beforeEach(() => {
           mockGetKnownDecentralandContract.mockImplementation((address: string) => (address === '0xspender' ? knownContract() : null))

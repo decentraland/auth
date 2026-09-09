@@ -36,7 +36,8 @@ import {
   getKnownDecentralandContract,
   hasNoVisibleEffects,
   isDangerousApproval,
-  resolveKnownDecentralandContract
+  resolveKnownDecentralandContract,
+  withoutAllowanceConsumption
 } from '../../../shared/auth'
 import { isRetiredSignInMethod } from '../../../shared/auth/signMethodGuard'
 import { isSocialProviderType, useCurrentConnectionData } from '../../../shared/connection'
@@ -685,9 +686,15 @@ export const RequestPage = () => {
         // preview to fall back to, so the request is rejected instead of degrading to an
         // acknowledgment: otherwise oversized or otherwise unpreviewable calldata would be a
         // deterministic way to skip the preview. Outages (5xx, timeouts) still degrade.
-        const fetchSimulation = async (body: SimulationRequestBody, { rejectUnpreviewable = false } = {}) => {
+        const fetchSimulation = async (body: SimulationRequestBody, call: DecodedCall, { rejectUnpreviewable = false } = {}) => {
           try {
-            const result = await authServerClient.current.simulateTransaction(body)
+            // The server reports every approval it logged; which of them are grants is decided here, where
+            // the function the signer called is known (see withoutAllowanceConsumption).
+            const result = withoutAllowanceConsumption(
+              await authServerClient.current.simulateTransaction(body),
+              call.functionName,
+              signerAddress
+            )
             if (isStale()) return
             setSimulationState({ status: 'ready', result })
             setSimulationVerified(collectVerifiedContracts(result, body.chainId))
@@ -811,7 +818,7 @@ export const RequestPage = () => {
             if (!isStale()) setPreviewCaveat(caveat)
             return caveat
           })
-          const simulationPromise = fetchSimulation(buildSendTransactionSimulationPayload(transaction, signerAddress))
+          const simulationPromise = fetchSimulation(buildSendTransactionSimulationPayload(transaction, signerAddress), transaction.call)
 
           if (transaction.branded !== 'gift_candidate') return
           const transferData = decodeNftTransferData(transaction.call)
@@ -896,6 +903,7 @@ export const RequestPage = () => {
             })
             void fetchSimulation(
               buildMetaTransactionSimulationPayload(classified.chainId, classified.contract.address, classified.calldata, signerAddress),
+              classified.call,
               { rejectUnpreviewable: true }
             )
             break
