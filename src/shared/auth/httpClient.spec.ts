@@ -209,7 +209,7 @@ describe('createAuthServerClient', () => {
       })
     })
 
-    describe('when a typed-data request is a MetaTransaction carrying an undeclared second call', () => {
+    describe('when a typed-data request is a MetaTransaction carrying an undeclared second call (no longer rejected at recover)', () => {
       beforeEach(() => {
         mockResponse.method = 'eth_signTypedData_v4'
         mockResponse.params = [
@@ -244,8 +244,8 @@ describe('createAuthServerClient', () => {
         })
       })
 
-      it('should throw a MalformedSignatureRequestError because the preview would simulate a call the wallet does not sign', async () => {
-        await expect(client.recover(mockRequestId, mockSignerAddress)).rejects.toBeInstanceOf(MalformedSignatureRequestError)
+      it('should recover the request, leaving the classifier to show the malformed MetaTransaction as unverified', async () => {
+        await expect(client.recover(mockRequestId, mockSignerAddress)).resolves.toEqual(mockResponse)
       })
     })
 
@@ -555,13 +555,13 @@ describe('createAuthServerClient', () => {
         expect(result).toEqual(mockResponse)
       })
 
-      it('should track the success without an authRequestId when none is provided', async () => {
+      it('should track the success without an authRequestId if the call gave none', async () => {
         await client.postIdentity(mockIdentity)
 
         expect(mockTrack).toHaveBeenCalledWith(TrackingEvents.DEEP_LINK_AUTH_SUCCESS, { type: 'success' })
       })
 
-      it('should forward the authRequestId onto the success tracking event when provided', async () => {
+      it('should forward a given authRequestId onto the success tracking event', async () => {
         await client.postIdentity(mockIdentity, { authRequestId: 'a-request-uuid' })
 
         expect(mockTrack).toHaveBeenCalledWith(TrackingEvents.DEEP_LINK_AUTH_SUCCESS, {
@@ -658,6 +658,48 @@ describe('createAuthServerClient', () => {
 
       it('should carry the response status so a caller can tell a rejected call from an outage', async () => {
         await expect(client.simulateTransaction(body)).rejects.toMatchObject({ status: 502 })
+      })
+    })
+
+    describe('and the server rejects the request with a typed code', () => {
+      beforeEach(() => {
+        mockFetch.mockResolvedValueOnce({
+          ok: false,
+          status: 400,
+          text: () => Promise.resolve(JSON.stringify({ error: 'x', code: 'upstream_rejected' }))
+        })
+      })
+
+      it('should carry the code so a caller can tell the request being refused from the provider refusing it', async () => {
+        await expect(client.simulateTransaction(body)).rejects.toMatchObject({ status: 400, code: 'upstream_rejected' })
+      })
+    })
+
+    describe('and the server rejects the request with a body larger than a rejection can be', () => {
+      beforeEach(() => {
+        mockFetch.mockResolvedValueOnce({
+          ok: false,
+          status: 400,
+          text: () => Promise.resolve(`{"code":"invalid_request","pad":"${'x'.repeat(5000)}"}`)
+        })
+      })
+
+      it('should stop reading it and leave the code unknown', async () => {
+        await expect(client.simulateTransaction(body)).rejects.toMatchObject({ status: 400, code: undefined })
+      })
+    })
+
+    describe('and the server rejects the request with a code this client does not know', () => {
+      beforeEach(() => {
+        mockFetch.mockResolvedValueOnce({
+          ok: false,
+          status: 400,
+          text: () => Promise.resolve(JSON.stringify({ error: 'x', code: 'something_new' }))
+        })
+      })
+
+      it('should leave the code unknown', async () => {
+        await expect(client.simulateTransaction(body)).rejects.toMatchObject({ status: 400, code: undefined })
       })
     })
 

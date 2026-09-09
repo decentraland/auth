@@ -1,27 +1,38 @@
 import { SimulationState } from '../../types'
 
-export interface WalletInteractionProps {
+/** What the review says about gas: covered by the relay, or the wallet's own fee estimate. */
+type WalletInteractionGas =
+  | { covered: true }
+  | { covered: false; status: 'loading' }
+  | { covered: false; status: 'unavailable' }
+  | { covered: false; status: 'ready'; cost: bigint; balance?: bigint }
+
+interface WalletInteractionProps {
   requestId: string
-  isWeb2Wallet?: boolean
-  explorerText?: string
   isLoading?: boolean
-  /** Asset-change simulation shown inline on this (first) screen for web2 users. */
-  simulation?: SimulationState
+  /** The function the calldata decodes to against the Decentraland contract's ABI. */
+  functionName: string
+  /** The Decentraland contract being called, as the registry names it. */
+  contractName: string
+  /** Asset-change simulation of the call, shown inline on this screen. */
+  simulation: SimulationState
   userAddress?: string
   /** Resolved counterparty display names keyed by lowercased address. */
   profiles?: Record<string, string>
   /** Lowercased addresses recognized as verified Decentraland contracts. */
   verifiedContracts?: string[]
+  /** Lowercased addresses of collections a Decentraland factory deployed (see SimulationSummaryProps). */
+  collectionContracts?: string[]
   /** Chain used for block-explorer links. */
   chainId?: number
   /** When true, the approve button is gated behind a high-risk acknowledgment checkbox. */
   requiresAcknowledgment?: boolean
-  /** True when the transaction is relayed as a meta-transaction (gas paid by the gas tank). */
-  gasCovered?: boolean
-  /** Estimated gas cost in wei, shown inline when the user pays their own gas. */
-  transactionCost?: bigint
-  /** User's native balance in wei, shown next to the gas cost. */
-  balance?: bigint
+  /**
+   * True while it is still being decided whether every contract the call reaches is Decentraland's; Allow
+   * waits for it. A call that reaches anything else is refused and never shown here.
+   */
+  isCounterpartyCheckPending?: boolean
+  gas: WalletInteractionGas
   /** True when the simulation predicts the transaction would revert. */
   isReverted?: boolean
   /**
@@ -32,3 +43,5 @@ export interface WalletInteractionProps {
   onDeny: () => void
   onApprove: () => void
 }
+
+export type { WalletInteractionGas, WalletInteractionProps }

@@ -12,6 +12,7 @@ enum TrackingEvents {
   REQUEST_OUTCOME_SUCCESS = 'Request outcome sent successfully',
   REQUEST_OUTCOME_FAILED = 'Request outcome sent with error',
   TRANSACTION_REVIEW_RESTARTED = 'Transaction review restarted',
+  REQUEST_CLASSIFIED = 'Request classified',
   DEEP_LINK_AUTH_SUCCESS = 'Deep link auth success',
   DEEP_LINK_AUTH_FAILED = 'Deep link auth failed',
   START_ADDING_NAME = 'Start adding name',

@@ -1,5 +1,5 @@
-import { isApprovalRevocation, isDangerousApproval } from './approvalRisk'
-import { ApprovalChange } from './types'
+import { isApprovalRevocation, isDangerousApproval, withoutAllowanceConsumption } from './approvalRisk'
+import { ApprovalChange, SimulationResponseBody } from './types'
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
 const SPENDER = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd'
@@ -163,6 +163,88 @@ describe('isDangerousApproval', () => {
 
     it('should return false because it is a revocation', () => {
       expect(isDangerousApproval(approval, unrecognized)).toBe(false)
+    })
+  })
+})
+
+describe('withoutAllowanceConsumption', () => {
+  const SIGNER = '0xD9B96b5dC720Fc52bEde1eC3B40A930E15F70DDD'
+  const MARKETPLACE = '0x480a0f4e360E8964e68858Dd231c2922f1df45Ef'
+  let consumedAllowance: ApprovalChange
+  let grantToAnotherSpender: ApprovalChange
+  let otherOwnerAllowance: ApprovalChange
+  let signerTokenApproval: ApprovalChange
+  let result: SimulationResponseBody
+
+  beforeEach(() => {
+    consumedAllowance = buildAllowance({ owner: SIGNER.toLowerCase(), spender: MARKETPLACE.toLowerCase() })
+    grantToAnotherSpender = buildAllowance({ owner: SIGNER.toLowerCase(), spender: SPENDER, isUnlimited: true, amount: null })
+    otherOwnerAllowance = buildAllowance({ owner: '0x1111111111111111111111111111111111111111', spender: MARKETPLACE.toLowerCase() })
+    signerTokenApproval = buildAllowance({
+      owner: SIGNER.toLowerCase(),
+      spender: MARKETPLACE.toLowerCase(),
+      standard: 'erc721',
+      amount: null,
+      rawAmount: null,
+      tokenId: '7'
+    })
+    result = {
+      status: 'success',
+      assetChanges: [],
+      approvalChanges: [consumedAllowance, grantToAnotherSpender, otherOwnerAllowance, signerTokenApproval],
+      balanceChanges: [],
+      events: []
+    }
+  })
+
+  describe.each(['approve', 'increaseAllowance', 'decreaseAllowance'])('when the signer called %s on the token', functionName => {
+    it('should keep every approval as reported, since the call is a grant whatever it names', () => {
+      expect(
+        withoutAllowanceConsumption(result, { functionName, calledContract: MARKETPLACE, signerAddress: SIGNER }).approvalChanges
+      ).toEqual(result.approvalChanges)
+    })
+  })
+
+  describe.each(['executeOrder', 'accept', 'permit', 'aNameThisPageHasNeverSeen'])(
+    'when the signer called %s on the marketplace',
+    functionName => {
+      let filtered: SimulationResponseBody
+
+      beforeEach(() => {
+        filtered = withoutAllowanceConsumption(result, { functionName, calledContract: MARKETPLACE, signerAddress: SIGNER })
+      })
+
+      it('should drop the allowance the called contract consumed, which is the remaining allowance a transfer wrote', () => {
+        expect(filtered.approvalChanges).not.toContainEqual(consumedAllowance)
+      })
+
+      it('should keep a grant to any other spender, whatever the function is called', () => {
+        expect(filtered.approvalChanges).toContainEqual(grantToAnotherSpender)
+      })
+
+      it('should keep an allowance owned by another account', () => {
+        expect(filtered.approvalChanges).toContainEqual(otherOwnerAllowance)
+      })
+
+      it('should keep a single-token approval, since only ERC20 allowances are written by transfers', () => {
+        expect(filtered.approvalChanges).toContainEqual(signerTokenApproval)
+      })
+
+      it('should leave the rest of the result untouched', () => {
+        expect(filtered).toEqual({ ...result, approvalChanges: [grantToAnotherSpender, otherOwnerAllowance, signerTokenApproval] })
+      })
+    }
+  )
+
+  describe('when the called contract is spelled in another casing', () => {
+    it('should still recognize the consumed allowance', () => {
+      expect(
+        withoutAllowanceConsumption(result, {
+          functionName: 'executeOrder',
+          calledContract: MARKETPLACE.toUpperCase(),
+          signerAddress: SIGNER
+        }).approvalChanges
+      ).not.toContainEqual(consumedAllowance)
     })
   })
 })

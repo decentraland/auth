@@ -1,7 +1,8 @@
+/* eslint-disable @typescript-eslint/naming-convention -- EIP-712 type names (EIP712Domain, MetaTransaction, Permit) are fixed by the standard and the contracts */
 import { Rarity } from '@dcl/schemas'
 import { Avatar } from '@dcl/schemas/dist/platform/profile/avatar'
 import { SimulationResponseBody } from '../../../../shared/auth'
-import { MANATransferData, NFTTransferData, SignaturePayload } from '../types'
+import { MANATransferData, NFTTransferData } from '../types'
 
 const avatar: Avatar = {
   hasClaimedName: true,
@@ -306,59 +307,140 @@ const simulationNoChanges: SimulationResponseBody = {
   events: [{ name: 'ConfigUpdated', address: MARKETPLACE_ADDRESS }]
 }
 
-const messageSignaturePayload: SignaturePayload = {
-  kind: 'message',
-  message: 'Sign this message to prove you own this wallet.\nNonce: 12345'
-}
+const MANA_CONTRACT_ADDRESS = '0xa1c57f48f0deb89f569dfbe6e2b7f46d33606fd4'
 
-// A schema-complete payload: the review renders only fields the signed struct declares, so the
-// gallery must carry the types a real request would.
-const typedDataSignaturePayload: SignaturePayload = {
-  kind: 'typedData',
-  raw: '{"types":{"EIP712Domain":[{"name":"name","type":"string"},{"name":"chainId","type":"uint256"},{"name":"verifyingContract","type":"address"}],"Order":[{"name":"price","type":"uint256"},{"name":"expiration","type":"uint256"}]},"primaryType":"Order","domain":{"name":"Decentraland Marketplace","chainId":137,"verifyingContract":"0x480a0f4e360e8964e68858dd231c2922f1df45ef"},"message":{"price":"1000000000000000000","expiration":"1700000000"}}',
-  typedData: {
+// The exact typed data decentraland-transactions builds for a MANA transfer meta-transaction.
+const metaTxRaw = JSON.stringify(
+  {
     types: {
-      // eslint-disable-next-line @typescript-eslint/naming-convention
       EIP712Domain: [
         { name: 'name', type: 'string' },
+        { name: 'version', type: 'string' },
+        { name: 'verifyingContract', type: 'address' },
+        { name: 'salt', type: 'bytes32' }
+      ],
+      MetaTransaction: [
+        { name: 'nonce', type: 'uint256' },
+        { name: 'from', type: 'address' },
+        { name: 'functionSignature', type: 'bytes' }
+      ]
+    },
+    domain: {
+      name: '(PoS) Decentraland MANA',
+      version: '1',
+      verifyingContract: MANA_CONTRACT_ADDRESS,
+      salt: '0x0000000000000000000000000000000000000000000000000000000000000089'
+    },
+    primaryType: 'MetaTransaction',
+    message: {
+      nonce: 12,
+      from: USER_ADDRESS,
+      functionSignature: `0xa9059cbb000000000000000000000000${MARKETPLACE_ADDRESS.slice(2)}0000000000000000000000000000000000000000000000056bc75e2d63100000`
+    }
+  },
+  null,
+  2
+)
+
+// A MetaTransaction for a contract Decentraland does not know, with a copied domain name.
+const unknownMetaTxRaw = metaTxRaw.replace(MANA_CONTRACT_ADDRESS, '0xabcdefabcdefabcdefabcdefabcdefabcdefef01')
+
+// An unlimited USDC Permit: typed data Auth does not interpret.
+const permitRaw = JSON.stringify(
+  {
+    types: {
+      EIP712Domain: [
+        { name: 'name', type: 'string' },
+        { name: 'version', type: 'string' },
         { name: 'chainId', type: 'uint256' },
         { name: 'verifyingContract', type: 'address' }
       ],
-      // eslint-disable-next-line @typescript-eslint/naming-convention
-      Order: [
-        { name: 'price', type: 'uint256' },
-        { name: 'expiration', type: 'uint256' }
+      Permit: [
+        { name: 'owner', type: 'address' },
+        { name: 'spender', type: 'address' },
+        { name: 'value', type: 'uint256' },
+        { name: 'nonce', type: 'uint256' },
+        { name: 'deadline', type: 'uint256' }
       ]
     },
-    primaryType: 'Order',
-    domain: { name: 'Decentraland Marketplace', chainId: 137, verifyingContract: '0x480a0f4e360e8964e68858dd231c2922f1df45ef' },
-    message: { price: '1000000000000000000', expiration: '1700000000' }
-  }
-}
+    domain: { name: 'USD Coin', version: '2', chainId: 137, verifyingContract: USDC_ADDRESS },
+    primaryType: 'Permit',
+    message: {
+      owner: USER_ADDRESS,
+      spender: MARKETPLACE_ADDRESS,
+      value: '115792089237316195423570985008687907853269984665640564039457584007913129639935',
+      nonce: 3,
+      deadline: 1893456000
+    }
+  },
+  null,
+  2
+)
 
-const metaTxSignaturePayload: SignaturePayload = {
-  kind: 'typedData',
-  raw: '{"primaryType":"MetaTransaction","domain":{"name":"Decentraland Collection","verifyingContract":"0xfef5c99885c3036e591b6e6db52482891834a5f4","salt":"0x0000000000000000000000000000000000000000000000000000000000000089"},"message":{"nonce":0,"from":"0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd","functionSignature":"0xa9059cbb"}}',
-  typedData: {
-    primaryType: 'MetaTransaction',
-    domain: {
-      name: 'Decentraland Collection',
-      verifyingContract: '0xfef5c99885c3036e591b6e6db52482891834a5f4',
-      salt: '0x0000000000000000000000000000000000000000000000000000000000000089'
+const personalSignText =
+  'Welcome to Example Scene!\nClick to sign in. This request will not trigger a blockchain transaction.\nNonce: 8f3a2c'
+const personalSignHex = `0x${Array.from(new TextEncoder().encode(personalSignText))
+  .map(byte => byte.toString(16).padStart(2, '0'))
+  .join('')}`
+const personalSignDigestHex = `0x${'9f'.repeat(32)}`
+
+// A trade on the off-chain marketplace paying 10 USDT (Polygon) for a wearable: the stablecoin is named from
+// the known-token table, the wearable from its collection.
+const simulationStablecoinTrade: SimulationResponseBody = {
+  status: 'success',
+  assetChanges: [
+    {
+      type: 'transfer',
+      standard: 'erc20',
+      from: USER_ADDRESS,
+      to: '0x9d2e7d8b9e4a0f1c3b5a6d7e8f9a0b1c2d3e4f5a',
+      amount: '10',
+      rawAmount: '10000000',
+      tokenId: null,
+      contractAddress: '0xc2132d05d31c914a87c6611c10748aeb04b58e8f',
+      symbol: 'USDT0',
+      name: 'USDT0',
+      decimals: 6,
+      logoUrl: null,
+      dollarValue: '10.00'
     },
-    message: { nonce: 0, from: USER_ADDRESS, functionSignature: '0xa9059cbb' }
-  }
+    {
+      type: 'transfer',
+      standard: 'erc721',
+      from: '0x9d2e7d8b9e4a0f1c3b5a6d7e8f9a0b1c2d3e4f5a',
+      to: USER_ADDRESS,
+      amount: null,
+      rawAmount: null,
+      tokenId: '412',
+      contractAddress: COLLECTION_ADDRESS,
+      symbol: null,
+      name: 'Rare Helmet',
+      decimals: null,
+      logoUrl: null,
+      dollarValue: null
+    }
+  ],
+  approvalChanges: [],
+  balanceChanges: [],
+  events: []
 }
 
 export {
+  COLLECTION_ADDRESS,
   avatar,
   manaData,
-  metaTxSignaturePayload,
-  messageSignaturePayload,
+  MANA_CONTRACT_ADDRESS,
+  MARKETPLACE_ADDRESS,
+  metaTxRaw,
   nftData,
+  permitRaw,
+  personalSignDigestHex,
+  personalSignHex,
+  personalSignText,
   simulationNoChanges,
   simulationReverted,
+  simulationStablecoinTrade,
   simulationSuccess,
-  typedDataSignaturePayload,
+  unknownMetaTxRaw,
   USER_ADDRESS
 }

@@ -2,16 +2,17 @@ import { test, expect } from '@playwright/test'
 import { injectMockWallet, mockApiRoutes } from '../helpers/setup'
 
 /**
- * End-to-end coverage for the web2 transaction-simulation and signature-preview views.
+ * End-to-end coverage for the request review views: the simulation review of a Decentraland
+ * contract call, and the unverified view shown for everything else.
  *
- * The fully connected web2 flow (Magic/Thirdweb → request page → simulated review) can't be
- * driven in E2E: the social connectors need a real SDK session to restore, so the request page
- * never resolves to a web2 wallet here (see the skipped case in request-edge-cases.spec.ts). That
- * orchestration is covered by RequestPage unit tests.
+ * The fully connected flow (wallet → request page → review) can't be driven in E2E: the social
+ * connectors need a real SDK session to restore, so the request page never resolves to a web2
+ * wallet here (see the skipped case in request-edge-cases.spec.ts). That orchestration is covered
+ * by RequestPage unit tests.
  *
  * These tests exercise the real components in a real browser through the `/auth/testView/:viewId`
- * gallery (available outside production): rendering, i18n, block-explorer links, the high-risk
- * acknowledgment gate and the raw-payload toggle — the parts jsdom can't fully validate.
+ * gallery (available outside production): rendering, i18n, block-explorer links, the acknowledgment
+ * gate, the Advanced tab and the raw-payload toggle — the parts jsdom can't fully validate.
  */
 
 const testView = (id: string) => `/auth/testView/${id}`
@@ -23,10 +24,11 @@ test.describe('Web2 transaction simulation & signature preview views', () => {
   })
 
   test.describe('when reviewing a simulated transaction', () => {
-    test('should render the asset changes, permissions and gas in a single review screen', async ({ page }) => {
+    test('should render the decoded call, asset changes, permissions and gas in a single review screen', async ({ page }) => {
       await page.goto(testView('walletInteractionSimulation'))
 
       await expect(page.getByText('Review this transaction')).toBeVisible({ timeout: 15_000 })
+      await expect(page.getByTestId('wallet-interaction-call')).toContainText('Calls executeOrder on Decentraland Marketplace')
       await expect(page.getByText('You send')).toBeVisible()
       await expect(page.getByText('100 MANA')).toBeVisible()
       await expect(page.getByText('You receive')).toBeVisible()
@@ -67,29 +69,82 @@ test.describe('Web2 transaction simulation & signature preview views', () => {
     })
   })
 
-  test.describe('when signing a plain message', () => {
-    test('should show the message being signed', async ({ page }) => {
-      await page.goto(testView('signatureMessage'))
+  test.describe('when the request is a personal_sign', () => {
+    test('should show the message, the signature warnings and the checkbox that gates Allow', async ({ page }) => {
+      await page.goto(testView('unverifiedPersonalSign'))
 
-      await expect(page.getByText('Confirm signature')).toBeVisible({ timeout: 15_000 })
-      await expect(page.getByText(/Sign this message to prove you own this wallet/i)).toBeVisible()
+      await expect(page.getByText('Review this signature')).toBeVisible({ timeout: 15_000 })
+      await expect(page.getByTestId('unverified-message')).toContainText('Welcome to Example Scene!')
+      await expect(page.getByText('It could log you in to another site or app as you.')).toBeVisible()
+
+      const allow = page.getByTestId('unverified-approve-button')
+      await expect(allow).toBeDisabled()
+      await page.getByRole('checkbox').check()
+      await expect(allow).toBeEnabled()
+    })
+
+    test('should reveal the exact bytes being signed under Advanced', async ({ page }) => {
+      await page.goto(testView('unverifiedPersonalSign'))
+
+      await expect(page.getByText('Review this signature')).toBeVisible({ timeout: 15_000 })
+      await page.getByRole('tab', { name: 'Advanced' }).click()
+
+      await expect(page.getByTestId('unverified-raw-hex')).toContainText('0x57656c636f6d65')
     })
   })
 
-  test.describe('when signing typed data', () => {
-    test('should show the structured message fields', async ({ page }) => {
-      await page.goto(testView('signatureTypedData'))
+  test.describe('when the request is typed data Decentraland does not interpret', () => {
+    test('should show the JSON verbatim under Advanced instead of a field tree', async ({ page }) => {
+      await page.goto(testView('unverifiedTypedData'))
 
-      await expect(page.getByText('Confirm signature')).toBeVisible({ timeout: 15_000 })
-      await expect(page.getByText(/price/i)).toBeVisible()
+      await expect(page.getByText('Review this signature')).toBeVisible({ timeout: 15_000 })
+      await expect(page.getByText(/authorize an off-chain order/i)).toBeVisible()
+      await page.getByRole('tab', { name: 'Advanced' }).click()
+
+      await expect(page.getByTestId('unverified-raw-typed-data')).toContainText('"primaryType": "Permit"')
     })
   })
 
-  test.describe('when signing a meta-transaction', () => {
-    test('should show the asset summary and reveal the raw payload on demand', async ({ page }) => {
+  test.describe('when the request is a MetaTransaction Decentraland cannot vouch for', () => {
+    test('should list the meta-transaction warnings and link the contract', async ({ page }) => {
+      await page.goto(testView('unverifiedMetaTransaction'))
+
+      await expect(page.getByText('The signature never expires.')).toBeVisible({ timeout: 15_000 })
+      await expect(page.getByText('Anyone who holds the signature can submit it, at any time.')).toBeVisible()
+      await expect(page.getByRole('link', { name: '0xabcd…ef01' })).toHaveAttribute('href', /polygonscan\.com\/address\//)
+    })
+  })
+
+  test.describe('when the request is a transaction to a contract Decentraland does not know', () => {
+    test('should show the fee, the warnings and the checkbox that gates Allow', async ({ page }) => {
+      await page.goto(testView('unverifiedTransaction'))
+
+      await expect(page.getByText('Review this transaction')).toBeVisible({ timeout: 15_000 })
+      await expect(page.getByTestId('unverified-fee')).toContainText('0.0042 POL')
+      await expect(page.getByText(/can move any assets or permissions/i)).toBeVisible()
+
+      const allow = page.getByTestId('unverified-approve-button')
+      await expect(allow).toBeDisabled()
+      await page.getByRole('checkbox').check()
+      await expect(allow).toBeEnabled()
+    })
+
+    test('should reveal the calldata the wallet will send under Advanced', async ({ page }) => {
+      await page.goto(testView('unverifiedTransaction'))
+
+      await expect(page.getByText('Review this transaction')).toBeVisible({ timeout: 15_000 })
+      await page.getByRole('tab', { name: 'Advanced' }).click()
+
+      await expect(page.getByTestId('unverified-raw-data')).toContainText('0x095ea7b3')
+    })
+  })
+
+  test.describe('when signing a Decentraland meta-transaction', () => {
+    test('should show the asset summary, the decoded call and reveal the raw payload on demand', async ({ page }) => {
       await page.goto(testView('signatureMetaTx'))
 
       await expect(page.getByText('You send')).toBeVisible({ timeout: 15_000 })
+      await expect(page.getByTestId('signature-call')).toContainText('Calls transfer on (PoS) Decentraland MANA')
       await expect(page.getByTestId('signature-raw')).toBeHidden()
 
       await page.getByText('View raw data').click()

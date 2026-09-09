@@ -5,12 +5,15 @@ import {
   ApprovalChange,
   AssetChange,
   SimulationResponseBody,
+  getKnownToken,
   hasNoVisibleEffects,
   isApprovalRevocation,
   isDangerousApproval,
   isZeroAddress
 } from '../../../../../shared/auth'
-import { getExplorerAddressUrl, getExplorerName, getNetworkName } from '../../../../../shared/explorer'
+import { getExplorerAddressUrl, getExplorerName, getNativeSymbol, getNetworkName } from '../../../../../shared/explorer'
+import { formatUntrustedLabel, shortenAddress } from '../../../../../shared/text'
+import { getHttpsUrl } from '../../../../../shared/urls'
 import { SimulationSummaryProps } from './SimulationSummary.types'
 import {
   AmountUsd,
@@ -47,11 +50,6 @@ type Translate = (key: string, opts?: Record<string, string | number>) => string
 // Defensive ceiling on decoded events rendered in the technical-details section. The server already
 // caps events at 50; this guards the UI against an unexpectedly large or malformed response.
 const MAX_DISPLAYED_EVENTS = 100
-
-const shortenAddress = (address: string | null): string => {
-  if (!address) return ''
-  return address.length > 12 ? `${address.slice(0, 6)}…${address.slice(-4)}` : address
-}
 
 const counterpartyLabel = (address: string | null, profiles: Record<string, string>): string => {
   if (!address) return ''
@@ -108,17 +106,25 @@ const formatUsd = (dollarValue: string | null, signed = false): string | null =>
   return `${value < 0 && Number(fixed) !== 0 ? '-' : '+'}${magnitude}`
 }
 
-const assetTitle = (change: AssetChange, t: Translate): string => {
-  if (change.standard === 'erc721' || change.standard === 'erc1155') {
-    const name = change.name || change.symbol
+// Token names and symbols are on-chain strings of whatever token the call touched, written by whoever
+// deployed it: shown as untrusted labels (hidden characters revealed, length capped). An NFT row is
+// marked as one and puts the id before the name ("NFT #7 · Name"), so a collection named after a
+// currency ("1000 MANA") can never read as an amount of it. ERC-1155 is not modelled: no Decentraland
+// contract is one, and the page refuses a preview that moves such an asset before this summary renders it.
+const assetTitle = (change: AssetChange, t: Translate, chainId: number | undefined): string => {
+  // A change of unknown standard that carries a token id is a token, not an amount of something.
+  if (change.standard === 'erc721' || (change.standard === 'unknown' && change.tokenId)) {
+    const name = formatUntrustedLabel(change.name || change.symbol)
     const tokenId = change.tokenId ? `#${change.tokenId}` : ''
-    return (
-      [name, tokenId].filter(Boolean).join(' ') ||
-      tokenId ||
-      t('request.transaction_dialog.unknown_token', { address: shortenAddress(change.contractAddress) })
-    )
+    if (!name && !tokenId) {
+      return t('request.transaction_dialog.unknown_token', { address: shortenAddress(change.contractAddress) })
+    }
+    return [t('request.transaction_dialog.nft_label'), tokenId, name ? `· ${name}` : ''].filter(Boolean).join(' ')
   }
-  const symbol = change.symbol || (change.standard === 'native' ? 'ETH' : '')
+  // A native change without a symbol is named by the chain, never by a fixed currency.
+  const symbol =
+    formatUntrustedLabel(change.symbol) ||
+    (change.standard === 'native' ? getNativeSymbol(chainId) || t('request.unverified.native_currency') : '')
   // `rawAmount` is in base units (e.g. wei), so it's only a valid display amount when the token
   // has 0 decimals. Otherwise, without a decimals-applied `amount`, we show the symbol alone
   // rather than a base-unit number inflated by ~18 orders of magnitude.
@@ -177,20 +183,26 @@ const AssetRow = ({
   direction,
   profiles,
   verified,
+  collections,
   chainId
 }: {
   change: AssetChange
   direction: 'send' | 'receive'
   profiles: Record<string, string>
   verified: Set<string>
+  collections: Set<string>
   chainId?: number
 }) => {
   const { t } = useTranslation()
-  const title = assetTitle(change, t)
+  const title = assetTitle(change, t, chainId)
   const dollar = formatUsd(change.dollarValue)
-  const fallbackInitial = (change.symbol || change.name || '?').charAt(0)
+  const fallbackInitial = (formatUntrustedLabel(change.symbol || change.name) || '?').charAt(0)
+  // A logo is fetched only from an https URL; anything else falls back to the initial.
+  const logoUrl = getHttpsUrl(change.logoUrl)
   const outgoing = direction === 'send'
   const isVerified = (address: string | null) => !!address && verified.has(address.toLowerCase())
+  const isCollection = (address: string | null) => !!address && collections.has(address.toLowerCase())
+  const knownToken = change.contractAddress && chainId !== undefined ? getKnownToken(change.contractAddress, chainId) : null
 
   let meta: React.ReactNode
   if (change.type === 'mint') {
@@ -217,15 +229,28 @@ const AssetRow = ({
       <DirectionIndicator outgoing={outgoing} aria-hidden="true">
         {outgoing ? '↑' : '↓'}
       </DirectionIndicator>
-      {change.logoUrl ? (
-        <TokenLogo src={change.logoUrl} alt={title} />
-      ) : (
-        <TokenLogoFallback aria-hidden="true">{fallbackInitial}</TokenLogoFallback>
-      )}
+      {logoUrl ? <TokenLogo src={logoUrl} alt={title} /> : <TokenLogoFallback aria-hidden="true">{fallbackInitial}</TokenLogoFallback>}
       <ChangeText>
         <ChangeAmount>
           <AddressLink address={change.contractAddress} chainId={chainId} label={title} verified={isVerified(change.contractAddress)} />
         </ChangeAmount>
+        {/* Four provenances: a registry contract carries the badge; a factory collection is Decentraland
+            code with content anyone can create, so it is named as a collection, never vouched for by
+            name; a stablecoin the marketplaces settle in is named from the known-token table, next to
+            whatever the token says about itself; anything else is unverified. The address is shown in
+            the last three cases. */}
+        {change.standard !== 'native' && !isVerified(change.contractAddress) ? (
+          <ChangeMeta title={change.contractAddress ?? undefined}>
+            {isCollection(change.contractAddress)
+              ? t('request.transaction_dialog.community_collection', { address: shortenAddress(change.contractAddress) || '—' })
+              : knownToken
+                ? t('request.transaction_dialog.known_token', {
+                    name: knownToken.name,
+                    address: shortenAddress(change.contractAddress) || '—'
+                  })
+                : t('request.transaction_dialog.unverified_token', { address: shortenAddress(change.contractAddress) || '—' })}
+          </ChangeMeta>
+        ) : null}
         <ChangeMeta>{meta}</ChangeMeta>
       </ChangeText>
       {dollar ? <AmountUsd>≈ {dollar}</AmountUsd> : null}
@@ -245,7 +270,7 @@ const ApprovalItem = ({
   chainId?: number
 }) => {
   const { t } = useTranslation()
-  const token = approval.name || approval.symbol || shortenAddress(approval.contractAddress)
+  const token = formatUntrustedLabel(approval.name || approval.symbol) || shortenAddress(approval.contractAddress)
   const spenderVerified = !!approval.spender && verified.has(approval.spender.toLowerCase())
   const spender = (
     <AddressLink
@@ -256,7 +281,7 @@ const ApprovalItem = ({
     />
   )
 
-  const symbol = approval.symbol || token
+  const symbol = formatUntrustedLabel(approval.symbol) || token
   const isRevocation = isApprovalRevocation(approval)
   // A revocation to the zero address has no counterparty to name. A grant to the zero address is
   // still shown with its address: it is a grant to an unrecognized spender and is worded as one.
@@ -359,11 +384,16 @@ export const SimulationSummary = ({
   userAddress,
   profiles = {},
   verifiedContracts = [],
+  collectionContracts = [],
   chainId,
   gas
 }: SimulationSummaryProps) => {
   const { t } = useTranslation()
   const verified = new Set(verifiedContracts.map(address => address.toLowerCase()))
+  const collections = new Set(collectionContracts.map(address => address.toLowerCase()))
+  // Gas is paid in the currency of the chain the call runs on: POL for a plain send to a Polygon
+  // contract without meta-transaction support, ETH on Ethereum. Never a fixed symbol.
+  const nativeSymbol = getNativeSymbol(chainId) || t('request.unverified.native_currency')
 
   // The gas footer comes from the wallet/meta-transaction check, not the Tenderly result, so it is
   // shown once the preview resolves (ready or unavailable) so the user always sees the gas cost (or
@@ -374,10 +404,14 @@ export const SimulationSummary = ({
     <GasFooter>
       {gas.covered ? (
         <GasNote>{t('request.transaction_dialog.gas_covered')}</GasNote>
+      ) : gas.unavailable ? (
+        <GasNote>{t('request.unverified.fact_fee_unavailable')}</GasNote>
       ) : (
         <>
-          <GasNote>{t('request.transaction_dialog.transaction_cost', { cost: gas.cost })}</GasNote>
-          <GasNote>{t('request.transaction_dialog.your_balance', { balance: gas.balance })}</GasNote>
+          <GasNote>{t('request.transaction_dialog.transaction_cost', { cost: gas.cost, symbol: nativeSymbol })}</GasNote>
+          {gas.balance !== undefined ? (
+            <GasNote>{t('request.transaction_dialog.your_balance', { balance: gas.balance, symbol: nativeSymbol })}</GasNote>
+          ) : null}
         </>
       )}
     </GasFooter>
@@ -441,7 +475,15 @@ export const SimulationSummary = ({
             {t('request.transaction_dialog.you_send')}
           </SectionTitle>
           {sends.map((change, index) => (
-            <AssetRow key={`send-${index}`} change={change} direction="send" profiles={profiles} verified={verified} chainId={chainId} />
+            <AssetRow
+              key={`send-${index}`}
+              change={change}
+              direction="send"
+              profiles={profiles}
+              verified={verified}
+              collections={collections}
+              chainId={chainId}
+            />
           ))}
         </Section>
       ) : null}
@@ -458,6 +500,7 @@ export const SimulationSummary = ({
               direction="receive"
               profiles={profiles}
               verified={verified}
+              collections={collections}
               chainId={chainId}
             />
           ))}

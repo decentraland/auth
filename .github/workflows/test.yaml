@@ -29,6 +29,9 @@ jobs:
           cache: 'npm'
       - run: npm ci
       - name: Build for E2E
+        # The same heap the release build gets: the default one ran out on this bundle.
+        env:
+          NODE_OPTIONS: '--max-old-space-size=6144'
         run: |
           npm run prebuild
           sed -i 's|^VITE_BASE_URL=.*|VITE_BASE_URL="/auth"|' .env

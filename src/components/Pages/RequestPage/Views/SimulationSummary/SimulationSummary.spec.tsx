@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { SimulationResponseBody } from '../../../../../shared/auth'
 import { SimulationState } from '../../types'
@@ -27,6 +27,197 @@ describe('when rendering the SimulationSummary', () => {
 
   afterEach(() => {
     jest.clearAllMocks()
+  })
+
+  describe.each([
+    { symbol: 'MANA', displayed: '1,000 MANA' },
+    { symbol: 'MANA\u202e', displayed: '1,000 MANA\\u202e' }
+  ])('and an unverified token uses the symbol $symbol', ({ symbol, displayed }) => {
+    beforeEach(() => {
+      simulation = {
+        status: 'ready',
+        result: emptyResult({
+          assetChanges: [
+            {
+              type: 'transfer',
+              standard: 'erc20',
+              from: '0x2222222222222222222222222222222222222222',
+              to: USER,
+              amount: '1000',
+              rawAmount: '1000000000000000000000',
+              tokenId: null,
+              contractAddress: '0x1111111111111111111111111111111111111111',
+              symbol,
+              name: 'Decentraland MANA',
+              decimals: 18,
+              logoUrl: null,
+              dollarValue: null
+            }
+          ]
+        })
+      }
+      render(<SimulationSummary simulation={simulation} userAddress={USER} chainId={137} verifiedContracts={[]} />)
+    })
+
+    it('should identify the token as unverified and show its address beneath the claimed name', () => {
+      expect(screen.getByText('request.transaction_dialog.unverified_token 0x1111…1111')).toBeInTheDocument()
+    })
+
+    describe('and the token is a collection a Decentraland factory deployed', () => {
+      beforeEach(() => {
+        cleanup()
+        render(
+          <SimulationSummary
+            simulation={simulation}
+            userAddress={USER}
+            chainId={137}
+            verifiedContracts={[]}
+            collectionContracts={['0x1111111111111111111111111111111111111111']}
+          />
+        )
+      })
+
+      it('should name it as a community collection with its address instead of calling it unverified', () => {
+        expect(screen.getByText('request.transaction_dialog.community_collection 0x1111…1111')).toBeInTheDocument()
+        expect(screen.queryByText('request.transaction_dialog.unverified_token 0x1111…1111')).not.toBeInTheDocument()
+      })
+
+      it('should not show the verified badge, since anyone can create its content', () => {
+        expect(screen.queryByLabelText('request.transaction_dialog.verified_contract')).not.toBeInTheDocument()
+      })
+    })
+
+    describe('and the token is a stablecoin the marketplaces settle in', () => {
+      beforeEach(() => {
+        cleanup()
+        const [change] = (simulation as { result: SimulationResponseBody }).result.assetChanges
+        simulation = {
+          status: 'ready',
+          result: emptyResult({
+            assetChanges: [{ ...change, contractAddress: '0xc2132d05d31c914a87c6611c10748aeb04b58e8f', symbol: 'USDT0', name: 'USDT0' }]
+          })
+        }
+        render(<SimulationSummary simulation={simulation} userAddress={USER} chainId={137} verifiedContracts={[]} />)
+      })
+
+      it('should name it from the known-token table with its address, next to what the token calls itself', () => {
+        expect(screen.getByText('request.transaction_dialog.known_token Tether USD 0xc213…8e8f')).toBeInTheDocument()
+        expect(screen.queryByText(/unverified_token/)).not.toBeInTheDocument()
+      })
+
+      it('should not show the verified badge, since it is not a Decentraland contract', () => {
+        expect(screen.queryByLabelText('request.transaction_dialog.verified_contract')).not.toBeInTheDocument()
+      })
+    })
+
+    describe('and the token is a stablecoin address from another chain', () => {
+      beforeEach(() => {
+        cleanup()
+        const [change] = (simulation as { result: SimulationResponseBody }).result.assetChanges
+        simulation = {
+          status: 'ready',
+          result: emptyResult({ assetChanges: [{ ...change, contractAddress: '0xc2132d05d31c914a87c6611c10748aeb04b58e8f' }] })
+        }
+        render(<SimulationSummary simulation={simulation} userAddress={USER} chainId={1} verifiedContracts={[]} />)
+      })
+
+      it('should call it unverified, since the same address is another contract there', () => {
+        expect(screen.getByText('request.transaction_dialog.unverified_token 0xc213…8e8f')).toBeInTheDocument()
+      })
+    })
+
+    describe('and a change of unknown standard carries a token id', () => {
+      beforeEach(() => {
+        cleanup()
+        const [change] = (simulation as { result: SimulationResponseBody }).result.assetChanges
+        simulation = {
+          status: 'ready',
+          result: emptyResult({
+            assetChanges: [{ ...change, standard: 'unknown', tokenId: '9', amount: '1', symbol: 'MYSTERY', name: 'Mystery' }]
+          })
+        }
+        render(<SimulationSummary simulation={simulation} userAddress={USER} chainId={137} verifiedContracts={[]} />)
+      })
+
+      it('should render it as a token with its id, never as an amount', () => {
+        expect(screen.getByText('request.transaction_dialog.nft_label #9 · Mystery')).toBeInTheDocument()
+      })
+    })
+
+    it('should display the claimed symbol with hidden characters exposed', () => {
+      expect(screen.getByRole('link', { name: displayed })).toHaveAttribute(
+        'href',
+        'https://polygonscan.com/address/0x1111111111111111111111111111111111111111'
+      )
+    })
+  })
+
+  describe('and an unverified token has a long name and a plain-http logo', () => {
+    beforeEach(() => {
+      simulation = {
+        status: 'ready',
+        result: emptyResult({
+          assetChanges: [
+            {
+              type: 'transfer',
+              standard: 'erc721',
+              from: '0x2222222222222222222222222222222222222222',
+              to: USER,
+              amount: null,
+              rawAmount: null,
+              tokenId: '42',
+              contractAddress: '0x1111111111111111111111111111111111111111',
+              symbol: 'FAKE',
+              name: 'A'.repeat(100),
+              decimals: 0,
+              logoUrl: 'http://evil.example/logo.png',
+              dollarValue: null
+            }
+          ]
+        })
+      }
+      render(<SimulationSummary simulation={simulation} userAddress={USER} chainId={137} verifiedContracts={[]} />)
+    })
+
+    it('should mark it as an NFT and put the token id before the capped name so the name cannot hide it', () => {
+      expect(screen.getByRole('link', { name: `request.transaction_dialog.nft_label #42 · ${'A'.repeat(39)}…` })).toBeInTheDocument()
+    })
+
+    it('should not load a logo from a plain-http URL', () => {
+      expect(screen.queryByRole('img')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('and a native transfer on Polygon comes without a symbol', () => {
+    beforeEach(() => {
+      simulation = {
+        status: 'ready',
+        result: emptyResult({
+          assetChanges: [
+            {
+              type: 'transfer',
+              standard: 'native',
+              from: USER,
+              to: '0x2222222222222222222222222222222222222222',
+              amount: '1.5',
+              rawAmount: '1500000000000000000',
+              tokenId: null,
+              contractAddress: null,
+              symbol: null,
+              name: null,
+              decimals: 18,
+              logoUrl: null,
+              dollarValue: null
+            }
+          ]
+        })
+      }
+      render(<SimulationSummary simulation={simulation} userAddress={USER} chainId={137} />)
+    })
+
+    it('should name the currency after the chain, not a fixed ETH', () => {
+      expect(screen.getByText('1.5 POL')).toBeInTheDocument()
+    })
   })
 
   describe('and the simulation is idle', () => {
@@ -141,9 +332,9 @@ describe('when rendering the SimulationSummary', () => {
       expect(screen.getByText('100 MANA')).toBeInTheDocument()
     })
 
-    it('should render the received NFT with its name and token id', () => {
+    it('should render the received NFT marked as one, with its token id before its name', () => {
       render(<SimulationSummary simulation={simulation} userAddress={USER} />)
-      expect(screen.getByText('Fancy Hat #512')).toBeInTheDocument()
+      expect(screen.getByText('request.transaction_dialog.nft_label #512 · Fancy Hat')).toBeInTheDocument()
     })
 
     it('should render the you-send section title', () => {
@@ -270,6 +461,94 @@ describe('when rendering the SimulationSummary', () => {
     })
   })
 
+  describe('and an ApprovalForAll is granted', () => {
+    beforeEach(() => {
+      const result = emptyResult({
+        approvalChanges: [
+          {
+            kind: 'approvalForAll',
+            standard: 'erc721',
+            owner: USER,
+            spender: '0x9999999999999999999999999999999999999999',
+            amount: null,
+            rawAmount: null,
+            isUnlimited: false,
+            tokenId: null,
+            approved: true,
+            contractAddress: '0x1111111111111111111111111111111111111111',
+            symbol: null,
+            name: 'Collection'
+          }
+        ]
+      })
+      simulation = { status: 'ready', result }
+    })
+
+    it('should say the operator can access every token of the collection', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} />)
+      expect(screen.getByText(/approval_can_access_all/)).toBeInTheDocument()
+    })
+  })
+
+  describe('and an ERC20 allowance is revoked with the zero address as spender', () => {
+    beforeEach(() => {
+      const result = emptyResult({
+        approvalChanges: [
+          {
+            kind: 'approval',
+            standard: 'erc20',
+            owner: USER,
+            spender: '0x0000000000000000000000000000000000000000',
+            amount: '0',
+            rawAmount: '0',
+            isUnlimited: false,
+            tokenId: null,
+            approved: null,
+            contractAddress: '0x1111111111111111111111111111111111111111',
+            symbol: 'MANA',
+            name: 'MANA'
+          }
+        ]
+      })
+      simulation = { status: 'ready', result }
+    })
+
+    it('should say the allowance was revoked without naming a counterparty', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} />)
+      expect(screen.getByText(/approval_allowance_revoked/)).toBeInTheDocument()
+    })
+  })
+
+  describe('and a token of the user is burned', () => {
+    beforeEach(() => {
+      const result = emptyResult({
+        assetChanges: [
+          {
+            type: 'burn',
+            standard: 'erc721',
+            from: USER,
+            to: null,
+            amount: null,
+            rawAmount: null,
+            tokenId: '3',
+            contractAddress: '0x1111111111111111111111111111111111111111',
+            symbol: null,
+            name: 'Old Hat',
+            decimals: null,
+            logoUrl: null,
+            dollarValue: null
+          }
+        ]
+      })
+      simulation = { status: 'ready', result }
+    })
+
+    it('should mark the row as burned instead of naming a recipient', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} />)
+      expect(screen.getByText('request.transaction_dialog.burned')).toBeInTheDocument()
+    })
+  })
+
   describe('and an ApprovalForAll is revoked', () => {
     beforeEach(() => {
       const result = emptyResult({
@@ -327,12 +606,12 @@ describe('when rendering the SimulationSummary', () => {
       expect(screen.getByText(/approval_can_transfer_token/)).toBeInTheDocument()
     })
 
-    it('should flag it with a warning icon when the spender is not a recognized Decentraland contract', () => {
+    it('should flag it with a warning icon for a spender that is not a recognized Decentraland contract', () => {
       render(<SimulationSummary simulation={simulation} userAddress={USER} />)
       expect(screen.getByText('⚠')).toBeInTheDocument()
     })
 
-    it('should not flag it when the spender is a recognized Decentraland contract', () => {
+    it('should not flag it for a recognized Decentraland spender', () => {
       render(
         <SimulationSummary simulation={simulation} userAddress={USER} verifiedContracts={['0x1234567890abcdef1234567890abcdef12345678']} />
       )
@@ -367,12 +646,12 @@ describe('when rendering the SimulationSummary', () => {
       }
     })
 
-    it('should flag it with a warning icon when the spender is not a recognized Decentraland contract', () => {
+    it('should flag it with a warning icon for a spender that is not a recognized Decentraland contract', () => {
       render(<SimulationSummary simulation={simulation} userAddress={USER} />)
       expect(screen.getByText('⚠')).toBeInTheDocument()
     })
 
-    it('should not flag it when the spender is a recognized Decentraland contract', () => {
+    it('should not flag it for a recognized Decentraland spender', () => {
       render(<SimulationSummary simulation={simulation} userAddress={USER} verifiedContracts={[spender]} />)
       expect(screen.queryByText('⚠')).not.toBeInTheDocument()
     })
@@ -719,7 +998,7 @@ describe('when rendering the SimulationSummary', () => {
       expect(link).toHaveAttribute('rel', 'noopener noreferrer')
     })
 
-    it('should render plain text when the chain is unknown', () => {
+    it('should render plain text for an unknown chain', () => {
       render(<SimulationSummary simulation={simulation} userAddress={USER} chainId={999999} />)
       expect(screen.queryByRole('link')).not.toBeInTheDocument()
     })
@@ -880,9 +1159,35 @@ describe('when rendering the SimulationSummary', () => {
       expect(screen.getByText(/gas_covered/)).toBeInTheDocument()
     })
 
-    it('should render the transaction cost when the user pays gas', () => {
-      render(<SimulationSummary simulation={simulation} userAddress={USER} gas={{ covered: false, cost: '0.0025', balance: '1.5' }} />)
-      expect(screen.getByText(/transaction_cost 0.0025/)).toBeInTheDocument()
+    it('should render the transaction cost and the balance in the currency of the chain the call runs on', () => {
+      render(
+        <SimulationSummary
+          simulation={simulation}
+          userAddress={USER}
+          chainId={137}
+          gas={{ covered: false, cost: '0.0025', balance: '1.5' }}
+        />
+      )
+      expect(screen.getByText('request.transaction_dialog.transaction_cost 0.0025 POL')).toBeInTheDocument()
+      expect(screen.getByText('request.transaction_dialog.your_balance 1.5 POL')).toBeInTheDocument()
+    })
+
+    it('should name the currency generically on a chain the page does not know', () => {
+      render(
+        <SimulationSummary
+          simulation={simulation}
+          userAddress={USER}
+          chainId={999}
+          gas={{ covered: false, cost: '0.0025', balance: '1.5' }}
+        />
+      )
+      expect(screen.getByText('request.transaction_dialog.transaction_cost 0.0025 request.unverified.native_currency')).toBeInTheDocument()
+    })
+
+    it('should leave out a balance the wallet could not report', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} chainId={137} gas={{ covered: false, cost: '0.0025' }} />)
+      expect(screen.getByText('request.transaction_dialog.transaction_cost 0.0025 POL')).toBeInTheDocument()
+      expect(screen.queryByText(/your_balance/)).not.toBeInTheDocument()
     })
   })
 

@@ -1,4 +1,4 @@
-import { ApprovalChange } from './types'
+import { ApprovalChange, SimulationResponseBody } from './types'
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
 
@@ -67,4 +67,47 @@ function isDangerousApproval(approval: ApprovalChange, isRecognizedSpender: (add
   return !isRecognizedSpender(approval.spender)
 }
 
-export { isApprovalRevocation, isDangerousApproval, isZeroAddress }
+// The functions through which an account changes its own ERC20 allowance: a call to one of these is a grant
+// by definition and is always shown.
+const ALLOWANCE_FUNCTIONS: ReadonlySet<string> = new Set(['approve', 'increaseAllowance', 'decreaseAllowance'])
+
+type ReviewedCall = {
+  /** The function the signer's calldata decodes to. */
+  functionName: string
+  /** The contract the signer's call is sent to. */
+  calledContract: string
+  signerAddress: string
+}
+
+/**
+ * Drops the one ERC20 `Approval` that is allowance consumption rather than a grant. An ERC20 `transferFrom`
+ * writes the remaining allowance as `Approval(owner, spender, remaining)`, and the spender that pulls the
+ * signer's tokens is the contract the signer called (a marketplace, the store, the credits manager); with
+ * an unlimited allowance to it, every purchase would otherwise read as an unlimited grant and trip the
+ * high-risk gate. So an ERC20 approval owned by the signer whose spender is the called contract is left
+ * out, unless the signer's own call is an allowance function, which is a grant whatever it names. Every
+ * other approval stays as reported: a grant to any other spender, whatever the function is called (a
+ * `permit`, a batch, a name this page has never seen), an approval owned by anyone else. The rule fails
+ * towards showing more, never less.
+ */
+function withoutAllowanceConsumption(result: SimulationResponseBody, call: ReviewedCall): SimulationResponseBody {
+  if (ALLOWANCE_FUNCTIONS.has(call.functionName)) {
+    return result
+  }
+  const signer = call.signerAddress.toLowerCase()
+  const calledContract = call.calledContract.toLowerCase()
+  return {
+    ...result,
+    approvalChanges: result.approvalChanges.filter(
+      approval =>
+        !(
+          approval.kind === 'approval' &&
+          approval.standard === 'erc20' &&
+          approval.owner.toLowerCase() === signer &&
+          approval.spender?.toLowerCase() === calledContract
+        )
+    )
+  }
+}
+
+export { isApprovalRevocation, isDangerousApproval, isZeroAddress, withoutAllowanceConsumption }

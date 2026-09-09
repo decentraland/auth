@@ -4,6 +4,7 @@ import { MenuItem } from 'decentraland-ui2'
 import { TransferType } from '../types'
 import {
   CloseWindow,
+  ConfirmRequestDialog,
   ContinueInApp,
   DeniedWalletInteraction,
   DifferentAccountError,
@@ -14,23 +15,30 @@ import {
   SigningError,
   SimulationSummary,
   TimeoutError,
-  TransactionConfirmDialog,
   TransferCanceledView,
   TransferCompletedView,
   TransferConfirmView,
+  UnverifiedRequestView,
   WalletInteraction,
   WalletInteractionComplete
 } from '../Views'
 import {
+  COLLECTION_ADDRESS,
+  MANA_CONTRACT_ADDRESS,
+  MARKETPLACE_ADDRESS,
   USER_ADDRESS,
   manaData,
-  messageSignaturePayload,
-  metaTxSignaturePayload,
+  metaTxRaw,
   nftData,
+  permitRaw,
+  personalSignDigestHex,
+  personalSignHex,
+  personalSignText,
   simulationNoChanges,
   simulationReverted,
+  simulationStablecoinTrade,
   simulationSuccess,
-  typedDataSignaturePayload
+  unknownMetaTxRaw
 } from './__data__'
 import { FloatingBar, PreviewSurface, ViewSelect } from './TestViewPage.styled'
 
@@ -87,11 +95,18 @@ export const TestViewPage = () => {
       outdatedClientError: { label: 'OutdatedClientError', element: <OutdatedClientError explorerText="Explorer" /> },
       recoverError: { label: 'RecoverError', element: <RecoverError onTryAgain={() => alert('try again')} /> },
       signingError: { label: 'SigningError', element: <SigningError error="Test error" /> },
-      timeoutError: { label: 'TimeoutError', element: <TimeoutError requestId={DEFAULT_REQUEST_ID} /> },
-      walletInteraction: {
-        label: 'Wallet Interaction',
-        element: <WalletInteraction requestId={DEFAULT_REQUEST_ID} onDeny={noop} onApprove={noop} />
+      signingErrorUnsupportedContract: {
+        label: 'SigningError (call reaches a contract Decentraland does not own, e.g. an ERC-1155 in a trade)',
+        element: (
+          <SigningError
+            kind="unsupported_contract"
+            error={
+              'The "eth_sendTransaction" request reaches beyond Decentraland\'s contracts: the call reaches a contract that is not Decentraland\'s: 0x76be3b62873462d2142405439777e971754e8e77'
+            }
+          />
+        )
       },
+      timeoutError: { label: 'TimeoutError', element: <TimeoutError requestId={DEFAULT_REQUEST_ID} /> },
       walletInteractionComplete: { label: 'WalletInteractionComplete', element: <WalletInteractionComplete /> },
       walletNftInteraction: {
         label: 'Wallet NFT Interaction',
@@ -137,96 +152,214 @@ export const TestViewPage = () => {
           </PreviewSurface>
         )
       },
-      walletInteractionSimulation: {
-        label: 'Wallet Interaction (with summary)',
+      walletInteractionChecking: {
+        label: 'Wallet Interaction (Decentraland contract, preview and counterparty check still running)',
         element: (
           <WalletInteraction
             requestId={DEFAULT_REQUEST_ID}
-            isWeb2Wallet
-            simulation={{ status: 'ready', result: simulationSuccess }}
+            functionName="accept"
+            contractName="Decentraland Marketplace"
+            simulation={{ status: 'loading' }}
             userAddress={USER_ADDRESS}
-            verifiedContracts={['0x1234567890abcdef1234567890abcdef12345678', '0x0f5d2fb29fb7d3cfee444a200298f468908cc942']}
             chainId={137}
-            requiresAcknowledgment
-            gasCovered
+            isCounterpartyCheckPending
+            gas={{ covered: true }}
             onDeny={noop}
             onApprove={noop}
           />
         )
       },
-      transactionDialogGasCovered: {
-        label: 'TransactionConfirmDialog (Gas covered)',
+      walletInteractionStablecoinTrade: {
+        label: 'Wallet Interaction (trade paying USDT for a wearable)',
         element: (
-          <TransactionConfirmDialog open transactionCost={BigInt(0)} balance={BigInt(0)} gasCovered onCancel={noop} onConfirm={noop} />
-        )
-      },
-      transactionDialogWithGas: {
-        label: 'TransactionConfirmDialog (User pays gas)',
-        element: (
-          <TransactionConfirmDialog
-            open
-            transactionCost={BigInt('2500000000000000')}
-            balance={BigInt('1500000000000000000')}
-            onCancel={noop}
-            onConfirm={noop}
-          />
-        )
-      },
-      transactionDialogReverted: {
-        label: 'TransactionConfirmDialog (Reverted)',
-        element: (
-          <TransactionConfirmDialog
-            open
-            transactionCost={BigInt('2500000000000000')}
-            balance={BigInt('1500000000000000000')}
-            isReverted
-            onCancel={noop}
-            onConfirm={noop}
-          />
-        )
-      },
-      signatureMessage: {
-        label: 'SignatureRequest (Message)',
-        element: (
-          <SignatureRequestView
+          <WalletInteraction
             requestId={DEFAULT_REQUEST_ID}
-            method="personal_sign"
-            payload={messageSignaturePayload}
-            simulation={{ status: 'idle' }}
+            functionName="accept"
+            contractName="Decentraland Marketplace"
+            simulation={{ status: 'ready', result: simulationStablecoinTrade }}
             userAddress={USER_ADDRESS}
-            isMetaTransaction={false}
+            verifiedContracts={[MARKETPLACE_ADDRESS]}
+            collectionContracts={[COLLECTION_ADDRESS]}
+            chainId={137}
+            gas={{ covered: true }}
             onDeny={noop}
-            onApprove={asyncNoop}
+            onApprove={noop}
           />
         )
       },
-      signatureTypedData: {
-        label: 'SignatureRequest (Typed Data)',
+      walletInteractionSimulation: {
+        label: 'Wallet Interaction (Decentraland contract, relayed)',
         element: (
-          <SignatureRequestView
+          <WalletInteraction
             requestId={DEFAULT_REQUEST_ID}
-            method="eth_signTypedData_v4"
-            payload={typedDataSignaturePayload}
-            simulation={{ status: 'idle' }}
-            userAddress={USER_ADDRESS}
-            isMetaTransaction={false}
-            onDeny={noop}
-            onApprove={asyncNoop}
-          />
-        )
-      },
-      signatureMetaTx: {
-        label: 'SignatureRequest (Meta-tx)',
-        element: (
-          <SignatureRequestView
-            requestId={DEFAULT_REQUEST_ID}
-            method="eth_signTypedData_v4"
-            payload={metaTxSignaturePayload}
+            functionName="executeOrder"
+            contractName="Decentraland Marketplace"
             simulation={{ status: 'ready', result: simulationSuccess }}
             userAddress={USER_ADDRESS}
-            isMetaTransaction={true}
+            verifiedContracts={[MARKETPLACE_ADDRESS, '0x0f5d2fb29fb7d3cfee444a200298f468908cc942']}
+            collectionContracts={[COLLECTION_ADDRESS]}
+            chainId={137}
+            requiresAcknowledgment
+            gas={{ covered: true }}
+            onDeny={noop}
+            onApprove={noop}
+          />
+        )
+      },
+      walletInteractionUserPaysGas: {
+        label: 'Wallet Interaction (Decentraland contract, user pays gas)',
+        element: (
+          <WalletInteraction
+            requestId={DEFAULT_REQUEST_ID}
+            functionName="approve"
+            contractName="Decentraland MANA"
+            simulation={{ status: 'ready', result: simulationNoChanges }}
+            userAddress={USER_ADDRESS}
+            chainId={1}
+            requiresAcknowledgment
+            gas={{ covered: false, status: 'ready', cost: BigInt('2500000000000000'), balance: BigInt('1500000000000000000') }}
+            onDeny={noop}
+            onApprove={noop}
+          />
+        )
+      },
+      confirmRequestGasCovered: {
+        label: 'ConfirmRequestDialog (Transaction, gas covered)',
+        element: <ConfirmRequestDialog open kind="transaction" gas={{ covered: true }} onCancel={noop} onConfirm={noop} />
+      },
+      confirmRequestUserPaysGas: {
+        label: 'ConfirmRequestDialog (Transaction, user pays gas)',
+        element: (
+          <ConfirmRequestDialog
+            open
+            kind="transaction"
+            gas={{ covered: false, status: 'ready', cost: BigInt('4200000000000000'), chainId: 137 }}
+            onCancel={noop}
+            onConfirm={noop}
+          />
+        )
+      },
+      confirmRequestSignature: {
+        label: 'ConfirmRequestDialog (Signature)',
+        element: <ConfirmRequestDialog open kind="signature" onCancel={noop} onConfirm={noop} />
+      },
+      signatureMetaTx: {
+        label: 'SignatureRequest (Decentraland meta-tx)',
+        element: (
+          <SignatureRequestView
+            requestId={DEFAULT_REQUEST_ID}
+            method="eth_signTypedData_v4"
+            raw={metaTxRaw}
+            verifyingContract={MANA_CONTRACT_ADDRESS}
+            functionName="transfer"
+            contractName="(PoS) Decentraland MANA"
+            simulation={{ status: 'ready', result: simulationSuccess }}
+            userAddress={USER_ADDRESS}
+            chainId={137}
             onDeny={noop}
             onApprove={asyncNoop}
+          />
+        )
+      },
+      unverifiedTransaction: {
+        label: 'UnverifiedRequest (Unknown transaction)',
+        element: (
+          <UnverifiedRequestView
+            requestId={DEFAULT_REQUEST_ID}
+            kind="unknown_transaction"
+            method="eth_sendTransaction"
+            targetAddress={MARKETPLACE_ADDRESS}
+            chainId={137}
+            nativeValue="0x0"
+            gas={{ status: 'ready', cost: BigInt('4200000000000000') }}
+            balance={BigInt('1500000000000000000')}
+            payload={{
+              kind: 'transaction',
+              to: MARKETPLACE_ADDRESS,
+              data: '0x095ea7b3000000000000000000000000abcdefabcdefabcdefabcdefabcdefabcdefabcdffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff',
+              value: '0x0'
+            }}
+            payloadFingerprint="unknown-transaction"
+            onDeny={noop}
+            onApprove={noop}
+          />
+        )
+      },
+      unverifiedNativeTransfer: {
+        label: 'UnverifiedRequest (Native transfer)',
+        element: (
+          <UnverifiedRequestView
+            requestId={DEFAULT_REQUEST_ID}
+            kind="native_transfer"
+            method="eth_sendTransaction"
+            targetAddress={USER_ADDRESS}
+            targetIsSelf
+            chainId={137}
+            nativeValue="0x6f05b59d3b20000"
+            gas={{ status: 'loading' }}
+            balance={BigInt('1500000000000000000')}
+            payload={{ kind: 'transaction', to: USER_ADDRESS, data: '0x', value: '0x6f05b59d3b20000' }}
+            payloadFingerprint="native-transfer"
+            onDeny={noop}
+            onApprove={noop}
+          />
+        )
+      },
+      unverifiedMetaTransaction: {
+        label: 'UnverifiedRequest (Unknown meta-transaction)',
+        element: (
+          <UnverifiedRequestView
+            requestId={DEFAULT_REQUEST_ID}
+            kind="unknown_meta_transaction"
+            method="eth_signTypedData_v4"
+            targetAddress="0xabcdefabcdefabcdefabcdefabcdefabcdefef01"
+            chainId={137}
+            payload={{ kind: 'typed_data', raw: unknownMetaTxRaw }}
+            payloadFingerprint="unknown-meta-tx"
+            onDeny={noop}
+            onApprove={noop}
+          />
+        )
+      },
+      unverifiedTypedData: {
+        label: 'UnverifiedRequest (Typed data)',
+        element: (
+          <UnverifiedRequestView
+            requestId={DEFAULT_REQUEST_ID}
+            kind="unknown_typed_data"
+            method="eth_signTypedData_v4"
+            payload={{ kind: 'typed_data', raw: permitRaw }}
+            payloadFingerprint="permit"
+            onDeny={noop}
+            onApprove={noop}
+          />
+        )
+      },
+      unverifiedPersonalSign: {
+        label: 'UnverifiedRequest (personal_sign)',
+        element: (
+          <UnverifiedRequestView
+            requestId={DEFAULT_REQUEST_ID}
+            kind="personal_sign"
+            method="personal_sign"
+            payload={{ kind: 'message', hex: personalSignHex, text: personalSignText }}
+            payloadFingerprint={personalSignHex}
+            onDeny={noop}
+            onApprove={noop}
+          />
+        )
+      },
+      unverifiedPersonalSignUnreadable: {
+        label: 'UnverifiedRequest (personal_sign, unreadable)',
+        element: (
+          <UnverifiedRequestView
+            requestId={DEFAULT_REQUEST_ID}
+            kind="personal_sign"
+            method="personal_sign"
+            payload={{ kind: 'message', hex: personalSignDigestHex, text: null }}
+            payloadFingerprint={personalSignDigestHex}
+            onDeny={noop}
+            onApprove={noop}
           />
         )
       }

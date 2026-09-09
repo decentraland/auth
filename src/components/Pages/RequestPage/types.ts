@@ -29,7 +29,7 @@ enum TransferType {
   GIFT = 'gift'
 }
 
-/** EIP-712 typed-data payload, as parsed from an eth_signTypedData_v4 request. */
+/** EIP-712 typed-data payload, as parsed from an eth_signTypedData request. */
 type TypedDataPayload = {
   types?: Record<string, Array<{ name: string; type: string }>>
   domain?: Record<string, unknown>
@@ -37,37 +37,15 @@ type TypedDataPayload = {
   message?: Record<string, unknown>
 }
 
-/** What a non-transaction signature request is asking the user to sign. */
-type SignaturePayload = { kind: 'message'; message: string } | { kind: 'typedData'; typedData: TypedDataPayload; raw: string }
-
-/**
- * Whether a MetaTransaction's verifying contract is a recognized Decentraland contract: `pending`
- * while the lookup runs, `confirmed` when it is in the static registry or known to the
- * meta-transaction server as a collection, `unconfirmed` otherwise.
- */
-type MetaTransactionContractTrust = 'pending' | 'confirmed' | 'unconfirmed'
-
-/**
- * Why a signature request cannot be checked by Auth: typed data whose primaryType is neither a
- * MetaTransaction nor a known approval type, or a personal_sign message that is not readable text.
- */
-type UnverifiableSignatureReason = 'unrecognized_typed_data' | 'opaque_message'
-
-/** Lifecycle of the best-effort transaction simulation shown to web2 users. */
+/** Lifecycle of the best-effort simulation shown for a Decentraland contract call. */
 type SimulationState =
   | { status: 'idle' }
   | { status: 'loading' }
   | { status: 'ready'; result: SimulationResponseBody }
   | { status: 'unavailable' }
 
+/** Lifecycle of the wallet-side fee estimate for a transaction the user pays gas for. */
+type GasEstimateState = { status: 'loading' } | { status: 'ready'; cost: bigint } | { status: 'unavailable' }
+
 export { TransferType }
-export type {
-  MANATransferData,
-  MetaTransactionContractTrust,
-  NFTTransferData,
-  ProfileAvatar,
-  TypedDataPayload,
-  SignaturePayload,
-  SimulationState,
-  UnverifiableSignatureReason
-}
+export type { GasEstimateState, MANATransferData, NFTTransferData, ProfileAvatar, TypedDataPayload, SimulationState }

@@ -92,6 +92,24 @@ class MalformedTransactionRequestError extends Error {
 }
 
 /**
+ * Thrown when a Decentraland contract call reaches beyond Decentraland's own contracts: it hands the
+ * transaction a contract Decentraland does not own (the NFT of a marketplace order or an off-chain trade,
+ * the recipient of a safe transfer, a nested call that could not be read), or its preview moves an asset
+ * no Decentraland contract issues (an ERC-1155). The page previews Decentraland code only, so such a
+ * request is refused rather than shown. `reason` says what was reached; it is safe to display.
+ */
+class UnsupportedContractError extends Error {
+  readonly skipReporting = true
+  constructor(
+    public readonly method: string,
+    public readonly reason: string
+  ) {
+    super(`The "${method}" request reaches beyond Decentraland's contracts: ${reason}`)
+    this.name = 'UnsupportedContractError'
+  }
+}
+
+/**
  * Thrown when the transaction-simulation endpoint is unreachable, times out, or
  * returns a non-200 response. The approval UI treats this as "details unavailable"
  * and falls back to the default confirmation — simulation is never allowed to block
@@ -102,14 +120,37 @@ class SimulationUnavailableError extends Error {
   readonly skipReporting = true
   constructor(
     reason?: string,
-    public readonly status?: number
+    public readonly status?: number,
+    /**
+     * The server's own account of a rejection (`invalid_request`: the request itself was refused;
+     * `upstream_rejected`: the simulation provider refused it), when it gave one.
+     */
+    public readonly code?: SimulationRejectionCode
   ) {
     super(`Transaction simulation unavailable${reason ? `: ${reason}` : ''}`)
     this.name = 'SimulationUnavailableError'
   }
 }
 
+type SimulationRejectionCode = 'invalid_request' | 'upstream_rejected'
+
+/**
+ * Thrown when classifying an eth_sendTransaction needs to know whether its target is a Decentraland
+ * wearable collection and the collection factories could not be asked (RPC failure or timeout). The
+ * page shows a retryable error instead of a review: reading "unavailable" as "not Decentraland"
+ * would send Polygon calldata as a plain transaction on whatever chain the wallet is on. The
+ * request is left unanswered so a retry can review it.
+ */
+class ContractLookupUnavailableError extends Error {
+  readonly skipReporting = true
+  constructor(public readonly address: string) {
+    super(`Could not verify whether ${address} is a Decentraland contract`)
+    this.name = 'ContractLookupUnavailableError'
+  }
+}
+
 export {
+  ContractLookupUnavailableError,
   DifferentSenderError,
   ExpiredRequestError,
   RequestNotFoundError,
@@ -118,5 +159,7 @@ export {
   UnsupportedMethodError,
   MalformedSignatureRequestError,
   MalformedTransactionRequestError,
-  SimulationUnavailableError
+  SimulationUnavailableError,
+  UnsupportedContractError
 }
+export type { SimulationRejectionCode }

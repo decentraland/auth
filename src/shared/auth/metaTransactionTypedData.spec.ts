@@ -140,8 +140,8 @@ describe('resolveMetaTransactionTypedData', () => {
       delete typedData.types.EIP712Domain
     })
 
-    it('should resolve the inner call because the wallet derives the domain struct from the domain fields', () => {
-      expect(resolveMetaTransactionTypedData(typedData, METHOD).calldata).toBe(ACCEPT_CALLDATA)
+    it('should reject the request because wallets disagree on the digest of an undeclared domain struct', () => {
+      expect(() => resolveMetaTransactionTypedData(typedData, METHOD)).toThrow('does not declare its domain struct')
     })
   })
 
@@ -296,8 +296,8 @@ describe('resolveMetaTransactionTypedData', () => {
 
     beforeEach(() => {
       typedData = buildOffchainTypedData()
-      // A domain without a salt also declares its struct without one; let the wallet derive it.
-      delete typedData.types.EIP712Domain
+      // A domain without a salt declares its struct without one, with the standard chainId field instead.
+      typedData.types.EIP712Domain = DOMAIN_TYPE.map(field => (field.name === 'salt' ? { name: 'chainId', type: 'uint256' } : field))
       delete typedData.domain.salt
       typedData.domain.chainId = 80002
     })

@@ -1,12 +1,12 @@
 import { hashTypedData } from 'viem'
 import { META_TRANSACTION_TYPE, OFFCHAIN_META_TRANSACTION_TYPE } from 'decentraland-transactions'
+import { isRecord } from '../utils/isRecord'
 import { ADDRESS_REGEX } from './address'
 import { EIP712_DOMAIN_FIELD_TYPES } from './eip712Domain'
 import { MalformedSignatureRequestError } from './errors'
+import { CALLDATA_REGEX } from './hex'
 
 const META_TRANSACTION_PRIMARY_TYPE = 'MetaTransaction'
-// A 4-byte function selector followed by whole bytes of arguments.
-const CALLDATA_REGEX = /^0x[0-9a-fA-F]{8}([0-9a-fA-F]{2})*$/
 
 type TypedDataField = { name: string; type: string }
 
@@ -38,10 +38,6 @@ type MetaTransactionTypedData = {
 
 type TypedDataLike = { types?: unknown; domain?: unknown; primaryType?: unknown; message?: unknown }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
 /**
  * Returns whether the typed data declares the Decentraland meta-transaction struct. The match is
  * case-sensitive because the contracts hash the literal type name `MetaTransaction(...)`.
@@ -61,7 +57,11 @@ function matchesSchema(fields: unknown, schema: readonly TypedDataField[]): bool
   })
 }
 
-/** Parses a positive chain id from a domain field (hex or decimal string, number or bigint). */
+/**
+ * Parses a positive chain id from a domain field (hex or decimal string, number or bigint). Shared with the
+ * classifier, which reads the chain a MetaTransaction names before the payload is validated, so both read it
+ * the same way.
+ */
 function parseChainId(value: unknown): number | undefined {
   if (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'bigint') {
     return undefined
@@ -84,11 +84,13 @@ function parseChainId(value: unknown): number | undefined {
  * undeclared call for the preview to simulate. The same holds for the domain: a `salt` the
  * `EIP712Domain` struct does not declare names a chain the signature is not bound to. The struct
  * therefore decides which field is the calldata, the message may hold nothing but the declared
- * fields, the domain may carry only the standard fields and its struct (when given) must declare
- * exactly those with their standard types, and the request is finally
- * hashed the way the wallet will and compared with a payload rebuilt from the resolved fields
- * alone — equality proves the bytes handed to the simulation are the bytes the signature covers.
- * (Thirdweb signs through ox, which shares viem's EIP-712 encoding.)
+ * fields, the domain may carry only the standard fields and its struct must be declared, exactly
+ * those fields with their standard types, and the request is finally hashed the way the wallet
+ * will and compared with a payload rebuilt from the resolved fields alone. Equality proves the
+ * structure: no unsigned field rides along and the declared calldata is the one hashed. It does not
+ * judge how a value is spelled (viem hashes a non-hex salt or a `0X` prefix rather than throwing),
+ * so the value checks above and the exact domain comparison the classifier adds are what pin the
+ * accepted set to what the SDK builds. (Thirdweb signs through ox, which shares viem's EIP-712 encoding.)
  *
  * This is deliberately strict: every legitimate payload is built by decentraland-transactions with
  * exactly these shapes, so anything that deviates is either broken or hostile, and neither should
@@ -150,42 +152,42 @@ function resolveMetaTransactionTypedData(typedData: unknown, method: string): Me
   // 2b. The domain must be signed whole, and as the standard defines it. EIP-712 hashes only the
   //     fields `types.EIP712Domain` declares, so a request could carry a `salt` — the chain this
   //     preview runs on — that the wallet never signs, declare a field the domain lacks, or declare a
-  //     field under a type the contract does not hash. The domain may only carry the standard fields:
-  //     when the struct is absent the wallet derives it from those names and drops anything else,
-  //     unsigned. When the struct is given it must declare exactly the domain's keys, each once, with
-  //     its standard type.
+  //     field under a type the contract does not hash. The domain may only carry the standard fields,
+  //     and the struct must be declared: wallets disagree on an absent one (viem derives it from the
+  //     domain's keys, eth-sig-util hashes an empty struct), so the binding proved below with viem
+  //     would not be what such a wallet signs. decentraland-transactions always declares it. The
+  //     struct must declare exactly the domain's keys, each once, with its standard type.
   const domainKeys = Object.keys(domain)
   if (domainKeys.some(key => !EIP712_DOMAIN_FIELD_TYPES.has(key))) {
     return reject('the MetaTransaction domain has a field EIP-712 does not define')
   }
   const domainType = types.EIP712Domain
-  if (domainType !== undefined) {
-    const declaresDomainExactly =
-      Array.isArray(domainType) &&
-      domainType.length === domainKeys.length &&
-      new Set(domainType.map(field => (isRecord(field) ? field.name : undefined))).size === domainKeys.length &&
-      domainType.every(
-        field =>
-          isRecord(field) &&
-          typeof field.name === 'string' &&
-          domainKeys.includes(field.name) &&
-          field.type === EIP712_DOMAIN_FIELD_TYPES.get(field.name)
-      )
-    if (!declaresDomainExactly) {
-      return reject('the MetaTransaction domain type does not match the domain fields')
-    }
+  if (domainType === undefined) {
+    return reject('the MetaTransaction does not declare its domain struct')
+  }
+  const declaresDomainExactly =
+    Array.isArray(domainType) &&
+    domainType.length === domainKeys.length &&
+    new Set(domainType.map(field => (isRecord(field) ? field.name : undefined))).size === domainKeys.length &&
+    domainType.every(
+      field =>
+        isRecord(field) &&
+        typeof field.name === 'string' &&
+        domainKeys.includes(field.name) &&
+        field.type === EIP712_DOMAIN_FIELD_TYPES.get(field.name)
+    )
+  if (!declaresDomainExactly) {
+    return reject('the MetaTransaction domain type does not match the domain fields')
   }
 
-  // 3. Prove the binding: hash the request as received and a payload rebuilt from nothing but the
-  //    resolved fields. The wallet signs the former; the simulation runs the latter.
+  // 3. Prove the structure: hash the request as received and a payload rebuilt from nothing but the
+  //    resolved fields. The wallet signs the former; the simulation runs the latter. Equal hashes mean
+  //    no unsigned field rides along; the spelling of each value is judged by the checks above.
   const canonical = {
     domain,
     primaryType: META_TRANSACTION_PRIMARY_TYPE,
-    types: {
-      // eslint-disable-next-line @typescript-eslint/naming-convention
-      ...(types.EIP712Domain !== undefined ? { EIP712Domain: types.EIP712Domain } : {}),
-      [META_TRANSACTION_PRIMARY_TYPE]: schema.fields
-    },
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    types: { EIP712Domain: domainType, [META_TRANSACTION_PRIMARY_TYPE]: schema.fields },
     message: { nonce: message.nonce, from, [schema.calldataField]: calldata }
   }
   let requestHash: string
@@ -206,5 +208,5 @@ function resolveMetaTransactionTypedData(typedData: unknown, method: string): Me
   return { calldataField: schema.calldataField, calldata, from, verifyingContract, chainId }
 }
 
-export { isMetaTransactionTypedData, resolveMetaTransactionTypedData }
+export { isMetaTransactionTypedData, parseChainId, resolveMetaTransactionTypedData }
 export type { MetaTransactionCalldataField, MetaTransactionTypedData }

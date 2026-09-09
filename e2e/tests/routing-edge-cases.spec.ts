@@ -126,6 +126,6 @@ test.describe('skipSetup logic: FF + redirectTo interaction', () => {
     await expect(page.getByPlaceholder(/enter your username/i)).toBeVisible()
 
     // Should NOT show the request approval screen (user goes through setup first)
-    await expect(page.locator('[data-testid="wallet-interaction-allow-button"]')).not.toBeVisible()
+    await expect(page.locator('[data-testid="unverified-approve-button"]')).not.toBeVisible()
   })
 })

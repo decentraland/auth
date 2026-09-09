@@ -415,6 +415,126 @@ describe('assertSignatureParamsAreCanonical', () => {
       })
     })
 
+    describe('and the typed data is larger than the review can take', () => {
+      let oversized: string
+
+      beforeEach(() => {
+        oversized = JSON.stringify({ ...JSON.parse(permit), message: { note: 'x'.repeat(96 * 1024) } })
+      })
+
+      it('should throw a MalformedSignatureRequestError naming the size', () => {
+        expect(() => assertSignatureParamsAreCanonical(method, [signer, oversized], signer)).toThrow('too large to review')
+      })
+
+      it('should judge an object payload by its JSON size', () => {
+        expect(() => assertSignatureParamsAreCanonical(method, [signer, JSON.parse(oversized)], signer)).toThrow('too large to review')
+      })
+    })
+
+    describe.each(['string', 'object'])('and the typed data arrives as a %s with excessive nesting', representation => {
+      let params: unknown[]
+      let raw: string
+
+      describe.each([
+        ['arrays', '[', ']'],
+        ['objects', '{"value":', '}']
+      ])('and the message contains deeply nested %s', (_shape, open, close) => {
+        beforeEach(() => {
+          raw = '{"primaryType":"Permit","message":' + open.repeat(1500) + '0' + close.repeat(1500) + '}'
+          params = [signer, representation === 'string' ? raw : JSON.parse(raw)]
+        })
+
+        it('should reject the request before formatting or signing its contents', () => {
+          expect(() => assertSignatureParamsAreCanonical(method, params, signer)).toThrow(MalformedSignatureRequestError)
+        })
+      })
+    })
+
+    describe.each([
+      ['an integer a double cannot hold', '9007199254740993'],
+      ['a negative integer a double cannot hold', '-9007199254740993'],
+      ['a collection item id', '105312291668557186697918027683670432318895095400549111254310977736'],
+      ['a fraction', '1.5'],
+      ['an exponent', '1e3']
+    ])('and the typed data text carries %s as a bare number', (_label, literal) => {
+      let params: unknown[]
+
+      beforeEach(() => {
+        params = [signer, `{"primaryType":"Permit","message":{"value":${literal}}}`]
+      })
+
+      it('should refuse it, since serializing it for the wallet would change what is signed', () => {
+        expect(() => assertSignatureParamsAreCanonical(method, params, signer)).toThrow('cannot be represented exactly')
+      })
+    })
+
+    describe.each([
+      ['a wei amount of 10^18', '1000000000000000000'],
+      ['a wei amount of 10^20', '100000000000000000000'],
+      ['the largest safe integer', '9007199254740991'],
+      ['zero', '0'],
+      ['a negative integer', '-42']
+    ])('and the typed data text carries %s as a bare number', (_label, literal) => {
+      let params: unknown[]
+
+      beforeEach(() => {
+        params = [signer, `{"primaryType":"Permit","message":{"value":${literal}}}`]
+      })
+
+      it('should keep the request reviewable, since a double holds that value exactly', () => {
+        expect(() => assertSignatureParamsAreCanonical(method, params, signer)).not.toThrow()
+      })
+    })
+
+    describe('and the typed data text carries large numbers only inside strings', () => {
+      let params: unknown[]
+
+      beforeEach(() => {
+        params = [signer, '{"primaryType":"Permit","message":{"amount":"9007199254740993","note":"quoted \\" 1.5 e10"}}']
+      })
+
+      it('should keep the request reviewable', () => {
+        expect(() => assertSignatureParamsAreCanonical(method, params, signer)).not.toThrow()
+      })
+    })
+
+    describe('and the typed data text is not JSON at all', () => {
+      let params: unknown[]
+
+      beforeEach(() => {
+        params = [signer, 'sign 9007199254740993 please']
+      })
+
+      it('should refuse it as malformed typed data rather than blame a number', () => {
+        expect(() => assertSignatureParamsAreCanonical(method, params, signer)).toThrow(MalformedSignatureRequestError)
+        expect(() => assertSignatureParamsAreCanonical(method, params, signer)).not.toThrow('cannot be represented exactly')
+      })
+    })
+
+    describe('and object nesting exceeds the serializer call stack', () => {
+      let params: unknown[]
+
+      beforeEach(() => {
+        params = [signer, JSON.parse('{"primaryType":"Permit","message":' + '['.repeat(12000) + '0' + ']'.repeat(12000) + '}')]
+      })
+
+      it('should refuse it as malformed without overflowing the stack', () => {
+        expect(() => assertSignatureParamsAreCanonical(method, params, signer)).toThrow(MalformedSignatureRequestError)
+      })
+    })
+
+    describe('and the message has ordinary nested structures', () => {
+      let params: unknown[]
+
+      beforeEach(() => {
+        params = [signer, JSON.parse('{"primaryType":"Permit","message":' + '{"value":'.repeat(8) + '0' + '}'.repeat(8) + '}')]
+      })
+
+      it('should keep the request reviewable', () => {
+        expect(() => assertSignatureParamsAreCanonical(method, params, signer)).not.toThrow()
+      })
+    })
+
     describe('and both params are typed data, with the harmless one first', () => {
       it('should throw a MalformedSignatureRequestError because the wallet would sign the second one', () => {
         expect(() => assertSignatureParamsAreCanonical(method, [statement, permit], signer)).toThrow(MalformedSignatureRequestError)
@@ -539,10 +659,10 @@ describe('assertSignatureParamsAreCanonical', () => {
         typedData.message = { ...(typedData.message as Record<string, unknown>), functionSignature: `0x2d0335ab${'00'.repeat(32)}` }
       })
 
-      it('should throw a MalformedSignatureRequestError because the wallet would sign only the declared call', () => {
+      it('should not throw, because the request classifier decides that such a MetaTransaction is shown as unverified', () => {
         expect(() =>
           assertSignatureParamsAreCanonical('eth_signTypedData_v4', [signerAddress, JSON.stringify(typedData)], signerAddress)
-        ).toThrow(MalformedSignatureRequestError)
+        ).not.toThrow()
       })
     })
   })
@@ -559,6 +679,18 @@ describe('assertSignatureParamsAreCanonical', () => {
     describe('and the params are [message, signer]', () => {
       it('should not throw', () => {
         expect(() => assertSignatureParamsAreCanonical('personal_sign', ['hello', signer], signer)).not.toThrow()
+      })
+    })
+
+    describe('and the message is larger than the review can take', () => {
+      let oversized: string
+
+      beforeEach(() => {
+        oversized = 'x'.repeat(96 * 1024 + 1)
+      })
+
+      it('should throw a MalformedSignatureRequestError naming the size', () => {
+        expect(() => assertSignatureParamsAreCanonical('personal_sign', [oversized, signer], signer)).toThrow('too large to review')
       })
     })
 
@@ -607,7 +739,7 @@ describe('assertSignatureParamsAreCanonical', () => {
       expect(() => assertSignatureParamsAreCanonical('eth_sendTransaction', [{ to: '0x1', data: '0x' }, 'extra'], signer)).not.toThrow()
     })
 
-    it('should not throw when there are no params', () => {
+    it('should not throw for a request without params', () => {
       expect(() => assertSignatureParamsAreCanonical('eth_sendTransaction', undefined, signer)).not.toThrow()
     })
   })

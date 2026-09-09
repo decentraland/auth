@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import overlayTextureUrl from '../../assets/images/background/DCL_LogoPattern.png'
 import { FRAGMENT_SHADER, VERTEX_SHADER } from './AnimatedBackground.shaders'
 import { type LoadedTexture, createProgram, createShader, loadTexture } from './AnimatedBackground.utils'
@@ -8,6 +8,10 @@ import { Canvas, Fallback, Wrapper } from './AnimatedBackground.styled'
 const AnimatedBackground = ({ variant = 'fixed' }: AnimatedBackgroundProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const animFrameRef = useRef<number>(0)
+  // Whether the WebGL renderer is drawing. When it is not (no WebGL, a shader that fails to compile,
+  // a context that is lost and not restored), the opaque canvas would otherwise sit on top of the
+  // static fallback image and leave the page blank, so it is hidden and the fallback shows through.
+  const [isRendering, setIsRendering] = useState(true)
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -16,6 +20,7 @@ const AnimatedBackground = ({ variant = 'fixed' }: AnimatedBackgroundProps) => {
     const gl = canvas.getContext('webgl', { alpha: false, antialias: false })
     if (!gl) {
       console.error('WebGL not supported')
+      setIsRendering(false)
       return
     }
 
@@ -41,10 +46,17 @@ const AnimatedBackground = ({ variant = 'fixed' }: AnimatedBackgroundProps) => {
     const setup = () => {
       vs = createShader(gl, gl.VERTEX_SHADER, VERTEX_SHADER)
       fs = createShader(gl, gl.FRAGMENT_SHADER, FRAGMENT_SHADER)
-      if (!vs || !fs) return
+      if (!vs || !fs) {
+        setIsRendering(false)
+        return
+      }
 
       program = createProgram(gl, vs, fs)
-      if (!program) return
+      if (!program) {
+        setIsRendering(false)
+        return
+      }
+      setIsRendering(true)
 
       const positionLoc = gl.getAttribLocation(program, 'a_position')
       const timeLoc = gl.getUniformLocation(program, 'u_time')
@@ -104,6 +116,8 @@ const AnimatedBackground = ({ variant = 'fixed' }: AnimatedBackgroundProps) => {
       event.preventDefault()
       contextLost = true
       cancelAnimationFrame(animFrameRef.current)
+      // Nothing draws until the context is restored; show the fallback in the meantime.
+      setIsRendering(false)
     }
 
     const handleContextRestored = () => {
@@ -128,7 +142,7 @@ const AnimatedBackground = ({ variant = 'fixed' }: AnimatedBackgroundProps) => {
   return (
     <Wrapper variant={variant}>
       <Fallback variant={variant} aria-hidden />
-      <Canvas ref={canvasRef} />
+      <Canvas ref={canvasRef} hidden={!isRendering} />
     </Wrapper>
   )
 }
