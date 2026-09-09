@@ -2,6 +2,8 @@ import { Abi, AbiFunction, decodeFunctionData, encodeFunctionData, toFunctionSel
 import { ChainId } from '@dcl/schemas/dist/dapps/chain-id'
 import { ContractData, ContractName, getContract } from 'decentraland-transactions'
 import { SUPPORTED_CHAIN_IDS, getSupportedChain } from '../chains'
+import { isRecord } from '../utils/isRecord'
+import { ADDRESS_REGEX } from './address'
 import { CALLDATA_REGEX } from './hex'
 import { MetaTransactionCalldataField } from './metaTransactionTypedData'
 
@@ -139,7 +141,7 @@ function getStaticContractIndex(): Map<number, Map<string, KnownContract>> {
         // Not deployed on this chain.
         continue
       }
-      if (!entry.address) {
+      if (!entry?.address) {
         continue
       }
       byAddress.set(entry.address.toLowerCase(), toKnownContract(name, chainId, entry))
@@ -237,7 +239,74 @@ function decodeKnownContractCall(contract: KnownContract, data: string): Decoded
   }
 }
 
+// A nested call as Decentraland contracts carry one: the CreditsManager's `externalCall` names a target, a
+// selector and the ABI-encoded arguments, and runs `target.call(selector ++ data)`.
+type ExternalCallLike = { target: string; selector: string; data: string }
+
+const SELECTOR_REGEX = /^0x[0-9a-fA-F]{8}$/
+const BYTES_REGEX = /^0x([0-9a-fA-F]{2})*$/
+// Nesting is bounded by the registry ABIs, not by calldata; this only stops a pathological chain of contracts.
+const MAX_NESTED_CALL_DEPTH = 3
+
+function isExternalCallLike(value: Record<string, unknown>): value is Record<string, unknown> & ExternalCallLike {
+  return (
+    typeof value.target === 'string' &&
+    ADDRESS_REGEX.test(value.target) &&
+    typeof value.selector === 'string' &&
+    SELECTOR_REGEX.test(value.selector) &&
+    typeof value.data === 'string' &&
+    BYTES_REGEX.test(value.data)
+  )
+}
+
+/** What a call reaches: every address in its arguments, and whether any nested payload could not be read. */
+type CallAddresses = { addresses: Set<string>; opaque: boolean }
+
+function collectInto(value: unknown, chainId: number, depth: number, result: CallAddresses): void {
+  if (typeof value === 'string') {
+    if (ADDRESS_REGEX.test(value)) result.addresses.add(value.toLowerCase())
+    return
+  }
+  if (Array.isArray(value)) {
+    value.forEach(item => collectInto(item, chainId, depth, result))
+    return
+  }
+  if (!isRecord(value)) return
+  if (isExternalCallLike(value)) {
+    // The target is a counterparty in its own right; the payload it runs is read only when the target is a
+    // Decentraland contract whose ABI decodes it canonically. Anything else stays unread, and unread means
+    // the preview cannot be vouched for.
+    result.addresses.add(value.target.toLowerCase())
+    const target = getKnownDecentralandContract(value.target, chainId)
+    const nested =
+      target && depth < MAX_NESTED_CALL_DEPTH ? decodeKnownContractCall(target, `${value.selector}${value.data.slice(2)}`) : null
+    if (!nested || nested.forwardsCall) {
+      result.opaque = true
+    } else {
+      collectInto(nested.args, chainId, depth + 1, result)
+    }
+    return
+  }
+  Object.values(value).forEach(item => collectInto(item, chainId, depth, result))
+}
+
+/**
+ * Every address a decoded Decentraland call is handed, lowercased, walking arrays and structs, and following
+ * a nested call (an `externalCall` struct) into the call it carries when its target is a Decentraland contract
+ * on `chainId` and the payload decodes against that contract's ABI. `opaque` is true when a nested payload
+ * could not be read that way: it may name addresses this walk cannot see, so the caller must not vouch for
+ * what the call reaches. Only calldata declared as a nested call is followed: a plain `bytes` argument (a
+ * safe transfer's `data`, a factory's `createCollection` initializer, a trade's `extra`) is not a call this
+ * page is asked to review, see FORWARDING_FUNCTIONS for the ones that are refused outright.
+ */
+function collectCallAddresses(call: DecodedCall, chainId: number): CallAddresses {
+  const result: CallAddresses = { addresses: new Set<string>(), opaque: false }
+  collectInto(call.args, chainId, 0, result)
+  return result
+}
+
 export {
+  collectCallAddresses,
   decodeKnownContractCall,
   getCollectionContract,
   getKnownDecentralandContract,
@@ -246,4 +315,4 @@ export {
   getStaticContractIndex,
   resolveKnownDecentralandContract
 }
-export type { CollectionLookup, ContractResolution, DecodedCall, KnownContract, ResolveContractDependencies }
+export type { CallAddresses, CollectionLookup, ContractResolution, DecodedCall, KnownContract, ResolveContractDependencies }

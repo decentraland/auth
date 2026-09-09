@@ -66,7 +66,7 @@
       "review_title": "Review this transaction",
       "preview_unavailable_warning": "We couldn't check what this transaction does because the preview service is temporarily unavailable. Only approve if you trust the scene that requested it.",
       "acknowledge_preview_unavailable": "I understand the preview is unavailable and I'm approving without seeing what this transaction does",
-      "unrecognized_contract_warning": "This action involves a contract Decentraland doesn't recognize. Its code runs inside the transaction and can't be previewed, so the preview may not show everything this transaction does.",
+      "unrecognized_contract_warning": "This action involves a contract Decentraland doesn't recognize, so the preview may not show everything this transaction does.",
       "acknowledge_unrecognized_contract": "I understand this involves a contract Decentraland can't check",
       "review_restarted_notice": "Your wallet's network changed or couldn't be verified, so this transaction was reviewed again on the current network.",
       "calls_function": "Calls {functionName} on {contractName}"

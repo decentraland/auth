@@ -111,7 +111,7 @@ const formatUsd = (dollarValue: string | null, signed = false): string | null =>
 // ERC-1155, so such a change only appears when a call reached a contract Decentraland does not recognize
 // (already caveated); its quantity is still shown, since one id can move many units and a row that names
 // the item alone would say less than what moves.
-const assetTitle = (change: AssetChange, t: Translate): string => {
+const assetTitle = (change: AssetChange, t: Translate, chainId: number | undefined): string => {
   if (change.standard === 'erc721' || change.standard === 'erc1155') {
     const name = formatUntrustedLabel(change.name || change.symbol)
     const tokenId = change.tokenId ? `#${change.tokenId}` : ''
@@ -121,7 +121,10 @@ const assetTitle = (change: AssetChange, t: Translate): string => {
       t('request.transaction_dialog.unknown_token', { address: shortenAddress(change.contractAddress) })
     )
   }
-  const symbol = formatUntrustedLabel(change.symbol) || (change.standard === 'native' ? 'ETH' : '')
+  // A native change without a symbol is named by the chain, never by a fixed currency.
+  const symbol =
+    formatUntrustedLabel(change.symbol) ||
+    (change.standard === 'native' ? getNativeSymbol(chainId) || t('request.unverified.native_currency') : '')
   // `rawAmount` is in base units (e.g. wei), so it's only a valid display amount when the token
   // has 0 decimals. Otherwise, without a decimals-applied `amount`, we show the symbol alone
   // rather than a base-unit number inflated by ~18 orders of magnitude.
@@ -189,7 +192,7 @@ const AssetRow = ({
   chainId?: number
 }) => {
   const { t } = useTranslation()
-  const title = assetTitle(change, t)
+  const title = assetTitle(change, t, chainId)
   const dollar = formatUsd(change.dollarValue)
   const fallbackInitial = (formatUntrustedLabel(change.symbol || change.name) || '?').charAt(0)
   // A logo is fetched only from an https URL; anything else falls back to the initial.

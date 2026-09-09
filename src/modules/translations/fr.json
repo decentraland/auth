@@ -66,7 +66,7 @@
       "review_title": "Vérifiez cette transaction",
       "preview_unavailable_warning": "Nous n'avons pas pu vérifier ce que fait cette transaction car le service d'aperçu est temporairement indisponible. N'approuvez que si vous faites confiance à la scène qui l'a demandée.",
       "acknowledge_preview_unavailable": "Je comprends que l'aperçu est indisponible et j'approuve sans voir ce que fait cette transaction",
-      "unrecognized_contract_warning": "Cette action implique un contrat que Decentraland ne reconnaît pas. Son code s'exécute dans la transaction et ne peut pas être prévisualisé, donc l'aperçu peut ne pas montrer tout ce que fait cette transaction.",
+      "unrecognized_contract_warning": "Cette action implique un contrat que Decentraland ne reconnaît pas, donc l'aperçu peut ne pas montrer tout ce que fait cette transaction.",
       "acknowledge_unrecognized_contract": "Je comprends que cela implique un contrat que Decentraland ne peut pas vérifier",
       "review_restarted_notice": "Le réseau de votre portefeuille a changé ou n'a pas pu être vérifié, cette transaction a donc été réexaminée sur le réseau actuel.",
       "calls_function": "Appelle {functionName} sur {contractName}"

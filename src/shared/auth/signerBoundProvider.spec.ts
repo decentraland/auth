@@ -114,12 +114,10 @@ describe('when binding a provider to the reviewed signer', () => {
 
     beforeEach(() => {
       send = jest.fn().mockResolvedValue([SIGNER])
-      bound = bindProviderToSigner({ send }, SIGNER) as typeof bound
     })
 
-    it('should forward through send with the method and params', async () => {
-      await expect(bound.request({ method: 'eth_accounts', params: [] })).resolves.toEqual([SIGNER])
-      expect(send).toHaveBeenCalledWith('eth_accounts', [])
+    it('should refuse to bind rather than forward through a path the binding does not read', () => {
+      expect(() => bindProviderToSigner({ send }, SIGNER)).toThrow('no EIP-1193 request method')
     })
   })
 })

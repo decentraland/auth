@@ -164,7 +164,7 @@ const INTERACTION_VIEWS = new Set([
 const RPC_METHOD_NOT_SUPPORTED = -32601
 const RPC_INVALID_PARAMS = -32602
 
-// Why a transaction review was discarded and started over (see restartTransactionReview).
+// Why a transaction review was discarded and started over (see restartReview).
 type ReviewRestartReason = 'network_changed' | 'network_unreadable' | 'network_unrecorded' | 'wallet_rejected_chain' | 'lookup_unavailable'
 
 type DecentralandTransaction = Extract<RequestClassification, { kind: 'dcl_transaction' }>
@@ -245,9 +245,10 @@ export const RequestPage = () => {
   // The confirmation dialog web2 users get on every Allow (see handleApproveWalletInteraction).
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false)
   const [simulationState, setSimulationState] = useState<SimulationState>({ status: 'idle' })
-  // Why the simulation of the reviewed call cannot be vouched for even when it ran (see PreviewCaveat).
-  // Decided before the simulation is fetched, so Allow never enables on a preview the page would not stand behind.
-  const [previewCaveat, setPreviewCaveat] = useState<PreviewCaveat | null>(null)
+  // Why the simulation of the reviewed call cannot be vouched for even when it ran (see PreviewCaveat):
+  // null when it can be, undefined while that is still being decided. Decided alongside the simulation,
+  // and Allow stays blocked until it is, so it never enables on a preview the page would not stand behind.
+  const [previewCaveat, setPreviewCaveat] = useState<PreviewCaveat | null | undefined>(undefined)
   // Resolved counterparty display names (lowercased address → name), filled in progressively.
   const [simulationProfiles, setSimulationProfiles] = useState<Record<string, string>>({})
   // Chain the pending transaction/meta-tx was simulated on, for block-explorer links.
@@ -457,7 +458,7 @@ export const RequestPage = () => {
       setErrorKind(null)
       setWalletInfo(undefined)
       setClassification(null)
-      setPreviewCaveat(null)
+      setPreviewCaveat(undefined)
       setGasEstimate(null)
       setNftTransferData(null)
       setManaTransferData(null)
@@ -711,27 +712,28 @@ export const RequestPage = () => {
 
         // Whether the preview of a call can be vouched for at all (see PreviewCaveat). Every address the
         // call is handed (see getCounterpartyAddresses) must be a Decentraland contract on the execution
-        // chain (registry, or a factory-deployed collection) or a plain account without code; anything
-        // else is code the requester chose, running inside the transaction, which a simulation cannot be
-        // relied on to show. Judged by Decentraland's RPC; when it cannot answer, the address counts as
-        // such code, so the page never vouches for a preview on a guess. Resolved before the simulation
-        // is fetched, while Allow is still blocked on the loading preview.
+        // chain (registry, or a factory-deployed collection) or a plain account without code, and nothing
+        // the call carries may have gone unread; anything else is code the requester chose, running inside
+        // the transaction, which a simulation cannot be relied on to show. Cheapest answer first: the
+        // registry costs nothing, one code read settles a plain wallet (the usual counterparty), and only
+        // an address with code on the relay chain asks the factories. Judged by Decentraland's RPC; when it
+        // cannot answer, the address counts as such code, so the page never vouches for a preview on a
+        // guess. Runs alongside the simulation; Allow stays blocked until both have settled.
         const detectPreviewCaveat = async (call: DecodedCall, chainId: number): Promise<PreviewCaveat | null> => {
-          const metaTransactionChainId = Number(getMetaTransactionChainId())
+          const { addresses, opaque } = getCounterpartyAddresses(call, signerAddress, chainId)
+          if (opaque) return 'unrecognized_contract'
+          const collectionsLiveHere = chainId === Number(getMetaTransactionChainId())
           const isRecognizedOrPlain = async (address: string): Promise<boolean> => {
             try {
-              const resolution = await resolveKnownDecentralandContract(address, chainId, {
-                metaTransactionChainId,
-                isCollection: isDecentralandCollection
-              })
-              if (resolution.status === 'found') return true
-              if (resolution.status === 'unavailable') return false
-              return await isAddressWithoutCode(address, chainId)
+              if (getKnownDecentralandContract(address, chainId)) return true
+              if (await isAddressWithoutCode(address, chainId)) return true
+              if (!collectionsLiveHere) return false
+              return await isDecentralandCollection(address)
             } catch {
               return false
             }
           }
-          const verdicts = await Promise.all(getCounterpartyAddresses(call, signerAddress).map(isRecognizedOrPlain))
+          const verdicts = await Promise.all(addresses.map(isRecognizedOrPlain))
           return verdicts.every(Boolean) ? null : 'unrecognized_contract'
         }
 
@@ -803,25 +805,27 @@ export const RequestPage = () => {
           if (!transaction.relayed) {
             void estimateTransactionFee(transaction)
           }
-          const caveat = await detectPreviewCaveat(transaction.call, transaction.chainId)
-          if (isStale()) return
-          setPreviewCaveat(caveat)
+          // The caveat and the simulation are independent, so they run side by side; the views keep Allow
+          // blocked until both have settled.
+          const caveatPromise = detectPreviewCaveat(transaction.call, transaction.chainId).then(caveat => {
+            if (!isStale()) setPreviewCaveat(caveat)
+            return caveat
+          })
           const simulationPromise = fetchSimulation(buildSendTransactionSimulationPayload(transaction, signerAddress))
 
-          // The branded gift view vouches for the transfer being the whole effect, which the page cannot
-          // do when code the request chose runs inside it: such a gift stays on the generic review and
-          // its acknowledgment.
-          if (transaction.branded !== 'gift_candidate' || caveat !== null) return
+          if (transaction.branded !== 'gift_candidate') return
           const transferData = decodeNftTransferData(transaction.call)
           if (!transferData) return
           try {
             // A recognized selector is not a complete preview: keep the branded view only when the sole
-            // visible effect is exactly the transfer it shows; anything else stays on the generic summary
-            // and its acknowledgment gates. The user may also have answered from the generic review while
-            // the simulation ran; their answer stands.
-            const simulation = await simulationPromise
+            // visible effect is exactly the transfer it shows and nothing the request chose runs inside
+            // it; anything else stays on the generic summary and its acknowledgment gates. The user may
+            // also have answered from the generic review while the simulation ran; their answer stands.
+            const [simulation, caveat] = await Promise.all([simulationPromise, caveatPromise])
             if (isStale()) return
-            if (!simulation || !isExactNftTransferSimulation(simulation, signerAddress, transaction.to, transferData)) return
+            if (!simulation || caveat !== null || !isExactNftTransferSimulation(simulation, signerAddress, transaction.to, transferData)) {
+              return
+            }
 
             const [metadata, recipientProfile] = await Promise.all([
               fetchNftMetadata(transaction.to, transaction.contract.abi, transferData.tokenId),
@@ -887,9 +891,9 @@ export const RequestPage = () => {
             setSimulationChainId(classified.chainId)
             setSimulationState({ status: 'loading' })
             setView(View.WALLET_SIGNATURE_INTERACTION)
-            const caveat = await detectPreviewCaveat(classified.call, classified.chainId)
-            if (isStale()) return
-            setPreviewCaveat(caveat)
+            void detectPreviewCaveat(classified.call, classified.chainId).then(caveat => {
+              if (!isStale()) setPreviewCaveat(caveat)
+            })
             void fetchSimulation(
               buildMetaTransactionSimulationPayload(classified.chainId, classified.contract.address, classified.calldata, signerAddress),
               { rejectUnpreviewable: true }
@@ -1065,7 +1069,7 @@ export const RequestPage = () => {
     }
   }, [nftTransferData, manaTransferData, requestId])
 
-  const restartTransactionReview = useCallback(
+  const restartReview = useCallback(
     (reason: ReviewRestartReason, { notice = true }: { notice?: boolean } = {}) => {
       // Make the stale review non-actionable immediately, then let the load effect's existing reset
       // clear every derived preview/classification and recover the same request again. No outcome is
@@ -1188,7 +1192,7 @@ export const RequestPage = () => {
           // The address and calldata may refer to entirely different code on another chain, and
           // an unreadable chain cannot be compared safely. Discard the stale review and recover
           // the still-unconsumed request so it is previewed on a verified live chain.
-          restartTransactionReview(
+          restartReview(
             reviewedChainId === undefined ? 'network_unrecorded' : currentChainId === undefined ? 'network_unreadable' : 'network_changed'
           )
           return
@@ -1250,7 +1254,7 @@ export const RequestPage = () => {
       } else if (isChainMismatchRejection(e)) {
         // The wallet refused the send because its network no longer matches the reviewed chain: the
         // binding above fired. That is not the user's decision, so answer nothing and review again.
-        restartTransactionReview('wallet_rejected_chain')
+        restartReview('wallet_rejected_chain')
       } else if (isUserRejectedTransaction(e)) {
         console.info('User rejected wallet interaction in wallet — not reporting to Sentry')
         let delivery: 'sent' | 'other_account' | 'unsent' = 'unsent'
@@ -1304,7 +1308,7 @@ export const RequestPage = () => {
       setIsLoading(false)
       isSettlingRef.current = false
     }
-  }, [isUserUsingWeb2Wallet, nftTransferData, manaTransferData, requestId, identity, showInteractionCompleteView, restartTransactionReview])
+  }, [isUserUsingWeb2Wallet, nftTransferData, manaTransferData, requestId, identity, showInteractionCompleteView, restartReview])
 
   // Allow, on every review: web2 users get a confirmation dialog first, since their wallet has no
   // prompt of its own; external wallets go straight to theirs.
@@ -1368,7 +1372,7 @@ export const RequestPage = () => {
   const requiresApprovalAcknowledgment =
     classification !== null &&
     (!isDecentralandRequest ||
-      previewCaveat !== null ||
+      (previewCaveat !== null && previewCaveat !== undefined) ||
       hasDangerousApprovalChange ||
       hasPreviewWithoutVisibleEffects ||
       simulationState.status === 'unavailable' ||
@@ -1421,7 +1425,7 @@ export const RequestPage = () => {
     case View.WALLET_INTERACTION_ERROR:
       return <SigningError error={error} kind={errorKind ?? undefined} />
     case View.LOOKUP_UNAVAILABLE:
-      return <LookupUnavailableError onTryAgain={() => restartTransactionReview('lookup_unavailable', { notice: false })} />
+      return <LookupUnavailableError onTryAgain={() => restartReview('lookup_unavailable', { notice: false })} />
     case View.CLIENT_LOGIN_ERROR:
       return <ClientLoginError error={error} onTryAgain={onRetryClientLogin} />
     case View.OUTDATED_CLIENT:
@@ -1502,7 +1506,8 @@ export const RequestPage = () => {
             verifiedContracts={simulationVerified}
             chainId={simulationChainId}
             requiresAcknowledgment={requiresApprovalAcknowledgment}
-            previewCaveat={previewCaveat}
+            previewCaveat={previewCaveat ?? null}
+            isPreviewCaveatPending={previewCaveat === undefined}
             gas={gas}
             isReverted={isSimulationReverted}
             reviewRestarted={reviewRestartReason !== null}
@@ -1531,7 +1536,8 @@ export const RequestPage = () => {
             verifiedContracts={simulationVerified}
             chainId={simulationChainId}
             requiresAcknowledgment={requiresApprovalAcknowledgment}
-            previewCaveat={previewCaveat}
+            previewCaveat={previewCaveat ?? null}
+            isPreviewCaveatPending={previewCaveat === undefined}
             isLoading={isLoading}
             onDeny={onDenyWalletInteraction}
             onApprove={handleApproveWalletInteraction}

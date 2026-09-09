@@ -6,12 +6,13 @@ import { Provider, connection } from 'decentraland-connect'
 import { ContractName, getContract } from 'decentraland-transactions'
 import { config } from '../../../modules/config'
 import {
-  ADDRESS_REGEX,
   DecodedCall,
   SimulationRequestBody,
   SimulationResponseBody,
-  buildMetaTransactionSimulationPayload
+  buildMetaTransactionSimulationPayload,
+  collectCallAddresses
 } from '../../../shared/auth'
+import { isErrorWithMessage } from '../../../shared/errors'
 import { formatUntrustedLabel } from '../../../shared/text'
 import { getHttpsUrl } from '../../../shared/urls'
 import { isRecord } from '../../../shared/utils/isRecord'
@@ -183,6 +184,39 @@ const COLLECTION_FACTORIES = [ContractName.CollectionFactory, ContractName.Colle
 const COLLECTION_LOOKUP_TIMEOUT_MS = 10_000
 // The most metadata JSON the gift view reads for one token. Real collection metadata is a few kilobytes.
 const MAX_METADATA_BYTES = 256 * 1024
+// A tokenURI host that does not answer must not hold the gift view's upgrade open forever.
+const METADATA_FETCH_TIMEOUT_MS = 10_000
+
+/**
+ * Reads a response body as text without buffering more than `maxBytes`: the stream is cancelled the moment
+ * the cap is passed, so a hostile host cannot make the page download an arbitrary body. Falls back to
+ * `text()` with the same cap where the body cannot be streamed.
+ */
+async function readTextWithCap(response: Response, maxBytes: number): Promise<string> {
+  const reader = response.body?.getReader?.()
+  if (!reader) {
+    const text = await response.text()
+    if (text.length > maxBytes) {
+      throw new Error(`Body is too large (${text.length} characters)`)
+    }
+    return text
+  }
+  const decoder = new TextDecoder()
+  const chunks: string[] = []
+  let received = 0
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    received += value.byteLength
+    if (received > maxBytes) {
+      await reader.cancel().catch(() => undefined)
+      throw new Error(`Body is too large (over ${maxBytes} bytes)`)
+    }
+    chunks.push(decoder.decode(value, { stream: true }))
+  }
+  chunks.push(decoder.decode())
+  return chunks.join('')
+}
 
 /** Rejects when `promise` has not settled within `timeoutMs`. */
 function withTimeout<T>(promise: PromiseLike<T> | T, timeoutMs: number, label: string): Promise<T> {
@@ -308,33 +342,28 @@ function decodeNftTransferData(call: DecodedCall): { fromAddress: string; tokenI
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
 
-function collectAddresses(value: unknown, into: Set<string>): void {
-  if (typeof value === 'string') {
-    if (ADDRESS_REGEX.test(value)) into.add(value.toLowerCase())
-  } else if (Array.isArray(value)) {
-    value.forEach(item => collectAddresses(item, into))
-  } else if (isRecord(value)) {
-    Object.values(value).forEach(item => collectAddresses(item, into))
-  }
-}
+/** The counterparties of a decoded call, and whether part of what it reaches could not be read. */
+type Counterparties = { addresses: string[]; opaque: boolean }
 
 /**
  * Every address a decoded Decentraland call is handed, other than the signer's own and the zero address,
  * lowercased and deduplicated. A Decentraland contract calls the addresses it is given: a collection
  * calls the recipient of a safe transfer (`onERC721Received`), the marketplaces and bids call the NFT
- * registry of an order (`ownerOf`, `safeTransferFrom`, a fingerprint check). Whatever code sits there runs
- * inside the transaction, and a simulation cannot be relied on to show what it does: the code can tell a
- * preview from the real thing (the preview's tx.origin is the contract, its gas price is zero and the
- * nonce has not moved) and behave differently in each. The page therefore vouches for a preview only when
- * every such address is a Decentraland contract or has no code (see detectPreviewCaveat). Arrays and
- * structs are walked, so batch transfers and order structs count too.
+ * registry of an order (`ownerOf`, `safeTransferFrom`, a fingerprint check), the credits manager runs the
+ * marketplace call nested in its `externalCall`. Whatever code sits there runs inside the transaction, and
+ * a simulation cannot be relied on to show what it does: the code can tell a preview from the real thing
+ * (the preview's tx.origin is the contract, its gas price is zero and the nonce has not moved) and behave
+ * differently in each. The page therefore vouches for a preview only when every such address is a
+ * Decentraland contract or has no code, and nothing the call carries went unread (see detectPreviewCaveat
+ * and collectCallAddresses). Arrays, structs and declared nested calls are walked; a plain `bytes`
+ * argument is not a call (the one that deploys code, `createCollection`, is a deliberate exception noted
+ * next to FORWARDING_FUNCTIONS).
  */
-function getCounterpartyAddresses(call: DecodedCall, signerAddress: string): string[] {
-  const addresses = new Set<string>()
-  collectAddresses(call.args, addresses)
+function getCounterpartyAddresses(call: DecodedCall, signerAddress: string, chainId: number): Counterparties {
+  const { addresses, opaque } = collectCallAddresses(call, chainId)
   addresses.delete(signerAddress.toLowerCase())
   addresses.delete(ZERO_ADDRESS)
-  return [...addresses]
+  return { addresses: [...addresses], opaque }
 }
 
 /** Whether two token ids name the same token, whatever notation each side uses (decimal, hex). */
@@ -450,8 +479,9 @@ async function fetchNftMetadata(
     throw new Error(`Unsupported tokenURI for token ${tokenId} at contract ${contractAddress}`)
   }
 
-  // Fetch the metadata JSON, bounded: a declared or actual body beyond the cap is not parsed.
-  const metadataResponse = await fetch(metadataUrl)
+  // Fetch the metadata JSON, bounded in time and in size: a declared or streamed body beyond the cap is
+  // never buffered, let alone parsed.
+  const metadataResponse = await fetch(metadataUrl, { signal: AbortSignal.timeout(METADATA_FETCH_TIMEOUT_MS) })
   if (!metadataResponse.ok) {
     // Drain the body so the connection can be reused; ignore failures doing so.
     await metadataResponse.body?.cancel().catch(() => undefined)
@@ -462,9 +492,13 @@ async function fetchNftMetadata(
     await metadataResponse.body?.cancel().catch(() => undefined)
     throw new Error(`Metadata for token ${tokenId} at contract ${contractAddress} is too large (${declaredLength} bytes)`)
   }
-  const metadataText = await metadataResponse.text()
-  if (metadataText.length > MAX_METADATA_BYTES) {
-    throw new Error(`Metadata for token ${tokenId} at contract ${contractAddress} is too large (${metadataText.length} bytes)`)
+  let metadataText: string
+  try {
+    metadataText = await readTextWithCap(metadataResponse, MAX_METADATA_BYTES)
+  } catch (e) {
+    throw new Error(
+      `Metadata for token ${tokenId} at contract ${contractAddress} is too large: ${isErrorWithMessage(e) ? e.message : 'unknown'}`
+    )
   }
   const metadata: unknown = JSON.parse(metadataText)
   if (!isRecord(metadata)) {

@@ -27,6 +27,8 @@ interface WalletInteractionProps {
   requiresAcknowledgment?: boolean
   /** Why the preview cannot be vouched for even though it ran (see PreviewCaveat), or null. */
   previewCaveat?: PreviewCaveat | null
+  /** True while whether the preview can be vouched for is still being decided; Allow waits for it. */
+  isPreviewCaveatPending?: boolean
   gas: WalletInteractionGas
   /** True when the simulation predicts the transaction would revert. */
   isReverted?: boolean

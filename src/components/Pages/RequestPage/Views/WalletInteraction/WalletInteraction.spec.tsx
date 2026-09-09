@@ -201,6 +201,17 @@ describe('when rendering the WalletInteraction view', () => {
     })
   })
 
+  describe('and whether the preview can be vouched for is still being decided', () => {
+    beforeEach(() => {
+      props = { ...props, isPreviewCaveatPending: true }
+    })
+
+    it('should keep Allow disabled until it is', () => {
+      render(<WalletInteraction {...props} />)
+      expect(screen.getByRole('button', { name: 'common.allow' })).toBeDisabled()
+    })
+  })
+
   describe.each(['unrecognized_contract'] as const)('and the preview has the %s caveat', previewCaveat => {
     beforeEach(() => {
       props = { ...props, previewCaveat, requiresAcknowledgment: true }

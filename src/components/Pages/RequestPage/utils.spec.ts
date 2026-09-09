@@ -412,14 +412,15 @@ describe('when reading the addresses a Decentraland call is handed', () => {
   const SIGNER = '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd'
   const OTHER = '0x1234567890abcdef1234567890abcdef12345678'
   const NFT = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd'
+  const CHAIN = 137
 
   describe('and the call is a safe transfer to another account', () => {
     beforeEach(() => {
       call = { functionName: 'safeTransferFrom', args: [SIGNER, OTHER, BigInt(1)], payable: false, forwardsCall: false }
     })
 
-    it('should return the recipient and not the signer', () => {
-      expect(getCounterpartyAddresses(call, SIGNER)).toEqual([OTHER])
+    it('should return the recipient and not the signer, with nothing left unread', () => {
+      expect(getCounterpartyAddresses(call, SIGNER, CHAIN)).toEqual({ addresses: [OTHER], opaque: false })
     })
   })
 
@@ -429,7 +430,7 @@ describe('when reading the addresses a Decentraland call is handed', () => {
     })
 
     it('should return the registry', () => {
-      expect(getCounterpartyAddresses(call, SIGNER)).toEqual([NFT])
+      expect(getCounterpartyAddresses(call, SIGNER, CHAIN)).toEqual({ addresses: [NFT], opaque: false })
     })
   })
 
@@ -452,7 +453,32 @@ describe('when reading the addresses a Decentraland call is handed', () => {
     })
 
     it('should return every nested address once, lowercased, without the signer', () => {
-      expect(getCounterpartyAddresses(call, SIGNER)).toEqual([OTHER, NFT])
+      expect(getCounterpartyAddresses(call, SIGNER, CHAIN)).toEqual({ addresses: [OTHER, NFT], opaque: false })
+    })
+  })
+
+  describe('and the call carries a nested call to a target the registry does not know', () => {
+    beforeEach(() => {
+      call = {
+        functionName: 'useCredits',
+        args: [
+          {
+            externalCall: {
+              target: OTHER,
+              selector: '0x12345678',
+              data: `0x${'00'.repeat(32)}`,
+              expiresAt: BigInt(1),
+              salt: `0x${'00'.repeat(32)}`
+            }
+          }
+        ],
+        payable: false,
+        forwardsCall: false
+      }
+    })
+
+    it('should return the target and flag the payload as unread', () => {
+      expect(getCounterpartyAddresses(call, SIGNER, CHAIN)).toEqual({ addresses: [OTHER], opaque: true })
     })
   })
 
@@ -467,7 +493,7 @@ describe('when reading the addresses a Decentraland call is handed', () => {
     })
 
     it('should return nothing', () => {
-      expect(getCounterpartyAddresses(call, SIGNER)).toEqual([])
+      expect(getCounterpartyAddresses(call, SIGNER, CHAIN)).toEqual({ addresses: [], opaque: false })
     })
   })
 
@@ -477,7 +503,7 @@ describe('when reading the addresses a Decentraland call is handed', () => {
     })
 
     it('should return nothing', () => {
-      expect(getCounterpartyAddresses(call, SIGNER)).toEqual([])
+      expect(getCounterpartyAddresses(call, SIGNER, CHAIN)).toEqual({ addresses: [], opaque: false })
     })
   })
 })

@@ -10,7 +10,9 @@ function getHttpsUrl(value: unknown): string | null {
   }
   try {
     const url = new URL(value)
-    return url.protocol === 'https:' ? url.toString() : null
+    // No embedded credentials either: the browser would send them from the auth origin.
+    if (url.protocol !== 'https:' || url.username || url.password) return null
+    return url.toString()
   } catch {
     return null
   }

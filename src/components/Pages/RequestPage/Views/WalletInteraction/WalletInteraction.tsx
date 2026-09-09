@@ -27,6 +27,7 @@ export const WalletInteraction = ({
   chainId,
   requiresAcknowledgment = false,
   previewCaveat = null,
+  isPreviewCaveatPending = false,
   gas,
   isReverted = false,
   reviewRestarted = false,
@@ -62,6 +63,7 @@ export const WalletInteraction = ({
     isLoading ||
     simulation.status === 'idle' ||
     simulation.status === 'loading' ||
+    isPreviewCaveatPending ||
     isGasPending ||
     (requiresAcknowledgment && !acknowledged)
 

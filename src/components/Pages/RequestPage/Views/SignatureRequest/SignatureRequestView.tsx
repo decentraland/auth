@@ -43,6 +43,7 @@ export const SignatureRequestView = ({
   chainId,
   requiresAcknowledgment = false,
   previewCaveat = null,
+  isPreviewCaveatPending = false,
   isLoading = false,
   onDeny,
   onApprove
@@ -146,7 +147,11 @@ export const SignatureRequestView = ({
           variant="contained"
           color={isReverted ? 'error' : 'primary'}
           disabled={
-            isLoading || simulation.status === 'idle' || simulation.status === 'loading' || (requiresAcknowledgment && !acknowledged)
+            isLoading ||
+            simulation.status === 'idle' ||
+            simulation.status === 'loading' ||
+            isPreviewCaveatPending ||
+            (requiresAcknowledgment && !acknowledged)
           }
           onClick={onApprove}
           data-testid="signature-approve-button"

@@ -165,6 +165,17 @@ describe('when rendering the SignatureRequestView', () => {
       })
     })
 
+    describe('and whether the preview can be vouched for is still being decided', () => {
+      beforeEach(() => {
+        props = { ...props, isPreviewCaveatPending: true }
+      })
+
+      it('should keep Allow disabled until it is', () => {
+        render(<SignatureRequestView {...props} />)
+        expect(screen.getByTestId('signature-approve-button')).toBeDisabled()
+      })
+    })
+
     describe.each(['unrecognized_contract'] as const)('and the preview has the %s caveat', previewCaveat => {
       beforeEach(() => {
         props = { ...props, previewCaveat }

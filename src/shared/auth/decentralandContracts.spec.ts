@@ -4,6 +4,7 @@ import {
   ContractResolution,
   DecodedCall,
   KnownContract,
+  collectCallAddresses,
   decodeKnownContractCall,
   getKnownDecentralandContract,
   getMetaTransactionCalldataField,
@@ -412,6 +413,115 @@ describe('when decoding a call against a known contract', () => {
         payable: false,
         forwardsCall: false
       })
+    })
+  })
+})
+
+describe('when collecting the addresses a call reaches', () => {
+  const POLYGON = 137
+  const USER = '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd'
+  const OTHER = '0x1234567890abcdef1234567890abcdef12345678'
+  const UNKNOWN_NFT = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd'
+  let credits: KnownContract
+  let marketplace: KnownContract
+  let acceptCalldata: `0x${string}`
+  let result: ReturnType<typeof collectCallAddresses>
+
+  const zeroHash = `0x${'00'.repeat(32)}`
+  const trade = {
+    signer: OTHER,
+    signature: '0x',
+    checks: {
+      uses: 1n,
+      expiration: 4102444800n,
+      effective: 0n,
+      salt: zeroHash,
+      contractSignatureIndex: 0n,
+      signerSignatureIndex: 0n,
+      allowedRoot: zeroHash,
+      allowedProof: [],
+      externalChecks: []
+    },
+    sent: [{ assetType: 1n, contractAddress: UNKNOWN_NFT, value: 1n, beneficiary: USER, extra: '0x' }],
+    received: [
+      { assetType: 1n, contractAddress: getContract(ContractName.MANAToken, POLYGON).address, value: 100n, beneficiary: OTHER, extra: '0x' }
+    ]
+  }
+  const useCreditsWith = (externalCall: { target: string; selector: string; data: string }) =>
+    decodeKnownContractCall(
+      credits,
+      encodeFunctionData({
+        abi: credits.abi,
+        functionName: 'useCredits',
+        args: [
+          {
+            credits: [],
+            creditsSignatures: [],
+            externalCall: { ...externalCall, expiresAt: 4102444800n, salt: zeroHash },
+            customExternalCallSignature: '0x',
+            maxUncreditedValue: 0n,
+            maxCreditedValue: 0n
+          }
+        ]
+      })
+    )!
+
+  beforeEach(() => {
+    credits = getKnownDecentralandContract(getContract(ContractName.CreditsManager, POLYGON).address, POLYGON)!
+    marketplace = getKnownDecentralandContract(getContract(ContractName.OffChainMarketplaceV2, POLYGON).address, POLYGON)!
+    acceptCalldata = encodeFunctionData({ abi: marketplace.abi, functionName: 'accept', args: [[trade]] })
+  })
+
+  describe('and a credits purchase nests a marketplace trade naming an unknown NFT registry', () => {
+    beforeEach(() => {
+      result = collectCallAddresses(
+        useCreditsWith({ target: marketplace.address, selector: acceptCalldata.slice(0, 10), data: `0x${acceptCalldata.slice(10)}` }),
+        POLYGON
+      )
+    })
+
+    it('should follow the nested call and surface the registry hidden in its payload', () => {
+      expect(result.opaque).toBe(false)
+      expect([...result.addresses]).toEqual(expect.arrayContaining([marketplace.address, UNKNOWN_NFT, OTHER, USER]))
+    })
+  })
+
+  describe('and the nested call targets a contract the registry does not know', () => {
+    beforeEach(() => {
+      result = collectCallAddresses(
+        useCreditsWith({ target: OTHER, selector: acceptCalldata.slice(0, 10), data: `0x${acceptCalldata.slice(10)}` }),
+        POLYGON
+      )
+    })
+
+    it('should keep the target and flag the payload as unread', () => {
+      expect(result.opaque).toBe(true)
+      expect(result.addresses.has(OTHER)).toBe(true)
+    })
+  })
+
+  describe('and the nested payload does not decode against the target', () => {
+    beforeEach(() => {
+      result = collectCallAddresses(useCreditsWith({ target: marketplace.address, selector: '0x12345678', data: '0x' }), POLYGON)
+    })
+
+    it('should flag the payload as unread', () => {
+      expect(result.opaque).toBe(true)
+    })
+  })
+
+  describe('and the nested call is itself a forwarder', () => {
+    beforeEach(() => {
+      const forwarder = getKnownDecentralandContract(getContract(ContractName.Forwarder, POLYGON).address, POLYGON)!
+      const forwardCalldata = encodeFunctionData({ abi: forwarder.abi, functionName: 'forwardCall', args: [OTHER, '0x'] })
+      result = collectCallAddresses(
+        useCreditsWith({ target: forwarder.address, selector: forwardCalldata.slice(0, 10), data: `0x${forwardCalldata.slice(10)}` }),
+        POLYGON
+      )
+    })
+
+    it('should flag the payload as unread rather than trust what the forwarder is handed', () => {
+      expect(result.opaque).toBe(true)
     })
   })
 })

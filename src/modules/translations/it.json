@@ -66,7 +66,7 @@
       "review_title": "Rivedi questa transazione",
       "preview_unavailable_warning": "Non è stato possibile verificare cosa fa questa transazione perché il servizio di anteprima è temporaneamente non disponibile. Approva solo se ti fidi della scena che l'ha richiesta.",
       "acknowledge_preview_unavailable": "Capisco che l'anteprima non è disponibile e sto approvando senza vedere cosa fa questa transazione",
-      "unrecognized_contract_warning": "Questa azione coinvolge un contratto che Decentraland non riconosce. Il suo codice viene eseguito all'interno della transazione e non può essere visualizzato in anteprima, quindi l'anteprima potrebbe non mostrare tutto ciò che fa questa transazione.",
+      "unrecognized_contract_warning": "Questa azione coinvolge un contratto che Decentraland non riconosce, quindi l'anteprima potrebbe non mostrare tutto ciò che fa questa transazione.",
       "acknowledge_unrecognized_contract": "Capisco che questo coinvolge un contratto che Decentraland non può verificare",
       "review_restarted_notice": "La rete del tuo wallet è cambiata o non è stato possibile verificarla, quindi questa transazione è stata riesaminata sulla rete attuale.",
       "calls_function": "Chiama {functionName} su {contractName}"

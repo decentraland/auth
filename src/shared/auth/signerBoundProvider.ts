@@ -58,19 +58,13 @@ function bindProviderToSigner(provider: Provider, signer: string): Provider {
   const mismatch = (value: unknown): ReviewedSignerMismatchError =>
     new ReviewedSignerMismatchError(signer, typeof value === 'string' ? value : null)
 
-  // Forward the way decentraland-transactions itself talks to a provider, so wrapping changes nothing else.
-  const forward = (args: RpcArguments): Promise<unknown> => {
-    if ('request' in provider && typeof provider.request === 'function') {
-      return provider.request(args)
-    }
-    if (typeof provider.sendAsync === 'function') {
-      return provider.sendAsync(args)
-    }
-    if (typeof provider.send === 'function') {
-      return provider.send(args.method, args.params ?? [])
-    }
-    throw new Error('The provider has no request, sendAsync or send method')
+  // Every provider the page connects exposes EIP-1193 `request` (decentraland-connect adapts the legacy
+  // shapes). Anything else is refused loudly rather than forwarded through a path this binding does not read.
+  if (!('request' in provider) || typeof provider.request !== 'function') {
+    throw new Error('The provider has no EIP-1193 request method')
   }
+  const forward = (args: RpcArguments): Promise<unknown> =>
+    (provider as { request: (args: RpcArguments) => Promise<unknown> }).request(args)
 
   return {
     request: async (args: RpcArguments): Promise<unknown> => {

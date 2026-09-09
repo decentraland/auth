@@ -107,6 +107,38 @@ describe('when rendering the SimulationSummary', () => {
     })
   })
 
+  describe('and a native transfer on Polygon comes without a symbol', () => {
+    beforeEach(() => {
+      simulation = {
+        status: 'ready',
+        result: emptyResult({
+          assetChanges: [
+            {
+              type: 'transfer',
+              standard: 'native',
+              from: USER,
+              to: '0x2222222222222222222222222222222222222222',
+              amount: '1.5',
+              rawAmount: '1500000000000000000',
+              tokenId: null,
+              contractAddress: null,
+              symbol: null,
+              name: null,
+              decimals: 18,
+              logoUrl: null,
+              dollarValue: null
+            }
+          ]
+        })
+      }
+      render(<SimulationSummary simulation={simulation} userAddress={USER} chainId={137} />)
+    })
+
+    it('should name the currency after the chain, not a fixed ETH', () => {
+      expect(screen.getByText('1.5 POL')).toBeInTheDocument()
+    })
+  })
+
   describe('and an ERC-1155 transfer moves several units of one token id', () => {
     beforeEach(() => {
       simulation = {

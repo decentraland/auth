@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { formatEther } from 'viem'
 import { useTranslation } from '@dcl/hooks'
 import { Box, Button, Checkbox, CircularProgress, FormControlLabel, Tab } from 'decentraland-ui2'
@@ -133,8 +133,9 @@ export const UnverifiedRequestView = ({
   const isTransaction = isTransactionKind(kind)
   // A long message shows only its first screen in the scrollable block. Its size is stated, and the
   // acknowledgment stays disabled until the block has been scrolled to its end, so an authorization
-  // buried below a benign opening cannot be agreed to unseen. Measured on render and on scroll; a block
-  // that does not overflow counts as read.
+  // buried below a benign opening cannot be agreed to unseen. Measured before paint and on scroll, so the
+  // checkbox is never enabled for a frame the measurement has not seen; a block that does not overflow
+  // counts as read.
   const messageText = payload.kind === 'message' ? payload.text : null
   const messageRef = useRef<HTMLDivElement>(null)
   const [messageReadToEnd, setMessageReadToEnd] = useState(true)
@@ -143,10 +144,12 @@ export const UnverifiedRequestView = ({
     if (!element) return
     setMessageReadToEnd(element.scrollHeight - element.scrollTop - element.clientHeight <= 1)
   }, [])
-  useEffect(() => {
+  useLayoutEffect(() => {
     measureMessage()
   }, [measureMessage, messageText, tab])
   const messageLines = messageText !== null ? messageText.split('\n').length : 0
+  // Code points, not UTF-16 units, so a message with emoji or other astral characters states its real length.
+  const messageCharacters = messageText !== null ? [...messageText].length : 0
   // Parsing, pretty-printing and scanning the typed data is linear in its size; done once per payload, not per render.
   const typedDataRaw = payload.kind === 'typed_data' ? payload.raw : null
   const typedDataForDisplay = useMemo(() => (typedDataRaw !== null ? formatTypedDataForDisplay(typedDataRaw) : null), [typedDataRaw])
@@ -271,14 +274,11 @@ export const UnverifiedRequestView = ({
               payload.text !== null ? (
                 <>
                   <Hint data-testid="unverified-message-length">
-                    {t('request.unverified.message_length', { lines: messageLines, characters: payload.text.length })}
+                    {t('request.unverified.message_length', { lines: messageLines, characters: messageCharacters })}
                   </Hint>
                   <RawBlock ref={messageRef} onScroll={measureMessage} data-testid="unverified-message">
                     {payload.text}
                   </RawBlock>
-                  {!messageReadToEnd ? (
-                    <Hint data-testid="unverified-message-scroll-hint">{t('request.unverified.message_scroll_hint')}</Hint>
-                  ) : null}
                 </>
               ) : (
                 <Hint data-testid="unverified-message-unreadable">{t('request.unverified.message_unreadable')}</Hint>
@@ -351,6 +351,10 @@ export const UnverifiedRequestView = ({
           </ReviewRestartedNotice>
         ) : null}
 
+        {acknowledgmentBlocked ? (
+          // Next to the checkbox it explains, whichever tab is open.
+          <Hint data-testid="unverified-message-scroll-hint">{t('request.unverified.message_scroll_hint')}</Hint>
+        ) : null}
         <FormControlLabel
           control={
             <Checkbox
