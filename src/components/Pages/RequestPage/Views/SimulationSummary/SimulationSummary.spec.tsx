@@ -139,42 +139,6 @@ describe('when rendering the SimulationSummary', () => {
     })
   })
 
-  describe('and an ERC-1155 transfer moves several units of one token id', () => {
-    beforeEach(() => {
-      simulation = {
-        status: 'ready',
-        result: emptyResult({
-          assetChanges: [
-            {
-              type: 'transfer',
-              standard: 'erc1155',
-              from: USER,
-              to: '0x2222222222222222222222222222222222222222',
-              amount: null,
-              rawAmount: '1500',
-              tokenId: '7',
-              contractAddress: '0x1111111111111111111111111111111111111111',
-              symbol: null,
-              name: 'Potion',
-              decimals: null,
-              logoUrl: null,
-              dollarValue: null
-            }
-          ]
-        })
-      }
-      render(<SimulationSummary simulation={simulation} userAddress={USER} chainId={137} verifiedContracts={[]} />)
-    })
-
-    it('should show the quantity before the token id and the name', () => {
-      expect(screen.getByRole('link', { name: '1,500 × #7 Potion' })).toBeInTheDocument()
-    })
-
-    it('should still mark the token as unverified', () => {
-      expect(screen.getByText('request.transaction_dialog.unverified_token 0x1111…1111')).toBeInTheDocument()
-    })
-  })
-
   describe('and the simulation is idle', () => {
     beforeEach(() => {
       simulation = { status: 'idle' }

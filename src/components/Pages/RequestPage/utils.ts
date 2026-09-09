@@ -353,9 +353,9 @@ type Counterparties = { addresses: string[]; opaque: boolean }
  * marketplace call nested in its `externalCall`. Whatever code sits there runs inside the transaction, and
  * a simulation cannot be relied on to show what it does: the code can tell a preview from the real thing
  * (the preview's tx.origin is the contract, its gas price is zero and the nonce has not moved) and behave
- * differently in each. The page therefore vouches for a preview only when every such address is a
- * Decentraland contract or has no code, and nothing the call carries went unread (see detectPreviewCaveat
- * and collectCallAddresses). Arrays, structs and declared nested calls are walked; a plain `bytes`
+ * differently in each. The page therefore previews a call only when every such address is a Decentraland
+ * contract or has no code, and nothing the call carries went unread, and refuses the request otherwise
+ * (see verifyCounterparties and collectCallAddresses). Arrays, structs and declared nested calls are walked; a plain `bytes`
  * argument is not a call (the one that deploys code, `createCollection`, is a deliberate exception noted
  * next to FORWARDING_FUNCTIONS).
  */

@@ -66,8 +66,6 @@
       "review_title": "查看此交易",
       "preview_unavailable_warning": "由于预览服务暂时不可用，我们无法检查此交易的作用。请仅在您信任发起该请求的场景时批准。",
       "acknowledge_preview_unavailable": "我了解预览不可用，并且我在未查看此交易作用的情况下进行批准",
-      "unrecognized_contract_warning": "此操作涉及一个 Decentraland 无法识别的合约，因此预览可能无法显示此交易的全部行为。",
-      "acknowledge_unrecognized_contract": "我了解这涉及一个 Decentraland 无法检查的合约",
       "review_restarted_notice": "你的钱包网络已更改或无法验证，因此此交易已在当前网络上重新审核。",
       "calls_function": "在 {contractName} 上调用 {functionName}"
     },
@@ -203,6 +201,7 @@
       "description": "返回 {explorerText} 重试，如果错误持续存在，请联系客服。",
       "malformed_transaction": "此交易已被拒绝：它指向一个 Decentraland 合约，但不符合 Decentraland 操作的格式，因此无法安全审查。",
       "malformed_signature": "此签名已被拒绝：它不符合任何 Decentraland 合约所签署的格式，因此无法安全审查。",
+      "unsupported_contract": "此请求已被拒绝：它涉及一个不属于 Decentraland 的合约，因此无法在此审查其行为。",
       "impersonated_sign_in": "此请求已被拒绝：它试图签署 Decentraland 登录，这将允许该场景以您的身份行事。",
       "wallet_error": "您的钱包无法完成此请求。",
       "details": "开发者详情："

@@ -1,4 +1,4 @@
-import { PreviewCaveat, SimulationState } from '../../types'
+import { SimulationState } from '../../types'
 
 /** What the review says about gas: covered by the relay, or the wallet's own fee estimate. */
 type WalletInteractionGas =
@@ -25,10 +25,11 @@ interface WalletInteractionProps {
   chainId?: number
   /** When true, the approve button is gated behind a high-risk acknowledgment checkbox. */
   requiresAcknowledgment?: boolean
-  /** Why the preview cannot be vouched for even though it ran (see PreviewCaveat), or null. */
-  previewCaveat?: PreviewCaveat | null
-  /** True while whether the preview can be vouched for is still being decided; Allow waits for it. */
-  isPreviewCaveatPending?: boolean
+  /**
+   * True while it is still being decided whether every contract the call reaches is Decentraland's; Allow
+   * waits for it. A call that reaches anything else is refused and never shown here.
+   */
+  isCounterpartyCheckPending?: boolean
   gas: WalletInteractionGas
   /** True when the simulation predicts the transaction would revert. */
   isReverted?: boolean

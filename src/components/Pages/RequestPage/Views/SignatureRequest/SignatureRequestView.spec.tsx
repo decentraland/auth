@@ -165,30 +165,14 @@ describe('when rendering the SignatureRequestView', () => {
       })
     })
 
-    describe('and whether the preview can be vouched for is still being decided', () => {
+    describe('and whether every contract the call reaches is Decentraland is still being decided', () => {
       beforeEach(() => {
-        props = { ...props, isPreviewCaveatPending: true }
+        props = { ...props, isCounterpartyCheckPending: true }
       })
 
       it('should keep Allow disabled until it is', () => {
         render(<SignatureRequestView {...props} />)
         expect(screen.getByTestId('signature-approve-button')).toBeDisabled()
-      })
-    })
-
-    describe.each(['unrecognized_contract'] as const)('and the preview has the %s caveat', previewCaveat => {
-      beforeEach(() => {
-        props = { ...props, previewCaveat }
-      })
-
-      it('should explain why the preview cannot verify all effects', () => {
-        render(<SignatureRequestView {...props} />)
-        expect(screen.getByTestId('preview-caveat-warning')).toHaveTextContent(`request.wallet_interaction.${previewCaveat}_warning`)
-      })
-
-      it('should word the acknowledgment for the preview limitation', () => {
-        render(<SignatureRequestView {...props} />)
-        expect(screen.getByText(`request.wallet_interaction.acknowledge_${previewCaveat}`)).toBeInTheDocument()
       })
     })
 

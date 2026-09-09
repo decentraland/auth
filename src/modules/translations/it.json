@@ -66,8 +66,6 @@
       "review_title": "Rivedi questa transazione",
       "preview_unavailable_warning": "Non è stato possibile verificare cosa fa questa transazione perché il servizio di anteprima è temporaneamente non disponibile. Approva solo se ti fidi della scena che l'ha richiesta.",
       "acknowledge_preview_unavailable": "Capisco che l'anteprima non è disponibile e sto approvando senza vedere cosa fa questa transazione",
-      "unrecognized_contract_warning": "Questa azione coinvolge un contratto che Decentraland non riconosce, quindi l'anteprima potrebbe non mostrare tutto ciò che fa questa transazione.",
-      "acknowledge_unrecognized_contract": "Capisco che questo coinvolge un contratto che Decentraland non può verificare",
       "review_restarted_notice": "La rete del tuo wallet è cambiata o non è stato possibile verificarla, quindi questa transazione è stata riesaminata sulla rete attuale.",
       "calls_function": "Chiama {functionName} su {contractName}"
     },
@@ -203,6 +201,7 @@
       "description": "Torna al {explorerText} per riprovare, o contatta il supporto se l'errore persiste.",
       "malformed_transaction": "Questa transazione è stata rifiutata: punta a un contratto Decentraland ma non ha la forma di un'azione Decentraland, quindi non può essere esaminata in sicurezza.",
       "malformed_signature": "Questa firma è stata rifiutata: non ha la forma di nulla che un contratto Decentraland firmi, quindi non può essere esaminata in sicurezza.",
+      "unsupported_contract": "Questa richiesta è stata rifiutata: raggiunge un contratto che non appartiene a Decentraland, quindi ciò che fa non può essere esaminato qui.",
       "impersonated_sign_in": "Questa richiesta è stata rifiutata: ha tentato di firmare un accesso a Decentraland, che permetterebbe alla scena di agire come te.",
       "wallet_error": "Il tuo wallet non è riuscito a completare la richiesta.",
       "details": "Dettagli per lo sviluppatore:"

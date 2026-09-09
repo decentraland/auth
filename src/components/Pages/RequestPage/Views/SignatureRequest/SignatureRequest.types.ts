@@ -1,4 +1,4 @@
-import { PreviewCaveat, SimulationState } from '../../types'
+import { SimulationState } from '../../types'
 
 /** The review of a Decentraland MetaTransaction signature: the decoded inner call and its simulation. */
 export interface SignatureRequestViewProps {
@@ -22,10 +22,11 @@ export interface SignatureRequestViewProps {
   chainId?: number
   /** When true, gates approval behind an acknowledgment checkbox. */
   requiresAcknowledgment?: boolean
-  /** Why the preview cannot be vouched for even though it ran (see PreviewCaveat), or null. */
-  previewCaveat?: PreviewCaveat | null
-  /** True while whether the preview can be vouched for is still being decided; Allow waits for it. */
-  isPreviewCaveatPending?: boolean
+  /**
+   * True while it is still being decided whether every contract the inner call reaches is Decentraland's;
+   * Allow waits for it. A call that reaches anything else is refused and never shown here.
+   */
+  isCounterpartyCheckPending?: boolean
   isLoading?: boolean
   onDeny: () => void
   onApprove: () => void

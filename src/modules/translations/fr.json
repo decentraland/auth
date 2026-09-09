@@ -66,8 +66,6 @@
       "review_title": "Vérifiez cette transaction",
       "preview_unavailable_warning": "Nous n'avons pas pu vérifier ce que fait cette transaction car le service d'aperçu est temporairement indisponible. N'approuvez que si vous faites confiance à la scène qui l'a demandée.",
       "acknowledge_preview_unavailable": "Je comprends que l'aperçu est indisponible et j'approuve sans voir ce que fait cette transaction",
-      "unrecognized_contract_warning": "Cette action implique un contrat que Decentraland ne reconnaît pas, donc l'aperçu peut ne pas montrer tout ce que fait cette transaction.",
-      "acknowledge_unrecognized_contract": "Je comprends que cela implique un contrat que Decentraland ne peut pas vérifier",
       "review_restarted_notice": "Le réseau de votre portefeuille a changé ou n'a pas pu être vérifié, cette transaction a donc été réexaminée sur le réseau actuel.",
       "calls_function": "Appelle {functionName} sur {contractName}"
     },
@@ -203,6 +201,7 @@
       "description": "Retournez au {explorerText} pour réessayer, ou contactez le support si l'erreur persiste.",
       "malformed_transaction": "Cette transaction a été refusée : elle vise un contrat Decentraland mais n'a pas la forme d'une action Decentraland, elle ne peut donc pas être vérifiée en toute sécurité.",
       "malformed_signature": "Cette signature a été refusée : elle n'a la forme d'aucune signature attendue par un contrat Decentraland, elle ne peut donc pas être vérifiée en toute sécurité.",
+      "unsupported_contract": "Cette demande a été refusée : elle atteint un contrat qui n'appartient pas à Decentraland, donc ce qu'elle fait ne peut pas être vérifié ici.",
       "impersonated_sign_in": "Cette demande a été refusée : elle tentait de signer une connexion Decentraland, ce qui permettrait à la scène d'agir en votre nom.",
       "wallet_error": "Votre portefeuille n'a pas pu terminer la demande.",
       "details": "Détails pour le développeur :"

@@ -29,6 +29,7 @@ import {
   SimulationRequestBody,
   SimulationResponseBody,
   SimulationUnavailableError,
+  UnsupportedContractError,
   UnsupportedMethodError,
   bindProviderToSigner,
   buildMetaTransactionSimulationPayload,
@@ -64,7 +65,7 @@ import {
   isDecentralandClassification,
   isTransactionClassification
 } from './classifyRequest'
-import { GasEstimateState, MANATransferData, NFTTransferData, PreviewCaveat, SimulationState, TransferType } from './types'
+import { GasEstimateState, MANATransferData, NFTTransferData, SimulationState, TransferType } from './types'
 import {
   buildSendTransactionSimulationPayload,
   decodeManaTransferData,
@@ -246,10 +247,10 @@ export const RequestPage = () => {
   // The confirmation dialog web2 users get on every Allow (see handleApproveWalletInteraction).
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false)
   const [simulationState, setSimulationState] = useState<SimulationState>({ status: 'idle' })
-  // Why the simulation of the reviewed call cannot be vouched for even when it ran (see PreviewCaveat):
-  // null when it can be, undefined while that is still being decided. Decided alongside the simulation,
-  // and Allow stays blocked until it is, so it never enables on a preview the page would not stand behind.
-  const [previewCaveat, setPreviewCaveat] = useState<PreviewCaveat | null | undefined>(undefined)
+  // Whether every contract the reviewed call reaches is Decentraland's (see verifyCounterparties). Decided
+  // alongside the simulation, and Allow stays blocked until it is; a call that reaches anything else is
+  // refused, so Allow never enables on a preview the page would not stand behind.
+  const [areCounterpartiesVerified, setAreCounterpartiesVerified] = useState(false)
   // Resolved counterparty display names (lowercased address → name), filled in progressively.
   const [simulationProfiles, setSimulationProfiles] = useState<Record<string, string>>({})
   // Chain the pending transaction/meta-tx was simulated on, for block-explorer links.
@@ -459,7 +460,7 @@ export const RequestPage = () => {
       setErrorKind(null)
       setWalletInfo(undefined)
       setClassification(null)
-      setPreviewCaveat(undefined)
+      setAreCounterpartiesVerified(false)
       setGasEstimate(null)
       setNftTransferData(null)
       setManaTransferData(null)
@@ -579,6 +580,18 @@ export const RequestPage = () => {
         }
       }
 
+      // Ends the review by refusing the request: the requester is answered with invalid params and the
+      // user sees why, in the words of `kind`; a retry recovers the same request and is refused again.
+      // Nothing to refuse once the user has already answered (e.g. denied while a check was running).
+      const refuseRequest = async (rejection: Error, kind: SigningErrorKind) => {
+        if (hasCompletedRef.current) return
+        hasCompletedRef.current = true
+        setError(rejection.message)
+        setErrorKind(kind)
+        setView(View.WALLET_INTERACTION_ERROR)
+        await reportRejectedRequest(RPC_INVALID_PARAMS, rejection.message)
+      }
+
       try {
         const [signerAddress] = await walletClientRef.current.getAddresses()
         connectedAddress = signerAddress
@@ -696,20 +709,26 @@ export const RequestPage = () => {
               signerAddress
             )
             if (isStale()) return
+            // No Decentraland contract is an ERC-1155, so a preview that moves one has reached code that is
+            // not Decentraland's, whatever the counterparty check concluded: refused, never summarized.
+            if (result.assetChanges.some(change => change.standard === 'erc1155')) {
+              await refuseRequest(
+                new UnsupportedContractError(request.method, 'the preview moves an ERC-1155 asset, which no Decentraland contract issues'),
+                'unsupported_contract'
+              )
+              return
+            }
             setSimulationState({ status: 'ready', result })
             setSimulationVerified(collectVerifiedContracts(result, body.chainId))
             void resolveSimulationProfiles(result)
             return result
           } catch (e) {
             if (isStale()) return
-            // Nothing to reject once the user has already answered (e.g. denied while loading).
-            if (rejectUnpreviewable && e instanceof SimulationUnavailableError && e.status === 400 && !hasCompletedRef.current) {
-              const rejection = new MalformedSignatureRequestError(request.method, 'the MetaTransaction call cannot be previewed')
-              hasCompletedRef.current = true
-              setError(rejection.message)
-              setErrorKind('malformed_signature')
-              setView(View.WALLET_INTERACTION_ERROR)
-              await reportRejectedRequest(RPC_INVALID_PARAMS, rejection.message)
+            if (rejectUnpreviewable && e instanceof SimulationUnavailableError && e.status === 400) {
+              await refuseRequest(
+                new MalformedSignatureRequestError(request.method, 'the MetaTransaction call cannot be previewed'),
+                'malformed_signature'
+              )
               return
             }
             console.info('Transaction simulation unavailable:', e instanceof Error ? e.message : String(e))
@@ -717,18 +736,24 @@ export const RequestPage = () => {
           }
         }
 
-        // Whether the preview of a call can be vouched for at all (see PreviewCaveat). Every address the
-        // call is handed (see getCounterpartyAddresses) must be a Decentraland contract on the execution
-        // chain (registry, or a factory-deployed collection) or a plain account without code, and nothing
-        // the call carries may have gone unread; anything else is code the requester chose, running inside
-        // the transaction, which a simulation cannot be relied on to show. Cheapest answer first: the
-        // registry costs nothing, one code read settles a plain wallet (the usual counterparty), and only
-        // an address with code on the relay chain asks the factories. Judged by Decentraland's RPC; when it
-        // cannot answer, the address counts as such code, so the page never vouches for a preview on a
-        // guess. Runs alongside the simulation; Allow stays blocked until both have settled.
-        const detectPreviewCaveat = async (call: DecodedCall, chainId: number): Promise<PreviewCaveat | null> => {
+        // The page previews Decentraland's contracts and nothing else. Every address the call is handed
+        // (see getCounterpartyAddresses) must be a Decentraland contract on the execution chain (registry,
+        // or a factory-deployed collection) or a plain account without code, and nothing the call carries
+        // may have gone unread; anything else is code the requester chose, running inside the transaction,
+        // which a simulation cannot be relied on to show, and the request is refused (the marketplaces
+        // accept any ERC-721 in an order or a trade; Auth does not). Cheapest answer first: the registry
+        // costs nothing, one code read settles a plain wallet (the usual counterparty), and only an address
+        // with code on the relay chain asks the factories. Judged by Decentraland's RPC; when it cannot
+        // answer, the address counts as such code, so the page never vouches for a preview on a guess.
+        // Runs alongside the simulation; Allow stays blocked until it has settled. Resolves to whether the
+        // review goes on.
+        const verifyCounterparties = async (call: DecodedCall, chainId: number): Promise<boolean> => {
+          const refuse = async (reason: string) => {
+            if (!isStale()) await refuseRequest(new UnsupportedContractError(request.method, reason), 'unsupported_contract')
+            return false
+          }
           const { addresses, opaque } = getCounterpartyAddresses(call, signerAddress, chainId)
-          if (opaque) return 'unrecognized_contract'
+          if (opaque) return refuse('the call carries a nested call that could not be read')
           const collectionsLiveHere = chainId === Number(getMetaTransactionChainId())
           const isRecognizedOrPlain = async (address: string): Promise<boolean> => {
             try {
@@ -741,7 +766,13 @@ export const RequestPage = () => {
             }
           }
           const verdicts = await Promise.all(addresses.map(isRecognizedOrPlain))
-          return verdicts.every(Boolean) ? null : 'unrecognized_contract'
+          if (isStale()) return false
+          const unrecognized = addresses.filter((_, index) => !verdicts[index])
+          if (unrecognized.length > 0) {
+            return refuse(`the call reaches a contract that is not Decentraland's: ${unrecognized.join(', ')}`)
+          }
+          setAreCounterpartiesVerified(true)
+          return true
         }
 
         // The wallet-side fee estimate for a transaction the user pays gas for (a plain send on the
@@ -812,12 +843,9 @@ export const RequestPage = () => {
           if (!transaction.relayed) {
             void estimateTransactionFee(transaction)
           }
-          // The caveat and the simulation are independent, so they run side by side; the views keep Allow
-          // blocked until both have settled.
-          const caveatPromise = detectPreviewCaveat(transaction.call, transaction.chainId).then(caveat => {
-            if (!isStale()) setPreviewCaveat(caveat)
-            return caveat
-          })
+          // The counterparty check and the simulation are independent, so they run side by side; the views
+          // keep Allow blocked until both have settled.
+          const verificationPromise = verifyCounterparties(transaction.call, transaction.chainId)
           const simulationPromise = fetchSimulation(buildSendTransactionSimulationPayload(transaction, signerAddress), transaction.call)
 
           if (transaction.branded !== 'gift_candidate') return
@@ -828,9 +856,9 @@ export const RequestPage = () => {
             // visible effect is exactly the transfer it shows and nothing the request chose runs inside
             // it; anything else stays on the generic summary and its acknowledgment gates. The user may
             // also have answered from the generic review while the simulation ran; their answer stands.
-            const [simulation, caveat] = await Promise.all([simulationPromise, caveatPromise])
+            const [simulation, verified] = await Promise.all([simulationPromise, verificationPromise])
             if (isStale()) return
-            if (!simulation || caveat !== null || !isExactNftTransferSimulation(simulation, signerAddress, transaction.to, transferData)) {
+            if (!simulation || !verified || !isExactNftTransferSimulation(simulation, signerAddress, transaction.to, transferData)) {
               return
             }
 
@@ -898,9 +926,7 @@ export const RequestPage = () => {
             setSimulationChainId(classified.chainId)
             setSimulationState({ status: 'loading' })
             setView(View.WALLET_SIGNATURE_INTERACTION)
-            void detectPreviewCaveat(classified.call, classified.chainId).then(caveat => {
-              if (!isStale()) setPreviewCaveat(caveat)
-            })
+            void verifyCounterparties(classified.call, classified.chainId)
             void fetchSimulation(
               buildMetaTransactionSimulationPayload(classified.chainId, classified.contract.address, classified.calldata, signerAddress),
               classified.call,
@@ -940,21 +966,13 @@ export const RequestPage = () => {
         } else if (e instanceof ImpersonatedSignInError) {
           // The request tried to sign a sign-in payload. Block it outright instead of
           // offering a retry that would re-trigger the same attack.
-          hasCompletedRef.current = true
-          setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
-          setErrorKind('impersonated_sign_in')
-          setView(View.WALLET_INTERACTION_ERROR)
-          await reportRejectedRequest(RPC_INVALID_PARAMS, e.message)
+          await refuseRequest(e, 'impersonated_sign_in')
           return
         } else if (e instanceof MalformedSignatureRequestError || e instanceof MalformedTransactionRequestError) {
           // The params could preview one payload and sign or execute another, or the request is aimed at a
           // Decentraland contract but is not shaped the way the SDK builds one (see classifyRequest). Block
           // it; a retry recovers the same request.
-          hasCompletedRef.current = true
-          setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
-          setErrorKind(e instanceof MalformedTransactionRequestError ? 'malformed_transaction' : 'malformed_signature')
-          setView(View.WALLET_INTERACTION_ERROR)
-          await reportRejectedRequest(RPC_INVALID_PARAMS, e.message)
+          await refuseRequest(e, e instanceof MalformedTransactionRequestError ? 'malformed_transaction' : 'malformed_signature')
           return
         } else if (e instanceof UnsupportedMethodError) {
           // The request used a method that is not on the allowlist. Block it outright — a retry
@@ -1380,7 +1398,6 @@ export const RequestPage = () => {
   const requiresApprovalAcknowledgment =
     classification !== null &&
     (!isDecentralandRequest ||
-      (previewCaveat !== null && previewCaveat !== undefined) ||
       hasDangerousApprovalChange ||
       hasPreviewWithoutVisibleEffects ||
       simulationState.status === 'unavailable' ||
@@ -1514,8 +1531,7 @@ export const RequestPage = () => {
             verifiedContracts={simulationVerified}
             chainId={simulationChainId}
             requiresAcknowledgment={requiresApprovalAcknowledgment}
-            previewCaveat={previewCaveat ?? null}
-            isPreviewCaveatPending={previewCaveat === undefined}
+            isCounterpartyCheckPending={!areCounterpartiesVerified}
             gas={gas}
             isReverted={isSimulationReverted}
             reviewRestarted={reviewRestartReason !== null}
@@ -1544,8 +1560,7 @@ export const RequestPage = () => {
             verifiedContracts={simulationVerified}
             chainId={simulationChainId}
             requiresAcknowledgment={requiresApprovalAcknowledgment}
-            previewCaveat={previewCaveat ?? null}
-            isPreviewCaveatPending={previewCaveat === undefined}
+            isCounterpartyCheckPending={!areCounterpartiesVerified}
             isLoading={isLoading}
             onDeny={onDenyWalletInteraction}
             onApprove={handleApproveWalletInteraction}

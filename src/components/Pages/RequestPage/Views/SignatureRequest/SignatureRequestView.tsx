@@ -42,8 +42,7 @@ export const SignatureRequestView = ({
   verifiedContracts,
   chainId,
   requiresAcknowledgment = false,
-  previewCaveat = null,
-  isPreviewCaveatPending = false,
+  isCounterpartyCheckPending = false,
   isLoading = false,
   onDeny,
   onApprove
@@ -70,7 +69,6 @@ export const SignatureRequestView = ({
     isReverted ? 'reverted' : '',
     simulation.status === 'unavailable' ? 'unavailable' : '',
     isPreviewWithoutVisibleEffects ? 'no-visible-effects' : '',
-    previewCaveat ?? '',
     // Exactly this preview: a re-simulation that showed something else is another statement.
     getPreviewFingerprint(simulation.status === 'ready' ? simulation.result : undefined)
   ].join('|')
@@ -109,9 +107,6 @@ export const SignatureRequestView = ({
         />
         <Notice data-testid="signature-meta-tx-notice">{t('request.signature.meta_tx_notice')}</Notice>
         {isReverted ? <Notice data-testid="signature-meta-tx-reverted">{t('request.signature.meta_tx_reverted')}</Notice> : null}
-        {previewCaveat ? (
-          <Notice data-testid="preview-caveat-warning">{t(`request.wallet_interaction.${previewCaveat}_warning`)}</Notice>
-        ) : null}
         <RawToggle type="button" aria-expanded={showRaw} onClick={() => setShowRaw(show => !show)}>
           {showRaw ? t('request.signature.hide_raw') : t('request.signature.view_raw')}
         </RawToggle>
@@ -129,11 +124,9 @@ export const SignatureRequestView = ({
             label={
               isUnverifiable
                 ? t('request.signature.acknowledge_unverified')
-                : previewCaveat
-                  ? t(`request.wallet_interaction.acknowledge_${previewCaveat}`)
-                  : isPreviewWithoutVisibleEffects
-                    ? t('request.transaction_dialog.acknowledge_no_visible_effects')
-                    : t('request.transaction_dialog.acknowledge_risk')
+                : isPreviewWithoutVisibleEffects
+                  ? t('request.transaction_dialog.acknowledge_no_visible_effects')
+                  : t('request.transaction_dialog.acknowledge_risk')
             }
           />
         ) : null}
@@ -150,7 +143,7 @@ export const SignatureRequestView = ({
             isLoading ||
             simulation.status === 'idle' ||
             simulation.status === 'loading' ||
-            isPreviewCaveatPending ||
+            isCounterpartyCheckPending ||
             (requiresAcknowledgment && !acknowledged)
           }
           onClick={onApprove}

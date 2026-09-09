@@ -26,8 +26,7 @@ export const WalletInteraction = ({
   verifiedContracts,
   chainId,
   requiresAcknowledgment = false,
-  previewCaveat = null,
-  isPreviewCaveatPending = false,
+  isCounterpartyCheckPending = false,
   gas,
   isReverted = false,
   reviewRestarted = false,
@@ -48,7 +47,6 @@ export const WalletInteraction = ({
     simulation.status,
     isReverted ? 'reverted' : '',
     isPreviewWithoutVisibleEffects ? 'no-visible-effects' : '',
-    previewCaveat ?? '',
     getPreviewFingerprint(simulation.status === 'ready' ? simulation.result : undefined)
   ].join('|')
   const { acknowledged, setAcknowledged } = useAcknowledgment(acknowledgmentStatement)
@@ -63,7 +61,7 @@ export const WalletInteraction = ({
     isLoading ||
     simulation.status === 'idle' ||
     simulation.status === 'loading' ||
-    isPreviewCaveatPending ||
+    isCounterpartyCheckPending ||
     isGasPending ||
     (requiresAcknowledgment && !acknowledged)
 
@@ -102,11 +100,6 @@ export const WalletInteraction = ({
           {t('request.wallet_interaction.preview_unavailable_warning')}
         </PreviewUnavailableWarning>
       ) : null}
-      {previewCaveat ? (
-        <PreviewUnavailableWarning severity="warning" role="alert" data-testid="preview-caveat-warning">
-          {t(`request.wallet_interaction.${previewCaveat}_warning`)}
-        </PreviewUnavailableWarning>
-      ) : null}
       {requiresAcknowledgment ? (
         <FormControlLabel
           control={
@@ -115,11 +108,9 @@ export const WalletInteraction = ({
           label={
             isPreviewUnavailable
               ? t('request.wallet_interaction.acknowledge_preview_unavailable')
-              : previewCaveat
-                ? t(`request.wallet_interaction.acknowledge_${previewCaveat}`)
-                : isPreviewWithoutVisibleEffects
-                  ? t('request.transaction_dialog.acknowledge_no_visible_effects')
-                  : t('request.transaction_dialog.acknowledge_risk')
+              : isPreviewWithoutVisibleEffects
+                ? t('request.transaction_dialog.acknowledge_no_visible_effects')
+                : t('request.transaction_dialog.acknowledge_risk')
           }
         />
       ) : null}

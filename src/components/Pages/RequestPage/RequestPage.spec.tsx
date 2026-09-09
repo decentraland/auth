@@ -199,8 +199,7 @@ jest.mock('./Views', () => ({
       data-testid="wallet-interaction"
       data-sim={props.simulation?.status}
       data-requires-acknowledgment={String(props.requiresAcknowledgment)}
-      data-preview-caveat={props.previewCaveat ?? ''}
-      data-preview-caveat-pending={String(props.isPreviewCaveatPending)}
+      data-counterparty-check-pending={String(props.isCounterpartyCheckPending)}
       data-gas-covered={String(props.gas?.covered)}
       data-gas-status={props.gas?.status ?? ''}
       data-function={props.functionName}
@@ -252,8 +251,7 @@ jest.mock('./Views', () => ({
       data-method={props.method}
       data-sim={props.simulation?.status}
       data-requires-acknowledgment={String(props.requiresAcknowledgment)}
-      data-preview-caveat={props.previewCaveat ?? ''}
-      data-preview-caveat-pending={String(props.isPreviewCaveatPending)}
+      data-counterparty-check-pending={String(props.isCounterpartyCheckPending)}
       data-function={props.functionName}
       data-contract={props.contractName}
       data-verifying-contract={props.verifyingContract}
@@ -1928,130 +1926,192 @@ describe('RequestPage', () => {
     })
   })
 
-  describe.each(['transaction', 'signature'] as const)(
-    'when a Decentraland %s is handed an address that is not a Decentraland one',
-    kind => {
-      let view: HTMLElement
-      const findView = async () => {
-        const found = await screen.findByTestId(kind === 'transaction' ? 'wallet-interaction' : 'signature-request')
-        await waitFor(() => expect(found).toHaveAttribute('data-sim', 'ready'))
-        await waitFor(() => expect(found).toHaveAttribute('data-preview-caveat-pending', 'false'))
-        return found
-      }
-
-      beforeEach(() => {
-        mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
-        mockGetAddresses.mockResolvedValue([SIGNER])
-        mockRecover.mockResolvedValue(
-          kind === 'transaction'
-            ? recovered('eth_sendTransaction', [{ to: CONTRACT, data: '0xabcd', value: '0x0' }])
-            : recovered('eth_signTypedData_v4', [SIGNER, '{"primaryType":"MetaTransaction"}'])
-        )
-        const call = { functionName: 'executeOrder', args: ['0xnft', BigInt(1), BigInt(1000)], payable: false, forwardsCall: false }
-        mockClassifyRequest.mockResolvedValue(kind === 'transaction' ? dclTransaction({ call }) : dclMetaTransaction({ call }))
-        mockGetCounterpartyAddresses.mockReturnValue({ addresses: ['0xnft'], opaque: false })
-        mockSimulateTransaction.mockResolvedValue(simulationOf({ assetChanges: [erc721Transfer()] }))
-      })
-
-      describe('and that address is a contract Decentraland does not recognize', () => {
-        beforeEach(async () => {
-          mockIsAddressWithoutCode.mockResolvedValue(false)
-          mockIsDecentralandCollection.mockResolvedValue(false)
-          renderRequestPage()
-          view = await findView()
-        })
-
-        it('should require acknowledgment although the preview succeeded with no dangerous approval', () => {
-          expect(view).toHaveAttribute('data-requires-acknowledgment', 'true')
-          expect(view).toHaveAttribute('data-preview-caveat', 'unrecognized_contract')
-        })
-
-        it('should judge the address on the chain the call executes on, cheapest check first', () => {
-          expect(mockIsAddressWithoutCode).toHaveBeenCalledWith('0xnft', 137)
-          expect(mockIsDecentralandCollection).toHaveBeenCalledWith('0xnft')
-        })
-      })
-
-      describe('and that address is a Decentraland contract in the registry', () => {
-        beforeEach(async () => {
-          mockGetKnownDecentralandContract.mockReturnValue(knownContract({ name: 'MANAToken' }))
-          renderRequestPage()
-          view = await findView()
-        })
-
-        it('should not add a caveat and not ask the network at all', () => {
-          expect(view).toHaveAttribute('data-preview-caveat', '')
-          expect(mockIsAddressWithoutCode).not.toHaveBeenCalled()
-          expect(mockIsDecentralandCollection).not.toHaveBeenCalled()
-        })
-      })
-
-      describe('and that address is a plain account', () => {
-        beforeEach(async () => {
-          mockIsAddressWithoutCode.mockResolvedValue(true)
-          renderRequestPage()
-          view = await findView()
-        })
-
-        it('should not add a caveat and settle it with the code read alone', () => {
-          expect(view).toHaveAttribute('data-preview-caveat', '')
-          expect(mockIsDecentralandCollection).not.toHaveBeenCalled()
-        })
-      })
-
-      describe('and that address is a Decentraland collection', () => {
-        beforeEach(async () => {
-          mockIsAddressWithoutCode.mockResolvedValue(false)
-          mockIsDecentralandCollection.mockResolvedValue(true)
-          renderRequestPage()
-          view = await findView()
-        })
-
-        it('should not add a caveat, since the code that runs is Decentraland code', () => {
-          expect(view).toHaveAttribute('data-preview-caveat', '')
-        })
-      })
-
-      describe('and whether that address is a Decentraland collection could not be checked', () => {
-        beforeEach(async () => {
-          mockIsAddressWithoutCode.mockResolvedValue(false)
-          mockIsDecentralandCollection.mockRejectedValue(new Error('RPC unavailable'))
-          renderRequestPage()
-          view = await findView()
-        })
-
-        it('should treat it as code Decentraland cannot vouch for', () => {
-          expect(view).toHaveAttribute('data-preview-caveat', 'unrecognized_contract')
-        })
-      })
-
-      describe('and the call carries a nested payload that could not be read', () => {
-        beforeEach(async () => {
-          mockGetCounterpartyAddresses.mockReturnValue({ addresses: [], opaque: true })
-          renderRequestPage()
-          view = await findView()
-        })
-
-        it('should add the caveat without asking the network', () => {
-          expect(view).toHaveAttribute('data-preview-caveat', 'unrecognized_contract')
-          expect(mockIsAddressWithoutCode).not.toHaveBeenCalled()
-        })
-      })
-
-      describe('and the code read has not answered yet', () => {
-        beforeEach(async () => {
-          mockIsAddressWithoutCode.mockReturnValue(new Promise(() => undefined))
-          renderRequestPage()
-          view = await screen.findByTestId(kind === 'transaction' ? 'wallet-interaction' : 'signature-request')
-          await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
-        })
-
-        it('should show the ready preview while still reporting the caveat as pending', () => {
-          expect(view).toHaveAttribute('data-preview-caveat-pending', 'true')
-        })
-      })
+  describe.each(['transaction', 'signature'] as const)('when a Decentraland %s is handed an address that is not its own', kind => {
+    const viewTestId = kind === 'transaction' ? 'wallet-interaction' : 'signature-request'
+    const method = kind === 'transaction' ? 'eth_sendTransaction' : 'eth_signTypedData_v4'
+    let view: HTMLElement
+    const findVerifiedView = async () => {
+      const found = await screen.findByTestId(viewTestId)
+      await waitFor(() => expect(found).toHaveAttribute('data-sim', 'ready'))
+      await waitFor(() => expect(found).toHaveAttribute('data-counterparty-check-pending', 'false'))
+      return found
     }
-  )
+
+    beforeEach(() => {
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockGetAddresses.mockResolvedValue([SIGNER])
+      mockRecover.mockResolvedValue(
+        kind === 'transaction'
+          ? recovered(method, [{ to: CONTRACT, data: '0xabcd', value: '0x0' }])
+          : recovered(method, [SIGNER, '{"primaryType":"MetaTransaction"}'])
+      )
+      const call = { functionName: 'executeOrder', args: ['0xnft', BigInt(1), BigInt(1000)], payable: false, forwardsCall: false }
+      mockClassifyRequest.mockResolvedValue(kind === 'transaction' ? dclTransaction({ call }) : dclMetaTransaction({ call }))
+      mockGetCounterpartyAddresses.mockReturnValue({ addresses: ['0xnft'], opaque: false })
+      mockSimulateTransaction.mockResolvedValue(simulationOf({ assetChanges: [erc721Transfer()] }))
+      mockSendFailedOutcome.mockResolvedValue({})
+    })
+
+    describe('and that address is a contract Decentraland does not own', () => {
+      beforeEach(() => {
+        mockIsAddressWithoutCode.mockResolvedValue(false)
+        mockIsDecentralandCollection.mockResolvedValue(false)
+        renderRequestPage()
+      })
+
+      it('should refuse the request although the preview succeeded with no dangerous approval', async () => {
+        expect(await screen.findByTestId('signing-error')).toHaveAttribute('data-kind', 'unsupported_contract')
+        expect(screen.queryByTestId(viewTestId)).not.toBeInTheDocument()
+      })
+
+      it('should answer the request as invalid, naming the contract for the developer', async () => {
+        await screen.findByTestId('signing-error')
+        await waitFor(() => {
+          expect(mockSendFailedOutcome).toHaveBeenCalledWith(REQUEST_ID, SIGNER, {
+            code: -32602,
+            message: `The "${method}" request reaches beyond Decentraland's contracts: the call reaches a contract that is not Decentraland's: 0xnft`
+          })
+        })
+      })
+
+      it('should judge the address on the chain the call executes on, cheapest check first', async () => {
+        await screen.findByTestId('signing-error')
+        expect(mockIsAddressWithoutCode).toHaveBeenCalledWith('0xnft', 137)
+        expect(mockIsDecentralandCollection).toHaveBeenCalledWith('0xnft')
+      })
+    })
+
+    describe('and that address is a Decentraland contract in the registry', () => {
+      beforeEach(async () => {
+        mockGetKnownDecentralandContract.mockReturnValue(knownContract({ name: 'MANAToken' }))
+        renderRequestPage()
+        view = await findVerifiedView()
+      })
+
+      it('should keep the review and not ask the network at all', () => {
+        expect(view).toBeInTheDocument()
+        expect(mockIsAddressWithoutCode).not.toHaveBeenCalled()
+        expect(mockIsDecentralandCollection).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and that address is a plain account', () => {
+      beforeEach(async () => {
+        mockIsAddressWithoutCode.mockResolvedValue(true)
+        renderRequestPage()
+        view = await findVerifiedView()
+      })
+
+      it('should keep the review and settle it with the code read alone', () => {
+        expect(view).toBeInTheDocument()
+        expect(mockIsDecentralandCollection).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and that address is a Decentraland collection', () => {
+      beforeEach(async () => {
+        mockIsAddressWithoutCode.mockResolvedValue(false)
+        mockIsDecentralandCollection.mockResolvedValue(true)
+        renderRequestPage()
+        view = await findVerifiedView()
+      })
+
+      it('should keep the review, since the code that runs is Decentraland code', () => {
+        expect(view).toBeInTheDocument()
+        expect(mockSendFailedOutcome).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and whether that address is a Decentraland collection could not be checked', () => {
+      beforeEach(() => {
+        mockIsAddressWithoutCode.mockResolvedValue(false)
+        mockIsDecentralandCollection.mockRejectedValue(new Error('RPC unavailable'))
+        renderRequestPage()
+      })
+
+      it('should refuse the request, since code Decentraland cannot vouch for counts as not its own', async () => {
+        expect(await screen.findByTestId('signing-error')).toHaveAttribute('data-kind', 'unsupported_contract')
+      })
+    })
+
+    describe('and the call carries a nested payload that could not be read', () => {
+      beforeEach(() => {
+        mockGetCounterpartyAddresses.mockReturnValue({ addresses: [], opaque: true })
+        renderRequestPage()
+      })
+
+      it('should refuse the request without asking the network', async () => {
+        expect(await screen.findByTestId('signing-error')).toHaveAttribute('data-kind', 'unsupported_contract')
+        expect(mockIsAddressWithoutCode).not.toHaveBeenCalled()
+      })
+
+      it('should tell the developer what could not be read', async () => {
+        await screen.findByTestId('signing-error')
+        await waitFor(() => {
+          expect(mockSendFailedOutcome).toHaveBeenCalledWith(REQUEST_ID, SIGNER, {
+            code: -32602,
+            message: `The "${method}" request reaches beyond Decentraland's contracts: the call carries a nested call that could not be read`
+          })
+        })
+      })
+    })
+
+    describe('and the code read has not answered yet', () => {
+      beforeEach(async () => {
+        mockIsAddressWithoutCode.mockReturnValue(new Promise(() => undefined))
+        renderRequestPage()
+        view = await screen.findByTestId(viewTestId)
+        await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+      })
+
+      it('should show the ready preview while still reporting the check as pending', () => {
+        expect(view).toHaveAttribute('data-counterparty-check-pending', 'true')
+      })
+    })
+
+    describe('and the user denied the request before the check answered', () => {
+      let settleCodeRead: (hasNoCode: boolean) => void
+
+      beforeEach(async () => {
+        mockIsAddressWithoutCode.mockReturnValue(new Promise<boolean>(resolve => (settleCodeRead = resolve)))
+        mockIsDecentralandCollection.mockResolvedValue(false)
+        renderRequestPage()
+        view = await screen.findByTestId(viewTestId)
+        await userEvent.click(screen.getByTestId(kind === 'transaction' ? 'wallet-interaction-deny' : 'signature-deny'))
+        settleCodeRead(false)
+      })
+
+      it('should leave the denial in place rather than refuse a request already answered', async () => {
+        await waitFor(() => expect(mockSendFailedOutcome).toHaveBeenCalledTimes(1))
+        expect(screen.queryByTestId('signing-error')).not.toBeInTheDocument()
+      })
+    })
+
+    describe('and every address is Decentraland but the preview moves an ERC-1155 asset', () => {
+      beforeEach(() => {
+        mockGetKnownDecentralandContract.mockReturnValue(knownContract({ name: 'MANAToken' }))
+        mockSimulateTransaction.mockResolvedValue(
+          simulationOf({ assetChanges: [erc721Transfer({ standard: 'erc1155', amount: null, rawAmount: '5', tokenId: '7' })] })
+        )
+        renderRequestPage()
+      })
+
+      it('should refuse the request, since no Decentraland contract issues one', async () => {
+        expect(await screen.findByTestId('signing-error')).toHaveAttribute('data-kind', 'unsupported_contract')
+        expect(screen.queryByTestId(viewTestId)).not.toBeInTheDocument()
+      })
+
+      it('should answer the request as invalid, naming the asset for the developer', async () => {
+        await screen.findByTestId('signing-error')
+        await waitFor(() => {
+          expect(mockSendFailedOutcome).toHaveBeenCalledWith(REQUEST_ID, SIGNER, {
+            code: -32602,
+            message: `The "${method}" request reaches beyond Decentraland's contracts: the preview moves an ERC-1155 asset, which no Decentraland contract issues`
+          })
+        })
+      })
+    })
+  })
 
   describe('when the request is a transaction to a Decentraland contract that is relayed', () => {
     beforeEach(() => {
@@ -2603,24 +2663,24 @@ describe('RequestPage', () => {
       })
     })
 
-    describe('and the recipient is a contract', () => {
+    describe('and the recipient is a contract that is not Decentraland', () => {
       beforeEach(() => {
         mockGetCounterpartyAddresses.mockReturnValue({ addresses: ['0xrecipient'], opaque: false })
         mockIsAddressWithoutCode.mockResolvedValue(false)
+        mockIsDecentralandCollection.mockResolvedValue(false)
+        mockSendFailedOutcome.mockResolvedValue({})
       })
 
-      it('should stay on the generic review with the acknowledgment instead of the branded gift view', async () => {
+      it('should refuse the request instead of showing the branded gift view, since its code runs inside the transfer', async () => {
         renderRequestPage()
-        const view = await screen.findByTestId('wallet-interaction')
-        await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
-        expect(view).toHaveAttribute('data-requires-acknowledgment', 'true')
+        expect(await screen.findByTestId('signing-error')).toHaveAttribute('data-kind', 'unsupported_contract')
         expect(screen.queryByTestId('transfer-confirm')).not.toBeInTheDocument()
       })
 
       it('should judge the recipient code on the chain the transfer executes on', async () => {
         renderRequestPage()
-        await screen.findByTestId('wallet-interaction')
-        await waitFor(() => expect(mockIsAddressWithoutCode).toHaveBeenCalledWith('0xrecipient', 137))
+        await screen.findByTestId('signing-error')
+        expect(mockIsAddressWithoutCode).toHaveBeenCalledWith('0xrecipient', 137)
       })
     })
 
@@ -2628,13 +2688,12 @@ describe('RequestPage', () => {
       beforeEach(() => {
         mockGetCounterpartyAddresses.mockReturnValue({ addresses: ['0xrecipient'], opaque: false })
         mockIsAddressWithoutCode.mockRejectedValue(new Error('RPC unavailable'))
+        mockSendFailedOutcome.mockResolvedValue({})
       })
 
-      it('should treat the recipient as a contract and stay on the generic review', async () => {
+      it('should treat the recipient as code Decentraland cannot vouch for and refuse the request', async () => {
         renderRequestPage()
-        const view = await screen.findByTestId('wallet-interaction')
-        await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
-        expect(view).toHaveAttribute('data-requires-acknowledgment', 'true')
+        expect(await screen.findByTestId('signing-error')).toHaveAttribute('data-kind', 'unsupported_contract')
         expect(screen.queryByTestId('transfer-confirm')).not.toBeInTheDocument()
       })
     })

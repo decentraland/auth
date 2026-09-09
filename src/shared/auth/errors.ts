@@ -92,6 +92,24 @@ class MalformedTransactionRequestError extends Error {
 }
 
 /**
+ * Thrown when a Decentraland contract call reaches beyond Decentraland's own contracts: it hands the
+ * transaction a contract Decentraland does not own (the NFT of a marketplace order or an off-chain trade,
+ * the recipient of a safe transfer, a nested call that could not be read), or its preview moves an asset
+ * no Decentraland contract issues (an ERC-1155). The page previews Decentraland code only, so such a
+ * request is refused rather than shown. `reason` says what was reached; it is safe to display.
+ */
+class UnsupportedContractError extends Error {
+  readonly skipReporting = true
+  constructor(
+    public readonly method: string,
+    public readonly reason: string
+  ) {
+    super(`The "${method}" request reaches beyond Decentraland's contracts: ${reason}`)
+    this.name = 'UnsupportedContractError'
+  }
+}
+
+/**
  * Thrown when the transaction-simulation endpoint is unreachable, times out, or
  * returns a non-200 response. The approval UI treats this as "details unavailable"
  * and falls back to the default confirmation — simulation is never allowed to block
@@ -134,5 +152,6 @@ export {
   UnsupportedMethodError,
   MalformedSignatureRequestError,
   MalformedTransactionRequestError,
-  SimulationUnavailableError
+  SimulationUnavailableError,
+  UnsupportedContractError
 }

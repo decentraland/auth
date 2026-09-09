@@ -66,8 +66,6 @@
       "review_title": "Review this transaction",
       "preview_unavailable_warning": "We couldn't check what this transaction does because the preview service is temporarily unavailable. Only approve if you trust the scene that requested it.",
       "acknowledge_preview_unavailable": "I understand the preview is unavailable and I'm approving without seeing what this transaction does",
-      "unrecognized_contract_warning": "This action involves a contract Decentraland doesn't recognize, so the preview may not show everything this transaction does.",
-      "acknowledge_unrecognized_contract": "I understand this involves a contract Decentraland can't check",
       "review_restarted_notice": "Your wallet's network changed or couldn't be verified, so this transaction was reviewed again on the current network.",
       "calls_function": "Calls {functionName} on {contractName}"
     },
@@ -203,6 +201,7 @@
       "description": "Return to the {explorerText} to try again, or contact support if the error persists.",
       "malformed_transaction": "This transaction was refused: it targets a Decentraland contract but isn't shaped like a Decentraland action, so it can't be reviewed safely.",
       "malformed_signature": "This signature was refused: it isn't shaped like anything a Decentraland contract signs, so it can't be reviewed safely.",
+      "unsupported_contract": "This request was refused: it reaches a contract Decentraland doesn't own, so what it does can't be reviewed here.",
       "impersonated_sign_in": "This request was refused: it tried to sign a Decentraland login, which would let the scene act as you.",
       "wallet_error": "Your wallet could not complete the request.",
       "details": "Details for the developer:"
