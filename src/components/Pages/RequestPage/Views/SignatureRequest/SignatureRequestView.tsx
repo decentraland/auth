@@ -108,8 +108,8 @@ export const SignatureRequestView = ({
         />
         <Notice data-testid="signature-meta-tx-notice">{t('request.signature.meta_tx_notice')}</Notice>
         {isReverted ? <Notice data-testid="signature-meta-tx-reverted">{t('request.signature.meta_tx_reverted')}</Notice> : null}
-        {previewCaveat === 'recipient_contract' ? (
-          <Notice data-testid="preview-caveat-warning">{t('request.wallet_interaction.recipient_contract_warning')}</Notice>
+        {previewCaveat ? (
+          <Notice data-testid="preview-caveat-warning">{t(`request.wallet_interaction.${previewCaveat}_warning`)}</Notice>
         ) : null}
         <RawToggle type="button" aria-expanded={showRaw} onClick={() => setShowRaw(show => !show)}>
           {showRaw ? t('request.signature.hide_raw') : t('request.signature.view_raw')}
@@ -128,8 +128,8 @@ export const SignatureRequestView = ({
             label={
               isUnverifiable
                 ? t('request.signature.acknowledge_unverified')
-                : previewCaveat === 'recipient_contract'
-                  ? t('request.wallet_interaction.acknowledge_recipient_contract')
+                : previewCaveat
+                  ? t(`request.wallet_interaction.acknowledge_${previewCaveat}`)
                   : isPreviewWithoutVisibleEffects
                     ? t('request.transaction_dialog.acknowledge_no_visible_effects')
                     : t('request.transaction_dialog.acknowledge_risk')

@@ -10,10 +10,14 @@ const CenteredContent = styled(Box)(({ theme }) => ({
   width: 'fit-content'
 }))
 
+// Written by the item's creator: isolated so it cannot reorder the line, wrapped so it cannot overflow.
 const ItemName = styled(Box)(({ theme }) => ({
   fontSize: theme.typography.pxToRem(22),
   fontWeight: 600,
-  marginTop: theme.spacing(2.5)
+  marginTop: theme.spacing(2.5),
+  maxWidth: '100%',
+  overflowWrap: 'anywhere',
+  unicodeBidi: 'isolate'
 }))
 
 const Label = styled(Typography)(({ theme }) => ({

@@ -70,8 +70,8 @@ import {
   decodeNftTransferData,
   fetchNftMetadata,
   fetchPlaceByCreatorAddress,
-  getCallbackRecipient,
   getConnectedProvider,
+  getCounterpartyAddresses,
   getExplorerDeeplink,
   getMetaTransactionChainId,
   getNetworkProvider,
@@ -709,22 +709,30 @@ export const RequestPage = () => {
           }
         }
 
-        // Whether the preview of a call can be vouched for at all (see PreviewCaveat): a call that hands
-        // tokens to a recipient with code runs that recipient's callback inside the transaction, and a
-        // simulation cannot be relied on to show what such code does. Judged by Decentraland's RPC on the
-        // execution chain; when it cannot answer, the recipient is treated as code, so the page never
-        // vouches for a preview on a guess. Resolved before the simulation is fetched, while Allow is
-        // still blocked on the loading preview.
+        // Whether the preview of a call can be vouched for at all (see PreviewCaveat). Every address the
+        // call is handed (see getCounterpartyAddresses) must be a Decentraland contract on the execution
+        // chain (registry, or a factory-deployed collection) or a plain account without code; anything
+        // else is code the requester chose, running inside the transaction, which a simulation cannot be
+        // relied on to show. Judged by Decentraland's RPC; when it cannot answer, the address counts as
+        // such code, so the page never vouches for a preview on a guess. Resolved before the simulation
+        // is fetched, while Allow is still blocked on the loading preview.
         const detectPreviewCaveat = async (call: DecodedCall, chainId: number): Promise<PreviewCaveat | null> => {
-          const recipient = getCallbackRecipient(call)
-          if (!recipient) return null
-          let withoutCode = false
-          try {
-            withoutCode = await isAddressWithoutCode(recipient, chainId)
-          } catch {
-            // Unknown is not "no code".
+          const metaTransactionChainId = Number(getMetaTransactionChainId())
+          const isRecognizedOrPlain = async (address: string): Promise<boolean> => {
+            try {
+              const resolution = await resolveKnownDecentralandContract(address, chainId, {
+                metaTransactionChainId,
+                isCollection: isDecentralandCollection
+              })
+              if (resolution.status === 'found') return true
+              if (resolution.status === 'unavailable') return false
+              return await isAddressWithoutCode(address, chainId)
+            } catch {
+              return false
+            }
           }
-          return withoutCode ? null : 'recipient_contract'
+          const verdicts = await Promise.all(getCounterpartyAddresses(call, signerAddress).map(isRecognizedOrPlain))
+          return verdicts.every(Boolean) ? null : 'unrecognized_contract'
         }
 
         // The wallet-side fee estimate for a transaction the user pays gas for (a plain send on the
@@ -801,7 +809,7 @@ export const RequestPage = () => {
           const simulationPromise = fetchSimulation(buildSendTransactionSimulationPayload(transaction, signerAddress))
 
           // The branded gift view vouches for the transfer being the whole effect, which the page cannot
-          // do when the recipient's own code runs inside it: such a gift stays on the generic review and
+          // do when code the request chose runs inside it: such a gift stays on the generic review and
           // its acknowledgment.
           if (transaction.branded !== 'gift_candidate' || caveat !== null) return
           const transferData = decodeNftTransferData(transaction.call)

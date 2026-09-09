@@ -66,8 +66,8 @@
       "review_title": "Vérifiez cette transaction",
       "preview_unavailable_warning": "Nous n'avons pas pu vérifier ce que fait cette transaction car le service d'aperçu est temporairement indisponible. N'approuvez que si vous faites confiance à la scène qui l'a demandée.",
       "acknowledge_preview_unavailable": "Je comprends que l'aperçu est indisponible et j'approuve sans voir ce que fait cette transaction",
-      "recipient_contract_warning": "Le destinataire est un contrat. Son code s'exécute à la réception de l'objet et ne peut pas être prévisualisé, donc l'aperçu peut ne pas montrer tout ce que fait cette transaction.",
-      "acknowledge_recipient_contract": "Je comprends que le destinataire est un contrat dont le code ne peut pas être prévisualisé",
+      "unrecognized_contract_warning": "Cette action implique un contrat que Decentraland ne reconnaît pas. Son code s'exécute dans la transaction et ne peut pas être prévisualisé, donc l'aperçu peut ne pas montrer tout ce que fait cette transaction.",
+      "acknowledge_unrecognized_contract": "Je comprends que cela implique un contrat que Decentraland ne peut pas vérifier",
       "review_restarted_notice": "Le réseau de votre portefeuille a changé ou n'a pas pu être vérifié, cette transaction a donc été réexaminée sur le réseau actuel.",
       "calls_function": "Appelle {functionName} sur {contractName}"
     },
@@ -110,7 +110,8 @@
       "title_signature": "Confirmer la signature",
       "summary_transaction": "Votre portefeuille va envoyer cette transaction maintenant.",
       "summary_signature": "Votre portefeuille va signer cette demande maintenant.",
-      "fee_estimate": "Frais estimés : {cost} {symbol}"
+      "fee_estimate": "Frais estimés : {cost} {symbol}",
+      "unverified_token": "Token non vérifié · {address}"
     },
     "signature": {
       "title": "Confirmer la signature",
@@ -164,6 +165,8 @@
       "raw_message_hex": "Message (hex)",
       "raw_typed_data": "Données typées (EIP-712)",
       "message_unreadable": "Ce message n'est pas du texte lisible. Les octets exacts sont dans Avancé.",
+      "message_length": "{lines} lignes, {characters} caractères",
+      "message_scroll_hint": "Faites défiler jusqu'à la fin du message avant de continuer.",
       "acknowledge_transaction": "Je comprends que Decentraland ne peut pas vérifier cette transaction et je l'envoie quand même",
       "acknowledge_native_transfer": "Je comprends que j'envoie {amount} {symbol} et que cela ne peut pas être annulé",
       "acknowledge_meta_transaction": "Je comprends que cette signature permet au contrat d'agir pour moi à tout moment et que ses effets ne peuvent pas être vérifiés",

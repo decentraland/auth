@@ -39,11 +39,13 @@ type TypedDataPayload = {
 
 /** Lifecycle of the best-effort simulation shown for a Decentraland contract call. */
 /**
- * A reason the simulation of a Decentraland call cannot be vouched for even when it ran: the call hands
- * tokens to a recipient with code, whose callback runs inside the transaction and can tell a preview
- * from the real thing (tx.origin, gas price, the nonce state) and behave differently in each.
+ * A reason the simulation of a Decentraland call cannot be vouched for even when it ran: the call is
+ * handed an address that is neither a Decentraland contract nor a plain account (a safe transfer's
+ * recipient, the NFT registry of a marketplace order or a bid, an asset in an off-chain trade), so code
+ * the requester chose runs inside the transaction and can tell a preview from the real thing (tx.origin,
+ * gas price, the nonce state) and behave differently in each.
  */
-type PreviewCaveat = 'recipient_contract'
+type PreviewCaveat = 'unrecognized_contract'
 
 type SimulationState =
   | { status: 'idle' }

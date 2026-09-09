@@ -66,8 +66,8 @@
       "review_title": "查看此交易",
       "preview_unavailable_warning": "由于预览服务暂时不可用，我们无法检查此交易的作用。请仅在您信任发起该请求的场景时批准。",
       "acknowledge_preview_unavailable": "我了解预览不可用，并且我在未查看此交易作用的情况下进行批准",
-      "recipient_contract_warning": "接收方是一个合约。它的代码会在收到物品时执行且无法预览，因此预览可能无法显示此交易的全部行为。",
-      "acknowledge_recipient_contract": "我了解接收方是一个合约，其代码无法预览",
+      "unrecognized_contract_warning": "此操作涉及一个 Decentraland 无法识别的合约。它的代码会在交易内执行且无法预览，因此预览可能无法显示此交易的全部行为。",
+      "acknowledge_unrecognized_contract": "我了解这涉及一个 Decentraland 无法检查的合约",
       "review_restarted_notice": "你的钱包网络已更改或无法验证，因此此交易已在当前网络上重新审核。",
       "calls_function": "在 {contractName} 上调用 {functionName}"
     },
@@ -110,7 +110,8 @@
       "title_signature": "确认签名",
       "summary_transaction": "您的钱包现在将发送此交易。",
       "summary_signature": "您的钱包现在将签署此请求。",
-      "fee_estimate": "预估费用：{cost} {symbol}"
+      "fee_estimate": "预估费用：{cost} {symbol}",
+      "unverified_token": "未经验证的代币 · {address}"
     },
     "signature": {
       "title": "确认签名",
@@ -164,6 +165,8 @@
       "raw_message_hex": "消息（十六进制）",
       "raw_typed_data": "类型化数据（EIP-712）",
       "message_unreadable": "此消息不是可读文本。确切的字节在“高级”中。",
+      "message_length": "{lines} 行，{characters} 个字符",
+      "message_scroll_hint": "请滚动到消息末尾后再继续。",
       "acknowledge_transaction": "我理解 Decentraland 无法检查此交易，我仍然选择发送",
       "acknowledge_native_transfer": "我理解我正在发送 {amount} {symbol}，且此操作无法撤销",
       "acknowledge_meta_transaction": "我理解此签名允许该合约随时代表我执行操作，且其效果无法检查",

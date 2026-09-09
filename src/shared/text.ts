@@ -25,4 +25,18 @@ const revealHiddenCharacters = (text: string): string =>
     Array.from({ length: character.length }, (_, index) => `\\u${character.charCodeAt(index).toString(16).padStart(4, '0')}`).join('')
   )
 
-export { HIDDEN_CHARACTER_PATTERN, capitalize, revealHiddenCharacters, shortenAddress }
+const DEFAULT_UNTRUSTED_LABEL_LENGTH = 40
+
+/**
+ * A label a third party wrote (a token name or symbol, a place title, an NFT name), made safe to show
+ * inside a screen the page vouches for: trimmed, its hidden characters revealed so none can reorder or
+ * hide the text around it, and cut to `maxLength` with an ellipsis so it cannot push the facts, the
+ * fee or the acknowledgment out of view. Empty for anything that is not a string.
+ */
+const formatUntrustedLabel = (value: unknown, maxLength = DEFAULT_UNTRUSTED_LABEL_LENGTH): string => {
+  if (typeof value !== 'string') return ''
+  const revealed = revealHiddenCharacters(value.trim())
+  return revealed.length > maxLength ? `${revealed.slice(0, maxLength - 1)}…` : revealed
+}
+
+export { HIDDEN_CHARACTER_PATTERN, capitalize, formatUntrustedLabel, revealHiddenCharacters, shortenAddress }

@@ -100,9 +100,9 @@ export const WalletInteraction = ({
           {t('request.wallet_interaction.preview_unavailable_warning')}
         </PreviewUnavailableWarning>
       ) : null}
-      {previewCaveat === 'recipient_contract' ? (
+      {previewCaveat ? (
         <PreviewUnavailableWarning severity="warning" role="alert" data-testid="preview-caveat-warning">
-          {t('request.wallet_interaction.recipient_contract_warning')}
+          {t(`request.wallet_interaction.${previewCaveat}_warning`)}
         </PreviewUnavailableWarning>
       ) : null}
       {requiresAcknowledgment ? (
@@ -113,8 +113,8 @@ export const WalletInteraction = ({
           label={
             isPreviewUnavailable
               ? t('request.wallet_interaction.acknowledge_preview_unavailable')
-              : previewCaveat === 'recipient_contract'
-                ? t('request.wallet_interaction.acknowledge_recipient_contract')
+              : previewCaveat
+                ? t(`request.wallet_interaction.acknowledge_${previewCaveat}`)
                 : isPreviewWithoutVisibleEffects
                   ? t('request.transaction_dialog.acknowledge_no_visible_effects')
                   : t('request.transaction_dialog.acknowledge_risk')

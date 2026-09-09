@@ -15,8 +15,8 @@ import {
   decodeManaTransferData,
   decodeNftTransferData,
   fetchNftMetadata,
-  getCallbackRecipient,
   getConnectedProvider,
+  getCounterpartyAddresses,
   getExplorerDeeplink,
   getMetaTransactionChainId,
   getNetworkProvider,
@@ -407,61 +407,77 @@ describe('when testing getMetaTransactionChainId', () => {
   })
 })
 
-describe('when reading the recipient a collection call hands tokens to with a callback', () => {
+describe('when reading the addresses a Decentraland call is handed', () => {
   let call: DecodedCall
+  const SIGNER = '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd'
+  const OTHER = '0x1234567890abcdef1234567890abcdef12345678'
+  const NFT = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd'
 
-  describe('and the call is a safeTransferFrom', () => {
+  describe('and the call is a safe transfer to another account', () => {
     beforeEach(() => {
-      call = { functionName: 'safeTransferFrom', args: ['0xfrom', '0xto', BigInt(1)], payable: false, forwardsCall: false }
+      call = { functionName: 'safeTransferFrom', args: [SIGNER, OTHER, BigInt(1)], payable: false, forwardsCall: false }
     })
 
-    it('should return the recipient', () => {
-      expect(getCallbackRecipient(call)).toBe('0xto')
+    it('should return the recipient and not the signer', () => {
+      expect(getCounterpartyAddresses(call, SIGNER)).toEqual([OTHER])
     })
   })
 
-  describe('and the call is a safeTransferFrom with data', () => {
+  describe('and the call is a marketplace order naming an NFT registry', () => {
     beforeEach(() => {
-      call = { functionName: 'safeTransferFrom', args: ['0xfrom', '0xto', BigInt(1), '0x'], payable: false, forwardsCall: false }
+      call = { functionName: 'executeOrder', args: [NFT, BigInt(7), BigInt(1000)], payable: false, forwardsCall: false }
     })
 
-    it('should return the recipient', () => {
-      expect(getCallbackRecipient(call)).toBe('0xto')
+    it('should return the registry', () => {
+      expect(getCounterpartyAddresses(call, SIGNER)).toEqual([NFT])
     })
   })
 
-  describe('and the call is a safeBatchTransferFrom', () => {
+  describe('and the call is an off-chain trade with assets nested in structs and arrays', () => {
     beforeEach(() => {
       call = {
-        functionName: 'safeBatchTransferFrom',
-        args: ['0xfrom', '0xto', [BigInt(1), BigInt(2)]],
+        functionName: 'accept',
+        args: [
+          [
+            {
+              signer: OTHER,
+              sent: [{ assetType: BigInt(1), contractAddress: NFT, beneficiary: SIGNER }],
+              received: [{ assetType: BigInt(1), contractAddress: NFT.toUpperCase().replace('0X', '0x'), beneficiary: OTHER }]
+            }
+          ]
+        ],
         payable: false,
         forwardsCall: false
       }
     })
 
-    it('should return the recipient', () => {
-      expect(getCallbackRecipient(call)).toBe('0xto')
+    it('should return every nested address once, lowercased, without the signer', () => {
+      expect(getCounterpartyAddresses(call, SIGNER)).toEqual([OTHER, NFT])
     })
   })
 
-  describe('and the call is a plain transferFrom', () => {
+  describe('and the call names the signer in another casing and the zero address', () => {
     beforeEach(() => {
-      call = { functionName: 'transferFrom', args: ['0xfrom', '0xto', BigInt(1)], payable: false, forwardsCall: false }
+      call = {
+        functionName: 'transferFrom',
+        args: [SIGNER.toUpperCase().replace('0X', '0x'), '0x0000000000000000000000000000000000000000', BigInt(1)],
+        payable: false,
+        forwardsCall: false
+      }
     })
 
-    it('should return null because no callback runs', () => {
-      expect(getCallbackRecipient(call)).toBeNull()
+    it('should return nothing', () => {
+      expect(getCounterpartyAddresses(call, SIGNER)).toEqual([])
     })
   })
 
-  describe('and the call is not a transfer', () => {
+  describe('and the call has no address arguments', () => {
     beforeEach(() => {
-      call = { functionName: 'setApprovalForAll', args: ['0xoperator', true], payable: false, forwardsCall: false }
+      call = { functionName: 'setApprovalForAll', args: [true], payable: false, forwardsCall: false }
     })
 
-    it('should return null', () => {
-      expect(getCallbackRecipient(call)).toBeNull()
+    it('should return nothing', () => {
+      expect(getCounterpartyAddresses(call, SIGNER)).toEqual([])
     })
   })
 })
@@ -883,7 +899,7 @@ describe('when testing fetchNftMetadata', () => {
       jest.mocked(createPublicClient).mockReturnValue(mockPublicClient)
       jest.mocked(fetch).mockResolvedValueOnce({
         ok: true,
-        json: jest.fn().mockResolvedValueOnce(metadata)
+        text: jest.fn().mockResolvedValueOnce(JSON.stringify(metadata))
       } as any)
     })
 
@@ -920,7 +936,7 @@ describe('when testing fetchNftMetadata', () => {
       jest.mocked(createPublicClient).mockReturnValue(mockPublicClient)
       jest.mocked(fetch).mockResolvedValueOnce({
         ok: true,
-        json: jest.fn().mockResolvedValueOnce(metadata)
+        text: jest.fn().mockResolvedValueOnce(JSON.stringify(metadata))
       } as any)
     })
 
@@ -952,7 +968,7 @@ describe('when testing fetchNftMetadata', () => {
       jest.mocked(createPublicClient).mockReturnValue(mockPublicClient)
       jest.mocked(fetch).mockResolvedValueOnce({
         ok: true,
-        json: jest.fn().mockResolvedValueOnce(metadata)
+        text: jest.fn().mockResolvedValueOnce(JSON.stringify(metadata))
       } as any)
     })
 
@@ -988,7 +1004,7 @@ describe('when testing fetchNftMetadata', () => {
       jest.mocked(createPublicClient).mockReturnValue(mockPublicClient)
       jest.mocked(fetch).mockResolvedValueOnce({
         ok: true,
-        json: jest.fn().mockResolvedValueOnce(metadata)
+        text: jest.fn().mockResolvedValueOnce(JSON.stringify(metadata))
       } as any)
     })
 
@@ -1048,8 +1064,88 @@ describe('when testing fetchNftMetadata', () => {
     })
 
     it('should throw an unsupported-scheme error without fetching', async () => {
-      await expect(fetchNftMetadata(contractAddress, contractABI, tokenId)).rejects.toThrow('Unsupported tokenURI scheme')
+      await expect(fetchNftMetadata(contractAddress, contractABI, tokenId)).rejects.toThrow('Unsupported tokenURI')
       expect(fetch).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('and the tokenURI uses plain http', () => {
+    beforeEach(() => {
+      mockPublicClient = {
+        getChainId: jest.fn().mockResolvedValue(1),
+        readContract: jest.fn().mockResolvedValueOnce('http://192.168.1.10/metadata.json')
+      }
+      jest.mocked(createPublicClient).mockReturnValue(mockPublicClient)
+    })
+
+    it('should refuse it without fetching, so a request cannot point the browser at a plain-http host', async () => {
+      await expect(fetchNftMetadata(contractAddress, contractABI, tokenId)).rejects.toThrow('Unsupported tokenURI')
+      expect(fetch).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('and the metadata is larger than the gift view reads', () => {
+    beforeEach(() => {
+      mockPublicClient = {
+        getChainId: jest.fn().mockResolvedValue(1),
+        readContract: jest.fn().mockResolvedValueOnce('https://example.com/token/123')
+      }
+      jest.mocked(createPublicClient).mockReturnValue(mockPublicClient)
+      jest.mocked(fetch).mockResolvedValueOnce({
+        ok: true,
+        headers: { get: () => null },
+        text: jest.fn().mockResolvedValueOnce(JSON.stringify({ name: 'x'.repeat(256 * 1024 + 1) }))
+      } as any)
+    })
+
+    it('should refuse to parse it', async () => {
+      await expect(fetchNftMetadata(contractAddress, contractABI, tokenId)).rejects.toThrow('too large')
+    })
+  })
+
+  describe('and the metadata declares a body larger than the gift view reads', () => {
+    let cancel: jest.Mock
+
+    beforeEach(() => {
+      cancel = jest.fn().mockResolvedValue(undefined)
+      mockPublicClient = {
+        getChainId: jest.fn().mockResolvedValue(1),
+        readContract: jest.fn().mockResolvedValueOnce('https://example.com/token/123')
+      }
+      jest.mocked(createPublicClient).mockReturnValue(mockPublicClient)
+      jest.mocked(fetch).mockResolvedValueOnce({
+        ok: true,
+        headers: { get: (name: string) => (name === 'content-length' ? String(10 * 1024 * 1024) : null) },
+        body: { cancel },
+        text: jest.fn()
+      } as any)
+    })
+
+    it('should refuse it without reading the body', async () => {
+      await expect(fetchNftMetadata(contractAddress, contractABI, tokenId)).rejects.toThrow('too large')
+      expect(cancel).toHaveBeenCalled()
+    })
+  })
+
+  describe('and the metadata name carries a bidi override and runs long', () => {
+    beforeEach(() => {
+      mockPublicClient = {
+        getChainId: jest.fn().mockResolvedValue(1),
+        readContract: jest.fn().mockResolvedValueOnce('https://example.com/token/123')
+      }
+      jest.mocked(createPublicClient).mockReturnValue(mockPublicClient)
+      jest.mocked(fetch).mockResolvedValueOnce({
+        ok: true,
+        text: jest.fn().mockResolvedValueOnce(JSON.stringify({ name: `Rare\u202e${'x'.repeat(100)}`, image: 'http://example.com/i.png' }))
+      } as any)
+    })
+
+    it('should reveal the override, cap the name and drop the plain-http image', async () => {
+      const result = await fetchNftMetadata(contractAddress, contractABI, tokenId)
+      expect(result.name.startsWith('Rare\\u202e')).toBe(true)
+      expect(result.name.length).toBe(64)
+      expect(result.name.endsWith('…')).toBe(true)
+      expect(result.imageUrl).toBe('')
     })
   })
 
@@ -1071,7 +1167,7 @@ describe('when testing fetchNftMetadata', () => {
       jest.mocked(createPublicClient).mockReturnValue(mockPublicClient)
       jest.mocked(fetch).mockResolvedValueOnce({
         ok: true,
-        json: jest.fn().mockResolvedValueOnce(metadata)
+        text: jest.fn().mockResolvedValueOnce(JSON.stringify(metadata))
       } as any)
     })
 

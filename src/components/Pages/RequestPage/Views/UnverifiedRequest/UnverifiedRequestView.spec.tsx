@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { UnverifiedRequestView } from './UnverifiedRequestView'
 import { UnverifiedRequestViewProps } from './UnverifiedRequest.types'
@@ -366,6 +366,51 @@ describe('when rendering the UnverifiedRequestView', () => {
       it('should show the text on the summary tab', () => {
         render(<UnverifiedRequestView {...props} />)
         expect(screen.getByTestId('unverified-message')).toHaveTextContent('Hello')
+      })
+
+      it('should state the size of the message', () => {
+        render(<UnverifiedRequestView {...props} />)
+        expect(screen.getByTestId('unverified-message-length')).toHaveTextContent(
+          'request.unverified.message_length {"lines":1,"characters":5}'
+        )
+      })
+
+      it('should let the acknowledgment be ticked when the message fits its block', () => {
+        render(<UnverifiedRequestView {...props} />)
+        expect(screen.getByRole('checkbox')).toBeEnabled()
+        expect(screen.queryByTestId('unverified-message-scroll-hint')).not.toBeInTheDocument()
+      })
+
+      describe('and the message is longer than its block shows', () => {
+        let scrollHeight: PropertyDescriptor | undefined
+        let clientHeight: PropertyDescriptor | undefined
+
+        beforeEach(() => {
+          scrollHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollHeight')
+          clientHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientHeight')
+          Object.defineProperty(HTMLElement.prototype, 'scrollHeight', { configurable: true, get: () => 1000 })
+          Object.defineProperty(HTMLElement.prototype, 'clientHeight', { configurable: true, get: () => 320 })
+        })
+
+        afterEach(() => {
+          if (scrollHeight) Object.defineProperty(HTMLElement.prototype, 'scrollHeight', scrollHeight)
+          if (clientHeight) Object.defineProperty(HTMLElement.prototype, 'clientHeight', clientHeight)
+        })
+
+        it('should keep the acknowledgment disabled and ask to scroll to the end', () => {
+          render(<UnverifiedRequestView {...props} />)
+          expect(screen.getByRole('checkbox')).toBeDisabled()
+          expect(screen.getByTestId('unverified-message-scroll-hint')).toBeInTheDocument()
+        })
+
+        it('should enable the acknowledgment once the message has been scrolled to its end', () => {
+          render(<UnverifiedRequestView {...props} />)
+          const block = screen.getByTestId('unverified-message')
+          Object.defineProperty(block, 'scrollTop', { configurable: true, value: 680 })
+          fireEvent.scroll(block)
+          expect(screen.getByRole('checkbox')).toBeEnabled()
+          expect(screen.queryByTestId('unverified-message-scroll-hint')).not.toBeInTheDocument()
+        })
       })
 
       it('should show the text and the bytes on the Advanced tab', async () => {

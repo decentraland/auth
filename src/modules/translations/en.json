@@ -66,8 +66,8 @@
       "review_title": "Review this transaction",
       "preview_unavailable_warning": "We couldn't check what this transaction does because the preview service is temporarily unavailable. Only approve if you trust the scene that requested it.",
       "acknowledge_preview_unavailable": "I understand the preview is unavailable and I'm approving without seeing what this transaction does",
-      "recipient_contract_warning": "The recipient is a contract. Its code runs when it receives the item and can't be previewed, so the preview may not show everything this transaction does.",
-      "acknowledge_recipient_contract": "I understand the recipient is a contract whose code can't be previewed",
+      "unrecognized_contract_warning": "This action involves a contract Decentraland doesn't recognize. Its code runs inside the transaction and can't be previewed, so the preview may not show everything this transaction does.",
+      "acknowledge_unrecognized_contract": "I understand this involves a contract Decentraland can't check",
       "review_restarted_notice": "Your wallet's network changed or couldn't be verified, so this transaction was reviewed again on the current network.",
       "calls_function": "Calls {functionName} on {contractName}"
     },
@@ -110,7 +110,8 @@
       "title_signature": "Confirm Signature",
       "summary_transaction": "Your wallet will send this transaction now.",
       "summary_signature": "Your wallet will sign this request now.",
-      "fee_estimate": "Estimated fee: {cost} {symbol}"
+      "fee_estimate": "Estimated fee: {cost} {symbol}",
+      "unverified_token": "Unverified token · {address}"
     },
     "signature": {
       "title": "Confirm signature",
@@ -164,6 +165,8 @@
       "raw_message_hex": "Message (hex)",
       "raw_typed_data": "Typed data (EIP-712)",
       "message_unreadable": "This message isn't readable text. The exact bytes are under Advanced.",
+      "message_length": "{lines} lines, {characters} characters",
+      "message_scroll_hint": "Scroll to the end of the message before continuing.",
       "acknowledge_transaction": "I understand Decentraland can't check this transaction and I'm sending it anyway",
       "acknowledge_native_transfer": "I understand I'm sending {amount} {symbol} and this can't be undone",
       "acknowledge_meta_transaction": "I understand this signature lets the contract act for me at any time and its effects can't be checked",

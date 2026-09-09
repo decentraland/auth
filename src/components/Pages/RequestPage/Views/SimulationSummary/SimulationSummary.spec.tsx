@@ -29,6 +29,84 @@ describe('when rendering the SimulationSummary', () => {
     jest.clearAllMocks()
   })
 
+  describe.each([
+    { symbol: 'MANA', displayed: '1,000 MANA' },
+    { symbol: 'MANA\u202e', displayed: '1,000 MANA\\u202e' }
+  ])('and an unverified token uses the symbol $symbol', ({ symbol, displayed }) => {
+    beforeEach(() => {
+      simulation = {
+        status: 'ready',
+        result: emptyResult({
+          assetChanges: [
+            {
+              type: 'transfer',
+              standard: 'erc20',
+              from: '0x2222222222222222222222222222222222222222',
+              to: USER,
+              amount: '1000',
+              rawAmount: '1000000000000000000000',
+              tokenId: null,
+              contractAddress: '0x1111111111111111111111111111111111111111',
+              symbol,
+              name: 'Decentraland MANA',
+              decimals: 18,
+              logoUrl: null,
+              dollarValue: null
+            }
+          ]
+        })
+      }
+      render(<SimulationSummary simulation={simulation} userAddress={USER} chainId={137} verifiedContracts={[]} />)
+    })
+
+    it('should identify the token as unverified and show its address beneath the claimed name', () => {
+      expect(screen.getByText('request.transaction_dialog.unverified_token 0x1111…1111')).toBeInTheDocument()
+    })
+
+    it('should display the claimed symbol with hidden characters exposed', () => {
+      expect(screen.getByRole('link', { name: displayed })).toHaveAttribute(
+        'href',
+        'https://polygonscan.com/address/0x1111111111111111111111111111111111111111'
+      )
+    })
+  })
+
+  describe('and an unverified token has a long name and a plain-http logo', () => {
+    beforeEach(() => {
+      simulation = {
+        status: 'ready',
+        result: emptyResult({
+          assetChanges: [
+            {
+              type: 'transfer',
+              standard: 'erc721',
+              from: '0x2222222222222222222222222222222222222222',
+              to: USER,
+              amount: null,
+              rawAmount: null,
+              tokenId: '42',
+              contractAddress: '0x1111111111111111111111111111111111111111',
+              symbol: 'FAKE',
+              name: 'A'.repeat(100),
+              decimals: 0,
+              logoUrl: 'http://evil.example/logo.png',
+              dollarValue: null
+            }
+          ]
+        })
+      }
+      render(<SimulationSummary simulation={simulation} userAddress={USER} chainId={137} verifiedContracts={[]} />)
+    })
+
+    it('should put the token id before the capped name so the name cannot hide it', () => {
+      expect(screen.getByRole('link', { name: `#42 ${'A'.repeat(39)}…` })).toBeInTheDocument()
+    })
+
+    it('should not load a logo from a plain-http URL', () => {
+      expect(screen.queryByRole('img')).not.toBeInTheDocument()
+    })
+  })
+
   describe('and the simulation is idle', () => {
     beforeEach(() => {
       simulation = { status: 'idle' }
@@ -141,9 +219,9 @@ describe('when rendering the SimulationSummary', () => {
       expect(screen.getByText('100 MANA')).toBeInTheDocument()
     })
 
-    it('should render the received NFT with its name and token id', () => {
+    it('should render the received NFT with its token id first and then its name', () => {
       render(<SimulationSummary simulation={simulation} userAddress={USER} />)
-      expect(screen.getByText('Fancy Hat #512')).toBeInTheDocument()
+      expect(screen.getByText('#512 Fancy Hat')).toBeInTheDocument()
     })
 
     it('should render the you-send section title', () => {

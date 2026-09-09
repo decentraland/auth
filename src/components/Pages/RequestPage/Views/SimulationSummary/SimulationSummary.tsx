@@ -11,7 +11,8 @@ import {
   isZeroAddress
 } from '../../../../../shared/auth'
 import { getExplorerAddressUrl, getExplorerName, getNativeSymbol, getNetworkName } from '../../../../../shared/explorer'
-import { shortenAddress } from '../../../../../shared/text'
+import { formatUntrustedLabel, shortenAddress } from '../../../../../shared/text'
+import { getHttpsUrl } from '../../../../../shared/urls'
 import { SimulationSummaryProps } from './SimulationSummary.types'
 import {
   AmountUsd,
@@ -104,17 +105,19 @@ const formatUsd = (dollarValue: string | null, signed = false): string | null =>
   return `${value < 0 && Number(fixed) !== 0 ? '-' : '+'}${magnitude}`
 }
 
+// Token names and symbols are on-chain strings of whatever token the call touched, written by whoever
+// deployed it: shown as untrusted labels (hidden characters revealed, length capped), and for a token the
+// id comes first so a long name can never push it out of the row.
 const assetTitle = (change: AssetChange, t: Translate): string => {
   if (change.standard === 'erc721' || change.standard === 'erc1155') {
-    const name = change.name || change.symbol
+    const name = formatUntrustedLabel(change.name || change.symbol)
     const tokenId = change.tokenId ? `#${change.tokenId}` : ''
     return (
-      [name, tokenId].filter(Boolean).join(' ') ||
-      tokenId ||
+      [tokenId, name].filter(Boolean).join(' ') ||
       t('request.transaction_dialog.unknown_token', { address: shortenAddress(change.contractAddress) })
     )
   }
-  const symbol = change.symbol || (change.standard === 'native' ? 'ETH' : '')
+  const symbol = formatUntrustedLabel(change.symbol) || (change.standard === 'native' ? 'ETH' : '')
   // `rawAmount` is in base units (e.g. wei), so it's only a valid display amount when the token
   // has 0 decimals. Otherwise, without a decimals-applied `amount`, we show the symbol alone
   // rather than a base-unit number inflated by ~18 orders of magnitude.
@@ -184,7 +187,9 @@ const AssetRow = ({
   const { t } = useTranslation()
   const title = assetTitle(change, t)
   const dollar = formatUsd(change.dollarValue)
-  const fallbackInitial = (change.symbol || change.name || '?').charAt(0)
+  const fallbackInitial = (formatUntrustedLabel(change.symbol || change.name) || '?').charAt(0)
+  // A logo is fetched only from an https URL; anything else falls back to the initial.
+  const logoUrl = getHttpsUrl(change.logoUrl)
   const outgoing = direction === 'send'
   const isVerified = (address: string | null) => !!address && verified.has(address.toLowerCase())
 
@@ -213,15 +218,16 @@ const AssetRow = ({
       <DirectionIndicator outgoing={outgoing} aria-hidden="true">
         {outgoing ? '↑' : '↓'}
       </DirectionIndicator>
-      {change.logoUrl ? (
-        <TokenLogo src={change.logoUrl} alt={title} />
-      ) : (
-        <TokenLogoFallback aria-hidden="true">{fallbackInitial}</TokenLogoFallback>
-      )}
+      {logoUrl ? <TokenLogo src={logoUrl} alt={title} /> : <TokenLogoFallback aria-hidden="true">{fallbackInitial}</TokenLogoFallback>}
       <ChangeText>
         <ChangeAmount>
           <AddressLink address={change.contractAddress} chainId={chainId} label={title} verified={isVerified(change.contractAddress)} />
         </ChangeAmount>
+        {change.standard !== 'native' && !isVerified(change.contractAddress) ? (
+          <ChangeMeta title={change.contractAddress ?? undefined}>
+            {t('request.transaction_dialog.unverified_token', { address: shortenAddress(change.contractAddress) || '—' })}
+          </ChangeMeta>
+        ) : null}
         <ChangeMeta>{meta}</ChangeMeta>
       </ChangeText>
       {dollar ? <AmountUsd>≈ {dollar}</AmountUsd> : null}
@@ -241,7 +247,7 @@ const ApprovalItem = ({
   chainId?: number
 }) => {
   const { t } = useTranslation()
-  const token = approval.name || approval.symbol || shortenAddress(approval.contractAddress)
+  const token = formatUntrustedLabel(approval.name || approval.symbol) || shortenAddress(approval.contractAddress)
   const spenderVerified = !!approval.spender && verified.has(approval.spender.toLowerCase())
   const spender = (
     <AddressLink
@@ -252,7 +258,7 @@ const ApprovalItem = ({
     />
   )
 
-  const symbol = approval.symbol || token
+  const symbol = formatUntrustedLabel(approval.symbol) || token
   const isRevocation = isApprovalRevocation(approval)
   // A revocation to the zero address has no counterparty to name. A grant to the zero address is
   // still shown with its address: it is a grant to an unrecognized spender and is worded as one.

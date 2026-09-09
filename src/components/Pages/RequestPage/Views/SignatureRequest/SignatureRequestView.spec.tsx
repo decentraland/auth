@@ -165,19 +165,19 @@ describe('when rendering the SignatureRequestView', () => {
       })
     })
 
-    describe('and the recipient of the inner transfer is a contract', () => {
+    describe.each(['unrecognized_contract'] as const)('and the preview has the %s caveat', previewCaveat => {
       beforeEach(() => {
-        props = { ...props, previewCaveat: 'recipient_contract' }
+        props = { ...props, previewCaveat }
       })
 
-      it('should warn that the recipient code cannot be previewed', () => {
+      it('should explain why the preview cannot verify all effects', () => {
         render(<SignatureRequestView {...props} />)
-        expect(screen.getByTestId('preview-caveat-warning')).toHaveTextContent('request.wallet_interaction.recipient_contract_warning')
+        expect(screen.getByTestId('preview-caveat-warning')).toHaveTextContent(`request.wallet_interaction.${previewCaveat}_warning`)
       })
 
-      it('should word the acknowledgment for the recipient contract', () => {
+      it('should word the acknowledgment for the preview limitation', () => {
         render(<SignatureRequestView {...props} />)
-        expect(screen.getByText('request.wallet_interaction.acknowledge_recipient_contract')).toBeInTheDocument()
+        expect(screen.getByText(`request.wallet_interaction.acknowledge_${previewCaveat}`)).toBeInTheDocument()
       })
     })
 

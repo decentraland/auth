@@ -5,7 +5,16 @@ import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
 import { Provider, connection } from 'decentraland-connect'
 import { ContractName, getContract } from 'decentraland-transactions'
 import { config } from '../../../modules/config'
-import { DecodedCall, SimulationRequestBody, SimulationResponseBody, buildMetaTransactionSimulationPayload } from '../../../shared/auth'
+import {
+  ADDRESS_REGEX,
+  DecodedCall,
+  SimulationRequestBody,
+  SimulationResponseBody,
+  buildMetaTransactionSimulationPayload
+} from '../../../shared/auth'
+import { formatUntrustedLabel } from '../../../shared/text'
+import { getHttpsUrl } from '../../../shared/urls'
+import { isRecord } from '../../../shared/utils/isRecord'
 import { isMobile } from '../LoginPage/utils'
 import { NFT_TRANSFER_FUNCTIONS, RequestClassification } from './classifyRequest'
 
@@ -172,6 +181,8 @@ const COLLECTION_FACTORIES = [ContractName.CollectionFactory, ContractName.Colle
 // RPC call itself is not aborted; the provider offers no handle for that) and the classifier treats the
 // answer as unavailable.
 const COLLECTION_LOOKUP_TIMEOUT_MS = 10_000
+// The most metadata JSON the gift view reads for one token. Real collection metadata is a few kilobytes.
+const MAX_METADATA_BYTES = 256 * 1024
 
 /** Rejects when `promise` has not settled within `timeoutMs`. */
 function withTimeout<T>(promise: PromiseLike<T> | T, timeoutMs: number, label: string): Promise<T> {
@@ -295,23 +306,35 @@ function decodeNftTransferData(call: DecodedCall): { fromAddress: string; tokenI
   return { fromAddress, tokenId: tokenId.toString(), toAddress }
 }
 
-// The collection transfers that call the recipient: ERC-721's safe variants invoke `onERC721Received` on a
-// recipient that has code. Whatever that code does runs inside the transaction, and a simulation cannot be
-// relied on to show it: the code can tell a preview from the real thing (the preview's tx.origin is the
-// contract, its gas price is zero and the nonce has not moved) and behave differently in each.
-const CALLBACK_TRANSFER_FUNCTIONS: ReadonlySet<string> = new Set(['safeTransferFrom', 'safeBatchTransferFrom'])
+const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
+
+function collectAddresses(value: unknown, into: Set<string>): void {
+  if (typeof value === 'string') {
+    if (ADDRESS_REGEX.test(value)) into.add(value.toLowerCase())
+  } else if (Array.isArray(value)) {
+    value.forEach(item => collectAddresses(item, into))
+  } else if (isRecord(value)) {
+    Object.values(value).forEach(item => collectAddresses(item, into))
+  }
+}
 
 /**
- * The recipient a decoded collection call hands tokens to with a callback, or null when the call makes no
- * callback (a plain `transferFrom` does not, nor does anything that is not a transfer).
+ * Every address a decoded Decentraland call is handed, other than the signer's own and the zero address,
+ * lowercased and deduplicated. A Decentraland contract calls the addresses it is given: a collection
+ * calls the recipient of a safe transfer (`onERC721Received`), the marketplaces and bids call the NFT
+ * registry of an order (`ownerOf`, `safeTransferFrom`, a fingerprint check). Whatever code sits there runs
+ * inside the transaction, and a simulation cannot be relied on to show what it does: the code can tell a
+ * preview from the real thing (the preview's tx.origin is the contract, its gas price is zero and the
+ * nonce has not moved) and behave differently in each. The page therefore vouches for a preview only when
+ * every such address is a Decentraland contract or has no code (see detectPreviewCaveat). Arrays and
+ * structs are walked, so batch transfers and order structs count too.
  */
-function getCallbackRecipient(call: DecodedCall): string | null {
-  if (!CALLBACK_TRANSFER_FUNCTIONS.has(call.functionName)) {
-    return null
-  }
-  // safeTransferFrom(address from, address to, ...) / safeBatchTransferFrom(address from, address to, ...)
-  const recipient = call.args[1]
-  return typeof recipient === 'string' ? recipient : null
+function getCounterpartyAddresses(call: DecodedCall, signerAddress: string): string[] {
+  const addresses = new Set<string>()
+  collectAddresses(call.args, addresses)
+  addresses.delete(signerAddress.toLowerCase())
+  addresses.delete(ZERO_ADDRESS)
+  return [...addresses]
 }
 
 /** Whether two token ids name the same token, whatever notation each side uses (decimal, hex). */
@@ -419,53 +442,49 @@ async function fetchNftMetadata(
     throw new Error(`No tokenURI returned for token ${tokenId} at contract ${contractAddress}`)
   }
 
-  // The tokenURI comes from an arbitrary (attacker-chosen) contract, so only allow http(s)
-  // before fetching. This blocks schemes like javascript:/data:/file: from being passed to fetch.
-  const metadataUrl = tokenUri
-
-  let metadataProtocol: string
-  try {
-    metadataProtocol = new URL(metadataUrl).protocol
-  } catch {
-    throw new Error(`Invalid tokenURI for token ${tokenId} at contract ${contractAddress}`)
-  }
-  if (metadataProtocol !== 'https:' && metadataProtocol !== 'http:') {
-    throw new Error(`Unsupported tokenURI scheme "${metadataProtocol}" for token ${tokenId} at contract ${contractAddress}`)
+  // The tokenURI comes from a contract the request chose, so only an absolute https URL is fetched:
+  // no other scheme, and no plain http, which could point the user's browser at a LAN host from the
+  // auth origin.
+  const metadataUrl = getHttpsUrl(tokenUri)
+  if (!metadataUrl) {
+    throw new Error(`Unsupported tokenURI for token ${tokenId} at contract ${contractAddress}`)
   }
 
-  // Fetch the metadata JSON
+  // Fetch the metadata JSON, bounded: a declared or actual body beyond the cap is not parsed.
   const metadataResponse = await fetch(metadataUrl)
   if (!metadataResponse.ok) {
     // Drain the body so the connection can be reused; ignore failures doing so.
     await metadataResponse.body?.cancel().catch(() => undefined)
     throw new Error(`Failed to fetch metadata from ${metadataUrl}: ${metadataResponse.status} ${metadataResponse.statusText}`)
   }
-
-  const metadata = await metadataResponse.json()
-
-  // The metadata comes from an attacker-controllable contract/URL, so only surface http(s)
-  // image URLs. This drops data:/other-scheme values as defense-in-depth (the actual transfer
-  // token/recipient come from the decoded tx, not this cosmetic field); a dropped image just
-  // falls back to the view's placeholder rather than breaking it.
-  const rawImageUrl = metadata.image || metadata.image_url
-  let imageUrl = ''
-  if (typeof rawImageUrl === 'string') {
-    try {
-      const imageProtocol = new URL(rawImageUrl).protocol
-      if (imageProtocol === 'https:' || imageProtocol === 'http:') {
-        imageUrl = rawImageUrl
-      }
-    } catch {
-      // Ignore malformed image URLs — leave imageUrl empty.
-    }
+  const declaredLength = Number(metadataResponse.headers?.get('content-length') ?? 0)
+  if (declaredLength > MAX_METADATA_BYTES) {
+    await metadataResponse.body?.cancel().catch(() => undefined)
+    throw new Error(`Metadata for token ${tokenId} at contract ${contractAddress} is too large (${declaredLength} bytes)`)
+  }
+  const metadataText = await metadataResponse.text()
+  if (metadataText.length > MAX_METADATA_BYTES) {
+    throw new Error(`Metadata for token ${tokenId} at contract ${contractAddress} is too large (${metadataText.length} bytes)`)
+  }
+  const metadata: unknown = JSON.parse(metadataText)
+  if (!isRecord(metadata)) {
+    throw new Error(`Metadata for token ${tokenId} at contract ${contractAddress} is not an object`)
   }
 
-  // Extract rarity from attributes
+  // The metadata comes from a URL the request chose, so its image is shown only when it is an absolute
+  // https URL (the transfer's token and recipient come from the decoded call, not from this cosmetic
+  // field; a dropped image falls back to the view's placeholder), and its texts are shown as untrusted
+  // labels: hidden characters revealed and length capped.
+  const imageUrl = getHttpsUrl(metadata.image ?? metadata.image_url) ?? ''
+
+  // Extract rarity from attributes. Cosmetic: it only picks the frame the item is shown in, and an
+  // unknown value is common.
   let rarity: Rarity = Rarity.COMMON
-  if (metadata.attributes && Array.isArray(metadata.attributes)) {
-    // eslint-disable-next-line @typescript-eslint/naming-convention
-    const rarityAttribute = metadata.attributes.find((attr: { trait_type: string; value: string }) => attr.trait_type === 'Rarity')
-    if (rarityAttribute && rarityAttribute.value) {
+  if (Array.isArray(metadata.attributes)) {
+    const rarityAttribute: unknown = metadata.attributes.find(
+      (attribute: unknown) => isRecord(attribute) && attribute.trait_type === 'Rarity'
+    )
+    if (isRecord(rarityAttribute) && typeof rarityAttribute.value === 'string') {
       // Map the string value to the Rarity enum
       const rarityValue = rarityAttribute.value.toLowerCase()
       switch (rarityValue) {
@@ -501,8 +520,8 @@ async function fetchNftMetadata(
 
   return {
     imageUrl,
-    name: metadata.name,
-    description: metadata.description,
+    name: formatUntrustedLabel(metadata.name, 64),
+    description: formatUntrustedLabel(metadata.description, 200),
     rarity
   }
 }
@@ -537,9 +556,11 @@ async function fetchPlaceByCreatorAddress(creatorAddress: string): Promise<{ sce
 
     const place = data.data[0]
 
+    // The place's title and image are written by whoever deployed the scene at the recipient the request
+    // chose, and sit next to the amount the user confirms: shown as an untrusted label and an https image.
     return {
-      sceneName: place.title || 'Unknown Place',
-      sceneImageUrl: place.image || ''
+      sceneName: formatUntrustedLabel(place.title) || 'Unknown Place',
+      sceneImageUrl: getHttpsUrl(place.image) ?? ''
     }
   } catch (error) {
     console.error('Error fetching place by creator address:', error)
@@ -557,7 +578,7 @@ export {
   isDecentralandCollection,
   getMetaTransactionChainId,
   decodeNftTransferData,
-  getCallbackRecipient,
+  getCounterpartyAddresses,
   isExactNftTransferSimulation,
   decodeManaTransferData,
   fetchNftMetadata,
