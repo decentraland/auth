@@ -23,9 +23,9 @@ import {
   WalletInteractionComplete
 } from '../Views'
 import {
+  COLLECTION_ADDRESS,
   MANA_CONTRACT_ADDRESS,
   MARKETPLACE_ADDRESS,
-  COLLECTION_ADDRESS,
   USER_ADDRESS,
   manaData,
   metaTxRaw,
