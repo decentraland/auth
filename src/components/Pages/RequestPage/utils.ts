@@ -174,10 +174,11 @@ const COLLECTION_FACTORIES = [ContractName.CollectionFactory, ContractName.Colle
 const COLLECTION_LOOKUP_TIMEOUT_MS = 10_000
 
 /** Rejects when `promise` has not settled within `timeoutMs`. */
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+function withTimeout<T>(promise: PromiseLike<T> | T, timeoutMs: number, label: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs)
-    promise.then(
+    // Resolve the value first so a synchronous or already-settled result goes through the same path.
+    Promise.resolve(promise).then(
       value => {
         clearTimeout(timer)
         resolve(value)
@@ -231,7 +232,9 @@ async function isDecentralandCollection(contractAddress: string): Promise<boolea
   // Note what "a factory deployed it" covers: every curated collection, third-party creators' included.
   // The branded gift frame is therefore available to any approved creator's collection, and what it says
   // stays true for all of them — exactly one token the signer holds leaves their account.
-  const networkProvider = await getTrustedNetworkProvider(chainId)
+  // The provider is created under the same deadline as the reads, like isAddressWithoutCode does, so the
+  // classification cannot hang on either step.
+  const networkProvider = await withTimeout(getTrustedNetworkProvider(chainId), COLLECTION_LOOKUP_TIMEOUT_MS, 'Collection factory provider')
   const publicClient = createPublicClient({ transport: custom(networkProvider) })
   const answers = await Promise.allSettled(
     factories.map(factory =>

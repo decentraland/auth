@@ -1,6 +1,13 @@
 export * from './address'
 export * from './approvalRisk'
-export * from './decentralandContracts'
+export {
+  decodeKnownContractCall,
+  getCollectionContract,
+  getKnownDecentralandContract,
+  getMetaTransactionSalt,
+  resolveKnownDecentralandContract
+} from './decentralandContracts'
+export type { CollectionLookup, ContractResolution, DecodedCall, KnownContract, ResolveContractDependencies } from './decentralandContracts'
 export * from './errors'
 export * from './hex'
 export * from './httpClient'

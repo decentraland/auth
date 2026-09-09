@@ -841,11 +841,13 @@ describe('when testing fetchNftMetadata', () => {
   let tokenId: string
   let mockPublicClient: any
   let mockNetworkProvider: any
+  let originalFetch: typeof global.fetch
 
   beforeEach(() => {
     contractAddress = '0xcontract'
     contractABI = [{ type: 'function', name: 'tokenURI' }]
     tokenId = '123'
+    originalFetch = global.fetch
     global.fetch = jest.fn()
 
     // Mock config.get for getMetaTransactionChainId
@@ -859,6 +861,7 @@ describe('when testing fetchNftMetadata', () => {
   })
 
   afterEach(() => {
+    global.fetch = originalFetch
     jest.resetAllMocks()
   })
 

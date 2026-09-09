@@ -436,7 +436,7 @@ describe('when classifying a request', () => {
         classification = await classifyRequest(request, context)
       })
 
-      it('should classify it the same way', () => {
+      it('should classify it as a Decentraland meta-transaction like the JSON string form', () => {
         expect(classification).toEqual(expect.objectContaining({ kind: 'dcl_meta_transaction' }))
       })
     })

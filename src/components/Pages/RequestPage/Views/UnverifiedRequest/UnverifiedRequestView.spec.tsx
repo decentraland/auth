@@ -79,20 +79,20 @@ describe('when rendering the UnverifiedRequestView', () => {
 
     it('should keep Allow disabled until the acknowledgment is ticked', async () => {
       render(<UnverifiedRequestView {...props} />)
-      expect(screen.getByTestId('unverified-approve-button')).toBeDisabled()
+      expect(screen.getByRole('button', { name: 'common.allow' })).toBeDisabled()
       await userEvent.click(screen.getByRole('checkbox'))
-      expect(screen.getByTestId('unverified-approve-button')).toBeEnabled()
+      expect(screen.getByRole('button', { name: 'common.allow' })).toBeEnabled()
     })
 
     it('should keep Deny enabled at all times', () => {
       render(<UnverifiedRequestView {...props} />)
-      expect(screen.getByTestId('unverified-deny-button')).toBeEnabled()
+      expect(screen.getByRole('button', { name: 'common.deny' })).toBeEnabled()
     })
 
     it('should call onApprove once ticked and clicked', async () => {
       render(<UnverifiedRequestView {...props} />)
       await userEvent.click(screen.getByRole('checkbox'))
-      await userEvent.click(screen.getByTestId('unverified-approve-button'))
+      await userEvent.click(screen.getByRole('button', { name: 'common.allow' }))
       expect(onApprove).toHaveBeenCalledTimes(1)
     })
 
@@ -158,7 +158,7 @@ describe('when rendering the UnverifiedRequestView', () => {
         render(<UnverifiedRequestView {...props} />)
         await userEvent.click(screen.getByRole('checkbox'))
         expect(screen.getByTestId('unverified-fee')).toHaveTextContent('request.unverified.fact_fee_loading')
-        expect(screen.getByTestId('unverified-approve-button')).toBeDisabled()
+        expect(screen.getByRole('button', { name: 'common.allow' })).toBeDisabled()
       })
     })
 
@@ -167,11 +167,11 @@ describe('when rendering the UnverifiedRequestView', () => {
         props = { ...props, gas: { status: 'unavailable' } }
       })
 
-      it('should say so and let the acknowledgment enable Allow', async () => {
+      it('should show the fee as unavailable and let the acknowledgment alone enable Allow', async () => {
         render(<UnverifiedRequestView {...props} />)
         expect(screen.getByTestId('unverified-fee')).toHaveTextContent('request.unverified.fact_fee_unavailable')
         await userEvent.click(screen.getByRole('checkbox'))
-        expect(screen.getByTestId('unverified-approve-button')).toBeEnabled()
+        expect(screen.getByRole('button', { name: 'common.allow' })).toBeEnabled()
       })
     })
 
@@ -185,10 +185,10 @@ describe('when rendering the UnverifiedRequestView', () => {
       it('should clear the tick in the same render', async () => {
         const { rerender } = render(<UnverifiedRequestView {...props} />)
         await userEvent.click(screen.getByRole('checkbox'))
-        expect(screen.getByTestId('unverified-approve-button')).toBeEnabled()
+        expect(screen.getByRole('button', { name: 'common.allow' })).toBeEnabled()
         rerender(<UnverifiedRequestView {...nextProps} />)
         expect(screen.getByRole('checkbox')).not.toBeChecked()
-        expect(screen.getByTestId('unverified-approve-button')).toBeDisabled()
+        expect(screen.getByRole('button', { name: 'common.allow' })).toBeDisabled()
       })
     })
 
@@ -293,7 +293,7 @@ describe('when rendering the UnverifiedRequestView', () => {
     it('should enable Allow on the acknowledgment alone', async () => {
       render(<UnverifiedRequestView {...props} />)
       await userEvent.click(screen.getByRole('checkbox'))
-      expect(screen.getByTestId('unverified-approve-button')).toBeEnabled()
+      expect(screen.getByRole('button', { name: 'common.allow' })).toBeEnabled()
     })
 
     describe('and the Advanced tab is opened', () => {

@@ -77,7 +77,7 @@ describe('when rendering the WalletInteraction view', () => {
 
     it('should approve directly on Allow', async () => {
       render(<WalletInteraction {...props} />)
-      await userEvent.click(screen.getByTestId('transfer-confirm-button'))
+      await userEvent.click(screen.getByRole('button', { name: 'common.allow' }))
       expect(onApprove).toHaveBeenCalledTimes(1)
     })
 
@@ -94,7 +94,7 @@ describe('when rendering the WalletInteraction view', () => {
 
     it('should keep the approve button disabled until it resolves', () => {
       render(<WalletInteraction {...props} />)
-      expect(screen.getByTestId('transfer-confirm-button')).toBeDisabled()
+      expect(screen.getByRole('button', { name: 'common.allow' })).toBeDisabled()
     })
   })
 
@@ -105,9 +105,9 @@ describe('when rendering the WalletInteraction view', () => {
 
     it('should keep approval disabled until the acknowledgment is checked', async () => {
       render(<WalletInteraction {...props} />)
-      expect(screen.getByTestId('transfer-confirm-button')).toBeDisabled()
+      expect(screen.getByRole('button', { name: 'common.allow' })).toBeDisabled()
       await userEvent.click(screen.getByRole('checkbox'))
-      expect(screen.getByTestId('transfer-confirm-button')).not.toBeDisabled()
+      expect(screen.getByRole('button', { name: 'common.allow' })).not.toBeDisabled()
     })
 
     describe('and the request changes after the user ticked it', () => {
@@ -184,7 +184,7 @@ describe('when rendering the WalletInteraction view', () => {
 
       it('should keep approval disabled so the cost is seen before sending', () => {
         render(<WalletInteraction {...props} />)
-        expect(screen.getByTestId('transfer-confirm-button')).toBeDisabled()
+        expect(screen.getByRole('button', { name: 'common.allow' })).toBeDisabled()
       })
     })
 
@@ -193,10 +193,10 @@ describe('when rendering the WalletInteraction view', () => {
         props = { ...props, gas: { covered: false, status: 'unavailable' } }
       })
 
-      it('should say so and leave approval to the other gates', () => {
+      it('should show the fee as unavailable and leave approval to the other gates', () => {
         render(<WalletInteraction {...props} />)
         expect(screen.getByText('request.unverified.fact_fee_unavailable')).toBeInTheDocument()
-        expect(screen.getByTestId('transfer-confirm-button')).toBeEnabled()
+        expect(screen.getByRole('button', { name: 'common.allow' })).toBeEnabled()
       })
     })
   })
@@ -218,9 +218,9 @@ describe('when rendering the WalletInteraction view', () => {
 
     it('should keep approval disabled until the caveat is acknowledged', async () => {
       render(<WalletInteraction {...props} />)
-      expect(screen.getByTestId('transfer-confirm-button')).toBeDisabled()
+      expect(screen.getByRole('button', { name: 'common.allow' })).toBeDisabled()
       await userEvent.click(screen.getByRole('checkbox'))
-      expect(screen.getByTestId('transfer-confirm-button')).toBeEnabled()
+      expect(screen.getByRole('button', { name: 'common.allow' })).toBeEnabled()
     })
   })
 
@@ -241,9 +241,9 @@ describe('when rendering the WalletInteraction view', () => {
 
     it('should keep approval disabled until the unavailable preview is acknowledged', async () => {
       render(<WalletInteraction {...props} />)
-      expect(screen.getByTestId('transfer-confirm-button')).toBeDisabled()
+      expect(screen.getByRole('button', { name: 'common.allow' })).toBeDisabled()
       await userEvent.click(screen.getByRole('checkbox'))
-      expect(screen.getByTestId('transfer-confirm-button')).not.toBeDisabled()
+      expect(screen.getByRole('button', { name: 'common.allow' })).not.toBeDisabled()
     })
   })
 

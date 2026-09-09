@@ -47,6 +47,12 @@ type DecodedCall = {
 // `_data` on a collection through the forwarder; `DCLRegistrar.forwardToResolver` runs `bytes` on the
 // resolver). The previewed kinds refuse all of them: a function name and a simulation say nothing about
 // the inner selector, and access control is the contract's business, not a reason to review less.
+//
+// Deliberately not here: `CollectionFactory.createCollection(bytes32, bytes _data)`. Its `_data` is also
+// executed, but by the proxy it deploys, whose implementation is Decentraland's collection code behind a
+// DAO-controlled beacon: it is the collection's `initialize`, not a call into code the requester chose.
+// The simulation and the no-visible-effects acknowledgment still gate it, and refusing it would break the
+// Builder's collection deployment.
 const FORWARDING_FUNCTIONS: ReadonlySet<string> = new Set([
   'executeMetaTransaction',
   'forwardCall',

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { formatEther } from 'viem'
 import { useTranslation } from '@dcl/hooks'
 import { Box, Button, Checkbox, CircularProgress, FormControlLabel, Tab } from 'decentraland-ui2'
@@ -131,6 +131,9 @@ export const UnverifiedRequestView = ({
   const { acknowledged, setAcknowledged } = useAcknowledgment(acknowledgmentStatement)
 
   const isTransaction = isTransactionKind(kind)
+  // Parsing, pretty-printing and scanning the typed data is linear in its size; done once per payload, not per render.
+  const typedDataRaw = payload.kind === 'typed_data' ? payload.raw : null
+  const typedDataForDisplay = useMemo(() => (typedDataRaw !== null ? formatTypedDataForDisplay(typedDataRaw) : null), [typedDataRaw])
   // A wallet can be on a chain this page does not know. That is exactly a case this view exists for,
   // so the chain is still named (by its id) and amounts still say what they are in.
   const nativeSymbol = getNativeSymbol(chainId ?? undefined) || t('request.unverified.native_currency')
@@ -297,7 +300,7 @@ export const UnverifiedRequestView = ({
             {payload.kind === 'typed_data' ? (
               <>
                 <RawLabel>{t('request.unverified.raw_typed_data')}</RawLabel>
-                <RawBlock data-testid="unverified-raw-typed-data">{formatTypedDataForDisplay(payload.raw)}</RawBlock>
+                <RawBlock data-testid="unverified-raw-typed-data">{typedDataForDisplay}</RawBlock>
               </>
             ) : null}
             {payload.kind === 'message' ? (

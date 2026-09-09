@@ -197,7 +197,17 @@
     },
     "signing_error": {
       "title": "There was an error while trying to submit the request.",
-      "description": "Return to the {explorerText} to try again, or contact support if the error persists."
+      "description": "Return to the {explorerText} to try again, or contact support if the error persists.",
+      "malformed_transaction": "This transaction was refused: it targets a Decentraland contract but isn't shaped like a Decentraland action, so it can't be reviewed safely.",
+      "malformed_signature": "This signature was refused: it isn't shaped like anything a Decentraland contract signs, so it can't be reviewed safely.",
+      "impersonated_sign_in": "This request was refused: it tried to sign a Decentraland login, which would let the scene act as you.",
+      "wallet_error": "Your wallet could not complete the request.",
+      "details": "Details for the developer:"
+    },
+    "lookup_unavailable": {
+      "title": "We couldn't verify this request yet",
+      "description": "Decentraland's network couldn't be reached to check the contract this request targets. Nothing was signed or sent, and the request is still waiting. Try again in a moment.",
+      "try_again": "TRY AGAIN"
     },
     "recover_error": {
       "title": "There was an error recovering the request...",

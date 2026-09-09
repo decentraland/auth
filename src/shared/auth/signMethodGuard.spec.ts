@@ -415,6 +415,22 @@ describe('assertSignatureParamsAreCanonical', () => {
       })
     })
 
+    describe('and the typed data is larger than the review can take', () => {
+      let oversized: string
+
+      beforeEach(() => {
+        oversized = JSON.stringify({ ...JSON.parse(permit), message: { note: 'x'.repeat(96 * 1024) } })
+      })
+
+      it('should throw a MalformedSignatureRequestError naming the size', () => {
+        expect(() => assertSignatureParamsAreCanonical(method, [signer, oversized], signer)).toThrow('too large to review')
+      })
+
+      it('should judge an object payload by its JSON size', () => {
+        expect(() => assertSignatureParamsAreCanonical(method, [signer, JSON.parse(oversized)], signer)).toThrow('too large to review')
+      })
+    })
+
     describe('and both params are typed data, with the harmless one first', () => {
       it('should throw a MalformedSignatureRequestError because the wallet would sign the second one', () => {
         expect(() => assertSignatureParamsAreCanonical(method, [statement, permit], signer)).toThrow(MalformedSignatureRequestError)
@@ -559,6 +575,18 @@ describe('assertSignatureParamsAreCanonical', () => {
     describe('and the params are [message, signer]', () => {
       it('should not throw', () => {
         expect(() => assertSignatureParamsAreCanonical('personal_sign', ['hello', signer], signer)).not.toThrow()
+      })
+    })
+
+    describe('and the message is larger than the review can take', () => {
+      let oversized: string
+
+      beforeEach(() => {
+        oversized = 'x'.repeat(96 * 1024 + 1)
+      })
+
+      it('should throw a MalformedSignatureRequestError naming the size', () => {
+        expect(() => assertSignatureParamsAreCanonical('personal_sign', [oversized, signer], signer)).toThrow('too large to review')
       })
     })
 

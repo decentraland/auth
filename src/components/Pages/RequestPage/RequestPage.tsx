@@ -87,6 +87,7 @@ import {
   DeniedWalletInteraction,
   DifferentAccountError,
   LoadingRequest,
+  LookupUnavailableError,
   OutdatedClientError,
   RecoverError,
   SignatureRequestView,
@@ -99,6 +100,7 @@ import {
   WalletInteraction,
   WalletInteractionComplete
 } from './Views'
+import type { SigningErrorKind } from './Views'
 import { ConfirmRequestGas } from './Views/ConfirmRequestDialog'
 import { UnverifiedRequestViewProps } from './Views/UnverifiedRequest'
 import { forwardSignatureRequest, toWalletSignatureRequest } from './walletSignatureRequest'
@@ -109,6 +111,8 @@ enum View {
   // Loading
   LOADING_REQUEST,
   LOADING_ERROR,
+  // Decentraland's RPC could not say whether the target is a Decentraland contract (retryable here)
+  LOOKUP_UNAVAILABLE,
   // Deep Link Flow
   DEEP_LINK_CONTINUE_IN_APP,
   // Client-login pseudo request (identity post failed)
@@ -161,7 +165,7 @@ const RPC_METHOD_NOT_SUPPORTED = -32601
 const RPC_INVALID_PARAMS = -32602
 
 // Why a transaction review was discarded and started over (see restartTransactionReview).
-type ReviewRestartReason = 'network_changed' | 'network_unreadable' | 'network_unrecorded' | 'wallet_rejected_chain'
+type ReviewRestartReason = 'network_changed' | 'network_unreadable' | 'network_unrecorded' | 'wallet_rejected_chain' | 'lookup_unavailable'
 
 type DecentralandTransaction = Extract<RequestClassification, { kind: 'dcl_transaction' }>
 
@@ -305,6 +309,8 @@ export const RequestPage = () => {
   // again when the check completes. A mismatch on the pair waits for the new check instead.
   const [profileReadyFor, setProfileReadyFor] = useState<{ requestId: string; account: string } | null>(null)
   const [error, setError] = useState<string>()
+  // Why the signing error view is shown, for its translated explanation (see SigningErrorKind).
+  const [errorKind, setErrorKind] = useState<SigningErrorKind | null>(null)
   const [identityId, setIdentityId] = useState<string>()
   const timeoutRef = useRef<NodeJS.Timeout>()
   const requestId = params.requestId ?? ''
@@ -448,6 +454,7 @@ export const RequestPage = () => {
       setView(View.LOADING_REQUEST)
       setIsLoading(false)
       setError(undefined)
+      setErrorKind(null)
       setWalletInfo(undefined)
       setClassification(null)
       setPreviewCaveat(null)
@@ -692,6 +699,7 @@ export const RequestPage = () => {
               const rejection = new MalformedSignatureRequestError(request.method, 'the MetaTransaction call cannot be previewed')
               hasCompletedRef.current = true
               setError(rejection.message)
+              setErrorKind('malformed_signature')
               setView(View.WALLET_INTERACTION_ERROR)
               await reportRejectedRequest(RPC_INVALID_PARAMS, rejection.message)
               return
@@ -914,6 +922,7 @@ export const RequestPage = () => {
           // offering a retry that would re-trigger the same attack.
           hasCompletedRef.current = true
           setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
+          setErrorKind('impersonated_sign_in')
           setView(View.WALLET_INTERACTION_ERROR)
           await reportRejectedRequest(RPC_INVALID_PARAMS, e.message)
           return
@@ -923,6 +932,7 @@ export const RequestPage = () => {
           // it; a retry recovers the same request.
           hasCompletedRef.current = true
           setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
+          setErrorKind(e instanceof MalformedTransactionRequestError ? 'malformed_transaction' : 'malformed_signature')
           setView(View.WALLET_INTERACTION_ERROR)
           await reportRejectedRequest(RPC_INVALID_PARAMS, e.message)
           return
@@ -939,10 +949,10 @@ export const RequestPage = () => {
           // Whether the target is a Decentraland collection could not be checked. Reading that as
           // "not Decentraland" would send Polygon calldata as a plain transaction on whatever chain
           // the wallet is on, or show a MetaTransaction for a Decentraland collection as one for a
-          // contract Decentraland does not know, so the request is neither reviewed nor answered:
-          // the error view offers a retry and the request stays available for it.
-          setError(e.message)
-          setView(View.LOADING_ERROR)
+          // contract Decentraland does not know, so the request is neither reviewed nor answered.
+          // The request is still there, so its view retries the review here (see LookupUnavailableError)
+          // instead of sending the user back to the app for a new one.
+          setView(View.LOOKUP_UNAVAILABLE)
           return
         }
 
@@ -1048,16 +1058,17 @@ export const RequestPage = () => {
   }, [nftTransferData, manaTransferData, requestId])
 
   const restartTransactionReview = useCallback(
-    (reason: ReviewRestartReason) => {
+    (reason: ReviewRestartReason, { notice = true }: { notice?: boolean } = {}) => {
       // Make the stale review non-actionable immediately, then let the load effect's existing reset
       // clear every derived preview/classification and recover the same request again. No outcome is
       // sent: a missing, changed, or temporarily unreadable chain says nothing about the user's
       // decision and the request must remain available for the fresh review. The restart is neither
       // silent nor invisible: it is reported so the frequency of a security-relevant invalidation is
       // visible in production, and the re-reviewed page says why it reloaded, so an Allow that seems
-      // not to take is explained.
+      // not to take is explained. A restart the user asked for (Try Again after a lookup could not
+      // complete) is tracked the same way but needs no notice: they know why the page reloaded.
       trackEvent(TrackingEvents.TRANSACTION_REVIEW_RESTARTED, { requestId, reason })
-      pendingReviewRestartRef.current = reason
+      pendingReviewRestartRef.current = notice ? reason : undefined
       recoveredRequestIdRef.current = undefined
       reviewedWalletChainIdRef.current = undefined
       loadedRequestIdRef.current = undefined
@@ -1278,6 +1289,7 @@ export const RequestPage = () => {
         }
 
         setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
+        setErrorKind('wallet_error')
         setView(View.WALLET_INTERACTION_ERROR)
       }
     } finally {
@@ -1399,7 +1411,9 @@ export const RequestPage = () => {
         />
       )
     case View.WALLET_INTERACTION_ERROR:
-      return <SigningError error={error} />
+      return <SigningError error={error} kind={errorKind ?? undefined} />
+    case View.LOOKUP_UNAVAILABLE:
+      return <LookupUnavailableError onTryAgain={() => restartTransactionReview('lookup_unavailable', { notice: false })} />
     case View.CLIENT_LOGIN_ERROR:
       return <ClientLoginError error={error} onTryAgain={onRetryClientLogin} />
     case View.OUTDATED_CLIENT:

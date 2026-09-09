@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from '@dcl/hooks'
 import { Box, Button, Checkbox, CircularProgress, FormControlLabel } from 'decentraland-ui2'
 import { getPreviewFingerprint, hasNoVisibleEffects } from '../../../../../shared/auth'
@@ -49,6 +49,8 @@ export const SignatureRequestView = ({
 }: SignatureRequestViewProps) => {
   const { t } = useTranslation()
   const [showRaw, setShowRaw] = useState(false)
+  // Parsing, pretty-printing and scanning the typed data is linear in its size; done once per payload, not per render.
+  const rawForDisplay = useMemo(() => formatTypedDataForDisplay(raw), [raw])
 
   const contractUrl = getExplorerAddressUrl(chainId, verifyingContract)
   const isReverted = simulation.status === 'ready' && simulation.result.status === 'reverted'
@@ -112,7 +114,7 @@ export const SignatureRequestView = ({
         <RawToggle type="button" aria-expanded={showRaw} onClick={() => setShowRaw(show => !show)}>
           {showRaw ? t('request.signature.hide_raw') : t('request.signature.view_raw')}
         </RawToggle>
-        {showRaw ? <MessageBlock data-testid="signature-raw">{formatTypedDataForDisplay(raw)}</MessageBlock> : null}
+        {showRaw ? <MessageBlock data-testid="signature-raw">{rawForDisplay}</MessageBlock> : null}
 
         {requiresAcknowledgment ? (
           <FormControlLabel

@@ -71,5 +71,5 @@ function getSupportedChain(chainId: number | null | undefined): SupportedChain |
   return chainId ? SUPPORTED_CHAINS.get(chainId) : undefined
 }
 
-export { SUPPORTED_CHAIN_IDS, SUPPORTED_CHAINS, getSupportedChain }
+export { SUPPORTED_CHAIN_IDS, getSupportedChain }
 export type { SupportedChain }

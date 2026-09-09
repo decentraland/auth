@@ -106,6 +106,9 @@ function isDecentralandIdentityAuthMessage(message: unknown): boolean {
 // decodes them the same way (see classifyRequest). The wallet signs the DECODED bytes, so a
 // hex-wrapped identity payload produces exactly the same usable auth chain as a plaintext one.
 // Detection therefore has to look through the encoding instead of only at the literal param.
+// Deliberately broader than the shared `isHexBytes` (which is strict on a lowercase `0x`, because that
+// is what wallets sign as bytes): this check must fail closed, so a `0X…` payload some wallet might
+// still decode is looked through as well. The two patterns differ on purpose.
 const HEX_STRING_REGEX = /^0x([0-9a-fA-F]{2})+$/i
 
 function decodeHexUtf8(value: string): string | null {
@@ -194,6 +197,9 @@ function assertSignatureParamsAreCanonical(method: string, params: unknown[] | u
     if (typeof first !== 'string' || typeof second !== 'string' || isSigner(first, signer) || !isSigner(second, signer)) {
       throw new MalformedSignatureRequestError(method)
     }
+    if (first.length > MAX_SIGNATURE_PAYLOAD_CHARS) {
+      throw new MalformedSignatureRequestError(method, 'the message is too large to review')
+    }
     return
   }
 
@@ -201,12 +207,19 @@ function assertSignatureParamsAreCanonical(method: string, params: unknown[] | u
   if (!isSigner(first, signer) || !hasPrimaryType(typedData)) {
     throw new MalformedSignatureRequestError(method)
   }
+  const serializedLength = typeof second === 'string' ? second.length : JSON.stringify(second).length
+  if (serializedLength > MAX_SIGNATURE_PAYLOAD_CHARS) {
+    throw new MalformedSignatureRequestError(method, 'the typed data is too large to review')
+  }
 }
 
 // Fields other than `data` that carry calldata. viem forwards them and thirdweb concatenates
 // `extraCallData` onto `data`, so a request using them would execute bytes the preview never read.
 const CALLDATA_ALIASES = ['input', 'extraCallData']
-const CALLDATA_REGEX = /^0x([0-9a-fA-F]{2})*$/
+// A transaction's `data` field: hex-encoded whole bytes, possibly none (a plain value transfer sends
+// `0x`). Not the shared CALLDATA_REGEX of the contract decoder, which requires a 4-byte selector: that
+// one judges a call, this one judges a field, and a transfer has no call.
+const TRANSACTION_DATA_REGEX = /^0x([0-9a-fA-F]{2})*$/
 // A JSON-RPC quantity: hex, or the decimal form some clients send. Shared with the request page's
 // toHexQuantity, which turns either form into the canonical hex the wallet and the preview are handed,
 // so the guard and the normalizer judge a quantity the same way.
@@ -215,6 +228,10 @@ const QUANTITY_REGEX = /^(0x[0-9a-fA-F]{1,64}|[0-9]{1,78})$/
 // accepted here can always be previewed. Legitimate Decentraland calls are far smaller; without a
 // cap, oversized calldata is a deterministic way to make the preview unavailable.
 const MAX_CALLDATA_BYTES = 96 * 1024
+// The same bound for what a signature request asks to sign (a personal_sign message, or typed data as
+// the string or object it arrives as). Legitimate payloads are far smaller; without a cap, the review
+// would parse, pretty-print and fingerprint whatever a scene sends on every render.
+const MAX_SIGNATURE_PAYLOAD_CHARS = 96 * 1024
 
 /**
  * Rejects eth_sendTransaction params that are not a single transaction object the preview can read
@@ -245,7 +262,7 @@ function assertTransactionParamsAreCanonical(method: string, params: unknown[] |
     return reject('"to" must be an address')
   }
   if (fields.data !== undefined) {
-    if (typeof fields.data !== 'string' || !CALLDATA_REGEX.test(fields.data)) {
+    if (typeof fields.data !== 'string' || !TRANSACTION_DATA_REGEX.test(fields.data)) {
       return reject('"data" must be hex-encoded bytes')
     }
     if ((fields.data.length - 2) / 2 > MAX_CALLDATA_BYTES) {

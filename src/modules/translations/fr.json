@@ -197,7 +197,17 @@
     },
     "signing_error": {
       "title": "Une erreur est survenue lors de la soumission de la demande.",
-      "description": "Retournez au {explorerText} pour réessayer, ou contactez le support si l'erreur persiste."
+      "description": "Retournez au {explorerText} pour réessayer, ou contactez le support si l'erreur persiste.",
+      "malformed_transaction": "Cette transaction a été refusée : elle vise un contrat Decentraland mais n'a pas la forme d'une action Decentraland, elle ne peut donc pas être vérifiée en toute sécurité.",
+      "malformed_signature": "Cette signature a été refusée : elle n'a la forme d'aucune signature attendue par un contrat Decentraland, elle ne peut donc pas être vérifiée en toute sécurité.",
+      "impersonated_sign_in": "Cette demande a été refusée : elle tentait de signer une connexion Decentraland, ce qui permettrait à la scène d'agir en votre nom.",
+      "wallet_error": "Votre portefeuille n'a pas pu terminer la demande.",
+      "details": "Détails pour le développeur :"
+    },
+    "lookup_unavailable": {
+      "title": "Nous n'avons pas encore pu vérifier cette demande",
+      "description": "Le réseau de Decentraland n'a pas pu être joint pour vérifier le contrat visé par cette demande. Rien n'a été signé ni envoyé, et la demande est toujours en attente. Réessayez dans un instant.",
+      "try_again": "RÉESSAYER"
     },
     "recover_error": {
       "title": "Une erreur est survenue lors de la récupération de la demande...",

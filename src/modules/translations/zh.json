@@ -197,7 +197,17 @@
     },
     "signing_error": {
       "title": "提交请求时发生错误。",
-      "description": "返回 {explorerText} 重试，如果错误持续存在，请联系客服。"
+      "description": "返回 {explorerText} 重试，如果错误持续存在，请联系客服。",
+      "malformed_transaction": "此交易已被拒绝：它指向一个 Decentraland 合约，但不符合 Decentraland 操作的格式，因此无法安全审查。",
+      "malformed_signature": "此签名已被拒绝：它不符合任何 Decentraland 合约所签署的格式，因此无法安全审查。",
+      "impersonated_sign_in": "此请求已被拒绝：它试图签署 Decentraland 登录，这将允许该场景以您的身份行事。",
+      "wallet_error": "您的钱包无法完成此请求。",
+      "details": "开发者详情："
+    },
+    "lookup_unavailable": {
+      "title": "我们暂时无法验证此请求",
+      "description": "无法连接 Decentraland 网络来检查此请求所指向的合约。没有任何内容被签署或发送，请求仍在等待中。请稍后再试。",
+      "try_again": "重试"
     },
     "recover_error": {
       "title": "恢复请求时发生错误...",

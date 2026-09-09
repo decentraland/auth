@@ -45,13 +45,13 @@ describe('when rendering the ConfirmRequestDialog', () => {
 
     it('should call onConfirm on the confirm button click', async () => {
       render(<ConfirmRequestDialog {...props} />)
-      await userEvent.click(screen.getByTestId('confirm-request-confirm'))
+      await userEvent.click(screen.getByRole('button', { name: 'common.confirm' }))
       expect(onConfirm).toHaveBeenCalledTimes(1)
     })
 
     it('should call onCancel on the cancel button click', async () => {
       render(<ConfirmRequestDialog {...props} />)
-      await userEvent.click(screen.getByTestId('confirm-request-cancel'))
+      await userEvent.click(screen.getByRole('button', { name: 'common.cancel' }))
       expect(onCancel).toHaveBeenCalledTimes(1)
     })
   })
@@ -74,7 +74,7 @@ describe('when rendering the ConfirmRequestDialog', () => {
       props = { ...props, gas: { covered: false, status: 'unavailable' } }
     })
 
-    it('should say so', () => {
+    it('should show the fee as unavailable instead of an amount', () => {
       render(<ConfirmRequestDialog {...props} />)
       expect(screen.getByTestId('confirm-request-gas')).toHaveTextContent('request.unverified.fact_fee_unavailable')
     })
@@ -100,8 +100,8 @@ describe('when rendering the ConfirmRequestDialog', () => {
 
     it('should disable both buttons', () => {
       render(<ConfirmRequestDialog {...props} />)
-      expect(screen.getByTestId('confirm-request-cancel')).toBeDisabled()
-      expect(screen.getByTestId('confirm-request-confirm')).toBeDisabled()
+      // While loading the confirm button shows a spinner instead of its name, so both are read by role alone.
+      screen.getAllByRole('button').forEach(button => expect(button).toBeDisabled())
     })
   })
 })

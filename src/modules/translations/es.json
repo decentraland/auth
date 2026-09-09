@@ -197,7 +197,17 @@
     },
     "signing_error": {
       "title": "Hubo un error al intentar enviar la solicitud.",
-      "description": "Regresa a la {explorerText} para intentar de nuevo, o contacta a soporte si el error persiste."
+      "description": "Regresa a la {explorerText} para intentar de nuevo, o contacta a soporte si el error persiste.",
+      "malformed_transaction": "Esta transacción fue rechazada: apunta a un contrato de Decentraland pero no tiene la forma de una acción de Decentraland, así que no puede revisarse con seguridad.",
+      "malformed_signature": "Esta firma fue rechazada: no tiene la forma de nada que un contrato de Decentraland firme, así que no puede revisarse con seguridad.",
+      "impersonated_sign_in": "Esta solicitud fue rechazada: intentó firmar un inicio de sesión de Decentraland, lo que permitiría a la escena actuar como tú.",
+      "wallet_error": "Tu wallet no pudo completar la solicitud.",
+      "details": "Detalles para el desarrollador:"
+    },
+    "lookup_unavailable": {
+      "title": "Aún no pudimos verificar esta solicitud",
+      "description": "No se pudo contactar la red de Decentraland para comprobar el contrato al que apunta esta solicitud. No se firmó ni se envió nada, y la solicitud sigue esperando. Inténtalo de nuevo en un momento.",
+      "try_again": "REINTENTAR"
     },
     "recover_error": {
       "title": "Hubo un error al recuperar la solicitud...",

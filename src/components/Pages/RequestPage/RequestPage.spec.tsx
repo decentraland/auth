@@ -180,7 +180,18 @@ jest.mock('./Views', () => ({
   DifferentAccountError: () => <div data-testid="different-account">Different Account</div>,
   OutdatedClientError: () => <div data-testid="outdated-client-error">Outdated Client</div>,
   RecoverError: () => <div data-testid="recover-error">Recover Error</div>,
-  SigningError: (props: any) => <div data-testid="signing-error">Signing Error: {props.error}</div>,
+  SigningError: (props: any) => (
+    <div data-testid="signing-error" data-kind={props.kind ?? ''}>
+      Signing Error: {props.error}
+    </div>
+  ),
+  LookupUnavailableError: (props: any) => (
+    <div data-testid="lookup-unavailable">
+      <button data-testid="lookup-unavailable-try-again" onClick={props.onTryAgain}>
+        try again
+      </button>
+    </div>
+  ),
   WalletInteraction: (props: any) => (
     <div
       data-testid="wallet-interaction"
@@ -479,7 +490,6 @@ describe('RequestPage', () => {
     mockGetConnectedProvider.mockResolvedValue({ isConnectedProvider: true })
     mockIsAddressWithoutCode.mockResolvedValue(true)
     mockGetCallbackRecipient.mockReturnValue(null)
-    mockIsExactNftTransferSimulation.mockReturnValue(true)
     mockGetBalance.mockResolvedValue(BigInt(1))
     mockGetChainId.mockResolvedValue(1)
     mockEstimateFeesPerGas.mockResolvedValue({ gasPrice: BigInt(1) })
@@ -677,16 +687,35 @@ describe('RequestPage', () => {
         mockSendFailedOutcome.mockResolvedValue({})
       })
 
-      it('should show the retryable error view instead of a review', async () => {
+      it('should show the lookup-unavailable view with its own retry instead of a review', async () => {
         renderRequestPage()
-        expect(await screen.findByTestId('recover-error')).toBeInTheDocument()
+        expect(await screen.findByTestId('lookup-unavailable')).toBeInTheDocument()
+        expect(screen.queryByTestId('recover-error')).not.toBeInTheDocument()
       })
 
       it('should leave the request unanswered so a retry can review it', async () => {
         renderRequestPage()
-        await screen.findByTestId('recover-error')
+        await screen.findByTestId('lookup-unavailable')
         expect(mockSendFailedOutcome).not.toHaveBeenCalled()
         expect(mockSendSuccessfulOutcome).not.toHaveBeenCalled()
+      })
+
+      describe('and the user tries again once the lookup can answer', () => {
+        beforeEach(() => {
+          mockClassifyRequest.mockReset()
+          mockClassifyRequest
+            .mockRejectedValueOnce(new ContractLookupUnavailableError(COLLECTION))
+            .mockImplementation(defaultClassification)
+        })
+
+        it('should review the same request again on this page without a notice or an outcome', async () => {
+          renderRequestPage()
+          await userEvent.click(await screen.findByTestId('lookup-unavailable-try-again'))
+          const view = await screen.findByTestId('unverified-request')
+          expect(view).toHaveAttribute('data-review-restarted', 'false')
+          expect(mockRecover).toHaveBeenCalledTimes(2)
+          expect(mockSendFailedOutcome).not.toHaveBeenCalled()
+        })
       })
     })
 
@@ -706,6 +735,11 @@ describe('RequestPage', () => {
         renderRequestPage()
         expect(await screen.findByTestId('signing-error')).toBeInTheDocument()
         expect(screen.queryByTestId('unverified-request')).not.toBeInTheDocument()
+      })
+
+      it('should explain the refusal as a malformed transaction in the user-facing copy', async () => {
+        renderRequestPage()
+        expect(await screen.findByTestId('signing-error')).toHaveAttribute('data-kind', 'malformed_transaction')
       })
 
       it('should answer the request as invalid so it cannot be retried into a review', async () => {
@@ -2358,6 +2392,7 @@ describe('RequestPage', () => {
         })
       )
       jest.mocked(decodeNftTransferData).mockReturnValue({ fromAddress: SIGNER, tokenId: '1', toAddress: '0xrecipient' })
+      mockIsExactNftTransferSimulation.mockReturnValue(true)
       jest.mocked(fetchProfile).mockResolvedValue(null)
       jest.mocked(fetchNftMetadata).mockResolvedValue({ imageUrl: 'x', tokenId: '1', name: 'n', description: 'd', rarity: 'common' } as any)
       mockSimulateTransaction.mockResolvedValue(exactGiftSimulation)
