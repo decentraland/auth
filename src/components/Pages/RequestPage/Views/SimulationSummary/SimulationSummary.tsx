@@ -107,13 +107,17 @@ const formatUsd = (dollarValue: string | null, signed = false): string | null =>
 
 // Token names and symbols are on-chain strings of whatever token the call touched, written by whoever
 // deployed it: shown as untrusted labels (hidden characters revealed, length capped), and for a token the
-// id comes first so a long name can never push it out of the row.
+// id comes first so a long name can never push it out of the row. No Decentraland contract is an
+// ERC-1155, so such a change only appears when a call reached a contract Decentraland does not recognize
+// (already caveated); its quantity is still shown, since one id can move many units and a row that names
+// the item alone would say less than what moves.
 const assetTitle = (change: AssetChange, t: Translate): string => {
   if (change.standard === 'erc721' || change.standard === 'erc1155') {
     const name = formatUntrustedLabel(change.name || change.symbol)
     const tokenId = change.tokenId ? `#${change.tokenId}` : ''
+    const quantity = change.standard === 'erc1155' && change.rawAmount ? `${formatTokenAmount(change.rawAmount)} ×` : ''
     return (
-      [tokenId, name].filter(Boolean).join(' ') ||
+      [quantity, tokenId, name].filter(Boolean).join(' ') ||
       t('request.transaction_dialog.unknown_token', { address: shortenAddress(change.contractAddress) })
     )
   }
