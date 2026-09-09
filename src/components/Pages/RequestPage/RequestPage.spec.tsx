@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import { useLayoutEffect } from 'react'
 import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import * as viem from 'viem'
 import { ProviderType } from '@dcl/schemas'
@@ -121,10 +121,11 @@ jest.mock('../../../shared/utils/errorHandler', () => ({
   handleError: jest.fn().mockReturnValue('An error occurred')
 }))
 const mockIsChainMismatchRejection = jest.fn()
+const mockIsUserRejectedTransaction = jest.fn()
 jest.mock('../../../shared/errors', () => ({
   isErrorWithMessage: jest.fn().mockReturnValue(true),
   isRpcError: jest.fn().mockReturnValue(false),
-  isUserRejectedTransaction: jest.fn().mockReturnValue(false),
+  isUserRejectedTransaction: (...args: any[]) => mockIsUserRejectedTransaction(...args),
   isChainMismatchRejection: (...args: any[]) => mockIsChainMismatchRejection(...args)
 }))
 jest.mock('../../../modules/profile', () => ({
@@ -463,6 +464,7 @@ describe('RequestPage', () => {
     mockClassifyRequest.mockImplementation(defaultClassification)
     mockGetKnownDecentralandContract.mockReturnValue(null)
     mockIsChainMismatchRejection.mockReturnValue(false)
+    mockIsUserRejectedTransaction.mockReturnValue(false)
     mockIsExactNftTransferSimulation.mockReturnValue(true)
     mockGetBalance.mockResolvedValue(BigInt(1))
     mockGetChainId.mockResolvedValue(1)
@@ -1167,6 +1169,106 @@ describe('RequestPage', () => {
       renderRequestPage()
       await userEvent.click(await screen.findByTestId('unverified-approve'))
       expect(await screen.findByTestId('different-account')).toBeInTheDocument()
+    })
+  })
+
+  describe('when the request expires while it is still being classified', () => {
+    let resolveClassification: (classification: RequestClassification) => void
+
+    beforeEach(() => {
+      mockGetAddresses.mockResolvedValue([SIGNER])
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockRecover.mockResolvedValue({
+        ...recovered('personal_sign', ['hello', SIGNER]),
+        expiration: new Date(Date.now() + 50).toISOString()
+      })
+      mockClassifyRequest.mockImplementation(
+        () =>
+          new Promise<RequestClassification>(resolve => {
+            resolveClassification = resolve
+          })
+      )
+    })
+
+    it('should keep the timeout view when the classification resolves afterwards', async () => {
+      renderRequestPage()
+      await waitFor(() => expect(mockClassifyRequest).toHaveBeenCalled())
+      expect(await screen.findByTestId('timeout-error')).toBeInTheDocument()
+      await act(async () => {
+        resolveClassification({ kind: 'personal_sign', text: 'hello', hex: HELLO_HEX })
+      })
+      expect(screen.getByTestId('timeout-error')).toBeInTheDocument()
+      expect(screen.queryByTestId('unverified-request')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('when Allow and Deny are clicked before React disables either button', () => {
+    beforeEach(() => {
+      mockGetAddresses.mockResolvedValue([SIGNER])
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockRecover.mockResolvedValue(recovered('personal_sign', ['hello', SIGNER]))
+      mockWalletRequest.mockResolvedValue('0xsignature')
+      mockSendSuccessfulOutcome.mockResolvedValue({})
+      mockSendFailedOutcome.mockResolvedValue({})
+    })
+
+    it('should perform only the first operation and answer the request once', async () => {
+      renderRequestPage()
+      const approve = await screen.findByTestId('unverified-approve')
+      fireEvent.click(approve)
+      fireEvent.click(screen.getByTestId('unverified-deny'))
+      await waitFor(() => expect(mockSendSuccessfulOutcome).toHaveBeenCalledTimes(1))
+      expect(mockWalletRequest).toHaveBeenCalledTimes(1)
+      expect(mockSendFailedOutcome).not.toHaveBeenCalled()
+    })
+
+    it('should answer a double Deny once', async () => {
+      renderRequestPage()
+      const deny = await screen.findByTestId('unverified-deny')
+      fireEvent.click(deny)
+      fireEvent.click(deny)
+      await screen.findByTestId('denied-wallet-interaction')
+      await waitFor(() => expect(mockSendFailedOutcome).toHaveBeenCalledTimes(1))
+      expect(mockWalletRequest).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('when the wallet account changes while the wallet prompt is open', () => {
+    beforeEach(() => {
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockRecover.mockResolvedValue(recovered('personal_sign', ['hello', SIGNER]))
+      // Recovered and verified as the reviewing account; by the time the wallet answers, another one is active.
+      mockGetAddresses.mockResolvedValueOnce([SIGNER]).mockResolvedValueOnce([SIGNER]).mockResolvedValue(['0xnewwallet'])
+      mockSendFailedOutcome.mockResolvedValue({})
+    })
+
+    describe('and the wallet reports that the user rejected the request', () => {
+      beforeEach(() => {
+        mockWalletRequest.mockRejectedValue(new Error('User rejected the request'))
+        mockIsUserRejectedTransaction.mockReturnValue(true)
+      })
+
+      it('should send no outcome and show the account-change view', async () => {
+        renderRequestPage()
+        await userEvent.click(await screen.findByTestId('unverified-approve'))
+        expect(await screen.findByTestId('different-account')).toBeInTheDocument()
+        expect(mockSendFailedOutcome).not.toHaveBeenCalled()
+        expect(mockSendSuccessfulOutcome).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and the wallet fails for another reason', () => {
+      beforeEach(() => {
+        mockWalletRequest.mockRejectedValue(new Error('Internal wallet error'))
+      })
+
+      it('should send no outcome and show the account-change view instead of the error view', async () => {
+        renderRequestPage()
+        await userEvent.click(await screen.findByTestId('unverified-approve'))
+        expect(await screen.findByTestId('different-account')).toBeInTheDocument()
+        expect(mockSendFailedOutcome).not.toHaveBeenCalled()
+        expect(screen.queryByTestId('signing-error')).not.toBeInTheDocument()
+      })
     })
   })
 

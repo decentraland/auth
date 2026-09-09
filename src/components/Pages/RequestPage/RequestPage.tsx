@@ -21,6 +21,7 @@ import {
   ImpersonatedSignInError,
   MalformedSignatureRequestError,
   MalformedTransactionRequestError,
+  OutcomeError,
   RecoverResponse,
   RequestFulfilledError,
   SimulationRequestBody,
@@ -274,7 +275,10 @@ export const RequestPage = () => {
   const reviewedWalletChainIdRef = useRef<number>()
   // Guards against re-entrant approvals (e.g. a fast double-click on the confirm dialog),
   // which would otherwise fire two transactions before `isLoading` re-renders the buttons.
-  const isApprovingRef = useRef(false)
+  // Whether Allow or Deny is answering the request right now. Both handlers check and set it synchronously
+  // before their first await, so opposing clicks in the same tick, or a second click before React disables
+  // the buttons, cannot start a second operation: one request gets one answer.
+  const isSettlingRef = useRef(false)
   // Shares the in-flight identity POST across effect re-runs so the client-login flow
   // creates the identity exactly once; cleared on failure so a retry can re-post.
   const clientLoginPromiseRef = useRef<Promise<IdentityResponse> | null>(null)
@@ -497,6 +501,10 @@ export const RequestPage = () => {
     }
 
     let cancelled = false
+    // A resume point of the load is stale when the effect was cancelled (another request or account took
+    // over) or the request has been settled in the meantime: answered, or expired. Either way none of the
+    // state it would set belongs on screen any more.
+    const isStale = () => cancelled || hasCompletedRef.current
 
     // Client-login flow: no request to recover. Post the identity generated during login
     // to the auth server and let the client retrieve it through the `open?signin=<id>`
@@ -562,7 +570,7 @@ export const RequestPage = () => {
         // deep-link handoff has no backing request and never recovers.
         const request = await authServerClient.current.recover(requestId, signerAddress)
 
-        if (cancelled) return
+        if (isStale()) return
 
         requestRef.current = request
         recoveredRequestIdRef.current = requestId
@@ -581,6 +589,10 @@ export const RequestPage = () => {
               requestTime: new Date(request.expiration).getTime(),
               timeTheSiteStartedLoading
             })
+            // Expiry is terminal: it settles the request like an answer does, so nothing that resolves
+            // later (the classification, a branded lookup, the simulation) can put an actionable review
+            // back on screen, and neither Allow nor Deny can act on the expired request.
+            hasCompletedRef.current = true
             setView(View.TIMEOUT)
           }, expirationDelay)
         }
@@ -615,7 +627,7 @@ export const RequestPage = () => {
               }
             })
           )
-          if (cancelled) return
+          if (isStale()) return
           const resolved = Object.fromEntries(entries.filter((entry): entry is readonly [string, string] => entry !== null))
           if (Object.keys(resolved).length > 0) {
             setSimulationProfiles(resolved)
@@ -660,13 +672,13 @@ export const RequestPage = () => {
         const fetchSimulation = async (body: SimulationRequestBody, { rejectUnpreviewable = false } = {}) => {
           try {
             const result = await authServerClient.current.simulateTransaction(body)
-            if (cancelled) return
+            if (isStale()) return
             setSimulationState({ status: 'ready', result })
             setSimulationVerified(collectVerifiedContracts(result, body.chainId))
             void resolveSimulationProfiles(result)
             return result
           } catch (e) {
-            if (cancelled) return
+            if (isStale()) return
             // Nothing to reject once the user has already answered (e.g. denied while loading).
             if (rejectUnpreviewable && e instanceof SimulationUnavailableError && e.status === 400 && !hasCompletedRef.current) {
               const rejection = new MalformedSignatureRequestError(request.method, 'the MetaTransaction call cannot be previewed')
@@ -696,11 +708,11 @@ export const RequestPage = () => {
                 value: BigInt(transaction.value)
               })
             ])
-            if (cancelled) return
+            if (isStale()) return
             const gasPrice = feeData.gasPrice ?? feeData.maxFeePerGas ?? BigInt(0)
             setGasEstimate({ status: 'ready', cost: gasPrice * gasUnits })
           } catch (e) {
-            if (cancelled) return
+            if (isStale()) return
             console.info('Could not estimate the transaction fee:', e instanceof Error ? e.message : String(e))
             setGasEstimate({ status: 'unavailable' })
           }
@@ -721,7 +733,7 @@ export const RequestPage = () => {
                   fetchProfile(manaData.toAddress),
                   fetchPlaceByCreatorAddress(manaData.toAddress)
                 ])
-                if (cancelled) return
+                if (isStale()) return
                 setManaTransferData({
                   // Show the exact formatted amount (formatEther already trims trailing zeros).
                   manaAmount: `${manaData.manaAmount} MANA`,
@@ -736,7 +748,7 @@ export const RequestPage = () => {
                 return
               }
             } catch (e) {
-              if (cancelled) return
+              if (isStale()) return
               console.error('Error building the branded tip view, falling back to the generic review', e)
             }
           }
@@ -761,14 +773,14 @@ export const RequestPage = () => {
             // on the generic summary and its acknowledgment gates. The user may also have answered
             // from the generic review while the simulation ran; their answer stands.
             const simulation = await simulationPromise
-            if (cancelled || hasCompletedRef.current) return
+            if (isStale()) return
             if (!simulation || !isExactNftTransferSimulation(simulation, signerAddress, transaction.to, transferData)) return
 
             const [metadata, recipientProfile] = await Promise.all([
               fetchNftMetadata(transaction.to, transaction.contract.abi, transferData.tokenId),
               fetchProfile(transferData.toAddress)
             ])
-            if (cancelled || hasCompletedRef.current) return
+            if (isStale()) return
 
             setNftTransferData({
               imageUrl: metadata.imageUrl,
@@ -782,7 +794,7 @@ export const RequestPage = () => {
             })
             setView(View.WALLET_NFT_INTERACTION)
           } catch (e) {
-            if (cancelled) return
+            if (isStale()) return
             console.error('Error building the branded gift view, keeping the generic review', e)
           }
         }
@@ -796,7 +808,7 @@ export const RequestPage = () => {
             publicClient.getChainId(),
             publicClient.getBalance({ address: signerAddress }).catch(() => undefined)
           ])
-          if (cancelled) return
+          if (isStale()) return
           connectedChainId = currentChainId
           reviewedWalletChainIdRef.current = currentChainId
           setWalletInfo({ balance: userBalance, chainId: currentChainId })
@@ -813,7 +825,7 @@ export const RequestPage = () => {
           resolveContract: (address, chainId) =>
             resolveKnownDecentralandContract(address, chainId, { metaTransactionChainId, isCollection: isDecentralandCollection })
         })
-        if (cancelled) return
+        if (isStale()) return
         classificationRef.current = classified
         setClassification(classified)
         trackEvent(TrackingEvents.REQUEST_CLASSIFIED, { requestId, ...describeClassification(classified) })
@@ -847,7 +859,7 @@ export const RequestPage = () => {
             setView(View.WALLET_UNVERIFIED_INTERACTION)
         }
       } catch (e) {
-        if (cancelled) return
+        if (isStale()) return
 
         if (e instanceof DifferentSenderError) {
           // Not reported: the outcome endpoint does not check the sender, so answering here would
@@ -954,6 +966,10 @@ export const RequestPage = () => {
     // Only the request this page recovered can be answered. If the route has moved on to another id,
     // nothing has been reviewed for it yet.
     if (recoveredRequestIdRef.current !== requestId) return
+    // One answer per request: not while Allow or an earlier Deny is in flight, and not once the request
+    // has been answered or has expired. Checked and set before the first await (see isSettlingRef).
+    if (isSettlingRef.current || hasCompletedRef.current) return
+    isSettlingRef.current = true
     // The decision is final the moment the user clicks: mark completion before the outcome
     // round-trip so nothing that resolves in the meantime (e.g. a late simulation rejection)
     // can override the denied view or answer the request a second time.
@@ -981,6 +997,8 @@ export const RequestPage = () => {
       }
     } catch (error) {
       console.error('Failed to send denied notification:', error)
+    } finally {
+      isSettlingRef.current = false
     }
 
     setIsLoading(false)
@@ -1020,13 +1038,27 @@ export const RequestPage = () => {
     // id, requestRef still holds the previous request and its outcome would be reported under the
     // new id; nothing reviewed exists for the new one yet.
     if (recoveredRequestIdRef.current !== requestId) return
-    // Prevent duplicate submissions — the confirm dialog buttons aren't disabled synchronously,
-    // so a double-click could otherwise re-enter before the first call flips isLoading.
-    if (isApprovingRef.current) return
-    isApprovingRef.current = true
+    // One answer per request: not while Deny or an earlier Allow is in flight (the buttons are not
+    // disabled synchronously, so a double click or opposing clicks could otherwise re-enter before
+    // React flips isLoading), and not once the request has been answered or has expired. Checked and
+    // set before the first await (see isSettlingRef).
+    if (isSettlingRef.current || hasCompletedRef.current) return
+    isSettlingRef.current = true
     setIsLoading(true)
     setIsTransactionModalOpen(false)
     const walletClient = walletClientRef.current
+    // Answers the request as failed for the account that reviewed it, or not at all. After async wallet
+    // work the wallet's active account is read again: if it is no longer the reviewing account, nothing
+    // is sent, because the outcome endpoint does not check the sender and the reviewed request would be
+    // consumed as a rejection from an account that never saw it. The caller then shows the account-change
+    // view and leaves the request for the fresh review the load effect starts.
+    const reportFailedOutcomeForReviewedSigner = async (error: OutcomeError): Promise<'sent' | 'other_account' | 'unsent'> => {
+      if (!walletClient) return 'unsent'
+      const [currentAddress] = await walletClient.getAddresses()
+      if (currentAddress.toLowerCase() !== recoveredSignerRef.current) return 'other_account'
+      await authServerClient.current.sendFailedOutcome(requestId, currentAddress, error)
+      return 'sent'
+    }
     // Flips once the wallet has executed the request. Past that point the action is irreversible —
     // the transaction is broadcast, or the payload is signed — so any later failure is a delivery
     // problem, never a rejection. See the catch below.
@@ -1153,16 +1185,15 @@ export const RequestPage = () => {
         restartTransactionReview('wallet_rejected_chain')
       } else if (isUserRejectedTransaction(e)) {
         console.info('User rejected wallet interaction in wallet — not reporting to Sentry')
+        let delivery: 'sent' | 'other_account' | 'unsent' = 'unsent'
         try {
-          if (walletClientRef.current) {
-            const [addr] = await walletClientRef.current.getAddresses()
-            await authServerClient.current.sendFailedOutcome(requestId, addr, {
-              code: -32003,
-              message: 'Transaction rejected'
-            })
-          }
+          delivery = await reportFailedOutcomeForReviewedSigner({ code: -32003, message: 'Transaction rejected' })
         } catch (failedOutcomeError) {
           console.error('Failed to send denied notification:', failedOutcomeError)
+        }
+        if (delivery === 'other_account') {
+          setView(View.DIFFERENT_ACCOUNT)
+          return
         }
         hasCompletedRef.current = true
         if (nftTransferData) {
@@ -1184,20 +1215,17 @@ export const RequestPage = () => {
         })
 
         // Try to send failed outcome, but don't let it prevent showing the error view
+        let delivery: 'sent' | 'other_account' | 'unsent' = 'unsent'
         try {
-          if (walletClientRef.current) {
-            const [addr] = await walletClientRef.current.getAddresses()
-            if (isRpcError(e)) {
-              await authServerClient.current.sendFailedOutcome(requestId, addr, e.error)
-            } else {
-              await authServerClient.current.sendFailedOutcome(requestId, addr, {
-                code: 999,
-                message: isErrorWithMessage(e) ? e.message : 'Unknown error'
-              })
-            }
-          }
+          delivery = await reportFailedOutcomeForReviewedSigner(
+            isRpcError(e) ? e.error : { code: 999, message: isErrorWithMessage(e) ? e.message : 'Unknown error' }
+          )
         } catch (failedOutcomeError) {
           console.error('Failed to send failed outcome:', failedOutcomeError)
+        }
+        if (delivery === 'other_account') {
+          setView(View.DIFFERENT_ACCOUNT)
+          return
         }
 
         setError(isErrorWithMessage(e) ? e.message : 'Unknown error')
@@ -1205,7 +1233,7 @@ export const RequestPage = () => {
       }
     } finally {
       setIsLoading(false)
-      isApprovingRef.current = false
+      isSettlingRef.current = false
     }
   }, [isUserUsingWeb2Wallet, nftTransferData, manaTransferData, requestId, identity, showInteractionCompleteView, restartTransactionReview])
 
