@@ -1110,6 +1110,9 @@ export const RequestPage = () => {
     // outcome already sent stands, but nothing here may touch the review now on screen.
     const generation = reviewGenerationRef.current
     const isStaleAction = () => reviewGenerationRef.current !== generation
+    // The account that reviewed this request, fixed now: the ref moves on to the next review's account while
+    // this answer is in flight, and an outcome must never be compared with or delivered under that one.
+    const reviewedSigner = recoveredSignerRef.current
     // The decision is final the moment the user clicks: mark completion before the outcome
     // round-trip so nothing that resolves in the meantime (e.g. a late simulation rejection)
     // can override the denied view or answer the request a second time.
@@ -1122,7 +1125,7 @@ export const RequestPage = () => {
       if (walletClientRef.current) {
         const [address] = await walletClientRef.current.getAddresses()
         if (isStaleAction()) return
-        if (address.toLowerCase() !== recoveredSignerRef.current) {
+        if (address.toLowerCase() !== reviewedSigner) {
           // The wallet's active account is no longer the one that recovered and reviewed this
           // request, so it has nothing to answer for it. Undo the early completion mark, say what
           // happened, and leave the rest to the load effect starting over for the new account.
@@ -1192,6 +1195,10 @@ export const RequestPage = () => {
     // here may touch the review now on screen or its settle state.
     const generation = reviewGenerationRef.current
     const isStaleAction = () => reviewGenerationRef.current !== generation
+    // The account that reviewed this request, fixed now. The ref moves on to the next review's account
+    // while this action is in flight; every comparison and every outcome below uses this value, never the
+    // ref, so a late rejection can neither pass the check against another account nor be delivered under it.
+    const reviewedSigner = recoveredSignerRef.current
     setIsLoading(true)
     setIsTransactionModalOpen(false)
     const walletClient = walletClientRef.current
@@ -1201,10 +1208,10 @@ export const RequestPage = () => {
     // consumed as a rejection from an account that never saw it. The caller then shows the account-change
     // view and leaves the request for the fresh review the load effect starts.
     const reportFailedOutcomeForReviewedSigner = async (error: OutcomeError): Promise<'sent' | 'other_account' | 'unsent'> => {
-      if (!walletClient) return 'unsent'
+      if (!walletClient || !reviewedSigner) return 'unsent'
       const [currentAddress] = await walletClient.getAddresses()
-      if (currentAddress.toLowerCase() !== recoveredSignerRef.current) return 'other_account'
-      await authServerClient.current.sendFailedOutcome(requestId, currentAddress, error)
+      if (currentAddress.toLowerCase() !== reviewedSigner) return 'other_account'
+      await authServerClient.current.sendFailedOutcome(requestId, reviewedSigner, error)
       return 'sent'
     }
     // Flips once the wallet has executed the request. Past that point the action is irreversible —
@@ -1222,7 +1229,7 @@ export const RequestPage = () => {
 
       const [signerAddress] = await walletClient.getAddresses()
       if (isStaleAction()) return
-      if (signerAddress.toLowerCase() !== recoveredSignerRef.current) {
+      if (signerAddress.toLowerCase() !== reviewedSigner) {
         // The wallet's active account is no longer the one that recovered and reviewed this request.
         // Executing here would run the reviewed request from an account that never saw it. Say what
         // happened rather than silently doing nothing: a wallet that never reports the switch would
@@ -1294,9 +1301,13 @@ export const RequestPage = () => {
           // Also bind the request to the reviewed chain. This is defense in depth for injected
           // wallets, which validate the standard JSON-RPC chainId and refuse a last-moment switch
           // between the check above and the send instead of broadcasting on the new chain (that
-          // refusal is routed back into the review, see the catch). Embedded wallets ignore it —
-          // thirdweb rebuilds the transaction from its own chain and Magic is unverified — so for
-          // them the check above is the whole guard.
+          // refusal is routed back into the review, see the catch). Embedded wallets (Magic,
+          // Thirdweb) ignore it, so for them the check above is the whole guard, and it is enough:
+          // their chain is not something a user or another site can switch. It changes only through
+          // `wallet_switchEthereumChain` on the connector this app holds (Thirdweb rebuilds its
+          // provider on the new chain, Magic re-instantiates its SDK), nothing outside this app can
+          // reach that connector, and this page never switches it while a review is open. With no
+          // actor able to move the chain between the read and the send, the read is the send's chain.
           params: [{ ...transactionParams, from: signerAddress, chainId: `0x${reviewedChainId.toString(16)}` }]
         })
       } else {

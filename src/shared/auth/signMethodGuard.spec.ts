@@ -450,6 +450,38 @@ describe('assertSignatureParamsAreCanonical', () => {
       })
     })
 
+    describe.each([
+      ['an integer beyond 2^53', '9007199254740993'],
+      ['a negative integer beyond 2^53', '-9007199254740993'],
+      ['a fraction', '1.5'],
+      ['an exponent', '1e3']
+    ])('and the typed data text carries %s as a bare number', (_label, literal) => {
+      let params: unknown[]
+
+      beforeEach(() => {
+        params = [signer, `{"primaryType":"Permit","message":{"value":${literal}}}`]
+      })
+
+      it('should refuse it, since serializing it for the wallet would change what is signed', () => {
+        expect(() => assertSignatureParamsAreCanonical(method, params, signer)).toThrow('cannot be represented exactly')
+      })
+    })
+
+    describe('and the typed data text carries safe integers, and large numbers only inside strings', () => {
+      let params: unknown[]
+
+      beforeEach(() => {
+        params = [
+          signer,
+          '{"primaryType":"Permit","message":{"value":9007199254740991,"amount":"9007199254740993","note":"quoted \\" 1.5 e10","zero":0,"neg":-42}}'
+        ]
+      })
+
+      it('should keep the request reviewable', () => {
+        expect(() => assertSignatureParamsAreCanonical(method, params, signer)).not.toThrow()
+      })
+    })
+
     describe('and object nesting exceeds the serializer call stack', () => {
       let params: unknown[]
 

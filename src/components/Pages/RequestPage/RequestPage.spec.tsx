@@ -1203,6 +1203,41 @@ describe('RequestPage', () => {
     })
   })
 
+  describe('when the account changes while Allow is still waiting for the wallet, which then rejects', () => {
+    let rejectWallet: (error: unknown) => void
+
+    beforeEach(() => {
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      // Recovery and Allow see the reviewing account; from then on the wallet reports the new one, which the
+      // new review recovers with (its own recovery is held so the state in between is observable).
+      mockGetAddresses.mockResolvedValueOnce([SIGNER]).mockResolvedValueOnce([SIGNER]).mockResolvedValue(['0xnewwallet'])
+      mockRecover
+        .mockResolvedValueOnce(recovered('personal_sign', ['hello', SIGNER]))
+        .mockImplementation(() => new Promise(() => undefined))
+      mockWalletRequest.mockImplementationOnce(() => new Promise((_, reject) => (rejectWallet = reject)))
+      mockIsUserRejectedTransaction.mockReturnValue(true)
+      mockSendFailedOutcome.mockResolvedValue({})
+    })
+
+    it('should send no rejection at all, since the account that reviewed the request is no longer the wallet account', async () => {
+      const { rerender } = renderRequestPage()
+      await userEvent.click(await screen.findByTestId('unverified-approve'))
+      await waitFor(() => expect(mockWalletRequest).toHaveBeenCalledTimes(1))
+
+      mockConnectionData = { ...mockConnectionData, account: '0xnewwallet' }
+      rerenderRequestPage(rerender)
+      // The new review has read the wallet's account (the third read) before the old prompt is answered.
+      await waitFor(() => expect(mockGetAddresses).toHaveBeenCalledTimes(3))
+
+      rejectWallet(new Error('User rejected the request'))
+
+      // The old action reads the account once more to decide whom to report for, then stops.
+      await waitFor(() => expect(mockGetAddresses).toHaveBeenCalledTimes(4))
+      expect(mockSendFailedOutcome).not.toHaveBeenCalled()
+      expect(screen.getByTestId('loading-request')).toBeInTheDocument()
+    })
+  })
+
   describe('when the account changes while Deny is still waiting for its outcome to be delivered', () => {
     let deliverOutcome: () => void
 
