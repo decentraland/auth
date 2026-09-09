@@ -109,6 +109,8 @@
       "summary_transaction": "您的钱包现在将发送此交易。",
       "summary_signature": "您的钱包现在将签署此请求。",
       "fee_estimate": "预估费用：{cost} {symbol}",
+      "nft_label": "NFT",
+      "community_collection": "社区系列 · {address}",
       "unverified_token": "未经验证的代币 · {address}"
     },
     "signature": {

@@ -24,6 +24,7 @@ export const WalletInteraction = ({
   userAddress = '',
   profiles,
   verifiedContracts,
+  collectionContracts,
   chainId,
   requiresAcknowledgment = false,
   isCounterpartyCheckPending = false,
@@ -86,6 +87,7 @@ export const WalletInteraction = ({
           userAddress={userAddress}
           profiles={profiles}
           verifiedContracts={verifiedContracts}
+          collectionContracts={collectionContracts}
           chainId={chainId}
           gas={summaryGas}
         />

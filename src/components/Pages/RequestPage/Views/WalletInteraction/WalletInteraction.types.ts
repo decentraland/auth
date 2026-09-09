@@ -21,6 +21,8 @@ interface WalletInteractionProps {
   profiles?: Record<string, string>
   /** Lowercased addresses recognized as verified Decentraland contracts. */
   verifiedContracts?: string[]
+  /** Lowercased addresses of collections a Decentraland factory deployed (see SimulationSummaryProps). */
+  collectionContracts?: string[]
   /** Chain used for block-explorer links. */
   chainId?: number
   /** When true, the approve button is gated behind a high-risk acknowledgment checkbox. */

@@ -431,6 +431,49 @@ describe('assertSignatureParamsAreCanonical', () => {
       })
     })
 
+    describe.each(['string', 'object'])('and the typed data arrives as a %s with excessive nesting', representation => {
+      let params: unknown[]
+      let raw: string
+
+      describe.each([
+        ['arrays', '[', ']'],
+        ['objects', '{"value":', '}']
+      ])('and the message contains deeply nested %s', (_shape, open, close) => {
+        beforeEach(() => {
+          raw = '{"primaryType":"Permit","message":' + open.repeat(1500) + '0' + close.repeat(1500) + '}'
+          params = [signer, representation === 'string' ? raw : JSON.parse(raw)]
+        })
+
+        it('should reject the request before formatting or signing its contents', () => {
+          expect(() => assertSignatureParamsAreCanonical(method, params, signer)).toThrow(MalformedSignatureRequestError)
+        })
+      })
+    })
+
+    describe('and object nesting exceeds the serializer call stack', () => {
+      let params: unknown[]
+
+      beforeEach(() => {
+        params = [signer, JSON.parse('{"primaryType":"Permit","message":' + '['.repeat(12000) + '0' + ']'.repeat(12000) + '}')]
+      })
+
+      it('should refuse it as malformed without overflowing the stack', () => {
+        expect(() => assertSignatureParamsAreCanonical(method, params, signer)).toThrow(MalformedSignatureRequestError)
+      })
+    })
+
+    describe('and the message has ordinary nested structures', () => {
+      let params: unknown[]
+
+      beforeEach(() => {
+        params = [signer, JSON.parse('{"primaryType":"Permit","message":' + '{"value":'.repeat(8) + '0' + '}'.repeat(8) + '}')]
+      })
+
+      it('should keep the request reviewable', () => {
+        expect(() => assertSignatureParamsAreCanonical(method, params, signer)).not.toThrow()
+      })
+    })
+
     describe('and both params are typed data, with the harmless one first', () => {
       it('should throw a MalformedSignatureRequestError because the wallet would sign the second one', () => {
         expect(() => assertSignatureParamsAreCanonical(method, [statement, permit], signer)).toThrow(MalformedSignatureRequestError)

@@ -40,6 +40,7 @@ export const SignatureRequestView = ({
   userAddress,
   profiles,
   verifiedContracts,
+  collectionContracts,
   chainId,
   requiresAcknowledgment = false,
   isCounterpartyCheckPending = false,
@@ -103,6 +104,7 @@ export const SignatureRequestView = ({
           userAddress={userAddress}
           profiles={profiles}
           verifiedContracts={verifiedContracts}
+          collectionContracts={collectionContracts}
           chainId={chainId}
         />
         <Notice data-testid="signature-meta-tx-notice">{t('request.signature.meta_tx_notice')}</Notice>

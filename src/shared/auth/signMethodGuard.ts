@@ -172,6 +172,16 @@ function hasPrimaryType(typedData: unknown): boolean {
   return typeof typedData === 'object' && typedData !== null && typeof (typedData as { primaryType?: unknown }).primaryType === 'string'
 }
 
+// A byte cap alone does not bound JSON indentation or serializer recursion. Check depth before any
+// stringify: a small request can contain thousands of nested arrays and expand dramatically in the view.
+const MAX_TYPED_DATA_DEPTH = 64
+
+function hasExcessiveTypedDataDepth(value: unknown, depth = 0): boolean {
+  if (value === null || typeof value !== 'object') return false
+  if (depth >= MAX_TYPED_DATA_DEPTH) return true
+  return Object.values(value).some(child => hasExcessiveTypedDataDepth(child, depth + 1))
+}
+
 /**
  * Rejects signature params that are not in the canonical EIP-1193 order for their method.
  * Typed data must be `[signer, typedData]`; personal_sign must be `[message, signer]`.
@@ -203,9 +213,17 @@ function assertSignatureParamsAreCanonical(method: string, params: unknown[] | u
     return
   }
 
+  // Refuse oversized strings before parsing them; object payloads are measured after the depth check
+  // so JSON.stringify cannot overflow its stack while trying to apply the size limit.
+  if (typeof second === 'string' && second.length > MAX_SIGNATURE_PAYLOAD_CHARS) {
+    throw new MalformedSignatureRequestError(method, 'the typed data is too large to review')
+  }
   const typedData = parseTypedData(second)
   if (!isSigner(first, signer) || !hasPrimaryType(typedData)) {
     throw new MalformedSignatureRequestError(method)
+  }
+  if (hasExcessiveTypedDataDepth(typedData)) {
+    throw new MalformedSignatureRequestError(method, 'the typed data is too deeply nested to review')
   }
   const serializedLength = typeof second === 'string' ? second.length : JSON.stringify(second).length
   if (serializedLength > MAX_SIGNATURE_PAYLOAD_CHARS) {

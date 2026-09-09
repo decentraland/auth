@@ -106,18 +106,18 @@ const formatUsd = (dollarValue: string | null, signed = false): string | null =>
 }
 
 // Token names and symbols are on-chain strings of whatever token the call touched, written by whoever
-// deployed it: shown as untrusted labels (hidden characters revealed, length capped), and for a token the
-// id comes first so a long name can never push it out of the row. ERC-1155 is not modelled: no
-// Decentraland contract is one, and the page refuses a preview that moves such an asset before this
-// summary renders it.
+// deployed it: shown as untrusted labels (hidden characters revealed, length capped). An NFT row is
+// marked as one and puts the id before the name ("NFT #7 · Name"), so a collection named after a
+// currency ("1000 MANA") can never read as an amount of it. ERC-1155 is not modelled: no Decentraland
+// contract is one, and the page refuses a preview that moves such an asset before this summary renders it.
 const assetTitle = (change: AssetChange, t: Translate, chainId: number | undefined): string => {
   if (change.standard === 'erc721') {
     const name = formatUntrustedLabel(change.name || change.symbol)
     const tokenId = change.tokenId ? `#${change.tokenId}` : ''
-    return (
-      [tokenId, name].filter(Boolean).join(' ') ||
-      t('request.transaction_dialog.unknown_token', { address: shortenAddress(change.contractAddress) })
-    )
+    if (!name && !tokenId) {
+      return t('request.transaction_dialog.unknown_token', { address: shortenAddress(change.contractAddress) })
+    }
+    return [t('request.transaction_dialog.nft_label'), tokenId, name ? `· ${name}` : ''].filter(Boolean).join(' ')
   }
   // A native change without a symbol is named by the chain, never by a fixed currency.
   const symbol =
@@ -181,12 +181,14 @@ const AssetRow = ({
   direction,
   profiles,
   verified,
+  collections,
   chainId
 }: {
   change: AssetChange
   direction: 'send' | 'receive'
   profiles: Record<string, string>
   verified: Set<string>
+  collections: Set<string>
   chainId?: number
 }) => {
   const { t } = useTranslation()
@@ -197,6 +199,7 @@ const AssetRow = ({
   const logoUrl = getHttpsUrl(change.logoUrl)
   const outgoing = direction === 'send'
   const isVerified = (address: string | null) => !!address && verified.has(address.toLowerCase())
+  const isCollection = (address: string | null) => !!address && collections.has(address.toLowerCase())
 
   let meta: React.ReactNode
   if (change.type === 'mint') {
@@ -228,9 +231,17 @@ const AssetRow = ({
         <ChangeAmount>
           <AddressLink address={change.contractAddress} chainId={chainId} label={title} verified={isVerified(change.contractAddress)} />
         </ChangeAmount>
+        {/* Three provenances: a registry contract carries the badge; a factory collection is Decentraland
+            code with content anyone can create, so it is named as a collection, never vouched for by
+            name; anything else is unverified. The address is shown in the last two cases. */}
         {change.standard !== 'native' && !isVerified(change.contractAddress) ? (
           <ChangeMeta title={change.contractAddress ?? undefined}>
-            {t('request.transaction_dialog.unverified_token', { address: shortenAddress(change.contractAddress) || '—' })}
+            {t(
+              isCollection(change.contractAddress)
+                ? 'request.transaction_dialog.community_collection'
+                : 'request.transaction_dialog.unverified_token',
+              { address: shortenAddress(change.contractAddress) || '—' }
+            )}
           </ChangeMeta>
         ) : null}
         <ChangeMeta>{meta}</ChangeMeta>
@@ -366,11 +377,13 @@ export const SimulationSummary = ({
   userAddress,
   profiles = {},
   verifiedContracts = [],
+  collectionContracts = [],
   chainId,
   gas
 }: SimulationSummaryProps) => {
   const { t } = useTranslation()
   const verified = new Set(verifiedContracts.map(address => address.toLowerCase()))
+  const collections = new Set(collectionContracts.map(address => address.toLowerCase()))
   // Gas is paid in the currency of the chain the call runs on: POL for a plain send to a Polygon
   // contract without meta-transaction support, ETH on Ethereum. Never a fixed symbol.
   const nativeSymbol = getNativeSymbol(chainId) || t('request.unverified.native_currency')
@@ -455,7 +468,15 @@ export const SimulationSummary = ({
             {t('request.transaction_dialog.you_send')}
           </SectionTitle>
           {sends.map((change, index) => (
-            <AssetRow key={`send-${index}`} change={change} direction="send" profiles={profiles} verified={verified} chainId={chainId} />
+            <AssetRow
+              key={`send-${index}`}
+              change={change}
+              direction="send"
+              profiles={profiles}
+              verified={verified}
+              collections={collections}
+              chainId={chainId}
+            />
           ))}
         </Section>
       ) : null}
@@ -472,6 +493,7 @@ export const SimulationSummary = ({
               direction="receive"
               profiles={profiles}
               verified={verified}
+              collections={collections}
               chainId={chainId}
             />
           ))}

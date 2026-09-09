@@ -385,6 +385,7 @@ const personalSignHex = `0x${Array.from(new TextEncoder().encode(personalSignTex
 const personalSignDigestHex = `0x${'9f'.repeat(32)}`
 
 export {
+  COLLECTION_ADDRESS,
   avatar,
   manaData,
   MANA_CONTRACT_ADDRESS,

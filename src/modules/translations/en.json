@@ -109,6 +109,8 @@
       "summary_transaction": "Your wallet will send this transaction now.",
       "summary_signature": "Your wallet will sign this request now.",
       "fee_estimate": "Estimated fee: {cost} {symbol}",
+      "nft_label": "NFT",
+      "community_collection": "Community collection · {address}",
       "unverified_token": "Unverified token · {address}"
     },
     "signature": {

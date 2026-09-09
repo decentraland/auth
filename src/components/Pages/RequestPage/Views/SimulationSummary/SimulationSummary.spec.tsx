@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { SimulationResponseBody } from '../../../../../shared/auth'
 import { SimulationState } from '../../types'
@@ -63,6 +63,30 @@ describe('when rendering the SimulationSummary', () => {
       expect(screen.getByText('request.transaction_dialog.unverified_token 0x1111…1111')).toBeInTheDocument()
     })
 
+    describe('and the token is a collection a Decentraland factory deployed', () => {
+      beforeEach(() => {
+        cleanup()
+        render(
+          <SimulationSummary
+            simulation={simulation}
+            userAddress={USER}
+            chainId={137}
+            verifiedContracts={[]}
+            collectionContracts={['0x1111111111111111111111111111111111111111']}
+          />
+        )
+      })
+
+      it('should name it as a community collection with its address instead of calling it unverified', () => {
+        expect(screen.getByText('request.transaction_dialog.community_collection 0x1111…1111')).toBeInTheDocument()
+        expect(screen.queryByText('request.transaction_dialog.unverified_token 0x1111…1111')).not.toBeInTheDocument()
+      })
+
+      it('should not show the verified badge, since anyone can create its content', () => {
+        expect(screen.queryByLabelText('request.transaction_dialog.verified_contract')).not.toBeInTheDocument()
+      })
+    })
+
     it('should display the claimed symbol with hidden characters exposed', () => {
       expect(screen.getByRole('link', { name: displayed })).toHaveAttribute(
         'href',
@@ -98,8 +122,8 @@ describe('when rendering the SimulationSummary', () => {
       render(<SimulationSummary simulation={simulation} userAddress={USER} chainId={137} verifiedContracts={[]} />)
     })
 
-    it('should put the token id before the capped name so the name cannot hide it', () => {
-      expect(screen.getByRole('link', { name: `#42 ${'A'.repeat(39)}…` })).toBeInTheDocument()
+    it('should mark it as an NFT and put the token id before the capped name so the name cannot hide it', () => {
+      expect(screen.getByRole('link', { name: `request.transaction_dialog.nft_label #42 · ${'A'.repeat(39)}…` })).toBeInTheDocument()
     })
 
     it('should not load a logo from a plain-http URL', () => {
@@ -251,9 +275,9 @@ describe('when rendering the SimulationSummary', () => {
       expect(screen.getByText('100 MANA')).toBeInTheDocument()
     })
 
-    it('should render the received NFT with its token id first and then its name', () => {
+    it('should render the received NFT marked as one, with its token id before its name', () => {
       render(<SimulationSummary simulation={simulation} userAddress={USER} />)
-      expect(screen.getByText('#512 Fancy Hat')).toBeInTheDocument()
+      expect(screen.getByText('request.transaction_dialog.nft_label #512 · Fancy Hat')).toBeInTheDocument()
     })
 
     it('should render the you-send section title', () => {

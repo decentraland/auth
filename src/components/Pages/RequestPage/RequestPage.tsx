@@ -257,6 +257,10 @@ export const RequestPage = () => {
   const [simulationChainId, setSimulationChainId] = useState<number>()
   // Lowercased addresses in the simulation that are recognized Decentraland contracts.
   const [simulationVerified, setSimulationVerified] = useState<string[]>([])
+  // Lowercased addresses of collections a Decentraland factory deployed, among the called contract and
+  // the call's counterparties (see verifyCounterparties): Decentraland code carrying content anyone can
+  // create, so the summary names them as collections instead of vouching for them by name.
+  const [simulationCollections, setSimulationCollections] = useState<string[]>([])
   const requestRef = useRef<RecoverResponse>()
   const viewRef = useRef(view)
   viewRef.current = view
@@ -469,6 +473,7 @@ export const RequestPage = () => {
       setSimulationProfiles({})
       setSimulationChainId(undefined)
       setSimulationVerified([])
+      setSimulationCollections([])
     }
 
     // A deep-link handoff requires a valid UUID v4 id (the client's correlation id). Reject a
@@ -670,14 +675,15 @@ export const RequestPage = () => {
         // chain: the addresses are judged against the registry deployments on the chain the
         // simulation ran on, never against the registry as a whole. The contract being called is
         // included too: a wearable collection is vouched for by the collection factories, not the registry.
+        // Registry contracts only. A factory collection is Decentraland code but carries content anyone
+        // can create, so the summary names it as a collection (see verifyCounterparties) rather than
+        // badging it as Decentraland's.
         const collectVerifiedContracts = (result: SimulationResponseBody, chainId: number): string[] => {
-          const reviewed = classificationRef.current
-          const calledContract = reviewed && isDecentralandClassification(reviewed) ? reviewed.contract.address : null
           const verified = new Set<string>()
           const consider = (address: string | null) => {
             if (!address) return
             const normalized = address.toLowerCase()
-            if (normalized === calledContract || getKnownDecentralandContract(normalized, chainId)) verified.add(normalized)
+            if (getKnownDecentralandContract(normalized, chainId)) verified.add(normalized)
           }
           for (const change of result.assetChanges) {
             consider(change.from)
@@ -694,12 +700,10 @@ export const RequestPage = () => {
         // Best-effort simulation of a Decentraland contract call. Fires without blocking the view
         // render and never throws to the caller — failures surface as "details unavailable".
         //
-        // `rejectUnpreviewable` is for signatures that leave Auth as a bearer authorization (a
-        // typed-data MetaTransaction). When the server rejects the call itself (400) there is no
-        // preview to fall back to, so the request is rejected instead of degrading to an
-        // acknowledgment: otherwise oversized or otherwise unpreviewable calldata would be a
-        // deterministic way to skip the preview. Outages (5xx, timeouts) still degrade.
-        const fetchSimulation = async (body: SimulationRequestBody, call: DecodedCall, { rejectUnpreviewable = false } = {}) => {
+        // When the server rejects the call itself (400), refuse both transaction and signature
+        // requests. Treating invalid calldata as an outage would let the requester select a different
+        // RPC method to bypass this refusal. Outages (5xx, timeouts) still require acknowledgment.
+        const fetchSimulation = async (body: SimulationRequestBody, call: DecodedCall) => {
           try {
             // The server reports every approval it logged; which of them are grants is decided here, where
             // the function the signer called is known (see withoutAllowanceConsumption).
@@ -724,10 +728,13 @@ export const RequestPage = () => {
             return result
           } catch (e) {
             if (isStale()) return
-            if (rejectUnpreviewable && e instanceof SimulationUnavailableError && e.status === 400) {
+            if (e instanceof SimulationUnavailableError && e.status === 400) {
+              const isTransaction = request.method === 'eth_sendTransaction'
               await refuseRequest(
-                new MalformedSignatureRequestError(request.method, 'the MetaTransaction call cannot be previewed'),
-                'malformed_signature'
+                isTransaction
+                  ? new MalformedTransactionRequestError(request.method, 'the transaction call cannot be previewed')
+                  : new MalformedSignatureRequestError(request.method, 'the MetaTransaction call cannot be previewed'),
+                isTransaction ? 'malformed_transaction' : 'malformed_signature'
               )
               return
             }
@@ -746,11 +753,18 @@ export const RequestPage = () => {
         // with code on the relay chain asks the factories. Judged by Decentraland's RPC; when it cannot
         // answer, the address counts as such code, so the page never vouches for a preview on a guess.
         // Runs alongside the simulation; Allow stays blocked until it has settled. Resolves to whether the
-        // review goes on.
-        const verifyCounterparties = async (call: DecodedCall, chainId: number): Promise<boolean> => {
+        // review goes on. On the way it records which of the contracts involved are factory collections,
+        // the called one included (it is one when the registry does not list it), for the summary to label.
+        const verifyCounterparties = async (call: DecodedCall, chainId: number, contractAddress: string): Promise<boolean> => {
           const refuse = async (reason: string) => {
             if (!isStale()) await refuseRequest(new UnsupportedContractError(request.method, reason), 'unsupported_contract')
             return false
+          }
+          const collections = new Set<string>()
+          if (!getKnownDecentralandContract(contractAddress, chainId)) {
+            collections.add(contractAddress.toLowerCase())
+            // Known before any lookup, so the summary never shows the called collection as unverified.
+            setSimulationCollections([...collections])
           }
           const { addresses, opaque } = getCounterpartyAddresses(call, signerAddress, chainId)
           if (opaque) return refuse('the call carries a nested call that could not be read')
@@ -759,8 +773,9 @@ export const RequestPage = () => {
             try {
               if (getKnownDecentralandContract(address, chainId)) return true
               if (await isAddressWithoutCode(address, chainId)) return true
-              if (!collectionsLiveHere) return false
-              return await isDecentralandCollection(address)
+              if (!collectionsLiveHere || !(await isDecentralandCollection(address))) return false
+              collections.add(address.toLowerCase())
+              return true
             } catch {
               return false
             }
@@ -771,6 +786,7 @@ export const RequestPage = () => {
           if (unrecognized.length > 0) {
             return refuse(`the call reaches a contract that is not Decentraland's: ${unrecognized.join(', ')}`)
           }
+          setSimulationCollections([...collections])
           setAreCounterpartiesVerified(true)
           return true
         }
@@ -845,7 +861,7 @@ export const RequestPage = () => {
           }
           // The counterparty check and the simulation are independent, so they run side by side; the views
           // keep Allow blocked until both have settled.
-          const verificationPromise = verifyCounterparties(transaction.call, transaction.chainId)
+          const verificationPromise = verifyCounterparties(transaction.call, transaction.chainId, transaction.contract.address)
           const simulationPromise = fetchSimulation(buildSendTransactionSimulationPayload(transaction, signerAddress), transaction.call)
 
           if (transaction.branded !== 'gift_candidate') return
@@ -926,11 +942,10 @@ export const RequestPage = () => {
             setSimulationChainId(classified.chainId)
             setSimulationState({ status: 'loading' })
             setView(View.WALLET_SIGNATURE_INTERACTION)
-            void verifyCounterparties(classified.call, classified.chainId)
+            void verifyCounterparties(classified.call, classified.chainId, classified.contract.address)
             void fetchSimulation(
               buildMetaTransactionSimulationPayload(classified.chainId, classified.contract.address, classified.calldata, signerAddress),
-              classified.call,
-              { rejectUnpreviewable: true }
+              classified.call
             )
             break
           }
@@ -1529,6 +1544,7 @@ export const RequestPage = () => {
             userAddress={account ?? ''}
             profiles={simulationProfiles}
             verifiedContracts={simulationVerified}
+            collectionContracts={simulationCollections}
             chainId={simulationChainId}
             requiresAcknowledgment={requiresApprovalAcknowledgment}
             isCounterpartyCheckPending={!areCounterpartiesVerified}
@@ -1558,6 +1574,7 @@ export const RequestPage = () => {
             userAddress={account ?? ''}
             profiles={simulationProfiles}
             verifiedContracts={simulationVerified}
+            collectionContracts={simulationCollections}
             chainId={simulationChainId}
             requiresAcknowledgment={requiresApprovalAcknowledgment}
             isCounterpartyCheckPending={!areCounterpartiesVerified}

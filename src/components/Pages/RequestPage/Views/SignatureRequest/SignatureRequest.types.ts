@@ -18,6 +18,8 @@ export interface SignatureRequestViewProps {
   profiles?: Record<string, string>
   /** Lowercased addresses recognized as verified Decentraland contracts. */
   verifiedContracts?: string[]
+  /** Lowercased addresses of collections a Decentraland factory deployed (see SimulationSummaryProps). */
+  collectionContracts?: string[]
   /** Chain the meta-transaction is bound to, used for block-explorer links. */
   chainId?: number
   /** When true, gates approval behind an acknowledgment checkbox. */

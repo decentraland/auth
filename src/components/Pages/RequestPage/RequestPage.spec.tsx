@@ -206,6 +206,7 @@ jest.mock('./Views', () => ({
       data-contract={props.contractName}
       data-profiles={JSON.stringify(props.profiles ?? {})}
       data-verified={JSON.stringify(props.verifiedContracts ?? [])}
+      data-collections={JSON.stringify(props.collectionContracts ?? [])}
       data-review-restarted={String(props.reviewRestarted)}
     >
       <button data-testid="wallet-interaction-approve" onClick={props.onApprove}>
@@ -255,6 +256,7 @@ jest.mock('./Views', () => ({
       data-function={props.functionName}
       data-contract={props.contractName}
       data-verifying-contract={props.verifyingContract}
+      data-collections={JSON.stringify(props.collectionContracts ?? [])}
     >
       <button data-testid="signature-approve" onClick={props.onApprove}>
         approve
@@ -2020,6 +2022,10 @@ describe('RequestPage', () => {
         expect(view).toBeInTheDocument()
         expect(mockSendFailedOutcome).not.toHaveBeenCalled()
       })
+
+      it('should hand the collection to the summary to be labelled as one', () => {
+        expect(JSON.parse(view.getAttribute('data-collections') ?? '[]')).toContain('0xnft')
+      })
     })
 
     describe('and whether that address is a Decentraland collection could not be checked', () => {
@@ -2108,6 +2114,56 @@ describe('RequestPage', () => {
             code: -32602,
             message: `The "${method}" request reaches beyond Decentraland's contracts: the preview moves an ERC-1155 asset, which no Decentraland contract issues`
           })
+        })
+      })
+    })
+  })
+
+  describe.each([true, false])('when a Decentraland transaction with relayed=%s cannot be previewed', relayed => {
+    beforeEach(() => {
+      mockEnsureProfile.mockResolvedValueOnce({ avatars: [{ name: 'TestUser' }] })
+      mockRecover.mockResolvedValueOnce(recovered('eth_sendTransaction', [{ to: CONTRACT, data: '0xabcd', value: '0x0' }]))
+      mockGetAddresses.mockResolvedValue([SIGNER])
+      mockClassifyRequest.mockResolvedValueOnce(dclTransaction({ relayed }))
+      mockSendFailedOutcome.mockResolvedValueOnce({})
+    })
+
+    afterEach(() => {
+      jest.clearAllMocks()
+    })
+
+    describe('and the simulation server rejects the call itself', () => {
+      beforeEach(() => {
+        mockSimulateTransaction.mockRejectedValueOnce(new SimulationUnavailableError('status 400', 400))
+        renderRequestPage()
+      })
+
+      it('should refuse the transaction before it can reach the wallet', async () => {
+        expect(await screen.findByTestId('signing-error')).toHaveAttribute('data-kind', 'malformed_transaction')
+        expect(mockWalletRequest).not.toHaveBeenCalled()
+        expect(sendMetaTransaction).not.toHaveBeenCalled()
+      })
+
+      it('should report an invalid-params outcome for the rejected call', async () => {
+        await waitFor(() =>
+          expect(mockSendFailedOutcome).toHaveBeenCalledWith(REQUEST_ID, SIGNER, {
+            code: -32602,
+            message: 'The "eth_sendTransaction" transaction parameters are malformed: the transaction call cannot be previewed'
+          })
+        )
+      })
+    })
+
+    describe('and the simulation provider is temporarily unavailable', () => {
+      beforeEach(() => {
+        mockSimulateTransaction.mockRejectedValueOnce(new SimulationUnavailableError('status 502', 502))
+        renderRequestPage()
+      })
+
+      it('should retain the unavailable preview with mandatory acknowledgment', async () => {
+        await waitFor(() => {
+          expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-sim', 'unavailable')
+          expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-requires-acknowledgment', 'true')
         })
       })
     })
@@ -2215,10 +2271,26 @@ describe('RequestPage', () => {
         )
       })
 
-      it('should treat the called contract as verified in the preview', async () => {
-        renderRequestPage()
-        const view = await screen.findByTestId('wallet-interaction')
-        await waitFor(() => expect(view).toHaveAttribute('data-verified', JSON.stringify([CONTRACT])))
+      describe('and the called contract is in the registry', () => {
+        beforeEach(() => {
+          mockGetKnownDecentralandContract.mockImplementation((address: string) => (address === CONTRACT ? knownContract() : null))
+        })
+
+        it('should treat the called contract as verified in the preview', async () => {
+          renderRequestPage()
+          const view = await screen.findByTestId('wallet-interaction')
+          await waitFor(() => expect(view).toHaveAttribute('data-verified', JSON.stringify([CONTRACT])))
+          expect(view).toHaveAttribute('data-collections', '[]')
+        })
+      })
+
+      describe('and the called contract is a collection a Decentraland factory deployed', () => {
+        it('should name it as a collection rather than vouch for it, since anyone can create its content', async () => {
+          renderRequestPage()
+          const view = await screen.findByTestId('wallet-interaction')
+          await waitFor(() => expect(view).toHaveAttribute('data-collections', JSON.stringify([CONTRACT])))
+          expect(view).toHaveAttribute('data-verified', '[]')
+        })
       })
     })
 

@@ -25,6 +25,7 @@ import {
 import {
   MANA_CONTRACT_ADDRESS,
   MARKETPLACE_ADDRESS,
+  COLLECTION_ADDRESS,
   USER_ADDRESS,
   manaData,
   metaTxRaw,
@@ -149,6 +150,7 @@ export const TestViewPage = () => {
             simulation={{ status: 'ready', result: simulationSuccess }}
             userAddress={USER_ADDRESS}
             verifiedContracts={[MARKETPLACE_ADDRESS, '0x0f5d2fb29fb7d3cfee444a200298f468908cc942']}
+            collectionContracts={[COLLECTION_ADDRESS]}
             chainId={137}
             requiresAcknowledgment
             gas={{ covered: true }}
