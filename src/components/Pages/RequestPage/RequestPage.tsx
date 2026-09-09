@@ -299,6 +299,11 @@ export const RequestPage = () => {
   // before their first await, so opposing clicks in the same tick, or a second click before React disables
   // the buttons, cannot start a second operation: one request gets one answer.
   const isSettlingRef = useRef(false)
+  // Which review the page is on: bumped by the load effect whenever the request id or the account changes.
+  // Allow and Deny capture it when they start and, after every await, touch no view, loading or settle
+  // state unless it is still current: a late wallet or server result belongs to the review that started
+  // it, not to the one on screen (see onDenyWalletInteraction, onApproveWalletInteraction).
+  const reviewGenerationRef = useRef(0)
   // Shares the in-flight identity POST across effect re-runs so the client-login flow
   // creates the identity exactly once; cleared on failure so a retry can re-post.
   const clientLoginPromiseRef = useRef<Promise<IdentityResponse> | null>(null)
@@ -452,6 +457,10 @@ export const RequestPage = () => {
       setReviewRestartReason(pendingReviewRestartRef.current ?? null)
       pendingReviewRestartRef.current = undefined
       hasCompletedRef.current = false
+      // A new review is a new settlement scope: an action still pending for the previous one may finish
+      // its own outcome delivery but no longer speaks for this page (see reviewGenerationRef).
+      isSettlingRef.current = false
+      reviewGenerationRef.current += 1
       requestRef.current = undefined
       classificationRef.current = null
       // Deep-link handoff state is per request as well: a new id is a new identity handoff.
@@ -1085,6 +1094,10 @@ export const RequestPage = () => {
     // has been answered or has expired. Checked and set before the first await (see isSettlingRef).
     if (isSettlingRef.current || hasCompletedRef.current) return
     isSettlingRef.current = true
+    // The review this answer belongs to. Once the page has moved on to another request or account, the
+    // outcome already sent stands, but nothing here may touch the review now on screen.
+    const generation = reviewGenerationRef.current
+    const isStaleAction = () => reviewGenerationRef.current !== generation
     // The decision is final the moment the user clicks: mark completion before the outcome
     // round-trip so nothing that resolves in the meantime (e.g. a late simulation rejection)
     // can override the denied view or answer the request a second time.
@@ -1096,6 +1109,7 @@ export const RequestPage = () => {
     try {
       if (walletClientRef.current) {
         const [address] = await walletClientRef.current.getAddresses()
+        if (isStaleAction()) return
         if (address.toLowerCase() !== recoveredSignerRef.current) {
           // The wallet's active account is no longer the one that recovered and reviewed this
           // request, so it has nothing to answer for it. Undo the early completion mark, say what
@@ -1113,8 +1127,9 @@ export const RequestPage = () => {
     } catch (error) {
       console.error('Failed to send denied notification:', error)
     } finally {
-      isSettlingRef.current = false
+      if (!isStaleAction()) isSettlingRef.current = false
     }
+    if (isStaleAction()) return
 
     setIsLoading(false)
     // Set appropriate view based on whether it's an NFT transfer or MANA transfer
@@ -1160,6 +1175,11 @@ export const RequestPage = () => {
     // set before the first await (see isSettlingRef).
     if (isSettlingRef.current || hasCompletedRef.current) return
     isSettlingRef.current = true
+    // The review this action belongs to. Once the page has moved on to another request or account, the
+    // wallet result and its outcome delivery still complete for the request that was reviewed, but nothing
+    // here may touch the review now on screen or its settle state.
+    const generation = reviewGenerationRef.current
+    const isStaleAction = () => reviewGenerationRef.current !== generation
     setIsLoading(true)
     setIsTransactionModalOpen(false)
     const walletClient = walletClientRef.current
@@ -1189,6 +1209,7 @@ export const RequestPage = () => {
       }
 
       const [signerAddress] = await walletClient.getAddresses()
+      if (isStaleAction()) return
       if (signerAddress.toLowerCase() !== recoveredSignerRef.current) {
         // The wallet's active account is no longer the one that recovered and reviewed this request.
         // Executing here would run the reviewed request from an account that never saw it. Say what
@@ -1246,6 +1267,7 @@ export const RequestPage = () => {
         }
         const reviewedChainId = reviewedWalletChainIdRef.current
         const currentChainId = await publicClientRef.current?.getChainId().catch(() => undefined)
+        if (isStaleAction()) return
         if (reviewedChainId === undefined || currentChainId !== reviewedChainId) {
           // The address and calldata may refer to entirely different code on another chain, and
           // an unreadable chain cannot be compared safely. Discard the stale review and recover
@@ -1278,6 +1300,7 @@ export const RequestPage = () => {
         method: requestRef.current?.method
       })
       await authServerClient.current.sendSuccessfulOutcome(requestId, signerAddress, result)
+      if (isStaleAction()) return
       hasCompletedRef.current = true
 
       // A side effect of an outcome the server has already accepted, so its failure is its own
@@ -1289,9 +1312,13 @@ export const RequestPage = () => {
         } catch (notificationError) {
           handleError(notificationError, 'Error sending the tip notification')
         }
+        if (isStaleAction()) return
       }
       showInteractionCompleteView()
     } catch (e) {
+      // Every branch reports, then shows the result. Reporting (Sentry, the failed outcome) belongs to the
+      // reviewed request and goes ahead; showing belongs to the review on screen and is skipped once this
+      // action is stale.
       if (hasWalletResult) {
         // The wallet already executed the request; only the delivery of its outcome failed.
         // Reporting a failed outcome here would tell the client the user rejected a transaction
@@ -1302,16 +1329,19 @@ export const RequestPage = () => {
         handleError(e, 'Error delivering the outcome of an executed wallet interaction', {
           sentryTags: { isWeb2Wallet: isUserUsingWeb2Wallet }
         })
+        if (isStaleAction()) return
         hasCompletedRef.current = true
         showInteractionCompleteView()
       } else if (e instanceof ReviewedSignerMismatchError) {
         // The wallet's active account changed between the check above and the relay's own account
         // read, so nothing was signed or submitted. Not the user's decision: no outcome, say what
         // happened, and let the load effect start over for the new account.
+        if (isStaleAction()) return
         setView(View.DIFFERENT_ACCOUNT)
       } else if (isChainMismatchRejection(e)) {
         // The wallet refused the send because its network no longer matches the reviewed chain: the
         // binding above fired. That is not the user's decision, so answer nothing and review again.
+        if (isStaleAction()) return
         restartReview('wallet_rejected_chain')
       } else if (isUserRejectedTransaction(e)) {
         console.info('User rejected wallet interaction in wallet — not reporting to Sentry')
@@ -1321,6 +1351,7 @@ export const RequestPage = () => {
         } catch (failedOutcomeError) {
           console.error('Failed to send denied notification:', failedOutcomeError)
         }
+        if (isStaleAction()) return
         if (delivery === 'other_account') {
           setView(View.DIFFERENT_ACCOUNT)
           return
@@ -1337,6 +1368,7 @@ export const RequestPage = () => {
         // The request was already fulfilled (e.g. another tab completed it, or it executed and the
         // outcome delivery raced). It succeeded — show completion instead of attempting a failed
         // outcome and reporting an expected state as an error.
+        if (isStaleAction()) return
         hasCompletedRef.current = true
         showInteractionCompleteView()
       } else {
@@ -1353,6 +1385,7 @@ export const RequestPage = () => {
         } catch (failedOutcomeError) {
           console.error('Failed to send failed outcome:', failedOutcomeError)
         }
+        if (isStaleAction()) return
         if (delivery === 'other_account') {
           setView(View.DIFFERENT_ACCOUNT)
           return
@@ -1363,8 +1396,11 @@ export const RequestPage = () => {
         setView(View.WALLET_INTERACTION_ERROR)
       }
     } finally {
-      setIsLoading(false)
-      isSettlingRef.current = false
+      // The review on screen owns its loading and settle state; a stale action leaves both alone.
+      if (!isStaleAction()) {
+        setIsLoading(false)
+        isSettlingRef.current = false
+      }
     }
   }, [isUserUsingWeb2Wallet, nftTransferData, manaTransferData, requestId, identity, showInteractionCompleteView, restartReview])
 

@@ -1203,6 +1203,40 @@ describe('RequestPage', () => {
     })
   })
 
+  describe('when the account changes while Deny is still waiting for its outcome to be delivered', () => {
+    let deliverOutcome: () => void
+
+    beforeEach(() => {
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      // Recovery and Deny both see the reviewing account; the new account's own recovery is held so
+      // the state in between is observable.
+      mockGetAddresses.mockResolvedValueOnce([SIGNER]).mockResolvedValueOnce([SIGNER]).mockResolvedValue(['0xnewwallet'])
+      mockRecover
+        .mockResolvedValueOnce(recovered('personal_sign', ['hello', SIGNER]))
+        .mockImplementation(() => new Promise(() => undefined))
+      mockSendFailedOutcome.mockReset()
+      mockSendFailedOutcome.mockImplementationOnce(
+        () => new Promise<Record<string, never>>(resolve => (deliverOutcome = () => resolve({})))
+      )
+    })
+
+    it('should keep the new account on the loading view and never show the old denial', async () => {
+      const { rerender } = renderRequestPage()
+      await userEvent.click(await screen.findByTestId('unverified-deny'))
+      await waitFor(() => expect(mockSendFailedOutcome).toHaveBeenCalledTimes(1))
+
+      mockConnectionData = { ...mockConnectionData, account: '0xnewwallet' }
+      rerenderRequestPage(rerender)
+      expect(await screen.findByTestId('loading-request')).toBeInTheDocument()
+
+      deliverOutcome()
+
+      await waitFor(() => expect(mockRecover).toHaveBeenCalledTimes(2))
+      expect(screen.getByTestId('loading-request')).toBeInTheDocument()
+      expect(screen.queryByTestId('denied-wallet-interaction')).not.toBeInTheDocument()
+    })
+  })
+
   describe('when the wallet reports a different active account at approval time than the one that reviewed the request', () => {
     beforeEach(() => {
       mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
@@ -3230,6 +3264,66 @@ describe('RequestPage', () => {
     afterEach(() => {
       mockRecover.mockReset()
       mockSimulateTransaction.mockReset()
+    })
+
+    describe('and Deny is still waiting for its outcome to be delivered when the id changes', () => {
+      let deliverOutcome: () => void
+
+      beforeEach(() => {
+        mockRecover.mockResolvedValue(recovered('eth_sendTransaction', [{ to: CONTRACT, data: '0xabcd', value: '0x0' }]))
+        mockSendFailedOutcome.mockReset()
+        mockSendFailedOutcome
+          .mockImplementationOnce(() => new Promise<Record<string, never>>(resolve => (deliverOutcome = () => resolve({}))))
+          .mockResolvedValue({})
+      })
+
+      it('should leave the new review on screen and answerable, never showing the old denial', async () => {
+        renderMountedPage()
+        const view = await screen.findByTestId('wallet-interaction')
+        await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+        await userEvent.click(screen.getByTestId('wallet-interaction-deny'))
+        await waitFor(() => expect(mockSendFailedOutcome).toHaveBeenCalledTimes(1))
+        await userEvent.click(screen.getByTestId('go-to-other'))
+        const fresh = await screen.findByTestId('wallet-interaction')
+        await waitFor(() => expect(mockRecover.mock.calls.some(call => call[0] === otherRequestId)).toBe(true))
+
+        deliverOutcome()
+
+        await waitFor(() => expect(fresh).toHaveAttribute('data-sim', 'loading'))
+        expect(screen.queryByTestId('denied-wallet-interaction')).not.toBeInTheDocument()
+        await userEvent.click(screen.getByTestId('wallet-interaction-deny'))
+        await waitFor(() => expect(mockSendFailedOutcome).toHaveBeenCalledTimes(2))
+        expect(mockSendFailedOutcome.mock.calls[1][0]).toBe(otherRequestId)
+      })
+    })
+
+    describe('and Allow is still waiting for the wallet when the id changes', () => {
+      let settleRelay: () => void
+
+      beforeEach(() => {
+        mockRecover.mockResolvedValue(recovered('eth_sendTransaction', [{ to: CONTRACT, data: '0xabcd', value: '0x0' }]))
+        jest
+          .mocked(sendMetaTransaction)
+          .mockImplementationOnce(() => new Promise<string>(resolve => (settleRelay = () => resolve('0xrelayedhash'))))
+      })
+
+      it('should still deliver the executed outcome for the old request but never show its completion over the new review', async () => {
+        renderMountedPage()
+        const view = await screen.findByTestId('wallet-interaction')
+        await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+        await userEvent.click(screen.getByTestId('wallet-interaction-approve'))
+        await waitFor(() => expect(sendMetaTransaction).toHaveBeenCalledTimes(1))
+        await userEvent.click(screen.getByTestId('go-to-other'))
+        const fresh = await screen.findByTestId('wallet-interaction')
+        await waitFor(() => expect(mockRecover.mock.calls.some(call => call[0] === otherRequestId)).toBe(true))
+
+        settleRelay()
+
+        await waitFor(() => expect(mockSendSuccessfulOutcome).toHaveBeenCalledWith(REQUEST_ID, SIGNER, '0xrelayedhash'))
+        expect(screen.queryByTestId('wallet-interaction-complete')).not.toBeInTheDocument()
+        expect(fresh).toBeInTheDocument()
+        expect(fresh).toHaveAttribute('data-sim', 'loading')
+      })
     })
 
     describe('and the new request is recovered normally', () => {
