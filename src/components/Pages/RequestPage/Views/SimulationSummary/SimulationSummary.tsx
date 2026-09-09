@@ -5,6 +5,7 @@ import {
   ApprovalChange,
   AssetChange,
   SimulationResponseBody,
+  getKnownToken,
   hasNoVisibleEffects,
   isApprovalRevocation,
   isDangerousApproval,
@@ -111,7 +112,8 @@ const formatUsd = (dollarValue: string | null, signed = false): string | null =>
 // currency ("1000 MANA") can never read as an amount of it. ERC-1155 is not modelled: no Decentraland
 // contract is one, and the page refuses a preview that moves such an asset before this summary renders it.
 const assetTitle = (change: AssetChange, t: Translate, chainId: number | undefined): string => {
-  if (change.standard === 'erc721') {
+  // A change of unknown standard that carries a token id is a token, not an amount of something.
+  if (change.standard === 'erc721' || (change.standard === 'unknown' && change.tokenId)) {
     const name = formatUntrustedLabel(change.name || change.symbol)
     const tokenId = change.tokenId ? `#${change.tokenId}` : ''
     if (!name && !tokenId) {
@@ -200,6 +202,7 @@ const AssetRow = ({
   const outgoing = direction === 'send'
   const isVerified = (address: string | null) => !!address && verified.has(address.toLowerCase())
   const isCollection = (address: string | null) => !!address && collections.has(address.toLowerCase())
+  const knownToken = change.contractAddress && chainId !== undefined ? getKnownToken(change.contractAddress, chainId) : null
 
   let meta: React.ReactNode
   if (change.type === 'mint') {
@@ -231,17 +234,21 @@ const AssetRow = ({
         <ChangeAmount>
           <AddressLink address={change.contractAddress} chainId={chainId} label={title} verified={isVerified(change.contractAddress)} />
         </ChangeAmount>
-        {/* Three provenances: a registry contract carries the badge; a factory collection is Decentraland
+        {/* Four provenances: a registry contract carries the badge; a factory collection is Decentraland
             code with content anyone can create, so it is named as a collection, never vouched for by
-            name; anything else is unverified. The address is shown in the last two cases. */}
+            name; a stablecoin the marketplaces settle in is named from the known-token table, next to
+            whatever the token says about itself; anything else is unverified. The address is shown in
+            the last three cases. */}
         {change.standard !== 'native' && !isVerified(change.contractAddress) ? (
           <ChangeMeta title={change.contractAddress ?? undefined}>
-            {t(
-              isCollection(change.contractAddress)
-                ? 'request.transaction_dialog.community_collection'
-                : 'request.transaction_dialog.unverified_token',
-              { address: shortenAddress(change.contractAddress) || '—' }
-            )}
+            {isCollection(change.contractAddress)
+              ? t('request.transaction_dialog.community_collection', { address: shortenAddress(change.contractAddress) || '—' })
+              : knownToken
+                ? t('request.transaction_dialog.known_token', {
+                    name: knownToken.name,
+                    address: shortenAddress(change.contractAddress) || '—'
+                  })
+                : t('request.transaction_dialog.unverified_token', { address: shortenAddress(change.contractAddress) || '—' })}
           </ChangeMeta>
         ) : null}
         <ChangeMeta>{meta}</ChangeMeta>

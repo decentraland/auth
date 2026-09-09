@@ -34,6 +34,8 @@ type ContractResolution = { status: 'found'; contract: KnownContract } | { statu
 type DecodedCall = {
   functionName: string
   args: readonly unknown[]
+  /** The ABI names of the top-level inputs, aligned with `args`; absent when the call was not decoded from an ABI. */
+  argNames?: readonly string[]
   /** True for `executeMetaTransaction` and `Forwarder.forwardCall`, the only payable entry points. */
   payable: boolean
   /**
@@ -59,6 +61,27 @@ const NON_CALLING_FUNCTIONS: ReadonlySet<string> = new Set([
   'increaseAllowance',
   'decreaseAllowance'
 ])
+
+// Address arguments, by function, that the contract records but never calls, verified in the contract
+// sources and pinned by registryCompatibility.spec.ts against the installed ABIs: Rentals sets `_operator`
+// (and an offer's `operator`) as the update operator through the LAND contract, compares a listing's
+// `target` with the tenant and stores the operators of `setUpdateOperator` and `setManyLandUpdateOperator`;
+// CollectionManager stores the collection's `_creator` and its items' `beneficiary`; CollectionStore mints
+// to `beneficiaries` with `_mint`, which runs no receiver hook. A contract wallet in any of these runs no
+// code inside the transaction, so it does not make the preview unreliable.
+//
+// Deliberately not here: a trade's or listing's `signer` (both the off-chain marketplace and Rentals accept
+// EIP-1271 contract signatures, so a contract signer is called to validate), a trade's `beneficiary` (an
+// ERC721 asset reaches it through `safeTransferFrom`, which calls a contract recipient) and the name
+// registrar's `_beneficiary`, whose mint path has not been read.
+const NON_CALLED_ARGUMENTS: Readonly<Record<string, ReadonlySet<string>>> = {
+  acceptListing: new Set(['_operator', 'target']),
+  acceptOffer: new Set(['operator']),
+  setUpdateOperator: new Set(['_operators']),
+  setManyLandUpdateOperator: new Set(['_operators']),
+  createCollection: new Set(['_creator', 'beneficiary']),
+  buy: new Set(['beneficiaries'])
+}
 
 // The registry functions that execute calldata they are given rather than an action of their own: the
 // payable entry points (`executeMetaTransaction` on every meta-transaction contract, `Forwarder.forwardCall`)
@@ -179,6 +202,14 @@ function getKnownDecentralandContract(address: string, chainId: number): KnownCo
 // Decentraland's when a call hands them to a Decentraland contract and they wear the verified badge, but no
 // call is ever decoded against them, since no ABI ships with them, so a transaction sent to one of them stays
 // an unknown transaction rather than becoming a Decentraland call whose calldata cannot be read.
+//
+// This table is a trust anchor and must not grow casually: a row here is also the "✓ Decentraland" badge in
+// the summary and the "routine spender" of an approval, so a wrong row would not only mislabel a contract but
+// suppress the high-risk acknowledgment for approvals to it. Source of every row: the `LANDProxy` and
+// `EstateProxy` entries of decentraland/contracts `addresses.json` (mainnet, sepolia), each read back on chain
+// before listing (symbol LAND / name "Decentraland LAND"; symbol EST / name "Estate", "Estate Impl" on
+// Sepolia). Neither registry exists on Polygon or Amoy: LAND is an Ethereum asset, `addresses.json` lists only
+// MANA there, and the mainnet address has no code on Polygon, so the Polygon marketplaces cannot name them.
 const RECOGNITION_ONLY_CONTRACTS: ReadonlyArray<{ chainId: number; address: string; name: string }> = [
   { chainId: ChainId.ETHEREUM_MAINNET, name: 'LANDRegistry', address: '0xf87e31492faf9a91b02ee0deaad50d51d56d5d4d' },
   { chainId: ChainId.ETHEREUM_MAINNET, name: 'EstateRegistry', address: '0x959e104e1a4db6317fa58f8295f586e1a978c297' },
@@ -275,7 +306,13 @@ function decodeKnownContractCall(contract: KnownContract, data: string): Decoded
       return null
     }
     const payable = item.stateMutability === 'payable'
-    return { functionName: item.name, args: args ?? [], payable, forwardsCall: payable || FORWARDING_FUNCTIONS.has(item.name) }
+    return {
+      functionName: item.name,
+      args: args ?? [],
+      argNames: item.inputs.map(input => input.name ?? ''),
+      payable,
+      forwardsCall: payable || FORWARDING_FUNCTIONS.has(item.name)
+    }
   } catch {
     return null
   }
@@ -304,13 +341,15 @@ function isExternalCallLike(value: Record<string, unknown>): value is Record<str
 /** What a call reaches: every address in its arguments, and whether any nested payload could not be read. */
 type CallAddresses = { addresses: Set<string>; opaque: boolean }
 
-function collectInto(value: unknown, chainId: number, depth: number, result: CallAddresses): void {
+const NO_SKIPPED_ARGUMENTS: ReadonlySet<string> = new Set()
+
+function collectInto(value: unknown, chainId: number, depth: number, result: CallAddresses, skipped: ReadonlySet<string>): void {
   if (typeof value === 'string') {
     if (ADDRESS_REGEX.test(value)) result.addresses.add(value.toLowerCase())
     return
   }
   if (Array.isArray(value)) {
-    value.forEach(item => collectInto(item, chainId, depth, result))
+    value.forEach(item => collectInto(item, chainId, depth, result, skipped))
     return
   }
   if (!isRecord(value)) return
@@ -324,34 +363,50 @@ function collectInto(value: unknown, chainId: number, depth: number, result: Cal
       target && depth < MAX_NESTED_CALL_DEPTH ? decodeKnownContractCall(target, `${value.selector}${value.data.slice(2)}`) : null
     if (!nested || nested.forwardsCall) {
       result.opaque = true
-    } else if (!NON_CALLING_FUNCTIONS.has(nested.functionName)) {
-      collectInto(nested.args, chainId, depth + 1, result)
+    } else {
+      collectCallArguments(nested, chainId, depth + 1, result)
     }
     return
   }
-  Object.values(value).forEach(item => collectInto(item, chainId, depth, result))
+  // Struct components come keyed by their ABI names; the ones this function only records are not reached.
+  Object.entries(value).forEach(([key, item]) => {
+    if (!skipped.has(key)) collectInto(item, chainId, depth, result, skipped)
+  })
+}
+
+/** Walks the arguments of one decoded call, leaving out what its function never calls (see NON_CALLING_FUNCTIONS, NON_CALLED_ARGUMENTS). */
+function collectCallArguments(call: DecodedCall, chainId: number, depth: number, result: CallAddresses): void {
+  if (NON_CALLING_FUNCTIONS.has(call.functionName)) return
+  const skipped = NON_CALLED_ARGUMENTS[call.functionName] ?? NO_SKIPPED_ARGUMENTS
+  call.args.forEach((arg, index) => {
+    const name = call.argNames?.[index]
+    if (name && skipped.has(name)) return
+    collectInto(arg, chainId, depth, result, skipped)
+  })
 }
 
 /**
  * Every address a decoded Decentraland call reaches, lowercased: the addresses in its arguments, walking
  * arrays and structs, and following a nested call (an `externalCall` struct) into the call it carries when
  * its target is a Decentraland contract on `chainId` and the payload decodes against that contract's ABI.
- * A function that never calls its address arguments (see NON_CALLING_FUNCTIONS) reaches nothing, at the top
- * level and nested alike. `opaque` is true when a nested payload could not be read: it may name addresses
- * this walk cannot see, so the caller must not vouch for what the call reaches. Only calldata declared as a
- * nested call is followed: a plain `bytes` argument (a safe transfer's `data`, a factory's `createCollection`
- * initializer, a trade's `extra`) is not a call this page is asked to review, see FORWARDING_FUNCTIONS for
- * the ones that are refused outright.
+ * A function that never calls its address arguments (see NON_CALLING_FUNCTIONS) reaches nothing, and an
+ * argument a function only records (see NON_CALLED_ARGUMENTS) is left out, at the top level and nested
+ * alike. `opaque` is true when a nested payload could not be read: it may name addresses this walk cannot
+ * see, so the caller must not vouch for what the call reaches. Only calldata declared as a nested call is
+ * followed: a plain `bytes` argument (a safe transfer's `data`, a factory's `createCollection` initializer,
+ * a trade's `extra`) is not a call this page is asked to review, see FORWARDING_FUNCTIONS for the ones that
+ * are refused outright.
  */
 function collectCallAddresses(call: DecodedCall, chainId: number): CallAddresses {
   const result: CallAddresses = { addresses: new Set<string>(), opaque: false }
-  if (!NON_CALLING_FUNCTIONS.has(call.functionName)) {
-    collectInto(call.args, chainId, 0, result)
-  }
+  collectCallArguments(call, chainId, 0, result)
   return result
 }
 
 export {
+  FORWARDING_FUNCTIONS,
+  NON_CALLED_ARGUMENTS,
+  NON_CALLING_FUNCTIONS,
   collectCallAddresses,
   decodeKnownContractCall,
   getCollectionContract,

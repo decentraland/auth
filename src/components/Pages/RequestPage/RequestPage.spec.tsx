@@ -2103,6 +2103,21 @@ describe('RequestPage', () => {
       })
     })
 
+    describe('and that address is a stablecoin the marketplaces settle in, such as USDT on Polygon', () => {
+      beforeEach(async () => {
+        mockGetCounterpartyAddresses.mockReturnValue({ addresses: ['0xc2132d05d31c914a87c6611c10748aeb04b58e8f'], opaque: false })
+        renderRequestPage()
+        view = await findVerifiedView()
+      })
+
+      it('should keep the review without asking the network, and neither badge nor label it as Decentraland', () => {
+        expect(mockIsAddressWithoutCode).not.toHaveBeenCalled()
+        expect(mockSendFailedOutcome).not.toHaveBeenCalled()
+        expect(view).toHaveAttribute('data-verified', '[]')
+        expect(JSON.parse(view.getAttribute('data-collections') ?? '[]')).not.toContain('0xc2132d05d31c914a87c6611c10748aeb04b58e8f')
+      })
+    })
+
     describe('and that address is a Decentraland registry the SDK does not carry, such as LAND', () => {
       beforeEach(async () => {
         mockIsRecognizedDecentralandContract.mockImplementation((address: string) => address === '0xnft')
@@ -2249,14 +2264,18 @@ describe('RequestPage', () => {
       })
     })
 
-    describe('and the simulation server answers a 400 without saying why, as an older server does', () => {
+    describe('and the simulation server answers a 400 without saying why, as a server from before the codes does', () => {
       beforeEach(() => {
         mockSimulateTransaction.mockRejectedValueOnce(new SimulationUnavailableError('status 400', 400))
         renderRequestPage()
       })
 
-      it('should refuse the transaction, since only the provider being at fault degrades', async () => {
-        expect(await screen.findByTestId('signing-error')).toHaveAttribute('data-kind', 'malformed_transaction')
+      it('should keep the transaction reviewable with the preview unavailable, so a client deployed first never refuses on a provider-side 400', async () => {
+        await waitFor(() => {
+          expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-sim', 'unavailable')
+          expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-requires-acknowledgment', 'true')
+        })
+        expect(mockSendFailedOutcome).not.toHaveBeenCalled()
       })
     })
 
@@ -3165,6 +3184,20 @@ describe('RequestPage', () => {
         const view = await screen.findByTestId('signature-request')
         await waitFor(() => expect(view).toHaveAttribute('data-sim', 'unavailable'))
         expect(view).toHaveAttribute('data-requires-acknowledgment', 'true')
+      })
+    })
+
+    describe('and the simulation provider refused the call upstream', () => {
+      beforeEach(() => {
+        mockSimulateTransaction.mockRejectedValue(new SimulationUnavailableError('status 400', 400, 'upstream_rejected'))
+      })
+
+      it('should keep the signature review with its effects unverified rather than refuse the request', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('signature-request')
+        await waitFor(() => expect(view).toHaveAttribute('data-sim', 'unavailable'))
+        expect(view).toHaveAttribute('data-requires-acknowledgment', 'true')
+        expect(mockSendFailedOutcome).not.toHaveBeenCalled()
       })
     })
 

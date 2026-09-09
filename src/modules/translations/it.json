@@ -111,6 +111,7 @@
       "fee_estimate": "Commissione stimata: {cost} {symbol}",
       "nft_label": "NFT",
       "community_collection": "Collezione della community · {address}",
+      "known_token": "Token noto: {name} · {address}",
       "unverified_token": "Token non verificato · {address}"
     },
     "signature": {

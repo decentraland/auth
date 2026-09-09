@@ -18,6 +18,7 @@ export type {
   ResolveContractDependencies
 } from './decentralandContracts'
 export * from './errors'
+export * from './knownTokens'
 export * from './hex'
 export * from './httpClient'
 export * from './metaTransactionSimulation'

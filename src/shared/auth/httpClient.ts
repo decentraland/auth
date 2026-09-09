@@ -3,6 +3,7 @@ import signedFetch from 'decentraland-crypto-fetch'
 import { RequestInteractionType, TrackingEvents } from '../../modules/analytics/types'
 import { config } from '../../modules/config'
 import { isErrorWithMessage } from '../errors'
+import { readTextWithCap } from '../http'
 import { trackEvent } from '../utils/analytics'
 import { handleError } from '../utils/errorHandler'
 import {
@@ -216,9 +217,12 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
    * SimulationUnavailableError, which the UI renders as "details unavailable" rather than
    * blocking the approval. Deliberately not routed through handleError/Sentry.
    */
+  // A rejection body is a short object; anything larger than this is not one and is not read further.
+  const MAX_REJECTION_BODY_BYTES = 4 * 1024
+
   const readRejectionCode = async (response: Response): Promise<SimulationRejectionCode | undefined> => {
     try {
-      const body: unknown = await response.json()
+      const body: unknown = JSON.parse(await readTextWithCap(response, MAX_REJECTION_BODY_BYTES))
       const code = typeof body === 'object' && body !== null ? (body as { code?: unknown }).code : undefined
       return code === 'invalid_request' || code === 'upstream_rejected' ? code : undefined
     } catch {

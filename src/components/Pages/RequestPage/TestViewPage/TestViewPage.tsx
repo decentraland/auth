@@ -36,6 +36,7 @@ import {
   personalSignText,
   simulationNoChanges,
   simulationReverted,
+  simulationStablecoinTrade,
   simulationSuccess,
   unknownMetaTxRaw
 } from './__data__'
@@ -99,7 +100,9 @@ export const TestViewPage = () => {
         element: (
           <SigningError
             kind="unsupported_contract"
-            error={`The "eth_sendTransaction" request reaches beyond Decentraland's contracts: the call reaches a contract that is not Decentraland's: 0x76be3b62873462d2142405439777e971754e8e77`}
+            error={
+              'The "eth_sendTransaction" request reaches beyond Decentraland\'s contracts: the call reaches a contract that is not Decentraland\'s: 0x76be3b62873462d2142405439777e971754e8e77'
+            }
           />
         )
       },
@@ -160,6 +163,24 @@ export const TestViewPage = () => {
             userAddress={USER_ADDRESS}
             chainId={137}
             isCounterpartyCheckPending
+            gas={{ covered: true }}
+            onDeny={noop}
+            onApprove={noop}
+          />
+        )
+      },
+      walletInteractionStablecoinTrade: {
+        label: 'Wallet Interaction (trade paying USDT for a wearable)',
+        element: (
+          <WalletInteraction
+            requestId={DEFAULT_REQUEST_ID}
+            functionName="accept"
+            contractName="Decentraland Marketplace"
+            simulation={{ status: 'ready', result: simulationStablecoinTrade }}
+            userAddress={USER_ADDRESS}
+            verifiedContracts={[MARKETPLACE_ADDRESS]}
+            collectionContracts={[COLLECTION_ADDRESS]}
+            chainId={137}
             gas={{ covered: true }}
             onDeny={noop}
             onApprove={noop}

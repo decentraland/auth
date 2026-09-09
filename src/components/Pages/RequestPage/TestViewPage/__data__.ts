@@ -384,6 +384,47 @@ const personalSignHex = `0x${Array.from(new TextEncoder().encode(personalSignTex
   .join('')}`
 const personalSignDigestHex = `0x${'9f'.repeat(32)}`
 
+// A trade on the off-chain marketplace paying 10 USDT (Polygon) for a wearable: the stablecoin is named from
+// the known-token table, the wearable from its collection.
+const simulationStablecoinTrade: SimulationResponseBody = {
+  status: 'success',
+  assetChanges: [
+    {
+      type: 'transfer',
+      standard: 'erc20',
+      from: USER_ADDRESS,
+      to: '0x9d2e7d8b9e4a0f1c3b5a6d7e8f9a0b1c2d3e4f5a',
+      amount: '10',
+      rawAmount: '10000000',
+      tokenId: null,
+      contractAddress: '0xc2132d05d31c914a87c6611c10748aeb04b58e8f',
+      symbol: 'USDT0',
+      name: 'USDT0',
+      decimals: 6,
+      logoUrl: null,
+      dollarValue: '10.00'
+    },
+    {
+      type: 'transfer',
+      standard: 'erc721',
+      from: '0x9d2e7d8b9e4a0f1c3b5a6d7e8f9a0b1c2d3e4f5a',
+      to: USER_ADDRESS,
+      amount: null,
+      rawAmount: null,
+      tokenId: '412',
+      contractAddress: COLLECTION_ADDRESS,
+      symbol: null,
+      name: 'Rare Helmet',
+      decimals: null,
+      logoUrl: null,
+      dollarValue: null
+    }
+  ],
+  approvalChanges: [],
+  balanceChanges: [],
+  events: []
+}
+
 export {
   COLLECTION_ADDRESS,
   avatar,
@@ -398,6 +439,7 @@ export {
   personalSignText,
   simulationNoChanges,
   simulationReverted,
+  simulationStablecoinTrade,
   simulationSuccess,
   unknownMetaTxRaw,
   USER_ADDRESS

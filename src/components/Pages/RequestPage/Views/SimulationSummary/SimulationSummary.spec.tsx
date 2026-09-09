@@ -87,6 +87,63 @@ describe('when rendering the SimulationSummary', () => {
       })
     })
 
+    describe('and the token is a stablecoin the marketplaces settle in', () => {
+      beforeEach(() => {
+        cleanup()
+        const [change] = (simulation as { result: SimulationResponseBody }).result.assetChanges
+        simulation = {
+          status: 'ready',
+          result: emptyResult({
+            assetChanges: [{ ...change, contractAddress: '0xc2132d05d31c914a87c6611c10748aeb04b58e8f', symbol: 'USDT0', name: 'USDT0' }]
+          })
+        }
+        render(<SimulationSummary simulation={simulation} userAddress={USER} chainId={137} verifiedContracts={[]} />)
+      })
+
+      it('should name it from the known-token table with its address, next to what the token calls itself', () => {
+        expect(screen.getByText('request.transaction_dialog.known_token Tether USD 0xc213…8e8f')).toBeInTheDocument()
+        expect(screen.queryByText(/unverified_token/)).not.toBeInTheDocument()
+      })
+
+      it('should not show the verified badge, since it is not a Decentraland contract', () => {
+        expect(screen.queryByLabelText('request.transaction_dialog.verified_contract')).not.toBeInTheDocument()
+      })
+    })
+
+    describe('and the token is a stablecoin address from another chain', () => {
+      beforeEach(() => {
+        cleanup()
+        const [change] = (simulation as { result: SimulationResponseBody }).result.assetChanges
+        simulation = {
+          status: 'ready',
+          result: emptyResult({ assetChanges: [{ ...change, contractAddress: '0xc2132d05d31c914a87c6611c10748aeb04b58e8f' }] })
+        }
+        render(<SimulationSummary simulation={simulation} userAddress={USER} chainId={1} verifiedContracts={[]} />)
+      })
+
+      it('should call it unverified, since the same address is another contract there', () => {
+        expect(screen.getByText('request.transaction_dialog.unverified_token 0xc213…8e8f')).toBeInTheDocument()
+      })
+    })
+
+    describe('and a change of unknown standard carries a token id', () => {
+      beforeEach(() => {
+        cleanup()
+        const [change] = (simulation as { result: SimulationResponseBody }).result.assetChanges
+        simulation = {
+          status: 'ready',
+          result: emptyResult({
+            assetChanges: [{ ...change, standard: 'unknown', tokenId: '9', amount: '1', symbol: 'MYSTERY', name: 'Mystery' }]
+          })
+        }
+        render(<SimulationSummary simulation={simulation} userAddress={USER} chainId={137} verifiedContracts={[]} />)
+      })
+
+      it('should render it as a token with its id, never as an amount', () => {
+        expect(screen.getByText('request.transaction_dialog.nft_label #9 · Mystery')).toBeInTheDocument()
+      })
+    })
+
     it('should display the claimed symbol with hidden characters exposed', () => {
       expect(screen.getByRole('link', { name: displayed })).toHaveAttribute(
         'href',

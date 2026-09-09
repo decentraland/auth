@@ -111,6 +111,7 @@
       "fee_estimate": "预估费用：{cost} {symbol}",
       "nft_label": "NFT",
       "community_collection": "社区系列 · {address}",
+      "known_token": "已知代币：{name} · {address}",
       "unverified_token": "未经验证的代币 · {address}"
     },
     "signature": {

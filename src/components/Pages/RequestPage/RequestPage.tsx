@@ -35,6 +35,7 @@ import {
   buildMetaTransactionSimulationPayload,
   createAuthServerHttpClient,
   getKnownDecentralandContract,
+  getKnownToken,
   hasNoVisibleEffects,
   isDangerousApproval,
   isRecognizedDecentralandContract,
@@ -711,11 +712,14 @@ export const RequestPage = () => {
         // Best-effort simulation of a Decentraland contract call. Fires without blocking the view
         // render and never throws to the caller — failures surface as "details unavailable".
         //
-        // When the server refuses the request itself (a 400 it accounts for as `invalid_request`, or one
-        // it does not account for at all), both transaction and signature requests are refused: treating
-        // invalid calldata as an outage would let the requester pick the RPC method that degrades. A 400
-        // the server attributes to the simulation provider (`upstream_rejected`) is the provider's
-        // problem, not the request's, and degrades like an outage (5xx, timeouts) to the acknowledgment.
+        // A 400 the server accounts for as `invalid_request` refuses the request: treating invalid calldata
+        // as an outage would let the requester pick the RPC method that degrades. One it attributes to the
+        // simulation provider (`upstream_rejected`) is the provider's problem, not the request's, and
+        // degrades like an outage (5xx, timeouts) to the acknowledgment. A 400 with no account (a server
+        // from before the codes) degrades a transaction, so a client deployed ahead of the server never
+        // refuses a legitimate transaction for a provider-side 400, and refuses a signature, which leaves
+        // Auth as a bearer authorization and was refused on any 400 before. Tighten the transaction rule to
+        // the explicit code once the server is everywhere.
         const fetchSimulation = async (body: SimulationRequestBody, call: DecodedCall) => {
           try {
             // The server reports every approval it logged; which of them are grants is decided here, where
@@ -742,8 +746,12 @@ export const RequestPage = () => {
             return result
           } catch (e) {
             if (isStale()) return
-            if (e instanceof SimulationUnavailableError && e.status === 400 && e.code !== 'upstream_rejected') {
-              const isTransaction = request.method === 'eth_sendTransaction'
+            const isTransaction = request.method === 'eth_sendTransaction'
+            const isRefusedByServer =
+              e instanceof SimulationUnavailableError &&
+              e.status === 400 &&
+              (isTransaction ? e.code === 'invalid_request' : e.code !== 'upstream_rejected')
+            if (isRefusedByServer) {
               await refuseRequest(
                 isTransaction
                   ? new MalformedTransactionRequestError(request.method, 'the transaction call cannot be previewed')
@@ -760,8 +768,9 @@ export const RequestPage = () => {
         // The page previews Decentraland's contracts and nothing else. Every address the call reaches (see
         // getCounterpartyAddresses: the ones its function actually calls, a safe transfer's recipient, the
         // registry of an order or a trade, a nested call) must be a Decentraland contract on the execution
-        // chain (the registry, the LAND and Estate registries, a factory-deployed collection) or a plain
-        // account without code, and nothing the call carries may have gone unread; anything else is code
+        // chain (the registry, the LAND and Estate registries, a factory-deployed collection), one of the
+        // stablecoins the marketplaces settle in (see getKnownToken) or a plain account without code, and
+        // nothing the call carries may have gone unread; anything else is code
         // the requester chose, running inside the transaction, which a simulation cannot be relied on to
         // show, and the request is refused (the marketplaces accept any ERC-721 in an order or a trade;
         // Auth does not). Cheapest answer first: the registry costs nothing, one code read settles a plain
@@ -772,7 +781,8 @@ export const RequestPage = () => {
         // simulation on every previewed review, the branded ones included, so the outcome never depends on
         // the view; Allow stays blocked until it has settled. Resolves to whether the review goes on. On the
         // way it records which of the contracts involved are factory collections, the called one included
-        // (it is one when the registry does not list it), for the summary to label.
+        // (it is one when the registry does not list it), for the summary to label. False means "do not go
+        // on", whether the request was refused or the review went stale meanwhile; every caller stops on it.
         const verifyCounterparties = async (call: DecodedCall, chainId: number, contractAddress: string): Promise<boolean> => {
           const refuse = async (reason: string) => {
             if (!isStale()) await refuseRequest(new UnsupportedContractError(request.method, reason), 'unsupported_contract')
@@ -790,7 +800,7 @@ export const RequestPage = () => {
             const collectionsLiveHere = chainId === Number(getMetaTransactionChainId())
             const isRecognizedOrPlain = async (address: string): Promise<boolean> => {
               try {
-                if (isRecognizedDecentralandContract(address, chainId)) return true
+                if (isRecognizedDecentralandContract(address, chainId) || getKnownToken(address, chainId)) return true
                 if (await isAddressWithoutCode(address, chainId)) return true
                 if (!collectionsLiveHere || !(await isDecentralandCollection(address))) return false
                 collections.add(address.toLowerCase())
@@ -848,7 +858,9 @@ export const RequestPage = () => {
 
           if (transaction.branded === 'tip') {
             // The same rule as the generic review, so a transfer's outcome cannot depend on which view shows it.
-            if (!(await verifyCounterparties(transaction.call, transaction.chainId, transaction.contract.address))) return
+            // `to` is what is sent and what the collections set is keyed on (a collection's registry entry
+            // is the template's, cloned at the requested address).
+            if (!(await verifyCounterparties(transaction.call, transaction.chainId, transaction.to))) return
             if (isStale()) return
             try {
               const manaData = decodeManaTransferData(transaction.call)
@@ -887,7 +899,7 @@ export const RequestPage = () => {
           }
           // The counterparty check and the simulation are independent, so they run side by side; the views
           // keep Allow blocked until both have settled.
-          const verificationPromise = verifyCounterparties(transaction.call, transaction.chainId, transaction.contract.address)
+          const verificationPromise = verifyCounterparties(transaction.call, transaction.chainId, transaction.to)
           const simulationPromise = fetchSimulation(buildSendTransactionSimulationPayload(transaction, signerAddress), transaction.call)
 
           if (transaction.branded !== 'gift_candidate') return

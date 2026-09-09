@@ -281,7 +281,13 @@ describe('when decoding a call against a known contract', () => {
     })
 
     it('should return the function name, its arguments and that it neither is payable nor forwards a call', () => {
-      expect(decoded).toEqual({ functionName: 'transfer', args: [getAddress(RECIPIENT), 1000n], payable: false, forwardsCall: false })
+      expect(decoded).toEqual({
+        functionName: 'transfer',
+        args: [getAddress(RECIPIENT), 1000n],
+        argNames: ['recipient', 'amount'],
+        payable: false,
+        forwardsCall: false
+      })
     })
   })
 
@@ -395,6 +401,7 @@ describe('when decoding a call against a known contract', () => {
       expect(decoded).toEqual({
         functionName: 'safeTransferFrom',
         args: [getAddress(USER), getAddress(RECIPIENT), 7n],
+        argNames: ['from', 'to', 'tokenId'],
         payable: false,
         forwardsCall: false
       })
@@ -411,6 +418,7 @@ describe('when decoding a call against a known contract', () => {
       expect(decoded).toEqual({
         functionName: 'safeTransferFrom',
         args: [getAddress(USER), getAddress(RECIPIENT), 7n, '0x1234'],
+        argNames: ['from', 'to', 'tokenId', '_data'],
         payable: false,
         forwardsCall: false
       })
@@ -540,6 +548,86 @@ describe('when collecting the addresses a call reaches', () => {
 
     it('should reach nothing, so a contract wallet as recipient, spender or operator changes nothing', () => {
       expect(result).toEqual({ addresses: new Set(), opaque: false })
+    })
+  })
+
+  describe('and the call is a rental listing whose operator and target are only recorded', () => {
+    const LAND = '0xf87e31492faf9a91b02ee0deaad50d51d56d5d4d'
+    const OPERATOR_WALLET = '0x5555555555555555555555555555555555555555'
+    const SIGNER_WALLET = '0x6666666666666666666666666666666666666666'
+
+    beforeEach(() => {
+      result = collectCallAddresses(
+        {
+          functionName: 'acceptListing',
+          argNames: ['_listing', '_operator', '_index', '_rentalDays', '_fingerprint'],
+          args: [
+            { signer: SIGNER_WALLET, contractAddress: LAND, tokenId: 1n, target: OTHER, signature: '0x' },
+            OPERATOR_WALLET,
+            0n,
+            1n,
+            `0x${'00'.repeat(32)}`
+          ],
+          payable: false,
+          forwardsCall: false
+        },
+        1
+      )
+    })
+
+    it('should reach the registry and the signer, who is called to validate a contract signature, but not the operator or the target', () => {
+      expect(result).toEqual({ addresses: new Set([LAND, SIGNER_WALLET]), opaque: false })
+    })
+  })
+
+  describe('and the call creates a collection whose creator and item beneficiaries are only recorded', () => {
+    const CREATOR_WALLET = '0x5555555555555555555555555555555555555555'
+    const ROYALTIES_WALLET = '0x6666666666666666666666666666666666666666'
+    const FORWARDER = '0x7777777777777777777777777777777777777777'
+
+    beforeEach(() => {
+      result = collectCallAddresses(
+        {
+          functionName: 'createCollection',
+          argNames: ['_forwarder', '_factory', '_salt', '_name', '_symbol', '_baseURI', '_creator', '_items'],
+          args: [
+            FORWARDER,
+            OTHER,
+            `0x${'00'.repeat(32)}`,
+            'Name',
+            'SYM',
+            'https://x',
+            CREATOR_WALLET,
+            [{ rarity: 'common', price: 1n, beneficiary: ROYALTIES_WALLET, metadata: '' }]
+          ],
+          payable: false,
+          forwardsCall: false
+        },
+        POLYGON
+      )
+    })
+
+    it('should reach the forwarder and the factory it calls but neither the creator nor the beneficiaries', () => {
+      expect(result).toEqual({ addresses: new Set([FORWARDER, OTHER]), opaque: false })
+    })
+  })
+
+  describe('and a recorded-only name appears in a function that does call it', () => {
+    beforeEach(() => {
+      result = collectCallAddresses(
+        {
+          functionName: 'accept',
+          args: [[{ signer: OTHER, sent: [{ contractAddress: UNKNOWN_NFT, beneficiary: USER }] }]],
+          payable: false,
+          forwardsCall: false
+        },
+        POLYGON
+      )
+    })
+
+    it('should still reach it, since the exemption is per function', () => {
+      expect(result.addresses.has(OTHER)).toBe(true)
+      expect(result.addresses.has(USER)).toBe(true)
     })
   })
 
