@@ -94,6 +94,15 @@ export const TestViewPage = () => {
       outdatedClientError: { label: 'OutdatedClientError', element: <OutdatedClientError explorerText="Explorer" /> },
       recoverError: { label: 'RecoverError', element: <RecoverError onTryAgain={() => alert('try again')} /> },
       signingError: { label: 'SigningError', element: <SigningError error="Test error" /> },
+      signingErrorUnsupportedContract: {
+        label: 'SigningError (call reaches a contract Decentraland does not own, e.g. an ERC-1155 in a trade)',
+        element: (
+          <SigningError
+            kind="unsupported_contract"
+            error={`The "eth_sendTransaction" request reaches beyond Decentraland's contracts: the call reaches a contract that is not Decentraland's: 0x76be3b62873462d2142405439777e971754e8e77`}
+          />
+        )
+      },
       timeoutError: { label: 'TimeoutError', element: <TimeoutError requestId={DEFAULT_REQUEST_ID} /> },
       walletInteractionComplete: { label: 'WalletInteractionComplete', element: <WalletInteractionComplete /> },
       walletNftInteraction: {
@@ -138,6 +147,23 @@ export const TestViewPage = () => {
           <PreviewSurface>
             <SimulationSummary simulation={{ status: 'ready', result: simulationNoChanges }} userAddress={USER_ADDRESS} chainId={137} />
           </PreviewSurface>
+        )
+      },
+      walletInteractionChecking: {
+        label: 'Wallet Interaction (Decentraland contract, preview and counterparty check still running)',
+        element: (
+          <WalletInteraction
+            requestId={DEFAULT_REQUEST_ID}
+            functionName="accept"
+            contractName="Decentraland Marketplace"
+            simulation={{ status: 'loading' }}
+            userAddress={USER_ADDRESS}
+            chainId={137}
+            isCounterpartyCheckPending
+            gas={{ covered: true }}
+            onDeny={noop}
+            onApprove={noop}
+          />
         )
       },
       walletInteractionSimulation: {
