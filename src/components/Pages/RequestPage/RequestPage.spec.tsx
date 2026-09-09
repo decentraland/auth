@@ -18,6 +18,7 @@ import {
   MalformedTransactionRequestError,
   RecoverResponse,
   RequestFulfilledError,
+  ReviewedSignerMismatchError,
   SimulationResponseBody,
   SimulationUnavailableError,
   UnsupportedMethodError
@@ -94,6 +95,9 @@ jest.mock('../../../shared/auth', () => {
 })
 
 // --- Classification ---
+const mockGetConnectedProvider = jest.fn()
+const mockIsAddressWithoutCode = jest.fn()
+const mockGetCallbackRecipient = jest.fn()
 const mockClassifyRequest = jest.fn()
 jest.mock('./classifyRequest', () => ({
   ...jest.requireActual('./classifyRequest'),
@@ -275,23 +279,30 @@ jest.mock('./utils', () => ({
   decodeNftTransferData: jest.fn().mockReturnValue(null),
   fetchNftMetadata: jest.fn(),
   fetchPlaceByCreatorAddress: jest.fn(),
-  getConnectedProvider: jest.fn().mockResolvedValue({ isConnectedProvider: true }),
+  getConnectedProvider: (...args: any[]) => mockGetConnectedProvider(...args),
   getExplorerDeeplink: jest.fn().mockReturnValue('decentraland://open'),
   getSigninDeeplink: jest.fn().mockReturnValue('decentraland://open?signin=anIdentityId'),
   getMetaTransactionChainId: jest.fn().mockReturnValue(137),
   getNetworkProvider: jest.fn().mockResolvedValue({ isNetworkProvider: true }),
-  isAddressWithoutCode: jest.fn(),
+  isAddressWithoutCode: (...args: any[]) => mockIsAddressWithoutCode(...args),
+  getCallbackRecipient: (...args: any[]) => mockGetCallbackRecipient(...args),
   isDecentralandCollection: jest.fn().mockResolvedValue(false),
   isExactNftTransferSimulation: (...args: any[]) => mockIsExactNftTransferSimulation(...args),
   buildSendTransactionSimulationPayload: (...args: any[]) => mockBuildSendTransactionSimulationPayload(...args)
 }))
 
 // Mock decentraland-transactions
-jest.mock('decentraland-transactions', () => ({
-  ContractName: { ERC721CollectionV2: 'ERC721CollectionV2', ERC20: 'ERC20', MANAToken: 'MANAToken' },
-  getContract: jest.fn().mockReturnValue({ abi: [] }),
-  sendMetaTransaction: jest.fn()
-}))
+jest.mock('decentraland-transactions', () => {
+  // The error classes stay real: the signer-bound provider extends MetaTransactionError so the SDK rethrows it as is.
+  const { ErrorCode, MetaTransactionError } = jest.requireActual('decentraland-transactions')
+  return {
+    ErrorCode,
+    MetaTransactionError,
+    ContractName: { ERC721CollectionV2: 'ERC721CollectionV2', ERC20: 'ERC20', MANAToken: 'MANAToken' },
+    getContract: jest.fn().mockReturnValue({ abi: [] }),
+    sendMetaTransaction: jest.fn()
+  }
+})
 
 // Mock decentraland-ui2
 jest.mock('decentraland-ui2', () => ({
@@ -465,6 +476,9 @@ describe('RequestPage', () => {
     mockGetKnownDecentralandContract.mockReturnValue(null)
     mockIsChainMismatchRejection.mockReturnValue(false)
     mockIsUserRejectedTransaction.mockReturnValue(false)
+    mockGetConnectedProvider.mockResolvedValue({ isConnectedProvider: true })
+    mockIsAddressWithoutCode.mockResolvedValue(true)
+    mockGetCallbackRecipient.mockReturnValue(null)
     mockIsExactNftTransferSimulation.mockReturnValue(true)
     mockGetBalance.mockResolvedValue(BigInt(1))
     mockGetChainId.mockResolvedValue(1)
@@ -1913,7 +1927,7 @@ describe('RequestPage', () => {
       await userEvent.click(screen.getByTestId('wallet-interaction-approve'))
       await screen.findByTestId('wallet-interaction-complete')
       expect(sendMetaTransaction).toHaveBeenCalledWith(
-        { isConnectedProvider: true },
+        expect.objectContaining({ request: expect.any(Function) }),
         { isNetworkProvider: true },
         '0xabcd',
         { abi: [], address: CONTRACT, name: 'Decentraland MANA', version: '1', chainId: 137 },
@@ -1921,6 +1935,49 @@ describe('RequestPage', () => {
       )
       expect(mockWalletRequest).not.toHaveBeenCalled()
       expect(mockSendSuccessfulOutcome).toHaveBeenCalledWith(REQUEST_ID, SIGNER, '0xrelayedhash')
+    })
+
+    describe('and the wallet switches account before the relay reads it', () => {
+      let providerRequest: jest.Mock
+
+      beforeEach(() => {
+        providerRequest = jest.fn().mockResolvedValue(['0xnewwallet'])
+        mockGetConnectedProvider.mockResolvedValue({ request: providerRequest })
+      })
+
+      it('should hand the relay a provider that refuses to act for the other account', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('wallet-interaction')
+        await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+        await userEvent.click(screen.getByTestId('wallet-interaction-approve'))
+        await waitFor(() => expect(sendMetaTransaction).toHaveBeenCalledTimes(1))
+        const [boundProvider] = jest.mocked(sendMetaTransaction).mock.calls[0] as unknown as [
+          { request: (args: unknown) => Promise<unknown> }
+        ]
+        await expect(boundProvider.request({ method: 'eth_requestAccounts', params: [] })).rejects.toBeInstanceOf(
+          ReviewedSignerMismatchError
+        )
+        await expect(boundProvider.request({ method: 'eth_signTypedData_v4', params: ['0xnewwallet', '{}'] })).rejects.toBeInstanceOf(
+          ReviewedSignerMismatchError
+        )
+      })
+    })
+
+    describe('and the relay refuses because the wallet no longer names the reviewing account', () => {
+      beforeEach(() => {
+        jest.mocked(sendMetaTransaction).mockRejectedValue(new ReviewedSignerMismatchError(SIGNER, '0xnewwallet'))
+        mockSendFailedOutcome.mockResolvedValue({})
+      })
+
+      it('should show the account-change view and answer nothing', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('wallet-interaction')
+        await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+        await userEvent.click(screen.getByTestId('wallet-interaction-approve'))
+        expect(await screen.findByTestId('different-account')).toBeInTheDocument()
+        expect(mockSendFailedOutcome).not.toHaveBeenCalled()
+        expect(mockSendSuccessfulOutcome).not.toHaveBeenCalled()
+      })
     })
 
     describe('and the preview moves an asset of the called contract', () => {
@@ -2328,6 +2385,42 @@ describe('RequestPage', () => {
         fromAddress: SIGNER,
         tokenId: '1',
         toAddress: '0xrecipient'
+      })
+    })
+
+    describe('and the recipient is a contract', () => {
+      beforeEach(() => {
+        mockGetCallbackRecipient.mockReturnValue('0xrecipient')
+        mockIsAddressWithoutCode.mockResolvedValue(false)
+      })
+
+      it('should stay on the generic review with the acknowledgment instead of the branded gift view', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('wallet-interaction')
+        await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+        expect(view).toHaveAttribute('data-requires-acknowledgment', 'true')
+        expect(screen.queryByTestId('transfer-confirm')).not.toBeInTheDocument()
+      })
+
+      it('should judge the recipient code on the chain the transfer executes on', async () => {
+        renderRequestPage()
+        await screen.findByTestId('wallet-interaction')
+        await waitFor(() => expect(mockIsAddressWithoutCode).toHaveBeenCalledWith('0xrecipient', 137))
+      })
+    })
+
+    describe('and the recipient code could not be checked', () => {
+      beforeEach(() => {
+        mockGetCallbackRecipient.mockReturnValue('0xrecipient')
+        mockIsAddressWithoutCode.mockRejectedValue(new Error('RPC unavailable'))
+      })
+
+      it('should treat the recipient as a contract and stay on the generic review', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('wallet-interaction')
+        await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+        expect(view).toHaveAttribute('data-requires-acknowledgment', 'true')
+        expect(screen.queryByTestId('transfer-confirm')).not.toBeInTheDocument()
       })
     })
 

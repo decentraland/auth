@@ -66,6 +66,8 @@
       "review_title": "查看此交易",
       "preview_unavailable_warning": "由于预览服务暂时不可用，我们无法检查此交易的作用。请仅在您信任发起该请求的场景时批准。",
       "acknowledge_preview_unavailable": "我了解预览不可用，并且我在未查看此交易作用的情况下进行批准",
+      "recipient_contract_warning": "接收方是一个合约。它的代码会在收到物品时执行且无法预览，因此预览可能无法显示此交易的全部行为。",
+      "acknowledge_recipient_contract": "我了解接收方是一个合约，其代码无法预览",
       "review_restarted_notice": "你的钱包网络已更改或无法验证，因此此交易已在当前网络上重新审核。",
       "calls_function": "在 {contractName} 上调用 {functionName}"
     },

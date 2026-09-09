@@ -292,6 +292,25 @@ function decodeNftTransferData(call: DecodedCall): { fromAddress: string; tokenI
   return { fromAddress, tokenId: tokenId.toString(), toAddress }
 }
 
+// The collection transfers that call the recipient: ERC-721's safe variants invoke `onERC721Received` on a
+// recipient that has code. Whatever that code does runs inside the transaction, and a simulation cannot be
+// relied on to show it: the code can tell a preview from the real thing (the preview's tx.origin is the
+// contract, its gas price is zero and the nonce has not moved) and behave differently in each.
+const CALLBACK_TRANSFER_FUNCTIONS: ReadonlySet<string> = new Set(['safeTransferFrom', 'safeBatchTransferFrom'])
+
+/**
+ * The recipient a decoded collection call hands tokens to with a callback, or null when the call makes no
+ * callback (a plain `transferFrom` does not, nor does anything that is not a transfer).
+ */
+function getCallbackRecipient(call: DecodedCall): string | null {
+  if (!CALLBACK_TRANSFER_FUNCTIONS.has(call.functionName)) {
+    return null
+  }
+  // safeTransferFrom(address from, address to, ...) / safeBatchTransferFrom(address from, address to, ...)
+  const recipient = call.args[1]
+  return typeof recipient === 'string' ? recipient : null
+}
+
 /** Whether two token ids name the same token, whatever notation each side uses (decimal, hex). */
 function isSameTokenId(left: string | null, right: string): boolean {
   if (left === null) {
@@ -535,6 +554,7 @@ export {
   isDecentralandCollection,
   getMetaTransactionChainId,
   decodeNftTransferData,
+  getCallbackRecipient,
   isExactNftTransferSimulation,
   decodeManaTransferData,
   fetchNftMetadata,

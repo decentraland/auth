@@ -201,6 +201,29 @@ describe('when rendering the WalletInteraction view', () => {
     })
   })
 
+  describe('and the recipient of the transfer is a contract', () => {
+    beforeEach(() => {
+      props = { ...props, previewCaveat: 'recipient_contract', requiresAcknowledgment: true }
+    })
+
+    it('should warn that the recipient code cannot be previewed', () => {
+      render(<WalletInteraction {...props} />)
+      expect(screen.getByTestId('preview-caveat-warning')).toHaveTextContent('request.wallet_interaction.recipient_contract_warning')
+    })
+
+    it('should word the acknowledgment for the recipient contract', () => {
+      render(<WalletInteraction {...props} />)
+      expect(screen.getByText('request.wallet_interaction.acknowledge_recipient_contract')).toBeInTheDocument()
+    })
+
+    it('should keep approval disabled until the caveat is acknowledged', async () => {
+      render(<WalletInteraction {...props} />)
+      expect(screen.getByTestId('transfer-confirm-button')).toBeDisabled()
+      await userEvent.click(screen.getByRole('checkbox'))
+      expect(screen.getByTestId('transfer-confirm-button')).toBeEnabled()
+    })
+  })
+
   describe('and the simulation preview is unavailable', () => {
     beforeEach(() => {
       props = { ...props, simulation: { status: 'unavailable' }, requiresAcknowledgment: true }

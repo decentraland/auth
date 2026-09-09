@@ -1,4 +1,4 @@
-import { SimulationState } from '../../types'
+import { PreviewCaveat, SimulationState } from '../../types'
 
 /** What the review says about gas: covered by the relay, or the wallet's own fee estimate. */
 type WalletInteractionGas =
@@ -25,6 +25,8 @@ interface WalletInteractionProps {
   chainId?: number
   /** When true, the approve button is gated behind a high-risk acknowledgment checkbox. */
   requiresAcknowledgment?: boolean
+  /** Why the preview cannot be vouched for even though it ran (see PreviewCaveat), or null. */
+  previewCaveat?: PreviewCaveat | null
   gas: WalletInteractionGas
   /** True when the simulation predicts the transaction would revert. */
   isReverted?: boolean

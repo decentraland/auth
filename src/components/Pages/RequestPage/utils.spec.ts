@@ -15,6 +15,7 @@ import {
   decodeManaTransferData,
   decodeNftTransferData,
   fetchNftMetadata,
+  getCallbackRecipient,
   getConnectedProvider,
   getExplorerDeeplink,
   getMetaTransactionChainId,
@@ -402,6 +403,65 @@ describe('when testing getMetaTransactionChainId', () => {
     it('should return MATIC_AMOY', () => {
       const result = getMetaTransactionChainId()
       expect(result).toBe(ChainId.MATIC_AMOY)
+    })
+  })
+})
+
+describe('when reading the recipient a collection call hands tokens to with a callback', () => {
+  let call: DecodedCall
+
+  describe('and the call is a safeTransferFrom', () => {
+    beforeEach(() => {
+      call = { functionName: 'safeTransferFrom', args: ['0xfrom', '0xto', BigInt(1)], payable: false, forwardsCall: false }
+    })
+
+    it('should return the recipient', () => {
+      expect(getCallbackRecipient(call)).toBe('0xto')
+    })
+  })
+
+  describe('and the call is a safeTransferFrom with data', () => {
+    beforeEach(() => {
+      call = { functionName: 'safeTransferFrom', args: ['0xfrom', '0xto', BigInt(1), '0x'], payable: false, forwardsCall: false }
+    })
+
+    it('should return the recipient', () => {
+      expect(getCallbackRecipient(call)).toBe('0xto')
+    })
+  })
+
+  describe('and the call is a safeBatchTransferFrom', () => {
+    beforeEach(() => {
+      call = {
+        functionName: 'safeBatchTransferFrom',
+        args: ['0xfrom', '0xto', [BigInt(1), BigInt(2)]],
+        payable: false,
+        forwardsCall: false
+      }
+    })
+
+    it('should return the recipient', () => {
+      expect(getCallbackRecipient(call)).toBe('0xto')
+    })
+  })
+
+  describe('and the call is a plain transferFrom', () => {
+    beforeEach(() => {
+      call = { functionName: 'transferFrom', args: ['0xfrom', '0xto', BigInt(1)], payable: false, forwardsCall: false }
+    })
+
+    it('should return null because no callback runs', () => {
+      expect(getCallbackRecipient(call)).toBeNull()
+    })
+  })
+
+  describe('and the call is not a transfer', () => {
+    beforeEach(() => {
+      call = { functionName: 'setApprovalForAll', args: ['0xoperator', true], payable: false, forwardsCall: false }
+    })
+
+    it('should return null', () => {
+      expect(getCallbackRecipient(call)).toBeNull()
     })
   })
 })

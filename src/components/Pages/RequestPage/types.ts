@@ -38,6 +38,13 @@ type TypedDataPayload = {
 }
 
 /** Lifecycle of the best-effort simulation shown for a Decentraland contract call. */
+/**
+ * A reason the simulation of a Decentraland call cannot be vouched for even when it ran: the call hands
+ * tokens to a recipient with code, whose callback runs inside the transaction and can tell a preview
+ * from the real thing (tx.origin, gas price, the nonce state) and behave differently in each.
+ */
+type PreviewCaveat = 'recipient_contract'
+
 type SimulationState =
   | { status: 'idle' }
   | { status: 'loading' }
@@ -48,4 +55,4 @@ type SimulationState =
 type GasEstimateState = { status: 'loading' } | { status: 'ready'; cost: bigint } | { status: 'unavailable' }
 
 export { TransferType }
-export type { GasEstimateState, MANATransferData, NFTTransferData, ProfileAvatar, TypedDataPayload, SimulationState }
+export type { GasEstimateState, MANATransferData, NFTTransferData, PreviewCaveat, ProfileAvatar, TypedDataPayload, SimulationState }

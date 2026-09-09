@@ -66,6 +66,8 @@
       "review_title": "Review this transaction",
       "preview_unavailable_warning": "We couldn't check what this transaction does because the preview service is temporarily unavailable. Only approve if you trust the scene that requested it.",
       "acknowledge_preview_unavailable": "I understand the preview is unavailable and I'm approving without seeing what this transaction does",
+      "recipient_contract_warning": "The recipient is a contract. Its code runs when it receives the item and can't be previewed, so the preview may not show everything this transaction does.",
+      "acknowledge_recipient_contract": "I understand the recipient is a contract whose code can't be previewed",
       "review_restarted_notice": "Your wallet's network changed or couldn't be verified, so this transaction was reviewed again on the current network.",
       "calls_function": "Calls {functionName} on {contractName}"
     },

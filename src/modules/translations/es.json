@@ -66,6 +66,8 @@
       "review_title": "Revisa esta transacción",
       "preview_unavailable_warning": "No pudimos verificar qué hace esta transacción porque el servicio de vista previa no está disponible temporalmente. Aprueba solo si confías en la escena que la solicitó.",
       "acknowledge_preview_unavailable": "Entiendo que la vista previa no está disponible y estoy aprobando sin ver qué hace esta transacción",
+      "recipient_contract_warning": "El destinatario es un contrato. Su código se ejecuta al recibir el ítem y no puede previsualizarse, así que la vista previa puede no mostrar todo lo que hace esta transacción.",
+      "acknowledge_recipient_contract": "Entiendo que el destinatario es un contrato cuyo código no puede previsualizarse",
       "review_restarted_notice": "La red de tu wallet cambió o no pudo verificarse, así que esta transacción se revisó de nuevo en la red actual.",
       "calls_function": "Llama a {functionName} en {contractName}"
     },

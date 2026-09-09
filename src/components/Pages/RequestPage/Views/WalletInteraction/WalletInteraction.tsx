@@ -26,6 +26,7 @@ export const WalletInteraction = ({
   verifiedContracts,
   chainId,
   requiresAcknowledgment = false,
+  previewCaveat = null,
   gas,
   isReverted = false,
   reviewRestarted = false,
@@ -46,6 +47,7 @@ export const WalletInteraction = ({
     simulation.status,
     isReverted ? 'reverted' : '',
     isPreviewWithoutVisibleEffects ? 'no-visible-effects' : '',
+    previewCaveat ?? '',
     getPreviewFingerprint(simulation.status === 'ready' ? simulation.result : undefined)
   ].join('|')
   const { acknowledged, setAcknowledged } = useAcknowledgment(acknowledgmentStatement)
@@ -98,6 +100,11 @@ export const WalletInteraction = ({
           {t('request.wallet_interaction.preview_unavailable_warning')}
         </PreviewUnavailableWarning>
       ) : null}
+      {previewCaveat === 'recipient_contract' ? (
+        <PreviewUnavailableWarning severity="warning" role="alert" data-testid="preview-caveat-warning">
+          {t('request.wallet_interaction.recipient_contract_warning')}
+        </PreviewUnavailableWarning>
+      ) : null}
       {requiresAcknowledgment ? (
         <FormControlLabel
           control={
@@ -106,9 +113,11 @@ export const WalletInteraction = ({
           label={
             isPreviewUnavailable
               ? t('request.wallet_interaction.acknowledge_preview_unavailable')
-              : isPreviewWithoutVisibleEffects
-                ? t('request.transaction_dialog.acknowledge_no_visible_effects')
-                : t('request.transaction_dialog.acknowledge_risk')
+              : previewCaveat === 'recipient_contract'
+                ? t('request.wallet_interaction.acknowledge_recipient_contract')
+                : isPreviewWithoutVisibleEffects
+                  ? t('request.transaction_dialog.acknowledge_no_visible_effects')
+                  : t('request.transaction_dialog.acknowledge_risk')
           }
         />
       ) : null}
