@@ -1238,6 +1238,27 @@ describe('RequestPage', () => {
     })
   })
 
+  describe('when delivering a denial fails', () => {
+    beforeEach(() => {
+      jest.spyOn(console, 'error').mockImplementation(() => undefined)
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockRecover.mockResolvedValue(recovered('personal_sign', ['hello', SIGNER]))
+      mockGetAddresses.mockResolvedValue([SIGNER])
+      mockSendFailedOutcome.mockRejectedValue(new Error('server down'))
+    })
+
+    afterEach(() => {
+      jest.mocked(console.error).mockRestore()
+    })
+
+    it('should still show the denied view, since the decision stands whatever the server heard', async () => {
+      renderRequestPage()
+      await userEvent.click(await screen.findByTestId('unverified-deny'))
+      expect(await screen.findByTestId('denied-wallet-interaction')).toBeInTheDocument()
+      expect(mockWalletRequest).not.toHaveBeenCalled()
+    })
+  })
+
   describe('when the account changes while Deny is still waiting for its outcome to be delivered', () => {
     let deliverOutcome: () => void
 
@@ -1323,7 +1344,7 @@ describe('RequestPage', () => {
       )
     })
 
-    it('should keep the timeout view when the classification resolves afterwards', async () => {
+    it('should keep the timeout view although the classification resolves afterwards', async () => {
       renderRequestPage()
       await waitFor(() => expect(mockClassifyRequest).toHaveBeenCalled())
       expect(await screen.findByTestId('timeout-error')).toBeInTheDocument()
@@ -1363,6 +1384,58 @@ describe('RequestPage', () => {
       await screen.findByTestId('denied-wallet-interaction')
       await waitFor(() => expect(mockSendFailedOutcome).toHaveBeenCalledTimes(1))
       expect(mockWalletRequest).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('when the wallet answers Allow with the account that reviewed the request', () => {
+    beforeEach(() => {
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockRecover.mockResolvedValue(recovered('personal_sign', ['hello', SIGNER]))
+      mockGetAddresses.mockResolvedValue([SIGNER])
+      mockSendFailedOutcome.mockResolvedValue({})
+    })
+
+    describe('and the wallet reports that the user rejected the request', () => {
+      beforeEach(() => {
+        mockWalletRequest.mockRejectedValue(new Error('User rejected the request'))
+        mockIsUserRejectedTransaction.mockReturnValue(true)
+      })
+
+      it('should show the denied view and answer the request as rejected once', async () => {
+        renderRequestPage()
+        await userEvent.click(await screen.findByTestId('unverified-approve'))
+        expect(await screen.findByTestId('denied-wallet-interaction')).toBeInTheDocument()
+        expect(mockSendFailedOutcome).toHaveBeenCalledTimes(1)
+        expect(mockSendFailedOutcome).toHaveBeenCalledWith(REQUEST_ID, SIGNER, { code: -32003, message: 'Transaction rejected' })
+      })
+    })
+
+    describe('and the wallet fails for another reason', () => {
+      beforeEach(() => {
+        jest.spyOn(console, 'error').mockImplementation(() => undefined)
+        mockWalletRequest.mockRejectedValue(new Error('Internal wallet error'))
+      })
+
+      afterEach(() => {
+        jest.mocked(console.error).mockRestore()
+      })
+
+      it('should show the wallet error view with the error for the developer', async () => {
+        renderRequestPage()
+        await userEvent.click(await screen.findByTestId('unverified-approve'))
+        const error = await screen.findByTestId('signing-error')
+        expect(error).toHaveAttribute('data-kind', 'wallet_error')
+        expect(error).toHaveTextContent('Internal wallet error')
+      })
+
+      it('should answer the request with the wallet error', async () => {
+        renderRequestPage()
+        await userEvent.click(await screen.findByTestId('unverified-approve'))
+        await screen.findByTestId('signing-error')
+        await waitFor(() =>
+          expect(mockSendFailedOutcome).toHaveBeenCalledWith(REQUEST_ID, SIGNER, { code: 999, message: 'Internal wallet error' })
+        )
+      })
     })
   })
 

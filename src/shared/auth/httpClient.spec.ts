@@ -555,13 +555,13 @@ describe('createAuthServerClient', () => {
         expect(result).toEqual(mockResponse)
       })
 
-      it('should track the success without an authRequestId when none is provided', async () => {
+      it('should track the success without an authRequestId if the call gave none', async () => {
         await client.postIdentity(mockIdentity)
 
         expect(mockTrack).toHaveBeenCalledWith(TrackingEvents.DEEP_LINK_AUTH_SUCCESS, { type: 'success' })
       })
 
-      it('should forward the authRequestId onto the success tracking event when provided', async () => {
+      it('should forward a given authRequestId onto the success tracking event', async () => {
         await client.postIdentity(mockIdentity, { authRequestId: 'a-request-uuid' })
 
         expect(mockTrack).toHaveBeenCalledWith(TrackingEvents.DEEP_LINK_AUTH_SUCCESS, {

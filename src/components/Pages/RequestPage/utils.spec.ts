@@ -15,6 +15,7 @@ import {
   decodeManaTransferData,
   decodeNftTransferData,
   fetchNftMetadata,
+  fetchPlaceByCreatorAddress,
   getConnectedProvider,
   getCounterpartyAddresses,
   getExplorerDeeplink,
@@ -1489,6 +1490,119 @@ describe('when testing buildSendTransactionSimulationPayload', () => {
         data: '0x095ea7b3',
         value: '0x0'
       })
+    })
+  })
+})
+
+describe('when fetching the place of a tip recipient', () => {
+  const CREATOR = '0xD9B96b5dC720Fc52bEde1eC3B40A930E15F70DDD'
+  let originalFetch: typeof global.fetch
+  let cancel: jest.Mock
+
+  beforeEach(() => {
+    originalFetch = global.fetch
+    cancel = jest.fn().mockResolvedValue(undefined)
+    global.fetch = jest.fn()
+    jest.mocked(config.get).mockReturnValue('https://places.example')
+  })
+
+  afterEach(() => {
+    global.fetch = originalFetch
+    jest.mocked(config.get).mockReset()
+  })
+
+  describe('and the API returns exactly one place', () => {
+    beforeEach(() => {
+      jest.mocked(fetch).mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({ ok: true, data: [{ title: `  Genesis\u202EPlaza ${'x'.repeat(60)}`, image: 'https://cdn.example/plaza.png' }] })
+      } as unknown as Response)
+    })
+
+    it('should ask the API for the recipient as creator, lowercased', async () => {
+      await fetchPlaceByCreatorAddress(CREATOR)
+      expect(fetch).toHaveBeenCalledWith(`https://places.example/api/places?creator_address=${CREATOR.toLowerCase()}`)
+    })
+
+    it('should return the title as an untrusted label, trimmed, with hidden characters revealed and the length capped', async () => {
+      await expect(fetchPlaceByCreatorAddress(CREATOR)).resolves.toMatchObject({ sceneName: `Genesis\\u202ePlaza ${'x'.repeat(20)}…` })
+    })
+
+    it('should return the https image', async () => {
+      await expect(fetchPlaceByCreatorAddress(CREATOR)).resolves.toMatchObject({ sceneImageUrl: 'https://cdn.example/plaza.png' })
+    })
+  })
+
+  describe('and the place image is not an https URL', () => {
+    beforeEach(() => {
+      jest.mocked(fetch).mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ ok: true, data: [{ title: 'Plaza', image: 'javascript:alert(1)' }] })
+      } as unknown as Response)
+    })
+
+    it('should drop the image', async () => {
+      await expect(fetchPlaceByCreatorAddress(CREATOR)).resolves.toEqual({ sceneName: 'Plaza', sceneImageUrl: '' })
+    })
+  })
+
+  describe('and the place has no title', () => {
+    beforeEach(() => {
+      jest.mocked(fetch).mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ ok: true, data: [{ image: 'https://cdn.example/plaza.png' }] })
+      } as unknown as Response)
+    })
+
+    it('should name it Unknown Place', async () => {
+      await expect(fetchPlaceByCreatorAddress(CREATOR)).resolves.toMatchObject({ sceneName: 'Unknown Place' })
+    })
+  })
+
+  describe('and the recipient created more than one place', () => {
+    beforeEach(() => {
+      jest.mocked(fetch).mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ ok: true, data: [{ title: 'One' }, { title: 'Two' }] })
+      } as unknown as Response)
+    })
+
+    it('should return null rather than guess', async () => {
+      await expect(fetchPlaceByCreatorAddress(CREATOR)).resolves.toBeNull()
+    })
+  })
+
+  describe('and the API answers with an error status', () => {
+    beforeEach(() => {
+      jest.spyOn(console, 'error').mockImplementation(() => undefined)
+      jest
+        .mocked(fetch)
+        .mockResolvedValueOnce({ ok: false, status: 503, statusText: 'Unavailable', body: { cancel } } as unknown as Response)
+    })
+
+    afterEach(() => {
+      jest.mocked(console.error).mockRestore()
+    })
+
+    it('should return null and drain the body', async () => {
+      await expect(fetchPlaceByCreatorAddress(CREATOR)).resolves.toBeNull()
+      expect(cancel).toHaveBeenCalled()
+    })
+  })
+
+  describe('and the request throws', () => {
+    beforeEach(() => {
+      jest.spyOn(console, 'error').mockImplementation(() => undefined)
+      jest.mocked(fetch).mockRejectedValueOnce(new Error('network down'))
+    })
+
+    afterEach(() => {
+      jest.mocked(console.error).mockRestore()
+    })
+
+    it('should return null', async () => {
+      await expect(fetchPlaceByCreatorAddress(CREATOR)).resolves.toBeNull()
     })
   })
 })

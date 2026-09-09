@@ -99,7 +99,7 @@ describe('buildTransactionParams', () => {
   })
 
   describe('when the params are not a usable transaction object', () => {
-    it('should name the type when the caller serialised the payload', () => {
+    it('should name the type of a payload the caller serialised', () => {
       expect(() => buildTransactionParams([JSON.stringify({ to: '0xdef' })])).toThrow(/received string/)
     })
 
@@ -160,7 +160,7 @@ describe('getUnsupportedCalldataAlias', () => {
     expect(getUnsupportedCalldataAlias({ to: '0xdef', [field]: '0x' })).toBe(field)
   })
 
-  it('should return null when calldata is only in data', () => {
+  it('should return null for calldata that is only in data', () => {
     expect(getUnsupportedCalldataAlias({ to: '0xdef', data: '0x' })).toBeNull()
   })
 

@@ -710,7 +710,7 @@ describe('assertSignatureParamsAreCanonical', () => {
       expect(() => assertSignatureParamsAreCanonical('eth_sendTransaction', [{ to: '0x1', data: '0x' }, 'extra'], signer)).not.toThrow()
     })
 
-    it('should not throw when there are no params', () => {
+    it('should not throw for a request without params', () => {
       expect(() => assertSignatureParamsAreCanonical('eth_sendTransaction', undefined, signer)).not.toThrow()
     })
   })

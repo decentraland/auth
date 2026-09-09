@@ -461,6 +461,94 @@ describe('when rendering the SimulationSummary', () => {
     })
   })
 
+  describe('and an ApprovalForAll is granted', () => {
+    beforeEach(() => {
+      const result = emptyResult({
+        approvalChanges: [
+          {
+            kind: 'approvalForAll',
+            standard: 'erc721',
+            owner: USER,
+            spender: '0x9999999999999999999999999999999999999999',
+            amount: null,
+            rawAmount: null,
+            isUnlimited: false,
+            tokenId: null,
+            approved: true,
+            contractAddress: '0x1111111111111111111111111111111111111111',
+            symbol: null,
+            name: 'Collection'
+          }
+        ]
+      })
+      simulation = { status: 'ready', result }
+    })
+
+    it('should say the operator can access every token of the collection', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} />)
+      expect(screen.getByText(/approval_can_access_all/)).toBeInTheDocument()
+    })
+  })
+
+  describe('and an ERC20 allowance is revoked with the zero address as spender', () => {
+    beforeEach(() => {
+      const result = emptyResult({
+        approvalChanges: [
+          {
+            kind: 'approval',
+            standard: 'erc20',
+            owner: USER,
+            spender: '0x0000000000000000000000000000000000000000',
+            amount: '0',
+            rawAmount: '0',
+            isUnlimited: false,
+            tokenId: null,
+            approved: null,
+            contractAddress: '0x1111111111111111111111111111111111111111',
+            symbol: 'MANA',
+            name: 'MANA'
+          }
+        ]
+      })
+      simulation = { status: 'ready', result }
+    })
+
+    it('should say the allowance was revoked without naming a counterparty', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} />)
+      expect(screen.getByText(/approval_allowance_revoked/)).toBeInTheDocument()
+    })
+  })
+
+  describe('and a token of the user is burned', () => {
+    beforeEach(() => {
+      const result = emptyResult({
+        assetChanges: [
+          {
+            type: 'burn',
+            standard: 'erc721',
+            from: USER,
+            to: null,
+            amount: null,
+            rawAmount: null,
+            tokenId: '3',
+            contractAddress: '0x1111111111111111111111111111111111111111',
+            symbol: null,
+            name: 'Old Hat',
+            decimals: null,
+            logoUrl: null,
+            dollarValue: null
+          }
+        ]
+      })
+      simulation = { status: 'ready', result }
+    })
+
+    it('should mark the row as burned instead of naming a recipient', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} />)
+      expect(screen.getByText('request.transaction_dialog.burned')).toBeInTheDocument()
+    })
+  })
+
   describe('and an ApprovalForAll is revoked', () => {
     beforeEach(() => {
       const result = emptyResult({
@@ -518,12 +606,12 @@ describe('when rendering the SimulationSummary', () => {
       expect(screen.getByText(/approval_can_transfer_token/)).toBeInTheDocument()
     })
 
-    it('should flag it with a warning icon when the spender is not a recognized Decentraland contract', () => {
+    it('should flag it with a warning icon for a spender that is not a recognized Decentraland contract', () => {
       render(<SimulationSummary simulation={simulation} userAddress={USER} />)
       expect(screen.getByText('⚠')).toBeInTheDocument()
     })
 
-    it('should not flag it when the spender is a recognized Decentraland contract', () => {
+    it('should not flag it for a recognized Decentraland spender', () => {
       render(
         <SimulationSummary simulation={simulation} userAddress={USER} verifiedContracts={['0x1234567890abcdef1234567890abcdef12345678']} />
       )
@@ -558,12 +646,12 @@ describe('when rendering the SimulationSummary', () => {
       }
     })
 
-    it('should flag it with a warning icon when the spender is not a recognized Decentraland contract', () => {
+    it('should flag it with a warning icon for a spender that is not a recognized Decentraland contract', () => {
       render(<SimulationSummary simulation={simulation} userAddress={USER} />)
       expect(screen.getByText('⚠')).toBeInTheDocument()
     })
 
-    it('should not flag it when the spender is a recognized Decentraland contract', () => {
+    it('should not flag it for a recognized Decentraland spender', () => {
       render(<SimulationSummary simulation={simulation} userAddress={USER} verifiedContracts={[spender]} />)
       expect(screen.queryByText('⚠')).not.toBeInTheDocument()
     })
@@ -910,7 +998,7 @@ describe('when rendering the SimulationSummary', () => {
       expect(link).toHaveAttribute('rel', 'noopener noreferrer')
     })
 
-    it('should render plain text when the chain is unknown', () => {
+    it('should render plain text for an unknown chain', () => {
       render(<SimulationSummary simulation={simulation} userAddress={USER} chainId={999999} />)
       expect(screen.queryByRole('link')).not.toBeInTheDocument()
     })
@@ -1096,7 +1184,7 @@ describe('when rendering the SimulationSummary', () => {
       expect(screen.getByText('request.transaction_dialog.transaction_cost 0.0025 request.unverified.native_currency')).toBeInTheDocument()
     })
 
-    it('should leave the balance out when the wallet could not report it', () => {
+    it('should leave out a balance the wallet could not report', () => {
       render(<SimulationSummary simulation={simulation} userAddress={USER} chainId={137} gas={{ covered: false, cost: '0.0025' }} />)
       expect(screen.getByText('request.transaction_dialog.transaction_cost 0.0025 POL')).toBeInTheDocument()
       expect(screen.queryByText(/your_balance/)).not.toBeInTheDocument()

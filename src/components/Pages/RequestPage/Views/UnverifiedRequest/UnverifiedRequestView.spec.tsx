@@ -375,7 +375,7 @@ describe('when rendering the UnverifiedRequestView', () => {
         )
       })
 
-      it('should let the acknowledgment be ticked when the message fits its block', () => {
+      it('should let the acknowledgment be ticked for a message that fits its block', () => {
         render(<UnverifiedRequestView {...props} />)
         expect(screen.getByRole('checkbox')).toBeEnabled()
         expect(screen.queryByTestId('unverified-message-scroll-hint')).not.toBeInTheDocument()
