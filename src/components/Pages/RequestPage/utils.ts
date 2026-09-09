@@ -187,6 +187,14 @@ const MAX_METADATA_BYTES = 256 * 1024
 // A tokenURI host that does not answer must not hold the gift view's upgrade open forever.
 const METADATA_FETCH_TIMEOUT_MS = 10_000
 
+/** The body passed the byte cap; told apart from a read that failed for another reason (a timeout, a reset). */
+class ResponseTooLargeError extends Error {
+  constructor(detail: string) {
+    super(`Body is too large (${detail})`)
+    this.name = 'ResponseTooLargeError'
+  }
+}
+
 /**
  * Reads a response body as text without buffering more than `maxBytes`: the stream is cancelled the moment
  * the cap is passed, so a hostile host cannot make the page download an arbitrary body. Falls back to
@@ -197,7 +205,7 @@ async function readTextWithCap(response: Response, maxBytes: number): Promise<st
   if (!reader) {
     const text = await response.text()
     if (text.length > maxBytes) {
-      throw new Error(`Body is too large (${text.length} characters)`)
+      throw new ResponseTooLargeError(`${text.length} characters`)
     }
     return text
   }
@@ -210,7 +218,7 @@ async function readTextWithCap(response: Response, maxBytes: number): Promise<st
     received += value.byteLength
     if (received > maxBytes) {
       await reader.cancel().catch(() => undefined)
-      throw new Error(`Body is too large (over ${maxBytes} bytes)`)
+      throw new ResponseTooLargeError(`over ${maxBytes} bytes`)
     }
     chunks.push(decoder.decode(value, { stream: true }))
   }
@@ -496,8 +504,11 @@ async function fetchNftMetadata(
   try {
     metadataText = await readTextWithCap(metadataResponse, MAX_METADATA_BYTES)
   } catch (e) {
+    const detail = isErrorWithMessage(e) ? e.message : 'unknown'
     throw new Error(
-      `Metadata for token ${tokenId} at contract ${contractAddress} is too large: ${isErrorWithMessage(e) ? e.message : 'unknown'}`
+      e instanceof ResponseTooLargeError
+        ? `Metadata for token ${tokenId} at contract ${contractAddress} is too large: ${detail}`
+        : `Metadata for token ${tokenId} at contract ${contractAddress} could not be read: ${detail}`
     )
   }
   const metadata: unknown = JSON.parse(metadataText)

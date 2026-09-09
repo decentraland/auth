@@ -6,6 +6,7 @@ export {
   getCollectionContract,
   getKnownDecentralandContract,
   getMetaTransactionSalt,
+  isRecognizedDecentralandContract,
   resolveKnownDecentralandContract
 } from './decentralandContracts'
 export type {

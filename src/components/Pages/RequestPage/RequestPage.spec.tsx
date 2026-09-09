@@ -78,6 +78,7 @@ const mockSendFailedOutcome = jest.fn()
 const mockPostIdentity = jest.fn()
 const mockSimulateTransaction = jest.fn()
 const mockGetKnownDecentralandContract = jest.fn()
+const mockIsRecognizedDecentralandContract = jest.fn()
 jest.mock('../../../shared/auth', () => {
   const actual = jest.requireActual('../../../shared/auth')
   return {
@@ -90,6 +91,7 @@ jest.mock('../../../shared/auth', () => {
       simulateTransaction: mockSimulateTransaction
     }),
     getKnownDecentralandContract: (...args: any[]) => mockGetKnownDecentralandContract(...args),
+    isRecognizedDecentralandContract: (...args: any[]) => mockIsRecognizedDecentralandContract(...args),
     resolveKnownDecentralandContract: (...args: any[]) => mockResolveKnownDecentralandContract(...args)
   }
 })
@@ -256,6 +258,7 @@ jest.mock('./Views', () => ({
       data-function={props.functionName}
       data-contract={props.contractName}
       data-verifying-contract={props.verifyingContract}
+      data-verified={JSON.stringify(props.verifiedContracts ?? [])}
       data-collections={JSON.stringify(props.collectionContracts ?? [])}
     >
       <button data-testid="signature-approve" onClick={props.onApprove}>
@@ -491,6 +494,10 @@ describe('RequestPage', () => {
     }
     mockClassifyRequest.mockImplementation(defaultClassification)
     mockGetKnownDecentralandContract.mockReturnValue(null)
+    // Recognition follows the registry mock unless a test says otherwise (the LAND and Estate registries).
+    mockIsRecognizedDecentralandContract.mockImplementation(
+      (address: string, chainId: number) => mockGetKnownDecentralandContract(address, chainId) !== null
+    )
     mockIsChainMismatchRejection.mockReturnValue(false)
     mockIsUserRejectedTransaction.mockReturnValue(false)
     // Every real provider exposes EIP-1193 request; the signer binding refuses one that does not.
@@ -2062,6 +2069,60 @@ describe('RequestPage', () => {
       })
     })
 
+    describe('and that address is a Decentraland registry the SDK does not carry, such as LAND', () => {
+      beforeEach(async () => {
+        mockIsRecognizedDecentralandContract.mockImplementation((address: string) => address === '0xnft')
+        mockSimulateTransaction.mockResolvedValue(simulationOf({ assetChanges: [erc721Transfer({ contractAddress: '0xnft' })] }))
+        renderRequestPage()
+        view = await findVerifiedView()
+      })
+
+      it('should keep the review without asking the network, and badge the registry as Decentraland', () => {
+        expect(mockIsAddressWithoutCode).not.toHaveBeenCalled()
+        expect(mockSendFailedOutcome).not.toHaveBeenCalled()
+        expect(view).toHaveAttribute('data-verified', JSON.stringify(['0xnft']))
+        expect(JSON.parse(view.getAttribute('data-collections') ?? '[]')).not.toContain('0xnft')
+      })
+    })
+
+    describe('and the call reaches many contracts that are not Decentraland', () => {
+      beforeEach(() => {
+        mockGetCounterpartyAddresses.mockReturnValue({ addresses: ['0xa', '0xb', '0xc', '0xd', '0xe'], opaque: false })
+        mockIsAddressWithoutCode.mockResolvedValue(false)
+        mockIsDecentralandCollection.mockResolvedValue(false)
+        renderRequestPage()
+      })
+
+      it('should name the first three and count the rest, so the outcome and the screen stay short', async () => {
+        await screen.findByTestId('signing-error')
+        await waitFor(() => {
+          expect(mockSendFailedOutcome).toHaveBeenCalledWith(REQUEST_ID, SIGNER, {
+            code: -32602,
+            message: `The "${method}" request reaches beyond Decentraland's contracts: the call reaches a contract that is not Decentraland's: 0xa, 0xb, 0xc and 2 more`
+          })
+        })
+      })
+    })
+
+    describe('and reading what the call reaches fails unexpectedly', () => {
+      beforeEach(() => {
+        mockGetCounterpartyAddresses.mockImplementation(() => {
+          throw new Error('unexpected')
+        })
+        renderRequestPage()
+      })
+
+      it('should refuse the request rather than leave Allow blocked on a check that never settles', async () => {
+        expect(await screen.findByTestId('signing-error')).toHaveAttribute('data-kind', 'unsupported_contract')
+        await waitFor(() => {
+          expect(mockSendFailedOutcome).toHaveBeenCalledWith(REQUEST_ID, SIGNER, {
+            code: -32602,
+            message: `The "${method}" request reaches beyond Decentraland's contracts: the contracts the call reaches could not be checked`
+          })
+        })
+      })
+    })
+
     describe('and the code read has not answered yet', () => {
       beforeEach(async () => {
         mockIsAddressWithoutCode.mockReturnValue(new Promise(() => undefined))
@@ -2132,9 +2193,9 @@ describe('RequestPage', () => {
       jest.clearAllMocks()
     })
 
-    describe('and the simulation server rejects the call itself', () => {
+    describe('and the simulation server refuses the request itself', () => {
       beforeEach(() => {
-        mockSimulateTransaction.mockRejectedValueOnce(new SimulationUnavailableError('status 400', 400))
+        mockSimulateTransaction.mockRejectedValueOnce(new SimulationUnavailableError('status 400', 400, 'invalid_request'))
         renderRequestPage()
       })
 
@@ -2151,6 +2212,32 @@ describe('RequestPage', () => {
             message: 'The "eth_sendTransaction" transaction parameters are malformed: the transaction call cannot be previewed'
           })
         )
+      })
+    })
+
+    describe('and the simulation server answers a 400 without saying why, as an older server does', () => {
+      beforeEach(() => {
+        mockSimulateTransaction.mockRejectedValueOnce(new SimulationUnavailableError('status 400', 400))
+        renderRequestPage()
+      })
+
+      it('should refuse the transaction, since only the provider being at fault degrades', async () => {
+        expect(await screen.findByTestId('signing-error')).toHaveAttribute('data-kind', 'malformed_transaction')
+      })
+    })
+
+    describe('and the simulation provider refused the call upstream', () => {
+      beforeEach(() => {
+        mockSimulateTransaction.mockRejectedValueOnce(new SimulationUnavailableError('status 400', 400, 'upstream_rejected'))
+        renderRequestPage()
+      })
+
+      it('should keep the review with the preview unavailable and its acknowledgment, since the request itself was not refused', async () => {
+        await waitFor(() => {
+          expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-sim', 'unavailable')
+          expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-requires-acknowledgment', 'true')
+        })
+        expect(mockSendFailedOutcome).not.toHaveBeenCalled()
       })
     })
 
@@ -2429,11 +2516,20 @@ describe('RequestPage', () => {
           mockClassifyRequest.mockResolvedValue(
             dclTransaction({ call: { functionName: 'executeOrder', args: ['0xnft', BigInt(1)], payable: false, forwardsCall: false } })
           )
+          mockBuildSendTransactionSimulationPayload.mockReturnValue({
+            chainId: 137,
+            from: SIGNER,
+            to: CONTRACT,
+            data: '0xabcd',
+            value: '0x0'
+          })
         })
 
-        describe('and the approval is owned by the signer', () => {
+        describe('and the approval is owned by the signer and names the called contract as spender', () => {
           beforeEach(() => {
-            mockSimulateTransaction.mockResolvedValue(simulationOf({ assetChanges: [payment], approvalChanges: [approval] }))
+            mockSimulateTransaction.mockResolvedValue(
+              simulationOf({ assetChanges: [payment], approvalChanges: [{ ...approval, spender: CONTRACT }] })
+            )
           })
 
           it('should not require an acknowledgment, since the approval is the remaining allowance the purchase consumed', async () => {
@@ -2444,10 +2540,23 @@ describe('RequestPage', () => {
           })
         })
 
+        describe('and the approval is owned by the signer but names another spender', () => {
+          beforeEach(() => {
+            mockSimulateTransaction.mockResolvedValue(simulationOf({ assetChanges: [payment], approvalChanges: [approval] }))
+          })
+
+          it('should require an acknowledgment, since a grant to someone else is not what the purchase consumed', async () => {
+            renderRequestPage()
+            const view = await screen.findByTestId('wallet-interaction')
+            await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+            expect(view).toHaveAttribute('data-requires-acknowledgment', 'true')
+          })
+        })
+
         describe('and the approval is owned by another account', () => {
           beforeEach(() => {
             mockSimulateTransaction.mockResolvedValue(
-              simulationOf({ assetChanges: [payment], approvalChanges: [{ ...approval, owner: '0xsomeoneelse' }] })
+              simulationOf({ assetChanges: [payment], approvalChanges: [{ ...approval, owner: '0xsomeoneelse', spender: CONTRACT }] })
             )
           })
 
@@ -2655,6 +2764,27 @@ describe('RequestPage', () => {
       renderRequestPage()
       expect(await screen.findByTestId('transfer-confirm')).toBeInTheDocument()
       expect(mockSimulateTransaction).not.toHaveBeenCalled()
+    })
+
+    it('should run the same counterparty check as the generic review', async () => {
+      renderRequestPage()
+      await screen.findByTestId('transfer-confirm')
+      expect(mockGetCounterpartyAddresses).toHaveBeenCalledWith(expect.objectContaining({ functionName: 'transfer' }), SIGNER, 137)
+    })
+
+    describe('and the check finds the call reaches a contract that is not Decentraland', () => {
+      beforeEach(() => {
+        mockGetCounterpartyAddresses.mockReturnValue({ addresses: ['0xother'], opaque: false })
+        mockIsAddressWithoutCode.mockResolvedValue(false)
+        mockIsDecentralandCollection.mockResolvedValue(false)
+        mockSendFailedOutcome.mockResolvedValue({})
+      })
+
+      it('should refuse the request instead of showing the branded view, like the generic review would', async () => {
+        renderRequestPage()
+        expect(await screen.findByTestId('signing-error')).toHaveAttribute('data-kind', 'unsupported_contract')
+        expect(screen.queryByTestId('transfer-confirm')).not.toBeInTheDocument()
+      })
     })
 
     it('should ask a web2 user to confirm once more before relaying', async () => {

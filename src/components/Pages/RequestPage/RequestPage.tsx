@@ -37,6 +37,7 @@ import {
   getKnownDecentralandContract,
   hasNoVisibleEffects,
   isDangerousApproval,
+  isRecognizedDecentralandContract,
   resolveKnownDecentralandContract,
   withoutAllowanceConsumption
 } from '../../../shared/auth'
@@ -54,6 +55,7 @@ import {
 } from '../../../shared/locations'
 import { sendTipNotification } from '../../../shared/notifications'
 import { getProfileDisplayName } from '../../../shared/profile'
+import { listAddresses } from '../../../shared/text'
 import { identifyUser, trackEvent } from '../../../shared/utils/analytics'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { FeatureFlagsContext } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
@@ -675,15 +677,15 @@ export const RequestPage = () => {
         // chain: the addresses are judged against the registry deployments on the chain the
         // simulation ran on, never against the registry as a whole. The contract being called is
         // included too: a wearable collection is vouched for by the collection factories, not the registry.
-        // Registry contracts only. A factory collection is Decentraland code but carries content anyone
-        // can create, so the summary names it as a collection (see verifyCounterparties) rather than
-        // badging it as Decentraland's.
+        // Decentraland's own contracts only (the registry, plus the LAND and Estate registries it does not
+        // carry). A factory collection is Decentraland code but carries content anyone can create, so the
+        // summary names it as a collection (see verifyCounterparties) rather than badging it as Decentraland's.
         const collectVerifiedContracts = (result: SimulationResponseBody, chainId: number): string[] => {
           const verified = new Set<string>()
           const consider = (address: string | null) => {
             if (!address) return
             const normalized = address.toLowerCase()
-            if (getKnownDecentralandContract(normalized, chainId)) verified.add(normalized)
+            if (isRecognizedDecentralandContract(normalized, chainId)) verified.add(normalized)
           }
           for (const change of result.assetChanges) {
             consider(change.from)
@@ -700,18 +702,21 @@ export const RequestPage = () => {
         // Best-effort simulation of a Decentraland contract call. Fires without blocking the view
         // render and never throws to the caller — failures surface as "details unavailable".
         //
-        // When the server rejects the call itself (400), refuse both transaction and signature
-        // requests. Treating invalid calldata as an outage would let the requester select a different
-        // RPC method to bypass this refusal. Outages (5xx, timeouts) still require acknowledgment.
+        // When the server refuses the request itself (a 400 it accounts for as `invalid_request`, or one
+        // it does not account for at all), both transaction and signature requests are refused: treating
+        // invalid calldata as an outage would let the requester pick the RPC method that degrades. A 400
+        // the server attributes to the simulation provider (`upstream_rejected`) is the provider's
+        // problem, not the request's, and degrades like an outage (5xx, timeouts) to the acknowledgment.
         const fetchSimulation = async (body: SimulationRequestBody, call: DecodedCall) => {
           try {
             // The server reports every approval it logged; which of them are grants is decided here, where
-            // the function the signer called is known (see withoutAllowanceConsumption).
-            const result = withoutAllowanceConsumption(
-              await authServerClient.current.simulateTransaction(body),
-              call.functionName,
+            // the function the signer called and the contract it called are known (see
+            // withoutAllowanceConsumption).
+            const result = withoutAllowanceConsumption(await authServerClient.current.simulateTransaction(body), {
+              functionName: call.functionName,
+              calledContract: body.to,
               signerAddress
-            )
+            })
             if (isStale()) return
             // No Decentraland contract is an ERC-1155, so a preview that moves one has reached code that is
             // not Decentraland's, whatever the counterparty check concluded: refused, never summarized.
@@ -728,7 +733,7 @@ export const RequestPage = () => {
             return result
           } catch (e) {
             if (isStale()) return
-            if (e instanceof SimulationUnavailableError && e.status === 400) {
+            if (e instanceof SimulationUnavailableError && e.status === 400 && e.code !== 'upstream_rejected') {
               const isTransaction = request.method === 'eth_sendTransaction'
               await refuseRequest(
                 isTransaction
@@ -743,52 +748,61 @@ export const RequestPage = () => {
           }
         }
 
-        // The page previews Decentraland's contracts and nothing else. Every address the call is handed
-        // (see getCounterpartyAddresses) must be a Decentraland contract on the execution chain (registry,
-        // or a factory-deployed collection) or a plain account without code, and nothing the call carries
-        // may have gone unread; anything else is code the requester chose, running inside the transaction,
-        // which a simulation cannot be relied on to show, and the request is refused (the marketplaces
-        // accept any ERC-721 in an order or a trade; Auth does not). Cheapest answer first: the registry
-        // costs nothing, one code read settles a plain wallet (the usual counterparty), and only an address
-        // with code on the relay chain asks the factories. Judged by Decentraland's RPC; when it cannot
-        // answer, the address counts as such code, so the page never vouches for a preview on a guess.
-        // Runs alongside the simulation; Allow stays blocked until it has settled. Resolves to whether the
-        // review goes on. On the way it records which of the contracts involved are factory collections,
-        // the called one included (it is one when the registry does not list it), for the summary to label.
+        // The page previews Decentraland's contracts and nothing else. Every address the call reaches (see
+        // getCounterpartyAddresses: the ones its function actually calls, a safe transfer's recipient, the
+        // registry of an order or a trade, a nested call) must be a Decentraland contract on the execution
+        // chain (the registry, the LAND and Estate registries, a factory-deployed collection) or a plain
+        // account without code, and nothing the call carries may have gone unread; anything else is code
+        // the requester chose, running inside the transaction, which a simulation cannot be relied on to
+        // show, and the request is refused (the marketplaces accept any ERC-721 in an order or a trade;
+        // Auth does not). Cheapest answer first: the registry costs nothing, one code read settles a plain
+        // wallet (the usual counterparty), and only an address with code on the relay chain asks the
+        // factories. Judged by Decentraland's RPC; when it cannot answer, the address counts as such code,
+        // so the page never vouches for a preview on a guess; and a check that fails for any other reason
+        // refuses too, so Allow is never left blocked on a check that will not settle. Runs alongside the
+        // simulation on every previewed review, the branded ones included, so the outcome never depends on
+        // the view; Allow stays blocked until it has settled. Resolves to whether the review goes on. On the
+        // way it records which of the contracts involved are factory collections, the called one included
+        // (it is one when the registry does not list it), for the summary to label.
         const verifyCounterparties = async (call: DecodedCall, chainId: number, contractAddress: string): Promise<boolean> => {
           const refuse = async (reason: string) => {
             if (!isStale()) await refuseRequest(new UnsupportedContractError(request.method, reason), 'unsupported_contract')
             return false
           }
-          const collections = new Set<string>()
-          if (!getKnownDecentralandContract(contractAddress, chainId)) {
-            collections.add(contractAddress.toLowerCase())
-            // Known before any lookup, so the summary never shows the called collection as unverified.
-            setSimulationCollections([...collections])
-          }
-          const { addresses, opaque } = getCounterpartyAddresses(call, signerAddress, chainId)
-          if (opaque) return refuse('the call carries a nested call that could not be read')
-          const collectionsLiveHere = chainId === Number(getMetaTransactionChainId())
-          const isRecognizedOrPlain = async (address: string): Promise<boolean> => {
-            try {
-              if (getKnownDecentralandContract(address, chainId)) return true
-              if (await isAddressWithoutCode(address, chainId)) return true
-              if (!collectionsLiveHere || !(await isDecentralandCollection(address))) return false
-              collections.add(address.toLowerCase())
-              return true
-            } catch {
-              return false
+          try {
+            const collections = new Set<string>()
+            if (!getKnownDecentralandContract(contractAddress, chainId)) {
+              collections.add(contractAddress.toLowerCase())
+              // Known before any lookup, so the summary never shows the called collection as unverified.
+              setSimulationCollections([...collections])
             }
+            const { addresses, opaque } = getCounterpartyAddresses(call, signerAddress, chainId)
+            if (opaque) return refuse('the call carries a nested call that could not be read')
+            const collectionsLiveHere = chainId === Number(getMetaTransactionChainId())
+            const isRecognizedOrPlain = async (address: string): Promise<boolean> => {
+              try {
+                if (isRecognizedDecentralandContract(address, chainId)) return true
+                if (await isAddressWithoutCode(address, chainId)) return true
+                if (!collectionsLiveHere || !(await isDecentralandCollection(address))) return false
+                collections.add(address.toLowerCase())
+                return true
+              } catch {
+                return false
+              }
+            }
+            const verdicts = await Promise.all(addresses.map(isRecognizedOrPlain))
+            if (isStale()) return false
+            const unrecognized = addresses.filter((_, index) => !verdicts[index])
+            if (unrecognized.length > 0) {
+              return refuse(`the call reaches a contract that is not Decentraland's: ${listAddresses(unrecognized)}`)
+            }
+            setSimulationCollections([...collections])
+            setAreCounterpartiesVerified(true)
+            return true
+          } catch (e) {
+            console.error('The contracts the call reaches could not be checked', e)
+            return refuse('the contracts the call reaches could not be checked')
           }
-          const verdicts = await Promise.all(addresses.map(isRecognizedOrPlain))
-          if (isStale()) return false
-          const unrecognized = addresses.filter((_, index) => !verdicts[index])
-          if (unrecognized.length > 0) {
-            return refuse(`the call reaches a contract that is not Decentraland's: ${unrecognized.join(', ')}`)
-          }
-          setSimulationCollections([...collections])
-          setAreCounterpartiesVerified(true)
-          return true
         }
 
         // The wallet-side fee estimate for a transaction the user pays gas for (a plain send on the
@@ -824,6 +838,9 @@ export const RequestPage = () => {
           setSimulationChainId(transaction.chainId)
 
           if (transaction.branded === 'tip') {
+            // The same rule as the generic review, so a transfer's outcome cannot depend on which view shows it.
+            if (!(await verifyCounterparties(transaction.call, transaction.chainId, transaction.contract.address))) return
+            if (isStale()) return
             try {
               const manaData = decodeManaTransferData(transaction.call)
               if (manaData) {

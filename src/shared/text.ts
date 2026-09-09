@@ -39,4 +39,16 @@ const formatUntrustedLabel = (value: unknown, maxLength = DEFAULT_UNTRUSTED_LABE
   return revealed.length > maxLength ? `${revealed.slice(0, maxLength - 1)}…` : revealed
 }
 
-export { HIDDEN_CHARACTER_PATTERN, capitalize, formatUntrustedLabel, revealHiddenCharacters, shortenAddress }
+const MAX_LISTED_ADDRESSES = 3
+
+/**
+ * A few addresses for a message a person reads and a request is answered with: the first three in full, the
+ * rest as a count, so a trade naming dozens of contracts cannot bloat an error screen or an outcome body.
+ */
+const listAddresses = (addresses: string[]): string => {
+  const listed = addresses.slice(0, MAX_LISTED_ADDRESSES).join(', ')
+  const rest = addresses.length - MAX_LISTED_ADDRESSES
+  return rest > 0 ? `${listed} and ${rest} more` : listed
+}
+
+export { HIDDEN_CHARACTER_PATTERN, capitalize, formatUntrustedLabel, listAddresses, revealHiddenCharacters, shortenAddress }

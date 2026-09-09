@@ -120,12 +120,19 @@ class SimulationUnavailableError extends Error {
   readonly skipReporting = true
   constructor(
     reason?: string,
-    public readonly status?: number
+    public readonly status?: number,
+    /**
+     * The server's own account of a rejection (`invalid_request`: the request itself was refused;
+     * `upstream_rejected`: the simulation provider refused it), when it gave one.
+     */
+    public readonly code?: SimulationRejectionCode
   ) {
     super(`Transaction simulation unavailable${reason ? `: ${reason}` : ''}`)
     this.name = 'SimulationUnavailableError'
   }
 }
+
+type SimulationRejectionCode = 'invalid_request' | 'upstream_rejected'
 
 /**
  * Thrown when classifying an eth_sendTransaction needs to know whether its target is a Decentraland
@@ -155,3 +162,4 @@ export {
   SimulationUnavailableError,
   UnsupportedContractError
 }
+export type { SimulationRejectionCode }

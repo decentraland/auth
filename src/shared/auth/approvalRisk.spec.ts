@@ -169,55 +169,82 @@ describe('isDangerousApproval', () => {
 
 describe('withoutAllowanceConsumption', () => {
   const SIGNER = '0xD9B96b5dC720Fc52bEde1eC3B40A930E15F70DDD'
-  let signerAllowance: ApprovalChange
+  const MARKETPLACE = '0x480a0f4e360E8964e68858Dd231c2922f1df45Ef'
+  let consumedAllowance: ApprovalChange
+  let grantToAnotherSpender: ApprovalChange
   let otherOwnerAllowance: ApprovalChange
   let signerTokenApproval: ApprovalChange
   let result: SimulationResponseBody
 
   beforeEach(() => {
-    signerAllowance = buildAllowance({ owner: SIGNER.toLowerCase() })
-    otherOwnerAllowance = buildAllowance({ owner: '0x1111111111111111111111111111111111111111' })
-    signerTokenApproval = buildAllowance({ owner: SIGNER.toLowerCase(), standard: 'erc721', amount: null, rawAmount: null, tokenId: '7' })
+    consumedAllowance = buildAllowance({ owner: SIGNER.toLowerCase(), spender: MARKETPLACE.toLowerCase() })
+    grantToAnotherSpender = buildAllowance({ owner: SIGNER.toLowerCase(), spender: SPENDER, isUnlimited: true, amount: null })
+    otherOwnerAllowance = buildAllowance({ owner: '0x1111111111111111111111111111111111111111', spender: MARKETPLACE.toLowerCase() })
+    signerTokenApproval = buildAllowance({
+      owner: SIGNER.toLowerCase(),
+      spender: MARKETPLACE.toLowerCase(),
+      standard: 'erc721',
+      amount: null,
+      rawAmount: null,
+      tokenId: '7'
+    })
     result = {
       status: 'success',
       assetChanges: [],
-      approvalChanges: [signerAllowance, otherOwnerAllowance, signerTokenApproval],
+      approvalChanges: [consumedAllowance, grantToAnotherSpender, otherOwnerAllowance, signerTokenApproval],
       balanceChanges: [],
       events: []
     }
   })
 
-  describe.each(['approve', 'increaseAllowance', 'decreaseAllowance'])('when the signer called %s', functionName => {
-    it('should keep every approval as reported, since the call changes an allowance by a grant', () => {
-      expect(withoutAllowanceConsumption(result, functionName, SIGNER).approvalChanges).toEqual([
-        signerAllowance,
-        otherOwnerAllowance,
-        signerTokenApproval
-      ])
+  describe.each(['approve', 'increaseAllowance', 'decreaseAllowance'])('when the signer called %s on the token', functionName => {
+    it('should keep every approval as reported, since the call is a grant whatever it names', () => {
+      expect(
+        withoutAllowanceConsumption(result, { functionName, calledContract: MARKETPLACE, signerAddress: SIGNER }).approvalChanges
+      ).toEqual(result.approvalChanges)
     })
   })
 
-  describe('when the signer called a function that is not an allowance function', () => {
-    let filtered: SimulationResponseBody
+  describe.each(['executeOrder', 'accept', 'permit', 'aNameThisPageHasNeverSeen'])(
+    'when the signer called %s on the marketplace',
+    functionName => {
+      let filtered: SimulationResponseBody
 
-    beforeEach(() => {
-      filtered = withoutAllowanceConsumption(result, 'executeOrder', SIGNER)
-    })
+      beforeEach(() => {
+        filtered = withoutAllowanceConsumption(result, { functionName, calledContract: MARKETPLACE, signerAddress: SIGNER })
+      })
 
-    it('should drop the ERC20 approval the signer owns, since it is the remaining allowance a transfer wrote', () => {
-      expect(filtered.approvalChanges).not.toContainEqual(signerAllowance)
-    })
+      it('should drop the allowance the called contract consumed, which is the remaining allowance a transfer wrote', () => {
+        expect(filtered.approvalChanges).not.toContainEqual(consumedAllowance)
+      })
 
-    it('should keep an ERC20 approval owned by another account', () => {
-      expect(filtered.approvalChanges).toContainEqual(otherOwnerAllowance)
-    })
+      it('should keep a grant to any other spender, whatever the function is called', () => {
+        expect(filtered.approvalChanges).toContainEqual(grantToAnotherSpender)
+      })
 
-    it('should keep a single-token approval the signer owns, since only ERC20 allowances are written by transfers', () => {
-      expect(filtered.approvalChanges).toContainEqual(signerTokenApproval)
-    })
+      it('should keep an allowance owned by another account', () => {
+        expect(filtered.approvalChanges).toContainEqual(otherOwnerAllowance)
+      })
 
-    it('should leave the rest of the result untouched', () => {
-      expect(filtered).toEqual({ ...result, approvalChanges: [otherOwnerAllowance, signerTokenApproval] })
+      it('should keep a single-token approval, since only ERC20 allowances are written by transfers', () => {
+        expect(filtered.approvalChanges).toContainEqual(signerTokenApproval)
+      })
+
+      it('should leave the rest of the result untouched', () => {
+        expect(filtered).toEqual({ ...result, approvalChanges: [grantToAnotherSpender, otherOwnerAllowance, signerTokenApproval] })
+      })
+    }
+  )
+
+  describe('when the called contract is spelled in another casing', () => {
+    it('should still recognize the consumed allowance', () => {
+      expect(
+        withoutAllowanceConsumption(result, {
+          functionName: 'executeOrder',
+          calledContract: MARKETPLACE.toUpperCase(),
+          signerAddress: SIGNER
+        }).approvalChanges
+      ).not.toContainEqual(consumedAllowance)
     })
   })
 })

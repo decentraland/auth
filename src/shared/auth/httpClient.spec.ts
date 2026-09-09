@@ -661,6 +661,26 @@ describe('createAuthServerClient', () => {
       })
     })
 
+    describe('and the server rejects the request with a typed code', () => {
+      beforeEach(() => {
+        mockFetch.mockResolvedValueOnce({ ok: false, status: 400, json: () => Promise.resolve({ error: 'x', code: 'upstream_rejected' }) })
+      })
+
+      it('should carry the code so a caller can tell the request being refused from the provider refusing it', async () => {
+        await expect(client.simulateTransaction(body)).rejects.toMatchObject({ status: 400, code: 'upstream_rejected' })
+      })
+    })
+
+    describe('and the server rejects the request with a code this client does not know', () => {
+      beforeEach(() => {
+        mockFetch.mockResolvedValueOnce({ ok: false, status: 400, json: () => Promise.resolve({ error: 'x', code: 'something_new' }) })
+      })
+
+      it('should leave the code unknown', async () => {
+        await expect(client.simulateTransaction(body)).rejects.toMatchObject({ status: 400, code: undefined })
+      })
+    })
+
     describe('and the request fails or times out', () => {
       beforeEach(() => {
         mockFetch.mockRejectedValueOnce(new Error('The operation was aborted due to timeout'))

@@ -67,29 +67,45 @@ function isDangerousApproval(approval: ApprovalChange, isRecognizedSpender: (add
   return !isRecognizedSpender(approval.spender)
 }
 
-// The functions through which an account changes its own ERC20 allowance. Only a call to one of these, made
-// by the owner, grants or changes an allowance; every other `Approval(owner, …)` a transaction logs is the
-// token writing the remaining allowance after a `transferFrom` spent part of it.
+// The functions through which an account changes its own ERC20 allowance: a call to one of these is a grant
+// by definition and is always shown.
 const ALLOWANCE_FUNCTIONS: ReadonlySet<string> = new Set(['approve', 'increaseAllowance', 'decreaseAllowance'])
 
+type ReviewedCall = {
+  /** The function the signer's calldata decodes to. */
+  functionName: string
+  /** The contract the signer's call is sent to. */
+  calledContract: string
+  signerAddress: string
+}
+
 /**
- * Drops the ERC20 `Approval` events that are allowance consumption rather than grants. An ERC20
- * `transferFrom` writes the remaining allowance as `Approval(owner, spender, remaining)`; with an unlimited
- * allowance to the marketplace, every purchase would otherwise read as an unlimited grant and trip the
- * high-risk gate. Logs alone cannot tell that write from a real grant, but the decoded call can: the
- * signer's allowance only changes by a grant when the signer's own call is an allowance function. So on
- * any other call, an ERC20 approval owned by the signer is consumption and is left out; approvals owned
- * by anyone else, and every approval on an allowance call, stay exactly as reported.
+ * Drops the one ERC20 `Approval` that is allowance consumption rather than a grant. An ERC20 `transferFrom`
+ * writes the remaining allowance as `Approval(owner, spender, remaining)`, and the spender that pulls the
+ * signer's tokens is the contract the signer called (a marketplace, the store, the credits manager); with
+ * an unlimited allowance to it, every purchase would otherwise read as an unlimited grant and trip the
+ * high-risk gate. So an ERC20 approval owned by the signer whose spender is the called contract is left
+ * out, unless the signer's own call is an allowance function, which is a grant whatever it names. Every
+ * other approval stays as reported: a grant to any other spender, whatever the function is called (a
+ * `permit`, a batch, a name this page has never seen), an approval owned by anyone else. The rule fails
+ * towards showing more, never less.
  */
-function withoutAllowanceConsumption(result: SimulationResponseBody, functionName: string, signerAddress: string): SimulationResponseBody {
-  if (ALLOWANCE_FUNCTIONS.has(functionName)) {
+function withoutAllowanceConsumption(result: SimulationResponseBody, call: ReviewedCall): SimulationResponseBody {
+  if (ALLOWANCE_FUNCTIONS.has(call.functionName)) {
     return result
   }
-  const signer = signerAddress.toLowerCase()
+  const signer = call.signerAddress.toLowerCase()
+  const calledContract = call.calledContract.toLowerCase()
   return {
     ...result,
     approvalChanges: result.approvalChanges.filter(
-      approval => !(approval.kind === 'approval' && approval.standard === 'erc20' && approval.owner.toLowerCase() === signer)
+      approval =>
+        !(
+          approval.kind === 'approval' &&
+          approval.standard === 'erc20' &&
+          approval.owner.toLowerCase() === signer &&
+          approval.spender?.toLowerCase() === calledContract
+        )
     )
   }
 }

@@ -10,6 +10,7 @@ import {
   getMetaTransactionCalldataField,
   getMetaTransactionSalt,
   getStaticContractIndex,
+  isRecognizedDecentralandContract,
   resolveKnownDecentralandContract
 } from './decentralandContracts'
 
@@ -417,6 +418,44 @@ describe('when decoding a call against a known contract', () => {
   })
 })
 
+describe('when asking whether an address is one of Decentraland contracts', () => {
+  const LAND_MAINNET = '0xF87E31492Faf9A91B02Ee0dEAAd50d51d56D5d4d'
+  const ESTATE_SEPOLIA = '0x369a7fbe718c870c79f99fb423882e8dd8b20486'
+
+  describe('and the address is a registry contract on that chain', () => {
+    it('should recognize it', () => {
+      expect(isRecognizedDecentralandContract(getContract(ContractName.MANAToken, POLYGON).address, POLYGON)).toBe(true)
+    })
+  })
+
+  describe('and the address is the LAND registry, which the SDK does not carry, in another casing', () => {
+    it('should recognize it on Ethereum', () => {
+      expect(isRecognizedDecentralandContract(LAND_MAINNET, ETHEREUM)).toBe(true)
+    })
+
+    it('should not recognize it on another chain', () => {
+      expect(isRecognizedDecentralandContract(LAND_MAINNET, POLYGON)).toBe(false)
+    })
+
+    it('should never decode a call against it, since no ABI ships with it', () => {
+      expect(getKnownDecentralandContract(LAND_MAINNET, ETHEREUM)).toBeNull()
+    })
+  })
+
+  describe('and the address is the Estate registry on Sepolia', () => {
+    it('should recognize it there only', () => {
+      expect(isRecognizedDecentralandContract(ESTATE_SEPOLIA, 11155111)).toBe(true)
+      expect(isRecognizedDecentralandContract(ESTATE_SEPOLIA, ETHEREUM)).toBe(false)
+    })
+  })
+
+  describe('and the address is not a Decentraland contract', () => {
+    it('should not recognize it', () => {
+      expect(isRecognizedDecentralandContract(RECIPIENT, ETHEREUM)).toBe(false)
+    })
+  })
+})
+
 describe('when collecting the addresses a call reaches', () => {
   const POLYGON = 137
   const USER = '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd'
@@ -483,6 +522,52 @@ describe('when collecting the addresses a call reaches', () => {
     it('should follow the nested call and surface the registry hidden in its payload', () => {
       expect(result.opaque).toBe(false)
       expect([...result.addresses]).toEqual(expect.arrayContaining([marketplace.address, UNKNOWN_NFT, OTHER, USER]))
+    })
+  })
+
+  describe.each([
+    'transfer',
+    'transferFrom',
+    'approve',
+    'setApprovalForAll',
+    'increaseAllowance',
+    'decreaseAllowance',
+    'batchTransferFrom'
+  ])('and the call is %s, whose address arguments are never called', functionName => {
+    beforeEach(() => {
+      result = collectCallAddresses({ functionName, args: [USER, OTHER, 1n], payable: false, forwardsCall: false }, POLYGON)
+    })
+
+    it('should reach nothing, so a contract wallet as recipient, spender or operator changes nothing', () => {
+      expect(result).toEqual({ addresses: new Set(), opaque: false })
+    })
+  })
+
+  describe('and the call is a safe transfer, whose recipient is called', () => {
+    beforeEach(() => {
+      result = collectCallAddresses(
+        { functionName: 'safeTransferFrom', args: [USER, OTHER, 1n], payable: false, forwardsCall: false },
+        POLYGON
+      )
+    })
+
+    it('should reach the recipient', () => {
+      expect(result.addresses.has(OTHER)).toBe(true)
+    })
+  })
+
+  describe('and a credits purchase nests a MANA transfer', () => {
+    beforeEach(() => {
+      const mana = getKnownDecentralandContract(getContract(ContractName.MANAToken, POLYGON).address, POLYGON)!
+      const transferCalldata = encodeFunctionData({ abi: mana.abi, functionName: 'transfer', args: [OTHER, 1n] })
+      result = collectCallAddresses(
+        useCreditsWith({ target: mana.address, selector: transferCalldata.slice(0, 10), data: `0x${transferCalldata.slice(10)}` }),
+        POLYGON
+      )
+    })
+
+    it('should reach the token it calls but not the recipient the transfer never calls', () => {
+      expect(result).toEqual({ addresses: new Set([getContract(ContractName.MANAToken, POLYGON).address.toLowerCase()]), opaque: false })
     })
   })
 

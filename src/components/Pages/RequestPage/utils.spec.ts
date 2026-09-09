@@ -485,7 +485,7 @@ describe('when reading the addresses a Decentraland call is handed', () => {
   describe('and the call names the signer in another casing and the zero address', () => {
     beforeEach(() => {
       call = {
-        functionName: 'transferFrom',
+        functionName: 'safeTransferFrom',
         args: [SIGNER.toUpperCase().replace('0X', '0x'), '0x0000000000000000000000000000000000000000', BigInt(1)],
         payable: false,
         forwardsCall: false
@@ -493,6 +493,16 @@ describe('when reading the addresses a Decentraland call is handed', () => {
     })
 
     it('should return nothing', () => {
+      expect(getCounterpartyAddresses(call, SIGNER, CHAIN)).toEqual({ addresses: [], opaque: false })
+    })
+  })
+
+  describe('and the call is a MANA transfer to a contract wallet', () => {
+    beforeEach(() => {
+      call = { functionName: 'transfer', args: [OTHER, BigInt(10)], payable: false, forwardsCall: false }
+    })
+
+    it('should return nothing, since a transfer never calls its recipient', () => {
       expect(getCounterpartyAddresses(call, SIGNER, CHAIN)).toEqual({ addresses: [], opaque: false })
     })
   })
@@ -1126,6 +1136,27 @@ describe('when testing fetchNftMetadata', () => {
 
     it('should refuse to parse it', async () => {
       await expect(fetchNftMetadata(contractAddress, contractABI, tokenId)).rejects.toThrow('too large')
+    })
+  })
+
+  describe('and reading the metadata body fails for a reason other than its size', () => {
+    beforeEach(() => {
+      mockPublicClient = {
+        getChainId: jest.fn().mockResolvedValue(1),
+        readContract: jest.fn().mockResolvedValueOnce('https://example.com/token/123')
+      }
+      jest.mocked(createPublicClient).mockReturnValue(mockPublicClient)
+      jest.mocked(fetch).mockResolvedValueOnce({
+        ok: true,
+        headers: { get: () => null },
+        body: { getReader: () => ({ read: jest.fn().mockRejectedValue(new Error('The operation was aborted due to timeout')) }) }
+      } as any)
+    })
+
+    it('should say the body could not be read rather than call it too large', async () => {
+      await expect(fetchNftMetadata(contractAddress, contractABI, tokenId)).rejects.toThrow(
+        'could not be read: The operation was aborted due to timeout'
+      )
     })
   })
 

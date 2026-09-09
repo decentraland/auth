@@ -43,6 +43,23 @@ type DecodedCall = {
   forwardsCall: boolean
 }
 
+// The registry functions whose address arguments are never called. The ERC20 functions of MANAToken and the
+// non-safe ERC721 functions of the collections and the name registrar (per the OpenZeppelin code they derive
+// from) only write balances, owners and allowances: the recipient, spender or operator they are handed runs
+// no code inside the transaction, so a contract wallet there (a Safe, a DAO treasury, an exchange deposit)
+// changes nothing about what the preview shows. Every other function keeps the conservative reading, since
+// `safeTransferFrom` calls its recipient and the marketplaces, bids and rentals call the registry they are
+// given. Checked by name: no registry contract declares one of these names with another meaning.
+const NON_CALLING_FUNCTIONS: ReadonlySet<string> = new Set([
+  'transfer',
+  'transferFrom',
+  'batchTransferFrom',
+  'approve',
+  'setApprovalForAll',
+  'increaseAllowance',
+  'decreaseAllowance'
+])
+
 // The registry functions that execute calldata they are given rather than an action of their own: the
 // payable entry points (`executeMetaTransaction` on every meta-transaction contract, `Forwarder.forwardCall`)
 // and the non-payable ones (`CollectionManager.manageCollection` and `Committee.manageCollection` run
@@ -155,6 +172,31 @@ function getStaticContractIndex(): Map<number, Map<string, KnownContract>> {
 /** The Decentraland contract deployed at `address` on `chainId` per the static registry, or null. */
 function getKnownDecentralandContract(address: string, chainId: number): KnownContract | null {
   return getStaticContractIndex().get(chainId)?.get(address.toLowerCase()) ?? null
+}
+
+// Decentraland's own contracts that `decentraland-transactions` does not carry: the LAND and Estate registries
+// (their proxies, the addresses every order, bid, rental and trade names). Recognition only: they count as
+// Decentraland's when a call hands them to a Decentraland contract and they wear the verified badge, but no
+// call is ever decoded against them, since no ABI ships with them, so a transaction sent to one of them stays
+// an unknown transaction rather than becoming a Decentraland call whose calldata cannot be read.
+const RECOGNITION_ONLY_CONTRACTS: ReadonlyArray<{ chainId: number; address: string; name: string }> = [
+  { chainId: ChainId.ETHEREUM_MAINNET, name: 'LANDRegistry', address: '0xf87e31492faf9a91b02ee0deaad50d51d56d5d4d' },
+  { chainId: ChainId.ETHEREUM_MAINNET, name: 'EstateRegistry', address: '0x959e104e1a4db6317fa58f8295f586e1a978c297' },
+  { chainId: ChainId.ETHEREUM_SEPOLIA, name: 'LANDRegistry', address: '0x42f4ba48791e2de32f5fbf553441c2672864bb33' },
+  { chainId: ChainId.ETHEREUM_SEPOLIA, name: 'EstateRegistry', address: '0x369a7fbe718c870c79f99fb423882e8dd8b20486' }
+]
+
+/**
+ * Whether `address` is one of Decentraland's own contracts on `chainId`: a registry contract, or one of the
+ * registries the SDK does not carry (see RECOGNITION_ONLY_CONTRACTS). Says nothing about how to decode a
+ * call to it; that is getKnownDecentralandContract's job, and factory collections are a lookup apart.
+ */
+function isRecognizedDecentralandContract(address: string, chainId: number): boolean {
+  const normalized = address.toLowerCase()
+  return (
+    getKnownDecentralandContract(normalized, chainId) !== null ||
+    RECOGNITION_ONLY_CONTRACTS.some(contract => contract.chainId === chainId && contract.address === normalized)
+  )
 }
 
 /** The `ERC721CollectionV2` template for `chainId` with `address` substituted, or null when the template is not on that chain. */
@@ -282,7 +324,7 @@ function collectInto(value: unknown, chainId: number, depth: number, result: Cal
       target && depth < MAX_NESTED_CALL_DEPTH ? decodeKnownContractCall(target, `${value.selector}${value.data.slice(2)}`) : null
     if (!nested || nested.forwardsCall) {
       result.opaque = true
-    } else {
+    } else if (!NON_CALLING_FUNCTIONS.has(nested.functionName)) {
       collectInto(nested.args, chainId, depth + 1, result)
     }
     return
@@ -291,17 +333,21 @@ function collectInto(value: unknown, chainId: number, depth: number, result: Cal
 }
 
 /**
- * Every address a decoded Decentraland call is handed, lowercased, walking arrays and structs, and following
- * a nested call (an `externalCall` struct) into the call it carries when its target is a Decentraland contract
- * on `chainId` and the payload decodes against that contract's ABI. `opaque` is true when a nested payload
- * could not be read that way: it may name addresses this walk cannot see, so the caller must not vouch for
- * what the call reaches. Only calldata declared as a nested call is followed: a plain `bytes` argument (a
- * safe transfer's `data`, a factory's `createCollection` initializer, a trade's `extra`) is not a call this
- * page is asked to review, see FORWARDING_FUNCTIONS for the ones that are refused outright.
+ * Every address a decoded Decentraland call reaches, lowercased: the addresses in its arguments, walking
+ * arrays and structs, and following a nested call (an `externalCall` struct) into the call it carries when
+ * its target is a Decentraland contract on `chainId` and the payload decodes against that contract's ABI.
+ * A function that never calls its address arguments (see NON_CALLING_FUNCTIONS) reaches nothing, at the top
+ * level and nested alike. `opaque` is true when a nested payload could not be read: it may name addresses
+ * this walk cannot see, so the caller must not vouch for what the call reaches. Only calldata declared as a
+ * nested call is followed: a plain `bytes` argument (a safe transfer's `data`, a factory's `createCollection`
+ * initializer, a trade's `extra`) is not a call this page is asked to review, see FORWARDING_FUNCTIONS for
+ * the ones that are refused outright.
  */
 function collectCallAddresses(call: DecodedCall, chainId: number): CallAddresses {
   const result: CallAddresses = { addresses: new Set<string>(), opaque: false }
-  collectInto(call.args, chainId, 0, result)
+  if (!NON_CALLING_FUNCTIONS.has(call.functionName)) {
+    collectInto(call.args, chainId, 0, result)
+  }
   return result
 }
 
@@ -313,6 +359,7 @@ export {
   getMetaTransactionCalldataField,
   getMetaTransactionSalt,
   getStaticContractIndex,
+  isRecognizedDecentralandContract,
   resolveKnownDecentralandContract
 }
 export type { CallAddresses, CollectionLookup, ContractResolution, DecodedCall, KnownContract, ResolveContractDependencies }
