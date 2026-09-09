@@ -1211,7 +1211,8 @@ export const RequestPage = () => {
       if (!walletClient || !reviewedSigner) return 'unsent'
       const [currentAddress] = await walletClient.getAddresses()
       if (currentAddress.toLowerCase() !== reviewedSigner) return 'other_account'
-      await authServerClient.current.sendFailedOutcome(requestId, reviewedSigner, error)
+      // The wallet's own spelling of the reviewing account, as every other outcome sends it.
+      await authServerClient.current.sendFailedOutcome(requestId, currentAddress, error)
       return 'sent'
     }
     // Flips once the wallet has executed the request. Past that point the action is irreversible —

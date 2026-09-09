@@ -91,7 +91,8 @@ describe('when checking the counterparty rules against the installed registry', 
     contracts = []
     for (const byAddress of getStaticContractIndex().values()) {
       for (const contract of byAddress.values()) {
-        const key = `${contract.name}:${JSON.stringify(contract.abi).length}`
+        // The ABI text itself is the key: two ABIs of one length are two ABIs.
+        const key = `${contract.name}:${JSON.stringify(contract.abi)}`
         if (seen.has(key)) continue
         seen.add(key)
         contracts.push(contract)

@@ -172,17 +172,26 @@ function hasPrimaryType(typedData: unknown): boolean {
   return typeof typedData === 'object' && typedData !== null && typeof (typedData as { primaryType?: unknown }).primaryType === 'string'
 }
 
-// EIP-712 carries integers only, and JavaScript represents a JSON number exactly only up to 2^53 - 1. A
-// number literal beyond that, or one with a fraction or an exponent, would be rewritten when the parsed
-// typed data is serialized for the wallet (9007199254740993 becomes 9007199254740992), so the wallet would
-// sign something other than what the request said. Such a request is refused: a value that large belongs in
-// a string, which is what every EIP-712 encoder emits for it.
+// EIP-712 carries integers only, and a JSON number becomes a JavaScript double when the typed data is parsed
+// and serialized for the wallet. An integer literal the double cannot hold exactly is rewritten on the way
+// (9007199254740993 becomes 9007199254740992, a collection item id loses its low digits), so the wallet would
+// sign a value other than the one the request said. Such a request is refused: a value that large belongs in
+// a string, which is what every EIP-712 encoder emits for it. Integers the double does hold exactly, such as
+// 10^18 or 10^20 wei, keep their value whatever digits the serializer prints, and pass. A fraction or an
+// exponent is refused too: neither is an EIP-712 integer.
 const JSON_NUMBER_LEXEME = /-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/y
-const SAFE_INTEGER_LEXEME = /^-?(?:0|[1-9]\d*)$/
+const INTEGER_LEXEME = /^-?(?:0|[1-9]\d*)$/
+
+/** Whether `lexeme` is an integer literal whose value a JavaScript number holds exactly. */
+function isExactInteger(lexeme: string): boolean {
+  if (!INTEGER_LEXEME.test(lexeme)) return false
+  const value = Number(lexeme)
+  return Number.isFinite(value) && BigInt(lexeme) === BigInt(value)
+}
 
 /**
- * Whether every number literal in `json` survives a parse and a serialization unchanged. Strings are skipped
- * (with their escapes), so a numeric-looking value inside quotes is not a number.
+ * Whether every number literal in `json` keeps its value through a parse and a serialization. Strings are
+ * skipped (with their escapes), so a numeric-looking value inside quotes is not a number.
  */
 function hasOnlyExactNumbers(json: string): boolean {
   let inString = false
@@ -202,7 +211,7 @@ function hasOnlyExactNumbers(json: string): boolean {
       const match = JSON_NUMBER_LEXEME.exec(json)
       if (!match) return false
       const lexeme = match[0]
-      if (!SAFE_INTEGER_LEXEME.test(lexeme) || !Number.isSafeInteger(Number(lexeme))) return false
+      if (!isExactInteger(lexeme)) return false
       index += lexeme.length - 1
     }
   }
@@ -255,12 +264,15 @@ function assertSignatureParamsAreCanonical(method: string, params: unknown[] | u
   if (typeof second === 'string' && second.length > MAX_SIGNATURE_PAYLOAD_CHARS) {
     throw new MalformedSignatureRequestError(method, 'the typed data is too large to review')
   }
-  if (typeof second === 'string' && !hasOnlyExactNumbers(second)) {
-    throw new MalformedSignatureRequestError(method, 'the typed data contains a number that cannot be represented exactly')
-  }
   const typedData = parseTypedData(second)
   if (!isSigner(first, signer) || !hasPrimaryType(typedData)) {
     throw new MalformedSignatureRequestError(method)
+  }
+  // Text that parsed as typed data is scanned as text: the wallet is handed a serialization of the parsed
+  // value, so a literal the parse rewrote would be signed as something else. A parsed object has no literals
+  // left to rewrite, since a number value serializes to itself.
+  if (typeof second === 'string' && !hasOnlyExactNumbers(second)) {
+    throw new MalformedSignatureRequestError(method, 'the typed data contains a number that cannot be represented exactly')
   }
   if (hasExcessiveTypedDataDepth(typedData)) {
     throw new MalformedSignatureRequestError(method, 'the typed data is too deeply nested to review')

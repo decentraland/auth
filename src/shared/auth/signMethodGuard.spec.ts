@@ -451,8 +451,9 @@ describe('assertSignatureParamsAreCanonical', () => {
     })
 
     describe.each([
-      ['an integer beyond 2^53', '9007199254740993'],
-      ['a negative integer beyond 2^53', '-9007199254740993'],
+      ['an integer a double cannot hold', '9007199254740993'],
+      ['a negative integer a double cannot hold', '-9007199254740993'],
+      ['a collection item id', '105312291668557186697918027683670432318895095400549111254310977736'],
       ['a fraction', '1.5'],
       ['an exponent', '1e3']
     ])('and the typed data text carries %s as a bare number', (_label, literal) => {
@@ -467,18 +468,46 @@ describe('assertSignatureParamsAreCanonical', () => {
       })
     })
 
-    describe('and the typed data text carries safe integers, and large numbers only inside strings', () => {
+    describe.each([
+      ['a wei amount of 10^18', '1000000000000000000'],
+      ['a wei amount of 10^20', '100000000000000000000'],
+      ['the largest safe integer', '9007199254740991'],
+      ['zero', '0'],
+      ['a negative integer', '-42']
+    ])('and the typed data text carries %s as a bare number', (_label, literal) => {
       let params: unknown[]
 
       beforeEach(() => {
-        params = [
-          signer,
-          '{"primaryType":"Permit","message":{"value":9007199254740991,"amount":"9007199254740993","note":"quoted \\" 1.5 e10","zero":0,"neg":-42}}'
-        ]
+        params = [signer, `{"primaryType":"Permit","message":{"value":${literal}}}`]
+      })
+
+      it('should keep the request reviewable, since a double holds that value exactly', () => {
+        expect(() => assertSignatureParamsAreCanonical(method, params, signer)).not.toThrow()
+      })
+    })
+
+    describe('and the typed data text carries large numbers only inside strings', () => {
+      let params: unknown[]
+
+      beforeEach(() => {
+        params = [signer, '{"primaryType":"Permit","message":{"amount":"9007199254740993","note":"quoted \\" 1.5 e10"}}']
       })
 
       it('should keep the request reviewable', () => {
         expect(() => assertSignatureParamsAreCanonical(method, params, signer)).not.toThrow()
+      })
+    })
+
+    describe('and the typed data text is not JSON at all', () => {
+      let params: unknown[]
+
+      beforeEach(() => {
+        params = [signer, 'sign 9007199254740993 please']
+      })
+
+      it('should refuse it as malformed typed data rather than blame a number', () => {
+        expect(() => assertSignatureParamsAreCanonical(method, params, signer)).toThrow(MalformedSignatureRequestError)
+        expect(() => assertSignatureParamsAreCanonical(method, params, signer)).not.toThrow('cannot be represented exactly')
       })
     })
 
