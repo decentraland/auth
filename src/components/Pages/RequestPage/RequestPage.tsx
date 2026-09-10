@@ -308,6 +308,16 @@ export const RequestPage = () => {
   // review whose connection has been replaced stops being actionable on the render that replaces it —
   // before the load effect that redoes the review has run (see isReviewActionable).
   const [loadedProvider, setLoadedProvider] = useState<typeof provider>()
+  // Whether the review on screen was made through the connection the page holds now. A wallet that hands
+  // the app a new provider object — an embedded wallet rebuilding its SDK, a chain change reported through
+  // the connection — starts a fresh review of the same request, but only when the load effect runs: React
+  // has already rendered, committed and painted the previous review under the new provider by then, and
+  // the wallet and public clients an answer would use are still the replaced provider's. So this is
+  // decided here, during that render, and both answers read it before they touch anything (see
+  // isReviewActionable, onDenyWalletInteraction). The ref carries the value to the handlers.
+  const isReviewConnectionCurrent = loadedProvider === provider
+  const isReviewConnectionCurrentRef = useRef(false)
+  isReviewConnectionCurrentRef.current = isReviewConnectionCurrent
   // Incremented when an approval discovers that its transaction review is no longer bound to a
   // verifiable live chain. This deliberately re-runs the load effect for the same route/account.
   const [reviewAttempt, setReviewAttempt] = useState(0)
@@ -1202,6 +1212,14 @@ export const RequestPage = () => {
     // Only the request this page recovered can be answered. If the route has moved on to another id,
     // nothing has been reviewed for it yet.
     if (recoveredRequestIdRef.current !== requestId) return
+    // Nor a review made through a connection the page has since replaced: the answer would go out through
+    // the replaced provider's clients, and marking the request answered below would tell the load that is
+    // about to redo the review that there is nothing left to do. Refused before either, so that load runs
+    // and Deny can be given again on the review it produces. Not re-checked after the await: a Deny that
+    // was in flight when the connection moved was decided on this request, by this account, through the
+    // wallet that was current when it was pressed, and that load has already left the review alone on its
+    // account — backing out then would leave nothing to redo it.
+    if (!isReviewConnectionCurrentRef.current) return
     // One answer per request: not while Allow or an earlier Deny is in flight, and not once the request
     // has been answered or has expired. Checked and set before the first await (see isSettlingRef).
     if (isSettlingRef.current || hasCompletedRef.current) return
@@ -1670,16 +1688,10 @@ export const RequestPage = () => {
   // own only for what it alone can measure (a long message scrolled to its end).
   const isReviewActionable = (() => {
     if (classification === null) return false
-    // The review was produced through the provider the page held when its load started. A wallet that
-    // hands the app a new provider object — an embedded wallet rebuilding its SDK, a chain change
-    // reported through the connection — starts a fresh review of the same request, but only when the
-    // load effect runs: React has already rendered, committed and painted the previous review under the
-    // new provider by then, and the wallet and public clients the approval would use are still the
-    // replaced provider's. So the check is made here, during that render, rather than left to the effect
-    // that follows it. Unlike the request id and the account, this gates approval rather than rendering:
-    // a review whose connection was replaced is still what the user was last shown, and a completed or
-    // failed screen must not blink back to loading because the wallet swapped a provider object.
-    if (loadedProvider !== provider) return false
+    // Unlike the request id and the account, a replaced connection gates the answers rather than the
+    // rendering: the review is still what the user was last shown, and a completed or failed screen must
+    // not blink back to loading because the wallet swapped a provider object.
+    if (!isReviewConnectionCurrent) return false
     const isPreviewSettled = simulationState.status === 'ready' || simulationState.status === 'unavailable'
     const isAcknowledgedIfNeeded = !requiresApprovalAcknowledgment || isAcknowledged
     switch (renderedView) {

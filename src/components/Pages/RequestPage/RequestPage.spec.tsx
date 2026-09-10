@@ -3759,30 +3759,31 @@ describe('RequestPage', () => {
     // leave it to the effect that follows.
     describe('and the replacement is observed commit by commit', () => {
       let approveBlockedAtCommit: string[]
-      let pressAllowOnNextCommit: boolean
-      let approvalStartedFromPress: boolean
+      let pressOnNextCommit: 'wallet-interaction-approve' | 'wallet-interaction-deny' | null
+      let walletReadFromPress: boolean
       let CommitProbe: ({ children }: { children: React.ReactNode }) => JSX.Element
 
       beforeEach(() => {
         // Injected, so Allow dispatches from the press instead of opening the web2 confirmation first.
         mockConnectionData = { ...mockConnectionData, providerType: ProviderType.INJECTED }
         approveBlockedAtCommit = []
-        pressAllowOnNextCommit = false
-        approvalStartedFromPress = false
+        pressOnNextCommit = null
+        walletReadFromPress = false
         // A layout effect runs in the same commit as the DOM update and before every passive effect, so it
         // sees the page exactly as the user would on that render — and can press what the user could press.
         CommitProbe = ({ children }: { children: React.ReactNode }) => {
           useLayoutEffect(() => {
             const view = screen.queryByTestId('wallet-interaction')
             approveBlockedAtCommit.push(view?.getAttribute('data-approve-blocked') ?? 'no-review')
-            if (pressAllowOnNextCommit) {
-              pressAllowOnNextCommit = false
-              // The double's Allow is never disabled, so the press reaches the page's handler either way:
-              // whether it starts an approval is the page's own answer, which is what this measures. The
-              // handler reads the wallet before anything else, so a read means it went ahead.
+            if (pressOnNextCommit) {
+              const pressed = pressOnNextCommit
+              pressOnNextCommit = null
+              // The double's buttons are never disabled, so the press reaches the page's handler either way:
+              // whether it goes ahead is the page's own answer, which is what this measures. Both handlers
+              // read the wallet before anything else, so a read means it did.
               const walletReadsBefore = mockGetAddresses.mock.calls.length
-              screen.queryByTestId('wallet-interaction-approve')?.click()
-              approvalStartedFromPress = mockGetAddresses.mock.calls.length > walletReadsBefore
+              screen.queryByTestId(pressed)?.click()
+              walletReadFromPress = mockGetAddresses.mock.calls.length > walletReadsBefore
             }
           })
           return <>{children}</>
@@ -3827,15 +3828,54 @@ describe('RequestPage', () => {
         const { rerender } = render(probedPage())
         await clearWalletInteractionGates()
 
-        pressAllowOnNextCommit = true
+        pressOnNextCommit = 'wallet-interaction-approve'
         refreshTheProbedProvider(rerender)
         await waitFor(() => expect(mockRecover.mock.calls.length).toBeGreaterThanOrEqual(2))
 
         // Refused by the page, not by a guard that happened to be re-read after the load had run: the
         // press must not reach the wallet at all.
-        expect(approvalStartedFromPress).toBe(false)
+        expect(walletReadFromPress).toBe(false)
         expect(jest.mocked(sendMetaTransaction)).not.toHaveBeenCalled()
         expect(mockSendSuccessfulOutcome).not.toHaveBeenCalled()
+      })
+
+      it('should answer nothing if Deny is pressed on that commit, and still redo the review', async () => {
+        const { rerender } = render(probedPage())
+        await clearWalletInteractionGates()
+
+        pressOnNextCommit = 'wallet-interaction-deny'
+        refreshTheProbedProvider(rerender)
+        await waitFor(() => expect(mockRecover.mock.calls.length).toBeGreaterThanOrEqual(2))
+
+        // Deny would have answered through the clients of the provider the page had just replaced. It is
+        // refused before it reads anything — and before it marks the request answered, so the load that
+        // follows is not told the request is settled and the replacement review comes up as it should.
+        expect(walletReadFromPress).toBe(false)
+        expect(mockSendFailedOutcome).not.toHaveBeenCalled()
+        await waitFor(() => expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-sim', 'ready'))
+        expect(screen.queryByTestId('denied-wallet-interaction')).not.toBeInTheDocument()
+      })
+
+      it('should still deliver a Deny that was in flight when the provider was replaced', async () => {
+        // The review reads the account once; Deny's read is held until the replacement has been committed.
+        let releaseAccountRead: (addresses: string[]) => void = () => undefined
+        mockGetAddresses
+          .mockResolvedValueOnce([SIGNER])
+          .mockImplementationOnce(() => new Promise(resolve => (releaseAccountRead = resolve)))
+        const { rerender } = render(probedPage())
+        await clearWalletInteractionGates()
+
+        await userEvent.click(screen.getByTestId('wallet-interaction-deny'))
+        await waitFor(() => expect(mockGetAddresses).toHaveBeenCalledTimes(2))
+        refreshTheProbedProvider(rerender)
+        releaseAccountRead([SIGNER])
+
+        // The decision was made — on this request, by this account, through the wallet that was current
+        // when it was made; only the provider object has moved since. It stands: Deny marked the request
+        // answered when it was pressed, so the load that ran meanwhile left the review alone, and backing
+        // out now would leave nothing to redo it.
+        await waitFor(() => expect(mockSendFailedOutcome).toHaveBeenCalledTimes(1))
+        expect(await screen.findByTestId('denied-wallet-interaction')).toBeInTheDocument()
       })
     })
   })
