@@ -14,6 +14,7 @@ import {
   SimulationUnavailableError
 } from './errors'
 import type { SimulationRejectionCode } from './errors'
+import { assertRecoverResponseIsCanonical } from './recoverResponse'
 import {
   assertMethodIsAllowed,
   assertRequestIsNotImpersonatingSignIn,
@@ -162,16 +163,21 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
         await extractError(response, requestId)
       }
 
-      recoverResponse = (await response.json()) as RecoverResponse
+      // Checked, not cast: `sender` and `expiration` are the two fields the checks below are made of, and
+      // both used to be read only when present, so a response without them was read as a request bound to
+      // nobody and expiring never (see assertRecoverResponseIsCanonical).
+      const body: unknown = await response.json()
+      assertRecoverResponseIsCanonical(body, requestId)
+      recoverResponse = body
 
       // If the sender defined in the request is different than the one that is connected, show an
       // error. Compare both sides case-insensitively — the server is not guaranteed to lowercase
       // `sender`, and a checksummed address must still match the connected (lowercased) account.
-      if (recoverResponse.sender && recoverResponse.sender.toLowerCase() !== signerAddress.toLowerCase()) {
+      if (recoverResponse.sender.toLowerCase() !== signerAddress.toLowerCase()) {
         throw new DifferentSenderError(signerAddress, recoverResponse.sender)
       }
 
-      if (recoverResponse.expiration && new Date(recoverResponse.expiration) < new Date()) {
+      if (new Date(recoverResponse.expiration) <= new Date()) {
         throw new ExpiredRequestError(requestId, recoverResponse.expiration)
       }
 

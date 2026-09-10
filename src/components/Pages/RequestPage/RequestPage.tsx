@@ -20,6 +20,7 @@ import {
   ExpiredRequestError,
   IdentityResponse,
   ImpersonatedSignInError,
+  MalformedRequestError,
   MalformedSignatureRequestError,
   MalformedTransactionRequestError,
   OutcomeError,
@@ -687,24 +688,28 @@ export const RequestPage = () => {
         setReviewedSignerAddress(signerAddress.toLowerCase())
 
         // Initialize the timeout to display the timeout view when the request expires.
-        // Guard against an unparseable expiration: `new Date(...).getTime()` would be NaN,
-        // which setTimeout coerces to 0 and fires the timeout view immediately.
         // A negative delay (a request that is already past its expiration) is intentional:
-        // setTimeout coerces it to 0 so the timeout view shows right away.
+        // setTimeout coerces it to 0 so the timeout view shows right away. So is an unreadable one:
+        // recover refuses a request whose expiration does not parse (see assertRecoverResponseIsCanonical),
+        // and if one ever reached here it would be a request with no expiry at all — the timer fires at
+        // once rather than never.
         const expirationDelay = new Date(request.expiration).getTime() - Date.now()
-        if (!Number.isNaN(expirationDelay)) {
-          timeoutRef.current = setTimeout(() => {
-            getAnalytics()?.track(TrackingEvents.REQUEST_EXPIRED, {
-              browserTime: Date.now(),
-              requestTime: new Date(request.expiration).getTime(),
-              timeTheSiteStartedLoading
-            })
-            // Expiry is terminal: it settles the request like an answer does, so nothing that resolves
-            // later (the classification, a branded lookup, the simulation) can put an actionable review
-            // back on screen, and neither Allow nor Deny can act on the expired request.
-            hasCompletedRef.current = true
-            setView(View.TIMEOUT)
-          }, expirationDelay)
+        {
+          timeoutRef.current = setTimeout(
+            () => {
+              getAnalytics()?.track(TrackingEvents.REQUEST_EXPIRED, {
+                browserTime: Date.now(),
+                requestTime: new Date(request.expiration).getTime(),
+                timeTheSiteStartedLoading
+              })
+              // Expiry is terminal: it settles the request like an answer does, so nothing that resolves
+              // later (the classification, a branded lookup, the simulation) can put an actionable review
+              // back on screen, and neither Allow nor Deny can act on the expired request.
+              hasCompletedRef.current = true
+              setView(View.TIMEOUT)
+            },
+            Number.isNaN(expirationDelay) ? 0 : expirationDelay
+          )
         }
 
         // Resolves Decentraland profile names for the transaction's counterparties as a
@@ -1110,6 +1115,11 @@ export const RequestPage = () => {
           // The request tried to sign a sign-in payload. Block it outright instead of
           // offering a retry that would re-trigger the same attack.
           await refuseRequest(e, 'impersonated_sign_in')
+          return
+        } else if (e instanceof MalformedRequestError) {
+          // The recovered request is not the shape the review is made of: no account to bind it to, no
+          // readable expiration. Block it; a retry recovers the same request.
+          await refuseRequest(e, 'malformed_request')
           return
         } else if (e instanceof MalformedSignatureRequestError || e instanceof MalformedTransactionRequestError) {
           // The params could preview one payload and sign or execute another, or the request is aimed at a

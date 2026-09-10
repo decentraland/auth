@@ -14,6 +14,7 @@ import {
   DifferentSenderError,
   ExpiredRequestError,
   ImpersonatedSignInError,
+  MalformedRequestError,
   MalformedSignatureRequestError,
   MalformedTransactionRequestError,
   RecoverResponse,
@@ -794,6 +795,35 @@ describe('RequestPage', () => {
           expect(mockRecover).toHaveBeenCalledTimes(2)
           expect(mockSendFailedOutcome).not.toHaveBeenCalled()
         })
+      })
+    })
+
+    // The recovered request is what the account binding and the expiry are made of. A response missing
+    // either used to read as a request bound to nobody and expiring never, so recover refuses one now and
+    // the page has to answer that refusal rather than review it (see assertRecoverResponseIsCanonical).
+    describe('and the recovered request names no account it is for, or no readable expiration', () => {
+      beforeEach(() => {
+        mockRecover.mockRejectedValue(new MalformedRequestError(REQUEST_ID, 'it names no account to be answered by'))
+        mockSendFailedOutcome.mockResolvedValue({})
+      })
+
+      it('should show the error view rather than review a request nothing binds', async () => {
+        renderRequestPage()
+
+        expect(await screen.findByTestId('signing-error')).toHaveAttribute('data-kind', 'malformed_request')
+        expect(screen.queryByTestId('unverified-request')).not.toBeInTheDocument()
+      })
+
+      it('should answer it as invalid, naming the rule for the developer', async () => {
+        renderRequestPage()
+        await screen.findByTestId('signing-error')
+
+        await waitFor(() =>
+          expect(mockSendFailedOutcome).toHaveBeenCalledWith(REQUEST_ID, SIGNER, {
+            code: -32602,
+            message: `The request ${REQUEST_ID} is malformed: it names no account to be answered by`
+          })
+        )
       })
     })
 

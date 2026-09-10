@@ -92,6 +92,22 @@ class MalformedTransactionRequestError extends Error {
 }
 
 /**
+ * Thrown when the recovered request itself is not the shape the review depends on: no account to bind it
+ * to, no readable expiration, no method, or parameters that are not a list. Unlike the malformed-params
+ * errors this is about the envelope rather than what is being signed, and it is what stops an absent field
+ * from reading as an absent restriction. `reason` says which rule was broken; it is safe to display.
+ */
+class MalformedRequestError extends Error {
+  constructor(
+    public readonly requestId: string,
+    public readonly reason: string
+  ) {
+    super(`The request ${requestId} is malformed: ${reason}`)
+    this.name = 'MalformedRequestError'
+  }
+}
+
+/**
  * Thrown when a Decentraland contract call reaches beyond Decentraland's own contracts: it hands the
  * transaction a contract Decentraland does not own (the NFT of a marketplace order or an off-chain trade,
  * the recipient of a safe transfer, a nested call that could not be read), or its preview moves an asset
@@ -156,6 +172,7 @@ export {
   DifferentSenderError,
   ExpiredRequestError,
   RequestNotFoundError,
+  MalformedRequestError,
   RequestFulfilledError,
   ImpersonatedSignInError,
   UnsupportedMethodError,

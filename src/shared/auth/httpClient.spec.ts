@@ -7,6 +7,7 @@ import {
   DifferentSenderError,
   ExpiredRequestError,
   ImpersonatedSignInError,
+  MalformedRequestError,
   MalformedSignatureRequestError,
   MalformedTransactionRequestError,
   RequestFulfilledError,
@@ -28,9 +29,11 @@ describe('createAuthServerClient', () => {
   // Common test variables
   const mockUrl = 'http://mock-auth-server.com'
   const mockRequestId = 'mock-request-id'
-  const mockSender = '0xmocksender'
-  const mockSignerAddress = '0xMockSignerAddress'
-  const mockSignerAddressLower = '0xmocksigneraddress'
+  // Real 20-byte addresses: recover requires the request to name the account it is for in the only form
+  // the comparison can be made against (see assertRecoverResponseIsCanonical).
+  const mockSender = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+  const mockSignerAddress = '0xAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAa'
+  const mockSignerAddressLower = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
 
   // Mock fetch
   let mockFetch: jest.Mock
@@ -133,7 +136,7 @@ describe('createAuthServerClient', () => {
 
     describe('when the sender does not match', () => {
       beforeEach(() => {
-        mockResponse.sender = 'different-sender'
+        mockResponse.sender = mockSender
         mockFetch.mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve(mockResponse)
@@ -142,6 +145,77 @@ describe('createAuthServerClient', () => {
 
       it('should throw a DifferentSenderError', async () => {
         await expect(client.recover(mockRequestId, mockSignerAddress)).rejects.toBeInstanceOf(DifferentSenderError)
+      })
+    })
+
+    // `sender` and `expiration` are not description but authorization: one binds the request to the account
+    // about to answer it, the other stops it being answerable forever. Both checks used to run only when
+    // the field was there, so a response without one carried no restriction at all.
+    describe('when the request names no account it is for', () => {
+      describe.each([
+        ['the field is missing', undefined],
+        ['it is empty', ''],
+        ['it is not an address', 'different-sender'],
+        ['it is too short to be one', '0xabc'],
+        ['it is not hexadecimal', '0xzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz']
+      ])('and %s', (_case, sender) => {
+        it('should refuse the request rather than answer one bound to nobody', async () => {
+          mockResponse.sender = sender as string
+          mockFetch.mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockResponse) })
+
+          await expect(client.recover(mockRequestId, mockSignerAddress)).rejects.toBeInstanceOf(MalformedRequestError)
+        })
+      })
+    })
+
+    describe('when the request carries no readable expiration', () => {
+      describe.each([
+        ['the field is missing', undefined],
+        ['it is empty', ''],
+        ['it is not a date', 'whenever'],
+        ['it is a number rather than a timestamp', 1234567890]
+      ])('and %s', (_case, expiration) => {
+        it('should refuse the request rather than treat it as never expiring', async () => {
+          mockResponse.expiration = expiration as string
+          mockFetch.mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockResponse) })
+
+          await expect(client.recover(mockRequestId, mockSignerAddress)).rejects.toBeInstanceOf(MalformedRequestError)
+        })
+      })
+    })
+
+    describe('when the response is not the shape the review is made of', () => {
+      describe.each([
+        ['it is not an object', 'not a request'],
+        ['it names no method', { sender: mockSignerAddressLower, expiration: new Date(Date.now() + 3600000).toISOString() }],
+        [
+          'its parameters are not a list',
+          {
+            sender: mockSignerAddressLower,
+            expiration: new Date(Date.now() + 3600000).toISOString(),
+            method: 'personal_sign',
+            params: 'hello'
+          }
+        ]
+      ])('and %s', (_case, body) => {
+        it('should refuse it rather than read fields off it', async () => {
+          mockFetch.mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(body) })
+
+          await expect(client.recover(mockRequestId, mockSignerAddress)).rejects.toBeInstanceOf(MalformedRequestError)
+        })
+      })
+    })
+
+    describe('when the request expires exactly now', () => {
+      it('should treat it as expired rather than as still answerable', async () => {
+        const now = new Date('2026-01-01T00:00:00.000Z')
+        jest.useFakeTimers().setSystemTime(now)
+        mockResponse.expiration = now.toISOString()
+        mockFetch.mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockResponse) })
+
+        await expect(client.recover(mockRequestId, mockSignerAddress)).rejects.toBeInstanceOf(ExpiredRequestError)
+
+        jest.useRealTimers()
       })
     })
 
