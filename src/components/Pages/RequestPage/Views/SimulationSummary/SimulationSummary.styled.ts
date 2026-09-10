@@ -113,6 +113,15 @@ const SkeletonRow = styled(Box)(({ theme }) => ({
   gap: theme.spacing(1.5)
 }))
 
+// The address a name belongs to, beside it. Subdued, since the name is what is read first, and never
+// wrapped away from it.
+const CounterpartyAddress = styled('span')(({ theme }) => ({
+  color: theme.palette.text.secondary,
+  marginLeft: theme.spacing(0.75),
+  opacity: 0.8,
+  whiteSpace: 'nowrap'
+}))
+
 const ExplorerLink = styled('a')(({ theme }) => ({
   color: 'inherit',
   textDecoration: 'underline',
@@ -272,6 +281,7 @@ export {
   DirectionIndicator,
   EventList,
   EventRow,
+  CounterpartyAddress,
   ExplorerLink,
   GasFooter,
   GasNote,
