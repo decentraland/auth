@@ -214,12 +214,17 @@ jest.mock('./Views', () => ({
       data-verified={JSON.stringify(props.verifiedContracts ?? [])}
       data-collections={JSON.stringify(props.collectionContracts ?? [])}
       data-review-restarted={String(props.reviewRestarted)}
+      data-deferred-callbacks={JSON.stringify(props.deferredCallbackAddresses ?? [])}
+      data-callback-acknowledged={String(props.deferredCallbackAcknowledged)}
     >
       <button data-testid="wallet-interaction-approve" onClick={props.onApprove}>
         approve
       </button>
       <button data-testid="wallet-interaction-acknowledge" onClick={() => props.onAcknowledgedChange?.(true)}>
         acknowledge
+      </button>
+      <button data-testid="wallet-interaction-callback-acknowledge" onClick={() => props.onDeferredCallbackAcknowledgedChange?.(true)}>
+        acknowledge callback risk
       </button>
       <button data-testid="wallet-interaction-deny" onClick={props.onDeny}>
         deny
@@ -2199,10 +2204,12 @@ describe('RequestPage', () => {
       beforeEach(async () => {
         mockIsAddressWithoutCode.mockResolvedValue(true)
         renderRequestPage()
-        if (kind === 'signature') {
-          await waitFor(() => expect(screen.getByTestId(viewTestId)).toHaveAttribute('data-deferred-callbacks', '["0xnft"]'))
-          await userEvent.click(screen.getByTestId('signature-callback-acknowledge'))
-        }
+        // Let through for having no code, and named for it: code can arrive there before the call executes,
+        // whichever way the call is dispatched, so both reviews ask consent for that before Allow enables.
+        await waitFor(() => expect(screen.getByTestId(viewTestId)).toHaveAttribute('data-deferred-callbacks', '["0xnft"]'))
+        await userEvent.click(
+          screen.getByTestId(`${viewTestId === 'wallet-interaction' ? 'wallet-interaction' : 'signature'}-callback-acknowledge`)
+        )
         view = await findVerifiedView()
       })
 
@@ -3056,6 +3063,117 @@ describe('RequestPage', () => {
         renderRequestPage()
         expect(await screen.findByTestId('wallet-interaction')).toBeInTheDocument()
         await waitFor(() => expect(mockSimulateTransaction).toHaveBeenCalled())
+      })
+    })
+  })
+
+  // The counterparty rule lets an address without code through: nothing can run there. A transaction is
+  // watched for and can be front-run, so the requester who chose the address can still put code there
+  // before it executes, and the preview no longer describes what runs. The same consent a signature asks
+  // for is asked here, on the one view able to ask it.
+  describe('when a Decentraland transaction hands an NFT to an address that has no code at preview time', () => {
+    const recipient = '0x1111111111111111111111111111111111111234'
+
+    beforeEach(() => {
+      // Injected, so Allow dispatches from the press instead of opening the web2 confirmation first.
+      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.INJECTED }
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockGetAddresses.mockResolvedValue([SIGNER])
+      mockRecover.mockResolvedValue(recovered('eth_sendTransaction', [{ to: CONTRACT, data: '0xabcd', value: '0x0' }]))
+      mockIsAddressWithoutCode.mockResolvedValue(true)
+      mockSimulateTransaction.mockResolvedValue(simulationOf({ assetChanges: [erc721Transfer({ from: SIGNER, to: recipient })] }))
+      jest.mocked(sendMetaTransaction).mockResolvedValue('0xrelayedhash')
+      mockSendSuccessfulOutcome.mockResolvedValue({})
+      mockSendFailedOutcome.mockResolvedValue({})
+    })
+
+    describe.each([false, true])('and safeTransferFrom carries receiver data: %s', withData => {
+      beforeEach(async () => {
+        const call = {
+          functionName: 'safeTransferFrom',
+          args: withData ? [SIGNER, recipient, BigInt(1), '0x1234'] : [SIGNER, recipient, BigInt(1)],
+          payable: false,
+          forwardsCall: false
+        }
+        const { addresses, opaque } = collectCallAddresses(call, 137)
+        addresses.delete(SIGNER.toLowerCase())
+        mockGetCounterpartyAddresses.mockReturnValue({ addresses: [...addresses], opaque })
+        mockClassifyRequest.mockResolvedValue(dclTransaction({ call }))
+        renderRequestPage()
+        await waitFor(() =>
+          expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-deferred-callbacks', JSON.stringify([recipient]))
+        )
+        await waitFor(() => expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-sim', 'ready'))
+      })
+
+      it('should require explicit consent despite the successful preview and empty recipient', async () => {
+        expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-approve-blocked', 'true')
+        await userEvent.click(screen.getByTestId('wallet-interaction-approve'))
+        expect(jest.mocked(sendMetaTransaction)).not.toHaveBeenCalled()
+      })
+
+      it('should relay after the callback risk is acknowledged', async () => {
+        await userEvent.click(screen.getByTestId('wallet-interaction-callback-acknowledge'))
+        await waitFor(() => expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-approve-blocked', 'false'))
+        await userEvent.click(screen.getByTestId('wallet-interaction-approve'))
+        await waitFor(() => expect(jest.mocked(sendMetaTransaction)).toHaveBeenCalledTimes(1))
+      })
+
+      it('should not count acknowledgment of other risks as consent to delayed code', async () => {
+        await userEvent.click(screen.getByTestId('wallet-interaction-acknowledge'))
+        await userEvent.click(screen.getByTestId('wallet-interaction-approve'))
+        expect(jest.mocked(sendMetaTransaction)).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and the transfer is a gift candidate', () => {
+      beforeEach(() => {
+        const call = { functionName: 'safeTransferFrom', args: [SIGNER, recipient, BigInt(1)], payable: false, forwardsCall: false }
+        const { addresses, opaque } = collectCallAddresses(call, 137)
+        addresses.delete(SIGNER.toLowerCase())
+        mockGetCounterpartyAddresses.mockReturnValue({ addresses: [...addresses], opaque })
+        mockClassifyRequest.mockResolvedValue(dclTransaction({ call, branded: 'gift_candidate' }))
+        jest.mocked(decodeNftTransferData).mockReturnValue({ fromAddress: SIGNER, tokenId: '1', toAddress: recipient })
+        mockIsExactNftTransferSimulation.mockReturnValue(true)
+        jest.mocked(fetchProfile).mockResolvedValue(null)
+        jest
+          .mocked(fetchNftMetadata)
+          .mockResolvedValue({ imageUrl: 'x', tokenId: '1', name: 'n', description: 'd', rarity: 'common' } as any)
+      })
+
+      afterEach(() => {
+        jest.mocked(decodeNftTransferData).mockReturnValue(null)
+        jest.mocked(fetchNftMetadata).mockReset()
+        jest.mocked(fetchProfile).mockReset()
+      })
+
+      it('should stay on the generic review, which can ask for the consent, rather than show the gift screen', async () => {
+        renderRequestPage()
+        await waitFor(() =>
+          expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-deferred-callbacks', JSON.stringify([recipient]))
+        )
+        await waitFor(() => expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-sim', 'ready'))
+
+        // The upgrade waits on the preview and the counterparty check, both settled by now; it did not happen.
+        expect(jest.mocked(fetchNftMetadata)).not.toHaveBeenCalled()
+        expect(screen.queryByTestId('transfer-confirm')).not.toBeInTheDocument()
+        expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-approve-blocked', 'true')
+      })
+    })
+
+    describe('and transferFrom does not call its recipient', () => {
+      beforeEach(() => {
+        const call = { functionName: 'transferFrom', args: [SIGNER, recipient, BigInt(1)], payable: false, forwardsCall: false }
+        const { addresses, opaque } = collectCallAddresses(call, 137)
+        mockGetCounterpartyAddresses.mockReturnValue({ addresses: [...addresses], opaque })
+        mockClassifyRequest.mockResolvedValue(dclTransaction({ call }))
+        renderRequestPage()
+      })
+
+      it('should allow the review without relying on the recipient remaining empty', async () => {
+        await waitFor(() => expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-approve-blocked', 'false'))
+        expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-deferred-callbacks', '[]')
+        expect(mockIsAddressWithoutCode).not.toHaveBeenCalled()
       })
     })
   })

@@ -66,6 +66,8 @@
       "review_title": "Rivedi questa transazione",
       "preview_unavailable_warning": "Non è stato possibile verificare cosa fa questa transazione perché il servizio di anteprima è temporaneamente non disponibile. Approva solo se ti fidi della scena che l'ha richiesta.",
       "acknowledge_preview_unavailable": "Capisco che l'anteprima non è disponibile e sto approvando senza vedere cosa fa questa transazione",
+      "deferred_callback_notice": "Un indirizzo che questa transazione passa al contratto non contiene codice al momento. Potrebbe esservi distribuito del codice prima che la transazione venga eseguita, e il contratto lo eseguirebbe; questa anteprima non può mostrare cosa farebbe quel codice.",
+      "acknowledge_deferred_callback": "Comprendo che il codice distribuito prima dell’esecuzione di questa transazione potrebbe modificarne gli effetti e accetto questo rischio.",
       "review_restarted_notice": "La rete del tuo wallet è cambiata o non è stato possibile verificarla, quindi questa transazione è stata riesaminata sulla rete attuale.",
       "calls_function": "Chiama {functionName} su {contractName}"
     },

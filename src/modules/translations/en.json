@@ -66,6 +66,8 @@
       "review_title": "Review this transaction",
       "preview_unavailable_warning": "We couldn't check what this transaction does because the preview service is temporarily unavailable. Only approve if you trust the scene that requested it.",
       "acknowledge_preview_unavailable": "I understand the preview is unavailable and I'm approving without seeing what this transaction does",
+      "deferred_callback_notice": "An address this transaction hands the contract has no code today. Code could be deployed there before the transaction executes, and the contract would then run it — this preview can't show what that code would do.",
+      "acknowledge_deferred_callback": "I understand that code deployed before this transaction executes could change what it does, and I accept this risk.",
       "review_restarted_notice": "Your wallet's network changed or couldn't be verified, so this transaction was reviewed again on the current network.",
       "calls_function": "Calls {functionName} on {contractName}"
     },

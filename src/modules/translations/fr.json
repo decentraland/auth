@@ -66,6 +66,8 @@
       "review_title": "Vérifiez cette transaction",
       "preview_unavailable_warning": "Nous n'avons pas pu vérifier ce que fait cette transaction car le service d'aperçu est temporairement indisponible. N'approuvez que si vous faites confiance à la scène qui l'a demandée.",
       "acknowledge_preview_unavailable": "Je comprends que l'aperçu est indisponible et j'approuve sans voir ce que fait cette transaction",
+      "deferred_callback_notice": "Une adresse que cette transaction transmet au contrat ne contient aucun code aujourd’hui. Du code pourrait y être déployé avant l’exécution de la transaction, et le contrat l’exécuterait ; cet aperçu ne peut pas montrer ce que ferait ce code.",
+      "acknowledge_deferred_callback": "Je comprends que du code déployé avant l’exécution de cette transaction pourrait modifier ses effets et j’accepte ce risque.",
       "review_restarted_notice": "Le réseau de votre portefeuille a changé ou n'a pas pu être vérifié, cette transaction a donc été réexaminée sur le réseau actuel.",
       "calls_function": "Appelle {functionName} sur {contractName}"
     },
