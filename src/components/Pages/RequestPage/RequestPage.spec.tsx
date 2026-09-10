@@ -3751,6 +3751,93 @@ describe('RequestPage', () => {
         expect(jest.mocked(sendMetaTransaction)).not.toHaveBeenCalled()
       })
     })
+
+    // The replacement is committed before anything invalidates it: React renders and paints the page with
+    // the new provider, and the load that re-recovers, reclassifies and re-simulates is a passive effect
+    // that only runs afterwards. On that commit the previous review is still on screen under a provider
+    // the page has already replaced, so the page has to refuse it there — during the render — rather than
+    // leave it to the effect that follows.
+    describe('and the replacement is observed commit by commit', () => {
+      let approveBlockedAtCommit: string[]
+      let pressAllowOnNextCommit: boolean
+      let approvalStartedFromPress: boolean
+      let CommitProbe: ({ children }: { children: React.ReactNode }) => JSX.Element
+
+      beforeEach(() => {
+        // Injected, so Allow dispatches from the press instead of opening the web2 confirmation first.
+        mockConnectionData = { ...mockConnectionData, providerType: ProviderType.INJECTED }
+        approveBlockedAtCommit = []
+        pressAllowOnNextCommit = false
+        approvalStartedFromPress = false
+        // A layout effect runs in the same commit as the DOM update and before every passive effect, so it
+        // sees the page exactly as the user would on that render — and can press what the user could press.
+        CommitProbe = ({ children }: { children: React.ReactNode }) => {
+          useLayoutEffect(() => {
+            const view = screen.queryByTestId('wallet-interaction')
+            approveBlockedAtCommit.push(view?.getAttribute('data-approve-blocked') ?? 'no-review')
+            if (pressAllowOnNextCommit) {
+              pressAllowOnNextCommit = false
+              // The double's Allow is never disabled, so the press reaches the page's handler either way:
+              // whether it starts an approval is the page's own answer, which is what this measures. The
+              // handler reads the wallet before anything else, so a read means it went ahead.
+              const walletReadsBefore = mockGetAddresses.mock.calls.length
+              screen.queryByTestId('wallet-interaction-approve')?.click()
+              approvalStartedFromPress = mockGetAddresses.mock.calls.length > walletReadsBefore
+            }
+          })
+          return <>{children}</>
+        }
+      })
+
+      const probedPage = () => (
+        <MemoryRouter initialEntries={[`/auth/requests/${REQUEST_ID}?targetConfigId=default`]}>
+          <FeatureFlagsContext.Provider value={{ flags: mockFlags as any, variants: {} as any, initialized: mockFlagsInitialized }}>
+            <Routes>
+              <Route
+                path="/auth/requests/:requestId"
+                element={
+                  <CommitProbe>
+                    <RequestPage />
+                  </CommitProbe>
+                }
+              />
+            </Routes>
+          </FeatureFlagsContext.Provider>
+        </MemoryRouter>
+      )
+
+      // A fresh tree, since re-rendering the same element bails out before the probe could record.
+      const refreshTheProbedProvider = (rerender: (ui: React.ReactElement) => void) => {
+        mockConnectionData = { ...mockConnectionData, provider: { isMagic: false, refreshed: true } }
+        rerender(probedPage())
+      }
+
+      it('should block Allow on the very commit the provider is replaced, before any effect runs', async () => {
+        const { rerender } = render(probedPage())
+        await clearWalletInteractionGates()
+
+        const commitsBefore = approveBlockedAtCommit.length
+        refreshTheProbedProvider(rerender)
+
+        expect(approveBlockedAtCommit.length).toBeGreaterThan(commitsBefore)
+        expect(approveBlockedAtCommit.slice(commitsBefore)).not.toContain('false')
+      })
+
+      it('should relay nothing if Allow is pressed on that commit', async () => {
+        const { rerender } = render(probedPage())
+        await clearWalletInteractionGates()
+
+        pressAllowOnNextCommit = true
+        refreshTheProbedProvider(rerender)
+        await waitFor(() => expect(mockRecover.mock.calls.length).toBeGreaterThanOrEqual(2))
+
+        // Refused by the page, not by a guard that happened to be re-read after the load had run: the
+        // press must not reach the wallet at all.
+        expect(approvalStartedFromPress).toBe(false)
+        expect(jest.mocked(sendMetaTransaction)).not.toHaveBeenCalled()
+        expect(mockSendSuccessfulOutcome).not.toHaveBeenCalled()
+      })
+    })
   })
 
   describe('when the request expires while Allow is still preparing', () => {

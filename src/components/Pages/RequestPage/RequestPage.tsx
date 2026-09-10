@@ -304,6 +304,10 @@ export const RequestPage = () => {
   const [loadedRequestId, setLoadedRequestId] = useState<string>()
   const loadedAccountRef = useRef<string>()
   const [loadedAccount, setLoadedAccount] = useState<string>()
+  // The provider the load that produced the review on screen started with. Read during rendering, so a
+  // review whose connection has been replaced stops being actionable on the render that replaces it —
+  // before the load effect that redoes the review has run (see isReviewActionable).
+  const [loadedProvider, setLoadedProvider] = useState<typeof provider>()
   // Incremented when an approval discovers that its transaction review is no longer bound to a
   // verifiable live chain. This deliberately re-runs the load effect for the same route/account.
   const [reviewAttempt, setReviewAttempt] = useState(0)
@@ -1121,6 +1125,10 @@ export const RequestPage = () => {
       // Every load produces a review of its own, so every load takes a new token — the key-change reset
       // above does not cover a reload for the same request and account.
       reviewRunRef.current += 1
+      // And every load records the provider it runs for, which is what the render compares against. Set
+      // here rather than at the top of the effect: a run that returns before this point has not reviewed
+      // anything through the new provider, and until one does, nothing may be approved.
+      setLoadedProvider(provider)
       if (!isNewRequest) {
         // The load is running again for the same request and the same account — an embedded wallet handed
         // the app a new provider object, the profile became ready — and it recovers, reclassifies and
@@ -1662,6 +1670,16 @@ export const RequestPage = () => {
   // own only for what it alone can measure (a long message scrolled to its end).
   const isReviewActionable = (() => {
     if (classification === null) return false
+    // The review was produced through the provider the page held when its load started. A wallet that
+    // hands the app a new provider object — an embedded wallet rebuilding its SDK, a chain change
+    // reported through the connection — starts a fresh review of the same request, but only when the
+    // load effect runs: React has already rendered, committed and painted the previous review under the
+    // new provider by then, and the wallet and public clients the approval would use are still the
+    // replaced provider's. So the check is made here, during that render, rather than left to the effect
+    // that follows it. Unlike the request id and the account, this gates approval rather than rendering:
+    // a review whose connection was replaced is still what the user was last shown, and a completed or
+    // failed screen must not blink back to loading because the wallet swapped a provider object.
+    if (loadedProvider !== provider) return false
     const isPreviewSettled = simulationState.status === 'ready' || simulationState.status === 'unavailable'
     const isAcknowledgedIfNeeded = !requiresApprovalAcknowledgment || isAcknowledged
     switch (renderedView) {
