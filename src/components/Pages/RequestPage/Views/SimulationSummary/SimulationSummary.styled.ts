@@ -186,6 +186,23 @@ const ApprovalLine = styled('span')<{ emphasized?: boolean }>(({ theme, emphasiz
   fontWeight: emphasized ? 700 : 400
 }))
 
+// One approval: the sentence and, beneath it, the token contract the permission is over.
+const ApprovalItemBlock = styled('div')(({ theme }) => ({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: theme.spacing(0.25)
+}))
+
+// The token contract an approval is over, on its own line under the sentence. Never emphasized with the
+// sentence: which contract it is stays legible whether or not the permission trips the risk warning.
+const ApprovalMeta = styled(Typography)(({ theme }) => ({
+  color: theme.palette.text.primary,
+  fontSize: theme.typography.pxToRem(12),
+  fontWeight: 400,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis'
+}))
+
 const NetLine = styled(Typography)(({ theme }) => ({
   borderTop: `1px solid ${theme.palette.divider}`,
   color: theme.palette.text.primary,
@@ -244,7 +261,9 @@ const EventRow = styled(Typography)(({ theme }) => ({
 
 export {
   AmountUsd,
+  ApprovalItemBlock,
   ApprovalLine,
+  ApprovalMeta,
   ApprovalsAlert,
   ChangeAmount,
   ChangeMeta,

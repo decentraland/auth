@@ -162,7 +162,7 @@ export const TestViewPage = () => {
             simulation={{ status: 'loading' }}
             userAddress={USER_ADDRESS}
             chainId={137}
-            isCounterpartyCheckPending
+            approveBlocked
             gas={{ covered: true }}
             onDeny={noop}
             onApprove={noop}
@@ -279,7 +279,7 @@ export const TestViewPage = () => {
               data: '0x095ea7b3000000000000000000000000abcdefabcdefabcdefabcdefabcdefabcdefabcdffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff',
               value: '0x0'
             }}
-            payloadFingerprint="unknown-transaction"
+            approveBlocked={false}
             onDeny={noop}
             onApprove={noop}
           />
@@ -299,7 +299,7 @@ export const TestViewPage = () => {
             gas={{ status: 'loading' }}
             balance={BigInt('1500000000000000000')}
             payload={{ kind: 'transaction', to: USER_ADDRESS, data: '0x', value: '0x6f05b59d3b20000' }}
-            payloadFingerprint="native-transfer"
+            approveBlocked={false}
             onDeny={noop}
             onApprove={noop}
           />
@@ -315,7 +315,7 @@ export const TestViewPage = () => {
             targetAddress="0xabcdefabcdefabcdefabcdefabcdefabcdefef01"
             chainId={137}
             payload={{ kind: 'typed_data', raw: unknownMetaTxRaw }}
-            payloadFingerprint="unknown-meta-tx"
+            approveBlocked={false}
             onDeny={noop}
             onApprove={noop}
           />
@@ -329,7 +329,7 @@ export const TestViewPage = () => {
             kind="unknown_typed_data"
             method="eth_signTypedData_v4"
             payload={{ kind: 'typed_data', raw: permitRaw }}
-            payloadFingerprint="permit"
+            approveBlocked={false}
             onDeny={noop}
             onApprove={noop}
           />
@@ -343,7 +343,7 @@ export const TestViewPage = () => {
             kind="personal_sign"
             method="personal_sign"
             payload={{ kind: 'message', hex: personalSignHex, text: personalSignText }}
-            payloadFingerprint={personalSignHex}
+            approveBlocked={false}
             onDeny={noop}
             onApprove={noop}
           />
@@ -357,7 +357,7 @@ export const TestViewPage = () => {
             kind="personal_sign"
             method="personal_sign"
             payload={{ kind: 'message', hex: personalSignDigestHex, text: null }}
-            payloadFingerprint={personalSignDigestHex}
+            approveBlocked={false}
             onDeny={noop}
             onApprove={noop}
           />

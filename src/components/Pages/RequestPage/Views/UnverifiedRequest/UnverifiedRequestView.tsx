@@ -8,7 +8,6 @@ import { isTransactionKind } from '../../classifyRequest'
 import { Container } from '../../Container'
 import { ButtonsContainer, ReviewRestartedNotice } from '../../RequestPage.styled'
 import { formatTypedDataForDisplay } from '../typedDataDisplay'
-import { useAcknowledgment } from '../useAcknowledgment'
 import styles from '../Views.module.css'
 import { UnverifiedRequestKind, UnverifiedRequestViewProps } from './UnverifiedRequest.types'
 import {
@@ -117,18 +116,16 @@ export const UnverifiedRequestView = ({
   gas,
   balance,
   payload,
-  payloadFingerprint,
+  approveBlocked = true,
+  acknowledged = false,
   isLoading = false,
   reviewRestarted = false,
+  onAcknowledgedChange,
   onDeny,
   onApprove
 }: UnverifiedRequestViewProps) => {
   const { t } = useTranslation()
   const [tab, setTab] = useState<TabId>('summary')
-  // The statement the user ticked: this request, this kind, this chain and exactly this payload. A
-  // tick given to one payload never carries over to another (see useAcknowledgment).
-  const acknowledgmentStatement = [requestId, kind, chainId ?? '', payloadFingerprint].join('|')
-  const { acknowledged, setAcknowledged } = useAcknowledgment(acknowledgmentStatement)
 
   const isTransaction = isTransactionKind(kind)
   // A long message shows only its first screen in the scrollable block. Its size is stated, and the
@@ -161,9 +158,9 @@ export const UnverifiedRequestView = ({
   const networkName = getNetworkName(chainId ?? undefined) || (chainId !== null ? t('request.unverified.unknown_network', { chainId }) : '')
   const explorerUrl = getExplorerAddressUrl(chainId ?? undefined, targetAddress)
   const explorerName = getExplorerName(chainId ?? undefined)
-  // The user always sees the cost before sending: on a transaction, Allow waits for the estimate.
-  const isFeePending = isTransaction && (!gas || gas.status === 'loading')
-  const approveBlocked = isLoading || isFeePending || !acknowledged
+  // Whether Allow may be pressed, and whether the tick counts, are the page's to decide, so that its
+  // approval handler and this button can never disagree (see isReviewActionable in RequestPage). The one
+  // gate that stays here is the one only this view can measure.
   const acknowledgmentBlocked = messageText !== null && !messageReadToEnd
   const acknowledgmentLabel =
     kind === 'native_transfer' && native
@@ -360,7 +357,7 @@ export const UnverifiedRequestView = ({
             <Checkbox
               checked={acknowledged}
               disabled={acknowledgmentBlocked}
-              onChange={event => setAcknowledged(event.target.checked)}
+              onChange={event => onAcknowledgedChange?.(event.target.checked)}
               data-testid="risk-acknowledgment"
             />
           }

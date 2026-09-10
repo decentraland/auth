@@ -1,14 +1,13 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from '@dcl/hooks'
 import { Box, Button, Checkbox, CircularProgress, FormControlLabel } from 'decentraland-ui2'
-import { getPreviewFingerprint, hasNoVisibleEffects } from '../../../../../shared/auth'
+import { hasNoVisibleEffects } from '../../../../../shared/auth'
 import { getExplorerAddressUrl, getExplorerName } from '../../../../../shared/explorer'
 import { shortenAddress } from '../../../../../shared/text'
 import { Container } from '../../Container'
 import { ButtonsContainer } from '../../RequestPage.styled'
 import { SimulationSummary } from '../SimulationSummary'
 import { formatTypedDataForDisplay } from '../typedDataDisplay'
-import { useAcknowledgment } from '../useAcknowledgment'
 import styles from '../Views.module.css'
 import { SignatureRequestViewProps } from './SignatureRequest.types'
 import {
@@ -43,8 +42,10 @@ export const SignatureRequestView = ({
   collectionContracts,
   chainId,
   requiresAcknowledgment = false,
-  isCounterpartyCheckPending = false,
+  acknowledged = false,
+  approveBlocked = true,
   isLoading = false,
+  onAcknowledgedChange,
   onDeny,
   onApprove
 }: SignatureRequestViewProps) => {
@@ -61,19 +62,9 @@ export const SignatureRequestView = ({
   // The inner call previewed cleanly but moves nothing the user can check. It may still change state
   // the summary cannot show, so the acknowledgment says that instead of talking about approvals.
   const isPreviewWithoutVisibleEffects = simulation.status === 'ready' && hasNoVisibleEffects(simulation.result, userAddress)
-
-  // The exact statement the user is asked to acknowledge: the request it belongs to, the label, and
-  // every notice shown alongside it (see useAcknowledgment).
-  const acknowledgmentStatement = [
-    requestId,
-    isUnverifiable ? 'unverified' : 'risk',
-    isReverted ? 'reverted' : '',
-    simulation.status === 'unavailable' ? 'unavailable' : '',
-    isPreviewWithoutVisibleEffects ? 'no-visible-effects' : '',
-    // Exactly this preview: a re-simulation that showed something else is another statement.
-    getPreviewFingerprint(simulation.status === 'ready' ? simulation.result : undefined)
-  ].join('|')
-  const { acknowledged, setAcknowledged } = useAcknowledgment(acknowledgmentStatement)
+  // Whether Allow may be pressed, and whether the tick counts, are the page's to decide: it holds every
+  // gate in one place so the confirmation dialog and the approval handler cannot disagree with this button
+  // (see isReviewActionable in RequestPage). This view still derives the wording it shows from the preview.
 
   return (
     <Container canChangeAccount requestId={requestId}>
@@ -119,7 +110,7 @@ export const SignatureRequestView = ({
             control={
               <Checkbox
                 checked={acknowledged}
-                onChange={event => setAcknowledged(event.target.checked)}
+                onChange={event => onAcknowledgedChange?.(event.target.checked)}
                 data-testid="risk-acknowledgment"
               />
             }
@@ -141,13 +132,7 @@ export const SignatureRequestView = ({
         <Button
           variant="contained"
           color={isReverted ? 'error' : 'primary'}
-          disabled={
-            isLoading ||
-            simulation.status === 'idle' ||
-            simulation.status === 'loading' ||
-            isCounterpartyCheckPending ||
-            (requiresAcknowledgment && !acknowledged)
-          }
+          disabled={approveBlocked}
           onClick={onApprove}
           data-testid="signature-approve-button"
         >

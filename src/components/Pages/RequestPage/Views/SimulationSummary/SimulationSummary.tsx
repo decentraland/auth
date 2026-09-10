@@ -17,7 +17,9 @@ import { getHttpsUrl } from '../../../../../shared/urls'
 import { SimulationSummaryProps } from './SimulationSummary.types'
 import {
   AmountUsd,
+  ApprovalItemBlock,
   ApprovalLine,
+  ApprovalMeta,
   ApprovalsAlert,
   ChangeAmount,
   ChangeMeta,
@@ -260,11 +262,13 @@ const ApprovalItem = ({
   approval,
   profiles,
   verified,
+  collections,
   chainId
 }: {
   approval: ApprovalChange
   profiles: Record<string, string>
   verified: Set<string>
+  collections: Set<string>
   chainId?: number
 }) => {
   const { t } = useTranslation()
@@ -320,11 +324,35 @@ const ApprovalItem = ({
   // The page gates the Allow button on the same rule, so the warning and the checkbox always agree.
   const highRisk = isDangerousApproval(approval, address => verified.has(address.toLowerCase()))
 
+  // Which contract the permission is over, on its own line, always. The sentence names the token by the
+  // name or symbol the token itself supplies, and two collections are free to supply the same one: without
+  // the address, a permission over a collection anyone deployed reads exactly like a permission over the
+  // one the user meant. The four provenances are the asset rows' (see AssetRow), so the same contract is
+  // described the same way whether an asset moved on it or a permission was granted over it: a registry
+  // contract wears the badge; a factory collection is Decentraland code carrying content anyone can
+  // create, so it is named as a collection and never vouched for by name; a stablecoin the marketplaces
+  // settle in is named from the known-token table; anything else is unverified.
+  const contractVerified = verified.has(approval.contractAddress.toLowerCase())
+  const knownToken = chainId !== undefined ? getKnownToken(approval.contractAddress, chainId) : null
+  const shortContract = shortenAddress(approval.contractAddress)
+  const contractLabel = contractVerified
+    ? shortContract
+    : collections.has(approval.contractAddress.toLowerCase())
+      ? t('request.transaction_dialog.community_collection', { address: shortContract })
+      : knownToken
+        ? t('request.transaction_dialog.known_token', { name: knownToken.name, address: shortContract })
+        : t('request.transaction_dialog.unverified_token', { address: shortContract })
+
   return (
-    <ApprovalLine emphasized={highRisk}>
-      {highRisk ? <RiskIcon aria-hidden="true">⚠</RiskIcon> : null}
-      {hasCounterparty ? spender : null} {predicate}
-    </ApprovalLine>
+    <ApprovalItemBlock>
+      <ApprovalLine emphasized={highRisk}>
+        {highRisk ? <RiskIcon aria-hidden="true">⚠</RiskIcon> : null}
+        {hasCounterparty ? spender : null} {predicate}
+      </ApprovalLine>
+      <ApprovalMeta title={approval.contractAddress}>
+        <AddressLink address={approval.contractAddress} chainId={chainId} label={contractLabel} verified={contractVerified} />
+      </ApprovalMeta>
+    </ApprovalItemBlock>
   )
 }
 
@@ -516,7 +544,14 @@ export const SimulationSummary = ({
             {t('request.transaction_dialog.approvals_title')}
           </SectionTitle>
           {result.approvalChanges.map((approval, index) => (
-            <ApprovalItem key={`approval-${index}`} approval={approval} profiles={profiles} verified={verified} chainId={chainId} />
+            <ApprovalItem
+              key={`approval-${index}`}
+              approval={approval}
+              profiles={profiles}
+              verified={verified}
+              collections={collections}
+              chainId={chainId}
+            />
           ))}
         </ApprovalsAlert>
       ) : null}

@@ -37,8 +37,17 @@ interface UnverifiedRequestViewProps {
   /** The user's native balance in wei, shown next to the fee. */
   balance?: bigint
   payload: UnverifiedRequestPayload
-  /** Fingerprint of `payload`, folded into the acknowledgment statement. */
-  payloadFingerprint: string
+  /**
+   * True while the review may not be acted on. The page holds every gate in one place — the fee is known
+   * and the acknowledgment was given for this exact payload — and its approval handler enforces the same
+   * value, so no button can approve a review the gates have not cleared (see isReviewActionable in
+   * RequestPage). This view adds one gate of its own, for what only it can measure: a long message must
+   * have been scrolled to its end before the checkbox is even enabled.
+   */
+  approveBlocked?: boolean
+  /** Whether the acknowledgment has been given for the payload on display. Owned by the page. */
+  acknowledged?: boolean
+  onAcknowledgedChange?: (checked: boolean) => void
   isLoading?: boolean
   /** True when this review replaced one invalidated because the wallet's network changed. */
   reviewRestarted?: boolean

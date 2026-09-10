@@ -74,7 +74,12 @@ const TransferConfirmView = (props: TransferConfirmViewProps) => {
         {isProcessing ? (
           <TransferLoadingState text={t('transfer.confirm.processing_authorization')} />
         ) : (
-          <TransferActionButtons isLoading={props.isLoading} onCancel={props.onDeny} onConfirm={handleApprove} />
+          <TransferActionButtons
+            isLoading={props.isLoading}
+            confirmDisabled={props.approveBlocked}
+            onCancel={props.onDeny}
+            onConfirm={handleApprove}
+          />
         )}
       </CenteredContent>
     </TransferLayout>

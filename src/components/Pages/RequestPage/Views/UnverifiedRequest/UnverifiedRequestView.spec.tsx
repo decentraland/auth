@@ -20,11 +20,13 @@ const CONTRACT = '0x1234567890abcdef1234567890abcdef12345678'
 describe('when rendering the UnverifiedRequestView', () => {
   let onDeny: jest.Mock
   let onApprove: jest.Mock
+  let onAcknowledgedChange: jest.Mock
   let props: UnverifiedRequestViewProps
 
   beforeEach(() => {
     onDeny = jest.fn()
     onApprove = jest.fn()
+    onAcknowledgedChange = jest.fn()
   })
 
   afterEach(() => {
@@ -43,7 +45,9 @@ describe('when rendering the UnverifiedRequestView', () => {
         gas: { status: 'ready', cost: BigInt('4200000000000000') },
         balance: BigInt('1500000000000000000'),
         payload: { kind: 'transaction', to: CONTRACT, data: '0x095ea7b3', value: '0x0' },
-        payloadFingerprint: `${CONTRACT}|0x095ea7b3|0x0|137`,
+        approveBlocked: false,
+        acknowledged: true,
+        onAcknowledgedChange,
         onDeny,
         onApprove
       }
@@ -77,11 +81,17 @@ describe('when rendering the UnverifiedRequestView', () => {
       expect(screen.queryByTestId('unverified-amount')).not.toBeInTheDocument()
     })
 
-    it('should keep Allow disabled until the acknowledgment is ticked', async () => {
-      render(<UnverifiedRequestView {...props} />)
-      expect(screen.getByRole('button', { name: 'common.allow' })).toBeDisabled()
+    it('should report a tick to the page rather than decide for itself what it enables', async () => {
+      render(<UnverifiedRequestView {...{ ...props, acknowledged: false }} />)
+
       await userEvent.click(screen.getByRole('checkbox'))
-      expect(screen.getByRole('button', { name: 'common.allow' })).toBeEnabled()
+
+      expect(onAcknowledgedChange).toHaveBeenCalledWith(true)
+    })
+
+    it('should keep Allow disabled while the page reports the review is not actionable', () => {
+      render(<UnverifiedRequestView {...{ ...props, approveBlocked: true }} />)
+      expect(screen.getByRole('button', { name: 'common.allow' })).toBeDisabled()
     })
 
     it('should keep Deny enabled at all times', () => {
@@ -89,10 +99,11 @@ describe('when rendering the UnverifiedRequestView', () => {
       expect(screen.getByRole('button', { name: 'common.deny' })).toBeEnabled()
     })
 
-    it('should call onApprove once ticked and clicked', async () => {
+    it('should call onApprove when clicked on a review the page has cleared', async () => {
       render(<UnverifiedRequestView {...props} />)
-      await userEvent.click(screen.getByRole('checkbox'))
+
       await userEvent.click(screen.getByRole('button', { name: 'common.allow' }))
+
       expect(onApprove).toHaveBeenCalledTimes(1)
     })
 
@@ -154,11 +165,9 @@ describe('when rendering the UnverifiedRequestView', () => {
         props = { ...props, gas: { status: 'loading' } }
       })
 
-      it('should keep Allow disabled even after the acknowledgment is ticked', async () => {
+      it('should say the fee is still being estimated', () => {
         render(<UnverifiedRequestView {...props} />)
-        await userEvent.click(screen.getByRole('checkbox'))
         expect(screen.getByTestId('unverified-fee')).toHaveTextContent('request.unverified.fact_fee_loading')
-        expect(screen.getByRole('button', { name: 'common.allow' })).toBeDisabled()
       })
     })
 
@@ -167,43 +176,18 @@ describe('when rendering the UnverifiedRequestView', () => {
         props = { ...props, gas: { status: 'unavailable' } }
       })
 
-      it('should show the fee as unavailable and let the acknowledgment alone enable Allow', async () => {
+      it('should show the fee as unavailable', () => {
         render(<UnverifiedRequestView {...props} />)
         expect(screen.getByTestId('unverified-fee')).toHaveTextContent('request.unverified.fact_fee_unavailable')
-        await userEvent.click(screen.getByRole('checkbox'))
-        expect(screen.getByRole('button', { name: 'common.allow' })).toBeEnabled()
       })
     })
 
-    describe('and the payload changes after the user ticked the acknowledgment', () => {
-      let nextProps: UnverifiedRequestViewProps
+    describe('and the page reports the tick no longer counts', () => {
+      it('should render the checkbox unchecked and Allow disabled', () => {
+        render(<UnverifiedRequestView {...{ ...props, acknowledged: false, approveBlocked: true }} />)
 
-      beforeEach(() => {
-        nextProps = { ...props, payloadFingerprint: 'other' }
-      })
-
-      it('should clear the tick in the same render', async () => {
-        const { rerender } = render(<UnverifiedRequestView {...props} />)
-        await userEvent.click(screen.getByRole('checkbox'))
-        expect(screen.getByRole('button', { name: 'common.allow' })).toBeEnabled()
-        rerender(<UnverifiedRequestView {...nextProps} />)
         expect(screen.getByRole('checkbox')).not.toBeChecked()
         expect(screen.getByRole('button', { name: 'common.allow' })).toBeDisabled()
-      })
-    })
-
-    describe('and the request id changes after the user ticked the acknowledgment', () => {
-      let nextProps: UnverifiedRequestViewProps
-
-      beforeEach(() => {
-        nextProps = { ...props, requestId: 'r2' }
-      })
-
-      it('should clear the tick in the same render', async () => {
-        const { rerender } = render(<UnverifiedRequestView {...props} />)
-        await userEvent.click(screen.getByRole('checkbox'))
-        rerender(<UnverifiedRequestView {...nextProps} />)
-        expect(screen.getByRole('checkbox')).not.toBeChecked()
       })
     })
 
@@ -232,7 +216,9 @@ describe('when rendering the UnverifiedRequestView', () => {
         gas: { status: 'ready', cost: BigInt('4200000000000000') },
         balance: BigInt('1500000000000000000'),
         payload: { kind: 'transaction', to: USER, data: '0x', value: '0x6f05b59d3b20000' },
-        payloadFingerprint: `${USER}|0x|0x6f05b59d3b20000|137`,
+        approveBlocked: false,
+        acknowledged: true,
+        onAcknowledgedChange,
         onDeny,
         onApprove
       }
@@ -270,7 +256,9 @@ describe('when rendering the UnverifiedRequestView', () => {
         targetAddress: CONTRACT,
         chainId: 137,
         payload: { kind: 'typed_data', raw: '{"primaryType":"MetaTransaction"}' },
-        payloadFingerprint: '{"primaryType":"MetaTransaction"}',
+        approveBlocked: false,
+        acknowledged: true,
+        onAcknowledgedChange,
         onDeny,
         onApprove
       }
@@ -290,9 +278,8 @@ describe('when rendering the UnverifiedRequestView', () => {
       expect(screen.queryByTestId('unverified-fee')).not.toBeInTheDocument()
     })
 
-    it('should enable Allow on the acknowledgment alone', async () => {
+    it('should enable Allow on a review the page has cleared, with no fee to wait for', () => {
       render(<UnverifiedRequestView {...props} />)
-      await userEvent.click(screen.getByRole('checkbox'))
       expect(screen.getByRole('button', { name: 'common.allow' })).toBeEnabled()
     })
 
@@ -320,7 +307,9 @@ describe('when rendering the UnverifiedRequestView', () => {
         kind: 'unknown_typed_data',
         method: 'eth_signTypedData_v4',
         payload: { kind: 'typed_data', raw: '{"primaryType":"Permit"}' },
-        payloadFingerprint: '{"primaryType":"Permit"}',
+        approveBlocked: false,
+        acknowledged: true,
+        onAcknowledgedChange,
         onDeny,
         onApprove
       }
@@ -357,7 +346,9 @@ describe('when rendering the UnverifiedRequestView', () => {
           kind: 'personal_sign',
           method: 'personal_sign',
           payload: { kind: 'message', hex: '0x48656c6c6f', text: 'Hello' },
-          payloadFingerprint: '0x48656c6c6f',
+          approveBlocked: false,
+          acknowledged: true,
+          onAcknowledgedChange,
           onDeny,
           onApprove
         }
@@ -428,7 +419,9 @@ describe('when rendering the UnverifiedRequestView', () => {
           kind: 'personal_sign',
           method: 'personal_sign',
           payload: { kind: 'message', hex: `0x${'9f'.repeat(32)}`, text: null },
-          payloadFingerprint: `0x${'9f'.repeat(32)}`,
+          approveBlocked: false,
+          acknowledged: true,
+          onAcknowledgedChange,
           onDeny,
           onApprove
         }

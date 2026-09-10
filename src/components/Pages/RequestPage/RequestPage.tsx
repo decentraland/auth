@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useRef, useState } from 'react'
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { createPublicClient, createWalletClient, custom } from 'viem'
 import { mainnet } from 'viem/chains'
@@ -36,6 +36,7 @@ import {
   createAuthServerHttpClient,
   getKnownDecentralandContract,
   getKnownToken,
+  getPreviewFingerprint,
   hasNoVisibleEffects,
   isDangerousApproval,
   isRecognizedDecentralandContract,
@@ -108,6 +109,7 @@ import {
 import type { SigningErrorKind } from './Views'
 import { ConfirmRequestGas } from './Views/ConfirmRequestDialog'
 import { UnverifiedRequestViewProps } from './Views/UnverifiedRequest'
+import { useAcknowledgment } from './Views/useAcknowledgment'
 import { forwardSignatureRequest, toWalletSignatureRequest } from './walletSignatureRequest'
 
 enum View {
@@ -291,6 +293,9 @@ export const RequestPage = () => {
   const requestRef = useRef<RecoverResponse>()
   const viewRef = useRef(view)
   viewRef.current = view
+  // The current value of `isReviewActionable`, for the approval handler to read at the moment it acts. It
+  // is assigned during render, like `viewRef`, because the handler is created before the value is derived.
+  const isReviewActionableRef = useRef(false)
   const hasCompletedRef = useRef(false)
   // The request id and account whose state this mounted page currently holds (see the load effect).
   // The refs are read by the effect; the state drives rendering, so a route or account change is
@@ -1101,6 +1106,23 @@ export const RequestPage = () => {
     if (isDeepLinkFlow) {
       completeClientLoginFlow()
     } else {
+      if (!isNewRequest) {
+        // The load is running again for the same request and the same account — an embedded wallet handed
+        // the app a new provider object, the profile became ready — and it recovers, reclassifies and
+        // re-simulates from scratch. The reset above is keyed to the request and the account, so it does
+        // not run for this, and everything the previous run derived would stay on screen and stay
+        // actionable while the fresh one works: a confirmation dialog opened a moment ago would still
+        // confirm, and Allow would still read a settled preview and a counterparty verdict belonging to
+        // the run before it. So the review is put back to "being decided" for as long as that takes.
+        // Not a reset: `hasCompletedRef` and the settle state are the request's, not this run's, and an
+        // answered or expired request must stay answered.
+        setIsTransactionModalOpen(false)
+        setSimulationState(current => (current.status === 'loading' ? current : { status: 'loading' }))
+        setAreCounterpartiesVerified(false)
+        setSimulationVerified(current => (current.length === 0 ? current : []))
+        setSimulationCollections(current => (current.length === 0 ? current : []))
+        setSimulationProfiles(current => (Object.keys(current).length === 0 ? current : {}))
+      }
       loadRequest()
     }
 
@@ -1233,12 +1255,25 @@ export const RequestPage = () => {
     // React flips isLoading), and not once the request has been answered or has expired. Checked and
     // set before the first await (see isSettlingRef).
     if (isSettlingRef.current || hasCompletedRef.current) return
+    // Every gate the review is subject to, enforced here rather than trusted to whichever button was
+    // pressed. The Allow buttons render the same value, so in the ordinary case this changes nothing; what
+    // it stops is a press that reaches this handler while the gates do not hold — the confirmation dialog
+    // web2 users get, whose own button knows only whether an approval is already running, still open when
+    // a re-review began behind it (see isReviewActionable).
+    if (!isReviewActionableRef.current) return
     isSettlingRef.current = true
     // The review this action belongs to. Once the page has moved on to another request or account, the
     // wallet result and its outcome delivery still complete for the request that was reviewed, but nothing
     // here may touch the review now on screen or its settle state.
     const generation = reviewGenerationRef.current
     const isStaleAction = () => reviewGenerationRef.current !== generation
+    // Whether the request may still be signed or sent, re-read after every await that precedes a dispatch.
+    // Each of those awaits is a window: the expiration timer can fire in it (which settles the request and
+    // shows the timeout screen without moving the generation, so `isStaleAction` alone does not see it),
+    // and a re-review can begin in it and take the gates away. Never consulted after a dispatch — past
+    // that point the transaction is broadcast or the payload is signed, and the outcome must still be
+    // delivered whatever has happened to the review (see hasWalletResult).
+    const canStillDispatch = () => !isStaleAction() && !hasCompletedRef.current && isReviewActionableRef.current
     // The account that reviewed this request, fixed now. The ref moves on to the next review's account
     // while this action is in flight; every comparison and every outcome below uses this value, never the
     // ref, so a late rejection can neither pass the check against another account nor be delivered under it.
@@ -1273,7 +1308,7 @@ export const RequestPage = () => {
       }
 
       const [signerAddress] = await walletClient.getAddresses()
-      if (isStaleAction()) return
+      if (!canStillDispatch()) return
       if (signerAddress.toLowerCase() !== reviewedSigner) {
         // The wallet's active account is no longer the one that recovered and reviewed this request.
         // Executing here would run the reviewed request from an account that never saw it. Say what
@@ -1302,6 +1337,7 @@ export const RequestPage = () => {
           throw new Error('Provider not connected')
         }
         const networkProvider = await getNetworkProvider(reviewed.chainId as ChainId)
+        if (!canStillDispatch()) return
         const contract = {
           abi: reviewed.contract.abi as unknown as object[],
           address: reviewed.to,
@@ -1331,7 +1367,7 @@ export const RequestPage = () => {
         }
         const reviewedChainId = reviewedWalletChainIdRef.current
         const currentChainId = await publicClientRef.current?.getChainId().catch(() => undefined)
-        if (isStaleAction()) return
+        if (!canStillDispatch()) return
         if (reviewedChainId === undefined || currentChainId !== reviewedChainId) {
           // The address and calldata may refer to entirely different code on another chain, and
           // an unreadable chain cannot be compared safely. Discard the stale review and recover
@@ -1546,6 +1582,84 @@ export const RequestPage = () => {
   // records together with its reset.
   const renderedView = loadedRequestId === requestId && loadedAccount === account ? view : View.LOADING_REQUEST
 
+  // A typed-data payload's fingerprint is its whole JSON, so it is computed once per classification.
+  const payloadFingerprint = useMemo(() => (classification ? getPayloadFingerprint(classification) : ''), [classification])
+  // The exact screen the user is asked to acknowledge, folded into one string: this request, this payload,
+  // the preview's outcome and contents, and every notice shown next to them. A tick counts for that string
+  // only, so anything that changes what is on screen — another request, a re-simulation that showed
+  // something else, a different reason for asking — stops it counting and the review asks again (see
+  // useAcknowledgment). One statement for every view rather than one composed inside each: a view whose
+  // statement left out something it displayed would carry a tick across a change the user never saw.
+  const acknowledgmentStatement = useMemo(
+    () =>
+      [
+        requestId,
+        classification?.kind ?? '',
+        payloadFingerprint,
+        simulationState.status,
+        isSimulationReverted ? 'reverted' : '',
+        hasPreviewWithoutVisibleEffects ? 'no-visible-effects' : '',
+        isSignatureWithoutVerifiedEffects ? 'unverified' : '',
+        getPreviewFingerprint(simulationState.status === 'ready' ? simulationState.result : undefined)
+      ].join('|'),
+    [
+      requestId,
+      classification?.kind,
+      payloadFingerprint,
+      simulationState,
+      isSimulationReverted,
+      hasPreviewWithoutVisibleEffects,
+      isSignatureWithoutVerifiedEffects
+    ]
+  )
+  const { acknowledged: isAcknowledged, setAcknowledged } = useAcknowledgment(acknowledgmentStatement)
+
+  // The wallet-side fee estimate a transaction the user pays gas for waits on, so the cost is always seen
+  // before sending. A relayed call and a signature cost nothing and never wait for it.
+  const isGasEstimatePending = gasEstimate === null || gasEstimate.status === 'loading'
+
+  // The one place that decides whether the review on screen may be acted on: its preview has settled, the
+  // contracts its call reaches have been checked, the fee is known where the user pays it, and any required
+  // acknowledgment was given for this exact screen. The Allow buttons render it and the approval handler
+  // enforces it, so nothing can approve a review whose gates have not cleared — not a confirmation dialog
+  // opened a moment before a re-review began, whose own button knows nothing about them, and not an Allow
+  // whose preparation outlived the review it started from.
+  //
+  // `isLoading` is deliberately not part of it: that says an approval is already running, which is the
+  // handler's own re-entry guard (isSettlingRef), not a property of the review. A view keeps a gate of its
+  // own only for what it alone can measure (a long message scrolled to its end).
+  const isReviewActionable = (() => {
+    if (classification === null) return false
+    const isPreviewSettled = simulationState.status === 'ready' || simulationState.status === 'unavailable'
+    const isAcknowledgedIfNeeded = !requiresApprovalAcknowledgment || isAcknowledged
+    switch (renderedView) {
+      case View.WALLET_INTERACTION:
+        return (
+          classification.kind === 'dcl_transaction' &&
+          isPreviewSettled &&
+          areCounterpartiesVerified &&
+          (classification.relayed || !isGasEstimatePending) &&
+          isAcknowledgedIfNeeded
+        )
+      case View.WALLET_SIGNATURE_INTERACTION:
+        return classification.kind === 'dcl_meta_transaction' && isPreviewSettled && areCounterpartiesVerified && isAcknowledgedIfNeeded
+      case View.WALLET_UNVERIFIED_INTERACTION:
+        // Nothing is previewed here, so there is no preview to settle, and the acknowledgment is always
+        // required (see UnverifiedRequestView).
+        return (!isTransactionClassification(classification) || !isGasEstimatePending) && isAcknowledged
+      // A branded screen stands in for the generic review only once that review's checks passed (see
+      // reviewDecentralandTransaction), so it carries the same counterparty requirement.
+      case View.WALLET_NFT_INTERACTION:
+        return nftTransferData !== null && areCounterpartiesVerified
+      case View.WALLET_MANA_INTERACTION:
+        return manaTransferData !== null && areCounterpartiesVerified
+      default:
+        return false
+    }
+  })()
+  isReviewActionableRef.current = isReviewActionable
+  const approveBlocked = isLoading || !isReviewActionable
+
   // What the confirmation dialog says the request will cost: covered by the relay, or the wallet's own
   // estimate for a plain send. Signatures are gasless and show no line.
   const isTransactionRequest = classification !== null && isTransactionClassification(classification)
@@ -1626,6 +1740,7 @@ export const RequestPage = () => {
             type={TransferType.GIFT}
             transferData={nftTransferData}
             isLoading={isLoading}
+            approveBlocked={approveBlocked}
             onDeny={onDenyWalletInteraction}
             onApprove={handleApproveWalletInteraction}
           />
@@ -1639,6 +1754,7 @@ export const RequestPage = () => {
             type={TransferType.TIP}
             transferData={manaTransferData}
             isLoading={isLoading}
+            approveBlocked={approveBlocked}
             onDeny={onDenyWalletInteraction}
             onApprove={handleApproveWalletInteraction}
           />
@@ -1669,10 +1785,12 @@ export const RequestPage = () => {
             collectionContracts={simulationCollections}
             chainId={simulationChainId}
             requiresAcknowledgment={requiresApprovalAcknowledgment}
-            isCounterpartyCheckPending={!areCounterpartiesVerified}
+            acknowledged={isAcknowledged}
+            approveBlocked={approveBlocked}
             gas={gas}
             isReverted={isSimulationReverted}
             reviewRestarted={reviewRestartReason !== null}
+            onAcknowledgedChange={setAcknowledged}
             onDeny={onDenyWalletInteraction}
             onApprove={handleApproveWalletInteraction}
           />
@@ -1699,8 +1817,10 @@ export const RequestPage = () => {
             collectionContracts={simulationCollections}
             chainId={simulationChainId}
             requiresAcknowledgment={requiresApprovalAcknowledgment}
-            isCounterpartyCheckPending={!areCounterpartiesVerified}
+            acknowledged={isAcknowledged}
+            approveBlocked={approveBlocked}
             isLoading={isLoading}
+            onAcknowledgedChange={setAcknowledged}
             onDeny={onDenyWalletInteraction}
             onApprove={handleApproveWalletInteraction}
           />
@@ -1720,9 +1840,11 @@ export const RequestPage = () => {
             {...unverified}
             gas={isTransactionKind ? (gasEstimate ?? { status: 'loading' }) : undefined}
             balance={isTransactionKind ? walletInfo?.balance : undefined}
-            payloadFingerprint={getPayloadFingerprint(classification)}
+            acknowledged={isAcknowledged}
+            approveBlocked={approveBlocked}
             isLoading={isLoading}
             reviewRestarted={reviewRestartReason !== null}
+            onAcknowledgedChange={setAcknowledged}
             onDeny={onDenyWalletInteraction}
             onApprove={handleApproveWalletInteraction}
           />

@@ -36,17 +36,20 @@ const successResult: SimulationResponseBody = {
   ],
   approvalChanges: [],
   balanceChanges: [],
-  events: []
+  events: [],
+  eventsTruncated: false
 }
 
 describe('when rendering the WalletInteraction view', () => {
   let onDeny: jest.Mock
   let onApprove: jest.Mock
+  let onAcknowledgedChange: jest.Mock
   let props: WalletInteractionProps
 
   beforeEach(() => {
     onDeny = jest.fn()
     onApprove = jest.fn()
+    onAcknowledgedChange = jest.fn()
     props = {
       requestId: 'r1',
       functionName: 'approve',
@@ -54,6 +57,8 @@ describe('when rendering the WalletInteraction view', () => {
       simulation: { status: 'ready', result: successResult },
       userAddress: USER,
       gas: { covered: true },
+      approveBlocked: false,
+      onAcknowledgedChange,
       onDeny,
       onApprove
     }
@@ -87,14 +92,19 @@ describe('when rendering the WalletInteraction view', () => {
     })
   })
 
-  describe('and the simulation is still loading', () => {
+  describe('and the page reports the review is not actionable', () => {
     beforeEach(() => {
-      props = { ...props, simulation: { status: 'loading' } }
+      props = { ...props, approveBlocked: true }
     })
 
-    it('should keep the approve button disabled until it resolves', () => {
+    it('should keep the approve button disabled, whatever it can see of the preview itself', () => {
       render(<WalletInteraction {...props} />)
       expect(screen.getByRole('button', { name: 'common.allow' })).toBeDisabled()
+    })
+
+    it('should still offer Deny', () => {
+      render(<WalletInteraction {...props} />)
+      expect(screen.getByRole('button', { name: 'common.deny' })).toBeEnabled()
     })
   })
 
@@ -103,54 +113,30 @@ describe('when rendering the WalletInteraction view', () => {
       props = { ...props, requiresAcknowledgment: true }
     })
 
-    it('should keep approval disabled until the acknowledgment is checked', async () => {
+    it('should report a tick to the page rather than decide for itself what it enables', async () => {
       render(<WalletInteraction {...props} />)
-      expect(screen.getByRole('button', { name: 'common.allow' })).toBeDisabled()
+
       await userEvent.click(screen.getByRole('checkbox'))
-      expect(screen.getByRole('button', { name: 'common.allow' })).not.toBeDisabled()
+
+      expect(onAcknowledgedChange).toHaveBeenCalledWith(true)
     })
 
-    describe('and the request changes after the user ticked it', () => {
-      let nextProps: WalletInteractionProps
+    it('should report the tick being taken back', async () => {
+      render(<WalletInteraction {...{ ...props, acknowledged: true }} />)
 
-      beforeEach(() => {
-        nextProps = { ...props, requestId: 'r2' }
-      })
+      await userEvent.click(screen.getByRole('checkbox'))
 
-      it('should clear the tick and disable approval for the new request in the same render', async () => {
-        const { rerender } = render(<WalletInteraction {...props} />)
-        await userEvent.click(screen.getByRole('checkbox'))
-        expect(screen.getByRole('button', { name: 'common.allow' })).toBeEnabled()
-        rerender(<WalletInteraction {...nextProps} />)
-        expect(screen.getByRole('checkbox')).not.toBeChecked()
-        expect(screen.getByRole('button', { name: 'common.allow' })).toBeDisabled()
-      })
+      expect(onAcknowledgedChange).toHaveBeenCalledWith(false)
     })
 
-    describe('and the same request re-simulates to a different preview after the user ticked it', () => {
-      let nextProps: WalletInteractionProps
+    it('should render the checkbox from what the page says was acknowledged', () => {
+      render(<WalletInteraction {...{ ...props, acknowledged: true }} />)
+      expect(screen.getByRole('checkbox')).toBeChecked()
+    })
 
-      beforeEach(() => {
-        nextProps = {
-          ...props,
-          simulation: {
-            status: 'ready',
-            result: {
-              ...successResult,
-              assetChanges: [{ ...successResult.assetChanges[0], to: '0x000000000000000000000000000000000000dead' }]
-            }
-          }
-        }
-      })
-
-      it('should clear the tick because it was given to the previous preview', async () => {
-        const { rerender } = render(<WalletInteraction {...props} />)
-        await userEvent.click(screen.getByRole('checkbox'))
-        expect(screen.getByRole('button', { name: 'common.allow' })).toBeEnabled()
-        rerender(<WalletInteraction {...nextProps} />)
-        expect(screen.getByRole('checkbox')).not.toBeChecked()
-        expect(screen.getByRole('button', { name: 'common.allow' })).toBeDisabled()
-      })
+    it('should render it unchecked when the page says the tick no longer counts', () => {
+      render(<WalletInteraction {...props} />)
+      expect(screen.getByRole('checkbox')).not.toBeChecked()
     })
   })
 
@@ -177,38 +163,15 @@ describe('when rendering the WalletInteraction view', () => {
       })
     })
 
-    describe('and the fee is still being estimated', () => {
-      beforeEach(() => {
-        props = { ...props, gas: { covered: false, status: 'loading' } }
-      })
-
-      it('should keep approval disabled so the cost is seen before sending', () => {
-        render(<WalletInteraction {...props} />)
-        expect(screen.getByRole('button', { name: 'common.allow' })).toBeDisabled()
-      })
-    })
-
     describe('and the fee could not be estimated', () => {
       beforeEach(() => {
         props = { ...props, gas: { covered: false, status: 'unavailable' } }
       })
 
-      it('should show the fee as unavailable and leave approval to the other gates', () => {
+      it('should show the fee as unavailable', () => {
         render(<WalletInteraction {...props} />)
         expect(screen.getByText('request.unverified.fact_fee_unavailable')).toBeInTheDocument()
-        expect(screen.getByRole('button', { name: 'common.allow' })).toBeEnabled()
       })
-    })
-  })
-
-  describe('and whether every contract the call reaches is Decentraland is still being decided', () => {
-    beforeEach(() => {
-      props = { ...props, isCounterpartyCheckPending: true }
-    })
-
-    it('should keep Allow disabled until it is', () => {
-      render(<WalletInteraction {...props} />)
-      expect(screen.getByRole('button', { name: 'common.allow' })).toBeDisabled()
     })
   })
 
@@ -227,11 +190,12 @@ describe('when rendering the WalletInteraction view', () => {
       expect(screen.getByText('request.wallet_interaction.acknowledge_preview_unavailable')).toBeInTheDocument()
     })
 
-    it('should keep approval disabled until the unavailable preview is acknowledged', async () => {
+    it('should still ask for a tick, reported to the page', async () => {
       render(<WalletInteraction {...props} />)
-      expect(screen.getByRole('button', { name: 'common.allow' })).toBeDisabled()
+
       await userEvent.click(screen.getByRole('checkbox'))
-      expect(screen.getByRole('button', { name: 'common.allow' })).not.toBeDisabled()
+
+      expect(onAcknowledgedChange).toHaveBeenCalledWith(true)
     })
   })
 
