@@ -38,6 +38,21 @@ const Title = styled(Typography)(({ theme }) => ({
   textAlign: 'center'
 }))
 
+// What sits between the item and the action buttons: the notices about the transfer, and the consent one of
+// them may ask for. The buttons keep their own top margin for the screens that show none of this, so the
+// group — not each notice — pulls them back up under whatever comes last. Putting that negative margin on a
+// notice would drag the next sibling over it: the checkbox up into the warning it belongs to.
+const Notices = styled(Box)(({ theme }) => ({
+  alignItems: 'center',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: theme.spacing(1),
+  marginBottom: theme.spacing(-8),
+  marginTop: theme.spacing(5),
+  maxWidth: theme.spacing(100),
+  width: '100%'
+}))
+
 const WarningAlert = styled(Alert)(({ theme }) => ({
   alignItems: 'center',
   alignSelf: 'center',
@@ -45,10 +60,7 @@ const WarningAlert = styled(Alert)(({ theme }) => ({
   color: theme.palette.text.primary,
   fontSize: theme.typography.pxToRem(18),
   justifyContent: 'center',
-  maxWidth: theme.spacing(100),
   width: '100%',
-  marginTop: theme.spacing(5),
-  marginBottom: theme.spacing(-8),
   ['& .MuiAlert-icon']: {
     alignItems: 'center',
     color: theme.palette.text.primary,
@@ -56,4 +68,4 @@ const WarningAlert = styled(Alert)(({ theme }) => ({
   }
 }))
 
-export { CenteredContent, ItemName, Label, Title, WarningAlert }
+export { CenteredContent, ItemName, Label, Notices, Title, WarningAlert }
