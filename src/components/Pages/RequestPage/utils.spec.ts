@@ -30,7 +30,12 @@ import {
 jest.mock('decentraland-connect')
 jest.mock('decentraland-transactions')
 jest.mock('../../../modules/config')
+// Only the parts that reach a network or that a case asserts on are mocked; the rest stays real. The
+// pure helpers are used at module load — `decentralandContracts` derives its selector sets from
+// `toFunctionSelector` when it is imported — so replacing the whole module leaves those undefined and the
+// suite fails before a single case runs.
 jest.mock('viem', () => ({
+  ...jest.requireActual('viem'),
   createPublicClient: jest.fn(),
   custom: jest.fn((provider: any) => provider),
   formatEther: jest.fn()
