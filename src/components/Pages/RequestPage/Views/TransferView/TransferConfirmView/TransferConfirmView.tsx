@@ -6,7 +6,7 @@ import { TransferActionButtons, TransferAssetImage, TransferLayout, TransferLoad
 import { CenteredContent, ItemName, Label, Notices, Title, WarningAlert } from '../../../../../Transfer/Transfer.styled'
 import { TransferType } from '../../../types'
 import type { MANATransferData, NFTTransferData, ProfileAvatar } from '../../../types'
-import { SceneName } from '../TransferTipComponents.styled'
+import { PlaceNote, SceneName } from '../TransferTipComponents.styled'
 import { TransferConfirmViewProps } from './TransferConfirmView.types'
 
 const TransferConfirmView = (props: TransferConfirmViewProps) => {
@@ -62,6 +62,11 @@ const TransferConfirmView = (props: TransferConfirmViewProps) => {
             <Label>{t('transfer.confirm.creator_of')}</Label>
             <TransferAssetImage src={(transferData as MANATransferData).sceneImageUrl} alt={(transferData as MANATransferData).sceneName} />
             <SceneName>{(transferData as MANATransferData).sceneName}</SceneName>
+            {/* The place is looked up by the recipient address alone (see fetchPlaceByCreatorAddress).
+                Nothing ties it to the scene that asked for this payment, and its name and image are
+                written by whoever deployed it, so the screen says what the block is worth rather than
+                letting its position imply the payment was requested from there. */}
+            <PlaceNote data-testid="place-not-verified">{t('transfer.place_not_verified')}</PlaceNote>
           </>
         ) : (
           <>

@@ -6,7 +6,7 @@ import { TransferAlert, TransferAssetImage, TransferLayout } from '../../../../.
 import { CenteredContent, ItemName, Label, Title } from '../../../../../Transfer/Transfer.styled'
 import { TransferType } from '../../../types'
 import type { MANATransferData, NFTTransferData, ProfileAvatar } from '../../../types'
-import { SceneName } from '../TransferTipComponents.styled'
+import { PlaceNote, SceneName } from '../TransferTipComponents.styled'
 import { TransferCompletedViewProps } from './TransferCompletedView.types'
 import { SceneImageWrapper, SuccessAnimation } from './TransferCompletedView.styled'
 
@@ -55,6 +55,8 @@ const TransferCompletedView = (props: TransferCompletedViewProps) => {
               {successAnimation ? <SuccessAnimation animationData={successAnimation} loop={true} /> : null}
             </SceneImageWrapper>
             <SceneName>{(transferData as MANATransferData).sceneName}</SceneName>
+            {/* Same block, same limit as on the confirmation (see TransferConfirmView). */}
+            <PlaceNote data-testid="place-not-verified">{t('transfer.place_not_verified')}</PlaceNote>
           </>
         ) : (
           <>

@@ -241,6 +241,7 @@
     }
   },
   "transfer": {
+    "place_not_verified": "Decentraland can't check that this is the place that asked for this payment — only the address above was verified. Place names and images can be copied.",
     "confirm": {
       "sending_tip": "Sending {manaAmount} Tip for",
       "confirm_tip": "Confirm {manaAmount} Tip for",

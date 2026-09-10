@@ -241,6 +241,7 @@
     }
   },
   "transfer": {
+    "place_not_verified": "Decentraland 无法确认这就是请求此付款的地点——仅验证了上方的地址。地点名称和图片可以被复制。",
     "confirm": {
       "sending_tip": "正在发送 {manaAmount} 小费给",
       "confirm_tip": "确认 {manaAmount} 小费给",

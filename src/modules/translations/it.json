@@ -241,6 +241,7 @@
     }
   },
   "transfer": {
+    "place_not_verified": "Decentraland non può verificare che questo sia il luogo che ha richiesto questo pagamento: è stato verificato solo l’indirizzo qui sopra. Nomi e immagini dei luoghi possono essere copiati.",
     "confirm": {
       "sending_tip": "Invio mancia di {manaAmount} per",
       "confirm_tip": "Conferma mancia di {manaAmount} per",

@@ -227,4 +227,46 @@ describe('when confirming a branded transfer', () => {
       })
     })
   })
+
+  // The place is looked up by the recipient address alone and its name and image are written by whoever
+  // deployed it, so its position under the amount must not be allowed to imply that the payment was asked
+  // for from there (see fetchPlaceByCreatorAddress).
+  describe('and the tip shows a place the recipient deployed', () => {
+    it('should say the place is not verified as the one that asked for the payment', () => {
+      render(<TransferConfirmView {...props} />)
+
+      expect(screen.getByTestId('place-not-verified')).toHaveTextContent('transfer.place_not_verified')
+    })
+
+    it('should keep the recipient address on screen next to it, which is what was verified', () => {
+      render(<TransferConfirmView {...props} />)
+
+      expect(screen.getByText('transfer.confirm.creator_of')).toBeInTheDocument()
+      expect(screen.getByTestId('place-not-verified')).toBeInTheDocument()
+    })
+  })
+
+  describe('and the transfer is a gift, which shows no place', () => {
+    beforeEach(() => {
+      props = {
+        ...props,
+        type: TransferType.GIFT,
+        transferData: {
+          imageUrl: 'https://example.com/nft.png',
+          tokenId: '1',
+          toAddress: transferData.toAddress,
+          contractAddress: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd',
+          name: 'Hat',
+          description: 'A hat',
+          rarity: Rarity.COMMON
+        }
+      }
+    })
+
+    it('should show no place note, since there is no place claim to qualify', () => {
+      render(<TransferConfirmView {...props} />)
+
+      expect(screen.queryByTestId('place-not-verified')).not.toBeInTheDocument()
+    })
+  })
 })
