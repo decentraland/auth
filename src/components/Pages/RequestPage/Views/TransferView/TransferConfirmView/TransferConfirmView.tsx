@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { useTranslation } from '@dcl/hooks'
 import { Rarity } from '@dcl/schemas'
-import { Profile } from 'decentraland-ui2'
+import { Checkbox, FormControlLabel, Profile } from 'decentraland-ui2'
 import { TransferActionButtons, TransferAssetImage, TransferLayout, TransferLoadingState } from '../../../../../Transfer'
-import { CenteredContent, ItemName, Label, Title, WarningAlert } from '../../../../../Transfer/Transfer.styled'
+import { CenteredContent, ItemName, Label, Notices, Title, WarningAlert } from '../../../../../Transfer/Transfer.styled'
 import { TransferType } from '../../../types'
 import type { MANATransferData, NFTTransferData, ProfileAvatar } from '../../../types'
 import { SceneName } from '../TransferTipComponents.styled'
@@ -19,6 +19,10 @@ const TransferConfirmView = (props: TransferConfirmViewProps) => {
   // or while the page executes it (a web2 user confirmed their dialog). Not while that dialog is open:
   // onApprove resolves once it is shown, and cancelling it must hand the buttons back.
   const isProcessing = isAwaitingApproval || props.isLoading
+  // The notices make way for the processing state, and the group that holds them goes with them: its
+  // margin is what closes the distance to the buttons, and there are no buttons then (see Notices).
+  const showsGiftingWarning = !isTip && !isProcessing
+  const asksCallbackConsent = !isProcessing && (props.callbackAddresses?.length ?? 0) > 0
 
   const handleApprove = async () => {
     setIsAwaitingApproval(true)
@@ -68,9 +72,33 @@ const TransferConfirmView = (props: TransferConfirmViewProps) => {
               rarity={(transferData as NFTTransferData).rarity || Rarity.COMMON}
             />
             {(transferData as NFTTransferData).name && <ItemName>{(transferData as NFTTransferData).name}</ItemName>}
-            {!isProcessing && <WarningAlert severity="info">{t('transfer.confirm.gifting_warning')}</WarningAlert>}
           </>
         )}
+        {showsGiftingWarning || asksCallbackConsent ? (
+          <Notices data-testid="transfer-notices">
+            {showsGiftingWarning ? (
+              <WarningAlert severity="info" data-testid="gifting-warning">
+                {t('transfer.confirm.gifting_warning')}
+              </WarningAlert>
+            ) : null}
+            {asksCallbackConsent ? (
+              <>
+                <WarningAlert severity="warning" data-testid="callback-code-warning">
+                  {t('request.transaction_dialog.callback_code_notice')}
+                </WarningAlert>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={props.callbackAcknowledged ?? false}
+                      onChange={event => props.onCallbackAcknowledgedChange?.(event.target.checked)}
+                    />
+                  }
+                  label={t('request.transaction_dialog.acknowledge_callback_code')}
+                />
+              </>
+            ) : null}
+          </Notices>
+        ) : null}
         {isProcessing ? (
           <TransferLoadingState text={t('transfer.confirm.processing_authorization')} />
         ) : (

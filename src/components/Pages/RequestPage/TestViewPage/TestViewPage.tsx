@@ -88,6 +88,40 @@ export const TestViewPage = () => {
           <TransferConfirmView type={TransferType.GIFT} transferData={nftData} isLoading={false} onDeny={noop} onApprove={asyncNoop} />
         )
       },
+      // The consent asked when the recipient had no code at preview time, gated here as RequestPage gates it,
+      // so the e2e suite can measure that the notices, the checkbox and the buttons stack without overlapping.
+      transferConfirmGiftCallbackConsent: {
+        label: 'TransferConfirmView (Gift, recipient without code — asks the delayed-code consent)',
+        element: (
+          <TransferConfirmView
+            type={TransferType.GIFT}
+            transferData={nftData}
+            isLoading={false}
+            callbackAddresses={[nftData.toAddress]}
+            callbackAcknowledged={acknowledged}
+            approveBlocked={!acknowledged}
+            onCallbackAcknowledgedChange={setAcknowledged}
+            onDeny={noop}
+            onApprove={asyncNoop}
+          />
+        )
+      },
+      transferConfirmTipCallbackConsent: {
+        label: 'TransferConfirmView (Tip, recipient without code — asks the delayed-code consent)',
+        element: (
+          <TransferConfirmView
+            type={TransferType.TIP}
+            transferData={manaData}
+            isLoading={false}
+            callbackAddresses={[manaData.toAddress]}
+            callbackAcknowledged={acknowledged}
+            approveBlocked={!acknowledged}
+            onCallbackAcknowledgedChange={setAcknowledged}
+            onDeny={noop}
+            onApprove={asyncNoop}
+          />
+        )
+      },
       nftTransferCanceled: {
         label: 'TransferCanceledView (Gift)',
         element: <TransferCanceledView type={TransferType.GIFT} transferData={nftData} />

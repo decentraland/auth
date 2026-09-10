@@ -43,12 +43,14 @@ describe('when rendering the WalletInteraction view', () => {
   let onDeny: jest.Mock
   let onApprove: jest.Mock
   let onAcknowledgedChange: jest.Mock
+  let onCallbackAcknowledgedChange: jest.Mock
   let props: WalletInteractionProps
 
   beforeEach(() => {
     onDeny = jest.fn()
     onApprove = jest.fn()
     onAcknowledgedChange = jest.fn()
+    onCallbackAcknowledgedChange = jest.fn()
     props = {
       requestId: 'r1',
       functionName: 'approve',
@@ -58,6 +60,7 @@ describe('when rendering the WalletInteraction view', () => {
       gas: { covered: true },
       approveBlocked: false,
       onAcknowledgedChange,
+      onCallbackAcknowledgedChange,
       onDeny,
       onApprove
     }
@@ -139,43 +142,25 @@ describe('when rendering the WalletInteraction view', () => {
     })
   })
 
-  describe('and code could be deployed at an address the call hands the contract before it executes', () => {
-    let onDeferredCallbackAcknowledgedChange: jest.Mock
-
+  describe('and a called address had no code during the preview', () => {
     beforeEach(() => {
-      onDeferredCallbackAcknowledgedChange = jest.fn()
-      props = {
-        ...props,
-        deferredCallbackAddresses: ['0x1234567890abcdef1234567890abcdef12345678'],
-        onDeferredCallbackAcknowledgedChange,
-        approveBlocked: true
-      }
+      props = { ...props, callbackAddresses: ['0x1234567890abcdef1234567890abcdef12345678'] }
     })
 
-    it('should explain the limitation and render an unchecked consent checkbox', () => {
+    it('should warn that code can appear before execution', () => {
       render(<WalletInteraction {...props} />)
-      expect(screen.getByTestId('deferred-callback-warning')).toHaveTextContent('request.wallet_interaction.deferred_callback_notice')
-      expect(screen.getByRole('checkbox', { name: 'request.wallet_interaction.acknowledge_deferred_callback' })).not.toBeChecked()
-      expect(screen.getByRole('button', { name: 'common.allow' })).toBeDisabled()
+      expect(screen.getByTestId('callback-code-warning')).toHaveTextContent('request.transaction_dialog.callback_code_notice')
     })
 
-    it('should send explicit consent to the page', async () => {
+    it('should render the separate callback acknowledgment unchecked', () => {
       render(<WalletInteraction {...props} />)
-      await userEvent.click(screen.getByRole('checkbox', { name: 'request.wallet_interaction.acknowledge_deferred_callback' }))
-      expect(onDeferredCallbackAcknowledgedChange).toHaveBeenCalledWith(true)
-      expect(onAcknowledgedChange).not.toHaveBeenCalled()
+      expect(screen.getByRole('checkbox', { name: 'request.transaction_dialog.acknowledge_callback_code' })).not.toBeChecked()
     })
 
-    describe('and a risk also needs acknowledgment', () => {
-      beforeEach(() => {
-        props = { ...props, requiresAcknowledgment: true, acknowledged: true }
-      })
-
-      it('should keep the consent separate from, and unchecked next to, the risk acknowledgment', () => {
-        render(<WalletInteraction {...props} />)
-        expect(screen.getByRole('checkbox', { name: 'request.transaction_dialog.acknowledge_risk' })).toBeChecked()
-        expect(screen.getByRole('checkbox', { name: 'request.wallet_interaction.acknowledge_deferred_callback' })).not.toBeChecked()
-      })
+    it('should report callback consent to the page', async () => {
+      render(<WalletInteraction {...props} />)
+      await userEvent.click(screen.getByRole('checkbox', { name: 'request.transaction_dialog.acknowledge_callback_code' }))
+      expect(onCallbackAcknowledgedChange).toHaveBeenCalledWith(true)
     })
   })
 

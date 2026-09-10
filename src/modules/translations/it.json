@@ -66,8 +66,6 @@
       "review_title": "Rivedi questa transazione",
       "preview_unavailable_warning": "Non è stato possibile verificare cosa fa questa transazione perché il servizio di anteprima è temporaneamente non disponibile. Approva solo se ti fidi della scena che l'ha richiesta.",
       "acknowledge_preview_unavailable": "Capisco che l'anteprima non è disponibile e sto approvando senza vedere cosa fa questa transazione",
-      "deferred_callback_notice": "Un indirizzo che questa transazione passa al contratto non contiene codice al momento. Potrebbe esservi distribuito del codice prima che la transazione venga eseguita, e il contratto lo eseguirebbe; questa anteprima non può mostrare cosa farebbe quel codice.",
-      "acknowledge_deferred_callback": "Comprendo che il codice distribuito prima dell’esecuzione di questa transazione potrebbe modificarne gli effetti e accetto questo rischio.",
       "review_restarted_notice": "La rete del tuo wallet è cambiata o non è stato possibile verificarla, quindi questa transazione è stata riesaminata sulla rete attuale.",
       "calls_function": "Chiama {functionName} su {contractName}"
     },
@@ -103,6 +101,8 @@
       "on_network": "su {network}",
       "acknowledge_risk": "Capisco che questo concede l'accesso ai miei asset",
       "acknowledge_no_visible_effects": "Capisco che l'anteprima non mostra modifiche ai miei asset e che questo può comunque cambiare impostazioni o ruoli che non vedo qui",
+      "callback_code_notice": "Un indirizzo utilizzato da questa chiamata non contiene attualmente codice di contratto. Potrebbe esservi distribuito del codice prima dell’esecuzione della chiamata, producendo un risultato diverso da questa anteprima.",
+      "acknowledge_callback_code": "Comprendo che il codice distribuito dopo questa anteprima potrebbe modificare gli effetti della chiamata e accetto questo rischio.",
       "approval_can_spend_symbol": "può spendere {symbol}",
       "approval_can_no_longer_spend": "non può più spendere {symbol}",
       "approval_allowance_revoked": "Autorizzazione di spesa per {symbol} revocata",
@@ -121,8 +121,6 @@
       "description": "Controlla cosa stai per firmare.",
       "view_raw": "Mostra dati grezzi",
       "hide_raw": "Nascondi dati grezzi",
-      "deferred_callback_notice": "Un indirizzo utilizzato da questa chiamata non contiene codice di contratto al momento. Potrebbe esservi distribuito del codice prima dell’invio di questa firma, causando un’esecuzione diversa da questa anteprima.",
-      "acknowledge_deferred_callback": "Comprendo che il codice distribuito dopo la firma potrebbe modificare gli effetti di questa chiamata e accetto questo rischio.",
       "meta_tx_notice": "Questa firma autorizza il contratto a eseguire questa azione per tuo conto. Non scade e l'app che l'ha richiesta può inviarla in seguito.",
       "meta_tx_reverted": "Questa azione al momento fallisce, quindi non è stato possibile visualizzarne gli effetti in anteprima. Firmala solo se prevedi che funzioni in seguito.",
       "acknowledge_unverified": "Capisco che non è stato possibile verificare gli effetti di questa firma"
