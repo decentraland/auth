@@ -67,6 +67,7 @@
       "preview_unavailable_warning": "Non è stato possibile verificare cosa fa questa transazione perché il servizio di anteprima è temporaneamente non disponibile. Approva solo se ti fidi della scena che l'ha richiesta.",
       "acknowledge_preview_unavailable": "Capisco che l'anteprima non è disponibile e sto approvando senza vedere cosa fa questa transazione",
       "review_restarted_notice": "La rete del tuo wallet è cambiata o non è stato possibile verificarla, quindi questa transazione è stata riesaminata sulla rete attuale.",
+      "review_restarted_recipient_code_notice": "È comparso codice di contratto all’indirizzo del destinatario, quindi questa richiesta è stata riesaminata come una chiamata a un contratto e non come un semplice trasferimento.",
       "calls_function": "Chiama {functionName} su {contractName}"
     },
     "transaction_dialog": {
@@ -172,6 +173,8 @@
       "message_scroll_hint": "Scorri fino alla fine del messaggio prima di continuare.",
       "acknowledge_transaction": "Capisco che Decentraland non può verificare questa transazione e la invio comunque",
       "acknowledge_native_transfer": "Capisco che sto inviando {amount} {symbol} e che non può essere annullato",
+      "recipient_code_notice": "Questo indirizzo non contiene codice di contratto in questo momento. La scena l’ha scelto, e potrebbe esservi distribuito del codice prima che questo trasferimento venga eseguito: il trasferimento eseguirebbe allora quel codice invece di limitarsi ad accreditare un account.",
+      "acknowledge_recipient_code": "Comprendo che del codice potrebbe comparire a questo indirizzo prima dell’esecuzione del trasferimento, e accetto questo rischio",
       "acknowledge_meta_transaction": "Capisco che questa firma permette al contratto di agire per me in qualsiasi momento e che i suoi effetti non possono essere verificati",
       "acknowledge_signature": "Capisco che Decentraland non può verificare cosa autorizza questa firma",
       "tabs_label": "Dettagli della richiesta",

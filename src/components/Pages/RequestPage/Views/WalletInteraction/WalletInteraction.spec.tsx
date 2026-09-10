@@ -236,7 +236,7 @@ describe('when rendering the WalletInteraction view', () => {
 
   describe('and the review replaced one invalidated by a network change', () => {
     beforeEach(() => {
-      props = { ...props, reviewRestarted: true }
+      props = { ...props, reviewRestartedReason: 'network' as const }
     })
 
     it('should tell the user why the page reloaded', () => {

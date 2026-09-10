@@ -67,6 +67,7 @@
       "preview_unavailable_warning": "We couldn't check what this transaction does because the preview service is temporarily unavailable. Only approve if you trust the scene that requested it.",
       "acknowledge_preview_unavailable": "I understand the preview is unavailable and I'm approving without seeing what this transaction does",
       "review_restarted_notice": "Your wallet's network changed or couldn't be verified, so this transaction was reviewed again on the current network.",
+      "review_restarted_recipient_code_notice": "Contract code appeared at the recipient's address, so this request was reviewed again as a call to a contract rather than a simple transfer.",
       "calls_function": "Calls {functionName} on {contractName}"
     },
     "transaction_dialog": {
@@ -172,6 +173,8 @@
       "message_scroll_hint": "Scroll to the end of the message before continuing.",
       "acknowledge_transaction": "I understand Decentraland can't check this transaction and I'm sending it anyway",
       "acknowledge_native_transfer": "I understand I'm sending {amount} {symbol} and this can't be undone",
+      "recipient_code_notice": "This address has no contract code right now. The scene chose it, and code could be deployed there before this transfer executes — the transfer would then run that code instead of only crediting an account.",
+      "acknowledge_recipient_code": "I understand code could appear at this address before the transfer executes, and I accept that risk",
       "acknowledge_meta_transaction": "I understand this signature lets the contract act for me at any time and its effects can't be checked",
       "acknowledge_signature": "I understand Decentraland can't check what this signature authorizes",
       "tabs_label": "Request details",

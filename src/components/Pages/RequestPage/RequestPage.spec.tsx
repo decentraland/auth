@@ -215,7 +215,7 @@ jest.mock('./Views', () => ({
       data-collections={JSON.stringify(props.collectionContracts ?? [])}
       data-callbacks={JSON.stringify(props.callbackAddresses ?? [])}
       data-callback-acknowledged={String(props.callbackAcknowledged)}
-      data-review-restarted={String(props.reviewRestarted)}
+      data-review-restarted={props.reviewRestartedReason ?? 'none'}
     >
       <button data-testid="wallet-interaction-approve" onClick={props.onApprove}>
         approve
@@ -308,12 +308,17 @@ jest.mock('./Views', () => ({
       data-chain={String(props.chainId ?? '')}
       data-gas={props.gas?.status ?? ''}
       data-payload={JSON.stringify(props.payload)}
-      data-review-restarted={String(props.reviewRestarted)}
+      data-review-restarted={props.reviewRestartedReason ?? 'none'}
       data-approve-blocked={String(props.approveBlocked)}
       data-acknowledged={String(props.acknowledged)}
+      data-callbacks={JSON.stringify(props.callbackAddresses ?? [])}
+      data-callback-acknowledged={String(props.callbackAcknowledged)}
     >
       <button data-testid="unverified-approve" onClick={props.onApprove}>
         approve
+      </button>
+      <button data-testid="unverified-callback-acknowledge" onClick={() => props.onCallbackAcknowledgedChange?.(true)}>
+        acknowledge recipient code
       </button>
       <button data-testid="unverified-acknowledge" onClick={() => props.onAcknowledgedChange?.(true)}>
         acknowledge
@@ -790,7 +795,7 @@ describe('RequestPage', () => {
           renderRequestPage()
           await userEvent.click(await screen.findByTestId('lookup-unavailable-try-again'))
           const view = await screen.findByTestId('unverified-request')
-          expect(view).toHaveAttribute('data-review-restarted', 'false')
+          expect(view).toHaveAttribute('data-review-restarted', 'none')
           expect(mockRecover).toHaveBeenCalledTimes(2)
           expect(mockSendFailedOutcome).not.toHaveBeenCalled()
         })
@@ -1589,7 +1594,7 @@ describe('RequestPage', () => {
       await approveUnverifiedRequest()
       await waitForRecoverCalls(2)
 
-      await waitFor(() => expect(screen.getByTestId('unverified-request')).toHaveAttribute('data-review-restarted', 'true'))
+      await waitFor(() => expect(screen.getByTestId('unverified-request')).toHaveAttribute('data-review-restarted', 'network'))
     })
 
     it('should report the restart and its reason to analytics', async () => {
@@ -2127,15 +2132,121 @@ describe('RequestPage', () => {
       expect(mockEstimateGas).toHaveBeenCalledWith({ account: SIGNER, to: '0xrecipient', data: '0x', value: BigInt('0xde0b6b3a7640000') })
     })
 
+    // What makes this a transfer rather than a call is that the recipient had no code when it was read, and
+    // the requester chose that address. So the review says the absence of code is a snapshot and asks a
+    // consent for it, as a Decentraland call does for its callbacks, and approval reads the code once more.
+    const approveNativeTransfer = async () => {
+      await userEvent.click(await screen.findByTestId('unverified-acknowledge'))
+      await userEvent.click(screen.getByTestId('unverified-callback-acknowledge'))
+      await waitFor(() => expect(screen.getByTestId('unverified-request')).toHaveAttribute('data-approve-blocked', 'false'))
+      await userEvent.click(screen.getByTestId('unverified-approve'))
+    }
+
     it('should send it as a plain transaction on the reviewed chain', async () => {
       renderRequestPage()
-      await approveUnverifiedRequest()
+      await approveNativeTransfer()
       await screen.findByTestId('wallet-interaction-complete')
       expect(mockWalletRequest).toHaveBeenCalledWith({
         method: 'eth_sendTransaction',
         params: [{ to: '0xrecipient', data: '0x', value: '0xde0b6b3a7640000', from: SIGNER, chainId: '0x1' }]
       })
       expect(sendMetaTransaction).not.toHaveBeenCalled()
+    })
+
+    it('should name the recipient as an address code can appear at', async () => {
+      renderRequestPage()
+      const view = await screen.findByTestId('unverified-request')
+      expect(view).toHaveAttribute('data-callbacks', '["0xrecipient"]')
+    })
+
+    it('should keep Allow blocked until that is consented to, however the transfer itself is acknowledged', async () => {
+      renderRequestPage()
+      await userEvent.click(await screen.findByTestId('unverified-acknowledge'))
+
+      const view = screen.getByTestId('unverified-request')
+      expect(view).toHaveAttribute('data-acknowledged', 'true')
+      expect(view).toHaveAttribute('data-approve-blocked', 'true')
+    })
+
+    it('should send nothing if Allow is pressed with only the transfer acknowledged', async () => {
+      renderRequestPage()
+      await userEvent.click(await screen.findByTestId('unverified-acknowledge'))
+
+      // Pressed raw on purpose: the double's button is not disabled, so this is the press the page's own
+      // approval handler has to refuse.
+      await userEvent.click(screen.getByTestId('unverified-approve'))
+
+      expect(mockWalletRequest).not.toHaveBeenCalled()
+    })
+
+    it('should read the recipient code again before sending, on the chain the transfer executes on', async () => {
+      renderRequestPage()
+      await screen.findByTestId('unverified-request')
+      expect(mockIsAddressWithoutCode).not.toHaveBeenCalled()
+
+      await approveNativeTransfer()
+
+      await waitFor(() => expect(mockIsAddressWithoutCode).toHaveBeenCalledWith('0xrecipient', 1))
+    })
+
+    describe('and code has appeared at the recipient by the time Allow is pressed', () => {
+      beforeEach(() => {
+        mockIsAddressWithoutCode.mockResolvedValue(false)
+      })
+
+      it('should send nothing and review the request again, saying why', async () => {
+        renderRequestPage()
+        await approveNativeTransfer()
+
+        await waitFor(() => expect(mockRecover.mock.calls.length).toBeGreaterThanOrEqual(2))
+        expect(mockWalletRequest).not.toHaveBeenCalled()
+        // No outcome either: code appearing is not the user's decision, and the request stays unconsumed
+        // for the review that replaces this one.
+        expect(mockSendFailedOutcome).not.toHaveBeenCalled()
+        expect(mockSendSuccessfulOutcome).not.toHaveBeenCalled()
+        await waitFor(() =>
+          expect(screen.getByTestId('unverified-request')).toHaveAttribute('data-review-restarted', 'recipient_gained_code')
+        )
+      })
+    })
+
+    describe('and the recipient code cannot be read when Allow is pressed', () => {
+      beforeEach(() => {
+        mockIsAddressWithoutCode.mockRejectedValue(new Error('rpc down'))
+      })
+
+      it('should send the transfer the user decided on, since an unreadable lookup says nothing', async () => {
+        renderRequestPage()
+        await approveNativeTransfer()
+
+        await screen.findByTestId('wallet-interaction-complete')
+        expect(mockWalletRequest).toHaveBeenCalledTimes(1)
+      })
+    })
+
+    describe('and the transfer goes to the signer their own account', () => {
+      beforeEach(() => {
+        mockRecover.mockResolvedValue(recovered('eth_sendTransaction', [{ to: SIGNER, value: '0xde0b6b3a7640000' }]))
+        mockClassifyRequest.mockResolvedValue({
+          kind: 'native_transfer',
+          to: SIGNER,
+          value: '0xde0b6b3a7640000',
+          chainId: 1,
+          toSelf: true
+        })
+      })
+
+      it('should ask no consent and read no code, since nobody else can deploy at that address', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('unverified-request')
+        expect(view).toHaveAttribute('data-callbacks', '[]')
+
+        await approveUnverifiedRequest()
+
+        await screen.findByTestId('wallet-interaction-complete')
+        expect(mockIsAddressWithoutCode).not.toHaveBeenCalled()
+        expect(mockWalletRequest).toHaveBeenCalledTimes(1)
+      })
     })
   })
 

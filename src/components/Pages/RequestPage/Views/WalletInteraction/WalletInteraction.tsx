@@ -32,7 +32,7 @@ export const WalletInteraction = ({
   approveBlocked = true,
   gas,
   isReverted = false,
-  reviewRestarted = false,
+  reviewRestartedReason = null,
   onAcknowledgedChange,
   onCallbackAcknowledgedChange,
   onDeny,
@@ -75,9 +75,13 @@ export const WalletInteraction = ({
           gas={summaryGas}
         />
       </SummaryBody>
-      {reviewRestarted ? (
+      {reviewRestartedReason ? (
         <ReviewRestartedNotice severity="info" role="status" data-testid="review-restarted-notice">
-          {t('request.wallet_interaction.review_restarted_notice')}
+          {t(
+            reviewRestartedReason === 'recipient_gained_code'
+              ? 'request.wallet_interaction.review_restarted_recipient_code_notice'
+              : 'request.wallet_interaction.review_restarted_notice'
+          )}
         </ReviewRestartedNotice>
       ) : null}
       {isPreviewUnavailable ? (

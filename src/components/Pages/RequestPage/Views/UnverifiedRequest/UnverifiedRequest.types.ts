@@ -1,5 +1,5 @@
 import type { RequestClassification } from '../../classifyRequest'
-import { GasEstimateState } from '../../types'
+import { GasEstimateState, ReviewRestartedNotice } from '../../types'
 
 /** The request kinds shown by the unverified view: everything that is not a Decentraland contract call. */
 type UnverifiedRequestKind = Exclude<RequestClassification['kind'], 'dcl_transaction' | 'dcl_meta_transaction'>
@@ -48,9 +48,19 @@ interface UnverifiedRequestViewProps {
   /** Whether the acknowledgment has been given for the payload on display. Owned by the page. */
   acknowledged?: boolean
   onAcknowledgedChange?: (checked: boolean) => void
+  /**
+   * Addresses this request reaches that had no code when they were checked. A simple transfer is only
+   * simple while its recipient stays empty, and the requester that chose the address can deploy to it
+   * before the transfer executes; when there are any, the view says so and asks a consent of its own,
+   * separate from the risk acknowledgment.
+   */
+  callbackAddresses?: string[]
+  /** Whether that consent has been given for the payload on display. Owned by the page. */
+  callbackAcknowledged?: boolean
+  onCallbackAcknowledgedChange?: (checked: boolean) => void
   isLoading?: boolean
-  /** True when this review replaced one invalidated because the wallet's network changed. */
-  reviewRestarted?: boolean
+  /** Why this review replaced an earlier one, when it did. Null when it is the first review. */
+  reviewRestartedReason?: ReviewRestartedNotice | null
   onDeny: () => void
   onApprove: () => void
 }

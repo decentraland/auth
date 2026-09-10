@@ -67,6 +67,7 @@
       "preview_unavailable_warning": "No pudimos verificar qué hace esta transacción porque el servicio de vista previa no está disponible temporalmente. Aprueba solo si confías en la escena que la solicitó.",
       "acknowledge_preview_unavailable": "Entiendo que la vista previa no está disponible y estoy aprobando sin ver qué hace esta transacción",
       "review_restarted_notice": "La red de tu wallet cambió o no pudo verificarse, así que esta transacción se revisó de nuevo en la red actual.",
+      "review_restarted_recipient_code_notice": "Apareció código de contrato en la dirección del destinatario, así que esta solicitud se revisó de nuevo como una llamada a un contrato y no como una transferencia simple.",
       "calls_function": "Llama a {functionName} en {contractName}"
     },
     "transaction_dialog": {
@@ -172,6 +173,8 @@
       "message_scroll_hint": "Desplázate hasta el final del mensaje antes de continuar.",
       "acknowledge_transaction": "Entiendo que Decentraland no puede comprobar esta transacción y la envío de todas formas",
       "acknowledge_native_transfer": "Entiendo que estoy enviando {amount} {symbol} y que esto no se puede deshacer",
+      "recipient_code_notice": "Esta dirección no tiene código de contrato en este momento. La escena la eligió, y podría desplegarse código allí antes de que se ejecute esta transferencia: entonces la transferencia ejecutaría ese código en lugar de solo acreditar una cuenta.",
+      "acknowledge_recipient_code": "Entiendo que podría aparecer código en esta dirección antes de que se ejecute la transferencia, y acepto ese riesgo",
       "acknowledge_meta_transaction": "Entiendo que esta firma permite que el contrato actúe por mí en cualquier momento y que sus efectos no se pueden comprobar",
       "acknowledge_signature": "Entiendo que Decentraland no puede comprobar qué autoriza esta firma",
       "tabs_label": "Detalles de la solicitud",

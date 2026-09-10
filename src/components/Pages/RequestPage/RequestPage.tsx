@@ -189,7 +189,13 @@ const RPC_METHOD_NOT_SUPPORTED = -32601
 const RPC_INVALID_PARAMS = -32602
 
 // Why a transaction review was discarded and started over (see restartReview).
-type ReviewRestartReason = 'network_changed' | 'network_unreadable' | 'network_unrecorded' | 'wallet_rejected_chain' | 'lookup_unavailable'
+type ReviewRestartReason =
+  | 'network_changed'
+  | 'network_unreadable'
+  | 'network_unrecorded'
+  | 'wallet_rejected_chain'
+  | 'lookup_unavailable'
+  | 'recipient_gained_code'
 
 type DecentralandTransaction = Extract<RequestClassification, { kind: 'dcl_transaction' }>
 
@@ -1080,6 +1086,17 @@ export const RequestPage = () => {
           case 'native_transfer':
           case 'unknown_transaction':
             // A plain send on the connected chain: nothing to preview, but the user pays gas.
+            if (classified.kind === 'native_transfer' && !classified.toSelf) {
+              // What makes this a transfer rather than a call is that the recipient had no code when it was
+              // read. The requester chose that address and can deploy to it before the transaction
+              // executes — empty calldata then runs the new contract's receive or fallback — so the
+              // recipient is named as mutable code and the review asks consent for that, exactly as a
+              // Decentraland call's callbacks do (see verifyCounterparties). Approval reads the code once
+              // more before dispatching, which closes the wide window but not the mempool race, so the
+              // consent is asked either way. Not for a send to the signer's own account: nobody else can
+              // deploy there.
+              setMutableCallbackAddresses([classified.to.toLowerCase()])
+            }
             setView(View.WALLET_UNVERIFIED_INTERACTION)
             void estimateTransactionFee({
               to: classified.to,
@@ -1452,6 +1469,21 @@ export const RequestPage = () => {
           )
           return
         }
+        if (reviewed.kind === 'native_transfer' && !reviewed.toSelf) {
+          // The review called this a transfer because the recipient had no code. Read it again rather than
+          // send on a claim that has had the whole review to stop being true: an address the requester
+          // chose can have been deployed to since. Only a confirmed contract turns this back into a call —
+          // it is reviewed again, as an unverified transaction, with everything that warns about. A lookup
+          // that fails says nothing either way and does not cancel a transfer the user has decided on and
+          // consented to the limits of; nor can any read close the mempool race, which is what the consent
+          // is for (see mutableCallbackAddresses).
+          const recipientStillWithoutCode = await isAddressWithoutCode(reviewed.to, reviewed.chainId).catch(() => undefined)
+          if (!canStillDispatch()) return
+          if (recipientStillWithoutCode === false) {
+            restartReview('recipient_gained_code')
+            return
+          }
+        }
         result = await walletClient.request({
           method: 'eth_sendTransaction',
           // Also bind the request to the reviewed chain. This is defense in depth for injected
@@ -1736,7 +1768,11 @@ export const RequestPage = () => {
       case View.WALLET_UNVERIFIED_INTERACTION:
         // Nothing is previewed here, so there is no preview to settle, and the acknowledgment is always
         // required (see UnverifiedRequestView).
-        return (!isTransactionClassification(classification) || !isGasEstimatePending) && isAcknowledged
+        return (
+          (!isTransactionClassification(classification) || !isGasEstimatePending) &&
+          isAcknowledged &&
+          (mutableCallbackAddresses.length === 0 || isMutableCallbackAcknowledged)
+        )
       // A branded screen stands in for the generic review only once that review's checks passed (see
       // reviewDecentralandTransaction), so it carries the same counterparty requirement.
       case View.WALLET_NFT_INTERACTION:
@@ -1891,7 +1927,9 @@ export const RequestPage = () => {
             approveBlocked={approveBlocked}
             gas={gas}
             isReverted={isSimulationReverted}
-            reviewRestarted={reviewRestartReason !== null}
+            reviewRestartedReason={
+              reviewRestartReason === null ? null : reviewRestartReason === 'recipient_gained_code' ? 'recipient_gained_code' : 'network'
+            }
             onAcknowledgedChange={setAcknowledged}
             onCallbackAcknowledgedChange={setMutableCallbackAcknowledged}
             onDeny={onDenyWalletInteraction}
@@ -1947,10 +1985,15 @@ export const RequestPage = () => {
             gas={isTransactionKind ? (gasEstimate ?? { status: 'loading' }) : undefined}
             balance={isTransactionKind ? walletInfo?.balance : undefined}
             acknowledged={isAcknowledged}
+            callbackAddresses={mutableCallbackAddresses}
+            callbackAcknowledged={isMutableCallbackAcknowledged}
             approveBlocked={approveBlocked}
             isLoading={isLoading}
-            reviewRestarted={reviewRestartReason !== null}
+            reviewRestartedReason={
+              reviewRestartReason === null ? null : reviewRestartReason === 'recipient_gained_code' ? 'recipient_gained_code' : 'network'
+            }
             onAcknowledgedChange={setAcknowledged}
+            onCallbackAcknowledgedChange={setMutableCallbackAcknowledged}
             onDeny={onDenyWalletInteraction}
             onApprove={handleApproveWalletInteraction}
           />

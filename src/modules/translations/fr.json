@@ -67,6 +67,7 @@
       "preview_unavailable_warning": "Nous n'avons pas pu vérifier ce que fait cette transaction car le service d'aperçu est temporairement indisponible. N'approuvez que si vous faites confiance à la scène qui l'a demandée.",
       "acknowledge_preview_unavailable": "Je comprends que l'aperçu est indisponible et j'approuve sans voir ce que fait cette transaction",
       "review_restarted_notice": "Le réseau de votre portefeuille a changé ou n'a pas pu être vérifié, cette transaction a donc été réexaminée sur le réseau actuel.",
+      "review_restarted_recipient_code_notice": "Du code de contrat est apparu à l’adresse du destinataire ; cette requête a donc été réexaminée comme un appel à un contrat et non comme un simple transfert.",
       "calls_function": "Appelle {functionName} sur {contractName}"
     },
     "transaction_dialog": {
@@ -172,6 +173,8 @@
       "message_scroll_hint": "Faites défiler jusqu'à la fin du message avant de continuer.",
       "acknowledge_transaction": "Je comprends que Decentraland ne peut pas vérifier cette transaction et je l'envoie quand même",
       "acknowledge_native_transfer": "Je comprends que j'envoie {amount} {symbol} et que cela ne peut pas être annulé",
+      "recipient_code_notice": "Cette adresse ne contient aucun code de contrat pour le moment. La scène l’a choisie, et du code pourrait y être déployé avant l’exécution de ce transfert : le transfert exécuterait alors ce code au lieu de seulement créditer un compte.",
+      "acknowledge_recipient_code": "Je comprends que du code pourrait apparaître à cette adresse avant l’exécution du transfert, et j’accepte ce risque",
       "acknowledge_meta_transaction": "Je comprends que cette signature permet au contrat d'agir pour moi à tout moment et que ses effets ne peuvent pas être vérifiés",
       "acknowledge_signature": "Je comprends que Decentraland ne peut pas vérifier ce que cette signature autorise",
       "tabs_label": "Détails de la demande",
