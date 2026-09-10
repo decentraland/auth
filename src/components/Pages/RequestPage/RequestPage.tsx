@@ -273,6 +273,8 @@ export const RequestPage = () => {
   // alongside the simulation, and Allow stays blocked until it is; a call that reaches anything else is
   // refused, so Allow never enables on a preview the page would not stand behind.
   const [areCounterpartiesVerified, setAreCounterpartiesVerified] = useState(false)
+  // Empty addresses a deferred call may invoke; the absence of code can change after signing.
+  const [deferredCallbackAddresses, setDeferredCallbackAddresses] = useState<string[]>([])
   // Resolved counterparty display names (lowercased address → name), filled in progressively.
   const [simulationProfiles, setSimulationProfiles] = useState<Record<string, string>>({})
   // Chain the pending transaction/meta-tx was simulated on, for block-explorer links.
@@ -532,6 +534,8 @@ export const RequestPage = () => {
       setWalletInfo(undefined)
       setClassification(null)
       setAreCounterpartiesVerified(false)
+      setDeferredCallbackAddresses([])
+      setDeferredCallbackAcknowledged(false)
       setGasEstimate(null)
       setNftTransferData(null)
       setManaTransferData(null)
@@ -858,13 +862,19 @@ export const RequestPage = () => {
         // way it records which of the contracts involved are factory collections, the called one included
         // (it is one when the registry does not list it), for the summary to label. False means "do not go
         // on", whether the request was refused or the review went stale meanwhile; every caller stops on it.
-        const verifyCounterparties = async (call: DecodedCall, chainId: number, contractAddress: string): Promise<boolean> => {
+        const verifyCounterparties = async (
+          call: DecodedCall,
+          chainId: number,
+          contractAddress: string,
+          deferredSignature = false
+        ): Promise<boolean> => {
           const refuse = async (reason: string) => {
             if (!isStale()) await refuseRequest(new UnsupportedContractError(request.method, reason), 'unsupported_contract')
             return false
           }
           try {
             const collections = new Set<string>()
+            const emptyAddresses = new Set<string>()
             if (!getKnownDecentralandContract(contractAddress, chainId)) {
               collections.add(contractAddress.toLowerCase())
               // Known before any lookup, so the summary never shows the called collection as unverified.
@@ -876,7 +886,12 @@ export const RequestPage = () => {
             const isRecognizedOrPlain = async (address: string): Promise<boolean> => {
               try {
                 if (isRecognizedDecentralandContract(address, chainId) || getKnownToken(address, chainId)) return true
-                if (await isAddressWithoutCode(address, chainId)) return true
+                if (await isAddressWithoutCode(address, chainId)) {
+                  // The requester can hold a returned signature while deploying receiver code here.
+                  // Keep the check, but require consent to the preview's limitation before signing.
+                  if (deferredSignature) emptyAddresses.add(address.toLowerCase())
+                  return true
+                }
                 if (!collectionsLiveHere || !(await isDecentralandCollection(address))) return false
                 collections.add(address.toLowerCase())
                 return true
@@ -891,6 +906,7 @@ export const RequestPage = () => {
               return refuse(`the call reaches a contract that is not Decentraland's: ${listAddresses(unrecognized)}`)
             }
             setSimulationCollections([...collections])
+            setDeferredCallbackAddresses([...emptyAddresses].sort())
             setAreCounterpartiesVerified(true)
             return true
           } catch (e) {
@@ -1055,7 +1071,7 @@ export const RequestPage = () => {
             setSimulationChainId(classified.chainId)
             setSimulationState({ status: 'loading' })
             setView(View.WALLET_SIGNATURE_INTERACTION)
-            void verifyCounterparties(classified.call, classified.chainId, classified.contract.address)
+            void verifyCounterparties(classified.call, classified.chainId, classified.contract.address, true)
             void fetchSimulation(
               buildMetaTransactionSimulationPayload(classified.chainId, classified.contract.address, classified.calldata, signerAddress),
               classified.call
@@ -1152,6 +1168,8 @@ export const RequestPage = () => {
         setIsTransactionModalOpen(false)
         setSimulationState(current => (current.status === 'loading' ? current : { status: 'loading' }))
         setAreCounterpartiesVerified(false)
+        setDeferredCallbackAddresses([])
+        setDeferredCallbackAcknowledged(false)
         setSimulationVerified(current => (current.length === 0 ? current : []))
         setSimulationCollections(current => (current.length === 0 ? current : []))
         setSimulationProfiles(current => (Object.keys(current).length === 0 ? current : {}))
@@ -1658,6 +1676,7 @@ export const RequestPage = () => {
         isSimulationReverted ? 'reverted' : '',
         hasPreviewWithoutVisibleEffects ? 'no-visible-effects' : '',
         isSignatureWithoutVerifiedEffects ? 'unverified' : '',
+        deferredCallbackAddresses.join(','),
         getPreviewFingerprint(simulationState.status === 'ready' ? simulationState.result : undefined)
       ].join('|'),
     [
@@ -1667,10 +1686,13 @@ export const RequestPage = () => {
       simulationState,
       isSimulationReverted,
       hasPreviewWithoutVisibleEffects,
-      isSignatureWithoutVerifiedEffects
+      isSignatureWithoutVerifiedEffects,
+      deferredCallbackAddresses
     ]
   )
   const { acknowledged: isAcknowledged, setAcknowledged } = useAcknowledgment(acknowledgmentStatement)
+  const { acknowledged: isDeferredCallbackAcknowledged, setAcknowledged: setDeferredCallbackAcknowledged } =
+    useAcknowledgment(acknowledgmentStatement)
 
   // The wallet-side fee estimate a transaction the user pays gas for waits on, so the cost is always seen
   // before sending. A relayed call and a signature cost nothing and never wait for it.
@@ -1704,7 +1726,13 @@ export const RequestPage = () => {
           isAcknowledgedIfNeeded
         )
       case View.WALLET_SIGNATURE_INTERACTION:
-        return classification.kind === 'dcl_meta_transaction' && isPreviewSettled && areCounterpartiesVerified && isAcknowledgedIfNeeded
+        return (
+          classification.kind === 'dcl_meta_transaction' &&
+          isPreviewSettled &&
+          areCounterpartiesVerified &&
+          isAcknowledgedIfNeeded &&
+          (deferredCallbackAddresses.length === 0 || isDeferredCallbackAcknowledged)
+        )
       case View.WALLET_UNVERIFIED_INTERACTION:
         // Nothing is previewed here, so there is no preview to settle, and the acknowledgment is always
         // required (see UnverifiedRequestView).
@@ -1865,6 +1893,9 @@ export const RequestPage = () => {
         <>
           {confirmDialog}
           <SignatureRequestView
+            deferredCallbackAddresses={deferredCallbackAddresses}
+            deferredCallbackAcknowledged={isDeferredCallbackAcknowledged}
+            onDeferredCallbackAcknowledgedChange={setDeferredCallbackAcknowledged}
             key={requestId}
             requestId={requestId}
             method={requestRef.current?.method ?? ''}

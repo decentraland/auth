@@ -24,6 +24,10 @@ export interface SignatureRequestViewProps {
   chainId?: number
   /** When true, gates approval behind an acknowledgment checkbox. */
   requiresAcknowledgment?: boolean
+  /** Called addresses with no code today; code can be deployed before this signature is submitted. */
+  deferredCallbackAddresses?: string[]
+  deferredCallbackAcknowledged?: boolean
+  onDeferredCallbackAcknowledgedChange?: (checked: boolean) => void
   /**
    * True while the review may not be acted on. The page holds every gate in one place — the preview has
    * settled, the contracts the call reaches were checked, the fee is known, the acknowledgment was given

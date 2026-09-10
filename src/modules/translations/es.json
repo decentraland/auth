@@ -119,6 +119,8 @@
       "description": "Revisa lo que estás a punto de firmar.",
       "view_raw": "Ver datos sin procesar",
       "hide_raw": "Ocultar datos sin procesar",
+      "deferred_callback_notice": "Una dirección utilizada por esta llamada no tiene código de contrato hoy. Podría desplegarse código allí antes de enviar esta firma, haciendo que la ejecución difiera de esta vista previa.",
+      "acknowledge_deferred_callback": "Entiendo que el código desplegado después de firmar podría cambiar lo que hace esta llamada y acepto este riesgo.",
       "meta_tx_notice": "Esta firma autoriza al contrato a ejecutar esta acción en tu nombre. No expira y la aplicación que la solicitó puede enviarla más adelante.",
       "meta_tx_reverted": "Esta acción falla ahora mismo, por lo que no se pudieron previsualizar sus efectos. Fírmala solo si esperas que funcione más adelante.",
       "acknowledge_unverified": "Entiendo que no se pudieron verificar los efectos de esta firma"

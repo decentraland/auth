@@ -119,6 +119,8 @@
       "description": "Vérifiez ce que vous êtes sur le point de signer.",
       "view_raw": "Afficher les données brutes",
       "hide_raw": "Masquer les données brutes",
+      "deferred_callback_notice": "Une adresse utilisée par cet appel ne contient aucun code de contrat aujourd’hui. Du code pourrait y être déployé avant l’envoi de cette signature, ce qui pourrait modifier l’exécution par rapport à cet aperçu.",
+      "acknowledge_deferred_callback": "Je comprends que du code déployé après ma signature pourrait modifier les effets de cet appel et j’accepte ce risque.",
       "meta_tx_notice": "Cette signature autorise le contrat à exécuter cette action en votre nom. Elle n'expire pas et l'application qui l'a demandée peut la soumettre plus tard.",
       "meta_tx_reverted": "Cette action échoue pour le moment, ses effets n'ont donc pas pu être prévisualisés. Ne la signez que si vous pensez qu'elle fonctionnera plus tard.",
       "acknowledge_unverified": "Je comprends que les effets de cette signature n'ont pas pu être vérifiés"

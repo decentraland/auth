@@ -119,6 +119,8 @@
       "description": "Controlla cosa stai per firmare.",
       "view_raw": "Mostra dati grezzi",
       "hide_raw": "Nascondi dati grezzi",
+      "deferred_callback_notice": "Un indirizzo utilizzato da questa chiamata non contiene codice di contratto al momento. Potrebbe esservi distribuito del codice prima dell’invio di questa firma, causando un’esecuzione diversa da questa anteprima.",
+      "acknowledge_deferred_callback": "Comprendo che il codice distribuito dopo la firma potrebbe modificare gli effetti di questa chiamata e accetto questo rischio.",
       "meta_tx_notice": "Questa firma autorizza il contratto a eseguire questa azione per tuo conto. Non scade e l'app che l'ha richiesta può inviarla in seguito.",
       "meta_tx_reverted": "Questa azione al momento fallisce, quindi non è stato possibile visualizzarne gli effetti in anteprima. Firmala solo se prevedi che funzioni in seguito.",
       "acknowledge_unverified": "Capisco che non è stato possibile verificare gli effetti di questa firma"

@@ -119,6 +119,8 @@
       "description": "Review what you are about to sign.",
       "view_raw": "View raw data",
       "hide_raw": "Hide raw data",
+      "deferred_callback_notice": "An address used by this call has no contract code today. Code could be deployed there before this signature is submitted, causing execution to differ from this preview.",
+      "acknowledge_deferred_callback": "I understand that code deployed after I sign could change what this call does, and I accept this risk.",
       "meta_tx_notice": "This signature authorizes the contract to run this action on your behalf. It doesn't expire and can be submitted later by the app that requested it.",
       "meta_tx_reverted": "This action fails right now, so its effects couldn't be previewed. Only sign it if you expect it to work later.",
       "acknowledge_unverified": "I understand the effects of this signature couldn't be verified"

@@ -21,7 +21,8 @@ import {
   ReviewedSignerMismatchError,
   SimulationResponseBody,
   SimulationUnavailableError,
-  UnsupportedMethodError
+  UnsupportedMethodError,
+  collectCallAddresses
 } from '../../../shared/auth'
 import { extractReferrerFromSearchParameters, getAuthRequestId, isBridgeOnlyEnabled } from '../../../shared/locations'
 import { trackEvent } from '../../../shared/utils/analytics'
@@ -265,6 +266,8 @@ jest.mock('./Views', () => ({
       data-function={props.functionName}
       data-contract={props.contractName}
       data-verifying-contract={props.verifyingContract}
+      data-deferred-callbacks={JSON.stringify(props.deferredCallbackAddresses ?? [])}
+      data-callback-acknowledged={String(props.deferredCallbackAcknowledged)}
       data-verified={JSON.stringify(props.verifiedContracts ?? [])}
       data-collections={JSON.stringify(props.collectionContracts ?? [])}
     >
@@ -273,6 +276,9 @@ jest.mock('./Views', () => ({
       </button>
       <button data-testid="signature-acknowledge" onClick={() => props.onAcknowledgedChange?.(true)}>
         acknowledge
+      </button>
+      <button data-testid="signature-callback-acknowledge" onClick={() => props.onDeferredCallbackAcknowledgedChange?.(true)}>
+        acknowledge callback risk
       </button>
       <button data-testid="signature-deny" onClick={props.onDeny}>
         deny
@@ -2193,6 +2199,10 @@ describe('RequestPage', () => {
       beforeEach(async () => {
         mockIsAddressWithoutCode.mockResolvedValue(true)
         renderRequestPage()
+        if (kind === 'signature') {
+          await waitFor(() => expect(screen.getByTestId(viewTestId)).toHaveAttribute('data-deferred-callbacks', '["0xnft"]'))
+          await userEvent.click(screen.getByTestId('signature-callback-acknowledge'))
+        }
         view = await findVerifiedView()
       })
 
@@ -3287,6 +3297,92 @@ describe('RequestPage', () => {
       mockWalletRequest.mockResolvedValue('0xsignature')
       mockSendSuccessfulOutcome.mockResolvedValue({})
       mockSendFailedOutcome.mockResolvedValue({})
+    })
+
+    describe('and an NFT recipient has no code at preview time', () => {
+      let recipient: string
+
+      beforeEach(() => {
+        recipient = '0x1111111111111111111111111111111111111234'
+        mockIsAddressWithoutCode.mockResolvedValue(true)
+      })
+
+      describe.each([false, true])('and safeTransferFrom carries receiver data: %s', withData => {
+        let rerender: ReturnType<typeof renderRequestPage>['rerender']
+
+        beforeEach(async () => {
+          const call = {
+            functionName: 'safeTransferFrom',
+            args: withData ? [SIGNER, recipient, BigInt(1), '0x1234'] : [SIGNER, recipient, BigInt(1)],
+            payable: false,
+            forwardsCall: false
+          }
+          const { addresses, opaque } = collectCallAddresses(call, 137)
+          addresses.delete(SIGNER.toLowerCase())
+          mockGetCounterpartyAddresses.mockReturnValue({ addresses: [...addresses], opaque })
+          mockClassifyRequest.mockResolvedValue(dclMetaTransaction({ call }))
+          ;({ rerender } = renderRequestPage())
+          await waitFor(() =>
+            expect(screen.getByTestId('signature-request')).toHaveAttribute('data-deferred-callbacks', JSON.stringify([recipient]))
+          )
+          await waitFor(() => expect(screen.getByTestId('signature-request')).toHaveAttribute('data-sim', 'ready'))
+        })
+
+        it('should require explicit consent despite the successful preview and empty recipient', async () => {
+          expect(screen.getByTestId('signature-request')).toHaveAttribute('data-approve-blocked', 'true')
+          await userEvent.click(screen.getByTestId('signature-approve'))
+          expect(mockWalletRequest).not.toHaveBeenCalled()
+        })
+
+        it('should sign after the callback risk is acknowledged', async () => {
+          await userEvent.click(screen.getByTestId('signature-callback-acknowledge'))
+          await waitFor(() => expect(screen.getByTestId('signature-request')).toHaveAttribute('data-approve-blocked', 'false'))
+          await userEvent.click(screen.getByTestId('signature-approve'))
+          await waitFor(() => expect(mockWalletRequest).toHaveBeenCalledTimes(1))
+        })
+
+        describe('and the provider refreshes after consent', () => {
+          beforeEach(async () => {
+            await userEvent.click(screen.getByTestId('signature-callback-acknowledge'))
+            await waitFor(() => expect(screen.getByTestId('signature-request')).toHaveAttribute('data-approve-blocked', 'false'))
+            mockConnectionData = { ...mockConnectionData, provider: { isMagic: false, refreshed: true } }
+            rerenderRequestPage(rerender)
+            await waitFor(() => expect(mockRecover.mock.calls.length).toBeGreaterThanOrEqual(2))
+            await waitFor(() =>
+              expect(screen.getByTestId('signature-request')).toHaveAttribute('data-deferred-callbacks', JSON.stringify([recipient]))
+            )
+            await waitFor(() => expect(screen.getByTestId('signature-request')).toHaveAttribute('data-sim', 'ready'))
+          })
+
+          it('should require fresh consent even if the new preview is identical', async () => {
+            expect(screen.getByTestId('signature-request')).toHaveAttribute('data-callback-acknowledged', 'false')
+            await userEvent.click(screen.getByTestId('signature-approve'))
+            expect(mockWalletRequest).not.toHaveBeenCalled()
+          })
+        })
+
+        it('should not count acknowledgment of other risks as consent to delayed code', async () => {
+          await userEvent.click(screen.getByTestId('signature-acknowledge'))
+          await userEvent.click(screen.getByTestId('signature-approve'))
+          expect(mockWalletRequest).not.toHaveBeenCalled()
+        })
+      })
+
+      describe('and transferFrom does not call its recipient', () => {
+        beforeEach(() => {
+          const call = { functionName: 'transferFrom', args: [SIGNER, recipient, BigInt(1)], payable: false, forwardsCall: false }
+          const { addresses, opaque } = collectCallAddresses(call, 137)
+          mockGetCounterpartyAddresses.mockReturnValue({ addresses: [...addresses], opaque })
+          mockClassifyRequest.mockResolvedValue(dclMetaTransaction({ call }))
+          renderRequestPage()
+        })
+
+        it('should allow review without relying on the recipient remaining empty', async () => {
+          await waitFor(() => expect(screen.getByTestId('signature-request')).toHaveAttribute('data-approve-blocked', 'false'))
+          expect(screen.getByTestId('signature-request')).toHaveAttribute('data-deferred-callbacks', '[]')
+          expect(mockIsAddressWithoutCode).not.toHaveBeenCalled()
+        })
+      })
     })
 
     it('should render the signature review naming the decoded call and the contract', async () => {
