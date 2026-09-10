@@ -45,7 +45,6 @@ function buildResponse(overrides: Partial<SimulationResponseBody> = {}): Simulat
     approvalChanges: [buildApprovalChange()],
     balanceChanges: [{ address: '0x1111111111111111111111111111111111111111', dollarValue: '-1.50' }],
     events: [{ name: 'Transfer', address: '0x3333333333333333333333333333333333333333' }],
-    eventsTruncated: false,
     ...overrides
   }
 }
@@ -72,26 +71,13 @@ describe('parseSimulationResponse', () => {
     })
   })
 
-  describe('when the body omits the truncation flag, as a server from before it does', () => {
-    it('should accept it and leave the flag absent, since silence is not a promise the events are complete', () => {
-      const response = buildResponse()
-      delete response.eventsTruncated
-
-      const parsed = parseSimulationResponse(response)
-
-      expect(parsed).not.toBeNull()
-      expect(parsed?.eventsTruncated).toBeUndefined()
-    })
-  })
-
   describe.each([
     ['not an object', null],
     ['an array', []],
     ['a string', 'success'],
     ['missing the status', { ...buildResponse(), status: undefined }],
     ['carrying a status this client does not declare', { ...buildResponse(), status: 'pending' }],
-    ['carrying a revert reason that is not text', { ...buildResponse(), status: 'reverted', error: 404 }],
-    ['carrying a truncation flag that is not a boolean', { ...buildResponse(), eventsTruncated: 'yes' }]
+    ['carrying a revert reason that is not text', { ...buildResponse(), status: 'reverted', error: 404 }]
   ])('when the body is %s', (_label, value) => {
     it('should return null', () => {
       expect(parseSimulationResponse(value)).toBeNull()
@@ -151,6 +137,37 @@ describe('parseSimulationResponse', () => {
       expect(parseSimulationResponse({ ...buildResponse(), assetChanges: [change] })).toBeNull()
     })
   })
+
+  describe.each([['assetChanges'], ['approvalChanges'], ['balanceChanges'], ['events']])(
+    'when the %s collection is longer than the review will render',
+    collection => {
+      it('should return null, so an unbounded list never reaches the summary and is never shown as a prefix', () => {
+        const entry: Record<string, unknown> = {
+          assetChanges: buildAssetChange(),
+          approvalChanges: buildApprovalChange(),
+          balanceChanges: { address: '0xa', dollarValue: null },
+          events: { name: 'Transfer', address: '0xa' }
+        }[collection] as Record<string, unknown>
+
+        const response = { ...buildResponse(), [collection]: Array.from({ length: 1025 }, () => entry) }
+
+        expect(parseSimulationResponse(response)).toBeNull()
+      })
+
+      it('should accept a collection exactly at the bound', () => {
+        const entry: Record<string, unknown> = {
+          assetChanges: buildAssetChange(),
+          approvalChanges: buildApprovalChange(),
+          balanceChanges: { address: '0xa', dollarValue: null },
+          events: { name: 'Transfer', address: '0xa' }
+        }[collection] as Record<string, unknown>
+
+        const response = { ...buildResponse(), [collection]: Array.from({ length: 1024 }, () => entry) }
+
+        expect(parseSimulationResponse(response)).not.toBeNull()
+      })
+    }
+  )
 
   describe('when a balance row has no address', () => {
     it('should return null, since the net-change line matches rows by address', () => {

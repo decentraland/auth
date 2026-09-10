@@ -17,6 +17,17 @@ import { ApprovalChange, AssetChange, BalanceChange, SimulationEvent, Simulation
  * present and null rather than absent, since that is what the server sends.
  */
 
+/**
+ * Upper bound on the entries of any collection in a preview. The server refuses a response past its own
+ * bound rather than truncating one, and reports at most 1024 movements or permissions, so a valid answer is
+ * always under this. It exists because "the server bounds it" is a promise the review should not have to
+ * take on trust: a server that broke that promise would otherwise hand the summary an unbounded list to
+ * render. Past it the body is refused like any other one that does not honour the DTO, which the review
+ * shows as "details unavailable" — never silently as a prefix, since a prefix of the effects is not a
+ * preview.
+ */
+const MAX_COLLECTION_ENTRIES = 1024
+
 const isStringOrNull = (value: unknown): value is string | null => value === null || typeof value === 'string'
 const isNumberOrNull = (value: unknown): value is number | null => value === null || typeof value === 'number'
 
@@ -90,20 +101,13 @@ function parseSimulationResponse(value: unknown): SimulationResponseBody | null 
   if (value.error !== undefined && typeof value.error !== 'string') {
     return null
   }
-  // Absent is accepted (a server from before the field) and left absent, never defaulted to false: see
-  // the field's note in types.ts.
-  if (value.eventsTruncated !== undefined && typeof value.eventsTruncated !== 'boolean') {
-    return null
-  }
+  const isBoundedArray = (collection: unknown, isEntry: (entry: unknown) => boolean): boolean =>
+    Array.isArray(collection) && collection.length <= MAX_COLLECTION_ENTRIES && collection.every(isEntry)
   if (
-    !Array.isArray(value.assetChanges) ||
-    !value.assetChanges.every(isAssetChange) ||
-    !Array.isArray(value.approvalChanges) ||
-    !value.approvalChanges.every(isApprovalChange) ||
-    !Array.isArray(value.balanceChanges) ||
-    !value.balanceChanges.every(isBalanceChange) ||
-    !Array.isArray(value.events) ||
-    !value.events.every(isSimulationEvent)
+    !isBoundedArray(value.assetChanges, isAssetChange) ||
+    !isBoundedArray(value.approvalChanges, isApprovalChange) ||
+    !isBoundedArray(value.balanceChanges, isBalanceChange) ||
+    !isBoundedArray(value.events, isSimulationEvent)
   ) {
     return null
   }

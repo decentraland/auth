@@ -47,10 +47,6 @@ import {
 
 type Translate = (key: string, opts?: Record<string, string | number>) => string
 
-// Defensive ceiling on decoded events rendered in the technical-details section. The server already
-// caps events at 50; this guards the UI against an unexpectedly large or malformed response.
-const MAX_DISPLAYED_EVENTS = 100
-
 const counterpartyLabel = (address: string | null, profiles: Record<string, string>): string => {
   if (!address) return ''
   return profiles[address.toLowerCase()] || shortenAddress(address)
@@ -357,7 +353,9 @@ const TechnicalDetails = ({
 }) => {
   const [open, setOpen] = useState(false)
   if (events.length === 0) return null
-  const displayedEvents = events.slice(0, MAX_DISPLAYED_EVENTS)
+  // Rendered whole, not sliced: the list is bounded before it gets here (the server refuses a response it
+  // cannot report in full, and parseSimulationResponse refuses one whose collections are longer than the
+  // review will render), so a slice here could only hide entries from a list that is already complete.
   return (
     <>
       <Toggle type="button" aria-expanded={open} onClick={() => setOpen(show => !show)}>
@@ -365,7 +363,7 @@ const TechnicalDetails = ({
       </Toggle>
       {open ? (
         <EventList data-testid="simulation-events">
-          {displayedEvents.map((event, index) => (
+          {events.map((event, index) => (
             <EventRow key={`event-${index}`}>
               {event.name || t('request.transaction_dialog.event_unknown')} ·{' '}
               <AddressLink

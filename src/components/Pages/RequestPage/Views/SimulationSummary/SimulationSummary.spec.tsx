@@ -910,7 +910,7 @@ describe('when rendering the SimulationSummary', () => {
     })
   })
 
-  describe('and there are more events than the display cap', () => {
+  describe('and the transaction emitted a long list of events', () => {
     beforeEach(() => {
       const events = Array.from({ length: 150 }, (_, index) => ({
         name: `Event${index}`,
@@ -919,10 +919,15 @@ describe('when rendering the SimulationSummary', () => {
       simulation = { status: 'ready', result: emptyResult({ events }) }
     })
 
-    it('should cap the rendered event rows at the defensive maximum', async () => {
+    it('should render every one of them, since the list it is handed is already complete', async () => {
       render(<SimulationSummary simulation={simulation} userAddress={USER} />)
+
       await userEvent.click(screen.getByText('request.transaction_dialog.technical_details'))
-      expect(screen.getByTestId('simulation-events').children).toHaveLength(100)
+
+      // Bounded before it reaches the summary: the server refuses a response it cannot report in full, and
+      // parseSimulationResponse refuses one whose collections run longer than this will render. Slicing
+      // here could therefore only hide entries from a list that is whole.
+      expect(screen.getByTestId('simulation-events').children).toHaveLength(150)
     })
   })
 

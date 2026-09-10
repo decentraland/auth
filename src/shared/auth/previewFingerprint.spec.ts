@@ -54,20 +54,6 @@ describe('getPreviewFingerprint', () => {
     })
   })
 
-  describe('when two results differ only in whether the events were truncated', () => {
-    let first: SimulationResponseBody
-    let second: SimulationResponseBody
-
-    beforeEach(() => {
-      first = buildResult({ events: [{ name: 'Transfer', address: '0xc' }], eventsTruncated: false })
-      second = buildResult({ events: [{ name: 'Transfer', address: '0xc' }], eventsTruncated: true })
-    })
-
-    it('should return different fingerprints, since it decides what a branded view may stand in for', () => {
-      expect(getPreviewFingerprint(first)).not.toBe(getPreviewFingerprint(second))
-    })
-  })
-
   describe('when two results differ only in the revert reason', () => {
     let first: SimulationResponseBody
     let second: SimulationResponseBody

@@ -89,14 +89,12 @@ type SimulationResponseBody = {
   assetChanges: AssetChange[]
   approvalChanges: ApprovalChange[]
   balanceChanges: BalanceChange[]
-  events: SimulationEvent[]
   /**
-   * Whether `events` is a prefix of what the transaction emitted rather than all of it. Optional because a
-   * server from before the field says nothing about it, and "nothing said" is not "not truncated": a check
-   * that reads the absence of an event as proof the emitting contract did nothing must require an explicit
-   * `false` (see isExactNftTransferSimulation). `assetChanges` and `approvalChanges` are never truncated.
+   * Every event the transaction emitted. Complete: the server refuses a response it cannot report in full
+   * rather than truncating one, so the absence of an event here is evidence the emitting contract did
+   * nothing (see isExactNftTransferSimulation, which relies on exactly that).
    */
-  eventsTruncated?: boolean
+  events: SimulationEvent[]
 }
 
 export type {

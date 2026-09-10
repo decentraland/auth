@@ -627,7 +627,7 @@ describe('createAuthServerClient', () => {
       let response: SimulationResponseBody
 
       beforeEach(() => {
-        response = { status: 'success', assetChanges: [], approvalChanges: [], balanceChanges: [], events: [], eventsTruncated: false }
+        response = { status: 'success', assetChanges: [], approvalChanges: [], balanceChanges: [], events: [] }
         mockFetch.mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve(response)
@@ -759,19 +759,23 @@ describe('createAuthServerClient', () => {
       })
     })
 
-    describe('and the server responds with a summary from before the truncation flag', () => {
+    describe('and the server responds with more entries than the review will render', () => {
       beforeEach(() => {
         mockFetch.mockResolvedValueOnce({
           ok: true,
-          json: () => Promise.resolve({ status: 'success', assetChanges: [], approvalChanges: [], balanceChanges: [], events: [] })
+          json: () =>
+            Promise.resolve({
+              status: 'success',
+              assetChanges: [],
+              approvalChanges: [],
+              balanceChanges: [],
+              events: Array.from({ length: 1025 }, () => ({ name: 'Transfer', address: '0xabc' }))
+            })
         })
       })
 
-      it('should accept it and leave the flag absent rather than assume the events were complete', async () => {
-        const result = await client.simulateTransaction(body)
-
-        expect(result.status).toBe('success')
-        expect(result.eventsTruncated).toBeUndefined()
+      it('should refuse it rather than render a prefix of a list it was handed whole', async () => {
+        await expect(client.simulateTransaction(body)).rejects.toBeInstanceOf(SimulationUnavailableError)
       })
     })
 

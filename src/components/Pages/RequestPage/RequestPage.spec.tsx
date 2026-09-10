@@ -370,7 +370,6 @@ const simulationOf = (overrides: Partial<SimulationResponseBody> = {}): Simulati
   approvalChanges: [],
   balanceChanges: [],
   events: [],
-  eventsTruncated: false,
   ...overrides
 })
 // A simulation that matches the branded gift exactly: the connected account's token #1 leaves for the
