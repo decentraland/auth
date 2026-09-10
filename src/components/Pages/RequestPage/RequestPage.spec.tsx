@@ -3602,4 +3602,109 @@ describe('RequestPage', () => {
       })
     })
   })
+  describe('when a preview reports far more movements than a review can show', () => {
+    beforeEach(() => {
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockGetAddresses.mockResolvedValue([SIGNER])
+      mockRecover.mockResolvedValue(recovered('eth_sendTransaction', [{ to: CONTRACT, data: '0xabcd', value: '0x0' }]))
+      mockClassifyRequest.mockResolvedValue(dclTransaction())
+      jest.mocked(fetchProfile).mockResolvedValue({ avatars: [{ name: 'Somebody', hasClaimedName: true }] } as never)
+    })
+
+    afterEach(() => {
+      jest.mocked(fetchProfile).mockReset()
+    })
+
+    describe('and every movement is the signer sending to a different counterparty', () => {
+      beforeEach(() => {
+        // `fetchProfile` is one request per address with no batching or cache, and the DTO admits 1,024
+        // movements and 1,024 permissions, so one lookup per counterparty would be thousands at once.
+        mockSimulateTransaction.mockResolvedValue(
+          simulationOf({
+            assetChanges: Array.from({ length: 400 }, (_, index) =>
+              erc721Transfer({ from: SIGNER, to: `0x${index.toString(16).padStart(40, 'a')}` })
+            )
+          })
+        )
+      })
+
+      it('should look up no more names than the cap, however many movements are reported', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('wallet-interaction')
+        await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+        await waitFor(() => expect(Object.keys(JSON.parse(view.getAttribute('data-profiles') ?? '{}')).length).toBeGreaterThan(0))
+
+        expect(jest.mocked(fetchProfile).mock.calls.length).toBeLessThanOrEqual(50)
+      })
+    })
+
+    describe('and the movements are between third parties the summary never shows', () => {
+      beforeEach(() => {
+        mockSimulateTransaction.mockResolvedValue(
+          simulationOf({
+            assetChanges: Array.from({ length: 40 }, (_, index) =>
+              erc721Transfer({ from: `0x${index.toString(16).padStart(40, 'b')}`, to: `0x${index.toString(16).padStart(40, 'c')}` })
+            )
+          })
+        )
+      })
+
+      it('should look up nothing, since a name nothing displays is a request made for nobody', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('wallet-interaction')
+        await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+
+        expect(jest.mocked(fetchProfile)).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and a movement is a mint to the signer', () => {
+      beforeEach(() => {
+        mockSimulateTransaction.mockResolvedValue(
+          simulationOf({ assetChanges: [erc721Transfer({ type: 'mint', from: '0xminter', to: SIGNER })] })
+        )
+      })
+
+      it('should look up nothing, since a mint names no counterparty on screen', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('wallet-interaction')
+        await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+
+        expect(jest.mocked(fetchProfile)).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and the lookups are in flight', () => {
+      let inFlight: number
+      let peak: number
+
+      beforeEach(() => {
+        inFlight = 0
+        peak = 0
+        jest.mocked(fetchProfile).mockImplementation(async () => {
+          inFlight += 1
+          peak = Math.max(peak, inFlight)
+          await Promise.resolve()
+          inFlight -= 1
+          return { avatars: [{ name: 'Somebody', hasClaimedName: true }] } as never
+        })
+        mockSimulateTransaction.mockResolvedValue(
+          simulationOf({
+            assetChanges: Array.from({ length: 40 }, (_, index) =>
+              erc721Transfer({ from: SIGNER, to: `0x${index.toString(16).padStart(40, 'd')}` })
+            )
+          })
+        )
+      })
+
+      it('should run a few at a time rather than all at once', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('wallet-interaction')
+        await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+        await waitFor(() => expect(jest.mocked(fetchProfile).mock.calls.length).toBe(40))
+
+        expect(peak).toBeLessThanOrEqual(6)
+      })
+    })
+  })
 })

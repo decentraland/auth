@@ -140,6 +140,20 @@ enum View {
 }
 
 // Terminal views that should not trigger a re-fetch of the request
+// The address approvals and mints/burns use to mean "nobody"; never a counterparty to name.
+const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
+
+/**
+ * How many counterparties a preview may have names looked up for, and how many lookups run at once.
+ * Profile names are progressive enhancement — a row without one shows the shortened address, which is what
+ * every row shows until its name arrives — so this is bounded rather than fanned out. The concurrency
+ * matches what a browser will open to one host anyway, and the cap is far above any review a person reads
+ * (the recorded previews have one to three counterparties) while keeping the burst on the profile service
+ * bounded for a preview that reports a thousand movements.
+ */
+const MAX_ENRICHED_COUNTERPARTIES = 50
+const PROFILE_LOOKUP_CONCURRENCY = 6
+
 const TERMINAL_VIEWS = new Set([
   View.DEEP_LINK_CONTINUE_IN_APP,
   View.CLIENT_LOGIN_ERROR,
@@ -663,30 +677,50 @@ export const RequestPage = () => {
         // with the address, or a wallet named "Decentraland" would read as the counterparty
         // "Decentraland" in "You send".
         const resolveSimulationProfiles = async (result: SimulationResponseBody) => {
+          const user = signerAddress.toLowerCase()
+          // Only the addresses the summary puts on screen. It shows one counterparty per movement the
+          // signer is party to — the other side of it — and one spender per permission; a mint or a burn
+          // names no counterparty, and a movement between third parties is not rendered at all. Asking for
+          // a name that nothing displays is a request made for nobody.
           const addresses = new Set<string>()
+          const consider = (address: string | null) => {
+            if (!address || addresses.size >= MAX_ENRICHED_COUNTERPARTIES) return
+            const normalized = address.toLowerCase()
+            if (normalized === user || normalized === ZERO_ADDRESS) return
+            addresses.add(normalized)
+          }
           for (const change of result.assetChanges) {
-            if (change.from) addresses.add(change.from.toLowerCase())
-            if (change.to) addresses.add(change.to.toLowerCase())
+            if (change.type !== 'transfer') continue
+            if (change.from?.toLowerCase() === user) consider(change.to)
+            else if (change.to?.toLowerCase() === user) consider(change.from)
           }
           for (const approval of result.approvalChanges) {
-            if (approval.spender) addresses.add(approval.spender.toLowerCase())
+            consider(approval.spender)
           }
-          addresses.delete(signerAddress.toLowerCase())
-          addresses.delete('0x0000000000000000000000000000000000000000')
 
-          const entries = await Promise.all(
-            [...addresses].map(async address => {
+          // A few at a time, and never more than the cap. A preview may report up to 1,024 movements and
+          // 1,024 permissions, and `fetchProfile` is one request per address with no batching or cache, so
+          // one call per counterparty would be thousands at once — aimed at the profile service, for names
+          // that mostly no one would read. The rows the cap leaves out keep the shortened address, which is
+          // what every row shows until a name arrives, and the cap takes the rows nearest the top first.
+          const queue = [...addresses]
+          const resolved: Record<string, string> = {}
+          const worker = async () => {
+            for (;;) {
+              const address = queue.shift()
+              if (address === undefined) return
               try {
                 const profile = await fetchProfile(address)
                 const name = getProfileDisplayName(profile, address)
-                return name ? ([address, name] as const) : null
+                if (name) resolved[address] = name
               } catch {
-                return null
+                // No name for this one; the row keeps its address.
               }
-            })
-          )
+            }
+          }
+          await Promise.all(Array.from({ length: Math.min(PROFILE_LOOKUP_CONCURRENCY, queue.length) }, worker))
+
           if (isStale()) return
-          const resolved = Object.fromEntries(entries.filter((entry): entry is readonly [string, string] => entry !== null))
           if (Object.keys(resolved).length > 0) {
             setSimulationProfiles(resolved)
           }
