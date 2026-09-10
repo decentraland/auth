@@ -627,7 +627,8 @@ describe('when checking whether an NFT simulation exactly matches the branded gi
       ],
       approvalChanges: [],
       balanceChanges: [],
-      events: []
+      events: [],
+      eventsTruncated: false
     }
   })
 
@@ -796,12 +797,45 @@ describe('when checking whether an NFT simulation exactly matches the branded gi
     })
   })
 
+  describe('and the server says it truncated the events it reported', () => {
+    beforeEach(() => {
+      result.events = [{ name: 'Transfer', address: contractAddress }]
+      result.eventsTruncated = true
+    })
+
+    it('should require the generic simulation summary, since nothing is known about the events past the cap', () => {
+      expect(isExactNftTransferSimulation(result, signerAddress, contractAddress, transfer)).toBe(false)
+    })
+  })
+
+  describe('and the server says nothing about whether it truncated the events', () => {
+    beforeEach(() => {
+      result.events = [{ name: 'Transfer', address: contractAddress }]
+      delete result.eventsTruncated
+    })
+
+    it('should require the generic simulation summary rather than read silence as a complete list', () => {
+      expect(isExactNftTransferSimulation(result, signerAddress, contractAddress, transfer)).toBe(false)
+    })
+  })
+
+  describe('and the response carries no events list at all', () => {
+    beforeEach(() => {
+      result = { ...result, events: undefined as unknown as SimulationResponseBody['events'] }
+    })
+
+    it('should require the generic simulation summary rather than read a missing list as an empty one', () => {
+      expect(isExactNftTransferSimulation(result, signerAddress, contractAddress, transfer)).toBe(false)
+    })
+  })
+
   describe('and the addresses only differ in casing between the calldata and the simulation', () => {
     beforeEach(() => {
       // The decoder returns EIP-55 checksummed addresses; the preview server lowercases.
       signerAddress = '0x0000000000000000000000000000000000000AbC'
       contractAddress = '0x0000000000000000000000000000000000000DeF'
       transfer = { fromAddress: signerAddress, tokenId: '7', toAddress: '0x0000000000000000000000000000000000000FeD' }
+      result.eventsTruncated = false
       result.assetChanges[0] = {
         ...result.assetChanges[0],
         from: signerAddress.toLowerCase(),

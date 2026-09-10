@@ -199,6 +199,7 @@ jest.mock('./Views', () => ({
   WalletInteraction: (props: any) => (
     <div
       data-testid="wallet-interaction"
+      data-user-address={props.userAddress}
       data-sim={props.simulation?.status}
       data-requires-acknowledgment={String(props.requiresAcknowledgment)}
       data-counterparty-check-pending={String(props.isCounterpartyCheckPending)}
@@ -369,6 +370,7 @@ const simulationOf = (overrides: Partial<SimulationResponseBody> = {}): Simulati
   approvalChanges: [],
   balanceChanges: [],
   events: [],
+  eventsTruncated: false,
   ...overrides
 })
 // A simulation that matches the branded gift exactly: the connected account's token #1 leaves for the
@@ -2561,6 +2563,34 @@ describe('RequestPage', () => {
         const view = await screen.findByTestId('wallet-interaction')
         await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
         expect(view).toHaveAttribute('data-requires-acknowledgment', 'true')
+      })
+    })
+
+    describe('and the connection state reports another account than the wallet does', () => {
+      beforeEach(() => {
+        // The wallet is on SIGNER — the address the request was recovered for and the preview simulated
+        // as — while the connection state still reports the account it knew before. Reading the preview
+        // against the latter would put the signer's own movement outside the summary's "you send" filter
+        // and turn a transaction that moves an asset into "nothing to show" behind a checkbox.
+        mockConnectionData = { ...mockConnectionData, account: '0xstaleconnectionaccount' }
+        mockGetAddresses.mockResolvedValue([SIGNER])
+        mockSimulateTransaction.mockResolvedValue(simulationOf({ assetChanges: [erc721Transfer({ from: SIGNER, to: '0xrecipient' })] }))
+      })
+
+      it('should read the preview against the account it was simulated for', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('wallet-interaction')
+        await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+
+        expect(view).toHaveAttribute('data-user-address', SIGNER)
+      })
+
+      it('should not require an acknowledgment, since the movement it shows does involve that account', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('wallet-interaction')
+        await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+
+        expect(view).toHaveAttribute('data-requires-acknowledgment', 'false')
       })
     })
 

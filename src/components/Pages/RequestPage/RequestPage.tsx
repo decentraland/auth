@@ -264,6 +264,13 @@ export const RequestPage = () => {
   // the call's counterparties (see verifyCounterparties): Decentraland code carrying content anyone can
   // create, so the summary names them as collections instead of vouching for them by name.
   const [simulationCollections, setSimulationCollections] = useState<string[]>([])
+  // The account this review was produced for: the one the wallet reported when the request was loaded,
+  // which is the `from` every preview was simulated as. The summary and the no-visible-effects gate read
+  // the preview against this and never against `account`, which is a separate source (the connection
+  // state) that can lag a wallet-side account switch. Read against another address, every movement would
+  // fall outside the summary's "you send"/"you receive" filters and a transaction that moves assets would
+  // render as "no changes" behind a single checkbox.
+  const [reviewedSignerAddress, setReviewedSignerAddress] = useState<string>()
   const requestRef = useRef<RecoverResponse>()
   const viewRef = useRef(view)
   viewRef.current = view
@@ -486,6 +493,7 @@ export const RequestPage = () => {
       setSimulationChainId(undefined)
       setSimulationVerified([])
       setSimulationCollections([])
+      setReviewedSignerAddress(undefined)
     }
 
     // A deep-link handoff requires a valid UUID v4 id (the client's correlation id). Reject a
@@ -622,6 +630,9 @@ export const RequestPage = () => {
         requestRef.current = request
         recoveredRequestIdRef.current = requestId
         recoveredSignerRef.current = signerAddress.toLowerCase()
+        // The rendered counterpart of the ref above: set before any preview is requested, so a preview
+        // that resolves is always read against the account it was simulated for.
+        setReviewedSignerAddress(signerAddress.toLowerCase())
 
         // Initialize the timeout to display the timeout view when the request expires.
         // Guard against an unparseable expiration: `new Date(...).getTime()` would be NaN,
@@ -760,7 +771,14 @@ export const RequestPage = () => {
               )
               return
             }
-            console.info('Transaction simulation unavailable:', e instanceof Error ? e.message : String(e))
+            // Every review that loses its preview falls back to an acknowledgment the user can tick, so why
+            // it was lost matters. `quota_exceeded` means our own rate limit refused the call, and that
+            // budget is shared by every caller: a flood aimed at making previews disappear reads exactly
+            // like provider flakiness from here unless the two are recorded apart.
+            const reason =
+              e instanceof SimulationUnavailableError ? (e.code ?? (e.status !== undefined ? `status_${e.status}` : 'error')) : 'error'
+            console.info(`Transaction simulation unavailable (${reason}):`, e instanceof Error ? e.message : String(e))
+            trackEvent(TrackingEvents.REQUEST_PREVIEW_UNAVAILABLE, { requestId, reason, method: request.method })
             setSimulationState({ status: 'unavailable' })
           }
         }
@@ -1473,7 +1491,8 @@ export const RequestPage = () => {
   // and no permission change (see hasNoVisibleEffects). A call can still change state the summary
   // does not model — an update operator on LAND, a collection's minters, managers or creator, a
   // name's resolver — so "nothing to show" is not "nothing happens" and must not be a single click.
-  const hasPreviewWithoutVisibleEffects = simulationState.status === 'ready' && hasNoVisibleEffects(simulationState.result, account ?? '')
+  const hasPreviewWithoutVisibleEffects =
+    simulationState.status === 'ready' && hasNoVisibleEffects(simulationState.result, reviewedSignerAddress ?? '')
   // A MetaTransaction signature whose inner call could not be previewed: the simulation was
   // unavailable, or the call reverts today. Unlike an eth_sendTransaction relayed through the gas
   // tank — which Auth signs and submits in one step, so the signature is consumed the moment it is
@@ -1618,7 +1637,7 @@ export const RequestPage = () => {
             contractName={classification.contract.domainName}
             isLoading={isLoading}
             simulation={simulationState}
-            userAddress={account ?? ''}
+            userAddress={reviewedSignerAddress ?? ''}
             profiles={simulationProfiles}
             verifiedContracts={simulationVerified}
             collectionContracts={simulationCollections}
@@ -1648,7 +1667,7 @@ export const RequestPage = () => {
             functionName={classification.call.functionName}
             contractName={classification.contract.domainName}
             simulation={simulationState}
-            userAddress={account ?? ''}
+            userAddress={reviewedSignerAddress ?? ''}
             profiles={simulationProfiles}
             verifiedContracts={simulationVerified}
             collectionContracts={simulationCollections}

@@ -20,6 +20,7 @@ import {
   assertSignatureParamsAreCanonical,
   assertTransactionParamsAreCanonical
 } from './signMethodGuard'
+import { parseSimulationResponse } from './simulationResponse'
 import { IdentityResponse, OutcomeError, OutcomeResponse, RecoverResponse, SimulationRequestBody, SimulationResponseBody } from './types'
 
 const SIMULATION_TIMEOUT_MS = 10_000
@@ -220,11 +221,18 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
   // A rejection body is a short object; anything larger than this is not one and is not read further.
   const MAX_REJECTION_BODY_BYTES = 4 * 1024
 
+  const REJECTION_CODES: ReadonlySet<string> = new Set<SimulationRejectionCode>([
+    'invalid_request',
+    'upstream_rejected',
+    'quota_exceeded',
+    'upstream_rate_limited'
+  ])
+
   const readRejectionCode = async (response: Response): Promise<SimulationRejectionCode | undefined> => {
     try {
       const body: unknown = JSON.parse(await readTextWithCap(response, MAX_REJECTION_BODY_BYTES))
       const code = typeof body === 'object' && body !== null ? (body as { code?: unknown }).code : undefined
-      return code === 'invalid_request' || code === 'upstream_rejected' ? code : undefined
+      return typeof code === 'string' && REJECTION_CODES.has(code) ? (code as SimulationRejectionCode) : undefined
     } catch {
       return undefined
     }
@@ -252,11 +260,20 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
       throw new SimulationUnavailableError(`status ${response.status}`, response.status, await readRejectionCode(response))
     }
 
+    let parsed: unknown
     try {
-      return (await response.json()) as SimulationResponseBody
+      parsed = await response.json()
     } catch (e) {
       throw new SimulationUnavailableError(isErrorWithMessage(e) ? e.message : 'invalid response')
     }
+    // Checked, not cast: the review reads these rows directly, so a body that does not honour the DTO must
+    // degrade like an outage rather than reach a consumer that assumes a field is there (see
+    // parseSimulationResponse).
+    const result = parseSimulationResponse(parsed)
+    if (!result) {
+      throw new SimulationUnavailableError('the response is not a simulation summary')
+    }
+    return result
   }
 
   const checkHealth = async (): Promise<{ timestamp: number }> => {

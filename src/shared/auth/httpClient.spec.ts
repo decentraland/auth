@@ -627,7 +627,7 @@ describe('createAuthServerClient', () => {
       let response: SimulationResponseBody
 
       beforeEach(() => {
-        response = { status: 'success', assetChanges: [], approvalChanges: [], balanceChanges: [], events: [] }
+        response = { status: 'success', assetChanges: [], approvalChanges: [], balanceChanges: [], events: [], eventsTruncated: false }
         mockFetch.mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve(response)
@@ -700,6 +700,78 @@ describe('createAuthServerClient', () => {
 
       it('should leave the code unknown', async () => {
         await expect(client.simulateTransaction(body)).rejects.toMatchObject({ status: 400, code: undefined })
+      })
+    })
+
+    describe('and the server refuses the call because its own rate limit is exhausted', () => {
+      beforeEach(() => {
+        mockFetch.mockResolvedValueOnce({
+          ok: false,
+          status: 429,
+          text: () => Promise.resolve(JSON.stringify({ error: 'Too many requests', code: 'quota_exceeded' }))
+        })
+      })
+
+      it('should carry the code so a suppressed preview is not recorded as provider flakiness', async () => {
+        await expect(client.simulateTransaction(body)).rejects.toMatchObject({ status: 429, code: 'quota_exceeded' })
+      })
+    })
+
+    describe('and the provider rate limited the server', () => {
+      beforeEach(() => {
+        mockFetch.mockResolvedValueOnce({
+          ok: false,
+          status: 429,
+          text: () => Promise.resolve(JSON.stringify({ error: 'Too many requests', code: 'upstream_rate_limited' }))
+        })
+      })
+
+      it('should carry the code so it is told apart from this service own quota', async () => {
+        await expect(client.simulateTransaction(body)).rejects.toMatchObject({ status: 429, code: 'upstream_rate_limited' })
+      })
+    })
+
+    describe.each([
+      ['a body that is not an object', 'null'],
+      ['no status', '{"assetChanges":[],"approvalChanges":[],"balanceChanges":[],"events":[]}'],
+      ['a status it does not declare', '{"status":"pending","assetChanges":[],"approvalChanges":[],"balanceChanges":[],"events":[]}'],
+      ['no asset changes', '{"status":"success","approvalChanges":[],"balanceChanges":[],"events":[]}'],
+      ['no approval changes', '{"status":"success","assetChanges":[],"balanceChanges":[],"events":[]}'],
+      [
+        'an approval row missing the fields the gate reads',
+        '{"status":"success","assetChanges":[],"approvalChanges":[{}],"balanceChanges":[],"events":[]}'
+      ],
+      [
+        'an asset row missing the fields the summary reads',
+        '{"status":"success","assetChanges":[{}],"approvalChanges":[],"balanceChanges":[],"events":[]}'
+      ],
+      [
+        'an asset row whose amount is a number rather than a string',
+        '{"status":"success","assetChanges":[{"type":"transfer","standard":"erc20","from":null,"to":null,"amount":1,"rawAmount":null,"tokenId":null,"contractAddress":null,"symbol":null,"name":null,"decimals":null,"logoUrl":null,"dollarValue":null}],"approvalChanges":[],"balanceChanges":[],"events":[]}'
+      ]
+    ])('and the server responds with 200 and %s', (_label, payload) => {
+      beforeEach(() => {
+        mockFetch.mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(JSON.parse(payload)) })
+      })
+
+      it('should throw a SimulationUnavailableError rather than hand the body to the review', async () => {
+        await expect(client.simulateTransaction(body)).rejects.toBeInstanceOf(SimulationUnavailableError)
+      })
+    })
+
+    describe('and the server responds with a summary from before the truncation flag', () => {
+      beforeEach(() => {
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ status: 'success', assetChanges: [], approvalChanges: [], balanceChanges: [], events: [] })
+        })
+      })
+
+      it('should accept it and leave the flag absent rather than assume the events were complete', async () => {
+        const result = await client.simulateTransaction(body)
+
+        expect(result.status).toBe('success')
+        expect(result.eventsTruncated).toBeUndefined()
       })
     })
 

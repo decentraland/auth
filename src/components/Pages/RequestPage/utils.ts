@@ -356,6 +356,12 @@ function isSameTokenId(left: string | null, right: string): boolean {
  * A receiver acting on a permission it already holds emits only its own events, which is why those are
  * judged too. Net dollar changes are not: the token leaving the account is one, and it is expected.
  *
+ * The events are only evidence of what no other contract did while the list is known to be complete. The
+ * server caps it, so a list it says it truncated — or one from a server that does not say either way, or
+ * that is not a list at all — proves nothing about the entries past the cap, and the generic summary is
+ * shown instead. The branded view stands in for the whole transaction, so it may only do so on evidence
+ * that covers the whole transaction.
+ *
  * The token id is compared numerically because the two sides come from different sources: the decoder
  * prints the calldata's uint256 in decimal, while the preview server passes the simulator's notation
  * through. A notation difference must not silently hide the gift view for every transfer.
@@ -373,7 +379,9 @@ function isExactNftTransferSimulation(
     transfer.fromAddress.toLowerCase() !== signer ||
     result.assetChanges.length !== 1 ||
     result.approvalChanges.length !== 0 ||
-    (result.events ?? []).some(event => event.address.toLowerCase() !== collection)
+    !Array.isArray(result.events) ||
+    result.eventsTruncated !== false ||
+    result.events.some(event => event.address.toLowerCase() !== collection)
   ) {
     return false
   }

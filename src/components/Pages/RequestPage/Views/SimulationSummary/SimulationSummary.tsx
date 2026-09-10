@@ -60,9 +60,12 @@ const counterpartyLabel = (address: string | null, profiles: Record<string, stri
 const groupThousands = (intPart: string): string => intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
 
 // Formats a decimal token amount for display: thousands separators, trailing zeros trimmed, and
-// lossless (works on the string, never through Number, so big/precise amounts aren't rounded).
-const formatTokenAmount = (raw: string): string => {
-  if (!/^\d+(\.\d+)?$/.test(raw)) return raw
+// lossless (works on the string, never through Number, so big/precise amounts aren't rounded). Null for
+// anything that is not a plain decimal: the caller then names the token without a figure, rather than
+// printing whatever it was handed on the line the user reads the amount from. The server already refuses
+// a non-numeric figure; this is the same rule at the point of display, so no path can print one.
+const formatTokenAmount = (raw: string): string | null => {
+  if (!/^\d+(\.\d+)?$/.test(raw)) return null
   const [intPart, decPart] = raw.split('.')
   const grouped = groupThousands(intPart)
   if (!decPart) return grouped
@@ -128,9 +131,8 @@ const assetTitle = (change: AssetChange, t: Translate, chainId: number | undefin
   // `rawAmount` is in base units (e.g. wei), so it's only a valid display amount when the token
   // has 0 decimals. Otherwise, without a decimals-applied `amount`, we show the symbol alone
   // rather than a base-unit number inflated by ~18 orders of magnitude.
-  let displayAmount: string | null = null
-  if (change.amount) displayAmount = formatTokenAmount(change.amount)
-  else if (change.rawAmount && change.decimals === 0) displayAmount = formatTokenAmount(change.rawAmount)
+  let displayAmount: string | null = change.amount ? formatTokenAmount(change.amount) : null
+  if (displayAmount === null && change.rawAmount && change.decimals === 0) displayAmount = formatTokenAmount(change.rawAmount)
   if (displayAmount && symbol) return `${displayAmount} ${symbol}`
   if (displayAmount) return displayAmount
   if (symbol) return symbol
@@ -309,10 +311,11 @@ const ApprovalItem = ({
     // Never show `rawAmount` (base units) here — approvals carry no decimals, so an unformatted
     // finite allowance would render as a huge misleading number. Show the decimals-applied
     // `amount` when the server provides it; otherwise state the permission without a figure.
+    const allowance = approval.amount ? formatTokenAmount(approval.amount) : null
     if (approval.isUnlimited) {
       predicate = t('request.transaction_dialog.approval_can_spend', { amount: t('request.transaction_dialog.approval_unlimited'), symbol })
-    } else if (approval.amount) {
-      predicate = t('request.transaction_dialog.approval_can_spend', { amount: formatTokenAmount(approval.amount), symbol })
+    } else if (allowance) {
+      predicate = t('request.transaction_dialog.approval_can_spend', { amount: allowance, symbol })
     } else {
       predicate = t('request.transaction_dialog.approval_can_spend_symbol', { symbol })
     }

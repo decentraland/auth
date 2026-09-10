@@ -287,7 +287,8 @@ const simulationSuccess: SimulationResponseBody = {
     { name: 'Transfer', address: '0x0f5d2fb29fb7d3cfee444a200298f468908cc942' },
     { name: 'Approval', address: USDC_ADDRESS },
     { name: null, address: MARKETPLACE_ADDRESS }
-  ]
+  ],
+  eventsTruncated: false
 }
 
 const simulationReverted: SimulationResponseBody = {
@@ -296,7 +297,8 @@ const simulationReverted: SimulationResponseBody = {
   assetChanges: [],
   approvalChanges: [],
   balanceChanges: [],
-  events: []
+  events: [],
+  eventsTruncated: false
 }
 
 const simulationNoChanges: SimulationResponseBody = {
@@ -304,7 +306,8 @@ const simulationNoChanges: SimulationResponseBody = {
   assetChanges: [],
   approvalChanges: [],
   balanceChanges: [],
-  events: [{ name: 'ConfigUpdated', address: MARKETPLACE_ADDRESS }]
+  events: [{ name: 'ConfigUpdated', address: MARKETPLACE_ADDRESS }],
+  eventsTruncated: false
 }
 
 const MANA_CONTRACT_ADDRESS = '0xa1c57f48f0deb89f569dfbe6e2b7f46d33606fd4'
@@ -422,7 +425,8 @@ const simulationStablecoinTrade: SimulationResponseBody = {
   ],
   approvalChanges: [],
   balanceChanges: [],
-  events: []
+  events: [],
+  eventsTruncated: false
 }
 
 export {

@@ -122,8 +122,10 @@ class SimulationUnavailableError extends Error {
     reason?: string,
     public readonly status?: number,
     /**
-     * The server's own account of a rejection (`invalid_request`: the request itself was refused;
-     * `upstream_rejected`: the simulation provider refused it), when it gave one.
+     * The server's own account of a rejection, when it gave one. On a 400, `invalid_request` (the request
+     * itself was refused) or `upstream_rejected` (the simulation provider refused it). On a 429,
+     * `quota_exceeded` (this service's own rate limit, per-IP or the shared global cap) or
+     * `upstream_rate_limited` (the provider's).
      */
     public readonly code?: SimulationRejectionCode
   ) {
@@ -132,7 +134,7 @@ class SimulationUnavailableError extends Error {
   }
 }
 
-type SimulationRejectionCode = 'invalid_request' | 'upstream_rejected'
+type SimulationRejectionCode = 'invalid_request' | 'upstream_rejected' | 'quota_exceeded' | 'upstream_rate_limited'
 
 /**
  * Thrown when classifying an eth_sendTransaction needs to know whether its target is a Decentraland
