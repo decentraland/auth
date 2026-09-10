@@ -1318,4 +1318,87 @@ describe('when rendering the SimulationSummary', () => {
       expect(screen.queryByText(/all of it/)).not.toBeInTheDocument()
     })
   })
+  describe('and a permission is granted over a collection', () => {
+    const COLLECTION_A = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+    const COLLECTION_B = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+    const OPERATOR = '0x2222222222222222222222222222222222222222'
+
+    // Two collections that named themselves the same thing. The name is on-chain text its deployer chose,
+    // so it cannot be what tells one permission from the other.
+    const approvalOver = (contractAddress: string) => ({
+      kind: 'approvalForAll' as const,
+      standard: 'unknown' as const,
+      owner: USER,
+      spender: OPERATOR,
+      amount: null,
+      rawAmount: null,
+      isUnlimited: true,
+      tokenId: null,
+      approved: true,
+      contractAddress,
+      symbol: null,
+      name: 'Fancy Wearables'
+    })
+
+    const renderOver = (contractAddress: string, props: Partial<Parameters<typeof SimulationSummary>[0]> = {}) =>
+      render(
+        <SimulationSummary
+          simulation={{ status: 'ready', result: emptyResult({ approvalChanges: [approvalOver(contractAddress)] }) }}
+          userAddress={USER}
+          chainId={137}
+          verifiedContracts={[]}
+          {...props}
+        />
+      )
+
+    it('should render differently for two collections that share a name', () => {
+      const { container, unmount } = renderOver(COLLECTION_A)
+      const first = container.innerHTML
+      unmount()
+      const { container: second } = renderOver(COLLECTION_B)
+
+      expect(first).not.toBe(second.innerHTML)
+    })
+
+    it('should name the token contract the permission is over, not only the spender', () => {
+      renderOver(COLLECTION_A)
+
+      expect(screen.getByRole('link', { name: 'request.transaction_dialog.unverified_token 0xaaaa…aaaa' })).toBeInTheDocument()
+    })
+
+    describe('and the collection is one a Decentraland factory deployed', () => {
+      it('should name it as a community collection, as the asset rows do', () => {
+        renderOver(COLLECTION_A, { collectionContracts: [COLLECTION_A] })
+
+        expect(screen.getByRole('link', { name: 'request.transaction_dialog.community_collection 0xaaaa…aaaa' })).toBeInTheDocument()
+      })
+    })
+
+    describe('and the contract is a registry contract', () => {
+      it('should show its address with the Decentraland badge instead of an unverified label', () => {
+        renderOver(COLLECTION_A, { verifiedContracts: [COLLECTION_A] })
+
+        expect(screen.getByRole('link', { name: '0xaaaa…aaaa' })).toBeInTheDocument()
+        expect(screen.getByLabelText('request.transaction_dialog.verified_contract')).toBeInTheDocument()
+      })
+    })
+
+    describe('and the contract is a stablecoin the marketplaces settle in', () => {
+      it('should name it from the known-token table', () => {
+        render(
+          <SimulationSummary
+            simulation={{
+              status: 'ready',
+              result: emptyResult({ approvalChanges: [approvalOver('0xc2132d05d31c914a87c6611c10748aeb04b58e8f')] })
+            }}
+            userAddress={USER}
+            chainId={137}
+            verifiedContracts={[]}
+          />
+        )
+
+        expect(screen.getByRole('link', { name: /request\.transaction_dialog\.known_token Tether USD 0xc213…8e8f/ })).toBeInTheDocument()
+      })
+    })
+  })
 })

@@ -203,7 +203,8 @@ jest.mock('./Views', () => ({
       data-user-address={props.userAddress}
       data-sim={props.simulation?.status}
       data-requires-acknowledgment={String(props.requiresAcknowledgment)}
-      data-counterparty-check-pending={String(props.isCounterpartyCheckPending)}
+      data-approve-blocked={String(props.approveBlocked)}
+      data-acknowledged={String(props.acknowledged)}
       data-gas-covered={String(props.gas?.covered)}
       data-gas-status={props.gas?.status ?? ''}
       data-function={props.functionName}
@@ -216,6 +217,9 @@ jest.mock('./Views', () => ({
       <button data-testid="wallet-interaction-approve" onClick={props.onApprove}>
         approve
       </button>
+      <button data-testid="wallet-interaction-acknowledge" onClick={() => props.onAcknowledgedChange?.(true)}>
+        acknowledge
+      </button>
       <button data-testid="wallet-interaction-deny" onClick={props.onDeny}>
         deny
       </button>
@@ -226,7 +230,7 @@ jest.mock('./Views', () => ({
   ContinueInApp: () => <div data-testid="continue-in-app">Continue in App</div>,
   ClientLoginError: (props: any) => <div data-testid="client-login-error">Client Login Error: {props.error}</div>,
   TransferConfirmView: (props: any) => (
-    <div data-testid="transfer-confirm">
+    <div data-testid="transfer-confirm" data-approve-blocked={String(props.approveBlocked)}>
       <button data-testid="transfer-confirm-approve" onClick={props.onApprove}>
         confirm
       </button>
@@ -256,7 +260,8 @@ jest.mock('./Views', () => ({
       data-method={props.method}
       data-sim={props.simulation?.status}
       data-requires-acknowledgment={String(props.requiresAcknowledgment)}
-      data-counterparty-check-pending={String(props.isCounterpartyCheckPending)}
+      data-approve-blocked={String(props.approveBlocked)}
+      data-acknowledged={String(props.acknowledged)}
       data-function={props.functionName}
       data-contract={props.contractName}
       data-verifying-contract={props.verifyingContract}
@@ -265,6 +270,9 @@ jest.mock('./Views', () => ({
     >
       <button data-testid="signature-approve" onClick={props.onApprove}>
         approve
+      </button>
+      <button data-testid="signature-acknowledge" onClick={() => props.onAcknowledgedChange?.(true)}>
+        acknowledge
       </button>
       <button data-testid="signature-deny" onClick={props.onDeny}>
         deny
@@ -282,9 +290,14 @@ jest.mock('./Views', () => ({
       data-gas={props.gas?.status ?? ''}
       data-payload={JSON.stringify(props.payload)}
       data-review-restarted={String(props.reviewRestarted)}
+      data-approve-blocked={String(props.approveBlocked)}
+      data-acknowledged={String(props.acknowledged)}
     >
       <button data-testid="unverified-approve" onClick={props.onApprove}>
         approve
+      </button>
+      <button data-testid="unverified-acknowledge" onClick={() => props.onAcknowledgedChange?.(true)}>
+        acknowledge
       </button>
       <button data-testid="unverified-deny" onClick={props.onDeny}>
         deny
@@ -473,6 +486,31 @@ const rerenderRequestPage = (rerender: (ui: React.ReactElement) => void) =>
       </FeatureFlagsContext.Provider>
     </MemoryRouter>
   )
+
+// The unverified review always asks for an acknowledgment before Allow enables, and the page's approval
+// handler enforces the same gate, so pressing Allow means giving the tick first — as a user must.
+const approveUnverifiedRequest = async () => {
+  await userEvent.click(await screen.findByTestId('unverified-acknowledge'))
+  await userEvent.click(screen.getByTestId('unverified-approve'))
+}
+
+// Pressing Allow on a Decentraland review means clearing its gates first, as a user must: waiting for the
+// preview to settle, and giving the acknowledgment when the review asks for one. The page holds both and
+// its approval handler enforces them, so a test that skipped either would be pressing a disabled button.
+const clearWalletInteractionGates = async () => {
+  const view = await screen.findByTestId('wallet-interaction')
+  await waitFor(() => expect(view.getAttribute('data-sim')).not.toBe('loading'))
+  if (view.getAttribute('data-requires-acknowledgment') === 'true') {
+    await userEvent.click(screen.getByTestId('wallet-interaction-acknowledge'))
+  }
+  await waitFor(() => expect(view).toHaveAttribute('data-approve-blocked', 'false'))
+  return view
+}
+
+const approveWalletInteraction = async () => {
+  await clearWalletInteractionGates()
+  await userEvent.click(screen.getByTestId('wallet-interaction-approve'))
+}
 
 const waitForRecoverCalls = (count: number) =>
   waitFor(() => {
@@ -1226,7 +1264,7 @@ describe('RequestPage', () => {
 
     it('should send no rejection at all, since the account that reviewed the request is no longer the wallet account', async () => {
       const { rerender } = renderRequestPage()
-      await userEvent.click(await screen.findByTestId('unverified-approve'))
+      await approveUnverifiedRequest()
       await waitFor(() => expect(mockWalletRequest).toHaveBeenCalledTimes(1))
 
       mockConnectionData = { ...mockConnectionData, account: '0xnewwallet' }
@@ -1311,14 +1349,14 @@ describe('RequestPage', () => {
 
     it('should not forward the request to the wallet', async () => {
       renderRequestPage()
-      await userEvent.click(await screen.findByTestId('unverified-approve'))
+      await approveUnverifiedRequest()
       await waitFor(() => expect(mockGetAddresses).toHaveBeenCalledTimes(2))
       expect(mockWalletRequest).not.toHaveBeenCalled()
     })
 
     it('should not report an outcome for it', async () => {
       renderRequestPage()
-      await userEvent.click(await screen.findByTestId('unverified-approve'))
+      await approveUnverifiedRequest()
       await waitFor(() => expect(mockGetAddresses).toHaveBeenCalledTimes(2))
       expect(mockSendSuccessfulOutcome).not.toHaveBeenCalled()
       expect(mockSendFailedOutcome).not.toHaveBeenCalled()
@@ -1326,7 +1364,7 @@ describe('RequestPage', () => {
 
     it('should show the different-account view instead of leaving an Allow button that does nothing', async () => {
       renderRequestPage()
-      await userEvent.click(await screen.findByTestId('unverified-approve'))
+      await approveUnverifiedRequest()
       expect(await screen.findByTestId('different-account')).toBeInTheDocument()
     })
   })
@@ -1373,8 +1411,8 @@ describe('RequestPage', () => {
 
     it('should perform only the first operation and answer the request once', async () => {
       renderRequestPage()
-      const approve = await screen.findByTestId('unverified-approve')
-      fireEvent.click(approve)
+      await userEvent.click(await screen.findByTestId('unverified-acknowledge'))
+      fireEvent.click(screen.getByTestId('unverified-approve'))
       fireEvent.click(screen.getByTestId('unverified-deny'))
       await waitFor(() => expect(mockSendSuccessfulOutcome).toHaveBeenCalledTimes(1))
       expect(mockWalletRequest).toHaveBeenCalledTimes(1)
@@ -1408,7 +1446,7 @@ describe('RequestPage', () => {
 
       it('should show the denied view and answer the request as rejected once', async () => {
         renderRequestPage()
-        await userEvent.click(await screen.findByTestId('unverified-approve'))
+        await approveUnverifiedRequest()
         expect(await screen.findByTestId('denied-wallet-interaction')).toBeInTheDocument()
         expect(mockSendFailedOutcome).toHaveBeenCalledTimes(1)
         expect(mockSendFailedOutcome).toHaveBeenCalledWith(REQUEST_ID, SIGNER, { code: -32003, message: 'Transaction rejected' })
@@ -1427,7 +1465,7 @@ describe('RequestPage', () => {
 
       it('should show the wallet error view with the error for the developer', async () => {
         renderRequestPage()
-        await userEvent.click(await screen.findByTestId('unverified-approve'))
+        await approveUnverifiedRequest()
         const error = await screen.findByTestId('signing-error')
         expect(error).toHaveAttribute('data-kind', 'wallet_error')
         expect(error).toHaveTextContent('Internal wallet error')
@@ -1435,7 +1473,7 @@ describe('RequestPage', () => {
 
       it('should answer the request with the wallet error', async () => {
         renderRequestPage()
-        await userEvent.click(await screen.findByTestId('unverified-approve'))
+        await approveUnverifiedRequest()
         await screen.findByTestId('signing-error')
         await waitFor(() =>
           expect(mockSendFailedOutcome).toHaveBeenCalledWith(REQUEST_ID, SIGNER, { code: 999, message: 'Internal wallet error' })
@@ -1461,7 +1499,7 @@ describe('RequestPage', () => {
 
       it('should send no outcome and show the account-change view', async () => {
         renderRequestPage()
-        await userEvent.click(await screen.findByTestId('unverified-approve'))
+        await approveUnverifiedRequest()
         expect(await screen.findByTestId('different-account')).toBeInTheDocument()
         expect(mockSendFailedOutcome).not.toHaveBeenCalled()
         expect(mockSendSuccessfulOutcome).not.toHaveBeenCalled()
@@ -1475,7 +1513,7 @@ describe('RequestPage', () => {
 
       it('should send no outcome and show the account-change view instead of the error view', async () => {
         renderRequestPage()
-        await userEvent.click(await screen.findByTestId('unverified-approve'))
+        await approveUnverifiedRequest()
         expect(await screen.findByTestId('different-account')).toBeInTheDocument()
         expect(mockSendFailedOutcome).not.toHaveBeenCalled()
         expect(screen.queryByTestId('signing-error')).not.toBeInTheDocument()
@@ -1498,7 +1536,7 @@ describe('RequestPage', () => {
 
     it('should not forward the transaction to the wallet', async () => {
       renderRequestPage()
-      await userEvent.click(await screen.findByTestId('unverified-approve'))
+      await approveUnverifiedRequest()
       await waitForRecoverCalls(2)
 
       expect(mockWalletRequest).not.toHaveBeenCalled()
@@ -1506,14 +1544,14 @@ describe('RequestPage', () => {
 
     it('should recover the request again so it can be reviewed on the current network', async () => {
       renderRequestPage()
-      await userEvent.click(await screen.findByTestId('unverified-approve'))
+      await approveUnverifiedRequest()
 
       await waitFor(() => expect(mockRecover).toHaveBeenCalledTimes(2))
     })
 
     it('should not report a successful outcome for the invalidated review', async () => {
       renderRequestPage()
-      await userEvent.click(await screen.findByTestId('unverified-approve'))
+      await approveUnverifiedRequest()
       await waitForRecoverCalls(2)
 
       expect(mockSendSuccessfulOutcome).not.toHaveBeenCalled()
@@ -1521,7 +1559,7 @@ describe('RequestPage', () => {
 
     it('should not report a failed outcome for the invalidated review', async () => {
       renderRequestPage()
-      await userEvent.click(await screen.findByTestId('unverified-approve'))
+      await approveUnverifiedRequest()
       await waitForRecoverCalls(2)
 
       expect(mockSendFailedOutcome).not.toHaveBeenCalled()
@@ -1529,7 +1567,7 @@ describe('RequestPage', () => {
 
     it('should tell the user on the fresh review that the network changed', async () => {
       renderRequestPage()
-      await userEvent.click(await screen.findByTestId('unverified-approve'))
+      await approveUnverifiedRequest()
       await waitForRecoverCalls(2)
 
       await waitFor(() => expect(screen.getByTestId('unverified-request')).toHaveAttribute('data-review-restarted', 'true'))
@@ -1537,7 +1575,7 @@ describe('RequestPage', () => {
 
     it('should report the restart and its reason to analytics', async () => {
       renderRequestPage()
-      await userEvent.click(await screen.findByTestId('unverified-approve'))
+      await approveUnverifiedRequest()
       await waitForRecoverCalls(2)
 
       expect(jest.mocked(trackEvent)).toHaveBeenCalledWith(TrackingEvents.TRANSACTION_REVIEW_RESTARTED, {
@@ -1563,7 +1601,7 @@ describe('RequestPage', () => {
 
     it('should recover the request again instead of consuming it as a failure', async () => {
       renderRequestPage()
-      await userEvent.click(await screen.findByTestId('unverified-approve'))
+      await approveUnverifiedRequest()
       await waitForRecoverCalls(2)
 
       expect(mockSendFailedOutcome).not.toHaveBeenCalled()
@@ -1571,7 +1609,7 @@ describe('RequestPage', () => {
 
     it('should not show the signing error view', async () => {
       renderRequestPage()
-      await userEvent.click(await screen.findByTestId('unverified-approve'))
+      await approveUnverifiedRequest()
       await waitForRecoverCalls(2)
 
       expect(screen.queryByTestId('signing-error')).not.toBeInTheDocument()
@@ -1579,7 +1617,7 @@ describe('RequestPage', () => {
 
     it('should report the restart with the wallet rejection as its reason', async () => {
       renderRequestPage()
-      await userEvent.click(await screen.findByTestId('unverified-approve'))
+      await approveUnverifiedRequest()
       await waitForRecoverCalls(2)
 
       expect(jest.mocked(trackEvent)).toHaveBeenCalledWith(TrackingEvents.TRANSACTION_REVIEW_RESTARTED, {
@@ -1602,7 +1640,7 @@ describe('RequestPage', () => {
 
     it('should recover the request again instead of consuming it as a failure', async () => {
       renderRequestPage()
-      await userEvent.click(await screen.findByTestId('unverified-approve'))
+      await approveUnverifiedRequest()
       await waitForRecoverCalls(2)
 
       expect(mockSendFailedOutcome).not.toHaveBeenCalled()
@@ -1654,7 +1692,7 @@ describe('RequestPage', () => {
 
       it('should hand the wallet the message bytes and the signer on approval', async () => {
         renderRequestPage()
-        await userEvent.click(await screen.findByTestId('unverified-approve'))
+        await approveUnverifiedRequest()
         await waitFor(() => {
           expect(mockWalletRequest).toHaveBeenCalledWith({ method: 'personal_sign', params: [HELLO_HEX, SIGNER] })
         })
@@ -1662,7 +1700,7 @@ describe('RequestPage', () => {
 
       it('should complete the interaction after a successful signature', async () => {
         renderRequestPage()
-        await userEvent.click(await screen.findByTestId('unverified-approve'))
+        await approveUnverifiedRequest()
         expect(await screen.findByTestId('wallet-interaction-complete')).toBeInTheDocument()
       })
 
@@ -1689,7 +1727,7 @@ describe('RequestPage', () => {
 
       it('should hand the wallet the signer and the typed data on approval', async () => {
         renderRequestPage()
-        await userEvent.click(await screen.findByTestId('unverified-approve'))
+        await approveUnverifiedRequest()
         await waitFor(() => {
           expect(mockWalletRequest).toHaveBeenCalledWith({ method: 'eth_signTypedData_v4', params: [SIGNER, '{"primaryType":"Permit"}'] })
         })
@@ -1758,7 +1796,7 @@ describe('RequestPage', () => {
 
         it('should forward the original payload on approval', async () => {
           renderRequestPage()
-          await userEvent.click(await screen.findByTestId('unverified-approve'))
+          await approveUnverifiedRequest()
           await waitFor(() => expect(mockWalletRequest).toHaveBeenCalledWith({ method: 'eth_signTypedData_v4', params: [SIGNER, raw] }))
         })
       })
@@ -1818,7 +1856,7 @@ describe('RequestPage', () => {
 
     it('should not report a failed outcome for an action the wallet already performed', async () => {
       renderRequestPage()
-      await userEvent.click(await screen.findByTestId('unverified-approve'))
+      await approveUnverifiedRequest()
       await waitFor(() => {
         expect(screen.getByTestId('wallet-interaction-complete')).toBeInTheDocument()
       })
@@ -1827,7 +1865,7 @@ describe('RequestPage', () => {
 
     it('should show the completion view instead of an error that would invite a second signature', async () => {
       renderRequestPage()
-      await userEvent.click(await screen.findByTestId('unverified-approve'))
+      await approveUnverifiedRequest()
       expect(await screen.findByTestId('wallet-interaction-complete')).toBeInTheDocument()
     })
 
@@ -1838,7 +1876,7 @@ describe('RequestPage', () => {
 
       it('should show the completion view without reporting a failed outcome', async () => {
         renderRequestPage()
-        await userEvent.click(await screen.findByTestId('unverified-approve'))
+        await approveUnverifiedRequest()
         await waitFor(() => {
           expect(screen.getByTestId('wallet-interaction-complete')).toBeInTheDocument()
         })
@@ -1865,7 +1903,7 @@ describe('RequestPage', () => {
 
     it('should send it as a plain transaction on the reviewed chain, never through the relay', async () => {
       renderRequestPage()
-      await userEvent.click(await screen.findByTestId('unverified-approve'))
+      await approveUnverifiedRequest()
       await screen.findByTestId('wallet-interaction-complete')
       expect(mockWalletRequest).toHaveBeenCalledWith({
         method: 'eth_sendTransaction',
@@ -1907,7 +1945,7 @@ describe('RequestPage', () => {
 
       it('should omit unreviewed request fields and bind the trusted sender and chain', async () => {
         renderRequestPage()
-        await userEvent.click(await screen.findByTestId('unverified-approve'))
+        await approveUnverifiedRequest()
         await screen.findByTestId('wallet-interaction-complete')
 
         expect(mockWalletRequest).toHaveBeenCalledWith({
@@ -1934,7 +1972,7 @@ describe('RequestPage', () => {
 
       it('should ask for a confirmation that names the transaction and its fee instead of sending immediately', async () => {
         renderRequestPage()
-        await userEvent.click(await screen.findByTestId('unverified-approve'))
+        await approveUnverifiedRequest()
         const dialog = await screen.findByTestId('confirm-request-dialog')
         expect(dialog).toHaveAttribute('data-kind', 'transaction')
         await waitFor(() => expect(dialog).toHaveAttribute('data-gas-status', 'ready'))
@@ -1943,7 +1981,7 @@ describe('RequestPage', () => {
 
       it('should send the transaction once the confirmation is given', async () => {
         renderRequestPage()
-        await userEvent.click(await screen.findByTestId('unverified-approve'))
+        await approveUnverifiedRequest()
         await userEvent.click(await screen.findByTestId('confirm-request-confirm'))
         await screen.findByTestId('wallet-interaction-complete')
         expect(mockWalletRequest).toHaveBeenCalledWith({
@@ -1954,7 +1992,7 @@ describe('RequestPage', () => {
 
       it('should close the confirmation on cancel without sending', async () => {
         renderRequestPage()
-        await userEvent.click(await screen.findByTestId('unverified-approve'))
+        await approveUnverifiedRequest()
         await userEvent.click(await screen.findByTestId('confirm-request-cancel'))
         expect(screen.queryByTestId('confirm-request-dialog')).not.toBeInTheDocument()
         expect(screen.getByTestId('unverified-request')).toBeInTheDocument()
@@ -1973,7 +2011,7 @@ describe('RequestPage', () => {
         renderRequestPage()
         const view = await screen.findByTestId('wallet-interaction')
         await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
-        await userEvent.click(screen.getByTestId('wallet-interaction-approve'))
+        await approveWalletInteraction()
         const dialog = await screen.findByTestId('confirm-request-dialog')
         expect(dialog).toHaveAttribute('data-kind', 'transaction')
         expect(dialog).toHaveAttribute('data-gas-covered', 'true')
@@ -1984,7 +2022,7 @@ describe('RequestPage', () => {
         renderRequestPage()
         const view = await screen.findByTestId('wallet-interaction')
         await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
-        await userEvent.click(screen.getByTestId('wallet-interaction-approve'))
+        await approveWalletInteraction()
         await userEvent.click(await screen.findByTestId('confirm-request-confirm'))
         await screen.findByTestId('wallet-interaction-complete')
         expect(sendMetaTransaction).toHaveBeenCalledTimes(1)
@@ -1998,7 +2036,7 @@ describe('RequestPage', () => {
 
       it('should ask for a confirmation that names the signature and shows no fee', async () => {
         renderRequestPage()
-        await userEvent.click(await screen.findByTestId('unverified-approve'))
+        await approveUnverifiedRequest()
         const dialog = await screen.findByTestId('confirm-request-dialog')
         expect(dialog).toHaveAttribute('data-kind', 'signature')
         expect(dialog).toHaveAttribute('data-gas-covered', 'undefined')
@@ -2007,7 +2045,7 @@ describe('RequestPage', () => {
 
       it('should sign once the confirmation is given', async () => {
         renderRequestPage()
-        await userEvent.click(await screen.findByTestId('unverified-approve'))
+        await approveUnverifiedRequest()
         await userEvent.click(await screen.findByTestId('confirm-request-confirm'))
         await screen.findByTestId('wallet-interaction-complete')
         expect(mockWalletRequest).toHaveBeenCalledWith({ method: 'personal_sign', params: [HELLO_HEX, SIGNER] })
@@ -2072,7 +2110,7 @@ describe('RequestPage', () => {
 
     it('should send it as a plain transaction on the reviewed chain', async () => {
       renderRequestPage()
-      await userEvent.click(await screen.findByTestId('unverified-approve'))
+      await approveUnverifiedRequest()
       await screen.findByTestId('wallet-interaction-complete')
       expect(mockWalletRequest).toHaveBeenCalledWith({
         method: 'eth_sendTransaction',
@@ -2089,7 +2127,7 @@ describe('RequestPage', () => {
     const findVerifiedView = async () => {
       const found = await screen.findByTestId(viewTestId)
       await waitFor(() => expect(found).toHaveAttribute('data-sim', 'ready'))
-      await waitFor(() => expect(found).toHaveAttribute('data-counterparty-check-pending', 'false'))
+      await waitFor(() => expect(found).toHaveAttribute('data-approve-blocked', 'false'))
       return found
     }
 
@@ -2294,7 +2332,7 @@ describe('RequestPage', () => {
       })
 
       it('should show the ready preview while still reporting the check as pending', () => {
-        expect(view).toHaveAttribute('data-counterparty-check-pending', 'true')
+        expect(view).toHaveAttribute('data-approve-blocked', 'true')
       })
     })
 
@@ -2461,7 +2499,7 @@ describe('RequestPage', () => {
       renderRequestPage()
       const view = await screen.findByTestId('wallet-interaction')
       await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
-      await userEvent.click(screen.getByTestId('wallet-interaction-approve'))
+      await approveWalletInteraction()
       await screen.findByTestId('wallet-interaction-complete')
       expect(sendMetaTransaction).toHaveBeenCalledWith(
         expect.objectContaining({ request: expect.any(Function) }),
@@ -2486,7 +2524,7 @@ describe('RequestPage', () => {
         renderRequestPage()
         const view = await screen.findByTestId('wallet-interaction')
         await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
-        await userEvent.click(screen.getByTestId('wallet-interaction-approve'))
+        await approveWalletInteraction()
         await waitFor(() => expect(sendMetaTransaction).toHaveBeenCalledTimes(1))
         const [boundProvider] = jest.mocked(sendMetaTransaction).mock.calls[0] as unknown as [
           { request: (args: unknown) => Promise<unknown> }
@@ -2510,7 +2548,7 @@ describe('RequestPage', () => {
         renderRequestPage()
         const view = await screen.findByTestId('wallet-interaction')
         await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
-        await userEvent.click(screen.getByTestId('wallet-interaction-approve'))
+        await approveWalletInteraction()
         expect(await screen.findByTestId('different-account')).toBeInTheDocument()
         expect(mockSendFailedOutcome).not.toHaveBeenCalled()
         expect(mockSendSuccessfulOutcome).not.toHaveBeenCalled()
@@ -2925,7 +2963,7 @@ describe('RequestPage', () => {
       renderRequestPage()
       const view = await screen.findByTestId('wallet-interaction')
       await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
-      await userEvent.click(screen.getByTestId('wallet-interaction-approve'))
+      await approveWalletInteraction()
       await screen.findByTestId('wallet-interaction-complete')
       expect(mockWalletRequest).toHaveBeenCalledWith({
         method: 'eth_sendTransaction',
@@ -3489,7 +3527,7 @@ describe('RequestPage', () => {
         renderMountedPage()
         const view = await screen.findByTestId('wallet-interaction')
         await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
-        await userEvent.click(screen.getByTestId('wallet-interaction-approve'))
+        await approveWalletInteraction()
         await waitFor(() => expect(sendMetaTransaction).toHaveBeenCalledTimes(1))
         await userEvent.click(screen.getByTestId('go-to-other'))
         const fresh = await screen.findByTestId('wallet-interaction')
@@ -3536,7 +3574,7 @@ describe('RequestPage', () => {
         renderMountedPage()
         const view = await screen.findByTestId('wallet-interaction')
         await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
-        await userEvent.click(screen.getByTestId('wallet-interaction-approve'))
+        await approveWalletInteraction()
         await screen.findByTestId('wallet-interaction-complete')
         await userEvent.click(screen.getByTestId('go-to-other'))
         await waitFor(() => expect(mockRecover.mock.calls.some(call => call[0] === otherRequestId)).toBe(true))
@@ -3610,6 +3648,335 @@ describe('RequestPage', () => {
       })
     })
   })
+  describe('when a load runs again for the same request and account', () => {
+    beforeEach(() => {
+      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.THIRDWEB }
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockGetAddresses.mockResolvedValue([SIGNER])
+      mockRecover.mockResolvedValue(recovered('eth_sendTransaction', [{ to: CONTRACT, data: '0xabcd', value: '0x0' }]))
+      mockClassifyRequest.mockResolvedValue(dclTransaction())
+      jest.mocked(sendMetaTransaction).mockResolvedValue('0xrelayedhash')
+      mockSendSuccessfulOutcome.mockResolvedValue({})
+    })
+
+    // An embedded wallet handing the app a fresh provider object for the same account. The reset keyed to
+    // the request and the account does not run for it, but the load does: it recovers, reclassifies and
+    // re-simulates, so nothing the previous run derived still describes what is on screen.
+    const refreshTheProvider = (rerender: (ui: React.ReactElement) => void) => {
+      mockConnectionData = { ...mockConnectionData, provider: { isMagic: false, refreshed: true } }
+      rerenderRequestPage(rerender)
+    }
+
+    describe('and the user had already opened the web2 confirmation', () => {
+      beforeEach(() => {
+        // The replacement preview is held, so the review is demonstrably unfinished.
+        mockSimulateTransaction.mockResolvedValueOnce(simulationOf()).mockImplementation(() => new Promise(() => undefined))
+      })
+
+      it('should close the confirmation, since it was opened against a review that no longer stands', async () => {
+        const { rerender } = renderRequestPage()
+        await clearWalletInteractionGates()
+        await userEvent.click(screen.getByTestId('wallet-interaction-approve'))
+        expect(await screen.findByTestId('confirm-request-dialog')).toBeInTheDocument()
+
+        refreshTheProvider(rerender)
+        await waitFor(() => expect(mockRecover.mock.calls.length).toBeGreaterThanOrEqual(2))
+
+        await waitFor(() => expect(screen.queryByTestId('confirm-request-dialog')).not.toBeInTheDocument())
+      })
+
+      it('should relay nothing even if the confirmation is confirmed anyway', async () => {
+        const { rerender } = renderRequestPage()
+        await clearWalletInteractionGates()
+        await userEvent.click(screen.getByTestId('wallet-interaction-approve'))
+        await screen.findByTestId('confirm-request-dialog')
+
+        refreshTheProvider(rerender)
+        await waitFor(() => expect(mockRecover.mock.calls.length).toBeGreaterThanOrEqual(2))
+        // The confirmation should be gone; if it is not, its Confirm reaches the same handler, and the
+        // handler is what must refuse. Allow itself is pressed raw either way, because the double's button
+        // is not disabled: both paths end at the handler, which enforces gates that no longer hold.
+        const confirm = screen.queryByTestId('confirm-request-confirm')
+        if (confirm) {
+          await userEvent.click(confirm)
+        }
+        await userEvent.click(screen.getByTestId('wallet-interaction-approve'))
+
+        expect(jest.mocked(sendMetaTransaction)).not.toHaveBeenCalled()
+      })
+
+      it('should put the review back to deciding rather than leave the settled preview on screen', async () => {
+        const { rerender } = renderRequestPage()
+        await clearWalletInteractionGates()
+
+        refreshTheProvider(rerender)
+
+        await waitFor(() => expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-sim', 'loading'))
+        expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-approve-blocked', 'true')
+      })
+    })
+
+    describe('and the replacement counterparty check has not answered', () => {
+      beforeEach(() => {
+        // The preview resolves as before, so only the counterparty verdict is outstanding.
+        mockSimulateTransaction.mockResolvedValue(simulationOf({ assetChanges: [erc721Transfer({ from: SIGNER, to: '0xrecipient' })] }))
+      })
+
+      it('should block Allow rather than carry the previous review verdict over', async () => {
+        const { rerender } = renderRequestPage()
+        await clearWalletInteractionGates()
+
+        mockGetCounterpartyAddresses.mockReturnValue({ addresses: ['0xsomecontract'], opaque: false })
+        mockIsAddressWithoutCode.mockImplementation(() => new Promise(() => undefined))
+        refreshTheProvider(rerender)
+        await waitFor(() => expect(mockRecover.mock.calls.length).toBeGreaterThanOrEqual(2))
+        await waitFor(() => expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-sim', 'ready'))
+
+        expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-approve-blocked', 'true')
+      })
+
+      it('should relay nothing if Allow is pressed anyway', async () => {
+        const { rerender } = renderRequestPage()
+        await clearWalletInteractionGates()
+
+        mockGetCounterpartyAddresses.mockReturnValue({ addresses: ['0xsomecontract'], opaque: false })
+        mockIsAddressWithoutCode.mockImplementation(() => new Promise(() => undefined))
+        refreshTheProvider(rerender)
+        await waitFor(() => expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-approve-blocked', 'true'))
+
+        // Pressed raw on purpose: the double's button is not disabled, so this is the press the handler
+        // itself has to refuse.
+        await userEvent.click(screen.getByTestId('wallet-interaction-approve'))
+
+        expect(jest.mocked(sendMetaTransaction)).not.toHaveBeenCalled()
+      })
+    })
+
+    // The replacement is committed before anything invalidates it: React renders and paints the page with
+    // the new provider, and the load that re-recovers, reclassifies and re-simulates is a passive effect
+    // that only runs afterwards. On that commit the previous review is still on screen under a provider
+    // the page has already replaced, so the page has to refuse it there — during the render — rather than
+    // leave it to the effect that follows.
+    describe('and the replacement is observed commit by commit', () => {
+      let approveBlockedAtCommit: string[]
+      let pressOnNextCommit: 'wallet-interaction-approve' | 'wallet-interaction-deny' | null
+      let walletReadFromPress: boolean
+      let CommitProbe: ({ children }: { children: React.ReactNode }) => JSX.Element
+
+      beforeEach(() => {
+        // Injected, so Allow dispatches from the press instead of opening the web2 confirmation first.
+        mockConnectionData = { ...mockConnectionData, providerType: ProviderType.INJECTED }
+        approveBlockedAtCommit = []
+        pressOnNextCommit = null
+        walletReadFromPress = false
+        // A layout effect runs in the same commit as the DOM update and before every passive effect, so it
+        // sees the page exactly as the user would on that render — and can press what the user could press.
+        CommitProbe = ({ children }: { children: React.ReactNode }) => {
+          useLayoutEffect(() => {
+            const view = screen.queryByTestId('wallet-interaction')
+            approveBlockedAtCommit.push(view?.getAttribute('data-approve-blocked') ?? 'no-review')
+            if (pressOnNextCommit) {
+              const pressed = pressOnNextCommit
+              pressOnNextCommit = null
+              // The double's buttons are never disabled, so the press reaches the page's handler either way:
+              // whether it goes ahead is the page's own answer, which is what this measures. Both handlers
+              // read the wallet before anything else, so a read means it did.
+              const walletReadsBefore = mockGetAddresses.mock.calls.length
+              screen.queryByTestId(pressed)?.click()
+              walletReadFromPress = mockGetAddresses.mock.calls.length > walletReadsBefore
+            }
+          })
+          return <>{children}</>
+        }
+      })
+
+      const probedPage = () => (
+        <MemoryRouter initialEntries={[`/auth/requests/${REQUEST_ID}?targetConfigId=default`]}>
+          <FeatureFlagsContext.Provider value={{ flags: mockFlags as any, variants: {} as any, initialized: mockFlagsInitialized }}>
+            <Routes>
+              <Route
+                path="/auth/requests/:requestId"
+                element={
+                  <CommitProbe>
+                    <RequestPage />
+                  </CommitProbe>
+                }
+              />
+            </Routes>
+          </FeatureFlagsContext.Provider>
+        </MemoryRouter>
+      )
+
+      // A fresh tree, since re-rendering the same element bails out before the probe could record.
+      const refreshTheProbedProvider = (rerender: (ui: React.ReactElement) => void) => {
+        mockConnectionData = { ...mockConnectionData, provider: { isMagic: false, refreshed: true } }
+        rerender(probedPage())
+      }
+
+      it('should block Allow on the very commit the provider is replaced, before any effect runs', async () => {
+        const { rerender } = render(probedPage())
+        await clearWalletInteractionGates()
+
+        const commitsBefore = approveBlockedAtCommit.length
+        refreshTheProbedProvider(rerender)
+
+        expect(approveBlockedAtCommit.length).toBeGreaterThan(commitsBefore)
+        expect(approveBlockedAtCommit.slice(commitsBefore)).not.toContain('false')
+      })
+
+      it('should relay nothing if Allow is pressed on that commit', async () => {
+        const { rerender } = render(probedPage())
+        await clearWalletInteractionGates()
+
+        pressOnNextCommit = 'wallet-interaction-approve'
+        refreshTheProbedProvider(rerender)
+        await waitFor(() => expect(mockRecover.mock.calls.length).toBeGreaterThanOrEqual(2))
+
+        // Refused by the page, not by a guard that happened to be re-read after the load had run: the
+        // press must not reach the wallet at all.
+        expect(walletReadFromPress).toBe(false)
+        expect(jest.mocked(sendMetaTransaction)).not.toHaveBeenCalled()
+        expect(mockSendSuccessfulOutcome).not.toHaveBeenCalled()
+      })
+
+      it('should answer nothing if Deny is pressed on that commit, and still redo the review', async () => {
+        const { rerender } = render(probedPage())
+        await clearWalletInteractionGates()
+
+        pressOnNextCommit = 'wallet-interaction-deny'
+        refreshTheProbedProvider(rerender)
+        await waitFor(() => expect(mockRecover.mock.calls.length).toBeGreaterThanOrEqual(2))
+
+        // Deny would have answered through the clients of the provider the page had just replaced. It is
+        // refused before it reads anything — and before it marks the request answered, so the load that
+        // follows is not told the request is settled and the replacement review comes up as it should.
+        expect(walletReadFromPress).toBe(false)
+        expect(mockSendFailedOutcome).not.toHaveBeenCalled()
+        await waitFor(() => expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-sim', 'ready'))
+        expect(screen.queryByTestId('denied-wallet-interaction')).not.toBeInTheDocument()
+      })
+
+      it('should still deliver a Deny that was in flight when the provider was replaced', async () => {
+        // The review reads the account once; Deny's read is held until the replacement has been committed.
+        let releaseAccountRead: (addresses: string[]) => void = () => undefined
+        mockGetAddresses
+          .mockResolvedValueOnce([SIGNER])
+          .mockImplementationOnce(() => new Promise(resolve => (releaseAccountRead = resolve)))
+        const { rerender } = render(probedPage())
+        await clearWalletInteractionGates()
+
+        await userEvent.click(screen.getByTestId('wallet-interaction-deny'))
+        await waitFor(() => expect(mockGetAddresses).toHaveBeenCalledTimes(2))
+        refreshTheProbedProvider(rerender)
+        releaseAccountRead([SIGNER])
+
+        // The decision was made — on this request, by this account, through the wallet that was current
+        // when it was made; only the provider object has moved since. It stands: Deny marked the request
+        // answered when it was pressed, so the load that ran meanwhile left the review alone, and backing
+        // out now would leave nothing to redo it.
+        await waitFor(() => expect(mockSendFailedOutcome).toHaveBeenCalledTimes(1))
+        expect(await screen.findByTestId('denied-wallet-interaction')).toBeInTheDocument()
+      })
+    })
+  })
+
+  describe('when the request expires while Allow is still preparing', () => {
+    beforeEach(() => {
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      // Far enough out that the review settles, close enough to fire while the account read is held.
+      mockRecover.mockResolvedValue({
+        method: 'eth_sendTransaction',
+        params: [{ to: CONTRACT, data: '0xabcd', value: '0x0' }],
+        sender: SIGNER,
+        expiration: new Date(Date.now() + 400).toISOString()
+      })
+      mockClassifyRequest.mockResolvedValue(dclTransaction())
+      jest.mocked(sendMetaTransaction).mockResolvedValue('0xrelayedhash')
+      mockSendSuccessfulOutcome.mockResolvedValue({})
+    })
+
+    it('should relay nothing once the timeout screen has taken over', async () => {
+      // The review reads the account once; Allow's read is held until the expiry has fired. Expiry settles
+      // the request and shows the timeout screen without moving the review generation, so the handler has
+      // to re-read the terminal state itself rather than rely on staleness.
+      let releaseAccountRead: (addresses: string[]) => void = () => undefined
+      mockGetAddresses.mockResolvedValueOnce([SIGNER]).mockImplementationOnce(() => new Promise(resolve => (releaseAccountRead = resolve)))
+
+      renderRequestPage()
+      await clearWalletInteractionGates()
+
+      await userEvent.click(screen.getByTestId('wallet-interaction-approve'))
+      await waitFor(() => expect(mockGetAddresses).toHaveBeenCalledTimes(2))
+      expect(await screen.findByTestId('timeout-error')).toBeInTheDocument()
+
+      releaseAccountRead([SIGNER])
+
+      await waitFor(() => expect(jest.mocked(sendMetaTransaction)).not.toHaveBeenCalled())
+      expect(mockSendSuccessfulOutcome).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('when the acknowledgment a review asked for is given', () => {
+    beforeEach(() => {
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockGetAddresses.mockResolvedValue([SIGNER])
+      mockRecover.mockResolvedValue(recovered('eth_sendTransaction', [{ to: CONTRACT, data: '0xabcd', value: '0x0' }]))
+      mockClassifyRequest.mockResolvedValue(dclTransaction())
+      jest.mocked(sendMetaTransaction).mockResolvedValue('0xrelayedhash')
+      mockSendSuccessfulOutcome.mockResolvedValue({})
+      // A preview with nothing the user can check: acknowledged before Allow enables.
+      mockSimulateTransaction.mockResolvedValue(simulationOf())
+    })
+
+    it('should block Allow until it is given', async () => {
+      renderRequestPage()
+      const view = await screen.findByTestId('wallet-interaction')
+      await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+
+      expect(view).toHaveAttribute('data-requires-acknowledgment', 'true')
+      expect(view).toHaveAttribute('data-approve-blocked', 'true')
+    })
+
+    it('should enable Allow once given for the screen on display', async () => {
+      renderRequestPage()
+      const view = await screen.findByTestId('wallet-interaction')
+      await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+
+      await userEvent.click(screen.getByTestId('wallet-interaction-acknowledge'))
+
+      await waitFor(() => expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-acknowledged', 'true'))
+      expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-approve-blocked', 'false')
+    })
+
+    it('should stop counting it when the same request is previewed again and shows something else', async () => {
+      const { rerender } = renderRequestPage()
+      const view = await screen.findByTestId('wallet-interaction')
+      await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+      await userEvent.click(screen.getByTestId('wallet-interaction-acknowledge'))
+      await waitFor(() => expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-acknowledged', 'true'))
+
+      // The replacement preview moves an asset the first one did not.
+      mockSimulateTransaction.mockResolvedValue(simulationOf({ assetChanges: [erc721Transfer({ from: SIGNER, to: '0xrecipient' })] }))
+      mockConnectionData = { ...mockConnectionData, provider: { isMagic: false, refreshed: true } }
+      rerenderRequestPage(rerender)
+
+      await waitFor(() => expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-acknowledged', 'false'))
+    })
+
+    it('should relay nothing if Allow is pressed before it is given', async () => {
+      renderRequestPage()
+      const view = await screen.findByTestId('wallet-interaction')
+      await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+      expect(view).toHaveAttribute('data-approve-blocked', 'true')
+
+      // Pressed raw on purpose: the double's button is not disabled, so this is the press the handler
+      // itself has to refuse.
+      await userEvent.click(screen.getByTestId('wallet-interaction-approve'))
+
+      expect(jest.mocked(sendMetaTransaction)).not.toHaveBeenCalled()
+    })
+  })
+
   describe('when a preview reports far more movements than a review can show', () => {
     beforeEach(() => {
       mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
@@ -3727,6 +4094,89 @@ describe('RequestPage', () => {
         expect(jest.mocked(fetchProfiles)).not.toHaveBeenCalled()
         expect(jest.mocked(fetchProfile)).not.toHaveBeenCalled()
       })
+    })
+  })
+  describe('when Allow is already in flight and the provider is replaced for the same account', () => {
+    let releaseAccountRead: (addresses: string[]) => void
+
+    beforeEach(() => {
+      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.INJECTED }
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockRecover.mockResolvedValue(recovered('eth_sendTransaction', [{ to: CONTRACT, data: '0xabcd', value: '0x0' }]))
+      mockClassifyRequest.mockResolvedValue(dclTransaction())
+      jest.mocked(sendMetaTransaction).mockResolvedValue('0xrelayedhash')
+      mockSendSuccessfulOutcome.mockResolvedValue({})
+      // The review's own read resolves; Allow's is held so the reload can finish underneath it.
+      releaseAccountRead = () => undefined
+      mockGetAddresses
+        .mockResolvedValueOnce([SIGNER])
+        .mockImplementationOnce(() => new Promise(resolve => (releaseAccountRead = resolve)))
+        .mockResolvedValue([SIGNER])
+    })
+
+    it('should not deliver an outcome for it either', async () => {
+      const { rerender } = renderRequestPage()
+      await clearWalletInteractionGates()
+      await userEvent.click(screen.getByTestId('wallet-interaction-approve'))
+      await waitFor(() => expect(mockGetAddresses).toHaveBeenCalledTimes(2))
+
+      mockConnectionData = { ...mockConnectionData, provider: { isMagic: false, refreshed: true } }
+      rerenderRequestPage(rerender)
+      await waitFor(() => expect(mockRecover.mock.calls.length).toBeGreaterThanOrEqual(2))
+      await waitFor(() => expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-sim', 'ready'))
+
+      releaseAccountRead([SIGNER])
+
+      await waitFor(() => expect(mockGetAddresses.mock.calls.length).toBeGreaterThanOrEqual(3))
+      expect(mockSendSuccessfulOutcome).not.toHaveBeenCalled()
+      expect(mockSendFailedOutcome).not.toHaveBeenCalled()
+    })
+
+    it('should not dispatch the replacement review with the click that was given to the previous one', async () => {
+      const { rerender } = renderRequestPage()
+      await clearWalletInteractionGates()
+
+      // Allow is pressed against the review on screen and stops at its first await.
+      await userEvent.click(screen.getByTestId('wallet-interaction-approve'))
+      await waitFor(() => expect(mockGetAddresses).toHaveBeenCalledTimes(2))
+
+      // The wallet hands the app a new provider for the same account; the replacement review settles.
+      mockConnectionData = { ...mockConnectionData, provider: { isMagic: false, refreshed: true } }
+      rerenderRequestPage(rerender)
+      await waitFor(() => expect(mockRecover.mock.calls.length).toBeGreaterThanOrEqual(2))
+      await waitFor(() => expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-sim', 'ready'))
+
+      // Only now does the held read resolve. The consent was given to a review that no longer stands.
+      releaseAccountRead([SIGNER])
+
+      await waitFor(() => expect(mockGetAddresses.mock.calls.length).toBeGreaterThanOrEqual(3))
+      expect(jest.mocked(sendMetaTransaction)).not.toHaveBeenCalled()
+      expect(mockSendSuccessfulOutcome).not.toHaveBeenCalled()
+    })
+  })
+  describe('when an unverified request was acknowledged and the provider is replaced for the same account', () => {
+    beforeEach(() => {
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockGetAddresses.mockResolvedValue([SIGNER])
+      mockRecover.mockResolvedValue(recovered('personal_sign', ['hello', SIGNER]))
+      mockWalletRequest.mockResolvedValue('0xsignature')
+      mockSendSuccessfulOutcome.mockResolvedValue({})
+    })
+
+    it('should stop counting the acknowledgment and take Allow with it while the replacement is decided', async () => {
+      const { rerender } = renderRequestPage()
+      await userEvent.click(await screen.findByTestId('unverified-acknowledge'))
+      await waitFor(() => expect(screen.getByTestId('unverified-request')).toHaveAttribute('data-approve-blocked', 'false'))
+
+      // Hold the replacement recovery so the state between the two reviews is observable.
+      mockRecover.mockImplementation(() => new Promise(() => undefined))
+      mockConnectionData = { ...mockConnectionData, provider: { isMagic: false, refreshed: true } }
+      rerenderRequestPage(rerender)
+
+      // Nothing of the previous review is left on screen to act on.
+      expect(await screen.findByTestId('loading-request')).toBeInTheDocument()
+      expect(screen.queryByTestId('unverified-request')).not.toBeInTheDocument()
+      expect(mockWalletRequest).not.toHaveBeenCalled()
     })
   })
 })

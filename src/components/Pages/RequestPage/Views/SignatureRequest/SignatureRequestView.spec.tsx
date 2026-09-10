@@ -42,11 +42,13 @@ const transferResult: SimulationResponseBody = {
 describe('when rendering the SignatureRequestView', () => {
   let onApprove: jest.Mock
   let onDeny: jest.Mock
+  let onAcknowledgedChange: jest.Mock
   let props: SignatureRequestViewProps
 
   beforeEach(() => {
     onApprove = jest.fn()
     onDeny = jest.fn()
+    onAcknowledgedChange = jest.fn()
     props = {
       requestId: 'r1',
       method: 'eth_signTypedData_v4',
@@ -57,6 +59,8 @@ describe('when rendering the SignatureRequestView', () => {
       simulation: { status: 'ready', result: transferResult },
       userAddress: USER,
       chainId: 137,
+      approveBlocked: false,
+      onAcknowledgedChange,
       onDeny,
       onApprove
     }
@@ -109,14 +113,19 @@ describe('when rendering the SignatureRequestView', () => {
     })
   })
 
-  describe('and the simulation is still loading', () => {
+  describe('and the page reports the review is not actionable', () => {
     beforeEach(() => {
-      props = { ...props, simulation: { status: 'loading' } }
+      props = { ...props, approveBlocked: true }
     })
 
-    it('should keep approval disabled until it resolves', () => {
+    it('should keep approval disabled, whatever it can see of the preview itself', () => {
       render(<SignatureRequestView {...props} />)
       expect(screen.getByTestId('signature-approve-button')).toBeDisabled()
+    })
+
+    it('should still offer Deny', () => {
+      render(<SignatureRequestView {...props} />)
+      expect(screen.getByTestId('signature-deny-button')).toBeEnabled()
     })
   })
 
@@ -125,33 +134,22 @@ describe('when rendering the SignatureRequestView', () => {
       props = { ...props, requiresAcknowledgment: true }
     })
 
-    it('should keep approval disabled until the acknowledgment is checked', async () => {
+    it('should report a tick to the page rather than decide for itself what it enables', async () => {
       render(<SignatureRequestView {...props} />)
-      expect(screen.getByTestId('signature-approve-button')).toBeDisabled()
+
       await userEvent.click(screen.getByRole('checkbox'))
-      expect(screen.getByTestId('signature-approve-button')).toBeEnabled()
+
+      expect(onAcknowledgedChange).toHaveBeenCalledWith(true)
+    })
+
+    it('should render the checkbox from what the page says was acknowledged', () => {
+      render(<SignatureRequestView {...{ ...props, acknowledged: true }} />)
+      expect(screen.getByRole('checkbox')).toBeChecked()
     })
 
     it('should word the acknowledgment for the granted access since the preview shows changes', () => {
       render(<SignatureRequestView {...props} />)
       expect(screen.getByText('request.transaction_dialog.acknowledge_risk')).toBeInTheDocument()
-    })
-
-    describe('and the request changes after the user ticked it', () => {
-      let nextProps: SignatureRequestViewProps
-
-      beforeEach(() => {
-        nextProps = { ...props, requestId: 'r2' }
-      })
-
-      it('should clear the tick in the same render', async () => {
-        const { rerender } = render(<SignatureRequestView {...props} />)
-        await userEvent.click(screen.getByRole('checkbox'))
-        expect(screen.getByTestId('signature-approve-button')).toBeEnabled()
-        rerender(<SignatureRequestView {...nextProps} />)
-        expect(screen.getByRole('checkbox')).not.toBeChecked()
-        expect(screen.getByTestId('signature-approve-button')).toBeDisabled()
-      })
     })
 
     describe('and the preview is unavailable', () => {
@@ -162,17 +160,6 @@ describe('when rendering the SignatureRequestView', () => {
       it('should word the acknowledgment for effects that could not be verified', () => {
         render(<SignatureRequestView {...props} />)
         expect(screen.getByText('request.signature.acknowledge_unverified')).toBeInTheDocument()
-      })
-    })
-
-    describe('and whether every contract the call reaches is Decentraland is still being decided', () => {
-      beforeEach(() => {
-        props = { ...props, isCounterpartyCheckPending: true }
-      })
-
-      it('should keep Allow disabled until it is', () => {
-        render(<SignatureRequestView {...props} />)
-        expect(screen.getByTestId('signature-approve-button')).toBeDisabled()
       })
     })
 

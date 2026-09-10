@@ -28,10 +28,15 @@ interface WalletInteractionProps {
   /** When true, the approve button is gated behind a high-risk acknowledgment checkbox. */
   requiresAcknowledgment?: boolean
   /**
-   * True while it is still being decided whether every contract the call reaches is Decentraland's; Allow
-   * waits for it. A call that reaches anything else is refused and never shown here.
+   * True while the review may not be acted on. The page holds every gate in one place — the preview has
+   * settled, the contracts the call reaches were checked, the fee is known, the acknowledgment was given
+   * for this exact screen — and its approval handler enforces the same value, so no button can approve a
+   * review the gates have not cleared (see isReviewActionable in RequestPage).
    */
-  isCounterpartyCheckPending?: boolean
+  approveBlocked?: boolean
+  /** Whether the acknowledgment has been given for the screen on display. Owned by the page. */
+  acknowledged?: boolean
+  onAcknowledgedChange?: (checked: boolean) => void
   gas: WalletInteractionGas
   /** True when the simulation predicts the transaction would revert. */
   isReverted?: boolean

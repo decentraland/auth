@@ -1,11 +1,10 @@
 import { formatEther } from 'viem'
 import { useTranslation } from '@dcl/hooks'
 import { Box, Button, Checkbox, CircularProgress, FormControlLabel } from 'decentraland-ui2'
-import { getPreviewFingerprint, hasNoVisibleEffects } from '../../../../../shared/auth'
+import { hasNoVisibleEffects } from '../../../../../shared/auth'
 import { Container } from '../../Container'
 import { ButtonsContainer, ReviewRestartedNotice } from '../../RequestPage.styled'
 import { SimulationSummary } from '../SimulationSummary'
-import { useAcknowledgment } from '../useAcknowledgment'
 import styles from '../Views.module.css'
 import { WalletInteractionProps } from './WalletInteraction.types'
 import { CallLine, PreviewUnavailableWarning, SummaryBody } from './WalletInteraction.styled'
@@ -27,10 +26,12 @@ export const WalletInteraction = ({
   collectionContracts,
   chainId,
   requiresAcknowledgment = false,
-  isCounterpartyCheckPending = false,
+  acknowledged = false,
+  approveBlocked = true,
   gas,
   isReverted = false,
   reviewRestarted = false,
+  onAcknowledgedChange,
   onDeny,
   onApprove
 }: WalletInteractionProps) => {
@@ -41,31 +42,10 @@ export const WalletInteraction = ({
   // The preview resolved but shows nothing the user can check. The call may still change state the
   // summary cannot show, so the acknowledgment says that instead of talking about approvals.
   const isPreviewWithoutVisibleEffects = simulation.status === 'ready' && hasNoVisibleEffects(simulation.result, userAddress)
-  // The statement being acknowledged: this request and exactly this preview — outcome, movements
-  // and approvals (see useAcknowledgment).
-  const acknowledgmentStatement = [
-    requestId,
-    simulation.status,
-    isReverted ? 'reverted' : '',
-    isPreviewWithoutVisibleEffects ? 'no-visible-effects' : '',
-    getPreviewFingerprint(simulation.status === 'ready' ? simulation.result : undefined)
-  ].join('|')
-  const { acknowledged, setAcknowledged } = useAcknowledgment(acknowledgmentStatement)
-  // The user pays gas and the estimate has not resolved: the cost must be seen before approving.
-  const isGasPending = !gas.covered && gas.status === 'loading'
-  // Block approval while the request is submitting, while the simulation or the fee estimate is
-  // still resolving (so a user can't approve before the summary, the cost and any high-risk warnings
-  // render), and until any required acknowledgment is given.
-  // Nothing to approve before the preview has settled: idle is the initial state and only ordering keeps
-  // it off this view, so it blocks like loading does.
-  const approveBlocked =
-    isLoading ||
-    simulation.status === 'idle' ||
-    simulation.status === 'loading' ||
-    isCounterpartyCheckPending ||
-    isGasPending ||
-    (requiresAcknowledgment && !acknowledged)
-
+  // Whether Allow may be pressed, and whether the tick counts, are the page's to decide: it holds every
+  // gate in one place so the confirmation dialog and the approval handler cannot disagree with this button
+  // (see isReviewActionable in RequestPage). This view still derives what it *says* — which acknowledgment
+  // wording applies, whether to warn that the preview is missing — from the preview it renders.
   const summaryGas = gas.covered
     ? { covered: true, cost: '0', balance: '0' }
     : gas.status === 'ready'
@@ -105,7 +85,11 @@ export const WalletInteraction = ({
       {requiresAcknowledgment ? (
         <FormControlLabel
           control={
-            <Checkbox checked={acknowledged} onChange={event => setAcknowledged(event.target.checked)} data-testid="risk-acknowledgment" />
+            <Checkbox
+              checked={acknowledged}
+              onChange={event => onAcknowledgedChange?.(event.target.checked)}
+              data-testid="risk-acknowledgment"
+            />
           }
           label={
             isPreviewUnavailable
