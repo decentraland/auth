@@ -65,7 +65,21 @@ const TransferConfirmView = (props: TransferConfirmViewProps) => {
           </>
         ) : (
           <>
-            <Profile address={transferData.toAddress} avatar={recipientAvatar as ProfileAvatar} size="huge" inline />
+            {/* Named exactly as a tip's recipient is. A display name is not an identity: only a claimed name
+                is unique, and an unclaimed one shown by itself reads the same from any account whose address
+                ends in the four characters Profile appends to it — 65,536 of them, which is a vanity address
+                away. The address the NFT is actually sent to therefore goes on screen next to the name, with
+                a copy button to check it against. */}
+            <Profile
+              address={transferData.toAddress}
+              avatar={recipientAvatar as ProfileAvatar}
+              size="huge"
+              inline
+              showBothNameAndAddress
+              shortenAddress
+              showCopyButton
+              highlightName
+            />
             <TransferAssetImage
               src={(transferData as NFTTransferData).imageUrl}
               name={(transferData as NFTTransferData).name || `NFT #${(transferData as NFTTransferData).tokenId}`}

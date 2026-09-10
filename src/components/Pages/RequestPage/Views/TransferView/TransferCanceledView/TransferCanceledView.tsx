@@ -49,7 +49,17 @@ const TransferCanceledView = memo((props: TransferCanceledViewProps) => {
           <>
             <TransferSecondaryText>
               {t('transfer.canceled.gift_not_delivered')}
-              <Profile address={transferData.toAddress} avatar={recipientAvatar as ProfileAvatar} size="huge" inline shortenAddress />
+              {/* The account that did not receive it, named as the confirmation screen named it. */}
+              <Profile
+                address={transferData.toAddress}
+                avatar={recipientAvatar as ProfileAvatar}
+                size="huge"
+                inline
+                showBothNameAndAddress
+                shortenAddress
+                showCopyButton
+                highlightName
+              />
             </TransferSecondaryText>
             <TransferAssetImage
               src={(transferData as NFTTransferData).imageUrl}

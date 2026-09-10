@@ -38,6 +38,7 @@ import {
   simulationReverted,
   simulationStablecoinTrade,
   simulationSuccess,
+  unclaimedNameAvatar,
   unknownMetaTxRaw
 } from './__data__'
 import { FloatingBar, PreviewSurface, ViewSelect } from './TestViewPage.styled'
@@ -117,6 +118,21 @@ export const TestViewPage = () => {
             callbackAcknowledged={acknowledged}
             approveBlocked={!acknowledged}
             onCallbackAcknowledgedChange={setAcknowledged}
+            onDeny={noop}
+            onApprove={asyncNoop}
+          />
+        )
+      },
+      // The gift confirmation for a recipient whose name is not claimed: the name is free to copy and Profile
+      // disambiguates it only by the last four characters of the address, so this is the screen where naming
+      // the address matters (see TransferConfirmView).
+      nftTransferUnclaimedName: {
+        label: 'TransferConfirmView (Gift, recipient with an unclaimed name)',
+        element: (
+          <TransferConfirmView
+            type={TransferType.GIFT}
+            transferData={{ ...nftData, recipientProfile: { avatars: [unclaimedNameAvatar] } }}
+            isLoading={false}
             onDeny={noop}
             onApprove={asyncNoop}
           />
