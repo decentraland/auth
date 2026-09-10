@@ -7,7 +7,7 @@ import { ButtonsContainer, ReviewRestartedNotice } from '../../RequestPage.style
 import { SimulationSummary } from '../SimulationSummary'
 import styles from '../Views.module.css'
 import { WalletInteractionProps } from './WalletInteraction.types'
-import { CallLine, PreviewUnavailableWarning, SummaryBody } from './WalletInteraction.styled'
+import { CallLine, DeferredCallbackWarning, PreviewUnavailableWarning, SummaryBody } from './WalletInteraction.styled'
 
 /**
  * The review of a transaction to a Decentraland contract: the decoded call, the simulated asset and
@@ -27,11 +27,14 @@ export const WalletInteraction = ({
   chainId,
   requiresAcknowledgment = false,
   acknowledged = false,
+  deferredCallbackAddresses = [],
+  deferredCallbackAcknowledged = false,
   approveBlocked = true,
   gas,
   isReverted = false,
   reviewRestarted = false,
   onAcknowledgedChange,
+  onDeferredCallbackAcknowledgedChange,
   onDeny,
   onApprove
 }: WalletInteractionProps) => {
@@ -82,6 +85,15 @@ export const WalletInteraction = ({
           {t('request.wallet_interaction.preview_unavailable_warning')}
         </PreviewUnavailableWarning>
       ) : null}
+      {deferredCallbackAddresses.length > 0 ? (
+        // An address the call hands the contract had no code when it was checked, and code can be deployed
+        // there before the transaction executes. The preview cannot vouch for what would run then, so this
+        // is said next to it and consented to on its own: the risk acknowledgment below speaks for what the
+        // preview does show, not for what it cannot.
+        <DeferredCallbackWarning severity="warning" role="alert" data-testid="deferred-callback-warning">
+          {t('request.wallet_interaction.deferred_callback_notice')}
+        </DeferredCallbackWarning>
+      ) : null}
       {requiresAcknowledgment ? (
         <FormControlLabel
           control={
@@ -98,6 +110,18 @@ export const WalletInteraction = ({
                 ? t('request.transaction_dialog.acknowledge_no_visible_effects')
                 : t('request.transaction_dialog.acknowledge_risk')
           }
+        />
+      ) : null}
+      {deferredCallbackAddresses.length > 0 ? (
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={deferredCallbackAcknowledged}
+              onChange={event => onDeferredCallbackAcknowledgedChange?.(event.target.checked)}
+              data-testid="deferred-callback-acknowledgment"
+            />
+          }
+          label={t('request.wallet_interaction.acknowledge_deferred_callback')}
         />
       ) : null}
       <ButtonsContainer>

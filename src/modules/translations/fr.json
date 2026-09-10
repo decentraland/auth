@@ -66,6 +66,8 @@
       "review_title": "Vérifiez cette transaction",
       "preview_unavailable_warning": "Nous n'avons pas pu vérifier ce que fait cette transaction car le service d'aperçu est temporairement indisponible. N'approuvez que si vous faites confiance à la scène qui l'a demandée.",
       "acknowledge_preview_unavailable": "Je comprends que l'aperçu est indisponible et j'approuve sans voir ce que fait cette transaction",
+      "deferred_callback_notice": "Une adresse que cette transaction transmet au contrat ne contient aucun code aujourd’hui. Du code pourrait y être déployé avant l’exécution de la transaction, et le contrat l’exécuterait ; cet aperçu ne peut pas montrer ce que ferait ce code.",
+      "acknowledge_deferred_callback": "Je comprends que du code déployé avant l’exécution de cette transaction pourrait modifier ses effets et j’accepte ce risque.",
       "review_restarted_notice": "Le réseau de votre portefeuille a changé ou n'a pas pu être vérifié, cette transaction a donc été réexaminée sur le réseau actuel.",
       "calls_function": "Appelle {functionName} sur {contractName}"
     },
@@ -119,6 +121,8 @@
       "description": "Vérifiez ce que vous êtes sur le point de signer.",
       "view_raw": "Afficher les données brutes",
       "hide_raw": "Masquer les données brutes",
+      "deferred_callback_notice": "Une adresse utilisée par cet appel ne contient aucun code de contrat aujourd’hui. Du code pourrait y être déployé avant l’envoi de cette signature, ce qui pourrait modifier l’exécution par rapport à cet aperçu.",
+      "acknowledge_deferred_callback": "Je comprends que du code déployé après ma signature pourrait modifier les effets de cet appel et j’accepte ce risque.",
       "meta_tx_notice": "Cette signature autorise le contrat à exécuter cette action en votre nom. Elle n'expire pas et l'application qui l'a demandée peut la soumettre plus tard.",
       "meta_tx_reverted": "Cette action échoue pour le moment, ses effets n'ont donc pas pu être prévisualisés. Ne la signez que si vous pensez qu'elle fonctionnera plus tard.",
       "acknowledge_unverified": "Je comprends que les effets de cette signature n'ont pas pu être vérifiés"

@@ -42,6 +42,9 @@ export const SignatureRequestView = ({
   collectionContracts,
   chainId,
   requiresAcknowledgment = false,
+  deferredCallbackAddresses = [],
+  deferredCallbackAcknowledged = false,
+  onDeferredCallbackAcknowledgedChange,
   acknowledged = false,
   approveBlocked = true,
   isLoading = false,
@@ -99,6 +102,20 @@ export const SignatureRequestView = ({
           chainId={chainId}
         />
         <Notice data-testid="signature-meta-tx-notice">{t('request.signature.meta_tx_notice')}</Notice>
+        {deferredCallbackAddresses.length > 0 ? (
+          <>
+            <Notice data-testid="signature-deferred-callback-notice">{t('request.signature.deferred_callback_notice')}</Notice>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={deferredCallbackAcknowledged}
+                  onChange={event => onDeferredCallbackAcknowledgedChange?.(event.target.checked)}
+                />
+              }
+              label={t('request.signature.acknowledge_deferred_callback')}
+            />
+          </>
+        ) : null}
         {isReverted ? <Notice data-testid="signature-meta-tx-reverted">{t('request.signature.meta_tx_reverted')}</Notice> : null}
         <RawToggle type="button" aria-expanded={showRaw} onClick={() => setShowRaw(show => !show)}>
           {showRaw ? t('request.signature.hide_raw') : t('request.signature.view_raw')}

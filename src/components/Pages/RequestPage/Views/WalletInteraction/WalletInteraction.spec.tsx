@@ -139,6 +139,46 @@ describe('when rendering the WalletInteraction view', () => {
     })
   })
 
+  describe('and code could be deployed at an address the call hands the contract before it executes', () => {
+    let onDeferredCallbackAcknowledgedChange: jest.Mock
+
+    beforeEach(() => {
+      onDeferredCallbackAcknowledgedChange = jest.fn()
+      props = {
+        ...props,
+        deferredCallbackAddresses: ['0x1234567890abcdef1234567890abcdef12345678'],
+        onDeferredCallbackAcknowledgedChange,
+        approveBlocked: true
+      }
+    })
+
+    it('should explain the limitation and render an unchecked consent checkbox', () => {
+      render(<WalletInteraction {...props} />)
+      expect(screen.getByTestId('deferred-callback-warning')).toHaveTextContent('request.wallet_interaction.deferred_callback_notice')
+      expect(screen.getByRole('checkbox', { name: 'request.wallet_interaction.acknowledge_deferred_callback' })).not.toBeChecked()
+      expect(screen.getByRole('button', { name: 'common.allow' })).toBeDisabled()
+    })
+
+    it('should send explicit consent to the page', async () => {
+      render(<WalletInteraction {...props} />)
+      await userEvent.click(screen.getByRole('checkbox', { name: 'request.wallet_interaction.acknowledge_deferred_callback' }))
+      expect(onDeferredCallbackAcknowledgedChange).toHaveBeenCalledWith(true)
+      expect(onAcknowledgedChange).not.toHaveBeenCalled()
+    })
+
+    describe('and a risk also needs acknowledgment', () => {
+      beforeEach(() => {
+        props = { ...props, requiresAcknowledgment: true, acknowledged: true }
+      })
+
+      it('should keep the consent separate from, and unchecked next to, the risk acknowledgment', () => {
+        render(<WalletInteraction {...props} />)
+        expect(screen.getByRole('checkbox', { name: 'request.transaction_dialog.acknowledge_risk' })).toBeChecked()
+        expect(screen.getByRole('checkbox', { name: 'request.wallet_interaction.acknowledge_deferred_callback' })).not.toBeChecked()
+      })
+    })
+  })
+
   describe('and the transaction is relayed as a meta-transaction', () => {
     it('should show the gas-covered note inline', () => {
       render(<WalletInteraction {...props} />)

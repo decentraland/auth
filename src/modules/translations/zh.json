@@ -66,6 +66,8 @@
       "review_title": "查看此交易",
       "preview_unavailable_warning": "由于预览服务暂时不可用，我们无法检查此交易的作用。请仅在您信任发起该请求的场景时批准。",
       "acknowledge_preview_unavailable": "我了解预览不可用，并且我在未查看此交易作用的情况下进行批准",
+      "deferred_callback_notice": "此交易传递给合约的某个地址目前没有代码。在交易执行之前，该地址可能会被部署代码，合约届时会运行它；此预览无法显示该代码会做什么。",
+      "acknowledge_deferred_callback": "我理解在此交易执行之前部署的代码可能改变其行为，并接受此风险。",
       "review_restarted_notice": "你的钱包网络已更改或无法验证，因此此交易已在当前网络上重新审核。",
       "calls_function": "在 {contractName} 上调用 {functionName}"
     },
@@ -119,6 +121,8 @@
       "description": "请查看您即将签名的内容。",
       "view_raw": "查看原始数据",
       "hide_raw": "隐藏原始数据",
+      "deferred_callback_notice": "此调用使用的某个地址目前没有合约代码。在提交此签名之前，该地址可能会被部署代码，导致实际执行结果与此预览不同。",
+      "acknowledge_deferred_callback": "我理解签名后部署的代码可能改变此调用的行为，并接受此风险。",
       "meta_tx_notice": "此签名授权该合约代表你执行此操作。它不会过期，请求它的应用可以稍后提交。",
       "meta_tx_reverted": "此操作当前会失败，因此无法预览其效果。只有在你预计它稍后能成功时才签名。",
       "acknowledge_unverified": "我了解无法验证此签名的效果"

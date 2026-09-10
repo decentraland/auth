@@ -129,6 +129,46 @@ describe('when rendering the SignatureRequestView', () => {
     })
   })
 
+  describe('and code could be deployed before the signature is submitted', () => {
+    let onDeferredCallbackAcknowledgedChange: jest.Mock
+
+    beforeEach(() => {
+      onDeferredCallbackAcknowledgedChange = jest.fn()
+      props = {
+        ...props,
+        deferredCallbackAddresses: ['0x1234567890abcdef1234567890abcdef12345678'],
+        onDeferredCallbackAcknowledgedChange,
+        approveBlocked: true
+      }
+    })
+
+    it('should explain the limitation and render an unchecked risk checkbox', () => {
+      render(<SignatureRequestView {...props} />)
+      expect(screen.getByTestId('signature-deferred-callback-notice')).toHaveTextContent('request.signature.deferred_callback_notice')
+      expect(screen.getByRole('checkbox', { name: 'request.signature.acknowledge_deferred_callback' })).not.toBeChecked()
+      expect(screen.getByRole('button', { name: 'common.allow' })).toBeDisabled()
+    })
+
+    it('should send explicit consent to the page', async () => {
+      render(<SignatureRequestView {...props} />)
+      await userEvent.click(screen.getByRole('checkbox', { name: 'request.signature.acknowledge_deferred_callback' }))
+      expect(onDeferredCallbackAcknowledgedChange).toHaveBeenCalledWith(true)
+      expect(onAcknowledgedChange).not.toHaveBeenCalled()
+    })
+
+    describe('and another risk also needs acknowledgment', () => {
+      beforeEach(() => {
+        props = { ...props, requiresAcknowledgment: true, acknowledged: true }
+      })
+
+      it('should keep the callback acknowledgment separate and unchecked', () => {
+        render(<SignatureRequestView {...props} />)
+        expect(screen.getByRole('checkbox', { name: 'request.transaction_dialog.acknowledge_risk' })).toBeChecked()
+        expect(screen.getByRole('checkbox', { name: 'request.signature.acknowledge_deferred_callback' })).not.toBeChecked()
+      })
+    })
+  })
+
   describe('and an acknowledgment is required', () => {
     beforeEach(() => {
       props = { ...props, requiresAcknowledgment: true }
