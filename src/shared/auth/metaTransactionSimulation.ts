@@ -17,10 +17,11 @@ import { SimulationRequestBody } from './types'
  *
  * What this preview cannot reproduce: on chain the relayer's account is `tx.origin`, gas is paid at
  * a real price and the contract's nonce for the user has already moved, while the preview runs from
- * the contract itself at a zero gas price with the nonce untouched. Decentraland's own code reads
- * none of that. Code the call reaches that is not Decentraland's (a recipient's ERC-721 callback)
- * can, so the page vouches for a preview only when the call reaches no such code (see
- * getCallbackRecipient in the request page utils).
+ * the contract itself at a zero gas price with the nonce untouched. A marketplace's custom external
+ * check can read getNonce even on a Decentraland contract, so collectCallAddresses refuses custom
+ * checks as well as unreadable nested calls. Code outside Decentraland's contracts (a recipient's
+ * ERC-721 callback) can distinguish these contexts too, so the page also checks the contracts the
+ * call reaches (see getCounterpartyAddresses in the request page utils).
  */
 function buildMetaTransactionSimulationPayload(
   chainId: number,
