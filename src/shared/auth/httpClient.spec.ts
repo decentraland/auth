@@ -628,10 +628,7 @@ describe('createAuthServerClient', () => {
 
       beforeEach(() => {
         response = { status: 'success', assetChanges: [], approvalChanges: [], balanceChanges: [], events: [] }
-        mockFetch.mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve(response)
-        })
+        mockFetch.mockResolvedValueOnce({ ok: true, body: new Response(JSON.stringify(response)).body })
       })
 
       it('should POST the body to the /simulations endpoint', async () => {
@@ -700,6 +697,119 @@ describe('createAuthServerClient', () => {
 
       it('should leave the code unknown', async () => {
         await expect(client.simulateTransaction(body)).rejects.toMatchObject({ status: 400, code: undefined })
+      })
+    })
+
+    describe('and the server refuses the call because its own rate limit is exhausted', () => {
+      beforeEach(() => {
+        mockFetch.mockResolvedValueOnce({
+          ok: false,
+          status: 429,
+          text: () => Promise.resolve(JSON.stringify({ error: 'Too many requests', code: 'quota_exceeded' }))
+        })
+      })
+
+      it('should carry the code so a suppressed preview is not recorded as provider flakiness', async () => {
+        await expect(client.simulateTransaction(body)).rejects.toMatchObject({ status: 429, code: 'quota_exceeded' })
+      })
+    })
+
+    describe('and the provider rate limited the server', () => {
+      beforeEach(() => {
+        mockFetch.mockResolvedValueOnce({
+          ok: false,
+          status: 429,
+          text: () => Promise.resolve(JSON.stringify({ error: 'Too many requests', code: 'upstream_rate_limited' }))
+        })
+      })
+
+      it('should carry the code so it is told apart from this service own quota', async () => {
+        await expect(client.simulateTransaction(body)).rejects.toMatchObject({ status: 429, code: 'upstream_rate_limited' })
+      })
+    })
+
+    describe.each([
+      ['a body that is not an object', 'null'],
+      ['no status', '{"assetChanges":[],"approvalChanges":[],"balanceChanges":[],"events":[]}'],
+      ['a status it does not declare', '{"status":"pending","assetChanges":[],"approvalChanges":[],"balanceChanges":[],"events":[]}'],
+      ['no asset changes', '{"status":"success","approvalChanges":[],"balanceChanges":[],"events":[]}'],
+      ['no approval changes', '{"status":"success","assetChanges":[],"balanceChanges":[],"events":[]}'],
+      [
+        'an approval row missing the fields the gate reads',
+        '{"status":"success","assetChanges":[],"approvalChanges":[{}],"balanceChanges":[],"events":[]}'
+      ],
+      [
+        'an asset row missing the fields the summary reads',
+        '{"status":"success","assetChanges":[{}],"approvalChanges":[],"balanceChanges":[],"events":[]}'
+      ],
+      [
+        'an asset row whose amount is a number rather than a string',
+        '{"status":"success","assetChanges":[{"type":"transfer","standard":"erc20","from":null,"to":null,"amount":1,"rawAmount":null,"tokenId":null,"contractAddress":null,"symbol":null,"name":null,"decimals":null,"logoUrl":null,"dollarValue":null}],"approvalChanges":[],"balanceChanges":[],"events":[]}'
+      ]
+    ])('and the server responds with 200 and %s', (_label, payload) => {
+      beforeEach(() => {
+        mockFetch.mockResolvedValueOnce({ ok: true, body: new Response(payload).body })
+      })
+
+      it('should throw a SimulationUnavailableError rather than hand the body to the review', async () => {
+        await expect(client.simulateTransaction(body)).rejects.toBeInstanceOf(SimulationUnavailableError)
+      })
+    })
+
+    describe('and the server responds with a successful body larger than the review will read', () => {
+      beforeEach(() => {
+        // Valid by every other rule — each collection sits exactly at its row bound and no field exceeds
+        // the field bound — so only its size can refuse it. Streamed, because that is how an oversized
+        // body arrives: the cap has to stop it while it is being read, not after the whole thing is
+        // buffered.
+        const padding = 'x'.repeat(1024)
+        const oversized = JSON.stringify({
+          status: 'success',
+          assetChanges: Array.from({ length: 1024 }, () => ({
+            type: 'transfer',
+            standard: 'erc20',
+            from: null,
+            to: null,
+            amount: null,
+            rawAmount: null,
+            tokenId: null,
+            contractAddress: null,
+            symbol: padding,
+            name: padding,
+            decimals: null,
+            logoUrl: null,
+            dollarValue: null
+          })),
+          approvalChanges: [],
+          balanceChanges: [],
+          events: []
+        })
+        mockFetch.mockResolvedValueOnce({ ok: true, body: new Response(oversized).body })
+      })
+
+      it('should degrade like an outage rather than buffer and parse it', async () => {
+        await expect(client.simulateTransaction(body)).rejects.toBeInstanceOf(SimulationUnavailableError)
+      })
+    })
+
+    describe('and the server responds with more entries than the review will render', () => {
+      beforeEach(() => {
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          body: new Response(
+            JSON.stringify({
+              status: 'success',
+              assetChanges: [],
+              approvalChanges: [],
+              balanceChanges: [],
+              events: Array.from({ length: 1025 }, () => ({ name: 'Transfer', address: '0xabc' }))
+            })
+          ).body
+        })
+      })
+
+      it('should refuse it rather than render a prefix of a list it was handed whole', async () => {
+        await expect(client.simulateTransaction(body)).rejects.toBeInstanceOf(SimulationUnavailableError)
       })
     })
 

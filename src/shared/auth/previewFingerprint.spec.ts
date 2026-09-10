@@ -18,11 +18,53 @@ describe('getPreviewFingerprint', () => {
 
     beforeEach(() => {
       first = buildResult({ balanceChanges: [{ address: '0xa', dollarValue: '1' }] })
-      second = buildResult({ balanceChanges: [{ address: '0xb', dollarValue: '2' }], events: [{ name: 'Transfer', address: '0xc' }] })
+      second = buildResult({ balanceChanges: [{ address: '0xa', dollarValue: '1' }] })
     })
 
-    it('should return the same fingerprint because balances and events are not part of the statement', () => {
+    it('should return the same fingerprint', () => {
       expect(getPreviewFingerprint(first)).toBe(getPreviewFingerprint(second))
+    })
+  })
+
+  describe('when two results differ only in the net dollar change', () => {
+    let first: SimulationResponseBody
+    let second: SimulationResponseBody
+
+    beforeEach(() => {
+      first = buildResult({ balanceChanges: [{ address: '0xa', dollarValue: '1' }] })
+      second = buildResult({ balanceChanges: [{ address: '0xa', dollarValue: '-5000' }] })
+    })
+
+    it('should return different fingerprints, since the summary renders that line', () => {
+      expect(getPreviewFingerprint(first)).not.toBe(getPreviewFingerprint(second))
+    })
+  })
+
+  describe('when two results differ only in the events', () => {
+    let first: SimulationResponseBody
+    let second: SimulationResponseBody
+
+    beforeEach(() => {
+      first = buildResult({ events: [{ name: 'Transfer', address: '0xc' }] })
+      second = buildResult({ events: [{ name: 'Transfer', address: '0xd' }] })
+    })
+
+    it('should return different fingerprints, since the summary lists them', () => {
+      expect(getPreviewFingerprint(first)).not.toBe(getPreviewFingerprint(second))
+    })
+  })
+
+  describe('when two results differ only in the revert reason', () => {
+    let first: SimulationResponseBody
+    let second: SimulationResponseBody
+
+    beforeEach(() => {
+      first = buildResult({ status: 'reverted', error: 'insufficient balance' })
+      second = buildResult({ status: 'reverted', error: 'transfer to the zero address' })
+    })
+
+    it('should return different fingerprints, since the revert reason is the whole preview', () => {
+      expect(getPreviewFingerprint(first)).not.toBe(getPreviewFingerprint(second))
     })
   })
 

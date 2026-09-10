@@ -796,6 +796,16 @@ describe('when checking whether an NFT simulation exactly matches the branded gi
     })
   })
 
+  describe('and the response carries no events list at all', () => {
+    beforeEach(() => {
+      result = { ...result, events: undefined as unknown as SimulationResponseBody['events'] }
+    })
+
+    it('should require the generic simulation summary rather than read a missing list as an empty one', () => {
+      expect(isExactNftTransferSimulation(result, signerAddress, contractAddress, transfer)).toBe(false)
+    })
+  })
+
   describe('and the addresses only differ in casing between the calldata and the simulation', () => {
     beforeEach(() => {
       // The decoder returns EIP-55 checksummed addresses; the preview server lowercases.

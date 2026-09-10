@@ -87,8 +87,16 @@ type ReviewedCall = {
  * high-risk gate. So an ERC20 approval owned by the signer whose spender is the called contract is left
  * out, unless the signer's own call is an allowance function, which is a grant whatever it names. Every
  * other approval stays as reported: a grant to any other spender, whatever the function is called (a
- * `permit`, a batch, a name this page has never seen), an approval owned by anyone else. The rule fails
- * towards showing more, never less.
+ * `permit`, a batch, a name this page has never seen), an approval owned by anyone else.
+ *
+ * This is the one rule on this page that shows less than was reported, and what it gives up is bounded and
+ * deliberate: the approval it drops names the signer as owner and, as spender, the very contract the signer
+ * called — which the page has already established is a Decentraland contract (see verifyCounterparties). A
+ * function on one of those that actually granted the signer's allowance to itself, under a name that is not
+ * `approve`, `increaseAllowance` or `decreaseAllowance`, would therefore go unshown. No registry function
+ * does that: the allowance functions are the only way an account changes its own allowance, and they are
+ * exempted above. Anything wider — another spender, another owner — stays visible, so the rule cannot be
+ * widened by choosing a different call.
  */
 function withoutAllowanceConsumption(result: SimulationResponseBody, call: ReviewedCall): SimulationResponseBody {
   if (ALLOWANCE_FUNCTIONS.has(call.functionName)) {

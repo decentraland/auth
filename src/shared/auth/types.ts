@@ -89,6 +89,11 @@ type SimulationResponseBody = {
   assetChanges: AssetChange[]
   approvalChanges: ApprovalChange[]
   balanceChanges: BalanceChange[]
+  /**
+   * Every event the transaction emitted. Complete: the server refuses a response it cannot report in full
+   * rather than truncating one, so the absence of an event here is evidence the emitting contract did
+   * nothing (see isExactNftTransferSimulation, which relies on exactly that).
+   */
   events: SimulationEvent[]
 }
 

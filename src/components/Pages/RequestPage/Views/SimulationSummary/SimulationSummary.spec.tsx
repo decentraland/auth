@@ -910,7 +910,7 @@ describe('when rendering the SimulationSummary', () => {
     })
   })
 
-  describe('and there are more events than the display cap', () => {
+  describe('and the transaction emitted a long list of events', () => {
     beforeEach(() => {
       const events = Array.from({ length: 150 }, (_, index) => ({
         name: `Event${index}`,
@@ -919,10 +919,15 @@ describe('when rendering the SimulationSummary', () => {
       simulation = { status: 'ready', result: emptyResult({ events }) }
     })
 
-    it('should cap the rendered event rows at the defensive maximum', async () => {
+    it('should render every one of them, since the list it is handed is already complete', async () => {
       render(<SimulationSummary simulation={simulation} userAddress={USER} />)
+
       await userEvent.click(screen.getByText('request.transaction_dialog.technical_details'))
-      expect(screen.getByTestId('simulation-events').children).toHaveLength(100)
+
+      // Bounded before it reaches the summary: the server refuses a response it cannot report in full, and
+      // parseSimulationResponse refuses one whose collections run longer than this will render. Slicing
+      // here could therefore only hide entries from a list that is whole.
+      expect(screen.getByTestId('simulation-events').children).toHaveLength(150)
     })
   })
 
@@ -1213,6 +1218,104 @@ describe('when rendering the SimulationSummary', () => {
     it('should still render the net change (address compared case-insensitively)', () => {
       render(<SimulationSummary simulation={simulation} userAddress={USER} />)
       expect(screen.getByText('-$10.00')).toBeInTheDocument()
+    })
+  })
+  describe('and an asset change carries a display amount that is not a number', () => {
+    beforeEach(() => {
+      simulation = {
+        status: 'ready',
+        result: emptyResult({
+          assetChanges: [
+            {
+              type: 'transfer',
+              standard: 'erc20',
+              from: USER,
+              to: '0x2222222222222222222222222222222222222222',
+              // Text where a figure belongs. The server refuses this, so it can only arrive from a server
+              // that does not; the amount line must still be a figure or nothing.
+              amount: '1000000 MANA (verified by Decentraland)',
+              rawAmount: '1000000000000000000000',
+              tokenId: null,
+              contractAddress: '0x1111111111111111111111111111111111111111',
+              symbol: 'MANA',
+              name: 'Decentraland MANA',
+              decimals: 18,
+              logoUrl: null,
+              dollarValue: null
+            }
+          ]
+        })
+      }
+      render(<SimulationSummary simulation={simulation} userAddress={USER} chainId={137} verifiedContracts={[]} />)
+    })
+
+    it('should name the token without a figure rather than print the text as the amount', () => {
+      expect(screen.getByRole('link', { name: 'MANA' })).toBeInTheDocument()
+      expect(screen.queryByText(/verified by Decentraland/)).not.toBeInTheDocument()
+    })
+  })
+
+  describe('and a zero-decimals token carries a display amount that is not a number', () => {
+    beforeEach(() => {
+      simulation = {
+        status: 'ready',
+        result: emptyResult({
+          assetChanges: [
+            {
+              type: 'transfer',
+              standard: 'erc20',
+              from: USER,
+              to: '0x2222222222222222222222222222222222222222',
+              amount: 'lots',
+              rawAmount: '1500',
+              tokenId: null,
+              contractAddress: '0x1111111111111111111111111111111111111111',
+              symbol: 'PTS',
+              name: 'Points',
+              decimals: 0,
+              logoUrl: null,
+              dollarValue: null
+            }
+          ]
+        })
+      }
+      render(<SimulationSummary simulation={simulation} userAddress={USER} chainId={137} verifiedContracts={[]} />)
+    })
+
+    it('should fall through to the base-unit amount, which is exact at zero decimals', () => {
+      expect(screen.getByRole('link', { name: '1,500 PTS' })).toBeInTheDocument()
+    })
+  })
+
+  describe('and an allowance is granted with an amount that is not a number', () => {
+    beforeEach(() => {
+      simulation = {
+        status: 'ready',
+        result: emptyResult({
+          approvalChanges: [
+            {
+              kind: 'approval',
+              standard: 'erc20',
+              owner: USER,
+              spender: '0x2222222222222222222222222222222222222222',
+              amount: 'all of it',
+              rawAmount: '1000000000000000000000',
+              isUnlimited: false,
+              tokenId: null,
+              approved: null,
+              contractAddress: '0x1111111111111111111111111111111111111111',
+              symbol: 'MANA',
+              name: 'Decentraland MANA'
+            }
+          ]
+        })
+      }
+      render(<SimulationSummary simulation={simulation} userAddress={USER} chainId={137} verifiedContracts={[]} />)
+    })
+
+    it('should state the permission without a figure rather than print the text as the allowance', () => {
+      expect(screen.getByText(/request\.transaction_dialog\.approval_can_spend_symbol/)).toBeInTheDocument()
+      expect(screen.queryByText(/all of it/)).not.toBeInTheDocument()
     })
   })
 })

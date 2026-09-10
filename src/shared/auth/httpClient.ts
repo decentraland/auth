@@ -20,6 +20,7 @@ import {
   assertSignatureParamsAreCanonical,
   assertTransactionParamsAreCanonical
 } from './signMethodGuard'
+import { parseSimulationResponse } from './simulationResponse'
 import { IdentityResponse, OutcomeError, OutcomeResponse, RecoverResponse, SimulationRequestBody, SimulationResponseBody } from './types'
 
 const SIMULATION_TIMEOUT_MS = 10_000
@@ -220,11 +221,31 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
   // A rejection body is a short object; anything larger than this is not one and is not read further.
   const MAX_REJECTION_BODY_BYTES = 4 * 1024
 
+  /**
+   * Upper bound on a successful summary. `parseSimulationResponse` bounds how many rows the review will
+   * take, but it can only do that once the body has been buffered and parsed — and the body is derived
+   * from calldata the requester chose, so its size is theirs to pick. Read under a cap first, and an
+   * oversized answer costs the page nothing past the bytes read.
+   *
+   * 2 MB against what a conforming server can send: every collection is bounded (1,024 movements, 1,024
+   * permissions, 512 events, 512 balance rows), which projects to ~1.04 MB with realistic field values.
+   * So this cannot refuse an answer the DTO parser would have accepted — anything past it was going to be
+   * refused for its row counts a moment later anyway.
+   */
+  const MAX_SIMULATION_BODY_BYTES = 2 * 1024 * 1024
+
+  const REJECTION_CODES: ReadonlySet<string> = new Set<SimulationRejectionCode>([
+    'invalid_request',
+    'upstream_rejected',
+    'quota_exceeded',
+    'upstream_rate_limited'
+  ])
+
   const readRejectionCode = async (response: Response): Promise<SimulationRejectionCode | undefined> => {
     try {
       const body: unknown = JSON.parse(await readTextWithCap(response, MAX_REJECTION_BODY_BYTES))
       const code = typeof body === 'object' && body !== null ? (body as { code?: unknown }).code : undefined
-      return code === 'invalid_request' || code === 'upstream_rejected' ? code : undefined
+      return typeof code === 'string' && REJECTION_CODES.has(code) ? (code as SimulationRejectionCode) : undefined
     } catch {
       return undefined
     }
@@ -252,11 +273,23 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
       throw new SimulationUnavailableError(`status ${response.status}`, response.status, await readRejectionCode(response))
     }
 
+    // Read under the cap, then parse: `response.json()` would buffer and parse the whole body before
+    // anything could refuse it (see MAX_SIMULATION_BODY_BYTES). An overrun degrades like an outage, which
+    // is the fallback the review already handles.
+    let parsed: unknown
     try {
-      return (await response.json()) as SimulationResponseBody
+      parsed = JSON.parse(await readTextWithCap(response, MAX_SIMULATION_BODY_BYTES))
     } catch (e) {
       throw new SimulationUnavailableError(isErrorWithMessage(e) ? e.message : 'invalid response')
     }
+    // Checked, not cast: the review reads these rows directly, so a body that does not honour the DTO must
+    // degrade like an outage rather than reach a consumer that assumes a field is there (see
+    // parseSimulationResponse).
+    const result = parseSimulationResponse(parsed)
+    if (!result) {
+      throw new SimulationUnavailableError('the response is not a simulation summary')
+    }
+    return result
   }
 
   const checkHealth = async (): Promise<{ timestamp: number }> => {

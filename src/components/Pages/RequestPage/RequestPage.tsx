@@ -12,7 +12,7 @@ import { useSkipSetup } from '../../../hooks/useSkipSetup'
 import { getAnalytics } from '../../../modules/analytics/segment'
 import { ClickEvents, TrackingEvents } from '../../../modules/analytics/types'
 import { config } from '../../../modules/config'
-import { fetchProfile } from '../../../modules/profile'
+import { fetchProfile, fetchProfiles } from '../../../modules/profile'
 import {
   ContractLookupUnavailableError,
   DecodedCall,
@@ -140,6 +140,23 @@ enum View {
 }
 
 // Terminal views that should not trigger a re-fetch of the request
+// The address approvals and mints/burns use to mean "nobody"; never a counterparty to name.
+const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
+
+/**
+ * How many counterparties a preview may have names looked up for. Names are progressive enhancement — a
+ * row without one shows the shortened address, which is what every row shows until its name arrives — so
+ * this is bounded rather than fanned out over whatever a preview reports (up to 1,024 movements and 1,024
+ * permissions).
+ *
+ * The bound is on the answer, not the requests: `fetchProfiles` asks in bulk, a hundred addresses per
+ * request, so the count stopped being the expensive part. What a bulk answer carries is whole profiles —
+ * avatar, wearables, snapshot URLs — for names of which only two fields are read, so it is payload that
+ * has to be kept proportionate to a screen someone is reading. 200 is far past any review a person works
+ * through (the recorded previews have one to three counterparties) and costs two requests.
+ */
+const MAX_ENRICHED_COUNTERPARTIES = 200
+
 const TERMINAL_VIEWS = new Set([
   View.DEEP_LINK_CONTINUE_IN_APP,
   View.CLIENT_LOGIN_ERROR,
@@ -264,6 +281,13 @@ export const RequestPage = () => {
   // the call's counterparties (see verifyCounterparties): Decentraland code carrying content anyone can
   // create, so the summary names them as collections instead of vouching for them by name.
   const [simulationCollections, setSimulationCollections] = useState<string[]>([])
+  // The account this review was produced for: the one the wallet reported when the request was loaded,
+  // which is the `from` every preview was simulated as. The summary and the no-visible-effects gate read
+  // the preview against this and never against `account`, which is a separate source (the connection
+  // state) that can lag a wallet-side account switch. Read against another address, every movement would
+  // fall outside the summary's "you send"/"you receive" filters and a transaction that moves assets would
+  // render as "no changes" behind a single checkbox.
+  const [reviewedSignerAddress, setReviewedSignerAddress] = useState<string>()
   const requestRef = useRef<RecoverResponse>()
   const viewRef = useRef(view)
   viewRef.current = view
@@ -486,6 +510,7 @@ export const RequestPage = () => {
       setSimulationChainId(undefined)
       setSimulationVerified([])
       setSimulationCollections([])
+      setReviewedSignerAddress(undefined)
     }
 
     // A deep-link handoff requires a valid UUID v4 id (the client's correlation id). Reject a
@@ -622,6 +647,9 @@ export const RequestPage = () => {
         requestRef.current = request
         recoveredRequestIdRef.current = requestId
         recoveredSignerRef.current = signerAddress.toLowerCase()
+        // The rendered counterpart of the ref above: set before any preview is requested, so a preview
+        // that resolves is always read against the account it was simulated for.
+        setReviewedSignerAddress(signerAddress.toLowerCase())
 
         // Initialize the timeout to display the timeout view when the request expires.
         // Guard against an unparseable expiration: `new Date(...).getTime()` would be NaN,
@@ -652,30 +680,39 @@ export const RequestPage = () => {
         // with the address, or a wallet named "Decentraland" would read as the counterparty
         // "Decentraland" in "You send".
         const resolveSimulationProfiles = async (result: SimulationResponseBody) => {
+          const user = signerAddress.toLowerCase()
+          // Only the addresses the summary puts on screen. It shows one counterparty per movement the
+          // signer is party to — the other side of it — and one spender per permission; a mint or a burn
+          // names no counterparty, and a movement between third parties is not rendered at all. Asking for
+          // a name that nothing displays is a request made for nobody.
           const addresses = new Set<string>()
+          const consider = (address: string | null) => {
+            if (!address || addresses.size >= MAX_ENRICHED_COUNTERPARTIES) return
+            const normalized = address.toLowerCase()
+            if (normalized === user || normalized === ZERO_ADDRESS) return
+            addresses.add(normalized)
+          }
           for (const change of result.assetChanges) {
-            if (change.from) addresses.add(change.from.toLowerCase())
-            if (change.to) addresses.add(change.to.toLowerCase())
+            if (change.type !== 'transfer') continue
+            if (change.from?.toLowerCase() === user) consider(change.to)
+            else if (change.to?.toLowerCase() === user) consider(change.from)
           }
           for (const approval of result.approvalChanges) {
-            if (approval.spender) addresses.add(approval.spender.toLowerCase())
+            consider(approval.spender)
           }
-          addresses.delete(signerAddress.toLowerCase())
-          addresses.delete('0x0000000000000000000000000000000000000000')
 
-          const entries = await Promise.all(
-            [...addresses].map(async address => {
-              try {
-                const profile = await fetchProfile(address)
-                const name = getProfileDisplayName(profile, address)
-                return name ? ([address, name] as const) : null
-              } catch {
-                return null
-              }
-            })
-          )
+          if (addresses.size === 0) return
+          // Asked in bulk, so the whole set costs a request or two rather than one per address (see
+          // fetchProfiles). The rows the cap leaves out keep the shortened address, which is what every row
+          // shows until a name arrives, and the cap takes the rows nearest the top first.
+          const profiles = await fetchProfiles([...addresses])
+          const resolved: Record<string, string> = {}
+          for (const address of addresses) {
+            const name = getProfileDisplayName(profiles.get(address), address)
+            if (name) resolved[address] = name
+          }
+
           if (isStale()) return
-          const resolved = Object.fromEntries(entries.filter((entry): entry is readonly [string, string] => entry !== null))
           if (Object.keys(resolved).length > 0) {
             setSimulationProfiles(resolved)
           }
@@ -760,7 +797,14 @@ export const RequestPage = () => {
               )
               return
             }
-            console.info('Transaction simulation unavailable:', e instanceof Error ? e.message : String(e))
+            // Every review that loses its preview falls back to an acknowledgment the user can tick, so why
+            // it was lost matters. `quota_exceeded` means our own rate limit refused the call, and that
+            // budget is shared by every caller: a flood aimed at making previews disappear reads exactly
+            // like provider flakiness from here unless the two are recorded apart.
+            const reason =
+              e instanceof SimulationUnavailableError ? (e.code ?? (e.status !== undefined ? `status_${e.status}` : 'error')) : 'error'
+            console.info(`Transaction simulation unavailable (${reason}):`, e instanceof Error ? e.message : String(e))
+            trackEvent(TrackingEvents.REQUEST_PREVIEW_UNAVAILABLE, { requestId, reason, method: request.method })
             setSimulationState({ status: 'unavailable' })
           }
         }
@@ -1473,7 +1517,8 @@ export const RequestPage = () => {
   // and no permission change (see hasNoVisibleEffects). A call can still change state the summary
   // does not model — an update operator on LAND, a collection's minters, managers or creator, a
   // name's resolver — so "nothing to show" is not "nothing happens" and must not be a single click.
-  const hasPreviewWithoutVisibleEffects = simulationState.status === 'ready' && hasNoVisibleEffects(simulationState.result, account ?? '')
+  const hasPreviewWithoutVisibleEffects =
+    simulationState.status === 'ready' && hasNoVisibleEffects(simulationState.result, reviewedSignerAddress ?? '')
   // A MetaTransaction signature whose inner call could not be previewed: the simulation was
   // unavailable, or the call reverts today. Unlike an eth_sendTransaction relayed through the gas
   // tank — which Auth signs and submits in one step, so the signature is consumed the moment it is
@@ -1618,7 +1663,7 @@ export const RequestPage = () => {
             contractName={classification.contract.domainName}
             isLoading={isLoading}
             simulation={simulationState}
-            userAddress={account ?? ''}
+            userAddress={reviewedSignerAddress ?? ''}
             profiles={simulationProfiles}
             verifiedContracts={simulationVerified}
             collectionContracts={simulationCollections}
@@ -1648,7 +1693,7 @@ export const RequestPage = () => {
             functionName={classification.call.functionName}
             contractName={classification.contract.domainName}
             simulation={simulationState}
-            userAddress={account ?? ''}
+            userAddress={reviewedSignerAddress ?? ''}
             profiles={simulationProfiles}
             verifiedContracts={simulationVerified}
             collectionContracts={simulationCollections}

@@ -8,7 +8,7 @@ import * as viem from 'viem'
 import { ProviderType } from '@dcl/schemas'
 import { sendMetaTransaction } from 'decentraland-transactions'
 import { TrackingEvents } from '../../../modules/analytics/types'
-import { fetchProfile } from '../../../modules/profile'
+import { fetchProfile, fetchProfiles } from '../../../modules/profile'
 import {
   ContractLookupUnavailableError,
   DifferentSenderError,
@@ -137,7 +137,8 @@ jest.mock('../../../shared/errors', () => ({
   isChainMismatchRejection: (...args: any[]) => mockIsChainMismatchRejection(...args)
 }))
 jest.mock('../../../modules/profile', () => ({
-  fetchProfile: jest.fn()
+  fetchProfile: jest.fn(),
+  fetchProfiles: jest.fn()
 }))
 jest.mock('../../../modules/config', () => ({
   config: { get: jest.fn().mockReturnValue('10000') }
@@ -199,6 +200,7 @@ jest.mock('./Views', () => ({
   WalletInteraction: (props: any) => (
     <div
       data-testid="wallet-interaction"
+      data-user-address={props.userAddress}
       data-sim={props.simulation?.status}
       data-requires-acknowledgment={String(props.requiresAcknowledgment)}
       data-counterparty-check-pending={String(props.isCounterpartyCheckPending)}
@@ -512,6 +514,9 @@ describe('RequestPage', () => {
     mockEstimateGas.mockResolvedValue(BigInt(21000))
     mockBuildSendTransactionSimulationPayload.mockReturnValue({ chainId: 137, from: SIGNER, to: CONTRACT, data: '0x', value: '0' })
     mockSimulateTransaction.mockResolvedValue(simulationOf())
+    // Counterparty names are progressive enhancement, so most cases want none; those that assert on them
+    // set their own.
+    jest.mocked(fetchProfiles).mockResolvedValue(new Map())
   })
 
   afterEach(() => {
@@ -2564,6 +2569,34 @@ describe('RequestPage', () => {
       })
     })
 
+    describe('and the connection state reports another account than the wallet does', () => {
+      beforeEach(() => {
+        // The wallet is on SIGNER — the address the request was recovered for and the preview simulated
+        // as — while the connection state still reports the account it knew before. Reading the preview
+        // against the latter would put the signer's own movement outside the summary's "you send" filter
+        // and turn a transaction that moves an asset into "nothing to show" behind a checkbox.
+        mockConnectionData = { ...mockConnectionData, account: '0xstaleconnectionaccount' }
+        mockGetAddresses.mockResolvedValue([SIGNER])
+        mockSimulateTransaction.mockResolvedValue(simulationOf({ assetChanges: [erc721Transfer({ from: SIGNER, to: '0xrecipient' })] }))
+      })
+
+      it('should read the preview against the account it was simulated for', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('wallet-interaction')
+        await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+
+        expect(view).toHaveAttribute('data-user-address', SIGNER)
+      })
+
+      it('should not require an acknowledgment, since the movement it shows does involve that account', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('wallet-interaction')
+        await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+
+        expect(view).toHaveAttribute('data-requires-acknowledgment', 'false')
+      })
+    })
+
     describe('and only third parties move assets', () => {
       beforeEach(() => {
         mockSimulateTransaction.mockResolvedValue(simulationOf({ assetChanges: [erc721Transfer({ from: '0xthird', to: '0xother' })] }))
@@ -2601,12 +2634,14 @@ describe('RequestPage', () => {
       })
 
       afterEach(() => {
-        jest.mocked(fetchProfile).mockReset()
+        jest.mocked(fetchProfiles).mockReset()
       })
 
       describe('and the name is unclaimed', () => {
         beforeEach(() => {
-          jest.mocked(fetchProfile).mockResolvedValue({ avatars: [{ name: 'Decentraland', hasClaimedName: false }] } as any)
+          jest
+            .mocked(fetchProfiles)
+            .mockResolvedValue(new Map([[counterparty, { avatars: [{ name: 'Decentraland', hasClaimedName: false }] } as any]]))
         })
 
         it('should qualify the name with the address so a self-chosen name cannot pose as a trusted party', async () => {
@@ -2618,7 +2653,9 @@ describe('RequestPage', () => {
 
       describe('and the name is claimed', () => {
         beforeEach(() => {
-          jest.mocked(fetchProfile).mockResolvedValue({ avatars: [{ name: 'Decentraland', hasClaimedName: true }] } as any)
+          jest
+            .mocked(fetchProfiles)
+            .mockResolvedValue(new Map([[counterparty, { avatars: [{ name: 'Decentraland', hasClaimedName: true }] } as any]]))
         })
 
         it('should show the name on its own', async () => {
@@ -3570,6 +3607,125 @@ describe('RequestPage', () => {
           expect(approvalUiAtCommit.length).toBeGreaterThan(commitsBefore)
           expect(approvalUiAtCommit.slice(commitsBefore).some(present => present)).toBe(false)
         })
+      })
+    })
+  })
+  describe('when a preview reports far more movements than a review can show', () => {
+    beforeEach(() => {
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockGetAddresses.mockResolvedValue([SIGNER])
+      mockRecover.mockResolvedValue(recovered('eth_sendTransaction', [{ to: CONTRACT, data: '0xabcd', value: '0x0' }]))
+      mockClassifyRequest.mockResolvedValue(dclTransaction())
+      jest.mocked(fetchProfiles).mockResolvedValue(new Map())
+    })
+
+    afterEach(() => {
+      jest.mocked(fetchProfiles).mockReset()
+    })
+
+    const requestedAddresses = () => (jest.mocked(fetchProfiles).mock.calls[0]?.[0] as string[] | undefined) ?? []
+
+    describe('and every movement is the signer sending to a different counterparty', () => {
+      beforeEach(() => {
+        mockSimulateTransaction.mockResolvedValue(
+          simulationOf({
+            assetChanges: Array.from({ length: 400 }, (_, index) =>
+              erc721Transfer({ from: SIGNER, to: `0x${index.toString(16).padStart(40, 'a')}` })
+            )
+          })
+        )
+      })
+
+      it('should ask for the names in one bulk request rather than one per address', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('wallet-interaction')
+        await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+        await waitFor(() => expect(jest.mocked(fetchProfiles)).toHaveBeenCalled())
+
+        expect(jest.mocked(fetchProfiles)).toHaveBeenCalledTimes(1)
+        expect(jest.mocked(fetchProfile)).not.toHaveBeenCalled()
+      })
+
+      it('should ask for no more than the cap, however many movements are reported', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('wallet-interaction')
+        await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+        await waitFor(() => expect(jest.mocked(fetchProfiles)).toHaveBeenCalled())
+
+        expect(requestedAddresses().length).toBe(200)
+      })
+    })
+
+    describe('and the movements are between third parties the summary never shows', () => {
+      beforeEach(() => {
+        mockSimulateTransaction.mockResolvedValue(
+          simulationOf({
+            assetChanges: Array.from({ length: 40 }, (_, index) =>
+              erc721Transfer({ from: `0x${index.toString(16).padStart(40, 'b')}`, to: `0x${index.toString(16).padStart(40, 'c')}` })
+            )
+          })
+        )
+      })
+
+      it('should ask for nothing, since a name nothing displays is a request made for nobody', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('wallet-interaction')
+        await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+
+        expect(jest.mocked(fetchProfiles)).not.toHaveBeenCalled()
+        expect(jest.mocked(fetchProfile)).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and a movement is a mint to the signer', () => {
+      beforeEach(() => {
+        mockSimulateTransaction.mockResolvedValue(
+          simulationOf({ assetChanges: [erc721Transfer({ type: 'mint', from: '0xminter', to: SIGNER })] })
+        )
+      })
+
+      it('should ask for nothing, since a mint names no counterparty on screen', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('wallet-interaction')
+        await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+
+        expect(jest.mocked(fetchProfiles)).not.toHaveBeenCalled()
+        expect(jest.mocked(fetchProfile)).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and the counterparties are the signer and the zero address', () => {
+      beforeEach(() => {
+        mockSimulateTransaction.mockResolvedValue(
+          simulationOf({
+            assetChanges: [erc721Transfer({ from: SIGNER, to: SIGNER })],
+            approvalChanges: [
+              {
+                kind: 'approval',
+                standard: 'erc721',
+                owner: SIGNER,
+                spender: '0x0000000000000000000000000000000000000000',
+                amount: null,
+                rawAmount: null,
+                isUnlimited: false,
+                tokenId: '1',
+                approved: null,
+                contractAddress: CONTRACT,
+                symbol: null,
+                name: null
+              }
+            ]
+          })
+        )
+      })
+
+      it('should ask for nothing, since neither is a counterparty to name', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('wallet-interaction')
+        await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+
+        expect(jest.mocked(fetchProfiles)).not.toHaveBeenCalled()
+        expect(jest.mocked(fetchProfile)).not.toHaveBeenCalled()
       })
     })
   })

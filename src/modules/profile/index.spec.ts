@@ -12,7 +12,12 @@ import {
 } from '../../tests/mocks/profile'
 import { config } from '../config'
 import { DeploymentError } from './errors'
-import { fetchProfileWithConsistencyCheck, redeployExistingProfile, redeployExistingProfileWithContentServerData } from './index'
+import {
+  fetchProfileWithConsistencyCheck,
+  fetchProfiles,
+  redeployExistingProfile,
+  redeployExistingProfileWithContentServerData
+} from './index'
 
 // Mock dependencies
 jest.mock('dcl-catalyst-client', () => ({
@@ -626,6 +631,99 @@ describe('profile module', () => {
       it('should start with the PEER_URL', () => {
         expect(deployCallUrls[0]).toBe('https://peer.decentraland.zone/content')
       })
+    })
+  })
+})
+
+describe('when fetching the profiles of many addresses', () => {
+  let getAvatarsDetailsByPost: jest.Mock
+
+  const avatarFor = (address: string, name: string) => ({ avatars: [{ ethAddress: address, name, hasClaimedName: true }] })
+
+  beforeEach(() => {
+    getAvatarsDetailsByPost = jest.fn().mockResolvedValue([])
+    ;(createLambdasClient as jest.Mock).mockReturnValue({ getAvatarsDetailsByPost })
+  })
+
+  describe('and every address has a profile', () => {
+    it('should key each one by its own lowercased address', async () => {
+      getAvatarsDetailsByPost.mockResolvedValue([avatarFor('0xAAA', 'alice'), avatarFor('0xBBB', 'bob')])
+
+      const profiles = await fetchProfiles(['0xaaa', '0xbbb'])
+
+      expect(profiles.get('0xaaa')?.avatars?.[0].name).toBe('alice')
+      expect(profiles.get('0xbbb')?.avatars?.[0].name).toBe('bob')
+    })
+  })
+
+  describe('and the endpoint answers only for the addresses that have one, in another order', () => {
+    it('should attribute by the address each profile reports rather than by position', async () => {
+      // The middle address has no profile, so the answer is shorter than the request and out of order.
+      // Matching by index here would give bob's name to the account that has none.
+      getAvatarsDetailsByPost.mockResolvedValue([avatarFor('0xCCC', 'carol'), avatarFor('0xAAA', 'alice')])
+
+      const profiles = await fetchProfiles(['0xaaa', '0xbbb', '0xccc'])
+
+      expect(profiles.get('0xaaa')?.avatars?.[0].name).toBe('alice')
+      expect(profiles.get('0xccc')?.avatars?.[0].name).toBe('carol')
+      expect(profiles.has('0xbbb')).toBe(false)
+    })
+  })
+
+  describe('and a profile reports its address only as a userId', () => {
+    it('should still attribute it', async () => {
+      getAvatarsDetailsByPost.mockResolvedValue([{ avatars: [{ userId: '0xAAA', name: 'alice', hasClaimedName: true }] }])
+
+      const profiles = await fetchProfiles(['0xaaa'])
+
+      expect(profiles.get('0xaaa')?.avatars?.[0].name).toBe('alice')
+    })
+  })
+
+  describe('and a profile reports no address at all', () => {
+    it('should drop it rather than guess whose it is', async () => {
+      getAvatarsDetailsByPost.mockResolvedValue([{ avatars: [{ name: 'nobody', hasClaimedName: true }] }])
+
+      const profiles = await fetchProfiles(['0xaaa'])
+
+      expect(profiles.size).toBe(0)
+    })
+  })
+
+  describe('and there are more addresses than one request carries', () => {
+    let addresses: string[]
+
+    beforeEach(() => {
+      addresses = Array.from({ length: 250 }, (_, index) => `0x${index.toString(16).padStart(40, '0')}`)
+    })
+
+    it('should chunk them well under the documented bulk ceiling', async () => {
+      await fetchProfiles(addresses)
+
+      expect(getAvatarsDetailsByPost).toHaveBeenCalledTimes(3)
+      for (const [{ ids }] of getAvatarsDetailsByPost.mock.calls) {
+        expect(ids.length).toBeLessThanOrEqual(100)
+      }
+    })
+
+    it('should ask for every address exactly once across the chunks', async () => {
+      await fetchProfiles(addresses)
+
+      const asked = getAvatarsDetailsByPost.mock.calls.flatMap(([{ ids }]) => ids)
+      expect(asked).toEqual(addresses)
+    })
+  })
+
+  describe('and one request fails', () => {
+    it('should keep the names the other requests returned', async () => {
+      const addresses = Array.from({ length: 150 }, (_, index) => `0x${index.toString(16).padStart(40, '0')}`)
+      getAvatarsDetailsByPost
+        .mockRejectedValueOnce(new Error('catalyst down'))
+        .mockResolvedValueOnce([avatarFor(addresses[120], 'survivor')])
+
+      const profiles = await fetchProfiles(addresses)
+
+      expect(profiles.get(addresses[120])?.avatars?.[0].name).toBe('survivor')
     })
   })
 })
