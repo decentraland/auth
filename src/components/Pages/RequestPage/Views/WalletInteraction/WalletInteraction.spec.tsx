@@ -36,8 +36,7 @@ const successResult: SimulationResponseBody = {
   ],
   approvalChanges: [],
   balanceChanges: [],
-  events: [],
-  eventsTruncated: false
+  events: []
 }
 
 describe('when rendering the WalletInteraction view', () => {

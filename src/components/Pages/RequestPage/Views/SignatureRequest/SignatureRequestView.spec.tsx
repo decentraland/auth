@@ -36,8 +36,7 @@ const transferResult: SimulationResponseBody = {
   ],
   approvalChanges: [],
   balanceChanges: [],
-  events: [],
-  eventsTruncated: false
+  events: []
 }
 
 describe('when rendering the SignatureRequestView', () => {

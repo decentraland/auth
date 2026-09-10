@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { MenuItem } from 'decentraland-ui2'
 import { TransferType } from '../types'
@@ -51,6 +51,10 @@ const noop = () => undefined
 const asyncNoop = async () => undefined
 
 export const TestViewPage = () => {
+  // Every screen that asks for an acknowledgment is gated on it here, the way RequestPage gates it (see
+  // isReviewActionable). Without this the checkbox would be inert and Allow frozen, so these screens would
+  // not behave as they do in the app — which is the whole point of rendering them.
+  const [acknowledged, setAcknowledged] = useState(false)
   const navigate = useNavigate()
   const { viewId } = useParams<ViewIdParam>()
 
@@ -200,6 +204,9 @@ export const TestViewPage = () => {
             collectionContracts={[COLLECTION_ADDRESS]}
             chainId={137}
             requiresAcknowledgment
+            acknowledged={acknowledged}
+            approveBlocked={!acknowledged}
+            onAcknowledgedChange={setAcknowledged}
             gas={{ covered: true }}
             onDeny={noop}
             onApprove={noop}
@@ -217,6 +224,9 @@ export const TestViewPage = () => {
             userAddress={USER_ADDRESS}
             chainId={1}
             requiresAcknowledgment
+            acknowledged={acknowledged}
+            approveBlocked={!acknowledged}
+            onAcknowledgedChange={setAcknowledged}
             gas={{ covered: false, status: 'ready', cost: BigInt('2500000000000000'), balance: BigInt('1500000000000000000') }}
             onDeny={noop}
             onApprove={noop}
@@ -279,7 +289,9 @@ export const TestViewPage = () => {
               data: '0x095ea7b3000000000000000000000000abcdefabcdefabcdefabcdefabcdefabcdefabcdffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff',
               value: '0x0'
             }}
-            approveBlocked={false}
+            approveBlocked={!acknowledged}
+            acknowledged={acknowledged}
+            onAcknowledgedChange={setAcknowledged}
             onDeny={noop}
             onApprove={noop}
           />
@@ -299,7 +311,9 @@ export const TestViewPage = () => {
             gas={{ status: 'loading' }}
             balance={BigInt('1500000000000000000')}
             payload={{ kind: 'transaction', to: USER_ADDRESS, data: '0x', value: '0x6f05b59d3b20000' }}
-            approveBlocked={false}
+            approveBlocked={!acknowledged}
+            acknowledged={acknowledged}
+            onAcknowledgedChange={setAcknowledged}
             onDeny={noop}
             onApprove={noop}
           />
@@ -315,7 +329,9 @@ export const TestViewPage = () => {
             targetAddress="0xabcdefabcdefabcdefabcdefabcdefabcdefef01"
             chainId={137}
             payload={{ kind: 'typed_data', raw: unknownMetaTxRaw }}
-            approveBlocked={false}
+            approveBlocked={!acknowledged}
+            acknowledged={acknowledged}
+            onAcknowledgedChange={setAcknowledged}
             onDeny={noop}
             onApprove={noop}
           />
@@ -329,7 +345,9 @@ export const TestViewPage = () => {
             kind="unknown_typed_data"
             method="eth_signTypedData_v4"
             payload={{ kind: 'typed_data', raw: permitRaw }}
-            approveBlocked={false}
+            approveBlocked={!acknowledged}
+            acknowledged={acknowledged}
+            onAcknowledgedChange={setAcknowledged}
             onDeny={noop}
             onApprove={noop}
           />
@@ -343,7 +361,9 @@ export const TestViewPage = () => {
             kind="personal_sign"
             method="personal_sign"
             payload={{ kind: 'message', hex: personalSignHex, text: personalSignText }}
-            approveBlocked={false}
+            approveBlocked={!acknowledged}
+            acknowledged={acknowledged}
+            onAcknowledgedChange={setAcknowledged}
             onDeny={noop}
             onApprove={noop}
           />
@@ -357,14 +377,16 @@ export const TestViewPage = () => {
             kind="personal_sign"
             method="personal_sign"
             payload={{ kind: 'message', hex: personalSignDigestHex, text: null }}
-            approveBlocked={false}
+            approveBlocked={!acknowledged}
+            acknowledged={acknowledged}
+            onAcknowledgedChange={setAcknowledged}
             onDeny={noop}
             onApprove={noop}
           />
         )
       }
     } as const
-  }, [])
+  }, [acknowledged])
 
   const selected = viewId ? (views as Record<string, { label: string; element: JSX.Element }>)[viewId] : undefined
 
