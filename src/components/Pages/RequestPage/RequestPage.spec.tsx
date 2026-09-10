@@ -3969,4 +3969,87 @@ describe('RequestPage', () => {
       })
     })
   })
+  describe('when Allow is already in flight and the provider is replaced for the same account', () => {
+    let releaseAccountRead: (addresses: string[]) => void
+
+    beforeEach(() => {
+      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.INJECTED }
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockRecover.mockResolvedValue(recovered('eth_sendTransaction', [{ to: CONTRACT, data: '0xabcd', value: '0x0' }]))
+      mockClassifyRequest.mockResolvedValue(dclTransaction())
+      jest.mocked(sendMetaTransaction).mockResolvedValue('0xrelayedhash')
+      mockSendSuccessfulOutcome.mockResolvedValue({})
+      // The review's own read resolves; Allow's is held so the reload can finish underneath it.
+      releaseAccountRead = () => undefined
+      mockGetAddresses
+        .mockResolvedValueOnce([SIGNER])
+        .mockImplementationOnce(() => new Promise(resolve => (releaseAccountRead = resolve)))
+        .mockResolvedValue([SIGNER])
+    })
+
+    it('should not deliver an outcome for it either', async () => {
+      const { rerender } = renderRequestPage()
+      await clearWalletInteractionGates()
+      await userEvent.click(screen.getByTestId('wallet-interaction-approve'))
+      await waitFor(() => expect(mockGetAddresses).toHaveBeenCalledTimes(2))
+
+      mockConnectionData = { ...mockConnectionData, provider: { isMagic: false, refreshed: true } }
+      rerenderRequestPage(rerender)
+      await waitFor(() => expect(mockRecover.mock.calls.length).toBeGreaterThanOrEqual(2))
+      await waitFor(() => expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-sim', 'ready'))
+
+      releaseAccountRead([SIGNER])
+
+      await waitFor(() => expect(mockGetAddresses.mock.calls.length).toBeGreaterThanOrEqual(3))
+      expect(mockSendSuccessfulOutcome).not.toHaveBeenCalled()
+      expect(mockSendFailedOutcome).not.toHaveBeenCalled()
+    })
+
+    it('should not dispatch the replacement review with the click that was given to the previous one', async () => {
+      const { rerender } = renderRequestPage()
+      await clearWalletInteractionGates()
+
+      // Allow is pressed against the review on screen and stops at its first await.
+      await userEvent.click(screen.getByTestId('wallet-interaction-approve'))
+      await waitFor(() => expect(mockGetAddresses).toHaveBeenCalledTimes(2))
+
+      // The wallet hands the app a new provider for the same account; the replacement review settles.
+      mockConnectionData = { ...mockConnectionData, provider: { isMagic: false, refreshed: true } }
+      rerenderRequestPage(rerender)
+      await waitFor(() => expect(mockRecover.mock.calls.length).toBeGreaterThanOrEqual(2))
+      await waitFor(() => expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-sim', 'ready'))
+
+      // Only now does the held read resolve. The consent was given to a review that no longer stands.
+      releaseAccountRead([SIGNER])
+
+      await waitFor(() => expect(mockGetAddresses.mock.calls.length).toBeGreaterThanOrEqual(3))
+      expect(jest.mocked(sendMetaTransaction)).not.toHaveBeenCalled()
+      expect(mockSendSuccessfulOutcome).not.toHaveBeenCalled()
+    })
+  })
+  describe('when an unverified request was acknowledged and the provider is replaced for the same account', () => {
+    beforeEach(() => {
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockGetAddresses.mockResolvedValue([SIGNER])
+      mockRecover.mockResolvedValue(recovered('personal_sign', ['hello', SIGNER]))
+      mockWalletRequest.mockResolvedValue('0xsignature')
+      mockSendSuccessfulOutcome.mockResolvedValue({})
+    })
+
+    it('should stop counting the acknowledgment and take Allow with it while the replacement is decided', async () => {
+      const { rerender } = renderRequestPage()
+      await userEvent.click(await screen.findByTestId('unverified-acknowledge'))
+      await waitFor(() => expect(screen.getByTestId('unverified-request')).toHaveAttribute('data-approve-blocked', 'false'))
+
+      // Hold the replacement recovery so the state between the two reviews is observable.
+      mockRecover.mockImplementation(() => new Promise(() => undefined))
+      mockConnectionData = { ...mockConnectionData, provider: { isMagic: false, refreshed: true } }
+      rerenderRequestPage(rerender)
+
+      // Nothing of the previous review is left on screen to act on.
+      expect(await screen.findByTestId('loading-request')).toBeInTheDocument()
+      expect(screen.queryByTestId('unverified-request')).not.toBeInTheDocument()
+      expect(mockWalletRequest).not.toHaveBeenCalled()
+    })
+  })
 })

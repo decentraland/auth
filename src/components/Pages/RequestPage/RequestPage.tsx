@@ -334,6 +334,18 @@ export const RequestPage = () => {
   // state unless it is still current: a late wallet or server result belongs to the review that started
   // it, not to the one on screen (see onDenyWalletInteraction, onApproveWalletInteraction).
   const reviewGenerationRef = useRef(0)
+  /**
+   * Which load produced the review on screen. Advanced by every load, including one that runs again for
+   * the same request and the same account — where `reviewGenerationRef` deliberately does not move,
+   * because that tracks the settlement scope (whose outcome an in-flight action may still deliver) rather
+   * than which review is being looked at.
+   *
+   * An approval captures this when it is clicked and must still hold it when it dispatches. Without that,
+   * a click given to one review can dispatch the next: the action's generation is unchanged, so it looks
+   * current, and by the time its first await resolves the replacement review may have settled and made
+   * the shared gates true again — for a screen the user never saw.
+   */
+  const reviewRunRef = useRef(0)
   // Shares the in-flight identity POST across effect re-runs so the client-login flow
   // creates the identity exactly once; cleared on failure so a retry can re-post.
   const clientLoginPromiseRef = useRef<Promise<IdentityResponse> | null>(null)
@@ -1106,6 +1118,9 @@ export const RequestPage = () => {
     if (isDeepLinkFlow) {
       completeClientLoginFlow()
     } else {
+      // Every load produces a review of its own, so every load takes a new token — the key-change reset
+      // above does not cover a reload for the same request and account.
+      reviewRunRef.current += 1
       if (!isNewRequest) {
         // The load is running again for the same request and the same account — an embedded wallet handed
         // the app a new provider object, the profile became ready — and it recovers, reclassifies and
@@ -1122,6 +1137,17 @@ export const RequestPage = () => {
         setSimulationVerified(current => (current.length === 0 ? current : []))
         setSimulationCollections(current => (current.length === 0 ? current : []))
         setSimulationProfiles(current => (Object.keys(current).length === 0 ? current : {}))
+        // Everything else the previous run derived goes too, and the page says it is deciding again. Each
+        // of these already blocked approval on its own — an unsettled preview, an unverified counterparty
+        // set, an acknowledgment whose statement no longer matches — but only as a side effect of what it
+        // happens to gate. Dropping them says it once: no part of the previous review is on screen or
+        // actionable while its replacement is being worked out.
+        setClassification(null)
+        classificationRef.current = null
+        setGasEstimate(null)
+        setNftTransferData(null)
+        setManaTransferData(null)
+        setView(View.LOADING_REQUEST)
       }
       loadRequest()
     }
@@ -1267,13 +1293,19 @@ export const RequestPage = () => {
     // here may touch the review now on screen or its settle state.
     const generation = reviewGenerationRef.current
     const isStaleAction = () => reviewGenerationRef.current !== generation
+    // And the review it was clicked on. A load that runs again for the same request and account leaves the
+    // generation alone by design, so this is what tells that review from the one that replaced it.
+    const run = reviewRunRef.current
     // Whether the request may still be signed or sent, re-read after every await that precedes a dispatch.
     // Each of those awaits is a window: the expiration timer can fire in it (which settles the request and
     // shows the timeout screen without moving the generation, so `isStaleAction` alone does not see it),
-    // and a re-review can begin in it and take the gates away. Never consulted after a dispatch — past
+    // a re-review can begin and even finish in it — which is why the run is checked as well as the gates,
+    // since the gates are shared and a settled replacement makes them true again, while only the run says
+    // whether they are true for the review this click was given to. Never consulted after a dispatch — past
     // that point the transaction is broadcast or the payload is signed, and the outcome must still be
     // delivered whatever has happened to the review (see hasWalletResult).
-    const canStillDispatch = () => !isStaleAction() && !hasCompletedRef.current && isReviewActionableRef.current
+    const canStillDispatch = () =>
+      !isStaleAction() && reviewRunRef.current === run && !hasCompletedRef.current && isReviewActionableRef.current
     // The account that reviewed this request, fixed now. The ref moves on to the next review's account
     // while this action is in flight; every comparison and every outcome below uses this value, never the
     // ref, so a late rejection can neither pass the check against another account nor be delivered under it.
