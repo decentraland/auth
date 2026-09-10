@@ -1,4 +1,4 @@
-import { encodeFunctionData, getAddress } from 'viem'
+import { encodeFunctionData, getAddress, toFunctionSelector } from 'viem'
 import { ContractData, ContractName, getContract } from 'decentraland-transactions'
 import {
   ContractResolution,
@@ -517,6 +517,71 @@ describe('when collecting the addresses a call reaches', () => {
     credits = getKnownDecentralandContract(getContract(ContractName.CreditsManager, POLYGON).address, POLYGON)!
     marketplace = getKnownDecentralandContract(getContract(ContractName.OffChainMarketplaceV2, POLYGON).address, POLYGON)!
     acceptCalldata = encodeFunctionData({ abi: marketplace.abi, functionName: 'accept', args: [[trade]] })
+  })
+
+  describe.each([
+    { signature: 'getNonce(address)', opaque: true },
+    { signature: 'custom(address,bytes)', opaque: true },
+    { signature: 'balanceOf(address)', opaque: false },
+    { signature: 'ownerOf(uint256)', opaque: false }
+  ])('and a trade uses the $signature external check', ({ signature, opaque }) => {
+    let checkedTrade: Omit<typeof trade, 'checks'> & {
+      checks: Omit<typeof trade.checks, 'externalChecks'> & {
+        externalChecks: Array<{ contractAddress: string; selector: string; value: string; required: boolean }>
+      }
+    }
+    let checkedCall: DecodedCall
+
+    beforeEach(() => {
+      checkedTrade = {
+        ...trade,
+        sent: [],
+        checks: {
+          ...trade.checks,
+          externalChecks: [
+            { contractAddress: marketplace.address, selector: toFunctionSelector(signature), value: zeroHash, required: true }
+          ]
+        }
+      }
+      acceptCalldata = encodeFunctionData({ abi: marketplace.abi, functionName: 'accept', args: [[checkedTrade]] })
+      checkedCall = decodeKnownContractCall(marketplace, acceptCalldata)!
+      result = collectCallAddresses(checkedCall, POLYGON)
+    })
+
+    it('should judge the selector even though the check targets a recognized marketplace', () => {
+      expect({ opaque: result.opaque, includesTarget: result.addresses.has(marketplace.address) }).toEqual({ opaque, includesTarget: true })
+    })
+
+    describe('and the trade is nested inside a credits purchase', () => {
+      beforeEach(() => {
+        result = collectCallAddresses(
+          useCreditsWith({ target: marketplace.address, selector: acceptCalldata.slice(0, 10), data: `0x${acceptCalldata.slice(10)}` }),
+          POLYGON
+        )
+      })
+
+      it('should enforce the same external-check restriction inside the nested trade', () => {
+        expect(result.opaque).toBe(opaque)
+      })
+    })
+
+    describe('and the check belongs to a coupon instead', () => {
+      beforeEach(() => {
+        checkedCall = decodeKnownContractCall(
+          marketplace,
+          encodeFunctionData({
+            abi: marketplace.abi,
+            functionName: 'acceptWithCoupon',
+            args: [[trade], [{ signature: '0x', checks: checkedTrade.checks, couponAddress: OTHER, data: '0x', callerData: '0x' }]]
+          })
+        )!
+        result = collectCallAddresses(checkedCall, POLYGON)
+      })
+
+      it('should enforce the same external-check restriction for coupon checks', () => {
+        expect(result.opaque).toBe(opaque)
+      })
+    })
   })
 
   describe('and a credits purchase nests a marketplace trade naming an unknown NFT registry', () => {

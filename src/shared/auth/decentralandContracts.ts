@@ -343,6 +343,16 @@ type CallAddresses = { addresses: Set<string>; opaque: boolean }
 
 const NO_SKIPPED_ARGUMENTS: ReadonlySet<string> = new Set()
 
+// Marketplace Verifications gives these two selectors defined semantics: a minimum balance and token
+// ownership. Every other selector is a custom staticcall(selector, caller, value), even on a recognized
+// contract. In particular, getNonce(address) accepts its first argument and ignores the extra bytes:
+// the preview reads nonce 0 as false, but executeMetaTransaction increments it to 1 before the same
+// check, which then passes. Recognizing the target alone therefore cannot vouch for a custom check.
+const PREVIEWABLE_EXTERNAL_CHECK_SELECTORS: ReadonlySet<string> = new Set([
+  toFunctionSelector('balanceOf(address)'),
+  toFunctionSelector('ownerOf(uint256)')
+])
+
 function collectInto(value: unknown, chainId: number, depth: number, result: CallAddresses, skipped: ReadonlySet<string>): void {
   if (typeof value === 'string') {
     if (ADDRESS_REGEX.test(value)) result.addresses.add(value.toLowerCase())
@@ -353,6 +363,17 @@ function collectInto(value: unknown, chainId: number, depth: number, result: Cal
     return
   }
   if (!isRecord(value)) return
+  // ExternalCheck is shared by trades and coupons, including those nested in a credits purchase.
+  // Keep collecting its target for the normal contract check, but refuse custom selector semantics.
+  if (
+    typeof value.contractAddress === 'string' &&
+    typeof value.selector === 'string' &&
+    typeof value.value === 'string' &&
+    typeof value.required === 'boolean' &&
+    !PREVIEWABLE_EXTERNAL_CHECK_SELECTORS.has(value.selector.toLowerCase())
+  ) {
+    result.opaque = true
+  }
   if (isExternalCallLike(value)) {
     // The target is a counterparty in its own right; the payload it runs is read only when the target is a
     // Decentraland contract whose ABI decodes it canonically. Anything else stays unread, and unread means
@@ -391,9 +412,9 @@ function collectCallArguments(call: DecodedCall, chainId: number, depth: number,
  * its target is a Decentraland contract on `chainId` and the payload decodes against that contract's ABI.
  * A function that never calls its address arguments (see NON_CALLING_FUNCTIONS) reaches nothing, and an
  * argument a function only records (see NON_CALLED_ARGUMENTS) is left out, at the top level and nested
- * alike. `opaque` is true when a nested payload could not be read: it may name addresses this walk cannot
- * see, so the caller must not vouch for what the call reaches. Only calldata declared as a nested call is
- * followed: a plain `bytes` argument (a safe transfer's `data`, a factory's `createCollection` initializer,
+ * alike. `opaque` is true when a nested payload could not be read or an external check uses a custom
+ * selector whose semantics cannot be previewed safely. The caller must not vouch for either. Only calldata
+ * declared as a nested call is followed: a plain `bytes` argument (a safe transfer's `data`, a factory's `createCollection` initializer,
  * a trade's `extra`) is not a call this page is asked to review, see FORWARDING_FUNCTIONS for the ones that
  * are refused outright.
  */

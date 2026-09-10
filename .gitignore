@@ -40,6 +40,9 @@ build/Release
 
 # Dependency directories
 node_modules/
+# Also the bare name, so a worktree that symlinks its dependencies to another checkout does not
+# stage the link: a trailing-slash pattern matches directories only, never a symlink.
+node_modules
 jspm_packages/
 
 # Snowpack dependency directory (https://snowpack.dev/)
