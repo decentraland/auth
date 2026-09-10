@@ -885,7 +885,7 @@ export const RequestPage = () => {
               // Known before any lookup, so the summary never shows the called collection as unverified.
               setSimulationCollections([...collections])
             }
-            const { addresses, opaque } = getCounterpartyAddresses(call, signerAddress, chainId)
+            const { addresses, opaque } = getCounterpartyAddresses(call, chainId)
             if (opaque) return refuse('the call carries a nested call that could not be read')
             const collectionsLiveHere = chainId === Number(getMetaTransactionChainId())
             const isRecognizedOrPlain = async (address: string): Promise<boolean> => {
@@ -894,8 +894,11 @@ export const RequestPage = () => {
                 if (await isAddressWithoutCode(address, chainId)) {
                   // Nothing runs here today. The requester who chose this address can still deploy code to it
                   // before the call executes — whether it holds a returned signature or watches for the
-                  // transaction — so the exemption stands but is named, and consent is asked for it.
-                  emptyAddresses.add(address.toLowerCase())
+                  // transaction — so the exemption stands but is named, and consent is asked for it. Not for
+                  // the reviewing signer's own address: nobody else can deploy at an existing EOA's address
+                  // (a signer that has code already is not empty, and passes the same contract check as every
+                  // other callback).
+                  if (address.toLowerCase() !== signerAddress.toLowerCase()) emptyAddresses.add(address.toLowerCase())
                   return true
                 }
                 if (!collectionsLiveHere || !(await isDecentralandCollection(address))) return false

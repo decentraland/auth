@@ -67,14 +67,17 @@ const NON_CALLING_FUNCTIONS: ReadonlySet<string> = new Set([
 // (and an offer's `operator`) as the update operator through the LAND contract, compares a listing's
 // `target` with the tenant and stores the operators of `setUpdateOperator` and `setManyLandUpdateOperator`;
 // CollectionManager stores the collection's `_creator` and its items' `beneficiary`; CollectionStore mints
-// to `beneficiaries` with `_mint`, which runs no receiver hook. A contract wallet in any of these runs no
-// code inside the transaction, so it does not make the preview unreliable.
+// to `beneficiaries` with `_mint`, which runs no receiver hook. ERC-721 safe transfers invoke only their
+// recipient, never `from`. A contract wallet in any of these skipped positions runs no code inside the
+// transaction, so it does not make the preview unreliable.
 //
 // Deliberately not here: a trade's or listing's `signer` (both the off-chain marketplace and Rentals accept
 // EIP-1271 contract signatures, so a contract signer is called to validate), a trade's `beneficiary` (an
 // ERC721 asset reaches it through `safeTransferFrom`, which calls a contract recipient) and the name
 // registrar's `_beneficiary`, whose mint path has not been read.
 const NON_CALLED_ARGUMENTS: Readonly<Record<string, ReadonlySet<string>>> = {
+  safeTransferFrom: new Set(['from']),
+  safeBatchTransferFrom: new Set(['_from']),
   acceptListing: new Set(['_operator', 'target']),
   acceptOffer: new Set(['operator']),
   setUpdateOperator: new Set(['_operators']),
