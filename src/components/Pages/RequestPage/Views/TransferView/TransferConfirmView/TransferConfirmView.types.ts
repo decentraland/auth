@@ -8,6 +8,10 @@ type BaseProps = {
    * both the generic and the branded screens render it (see isReviewActionable in RequestPage).
    */
   approveBlocked?: boolean
+  /** Called addresses that had no code when the preview was checked. */
+  callbackAddresses?: string[]
+  callbackAcknowledged?: boolean
+  onCallbackAcknowledgedChange?: (checked: boolean) => void
   onApprove: () => Promise<void>
   onDeny: () => void
 }

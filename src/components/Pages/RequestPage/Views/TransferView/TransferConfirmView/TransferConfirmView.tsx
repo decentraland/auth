@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from '@dcl/hooks'
 import { Rarity } from '@dcl/schemas'
-import { Profile } from 'decentraland-ui2'
+import { Checkbox, FormControlLabel, Profile } from 'decentraland-ui2'
 import { TransferActionButtons, TransferAssetImage, TransferLayout, TransferLoadingState } from '../../../../../Transfer'
 import { CenteredContent, ItemName, Label, Title, WarningAlert } from '../../../../../Transfer/Transfer.styled'
 import { TransferType } from '../../../types'
@@ -71,6 +71,22 @@ const TransferConfirmView = (props: TransferConfirmViewProps) => {
             {!isProcessing && <WarningAlert severity="info">{t('transfer.confirm.gifting_warning')}</WarningAlert>}
           </>
         )}
+        {!isProcessing && (props.callbackAddresses?.length ?? 0) > 0 ? (
+          <>
+            <WarningAlert severity="warning" data-testid="callback-code-warning">
+              {t('request.transaction_dialog.callback_code_notice')}
+            </WarningAlert>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={props.callbackAcknowledged ?? false}
+                  onChange={event => props.onCallbackAcknowledgedChange?.(event.target.checked)}
+                />
+              }
+              label={t('request.transaction_dialog.acknowledge_callback_code')}
+            />
+          </>
+        ) : null}
         {isProcessing ? (
           <TransferLoadingState text={t('transfer.confirm.processing_authorization')} />
         ) : (

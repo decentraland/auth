@@ -66,8 +66,6 @@
       "review_title": "Revisa esta transacción",
       "preview_unavailable_warning": "No pudimos verificar qué hace esta transacción porque el servicio de vista previa no está disponible temporalmente. Aprueba solo si confías en la escena que la solicitó.",
       "acknowledge_preview_unavailable": "Entiendo que la vista previa no está disponible y estoy aprobando sin ver qué hace esta transacción",
-      "deferred_callback_notice": "Una dirección que esta transacción entrega al contrato no tiene código hoy. Podría desplegarse código allí antes de que la transacción se ejecute, y el contrato lo ejecutaría; esta vista previa no puede mostrar qué haría ese código.",
-      "acknowledge_deferred_callback": "Entiendo que el código desplegado antes de que esta transacción se ejecute podría cambiar lo que hace, y acepto este riesgo.",
       "review_restarted_notice": "La red de tu wallet cambió o no pudo verificarse, así que esta transacción se revisó de nuevo en la red actual.",
       "calls_function": "Llama a {functionName} en {contractName}"
     },
@@ -103,6 +101,8 @@
       "on_network": "en {network}",
       "acknowledge_risk": "Entiendo que esto otorga acceso a mis activos",
       "acknowledge_no_visible_effects": "Entiendo que la vista previa no muestra cambios en mis activos y que esto aun así puede cambiar configuraciones o roles que no veo aquí",
+      "callback_code_notice": "Una dirección utilizada por esta llamada no tiene código de contrato ahora. Podría desplegarse código allí antes de que se ejecute la llamada, haciendo que la ejecución difiera de esta vista previa.",
+      "acknowledge_callback_code": "Entiendo que el código desplegado después de esta vista previa podría cambiar lo que hace esta llamada y acepto este riesgo.",
       "approval_can_spend_symbol": "puede gastar {symbol}",
       "approval_can_no_longer_spend": "ya no puede gastar {symbol}",
       "approval_allowance_revoked": "Permiso de gasto de {symbol} revocado",
@@ -121,8 +121,6 @@
       "description": "Revisa lo que estás a punto de firmar.",
       "view_raw": "Ver datos sin procesar",
       "hide_raw": "Ocultar datos sin procesar",
-      "deferred_callback_notice": "Una dirección utilizada por esta llamada no tiene código de contrato hoy. Podría desplegarse código allí antes de enviar esta firma, haciendo que la ejecución difiera de esta vista previa.",
-      "acknowledge_deferred_callback": "Entiendo que el código desplegado después de firmar podría cambiar lo que hace esta llamada y acepto este riesgo.",
       "meta_tx_notice": "Esta firma autoriza al contrato a ejecutar esta acción en tu nombre. No expira y la aplicación que la solicitó puede enviarla más adelante.",
       "meta_tx_reverted": "Esta acción falla ahora mismo, por lo que no se pudieron previsualizar sus efectos. Fírmala solo si esperas que funcione más adelante.",
       "acknowledge_unverified": "Entiendo que no se pudieron verificar los efectos de esta firma"

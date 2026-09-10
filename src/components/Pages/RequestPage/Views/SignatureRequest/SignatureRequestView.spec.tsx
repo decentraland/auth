@@ -144,14 +144,14 @@ describe('when rendering the SignatureRequestView', () => {
 
     it('should explain the limitation and render an unchecked risk checkbox', () => {
       render(<SignatureRequestView {...props} />)
-      expect(screen.getByTestId('signature-deferred-callback-notice')).toHaveTextContent('request.signature.deferred_callback_notice')
-      expect(screen.getByRole('checkbox', { name: 'request.signature.acknowledge_deferred_callback' })).not.toBeChecked()
+      expect(screen.getByTestId('signature-deferred-callback-notice')).toHaveTextContent('request.transaction_dialog.callback_code_notice')
+      expect(screen.getByRole('checkbox', { name: 'request.transaction_dialog.acknowledge_callback_code' })).not.toBeChecked()
       expect(screen.getByRole('button', { name: 'common.allow' })).toBeDisabled()
     })
 
     it('should send explicit consent to the page', async () => {
       render(<SignatureRequestView {...props} />)
-      await userEvent.click(screen.getByRole('checkbox', { name: 'request.signature.acknowledge_deferred_callback' }))
+      await userEvent.click(screen.getByRole('checkbox', { name: 'request.transaction_dialog.acknowledge_callback_code' }))
       expect(onDeferredCallbackAcknowledgedChange).toHaveBeenCalledWith(true)
       expect(onAcknowledgedChange).not.toHaveBeenCalled()
     })
@@ -164,7 +164,7 @@ describe('when rendering the SignatureRequestView', () => {
       it('should keep the callback acknowledgment separate and unchecked', () => {
         render(<SignatureRequestView {...props} />)
         expect(screen.getByRole('checkbox', { name: 'request.transaction_dialog.acknowledge_risk' })).toBeChecked()
-        expect(screen.getByRole('checkbox', { name: 'request.signature.acknowledge_deferred_callback' })).not.toBeChecked()
+        expect(screen.getByRole('checkbox', { name: 'request.transaction_dialog.acknowledge_callback_code' })).not.toBeChecked()
       })
     })
   })

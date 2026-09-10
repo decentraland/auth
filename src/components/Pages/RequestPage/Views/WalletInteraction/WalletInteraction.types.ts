@@ -37,15 +37,11 @@ interface WalletInteractionProps {
   /** Whether the acknowledgment has been given for the screen on display. Owned by the page. */
   acknowledged?: boolean
   onAcknowledgedChange?: (checked: boolean) => void
-  /**
-   * Addresses the call hands the contract that had no code when they were checked. Code can be deployed
-   * there before the transaction executes, so the preview cannot vouch for what would then run; when there
-   * are any, the view says so and asks a consent of its own, separate from the risk acknowledgment.
-   */
-  deferredCallbackAddresses?: string[]
-  /** Whether that consent has been given for the screen on display. Owned by the page. */
-  deferredCallbackAcknowledged?: boolean
-  onDeferredCallbackAcknowledgedChange?: (checked: boolean) => void
+  /** Called addresses that had no code when the preview was checked. */
+  callbackAddresses?: string[]
+  /** Whether the user accepted that code may appear at those addresses before execution. */
+  callbackAcknowledged?: boolean
+  onCallbackAcknowledgedChange?: (checked: boolean) => void
   gas: WalletInteractionGas
   /** True when the simulation predicts the transaction would revert. */
   isReverted?: boolean

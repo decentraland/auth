@@ -273,12 +273,8 @@ export const RequestPage = () => {
   // alongside the simulation, and Allow stays blocked until it is; a call that reaches anything else is
   // refused, so Allow never enables on a preview the page would not stand behind.
   const [areCounterpartiesVerified, setAreCounterpartiesVerified] = useState(false)
-  // Addresses the call hands the contract that had no code when they were checked. The counterparty rule
-  // lets them through because nothing can run there — but that holds only for as long as they stay empty,
-  // and the requester who chose them can deploy code there between the check and execution: indefinitely
-  // for a signature it holds, within the mempool race for a transaction it watches being sent. Either way
-  // the preview stops describing what runs, so the review says so and asks for consent before going on.
-  const [deferredCallbackAddresses, setDeferredCallbackAddresses] = useState<string[]>([])
+  // Empty addresses a reviewed call may invoke; the absence of code can change before execution.
+  const [mutableCallbackAddresses, setMutableCallbackAddresses] = useState<string[]>([])
   // Resolved counterparty display names (lowercased address → name), filled in progressively.
   const [simulationProfiles, setSimulationProfiles] = useState<Record<string, string>>({})
   // Chain the pending transaction/meta-tx was simulated on, for block-explorer links.
@@ -538,8 +534,8 @@ export const RequestPage = () => {
       setWalletInfo(undefined)
       setClassification(null)
       setAreCounterpartiesVerified(false)
-      setDeferredCallbackAddresses([])
-      setDeferredCallbackAcknowledged(false)
+      setMutableCallbackAddresses([])
+      setMutableCallbackAcknowledged(false)
       setGasEstimate(null)
       setNftTransferData(null)
       setManaTransferData(null)
@@ -866,16 +862,10 @@ export const RequestPage = () => {
         // way it records which of the contracts involved are factory collections, the called one included
         // (it is one when the registry does not list it), for the summary to label. False means "do not go
         // on", whether the request was refused or the review went stale meanwhile; every caller stops on it.
-        // Going on, it also names the addresses that were let through for having no code, so the caller can
-        // keep the review on a view able to ask consent for that (see deferredCallbackAddresses).
-        const verifyCounterparties = async (
-          call: DecodedCall,
-          chainId: number,
-          contractAddress: string
-        ): Promise<{ emptyAddresses: string[] } | null> => {
+        const verifyCounterparties = async (call: DecodedCall, chainId: number, contractAddress: string): Promise<boolean> => {
           const refuse = async (reason: string) => {
             if (!isStale()) await refuseRequest(new UnsupportedContractError(request.method, reason), 'unsupported_contract')
-            return null
+            return false
           }
           try {
             const collections = new Set<string>()
@@ -892,13 +882,13 @@ export const RequestPage = () => {
               try {
                 if (isRecognizedDecentralandContract(address, chainId) || getKnownToken(address, chainId)) return true
                 if (await isAddressWithoutCode(address, chainId)) {
-                  // Nothing runs here today. The requester who chose this address can still deploy code to it
-                  // before the call executes — whether it holds a returned signature or watches for the
-                  // transaction — so the exemption stands but is named, and consent is asked for it. Not for
-                  // the reviewing signer's own address: nobody else can deploy at an existing EOA's address
-                  // (a signer that has code already is not empty, and passes the same contract check as every
-                  // other callback).
-                  if (address.toLowerCase() !== signerAddress.toLowerCase()) emptyAddresses.add(address.toLowerCase())
+                  // Code can be deployed after this lookup and before the reviewed call executes.
+                  // Keep the check, but require consent to the preview's limitation before approval.
+                  // Nobody else can deploy at an existing EOA's address. If the reviewing signer has
+                  // code already, however, it must pass the same contract check as every other callback.
+                  if (address.toLowerCase() !== signerAddress.toLowerCase()) {
+                    emptyAddresses.add(address.toLowerCase())
+                  }
                   return true
                 }
                 if (!collectionsLiveHere || !(await isDecentralandCollection(address))) return false
@@ -909,16 +899,15 @@ export const RequestPage = () => {
               }
             }
             const verdicts = await Promise.all(addresses.map(isRecognizedOrPlain))
-            if (isStale()) return null
+            if (isStale()) return false
             const unrecognized = addresses.filter((_, index) => !verdicts[index])
             if (unrecognized.length > 0) {
               return refuse(`the call reaches a contract that is not Decentraland's: ${listAddresses(unrecognized)}`)
             }
-            const sortedEmptyAddresses = [...emptyAddresses].sort()
             setSimulationCollections([...collections])
-            setDeferredCallbackAddresses(sortedEmptyAddresses)
+            setMutableCallbackAddresses([...emptyAddresses].sort())
             setAreCounterpartiesVerified(true)
-            return { emptyAddresses: sortedEmptyAddresses }
+            return true
           } catch (e) {
             console.error('The contracts the call reaches could not be checked', e)
             return refuse('the contracts the call reaches could not be checked')
@@ -1013,14 +1002,7 @@ export const RequestPage = () => {
             // also have answered from the generic review while the simulation ran; their answer stands.
             const [simulation, verified] = await Promise.all([simulationPromise, verificationPromise])
             if (isStale()) return
-            // A recipient that has no code today owes the consent the branded screen has no place for, so
-            // that transfer stays on the generic review, which asks for it (see deferredCallbackAddresses).
-            if (
-              !simulation ||
-              !verified ||
-              verified.emptyAddresses.length > 0 ||
-              !isExactNftTransferSimulation(simulation, signerAddress, transaction.to, transferData)
-            ) {
+            if (!simulation || !verified || !isExactNftTransferSimulation(simulation, signerAddress, transaction.to, transferData)) {
               return
             }
 
@@ -1185,8 +1167,8 @@ export const RequestPage = () => {
         setIsTransactionModalOpen(false)
         setSimulationState(current => (current.status === 'loading' ? current : { status: 'loading' }))
         setAreCounterpartiesVerified(false)
-        setDeferredCallbackAddresses([])
-        setDeferredCallbackAcknowledged(false)
+        setMutableCallbackAddresses([])
+        setMutableCallbackAcknowledged(false)
         setSimulationVerified(current => (current.length === 0 ? current : []))
         setSimulationCollections(current => (current.length === 0 ? current : []))
         setSimulationProfiles(current => (Object.keys(current).length === 0 ? current : {}))
@@ -1693,7 +1675,7 @@ export const RequestPage = () => {
         isSimulationReverted ? 'reverted' : '',
         hasPreviewWithoutVisibleEffects ? 'no-visible-effects' : '',
         isSignatureWithoutVerifiedEffects ? 'unverified' : '',
-        deferredCallbackAddresses.join(','),
+        mutableCallbackAddresses.join(','),
         getPreviewFingerprint(simulationState.status === 'ready' ? simulationState.result : undefined)
       ].join('|'),
     [
@@ -1704,11 +1686,11 @@ export const RequestPage = () => {
       isSimulationReverted,
       hasPreviewWithoutVisibleEffects,
       isSignatureWithoutVerifiedEffects,
-      deferredCallbackAddresses
+      mutableCallbackAddresses
     ]
   )
   const { acknowledged: isAcknowledged, setAcknowledged } = useAcknowledgment(acknowledgmentStatement)
-  const { acknowledged: isDeferredCallbackAcknowledged, setAcknowledged: setDeferredCallbackAcknowledged } =
+  const { acknowledged: isMutableCallbackAcknowledged, setAcknowledged: setMutableCallbackAcknowledged } =
     useAcknowledgment(acknowledgmentStatement)
 
   // The wallet-side fee estimate a transaction the user pays gas for waits on, so the cost is always seen
@@ -1741,7 +1723,7 @@ export const RequestPage = () => {
           areCounterpartiesVerified &&
           (classification.relayed || !isGasEstimatePending) &&
           isAcknowledgedIfNeeded &&
-          (deferredCallbackAddresses.length === 0 || isDeferredCallbackAcknowledged)
+          (mutableCallbackAddresses.length === 0 || isMutableCallbackAcknowledged)
         )
       case View.WALLET_SIGNATURE_INTERACTION:
         return (
@@ -1749,7 +1731,7 @@ export const RequestPage = () => {
           isPreviewSettled &&
           areCounterpartiesVerified &&
           isAcknowledgedIfNeeded &&
-          (deferredCallbackAddresses.length === 0 || isDeferredCallbackAcknowledged)
+          (mutableCallbackAddresses.length === 0 || isMutableCallbackAcknowledged)
         )
       case View.WALLET_UNVERIFIED_INTERACTION:
         // Nothing is previewed here, so there is no preview to settle, and the acknowledgment is always
@@ -1757,12 +1739,14 @@ export const RequestPage = () => {
         return (!isTransactionClassification(classification) || !isGasEstimatePending) && isAcknowledged
       // A branded screen stands in for the generic review only once that review's checks passed (see
       // reviewDecentralandTransaction), so it carries the same counterparty requirement.
-      // A branded screen has no place to ask consent for an empty address, so it may not be acted on while
-      // one is owed; the generic review, which asks, is what shows such a transfer (see the gift upgrade).
       case View.WALLET_NFT_INTERACTION:
-        return nftTransferData !== null && areCounterpartiesVerified && deferredCallbackAddresses.length === 0
+        return (
+          nftTransferData !== null && areCounterpartiesVerified && (mutableCallbackAddresses.length === 0 || isMutableCallbackAcknowledged)
+        )
       case View.WALLET_MANA_INTERACTION:
-        return manaTransferData !== null && areCounterpartiesVerified && deferredCallbackAddresses.length === 0
+        return (
+          manaTransferData !== null && areCounterpartiesVerified && (mutableCallbackAddresses.length === 0 || isMutableCallbackAcknowledged)
+        )
       default:
         return false
     }
@@ -1850,7 +1834,10 @@ export const RequestPage = () => {
             type={TransferType.GIFT}
             transferData={nftTransferData}
             isLoading={isLoading}
+            callbackAddresses={mutableCallbackAddresses}
+            callbackAcknowledged={isMutableCallbackAcknowledged}
             approveBlocked={approveBlocked}
+            onCallbackAcknowledgedChange={setMutableCallbackAcknowledged}
             onDeny={onDenyWalletInteraction}
             onApprove={handleApproveWalletInteraction}
           />
@@ -1864,7 +1851,10 @@ export const RequestPage = () => {
             type={TransferType.TIP}
             transferData={manaTransferData}
             isLoading={isLoading}
+            callbackAddresses={mutableCallbackAddresses}
+            callbackAcknowledged={isMutableCallbackAcknowledged}
             approveBlocked={approveBlocked}
+            onCallbackAcknowledgedChange={setMutableCallbackAcknowledged}
             onDeny={onDenyWalletInteraction}
             onApprove={handleApproveWalletInteraction}
           />
@@ -1896,14 +1886,14 @@ export const RequestPage = () => {
             chainId={simulationChainId}
             requiresAcknowledgment={requiresApprovalAcknowledgment}
             acknowledged={isAcknowledged}
-            deferredCallbackAddresses={deferredCallbackAddresses}
-            deferredCallbackAcknowledged={isDeferredCallbackAcknowledged}
+            callbackAddresses={mutableCallbackAddresses}
+            callbackAcknowledged={isMutableCallbackAcknowledged}
             approveBlocked={approveBlocked}
             gas={gas}
             isReverted={isSimulationReverted}
             reviewRestarted={reviewRestartReason !== null}
             onAcknowledgedChange={setAcknowledged}
-            onDeferredCallbackAcknowledgedChange={setDeferredCallbackAcknowledged}
+            onCallbackAcknowledgedChange={setMutableCallbackAcknowledged}
             onDeny={onDenyWalletInteraction}
             onApprove={handleApproveWalletInteraction}
           />
@@ -1916,9 +1906,9 @@ export const RequestPage = () => {
         <>
           {confirmDialog}
           <SignatureRequestView
-            deferredCallbackAddresses={deferredCallbackAddresses}
-            deferredCallbackAcknowledged={isDeferredCallbackAcknowledged}
-            onDeferredCallbackAcknowledgedChange={setDeferredCallbackAcknowledged}
+            deferredCallbackAddresses={mutableCallbackAddresses}
+            deferredCallbackAcknowledged={isMutableCallbackAcknowledged}
+            onDeferredCallbackAcknowledgedChange={setMutableCallbackAcknowledged}
             key={requestId}
             requestId={requestId}
             method={requestRef.current?.method ?? ''}

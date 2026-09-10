@@ -104,7 +104,7 @@ export const SignatureRequestView = ({
         <Notice data-testid="signature-meta-tx-notice">{t('request.signature.meta_tx_notice')}</Notice>
         {deferredCallbackAddresses.length > 0 ? (
           <>
-            <Notice data-testid="signature-deferred-callback-notice">{t('request.signature.deferred_callback_notice')}</Notice>
+            <Notice data-testid="signature-deferred-callback-notice">{t('request.transaction_dialog.callback_code_notice')}</Notice>
             <FormControlLabel
               control={
                 <Checkbox
@@ -112,7 +112,7 @@ export const SignatureRequestView = ({
                   onChange={event => onDeferredCallbackAcknowledgedChange?.(event.target.checked)}
                 />
               }
-              label={t('request.signature.acknowledge_deferred_callback')}
+              label={t('request.transaction_dialog.acknowledge_callback_code')}
             />
           </>
         ) : null}

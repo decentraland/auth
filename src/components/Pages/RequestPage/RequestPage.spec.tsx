@@ -213,9 +213,9 @@ jest.mock('./Views', () => ({
       data-profiles={JSON.stringify(props.profiles ?? {})}
       data-verified={JSON.stringify(props.verifiedContracts ?? [])}
       data-collections={JSON.stringify(props.collectionContracts ?? [])}
+      data-callbacks={JSON.stringify(props.callbackAddresses ?? [])}
+      data-callback-acknowledged={String(props.callbackAcknowledged)}
       data-review-restarted={String(props.reviewRestarted)}
-      data-deferred-callbacks={JSON.stringify(props.deferredCallbackAddresses ?? [])}
-      data-callback-acknowledged={String(props.deferredCallbackAcknowledged)}
     >
       <button data-testid="wallet-interaction-approve" onClick={props.onApprove}>
         approve
@@ -223,7 +223,7 @@ jest.mock('./Views', () => ({
       <button data-testid="wallet-interaction-acknowledge" onClick={() => props.onAcknowledgedChange?.(true)}>
         acknowledge
       </button>
-      <button data-testid="wallet-interaction-callback-acknowledge" onClick={() => props.onDeferredCallbackAcknowledgedChange?.(true)}>
+      <button data-testid="callback-acknowledge" onClick={() => props.onCallbackAcknowledgedChange?.(true)}>
         acknowledge callback risk
       </button>
       <button data-testid="wallet-interaction-deny" onClick={props.onDeny}>
@@ -236,9 +236,17 @@ jest.mock('./Views', () => ({
   ContinueInApp: () => <div data-testid="continue-in-app">Continue in App</div>,
   ClientLoginError: (props: any) => <div data-testid="client-login-error">Client Login Error: {props.error}</div>,
   TransferConfirmView: (props: any) => (
-    <div data-testid="transfer-confirm" data-approve-blocked={String(props.approveBlocked)}>
+    <div
+      data-testid="transfer-confirm"
+      data-approve-blocked={String(props.approveBlocked)}
+      data-callbacks={JSON.stringify(props.callbackAddresses ?? [])}
+      data-callback-acknowledged={String(props.callbackAcknowledged)}
+    >
       <button data-testid="transfer-confirm-approve" onClick={props.onApprove}>
         confirm
+      </button>
+      <button data-testid="callback-acknowledge" onClick={() => props.onCallbackAcknowledgedChange?.(true)}>
+        acknowledge callback risk
       </button>
     </div>
   ),
@@ -271,7 +279,7 @@ jest.mock('./Views', () => ({
       data-function={props.functionName}
       data-contract={props.contractName}
       data-verifying-contract={props.verifyingContract}
-      data-deferred-callbacks={JSON.stringify(props.deferredCallbackAddresses ?? [])}
+      data-callbacks={JSON.stringify(props.deferredCallbackAddresses ?? [])}
       data-callback-acknowledged={String(props.deferredCallbackAcknowledged)}
       data-verified={JSON.stringify(props.verifiedContracts ?? [])}
       data-collections={JSON.stringify(props.collectionContracts ?? [])}
@@ -282,7 +290,7 @@ jest.mock('./Views', () => ({
       <button data-testid="signature-acknowledge" onClick={() => props.onAcknowledgedChange?.(true)}>
         acknowledge
       </button>
-      <button data-testid="signature-callback-acknowledge" onClick={() => props.onDeferredCallbackAcknowledgedChange?.(true)}>
+      <button data-testid="callback-acknowledge" onClick={() => props.onDeferredCallbackAcknowledgedChange?.(true)}>
         acknowledge callback risk
       </button>
       <button data-testid="signature-deny" onClick={props.onDeny}>
@@ -2204,18 +2212,33 @@ describe('RequestPage', () => {
       beforeEach(async () => {
         mockIsAddressWithoutCode.mockResolvedValue(true)
         renderRequestPage()
-        // Let through for having no code, and named for it: code can arrive there before the call executes,
-        // whichever way the call is dispatched, so both reviews ask consent for that before Allow enables.
-        await waitFor(() => expect(screen.getByTestId(viewTestId)).toHaveAttribute('data-deferred-callbacks', '["0xnft"]'))
-        await userEvent.click(
-          screen.getByTestId(`${viewTestId === 'wallet-interaction' ? 'wallet-interaction' : 'signature'}-callback-acknowledge`)
-        )
-        view = await findVerifiedView()
+        view = await screen.findByTestId(viewTestId)
+        await waitFor(() => expect(view).toHaveAttribute('data-callbacks', '["0xnft"]'))
+        await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
       })
 
       it('should keep the review and settle it with the code read alone', () => {
         expect(view).toBeInTheDocument()
         expect(mockIsDecentralandCollection).not.toHaveBeenCalled()
+      })
+
+      it('should require consent because code can appear after the preview', () => {
+        expect(view).toHaveAttribute('data-approve-blocked', 'true')
+      })
+
+      it('should enforce callback consent in the approval handler', async () => {
+        await userEvent.click(screen.getByTestId(kind === 'transaction' ? 'wallet-interaction-approve' : 'signature-approve'))
+        expect([sendMetaTransaction, mockWalletRequest].filter(mock => jest.mocked(mock).mock.calls.length > 0)).toHaveLength(0)
+      })
+
+      it('should not count acknowledgment of another risk as callback consent', async () => {
+        await userEvent.click(screen.getByTestId(kind === 'transaction' ? 'wallet-interaction-acknowledge' : 'signature-acknowledge'))
+        expect(view).toHaveAttribute('data-approve-blocked', 'true')
+      })
+
+      it('should allow the reviewed request after the callback risk is acknowledged', async () => {
+        await userEvent.click(screen.getByTestId('callback-acknowledge'))
+        await waitFor(() => expect(view).toHaveAttribute('data-approve-blocked', 'false'))
       })
     })
 
@@ -2246,9 +2269,7 @@ describe('RequestPage', () => {
 
         it('should keep the review without warning that another party can deploy at the signer address', () => {
           expect(view).toBeInTheDocument()
-          if (kind === 'signature') {
-            expect(view).toHaveAttribute('data-deferred-callbacks', '[]')
-          }
+          expect(view).toHaveAttribute('data-callbacks', '[]')
         })
       })
     })
@@ -3134,9 +3155,7 @@ describe('RequestPage', () => {
         mockGetCounterpartyAddresses.mockReturnValue({ addresses: [...addresses], opaque })
         mockClassifyRequest.mockResolvedValue(dclTransaction({ call }))
         renderRequestPage()
-        await waitFor(() =>
-          expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-deferred-callbacks', JSON.stringify([recipient]))
-        )
+        await waitFor(() => expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-callbacks', JSON.stringify([recipient])))
         await waitFor(() => expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-sim', 'ready'))
       })
 
@@ -3147,7 +3166,7 @@ describe('RequestPage', () => {
       })
 
       it('should relay after the callback risk is acknowledged', async () => {
-        await userEvent.click(screen.getByTestId('wallet-interaction-callback-acknowledge'))
+        await userEvent.click(screen.getByTestId('callback-acknowledge'))
         await waitFor(() => expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-approve-blocked', 'false'))
         await userEvent.click(screen.getByTestId('wallet-interaction-approve'))
         await waitFor(() => expect(jest.mocked(sendMetaTransaction)).toHaveBeenCalledTimes(1))
@@ -3157,41 +3176,6 @@ describe('RequestPage', () => {
         await userEvent.click(screen.getByTestId('wallet-interaction-acknowledge'))
         await userEvent.click(screen.getByTestId('wallet-interaction-approve'))
         expect(jest.mocked(sendMetaTransaction)).not.toHaveBeenCalled()
-      })
-    })
-
-    describe('and the transfer is a gift candidate', () => {
-      beforeEach(() => {
-        const call = { functionName: 'safeTransferFrom', args: [SIGNER, recipient, BigInt(1)], payable: false, forwardsCall: false }
-        const { addresses, opaque } = collectCallAddresses(call, 137)
-        addresses.delete(SIGNER.toLowerCase())
-        mockGetCounterpartyAddresses.mockReturnValue({ addresses: [...addresses], opaque })
-        mockClassifyRequest.mockResolvedValue(dclTransaction({ call, branded: 'gift_candidate' }))
-        jest.mocked(decodeNftTransferData).mockReturnValue({ fromAddress: SIGNER, tokenId: '1', toAddress: recipient })
-        mockIsExactNftTransferSimulation.mockReturnValue(true)
-        jest.mocked(fetchProfile).mockResolvedValue(null)
-        jest
-          .mocked(fetchNftMetadata)
-          .mockResolvedValue({ imageUrl: 'x', tokenId: '1', name: 'n', description: 'd', rarity: 'common' } as any)
-      })
-
-      afterEach(() => {
-        jest.mocked(decodeNftTransferData).mockReturnValue(null)
-        jest.mocked(fetchNftMetadata).mockReset()
-        jest.mocked(fetchProfile).mockReset()
-      })
-
-      it('should stay on the generic review, which can ask for the consent, rather than show the gift screen', async () => {
-        renderRequestPage()
-        await waitFor(() =>
-          expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-deferred-callbacks', JSON.stringify([recipient]))
-        )
-        await waitFor(() => expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-sim', 'ready'))
-
-        // The upgrade waits on the preview and the counterparty check, both settled by now; it did not happen.
-        expect(jest.mocked(fetchNftMetadata)).not.toHaveBeenCalled()
-        expect(screen.queryByTestId('transfer-confirm')).not.toBeInTheDocument()
-        expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-approve-blocked', 'true')
       })
     })
 
@@ -3206,7 +3190,7 @@ describe('RequestPage', () => {
 
       it('should allow the review without relying on the recipient remaining empty', async () => {
         await waitFor(() => expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-approve-blocked', 'false'))
-        expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-deferred-callbacks', '[]')
+        expect(screen.getByTestId('wallet-interaction')).toHaveAttribute('data-callbacks', '[]')
         expect(mockIsAddressWithoutCode).not.toHaveBeenCalled()
       })
     })
@@ -3295,6 +3279,30 @@ describe('RequestPage', () => {
         renderRequestPage()
         expect(await screen.findByTestId('signing-error')).toHaveAttribute('data-kind', 'unsupported_contract')
         expect(screen.queryByTestId('transfer-confirm')).not.toBeInTheDocument()
+      })
+    })
+
+    describe('and the recipient has no code during the preview', () => {
+      let view: HTMLElement
+
+      beforeEach(async () => {
+        mockGetCounterpartyAddresses.mockReturnValue({ addresses: ['0xrecipient'], opaque: false })
+        mockIsAddressWithoutCode.mockResolvedValue(true)
+        renderRequestPage()
+        view = await screen.findByTestId('transfer-confirm')
+      })
+
+      it('should carry the mutable callback into the branded review', () => {
+        expect(view).toHaveAttribute('data-callbacks', '["0xrecipient"]')
+      })
+
+      it('should block approval until the callback risk is acknowledged', () => {
+        expect(view).toHaveAttribute('data-approve-blocked', 'true')
+      })
+
+      it('should enable approval after the callback risk is acknowledged', async () => {
+        await userEvent.click(screen.getByTestId('callback-acknowledge'))
+        await waitFor(() => expect(view).toHaveAttribute('data-approve-blocked', 'false'))
       })
     })
 
@@ -3475,7 +3483,7 @@ describe('RequestPage', () => {
           mockClassifyRequest.mockResolvedValue(dclMetaTransaction({ call }))
           ;({ rerender } = renderRequestPage())
           await waitFor(() =>
-            expect(screen.getByTestId('signature-request')).toHaveAttribute('data-deferred-callbacks', JSON.stringify([recipient]))
+            expect(screen.getByTestId('signature-request')).toHaveAttribute('data-callbacks', JSON.stringify([recipient]))
           )
           await waitFor(() => expect(screen.getByTestId('signature-request')).toHaveAttribute('data-sim', 'ready'))
         })
@@ -3487,7 +3495,7 @@ describe('RequestPage', () => {
         })
 
         it('should sign after the callback risk is acknowledged', async () => {
-          await userEvent.click(screen.getByTestId('signature-callback-acknowledge'))
+          await userEvent.click(screen.getByTestId('callback-acknowledge'))
           await waitFor(() => expect(screen.getByTestId('signature-request')).toHaveAttribute('data-approve-blocked', 'false'))
           await userEvent.click(screen.getByTestId('signature-approve'))
           await waitFor(() => expect(mockWalletRequest).toHaveBeenCalledTimes(1))
@@ -3495,13 +3503,13 @@ describe('RequestPage', () => {
 
         describe('and the provider refreshes after consent', () => {
           beforeEach(async () => {
-            await userEvent.click(screen.getByTestId('signature-callback-acknowledge'))
+            await userEvent.click(screen.getByTestId('callback-acknowledge'))
             await waitFor(() => expect(screen.getByTestId('signature-request')).toHaveAttribute('data-approve-blocked', 'false'))
             mockConnectionData = { ...mockConnectionData, provider: { isMagic: false, refreshed: true } }
             rerenderRequestPage(rerender)
             await waitFor(() => expect(mockRecover.mock.calls.length).toBeGreaterThanOrEqual(2))
             await waitFor(() =>
-              expect(screen.getByTestId('signature-request')).toHaveAttribute('data-deferred-callbacks', JSON.stringify([recipient]))
+              expect(screen.getByTestId('signature-request')).toHaveAttribute('data-callbacks', JSON.stringify([recipient]))
             )
             await waitFor(() => expect(screen.getByTestId('signature-request')).toHaveAttribute('data-sim', 'ready'))
           })
@@ -3531,7 +3539,7 @@ describe('RequestPage', () => {
 
         it('should allow review without relying on the recipient remaining empty', async () => {
           await waitFor(() => expect(screen.getByTestId('signature-request')).toHaveAttribute('data-approve-blocked', 'false'))
-          expect(screen.getByTestId('signature-request')).toHaveAttribute('data-deferred-callbacks', '[]')
+          expect(screen.getByTestId('signature-request')).toHaveAttribute('data-callbacks', '[]')
           expect(mockIsAddressWithoutCode).not.toHaveBeenCalled()
         })
       })

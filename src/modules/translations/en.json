@@ -66,8 +66,6 @@
       "review_title": "Review this transaction",
       "preview_unavailable_warning": "We couldn't check what this transaction does because the preview service is temporarily unavailable. Only approve if you trust the scene that requested it.",
       "acknowledge_preview_unavailable": "I understand the preview is unavailable and I'm approving without seeing what this transaction does",
-      "deferred_callback_notice": "An address this transaction hands the contract has no code today. Code could be deployed there before the transaction executes, and the contract would then run it — this preview can't show what that code would do.",
-      "acknowledge_deferred_callback": "I understand that code deployed before this transaction executes could change what it does, and I accept this risk.",
       "review_restarted_notice": "Your wallet's network changed or couldn't be verified, so this transaction was reviewed again on the current network.",
       "calls_function": "Calls {functionName} on {contractName}"
     },
@@ -103,6 +101,8 @@
       "on_network": "on {network}",
       "acknowledge_risk": "I understand this grants access to my assets",
       "acknowledge_no_visible_effects": "I understand the preview shows no changes to my assets and this may still change settings or roles I can't see here",
+      "callback_code_notice": "An address used by this call has no contract code now. Code could be deployed there before the call executes, causing execution to differ from this preview.",
+      "acknowledge_callback_code": "I understand that code deployed after this preview could change what this call does, and I accept this risk.",
       "approval_can_spend_symbol": "can spend {symbol}",
       "approval_can_no_longer_spend": "can no longer spend {symbol}",
       "approval_allowance_revoked": "Spending allowance for {symbol} revoked",
@@ -121,8 +121,6 @@
       "description": "Review what you are about to sign.",
       "view_raw": "View raw data",
       "hide_raw": "Hide raw data",
-      "deferred_callback_notice": "An address used by this call has no contract code today. Code could be deployed there before this signature is submitted, causing execution to differ from this preview.",
-      "acknowledge_deferred_callback": "I understand that code deployed after I sign could change what this call does, and I accept this risk.",
       "meta_tx_notice": "This signature authorizes the contract to run this action on your behalf. It doesn't expire and can be submitted later by the app that requested it.",
       "meta_tx_reverted": "This action fails right now, so its effects couldn't be previewed. Only sign it if you expect it to work later.",
       "acknowledge_unverified": "I understand the effects of this signature couldn't be verified"
