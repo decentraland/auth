@@ -316,8 +316,10 @@ const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
 type Counterparties = { addresses: string[]; opaque: boolean }
 
 /**
- * Every address a decoded Decentraland call is handed, other than the signer's own and the zero address,
- * lowercased and deduplicated. A Decentraland contract calls the addresses it is given: a collection
+ * Every address a decoded Decentraland call may invoke, other than the zero address, lowercased and
+ * deduplicated. The reviewing signer's address remains included: it may itself contain contract-wallet
+ * code, and ownership of the address is not evidence that the code is safe to omit from the review.
+ * A Decentraland contract calls the addresses it is given: a collection
  * calls the recipient of a safe transfer (`onERC721Received`), the marketplaces and bids call the NFT
  * registry of an order (`ownerOf`, `safeTransferFrom`, a fingerprint check), the credits manager runs the
  * marketplace call nested in its `externalCall`. Whatever code sits there runs inside the transaction, and
@@ -329,9 +331,8 @@ type Counterparties = { addresses: string[]; opaque: boolean }
  * argument is not a call (the one that deploys code, `createCollection`, is a deliberate exception noted
  * next to FORWARDING_FUNCTIONS).
  */
-function getCounterpartyAddresses(call: DecodedCall, signerAddress: string, chainId: number): Counterparties {
+function getCounterpartyAddresses(call: DecodedCall, chainId: number): Counterparties {
   const { addresses, opaque } = collectCallAddresses(call, chainId)
-  addresses.delete(signerAddress.toLowerCase())
   addresses.delete(ZERO_ADDRESS)
   return { addresses: [...addresses], opaque }
 }

@@ -422,11 +422,27 @@ describe('when reading the addresses a Decentraland call is handed', () => {
 
   describe('and the call is a safe transfer to another account', () => {
     beforeEach(() => {
-      call = { functionName: 'safeTransferFrom', args: [SIGNER, OTHER, BigInt(1)], payable: false, forwardsCall: false }
+      call = {
+        functionName: 'safeTransferFrom',
+        argNames: ['from', 'to', 'tokenId'],
+        args: [SIGNER, OTHER, BigInt(1)],
+        payable: false,
+        forwardsCall: false
+      }
     })
 
-    it('should return the recipient and not the signer, with nothing left unread', () => {
-      expect(getCounterpartyAddresses(call, SIGNER, CHAIN)).toEqual({ addresses: [OTHER], opaque: false })
+    it('should return the recipient and skip the sender that the token never calls', () => {
+      expect(getCounterpartyAddresses(call, CHAIN)).toEqual({ addresses: [OTHER], opaque: false })
+    })
+  })
+
+  describe('and the signer is itself a called address', () => {
+    beforeEach(() => {
+      call = { functionName: 'mintUniqueTokenTo', args: [SIGNER, BigInt(1), 'uri'], payable: false, forwardsCall: false }
+    })
+
+    it('should retain it so connected contract-wallet code is verified', () => {
+      expect(getCounterpartyAddresses(call, CHAIN)).toEqual({ addresses: [SIGNER], opaque: false })
     })
   })
 
@@ -436,7 +452,7 @@ describe('when reading the addresses a Decentraland call is handed', () => {
     })
 
     it('should return the registry', () => {
-      expect(getCounterpartyAddresses(call, SIGNER, CHAIN)).toEqual({ addresses: [NFT], opaque: false })
+      expect(getCounterpartyAddresses(call, CHAIN)).toEqual({ addresses: [NFT], opaque: false })
     })
   })
 
@@ -459,7 +475,7 @@ describe('when reading the addresses a Decentraland call is handed', () => {
     })
 
     it('should return every nested address once, lowercased, without the signer', () => {
-      expect(getCounterpartyAddresses(call, SIGNER, CHAIN)).toEqual({ addresses: [OTHER, NFT], opaque: false })
+      expect(getCounterpartyAddresses(call, CHAIN)).toEqual({ addresses: [OTHER, NFT, SIGNER], opaque: false })
     })
   })
 
@@ -484,22 +500,22 @@ describe('when reading the addresses a Decentraland call is handed', () => {
     })
 
     it('should return the target and flag the payload as unread', () => {
-      expect(getCounterpartyAddresses(call, SIGNER, CHAIN)).toEqual({ addresses: [OTHER], opaque: true })
+      expect(getCounterpartyAddresses(call, CHAIN)).toEqual({ addresses: [OTHER], opaque: true })
     })
   })
 
   describe('and the call names the signer in another casing and the zero address', () => {
     beforeEach(() => {
       call = {
-        functionName: 'safeTransferFrom',
+        functionName: 'mintUniqueTokenTo',
         args: [SIGNER.toUpperCase().replace('0X', '0x'), '0x0000000000000000000000000000000000000000', BigInt(1)],
         payable: false,
         forwardsCall: false
       }
     })
 
-    it('should return nothing', () => {
-      expect(getCounterpartyAddresses(call, SIGNER, CHAIN)).toEqual({ addresses: [], opaque: false })
+    it('should preserve the signer canonically and omit the zero address', () => {
+      expect(getCounterpartyAddresses(call, CHAIN)).toEqual({ addresses: [SIGNER], opaque: false })
     })
   })
 
@@ -509,7 +525,7 @@ describe('when reading the addresses a Decentraland call is handed', () => {
     })
 
     it('should return nothing, since a transfer never calls its recipient', () => {
-      expect(getCounterpartyAddresses(call, SIGNER, CHAIN)).toEqual({ addresses: [], opaque: false })
+      expect(getCounterpartyAddresses(call, CHAIN)).toEqual({ addresses: [], opaque: false })
     })
   })
 
@@ -519,7 +535,7 @@ describe('when reading the addresses a Decentraland call is handed', () => {
     })
 
     it('should return nothing', () => {
-      expect(getCounterpartyAddresses(call, SIGNER, CHAIN)).toEqual({ addresses: [], opaque: false })
+      expect(getCounterpartyAddresses(call, CHAIN)).toEqual({ addresses: [], opaque: false })
     })
   })
 })

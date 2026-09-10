@@ -699,13 +699,19 @@ describe('when collecting the addresses a call reaches', () => {
   describe('and the call is a safe transfer, whose recipient is called', () => {
     beforeEach(() => {
       result = collectCallAddresses(
-        { functionName: 'safeTransferFrom', args: [USER, OTHER, 1n], payable: false, forwardsCall: false },
+        {
+          functionName: 'safeTransferFrom',
+          argNames: ['from', 'to', 'tokenId'],
+          args: [USER, OTHER, 1n],
+          payable: false,
+          forwardsCall: false
+        },
         POLYGON
       )
     })
 
-    it('should reach the recipient', () => {
-      expect(result.addresses.has(OTHER)).toBe(true)
+    it('should reach the recipient but not the sender', () => {
+      expect(result).toEqual({ addresses: new Set([OTHER]), opaque: false })
     })
   })
 

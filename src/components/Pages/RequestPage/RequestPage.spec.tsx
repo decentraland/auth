@@ -2219,6 +2219,40 @@ describe('RequestPage', () => {
       })
     })
 
+    describe('and the reviewing signer is among the addresses the call invokes', () => {
+      beforeEach(() => {
+        mockGetCounterpartyAddresses.mockReturnValue({ addresses: [SIGNER], opaque: false })
+      })
+
+      describe('and the signer has unrecognized contract code', () => {
+        beforeEach(() => {
+          mockIsAddressWithoutCode.mockResolvedValue(false)
+          mockIsDecentralandCollection.mockResolvedValue(false)
+          renderRequestPage()
+        })
+
+        it('should refuse instead of exempting code because it belongs to the connected account', async () => {
+          expect(await screen.findByTestId('signing-error')).toHaveAttribute('data-kind', 'unsupported_contract')
+          expect(mockIsAddressWithoutCode).toHaveBeenCalledWith(SIGNER, 137)
+        })
+      })
+
+      describe('and the signer is an account without code', () => {
+        beforeEach(async () => {
+          mockIsAddressWithoutCode.mockResolvedValue(true)
+          renderRequestPage()
+          view = await findVerifiedView()
+        })
+
+        it('should keep the review without warning that another party can deploy at the signer address', () => {
+          expect(view).toBeInTheDocument()
+          if (kind === 'signature') {
+            expect(view).toHaveAttribute('data-deferred-callbacks', '[]')
+          }
+        })
+      })
+    })
+
     describe('and that address is a Decentraland collection', () => {
       beforeEach(async () => {
         mockIsAddressWithoutCode.mockResolvedValue(false)
@@ -3022,7 +3056,7 @@ describe('RequestPage', () => {
     it('should run the same counterparty check as the generic review', async () => {
       renderRequestPage()
       await screen.findByTestId('transfer-confirm')
-      expect(mockGetCounterpartyAddresses).toHaveBeenCalledWith(expect.objectContaining({ functionName: 'transfer' }), SIGNER, 137)
+      expect(mockGetCounterpartyAddresses).toHaveBeenCalledWith(expect.objectContaining({ functionName: 'transfer' }), 137)
     })
 
     describe('and the check finds the call reaches a contract that is not Decentraland', () => {
