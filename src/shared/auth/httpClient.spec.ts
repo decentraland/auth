@@ -628,10 +628,7 @@ describe('createAuthServerClient', () => {
 
       beforeEach(() => {
         response = { status: 'success', assetChanges: [], approvalChanges: [], balanceChanges: [], events: [] }
-        mockFetch.mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve(response)
-        })
+        mockFetch.mockResolvedValueOnce({ ok: true, body: new Response(JSON.stringify(response)).body })
       })
 
       it('should POST the body to the /simulations endpoint', async () => {
@@ -751,10 +748,46 @@ describe('createAuthServerClient', () => {
       ]
     ])('and the server responds with 200 and %s', (_label, payload) => {
       beforeEach(() => {
-        mockFetch.mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(JSON.parse(payload)) })
+        mockFetch.mockResolvedValueOnce({ ok: true, body: new Response(payload).body })
       })
 
       it('should throw a SimulationUnavailableError rather than hand the body to the review', async () => {
+        await expect(client.simulateTransaction(body)).rejects.toBeInstanceOf(SimulationUnavailableError)
+      })
+    })
+
+    describe('and the server responds with a successful body larger than the review will read', () => {
+      beforeEach(() => {
+        // Valid by every other rule — each collection sits exactly at its row bound and no field exceeds
+        // the field bound — so only its size can refuse it. Streamed, because that is how an oversized
+        // body arrives: the cap has to stop it while it is being read, not after the whole thing is
+        // buffered.
+        const padding = 'x'.repeat(1024)
+        const oversized = JSON.stringify({
+          status: 'success',
+          assetChanges: Array.from({ length: 1024 }, () => ({
+            type: 'transfer',
+            standard: 'erc20',
+            from: null,
+            to: null,
+            amount: null,
+            rawAmount: null,
+            tokenId: null,
+            contractAddress: null,
+            symbol: padding,
+            name: padding,
+            decimals: null,
+            logoUrl: null,
+            dollarValue: null
+          })),
+          approvalChanges: [],
+          balanceChanges: [],
+          events: []
+        })
+        mockFetch.mockResolvedValueOnce({ ok: true, body: new Response(oversized).body })
+      })
+
+      it('should degrade like an outage rather than buffer and parse it', async () => {
         await expect(client.simulateTransaction(body)).rejects.toBeInstanceOf(SimulationUnavailableError)
       })
     })
@@ -763,14 +796,15 @@ describe('createAuthServerClient', () => {
       beforeEach(() => {
         mockFetch.mockResolvedValueOnce({
           ok: true,
-          json: () =>
-            Promise.resolve({
+          body: new Response(
+            JSON.stringify({
               status: 'success',
               assetChanges: [],
               approvalChanges: [],
               balanceChanges: [],
               events: Array.from({ length: 1025 }, () => ({ name: 'Transfer', address: '0xabc' }))
             })
+          ).body
         })
       })
 

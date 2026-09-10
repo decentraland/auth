@@ -180,4 +180,29 @@ describe('parseSimulationResponse', () => {
       expect(parseSimulationResponse({ ...buildResponse(), events: [{ name: 'Transfer' }] })).toBeNull()
     })
   })
+  describe('when a string field runs longer than anything a conforming server sends', () => {
+    it.each([
+      ['an asset symbol', 'assetChanges', () => ({ ...buildAssetChange(), symbol: 'x'.repeat(1025) })],
+      ['an asset contract address', 'assetChanges', () => ({ ...buildAssetChange(), contractAddress: 'x'.repeat(1025) })],
+      ['an asset logo URL', 'assetChanges', () => ({ ...buildAssetChange(), logoUrl: `https://e.example/${'x'.repeat(1025)}` })],
+      ['an approval owner', 'approvalChanges', () => ({ ...buildApprovalChange(), owner: 'x'.repeat(1025) })],
+      ['an approval name', 'approvalChanges', () => ({ ...buildApprovalChange(), name: 'x'.repeat(1025) })],
+      ['a balance address', 'balanceChanges', () => ({ address: 'x'.repeat(1025), dollarValue: null })],
+      ['an event name', 'events', () => ({ name: 'x'.repeat(1025), address: '0xa' })]
+    ])('should return null for %s', (_label, collection, build) => {
+      expect(parseSimulationResponse({ ...buildResponse(), [collection]: [build()] })).toBeNull()
+    })
+
+    it('should return null for a revert reason, which is the whole preview on a revert', () => {
+      const response = { ...buildResponse(), status: 'reverted', error: 'x'.repeat(1025), assetChanges: [], approvalChanges: [] }
+
+      expect(parseSimulationResponse(response)).toBeNull()
+    })
+
+    it('should accept a field exactly at the bound', () => {
+      const response = { ...buildResponse(), assetChanges: [{ ...buildAssetChange(), name: 'x'.repeat(1024) }] }
+
+      expect(parseSimulationResponse(response)).not.toBeNull()
+    })
+  })
 })

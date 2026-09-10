@@ -28,7 +28,18 @@ import { ApprovalChange, AssetChange, BalanceChange, SimulationEvent, Simulation
  */
 const MAX_COLLECTION_ENTRIES = 1024
 
-const isStringOrNull = (value: unknown): value is string | null => value === null || typeof value === 'string'
+/**
+ * Upper bound on any single string in a preview. Every one of them is read by something whose cost grows
+ * with its length: the acknowledgment fingerprint serializes the whole result on each render, and a few
+ * reach the screen without a display cap of their own (an event name, a contract address in a tooltip, a
+ * revert reason). The longest legitimate value is a logo URL or a decimals-applied figure the server
+ * already bounds at 128 characters, and a uint256 token id is 78, so this is several times the longest
+ * thing a conforming server sends while keeping any one field's cost bounded.
+ */
+const MAX_FIELD_LENGTH = 1024
+
+const isBoundedString = (value: unknown): value is string => typeof value === 'string' && value.length <= MAX_FIELD_LENGTH
+const isStringOrNull = (value: unknown): value is string | null => value === null || isBoundedString(value)
 const isNumberOrNull = (value: unknown): value is number | null => value === null || typeof value === 'number'
 
 const ASSET_TYPES: ReadonlySet<string> = new Set(['transfer', 'mint', 'burn'])
@@ -39,9 +50,9 @@ const APPROVAL_STANDARDS: ReadonlySet<string> = new Set(['erc20', 'erc721', 'unk
 function isAssetChange(value: unknown): value is AssetChange {
   return (
     isRecord(value) &&
-    typeof value.type === 'string' &&
+    isBoundedString(value.type) &&
     ASSET_TYPES.has(value.type) &&
-    typeof value.standard === 'string' &&
+    isBoundedString(value.standard) &&
     ASSET_STANDARDS.has(value.standard) &&
     isStringOrNull(value.from) &&
     isStringOrNull(value.to) &&
@@ -60,13 +71,13 @@ function isAssetChange(value: unknown): value is AssetChange {
 function isApprovalChange(value: unknown): value is ApprovalChange {
   return (
     isRecord(value) &&
-    typeof value.kind === 'string' &&
+    isBoundedString(value.kind) &&
     APPROVAL_KINDS.has(value.kind) &&
-    typeof value.standard === 'string' &&
+    isBoundedString(value.standard) &&
     APPROVAL_STANDARDS.has(value.standard) &&
-    typeof value.owner === 'string' &&
-    typeof value.spender === 'string' &&
-    typeof value.contractAddress === 'string' &&
+    isBoundedString(value.owner) &&
+    isBoundedString(value.spender) &&
+    isBoundedString(value.contractAddress) &&
     typeof value.isUnlimited === 'boolean' &&
     (value.approved === null || typeof value.approved === 'boolean') &&
     isStringOrNull(value.amount) &&
@@ -78,11 +89,11 @@ function isApprovalChange(value: unknown): value is ApprovalChange {
 }
 
 function isBalanceChange(value: unknown): value is BalanceChange {
-  return isRecord(value) && typeof value.address === 'string' && isStringOrNull(value.dollarValue)
+  return isRecord(value) && isBoundedString(value.address) && isStringOrNull(value.dollarValue)
 }
 
 function isSimulationEvent(value: unknown): value is SimulationEvent {
-  return isRecord(value) && typeof value.address === 'string' && isStringOrNull(value.name)
+  return isRecord(value) && isBoundedString(value.address) && isStringOrNull(value.name)
 }
 
 /**
@@ -97,8 +108,9 @@ function parseSimulationResponse(value: unknown): SimulationResponseBody | null 
   if (value.status !== 'success' && value.status !== 'reverted') {
     return null
   }
-  // Only present on a revert, and only shown there.
-  if (value.error !== undefined && typeof value.error !== 'string') {
+  // Only present on a revert, and only shown there — where it is the whole preview, so it is bounded
+  // like every other string the review renders.
+  if (value.error !== undefined && !isBoundedString(value.error)) {
     return null
   }
   const isBoundedArray = (collection: unknown, isEntry: (entry: unknown) => boolean): boolean =>
