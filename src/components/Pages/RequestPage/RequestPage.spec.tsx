@@ -8,7 +8,7 @@ import * as viem from 'viem'
 import { ProviderType } from '@dcl/schemas'
 import { sendMetaTransaction } from 'decentraland-transactions'
 import { TrackingEvents } from '../../../modules/analytics/types'
-import { fetchProfile } from '../../../modules/profile'
+import { fetchProfile, fetchProfiles } from '../../../modules/profile'
 import {
   ContractLookupUnavailableError,
   DifferentSenderError,
@@ -137,7 +137,8 @@ jest.mock('../../../shared/errors', () => ({
   isChainMismatchRejection: (...args: any[]) => mockIsChainMismatchRejection(...args)
 }))
 jest.mock('../../../modules/profile', () => ({
-  fetchProfile: jest.fn()
+  fetchProfile: jest.fn(),
+  fetchProfiles: jest.fn()
 }))
 jest.mock('../../../modules/config', () => ({
   config: { get: jest.fn().mockReturnValue('10000') }
@@ -513,6 +514,9 @@ describe('RequestPage', () => {
     mockEstimateGas.mockResolvedValue(BigInt(21000))
     mockBuildSendTransactionSimulationPayload.mockReturnValue({ chainId: 137, from: SIGNER, to: CONTRACT, data: '0x', value: '0' })
     mockSimulateTransaction.mockResolvedValue(simulationOf())
+    // Counterparty names are progressive enhancement, so most cases want none; those that assert on them
+    // set their own.
+    jest.mocked(fetchProfiles).mockResolvedValue(new Map())
   })
 
   afterEach(() => {
@@ -2630,12 +2634,14 @@ describe('RequestPage', () => {
       })
 
       afterEach(() => {
-        jest.mocked(fetchProfile).mockReset()
+        jest.mocked(fetchProfiles).mockReset()
       })
 
       describe('and the name is unclaimed', () => {
         beforeEach(() => {
-          jest.mocked(fetchProfile).mockResolvedValue({ avatars: [{ name: 'Decentraland', hasClaimedName: false }] } as any)
+          jest
+            .mocked(fetchProfiles)
+            .mockResolvedValue(new Map([[counterparty, { avatars: [{ name: 'Decentraland', hasClaimedName: false }] } as any]]))
         })
 
         it('should qualify the name with the address so a self-chosen name cannot pose as a trusted party', async () => {
@@ -2647,7 +2653,9 @@ describe('RequestPage', () => {
 
       describe('and the name is claimed', () => {
         beforeEach(() => {
-          jest.mocked(fetchProfile).mockResolvedValue({ avatars: [{ name: 'Decentraland', hasClaimedName: true }] } as any)
+          jest
+            .mocked(fetchProfiles)
+            .mockResolvedValue(new Map([[counterparty, { avatars: [{ name: 'Decentraland', hasClaimedName: true }] } as any]]))
         })
 
         it('should show the name on its own', async () => {
@@ -3608,17 +3616,17 @@ describe('RequestPage', () => {
       mockGetAddresses.mockResolvedValue([SIGNER])
       mockRecover.mockResolvedValue(recovered('eth_sendTransaction', [{ to: CONTRACT, data: '0xabcd', value: '0x0' }]))
       mockClassifyRequest.mockResolvedValue(dclTransaction())
-      jest.mocked(fetchProfile).mockResolvedValue({ avatars: [{ name: 'Somebody', hasClaimedName: true }] } as never)
+      jest.mocked(fetchProfiles).mockResolvedValue(new Map())
     })
 
     afterEach(() => {
-      jest.mocked(fetchProfile).mockReset()
+      jest.mocked(fetchProfiles).mockReset()
     })
+
+    const requestedAddresses = () => (jest.mocked(fetchProfiles).mock.calls[0]?.[0] as string[] | undefined) ?? []
 
     describe('and every movement is the signer sending to a different counterparty', () => {
       beforeEach(() => {
-        // `fetchProfile` is one request per address with no batching or cache, and the DTO admits 1,024
-        // movements and 1,024 permissions, so one lookup per counterparty would be thousands at once.
         mockSimulateTransaction.mockResolvedValue(
           simulationOf({
             assetChanges: Array.from({ length: 400 }, (_, index) =>
@@ -3628,13 +3636,23 @@ describe('RequestPage', () => {
         )
       })
 
-      it('should look up no more names than the cap, however many movements are reported', async () => {
+      it('should ask for the names in one bulk request rather than one per address', async () => {
         renderRequestPage()
         const view = await screen.findByTestId('wallet-interaction')
         await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
-        await waitFor(() => expect(Object.keys(JSON.parse(view.getAttribute('data-profiles') ?? '{}')).length).toBeGreaterThan(0))
+        await waitFor(() => expect(jest.mocked(fetchProfiles)).toHaveBeenCalled())
 
-        expect(jest.mocked(fetchProfile).mock.calls.length).toBeLessThanOrEqual(50)
+        expect(jest.mocked(fetchProfiles)).toHaveBeenCalledTimes(1)
+        expect(jest.mocked(fetchProfile)).not.toHaveBeenCalled()
+      })
+
+      it('should ask for no more than the cap, however many movements are reported', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('wallet-interaction')
+        await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+        await waitFor(() => expect(jest.mocked(fetchProfiles)).toHaveBeenCalled())
+
+        expect(requestedAddresses().length).toBe(200)
       })
     })
 
@@ -3649,11 +3667,12 @@ describe('RequestPage', () => {
         )
       })
 
-      it('should look up nothing, since a name nothing displays is a request made for nobody', async () => {
+      it('should ask for nothing, since a name nothing displays is a request made for nobody', async () => {
         renderRequestPage()
         const view = await screen.findByTestId('wallet-interaction')
         await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
 
+        expect(jest.mocked(fetchProfiles)).not.toHaveBeenCalled()
         expect(jest.mocked(fetchProfile)).not.toHaveBeenCalled()
       })
     })
@@ -3665,45 +3684,48 @@ describe('RequestPage', () => {
         )
       })
 
-      it('should look up nothing, since a mint names no counterparty on screen', async () => {
+      it('should ask for nothing, since a mint names no counterparty on screen', async () => {
         renderRequestPage()
         const view = await screen.findByTestId('wallet-interaction')
         await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
 
+        expect(jest.mocked(fetchProfiles)).not.toHaveBeenCalled()
         expect(jest.mocked(fetchProfile)).not.toHaveBeenCalled()
       })
     })
 
-    describe('and the lookups are in flight', () => {
-      let inFlight: number
-      let peak: number
-
+    describe('and the counterparties are the signer and the zero address', () => {
       beforeEach(() => {
-        inFlight = 0
-        peak = 0
-        jest.mocked(fetchProfile).mockImplementation(async () => {
-          inFlight += 1
-          peak = Math.max(peak, inFlight)
-          await Promise.resolve()
-          inFlight -= 1
-          return { avatars: [{ name: 'Somebody', hasClaimedName: true }] } as never
-        })
         mockSimulateTransaction.mockResolvedValue(
           simulationOf({
-            assetChanges: Array.from({ length: 40 }, (_, index) =>
-              erc721Transfer({ from: SIGNER, to: `0x${index.toString(16).padStart(40, 'd')}` })
-            )
+            assetChanges: [erc721Transfer({ from: SIGNER, to: SIGNER })],
+            approvalChanges: [
+              {
+                kind: 'approval',
+                standard: 'erc721',
+                owner: SIGNER,
+                spender: '0x0000000000000000000000000000000000000000',
+                amount: null,
+                rawAmount: null,
+                isUnlimited: false,
+                tokenId: '1',
+                approved: null,
+                contractAddress: CONTRACT,
+                symbol: null,
+                name: null
+              }
+            ]
           })
         )
       })
 
-      it('should run a few at a time rather than all at once', async () => {
+      it('should ask for nothing, since neither is a counterparty to name', async () => {
         renderRequestPage()
         const view = await screen.findByTestId('wallet-interaction')
         await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
-        await waitFor(() => expect(jest.mocked(fetchProfile).mock.calls.length).toBe(40))
 
-        expect(peak).toBeLessThanOrEqual(6)
+        expect(jest.mocked(fetchProfiles)).not.toHaveBeenCalled()
+        expect(jest.mocked(fetchProfile)).not.toHaveBeenCalled()
       })
     })
   })

@@ -12,7 +12,7 @@ import { useSkipSetup } from '../../../hooks/useSkipSetup'
 import { getAnalytics } from '../../../modules/analytics/segment'
 import { ClickEvents, TrackingEvents } from '../../../modules/analytics/types'
 import { config } from '../../../modules/config'
-import { fetchProfile } from '../../../modules/profile'
+import { fetchProfile, fetchProfiles } from '../../../modules/profile'
 import {
   ContractLookupUnavailableError,
   DecodedCall,
@@ -144,15 +144,18 @@ enum View {
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
 
 /**
- * How many counterparties a preview may have names looked up for, and how many lookups run at once.
- * Profile names are progressive enhancement — a row without one shows the shortened address, which is what
- * every row shows until its name arrives — so this is bounded rather than fanned out. The concurrency
- * matches what a browser will open to one host anyway, and the cap is far above any review a person reads
- * (the recorded previews have one to three counterparties) while keeping the burst on the profile service
- * bounded for a preview that reports a thousand movements.
+ * How many counterparties a preview may have names looked up for. Names are progressive enhancement — a
+ * row without one shows the shortened address, which is what every row shows until its name arrives — so
+ * this is bounded rather than fanned out over whatever a preview reports (up to 1,024 movements and 1,024
+ * permissions).
+ *
+ * The bound is on the answer, not the requests: `fetchProfiles` asks in bulk, a hundred addresses per
+ * request, so the count stopped being the expensive part. What a bulk answer carries is whole profiles —
+ * avatar, wearables, snapshot URLs — for names of which only two fields are read, so it is payload that
+ * has to be kept proportionate to a screen someone is reading. 200 is far past any review a person works
+ * through (the recorded previews have one to three counterparties) and costs two requests.
  */
-const MAX_ENRICHED_COUNTERPARTIES = 50
-const PROFILE_LOOKUP_CONCURRENCY = 6
+const MAX_ENRICHED_COUNTERPARTIES = 200
 
 const TERMINAL_VIEWS = new Set([
   View.DEEP_LINK_CONTINUE_IN_APP,
@@ -698,27 +701,16 @@ export const RequestPage = () => {
             consider(approval.spender)
           }
 
-          // A few at a time, and never more than the cap. A preview may report up to 1,024 movements and
-          // 1,024 permissions, and `fetchProfile` is one request per address with no batching or cache, so
-          // one call per counterparty would be thousands at once — aimed at the profile service, for names
-          // that mostly no one would read. The rows the cap leaves out keep the shortened address, which is
-          // what every row shows until a name arrives, and the cap takes the rows nearest the top first.
-          const queue = [...addresses]
+          if (addresses.size === 0) return
+          // Asked in bulk, so the whole set costs a request or two rather than one per address (see
+          // fetchProfiles). The rows the cap leaves out keep the shortened address, which is what every row
+          // shows until a name arrives, and the cap takes the rows nearest the top first.
+          const profiles = await fetchProfiles([...addresses])
           const resolved: Record<string, string> = {}
-          const worker = async () => {
-            for (;;) {
-              const address = queue.shift()
-              if (address === undefined) return
-              try {
-                const profile = await fetchProfile(address)
-                const name = getProfileDisplayName(profile, address)
-                if (name) resolved[address] = name
-              } catch {
-                // No name for this one; the row keeps its address.
-              }
-            }
+          for (const address of addresses) {
+            const name = getProfileDisplayName(profiles.get(address), address)
+            if (name) resolved[address] = name
           }
-          await Promise.all(Array.from({ length: Math.min(PROFILE_LOOKUP_CONCURRENCY, queue.length) }, worker))
 
           if (isStale()) return
           if (Object.keys(resolved).length > 0) {

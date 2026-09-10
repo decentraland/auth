@@ -68,6 +68,62 @@ async function fetchProfile(address: string, fetcher?: IFetchComponent): Promise
   return profile
 }
 
+/**
+ * How many addresses go in one bulk request. The lambdas bulk endpoints document a 500-id ceiling for
+ * their other collections, and this one states none, so it is chunked well under that rather than trusting
+ * an undocumented limit — a server that silently answered for a prefix would look exactly like the
+ * addresses having no profile.
+ */
+const PROFILES_PER_REQUEST = 100
+
+/** How many of those requests are in flight at once. Each answer carries whole profiles, not just names. */
+const PROFILE_REQUEST_CONCURRENCY = 3
+
+/**
+ * The profiles for many addresses, keyed by lowercased address, using the lambdas bulk endpoint — one
+ * request per hundred addresses instead of one per address.
+ *
+ * Results are attributed by the address each profile reports (`ethAddress`, or `userId` when it does not),
+ * never by position: the endpoint answers with the profiles that exist, so an address without one is
+ * absent from the array and matching by index would hand a name to the wrong account. A profile that
+ * reports no address at all is dropped for the same reason.
+ *
+ * A failed chunk resolves to no names for its addresses rather than rejecting: names are progressive
+ * enhancement, and one unlucky request should not cost the others theirs.
+ */
+async function fetchProfiles(addresses: string[], fetcher?: IFetchComponent): Promise<Map<string, Profile>> {
+  const PEER_URL = config.get('PEER_URL')
+  const defaultFetcher = createFetcher({ timeout: Number(config.get('PROFILE_CONSISTENCY_CHECK_TIMEOUT')) || 10000 })
+  const client = createLambdasClient({ url: PEER_URL + '/lambdas', fetcher: fetcher ?? defaultFetcher })
+
+  const chunks: string[][] = []
+  for (let index = 0; index < addresses.length; index += PROFILES_PER_REQUEST) {
+    chunks.push(addresses.slice(index, index + PROFILES_PER_REQUEST))
+  }
+
+  const byAddress = new Map<string, Profile>()
+  const queue = [...chunks]
+  const worker = async () => {
+    for (;;) {
+      const chunk = queue.shift()
+      if (chunk === undefined) return
+      try {
+        const profiles = await client.getAvatarsDetailsByPost({ ids: chunk })
+        for (const profile of profiles) {
+          const [avatar] = profile.avatars ?? []
+          const owner = avatar?.ethAddress ?? avatar?.userId
+          if (!owner) continue
+          byAddress.set(owner.toLowerCase(), profile)
+        }
+      } catch {
+        // No names for this chunk; its rows keep their addresses.
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(PROFILE_REQUEST_CONCURRENCY, queue.length) }, worker))
+  return byAddress
+}
+
 async function fetchProfileWithConsistencyCheck(
   address: string,
   disabledCatalysts: string[],
@@ -297,6 +353,7 @@ function isNotFoundResponse(response: any): boolean {
 
 export {
   fetchProfile,
+  fetchProfiles,
   fetchProfileWithStatus,
   fetchProfileWithConsistencyCheck,
   getCatalystUrlsForRotation,
