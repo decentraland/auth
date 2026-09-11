@@ -250,6 +250,7 @@
       "sending_gift": "Enviando regalo a",
       "confirm_gift": "Confirmar regalo para",
       "creator_of": "CREADOR DE",
+      "view_recipient_on_explorer": "Ver destinatario en {explorer}",
       "processing_authorization": "Procesando autorización",
       "gifting_warning": "Regalar un artículo no se puede deshacer."
     },

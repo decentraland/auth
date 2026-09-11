@@ -1848,6 +1848,7 @@ export const RequestPage = () => {
             type={TransferType.GIFT}
             transferData={nftTransferData}
             isLoading={isLoading}
+            chainId={simulationChainId}
             callbackAddresses={mutableCallbackAddresses}
             callbackAcknowledged={isMutableCallbackAcknowledged}
             approveBlocked={approveBlocked}
@@ -1865,6 +1866,7 @@ export const RequestPage = () => {
             type={TransferType.TIP}
             transferData={manaTransferData}
             isLoading={isLoading}
+            chainId={simulationChainId}
             callbackAddresses={mutableCallbackAddresses}
             callbackAcknowledged={isMutableCallbackAcknowledged}
             approveBlocked={approveBlocked}
