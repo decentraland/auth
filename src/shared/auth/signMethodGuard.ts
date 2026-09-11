@@ -78,6 +78,9 @@ function assertMethodIsAllowed(method: string): string {
 // reads, not on the prefixes.
 const EPHEMERAL_ADDRESS_LINE_OFFSET = 'Ephemeral address: '.length
 const EXPIRATION_LINE_OFFSET = 'Expiration: '.length
+// The auth-chain consumer also accepts unprefixed hex contract addresses. Keep this
+// deny-list broader than the canonical address format required for wallet requests.
+const IDENTITY_AUTH_ADDRESS_REGEX = /^(?:0x)?[0-9a-f]{40}$/i
 
 /**
  * Returns whether a message would parse as a Decentraland identity-authorization payload the way
@@ -99,7 +102,7 @@ function isDecentralandIdentityAuthMessage(message: unknown): boolean {
   // The exact bytes parseEmphemeralPayload would take as the ephemeral address and expiration.
   const ephemeralAddress = lines[1].slice(EPHEMERAL_ADDRESS_LINE_OFFSET)
   const expiration = Date.parse(lines[2].slice(EXPIRATION_LINE_OFFSET))
-  return ADDRESS_REGEX.test(ephemeralAddress) && !Number.isNaN(expiration)
+  return IDENTITY_AUTH_ADDRESS_REGEX.test(ephemeralAddress) && !Number.isNaN(expiration)
 }
 
 // `personal_sign` params are routinely hex-encoded UTF-8 rather than plaintext — the approval UI

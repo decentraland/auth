@@ -158,6 +158,8 @@ const COLLECTION_LOOKUP_TIMEOUT_MS = 10_000
 const MAX_METADATA_BYTES = 256 * 1024
 // A tokenURI host that does not answer must not hold the gift view's upgrade open forever.
 const METADATA_FETCH_TIMEOUT_MS = 10_000
+// Optional scene details must not keep a tip waiting for the Places service until the request expires.
+const PLACES_FETCH_TIMEOUT_MS = 10_000
 
 /** Rejects when `promise` has not settled within `timeoutMs`. */
 function withTimeout<T>(promise: PromiseLike<T> | T, timeoutMs: number, label: string): Promise<T> {
@@ -506,7 +508,9 @@ async function fetchPlaceByCreatorAddress(
 ): Promise<{ sceneName: string; sceneImageUrl: string; sceneLocation: PlaceLocation } | null> {
   try {
     const placesApiUrl = config.get('PLACES_API_URL')
-    const response = await fetch(`${placesApiUrl}/api/places?creator_address=${creatorAddress.toLowerCase()}`)
+    const response = await fetch(`${placesApiUrl}/api/places?creator_address=${creatorAddress.toLowerCase()}`, {
+      signal: AbortSignal.timeout(PLACES_FETCH_TIMEOUT_MS)
+    })
 
     if (!response.ok) {
       console.error(`Failed to fetch place info from Places API: ${response.status} ${response.statusText}`)

@@ -1,6 +1,6 @@
 import { ErrorCode, MetaTransactionError, sendMetaTransaction } from 'decentraland-transactions'
 import { isUserRejectedTransaction } from '../errors'
-import { ReviewedSignerMismatchError, bindProviderToSigner } from './signerBoundProvider'
+import { ReviewedRequestInvalidatedError, ReviewedSignerMismatchError, bindProviderToSigner } from './signerBoundProvider'
 
 const SIGNER = '0xD9b96b5DC720fc52BEDE1ec3B40A930e15F70Ddd'
 const OTHER = '0x1234567890abcdef1234567890abcdef12345678'
@@ -170,6 +170,33 @@ describe('when binding a provider to the reviewed signer', () => {
 
     it('should preserve the original failure', async () => {
       await expect(bound.request({ method: 'eth_signTypedData_v4', params: [SIGNER, '{}'] })).rejects.toBe(failure)
+    })
+  })
+
+  describe('and the review is invalidated before signing', () => {
+    let failure: ReviewedRequestInvalidatedError
+    let networkRequest: jest.Mock
+
+    beforeEach(() => {
+      failure = new ReviewedRequestInvalidatedError()
+      bound = bindProviderToSigner({ request }, SIGNER, () => {
+        throw failure
+      }) as typeof bound
+      request.mockResolvedValueOnce([SIGNER]).mockResolvedValueOnce('0x')
+      networkRequest = jest.fn().mockResolvedValueOnce('0x0')
+    })
+
+    it('should stop the real relay before any wallet signature and preserve the invalidation error', async () => {
+      await expect(
+        sendMetaTransaction({ request: bound.request }, { request: networkRequest }, '0xabcd', {
+          address: OTHER,
+          abi: [],
+          name: 'Test',
+          version: '1',
+          chainId: 137
+        })
+      ).rejects.toBe(failure)
+      expect(request.mock.calls.map(([args]) => args.method)).toEqual(['eth_requestAccounts', 'eth_getCode'])
     })
   })
 })

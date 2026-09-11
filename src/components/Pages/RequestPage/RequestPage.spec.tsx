@@ -2318,6 +2318,57 @@ describe('RequestPage', () => {
       expect(sendMetaTransaction).toHaveBeenCalledTimes(1)
     })
 
+    describe('and outcome delivery is still pending after wallet execution', () => {
+      let user: ReturnType<typeof userEvent.setup>
+      let rejectOutcome: (error: Error) => void
+      let deliveryError: Error
+
+      beforeEach(() => {
+        jest.useFakeTimers()
+        user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime })
+        deliveryError = new Error('Outcome delivery unavailable')
+        mockConnectionData = { ...mockConnectionData, providerType: ProviderType.INJECTED }
+        mockRecover.mockResolvedValue({
+          ...recovered('eth_sendTransaction', [{ to: '0xmanacontract', data: '0xa9059cbb', value: '0x0' }]),
+          expiration: new Date(Date.now() + 60_000).toISOString()
+        })
+        mockSendSuccessfulOutcome.mockImplementationOnce(
+          () =>
+            new Promise((_resolve, reject) => {
+              rejectOutcome = reject
+            })
+        )
+      })
+
+      afterEach(() => {
+        jest.useRealTimers()
+      })
+
+      it('should show wallet completion immediately and preserve it past request expiry', async () => {
+        renderRequestPage()
+        await user.click(await screen.findByTestId('transfer-confirm-approve'))
+        expect(await screen.findByTestId('transfer-completed')).toBeInTheDocument()
+        act(() => jest.advanceTimersByTime(61_000))
+        expect(screen.getByTestId('transfer-completed')).toBeInTheDocument()
+        expect(screen.queryByTestId('timeout-error')).not.toBeInTheDocument()
+        expect(mockSendFailedOutcome).not.toHaveBeenCalled()
+      })
+
+      it('should report a delivery failure without changing the completed wallet action to failure', async () => {
+        renderRequestPage()
+        await user.click(await screen.findByTestId('transfer-confirm-approve'))
+        expect(await screen.findByTestId('transfer-completed')).toBeInTheDocument()
+        await act(async () => rejectOutcome(deliveryError))
+        expect(screen.getByTestId('transfer-completed')).toBeInTheDocument()
+        expect(mockSendFailedOutcome).not.toHaveBeenCalled()
+        expect(jest.requireMock('../../../shared/utils/errorHandler').handleError).toHaveBeenCalledWith(
+          deliveryError,
+          'Error delivering the outcome of an executed wallet interaction',
+          expect.any(Object)
+        )
+      })
+    })
+
     describe('and notification delivery is still pending after success', () => {
       let user: ReturnType<typeof userEvent.setup>
       let rejectNotification: (error: Error) => void
@@ -3577,6 +3628,112 @@ describe('RequestPage', () => {
         await waitFor(() => expect(mockWalletRequest).toHaveBeenCalledTimes(1))
         expect(mockWalletRequest).toHaveBeenCalledWith({ method: 'eth_signTypedData_v4', params: [SIGNER, TYPED_DATA] })
       })
+    })
+  })
+  describe('when relay preparation is still waiting for the nonce', () => {
+    let page: ReturnType<typeof renderRequestPage>
+    let user: ReturnType<typeof userEvent.setup>
+    let resolveNonce: (nonce: string) => void
+    let walletRequest: jest.Mock
+    let networkRequest: jest.Mock
+    let fetchSpy: jest.SpyInstance
+
+    beforeEach(() => {
+      jest.useFakeTimers()
+      user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime })
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'User' }] })
+      mockGetAddresses.mockResolvedValue([SIGNER])
+      mockRecover.mockResolvedValue({
+        ...recovered('eth_sendTransaction', [{ to: CONTRACT, data: '0xabcd', value: '0x0' }]),
+        expiration: new Date(Date.now() + 60000).toISOString()
+      })
+      mockClassifyRequest.mockResolvedValue(dclTransaction({ branded: 'tip' }))
+      jest.mocked(decodeManaTransferData).mockReturnValueOnce({ manaAmount: '1', toAddress: SIGNER })
+      jest.mocked(fetchProfile).mockResolvedValueOnce(null)
+      jest.requireMock('./utils').fetchPlaceByCreatorAddress.mockResolvedValueOnce(null)
+      walletRequest = jest.fn().mockImplementation(async ({ method }) => {
+        if (method === 'eth_requestAccounts' || method === 'eth_accounts') return [SIGNER]
+        if (method === 'eth_getCode') return '0x'
+        if (method === 'eth_signTypedData_v4') return '0x' + '00'.repeat(64) + '1b'
+        throw new Error(method)
+      })
+      networkRequest = jest.fn().mockImplementation(
+        () =>
+          new Promise<string>(resolve => {
+            resolveNonce = resolve
+          })
+      )
+      mockGetConnectedProvider.mockResolvedValue({ request: walletRequest })
+      jest.requireMock('./utils').getNetworkProvider.mockResolvedValue({ request: networkRequest })
+      jest.mocked(sendMetaTransaction).mockImplementation(jest.requireActual('decentraland-transactions').sendMetaTransaction)
+      fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({ json: async () => ({ txHash: '0xhash' }) } as Response)
+      mockSendSuccessfulOutcome.mockResolvedValue({})
+      page = renderRequestPage()
+    })
+
+    afterEach(() => {
+      fetchSpy.mockRestore()
+      jest.mocked(sendMetaTransaction).mockReset()
+      jest.requireMock('./utils').getNetworkProvider.mockResolvedValue({ isNetworkProvider: true })
+      jest.useRealTimers()
+    })
+
+    it('should stop an expired request before signing or submitting it', async () => {
+      await user.click(await screen.findByTestId('transfer-confirm-approve'))
+      await waitFor(() => expect(networkRequest).toHaveBeenCalled())
+      expect(walletRequest.mock.calls.some(([args]) => args.method === 'eth_signTypedData_v4')).toBe(false)
+      act(() => jest.advanceTimersByTime(61000))
+      expect(screen.getByTestId('timeout-error')).toBeInTheDocument()
+      await act(async () => resolveNonce('0x0'))
+      expect(walletRequest.mock.calls.some(([args]) => args.method === 'eth_signTypedData_v4')).toBe(false)
+      expect(fetchSpy).not.toHaveBeenCalled()
+      expect(mockSendSuccessfulOutcome).not.toHaveBeenCalled()
+      expect(mockSendFailedOutcome).not.toHaveBeenCalled()
+      expect(screen.getByTestId('timeout-error')).toBeInTheDocument()
+    })
+
+    it('should stop preparation after the review page unmounts', async () => {
+      await user.click(await screen.findByTestId('transfer-confirm-approve'))
+      await waitFor(() => expect(networkRequest).toHaveBeenCalled())
+      page.unmount()
+      await act(async () => resolveNonce('0x0'))
+      expect(walletRequest.mock.calls.some(([args]) => args.method === 'eth_signTypedData_v4')).toBe(false)
+      expect(fetchSpy).not.toHaveBeenCalled()
+      expect(mockSendSuccessfulOutcome).not.toHaveBeenCalled()
+      expect(mockSendFailedOutcome).not.toHaveBeenCalled()
+    })
+
+    it('should complete a valid request after relay preparation finishes', async () => {
+      await user.click(await screen.findByTestId('transfer-confirm-approve'))
+      await waitFor(() => expect(networkRequest).toHaveBeenCalled())
+      await act(async () => resolveNonce('0x0'))
+      expect(walletRequest.mock.calls.some(([args]) => args.method === 'eth_signTypedData_v4')).toBe(true)
+      expect(fetchSpy).toHaveBeenCalled()
+      expect(mockSendSuccessfulOutcome).toHaveBeenCalledWith(REQUEST_ID, SIGNER, '0xhash')
+      expect(screen.getByTestId('transfer-completed')).toBeInTheDocument()
+    })
+
+    it('should check the expiration time even before its timer has run', async () => {
+      await user.click(await screen.findByTestId('transfer-confirm-approve'))
+      await waitFor(() => expect(networkRequest).toHaveBeenCalled())
+      jest.setSystemTime(Date.now() + 61000)
+      await act(async () => resolveNonce('0x0'))
+      expect(walletRequest.mock.calls.some(([args]) => args.method === 'eth_signTypedData_v4')).toBe(false)
+      expect(fetchSpy).not.toHaveBeenCalled()
+      expect(mockSendFailedOutcome).not.toHaveBeenCalled()
+      expect(screen.getByTestId('timeout-error')).toBeInTheDocument()
+    })
+
+    it('should discard preparation when the connection replaces the reviewed provider', async () => {
+      await user.click(await screen.findByTestId('transfer-confirm-approve'))
+      await waitFor(() => expect(networkRequest).toHaveBeenCalled())
+      mockConnectionData = { ...mockConnectionData, provider: { refreshed: true } }
+      rerenderRequestPage(page.rerender)
+      await act(async () => resolveNonce('0x0'))
+      expect(walletRequest.mock.calls.some(([args]) => args.method === 'eth_signTypedData_v4')).toBe(false)
+      expect(fetchSpy).not.toHaveBeenCalled()
+      expect(mockSendSuccessfulOutcome).not.toHaveBeenCalled()
+      expect(mockSendFailedOutcome).not.toHaveBeenCalled()
     })
   })
 })
