@@ -102,6 +102,7 @@
       "on_network": "on {network}",
       "acknowledge_risk": "I understand this grants access to my assets",
       "acknowledge_no_visible_effects": "I understand the preview shows no changes to my assets and this may still change settings or roles I can't see here",
+      "acknowledge_reverted": "I understand this action fails right now, and that if that changes before it is sent it could do something this preview didn't show",
       "callback_code_notice": "An address used by this call has no contract code now. Code could be deployed there before the call executes, causing execution to differ from this preview.",
       "acknowledge_callback_code": "I understand that code deployed after this preview could change what this call does, and I accept this risk.",
       "approval_can_spend_symbol": "can spend {symbol}",

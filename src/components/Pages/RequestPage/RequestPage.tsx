@@ -1674,13 +1674,24 @@ export const RequestPage = () => {
   // is acknowledged when: (a) the simulation shows a high-risk permission; (b) the simulation could
   // NOT be produced, so the effects can't be shown — this holds even for a relayed call, because a
   // gas-covered relay still executes whatever call it is handed; (c) a signed MetaTransaction has no
-  // verified effects; or (d) the preview ran but shows no change the user can check.
+  // verified effects; (d) the preview ran but shows no change the user can check; or (e) the preview
+  // says the call reverts.
+  //
+  // (e) is asked of a transaction as well, not only of a signature. A revert is the one previewed
+  // outcome that describes state rather than the call: it says this call fails against the state the
+  // simulation ran on, and says nothing about the state it will be mined against. Anything that makes
+  // it stop reverting — the requester's own transaction landing first, a listing appearing, an
+  // allowance arriving — leaves it executing effects nobody previewed, and the delay is real for both
+  // kinds: an ordinary send waits in the mempool, a relayed one waits on the gas tank's own
+  // submission. `hasNoVisibleEffects` deliberately does not count a reverted preview as "nothing to
+  // show" (see previewEffects), so nothing else was asking for this.
   const requiresApprovalAcknowledgment =
     classification !== null &&
     (!isDecentralandRequest ||
       hasDangerousApprovalChange ||
       hasPreviewWithoutVisibleEffects ||
       simulationState.status === 'unavailable' ||
+      isSimulationReverted ||
       isSignatureWithoutVerifiedEffects)
 
   // Derived, not synced: on the render where the route id or the account changes, every piece of

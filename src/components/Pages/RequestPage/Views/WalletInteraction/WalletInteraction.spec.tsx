@@ -228,6 +228,16 @@ describe('when rendering the WalletInteraction view', () => {
       props = { ...props, simulation: { status: 'ready', result: { ...successResult, assetChanges: [] } }, requiresAcknowledgment: true }
     })
 
+    it('should word the acknowledgment for a call that fails against today state', () => {
+      render(<WalletInteraction {...{ ...props, isReverted: true }} />)
+      expect(screen.getByText('request.transaction_dialog.acknowledge_reverted')).toBeInTheDocument()
+    })
+
+    it('should keep the unavailable-preview wording when there is no preview to have reverted', () => {
+      render(<WalletInteraction {...{ ...props, isReverted: true, simulation: { status: 'unavailable' } }} />)
+      expect(screen.getByText('request.wallet_interaction.acknowledge_preview_unavailable')).toBeInTheDocument()
+    })
+
     it('should word the acknowledgment for a call whose effects the preview cannot show', () => {
       render(<WalletInteraction {...props} />)
       expect(screen.getByText('request.transaction_dialog.acknowledge_no_visible_effects')).toBeInTheDocument()
