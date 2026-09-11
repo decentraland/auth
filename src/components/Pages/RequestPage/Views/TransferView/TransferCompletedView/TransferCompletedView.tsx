@@ -58,7 +58,17 @@ const TransferCompletedView = (props: TransferCompletedViewProps) => {
           </>
         ) : (
           <>
-            <Profile address={transferData.toAddress} avatar={recipientAvatar as ProfileAvatar} size="huge" inline />
+            {/* The account that now holds the NFT, named as the confirmation screen named it. */}
+            <Profile
+              address={transferData.toAddress}
+              avatar={recipientAvatar as ProfileAvatar}
+              size="huge"
+              inline
+              showBothNameAndAddress
+              shortenAddress
+              showCopyButton
+              highlightName
+            />
             <Box>
               <SceneImageWrapper isGift>
                 <TransferAssetImage
