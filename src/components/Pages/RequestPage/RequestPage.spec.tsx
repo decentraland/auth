@@ -196,6 +196,7 @@ jest.mock('./Views', () => ({
       data-testid="action-request"
       data-kind={props.payload?.kind}
       data-payload={JSON.stringify(props.payload)}
+      data-method={props.method ?? ''}
       data-approve-blocked={String(props.approveBlocked)}
       data-acknowledged={String(props.acknowledged)}
       data-review-restarted={String(props.reviewRestarted)}
@@ -3438,6 +3439,17 @@ describe('RequestPage', () => {
 
       beforeEach(() => {
         mockRecover.mockResolvedValue(recovered('eth_signTypedData_v3', [SIGNER, TYPED_DATA]))
+      })
+
+      it('should name the method on screen, so the change the tick was dropped for is visible', async () => {
+        const { rerender } = renderRequestPage()
+        expect(await screen.findByTestId('action-request')).toHaveAttribute('data-method', 'eth_signTypedData_v3')
+
+        mockRecover.mockResolvedValue(recovered('eth_signTypedData_v4', [SIGNER, TYPED_DATA]))
+        mockConnectionData = { ...mockConnectionData, provider: { isMagic: false, refreshed: true } }
+        rerenderRequestPage(rerender)
+
+        await waitFor(() => expect(screen.getByTestId('action-request')).toHaveAttribute('data-method', 'eth_signTypedData_v4'))
       })
 
       it('should stop counting the acknowledgment and ask again before signing under the new method', async () => {

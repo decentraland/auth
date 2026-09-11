@@ -12,6 +12,8 @@ import {
   ConsentBox,
   Content,
   Hint,
+  MethodRow,
+  MethodValue,
   PayloadBlock,
   PayloadFrame,
   PayloadLabel,
@@ -91,6 +93,7 @@ function formatPayload(payload: ActionRequestPayload, t: Translate): string {
 export const ActionRequestView = ({
   requestId,
   payload,
+  method,
   approveBlocked = true,
   acknowledged = false,
   isLoading = false,
@@ -105,6 +108,9 @@ export const ActionRequestView = ({
   // Decentraland relays this call and covers the gas, so what the wallet will show is a signature over a
   // meta-transaction wrapping it. The block is the action, not the bytes the wallet receives, and says so.
   const isRelayed = payload.kind === 'transaction' && payload.relayed === true
+  // Which wallet operation this is. The same typed data can be signed under either typed-data method, and
+  // the two are different operations, so the method is named rather than left to be inferred from the JSON.
+  const shownMethod = payload.kind === 'transaction' ? undefined : method
 
   // Measured before paint and on every scroll, so the checkbox is never enabled for a frame the measurement
   // has not seen; a payload that fits the box without scrolling counts as read. Re-measured when the window
@@ -139,6 +145,12 @@ export const ActionRequestView = ({
       </Box>
       <Statement data-testid="action-statement">{t('request.action.statement')}</Statement>
       <Content data-testid="action-request" data-kind={payload.kind}>
+        {shownMethod ? (
+          <MethodRow data-testid="action-method">
+            <PayloadLabel>{t('request.action.payload_method')}</PayloadLabel>
+            <MethodValue>{shownMethod}</MethodValue>
+          </MethodRow>
+        ) : null}
         <PayloadLabel id="action-payload-label">
           {t(isRelayed ? 'request.action.payload_label_relayed' : 'request.action.payload_label')}
         </PayloadLabel>

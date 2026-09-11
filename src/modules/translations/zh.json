@@ -73,6 +73,7 @@
       "warning_signature_bearer": "允许合约以后代表你行事：签名不会过期，任何持有它的人都可以提交。",
       "warning_signature_login": "以你的身份登录其他网站或应用。",
       "warning_trust": "只有在你信任发起此请求的场景或应用时才继续。",
+      "payload_method": "方法",
       "payload_label": "以下是将发送到你钱包的完整内容：",
       "payload_label_relayed": "以下是将要执行的完整操作：",
       "payload_to": "接收方",

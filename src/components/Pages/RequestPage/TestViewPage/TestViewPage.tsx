@@ -255,6 +255,7 @@ export const TestViewPage = () => {
           <ActionRequestView
             requestId={DEFAULT_REQUEST_ID}
             payload={{ kind: 'typed_data', raw: metaTxRaw }}
+            method="eth_signTypedData_v4"
             approveBlocked={!acknowledged}
             acknowledged={acknowledged}
             onAcknowledgedChange={setAcknowledged}
@@ -269,6 +270,23 @@ export const TestViewPage = () => {
           <ActionRequestView
             requestId={DEFAULT_REQUEST_ID}
             payload={{ kind: 'typed_data', raw: permitRaw }}
+            method="eth_signTypedData_v4"
+            approveBlocked={!acknowledged}
+            acknowledged={acknowledged}
+            onAcknowledgedChange={setAcknowledged}
+            onDeny={noop}
+            onApprove={noop}
+          />
+        )
+      },
+      // The same JSON under the other typed-data method: a different wallet operation, named as one.
+      actionTypedDataV3: {
+        label: 'ActionRequest (typed data, signed under eth_signTypedData_v3)',
+        element: (
+          <ActionRequestView
+            requestId={DEFAULT_REQUEST_ID}
+            payload={{ kind: 'typed_data', raw: permitRaw }}
+            method="eth_signTypedData_v3"
             approveBlocked={!acknowledged}
             acknowledged={acknowledged}
             onAcknowledgedChange={setAcknowledged}
@@ -283,6 +301,7 @@ export const TestViewPage = () => {
           <ActionRequestView
             requestId={DEFAULT_REQUEST_ID}
             payload={{ kind: 'message', hex: personalSignHex, text: personalSignText }}
+            method="personal_sign"
             approveBlocked={!acknowledged}
             acknowledged={acknowledged}
             onAcknowledgedChange={setAcknowledged}
@@ -297,6 +316,7 @@ export const TestViewPage = () => {
           <ActionRequestView
             requestId={DEFAULT_REQUEST_ID}
             payload={{ kind: 'message', hex: personalSignDigestHex, text: null }}
+            method="personal_sign"
             approveBlocked={!acknowledged}
             acknowledged={acknowledged}
             onAcknowledgedChange={setAcknowledged}

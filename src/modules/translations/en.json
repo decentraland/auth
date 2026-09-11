@@ -73,6 +73,7 @@
       "warning_signature_bearer": "Let a contract act for you later: a signature doesn't expire, and anyone who holds it can submit it.",
       "warning_signature_login": "Log you in to another site or app as you.",
       "warning_trust": "Only continue if you trust the scene or app that asked for this.",
+      "payload_method": "Method",
       "payload_label": "This is exactly what will be sent to your wallet:",
       "payload_label_relayed": "This is exactly the action that will be performed:",
       "payload_to": "To",

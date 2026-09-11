@@ -32,6 +32,13 @@ interface ActionRequestViewProps {
   requestId: string
   payload: ActionRequestPayload
   /**
+   * The JSON-RPC method the wallet will be asked, as the request was recovered. Shown for the signing
+   * methods, where the same JSON can be signed under `eth_signTypedData_v3` or `_v4` and only the method
+   * tells the two wallet operations apart. A transaction omits it: its fields already say what it is, and
+   * a relayed one reaches the wallet as a signature rather than under the method the request named.
+   */
+  method?: string
+  /**
    * True while the review may not be acted on. The page holds every gate in one place — the acknowledgment
    * was given for this exact payload, the fee is known where the user pays it — and its approval handler
    * enforces the same value, so no button can approve a review the gates have not cleared (see

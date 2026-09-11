@@ -1593,6 +1593,7 @@ export const RequestPage = () => {
             key={requestId}
             requestId={requestId}
             payload={getActionPayload(classification)}
+            method={reviewedMethod}
             acknowledged={isAcknowledged}
             approveBlocked={approveBlocked}
             isLoading={isBusy}

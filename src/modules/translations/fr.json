@@ -73,6 +73,7 @@
       "warning_signature_bearer": "Laisser un contrat agir pour vous plus tard : une signature n'expire pas et quiconque la détient peut la soumettre.",
       "warning_signature_login": "Vous connecter à un autre site ou une autre application en votre nom.",
       "warning_trust": "Ne continuez que si vous faites confiance à la scène ou à l'application qui l'a demandé.",
+      "payload_method": "Méthode",
       "payload_label": "Voici exactement ce qui sera envoyé à votre portefeuille :",
       "payload_label_relayed": "Voici exactement l'action qui sera effectuée :",
       "payload_to": "À",

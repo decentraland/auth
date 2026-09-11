@@ -68,6 +68,22 @@ const ConsentBox = styled(Box)(({ theme }) => ({
   }
 }))
 
+// The method the wallet will be asked, beside its label: monospace, because it is an identifier the reader
+// may need to compare character by character (`eth_signTypedData_v3` against `_v4`).
+const MethodRow = styled(Box)(({ theme }) => ({
+  alignItems: 'baseline',
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: theme.spacing(0, 1)
+}))
+
+const MethodValue = styled('span')(({ theme }) => ({
+  color: theme.palette.text.primary,
+  fontFamily: 'monospace',
+  fontSize: theme.typography.pxToRem(13),
+  overflowWrap: 'anywhere'
+}))
+
 const PayloadLabel = styled(Typography)(({ theme }) => ({
   color: theme.palette.text.secondary,
   fontSize: theme.typography.pxToRem(13)
@@ -75,7 +91,7 @@ const PayloadLabel = styled(Typography)(({ theme }) => ({
 
 // Frames the payload so a fade can sit over its bottom edge while there is more below the fold: phones
 // draw no scrollbar, so without it a payload cut exactly at a line break would look complete.
-const PayloadFrame = styled(Box)<{ more?: boolean }>(({ theme, more }) => ({
+const PayloadFrame = styled('div')<{ more?: boolean }>(({ theme, more }) => ({
   position: 'relative',
   ['&::after']: {
     borderRadius: `0 0 ${theme.shape.borderRadius}px ${theme.shape.borderRadius}px`,
@@ -125,4 +141,4 @@ const Hint = styled(Typography)(({ theme }) => ({
   fontSize: theme.typography.pxToRem(13)
 }))
 
-export { ConsentBox, Content, Hint, PayloadBlock, PayloadFrame, PayloadLabel, Statement, WarningBox, WarningTitle }
+export { ConsentBox, Content, Hint, MethodRow, MethodValue, PayloadBlock, PayloadFrame, PayloadLabel, Statement, WarningBox, WarningTitle }

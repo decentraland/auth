@@ -73,6 +73,7 @@
       "warning_signature_bearer": "Permettere a un contratto di agire per te in futuro: una firma non scade e chiunque la possieda può inviarla.",
       "warning_signature_login": "Farti accedere a un altro sito o app come se fossi tu.",
       "warning_trust": "Continua solo se ti fidi della scena o dell'app che l'ha richiesto.",
+      "payload_method": "Metodo",
       "payload_label": "Questo è esattamente ciò che verrà inviato al tuo wallet:",
       "payload_label_relayed": "Questa è esattamente l'azione che verrà eseguita:",
       "payload_to": "A",

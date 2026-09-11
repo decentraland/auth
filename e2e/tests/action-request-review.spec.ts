@@ -128,6 +128,17 @@ test.describe('Generic request review', () => {
       await expect(page.getByTestId('action-scroll-hint')).toBeHidden()
     })
 
+    test('should name the signing method, so v3 and v4 are told apart for identical JSON', async ({ page }) => {
+      await page.goto(testView('actionTypedData'))
+      await expect(page.getByTestId('action-method')).toContainText('eth_signTypedData_v4', { timeout: 15_000 })
+      const v4Payload = await page.getByTestId('action-payload').textContent()
+
+      await page.goto(testView('actionTypedDataV3'))
+      await expect(page.getByTestId('action-method')).toContainText('eth_signTypedData_v3', { timeout: 15_000 })
+      // Same bytes, different wallet operation, and the screen says which.
+      expect(await page.getByTestId('action-payload').textContent()).toBe(v4Payload)
+    })
+
     test('should show a Decentraland meta-transaction the same way and warn that a signature never expires', async ({ page }) => {
       await page.goto(testView('actionMetaTransaction'))
 
@@ -171,6 +182,8 @@ test.describe('Generic request review', () => {
   test.describe('when the request is a personal_sign', () => {
     test('should show the message text and warn that it could log the user in elsewhere', async ({ page }) => {
       await page.goto(testView('actionPersonalSign'))
+
+      await expect(page.getByTestId('action-method')).toContainText('personal_sign', { timeout: 15_000 })
 
       await expect(page.getByTestId('action-payload')).toContainText('Welcome to Example Scene!', { timeout: 15_000 })
       await expect(page.getByTestId('action-warnings')).toContainText('Log you in to another site or app as you.')

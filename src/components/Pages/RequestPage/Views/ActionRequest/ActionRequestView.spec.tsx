@@ -230,6 +230,20 @@ describe('when rendering the ActionRequestView', () => {
     })
   })
 
+  describe('and the payload is a transaction', () => {
+    it('should not name a method, since the fields already say what it is', () => {
+      render(<ActionRequestView {...{ ...props, method: 'eth_sendTransaction' }} />)
+      expect(screen.queryByTestId('action-method')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('and no method is given', () => {
+    it('should show no method row rather than an empty one', () => {
+      render(<ActionRequestView {...{ ...props, payload: { kind: 'message', hex: '0x00', text: null } }} />)
+      expect(screen.queryByTestId('action-method')).not.toBeInTheDocument()
+    })
+  })
+
   describe('and the transaction is sent by the wallet itself', () => {
     it('should word the block as what the wallet receives and show no relay note', () => {
       render(<ActionRequestView {...props} />)
@@ -241,6 +255,28 @@ describe('when rendering the ActionRequestView', () => {
   describe('and the payload is typed data', () => {
     beforeEach(() => {
       props = { ...props, payload: { kind: 'typed_data', raw: '{"primaryType":"Permit","message":{"value":"1"}}' } }
+    })
+
+    // The same JSON can be signed under either typed-data method, and they are different wallet operations,
+    // so the one being asked for has to be on screen rather than inferred from the payload.
+    describe.each(['eth_signTypedData_v3', 'eth_signTypedData_v4'])('and the method is %s', method => {
+      it('should name that method beside the payload', () => {
+        render(<ActionRequestView {...{ ...props, method }} />)
+        const row = screen.getByTestId('action-method')
+        expect(row).toHaveTextContent('request.action.payload_method')
+        expect(row).toHaveTextContent(method)
+      })
+    })
+
+    it('should distinguish the two typed-data methods for one identical payload', () => {
+      const { rerender } = render(<ActionRequestView {...{ ...props, method: 'eth_signTypedData_v3' }} />)
+      const payload = screen.getByTestId('action-payload').textContent
+      expect(screen.getByTestId('action-method')).toHaveTextContent('eth_signTypedData_v3')
+
+      rerender(<ActionRequestView {...{ ...props, method: 'eth_signTypedData_v4' }} />)
+
+      expect(screen.getByTestId('action-payload').textContent).toBe(payload)
+      expect(screen.getByTestId('action-method')).toHaveTextContent('eth_signTypedData_v4')
     })
 
     it('should warn what a malicious signature could do, including that it never expires', () => {
@@ -264,6 +300,11 @@ describe('when rendering the ActionRequestView', () => {
   describe('and the payload is a readable message', () => {
     beforeEach(() => {
       props = { ...props, payload: { kind: 'message', hex: '0x57656c636f6d65', text: 'Welcome' } }
+    })
+
+    it('should name the signing method beside it', () => {
+      render(<ActionRequestView {...{ ...props, method: 'personal_sign' }} />)
+      expect(screen.getByTestId('action-method')).toHaveTextContent('personal_sign')
     })
 
     it('should warn that a message can log the user in elsewhere or authorize an order', () => {
