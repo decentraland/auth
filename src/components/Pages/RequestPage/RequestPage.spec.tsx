@@ -239,6 +239,7 @@ jest.mock('./Views', () => ({
     <div
       data-testid="transfer-confirm"
       data-approve-blocked={String(props.approveBlocked)}
+      data-chain={props.chainId ?? ''}
       data-callbacks={JSON.stringify(props.callbackAddresses ?? [])}
       data-callback-acknowledged={String(props.callbackAcknowledged)}
     >
@@ -3366,6 +3367,13 @@ describe('RequestPage', () => {
         await userEvent.click(screen.getByTestId('callback-acknowledge'))
         await waitFor(() => expect(view).toHaveAttribute('data-approve-blocked', 'false'))
       })
+    })
+
+    it('should hand the branded screen the chain, so the recipient can be looked up on the explorer', async () => {
+      renderRequestPage()
+      const view = await screen.findByTestId('transfer-confirm')
+
+      await waitFor(() => expect(view).toHaveAttribute('data-chain', '137'))
     })
 
     it('should relay the transfer through the collection on approval', async () => {

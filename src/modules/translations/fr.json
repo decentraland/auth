@@ -250,6 +250,7 @@
       "sending_gift": "Envoi d'un cadeau à",
       "confirm_gift": "Confirmer le cadeau pour",
       "creator_of": "CRÉATEUR DE",
+      "view_recipient_on_explorer": "Voir le destinataire sur {explorer}",
       "processing_authorization": "Traitement de l'autorisation",
       "gifting_warning": "Offrir un objet est irréversible."
     },

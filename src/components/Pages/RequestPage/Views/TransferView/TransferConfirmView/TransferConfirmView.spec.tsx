@@ -301,4 +301,61 @@ describe('when confirming a branded transfer', () => {
       expect(screen.queryByTestId('place-not-verified')).not.toBeInTheDocument()
     })
   })
+
+  // A way to check the recipient beyond what the screen states, on the chain the transfer executes on.
+  describe('and the gift screen knows the chain the transfer executes on', () => {
+    const RECIPIENT = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa5678'
+
+    const gift = (overrides: Partial<TransferConfirmViewProps> = {}): TransferConfirmViewProps =>
+      ({
+        type: TransferType.GIFT,
+        transferData: {
+          imageUrl: 'https://example.com/nft.png',
+          tokenId: '1',
+          toAddress: RECIPIENT,
+          contractAddress: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd',
+          name: 'Fancy Hat',
+          description: 'A hat',
+          rarity: Rarity.COMMON
+        },
+        isLoading: false,
+        chainId: 137,
+        onApprove,
+        onDeny,
+        ...overrides
+      }) as TransferConfirmViewProps
+
+    it('should offer the recipient on that chain block explorer', () => {
+      renderView(gift())
+
+      const link = screen.getByTestId('recipient-explorer-link')
+      expect(link).toHaveAttribute('href', `https://polygonscan.com/address/${RECIPIENT}`)
+      expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+      expect(link).toHaveAttribute('target', '_blank')
+    })
+
+    describe('and no chain is known for it', () => {
+      it('should show no link rather than one that goes nowhere', () => {
+        renderView(gift({ chainId: undefined }))
+
+        expect(screen.queryByTestId('recipient-explorer-link')).not.toBeInTheDocument()
+      })
+    })
+
+    describe('and the approval is being processed', () => {
+      it('should offer nothing to act on, the link included', () => {
+        renderView(gift({ isLoading: true }))
+
+        expect(screen.queryByTestId('recipient-explorer-link')).not.toBeInTheDocument()
+      })
+    })
+
+    describe('and the transfer is a tip', () => {
+      it('should offer no link, since that screen names the place and its own caveats instead', () => {
+        renderView(props)
+
+        expect(screen.queryByTestId('recipient-explorer-link')).not.toBeInTheDocument()
+      })
+    })
+  })
 })

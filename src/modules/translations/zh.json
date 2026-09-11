@@ -250,6 +250,7 @@
       "sending_gift": "正在发送礼物给",
       "confirm_gift": "确认礼物给",
       "creator_of": "创作者",
+      "view_recipient_on_explorer": "在 {explorer} 上查看接收方",
       "processing_authorization": "正在处理授权",
       "gifting_warning": "赠送物品无法撤销。"
     },

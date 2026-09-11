@@ -2,12 +2,14 @@ import { useState } from 'react'
 import { useTranslation } from '@dcl/hooks'
 import { Rarity } from '@dcl/schemas'
 import { Checkbox, FormControlLabel, Profile } from 'decentraland-ui2'
+import { getExplorerAddressUrl, getExplorerName } from '../../../../../../shared/explorer'
 import { TransferActionButtons, TransferAssetImage, TransferLayout, TransferLoadingState } from '../../../../../Transfer'
 import { CenteredContent, ItemName, Label, Notices, Title, WarningAlert } from '../../../../../Transfer/Transfer.styled'
 import { TransferType } from '../../../types'
 import type { MANATransferData, NFTTransferData, ProfileAvatar } from '../../../types'
 import { PlaceDetails, PlaceLocationName, PlaceNote, SceneName } from '../TransferTipComponents.styled'
 import { TransferConfirmViewProps } from './TransferConfirmView.types'
+import { RecipientExplorerLink } from './TransferConfirmView.styled'
 
 const TransferConfirmView = (props: TransferConfirmViewProps) => {
   const { t } = useTranslation()
@@ -24,6 +26,10 @@ const TransferConfirmView = (props: TransferConfirmViewProps) => {
   // The notices make way for the processing state, and the group that holds them goes with them: its
   // margin is what closes the distance to the buttons, and there are no buttons then (see Notices).
   const showsGiftingWarning = !isTip && !isProcessing
+  // A way to go and look the recipient up, next to the address the screen already states. Gone once the
+  // approval is being processed, with the notices and the buttons: the decision has been made, and the
+  // screen stops offering anything to act on.
+  const explorerUrl = isProcessing ? null : getExplorerAddressUrl(props.chainId, transferData.toAddress)
   const asksCallbackConsent = !isProcessing && (props.callbackAddresses?.length ?? 0) > 0
 
   const handleApprove = async () => {
@@ -96,6 +102,11 @@ const TransferConfirmView = (props: TransferConfirmViewProps) => {
               showCopyButton
               highlightName
             />
+            {explorerUrl ? (
+              <RecipientExplorerLink href={explorerUrl} target="_blank" rel="noopener noreferrer" data-testid="recipient-explorer-link">
+                {t('transfer.confirm.view_recipient_on_explorer', { explorer: getExplorerName(props.chainId) })}
+              </RecipientExplorerLink>
+            ) : null}
             <TransferAssetImage
               src={(transferData as NFTTransferData).imageUrl}
               name={(transferData as NFTTransferData).name || `NFT #${(transferData as NFTTransferData).tokenId}`}

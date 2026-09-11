@@ -100,7 +100,14 @@ export const TestViewPage = () => {
       nftTransfer: {
         label: 'TransferConfirmView (Gift)',
         element: (
-          <TransferConfirmView type={TransferType.GIFT} transferData={nftData} isLoading={false} onDeny={noop} onApprove={asyncNoop} />
+          <TransferConfirmView
+            type={TransferType.GIFT}
+            transferData={nftData}
+            isLoading={false}
+            chainId={137}
+            onDeny={noop}
+            onApprove={asyncNoop}
+          />
         )
       },
       // The consent asked when the recipient had no code at preview time, gated here as RequestPage gates it,
@@ -112,6 +119,7 @@ export const TestViewPage = () => {
             type={TransferType.GIFT}
             transferData={nftData}
             isLoading={false}
+            chainId={137}
             callbackAddresses={[nftData.toAddress]}
             callbackAcknowledged={acknowledged}
             approveBlocked={!acknowledged}
@@ -147,6 +155,7 @@ export const TestViewPage = () => {
             type={TransferType.GIFT}
             transferData={{ ...nftData, recipientProfile: { avatars: [unclaimedNameAvatar] } }}
             isLoading={false}
+            chainId={137}
             onDeny={noop}
             onApprove={asyncNoop}
           />
@@ -179,7 +188,14 @@ export const TestViewPage = () => {
       walletNftInteraction: {
         label: 'Wallet NFT Interaction',
         element: (
-          <TransferConfirmView type={TransferType.GIFT} transferData={nftData} isLoading={false} onDeny={noop} onApprove={asyncNoop} />
+          <TransferConfirmView
+            type={TransferType.GIFT}
+            transferData={nftData}
+            isLoading={false}
+            chainId={137}
+            onDeny={noop}
+            onApprove={asyncNoop}
+          />
         )
       },
       walletManaInteraction: {

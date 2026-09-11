@@ -250,6 +250,7 @@
       "sending_gift": "Sending Gift to",
       "confirm_gift": "Confirm Gift for",
       "creator_of": "CREATOR OF",
+      "view_recipient_on_explorer": "View recipient on {explorer}",
       "processing_authorization": "Processing Authorization",
       "gifting_warning": "Gifting an item cannot be undone."
     },
