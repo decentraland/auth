@@ -75,6 +75,20 @@ export const TestViewPage = () => {
           <TransferConfirmView type={TransferType.TIP} transferData={manaData} isLoading={false} onDeny={noop} onApprove={asyncNoop} />
         )
       },
+      // The same screen for a place that is a world: addressed by a NAME its deployer owns, so the name is
+      // what locates it and its base position says nothing (see getPlaceLocation).
+      manaTransferWorld: {
+        label: 'TransferConfirmView (Tip, place is a world)',
+        element: (
+          <TransferConfirmView
+            type={TransferType.TIP}
+            transferData={{ ...manaData, sceneLocation: { kind: 'world', name: 'flagtag.dcl.eth' } }}
+            isLoading={false}
+            onDeny={noop}
+            onApprove={asyncNoop}
+          />
+        )
+      },
       manaTransferCanceled: {
         label: 'TransferCanceledView (Tip)',
         element: <TransferCanceledView type={TransferType.TIP} transferData={manaData} />
