@@ -8,10 +8,8 @@ import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
 import { connection } from 'decentraland-connect'
 import { getContract } from 'decentraland-transactions'
 import { config } from '../../../modules/config'
-import { DecodedCall, KnownContract, SimulationResponseBody } from '../../../shared/auth'
-import { RequestClassification } from './classifyRequest'
+import { DecodedCall } from '../../../shared/auth'
 import {
-  buildSendTransactionSimulationPayload,
   decodeManaTransferData,
   decodeNftTransferData,
   fetchNftMetadata,
@@ -23,8 +21,7 @@ import {
   getNetworkProvider,
   getSigninDeeplink,
   isAddressWithoutCode,
-  isDecentralandCollection,
-  isExactNftTransferSimulation
+  isDecentralandCollection
 } from './utils'
 
 jest.mock('decentraland-connect')
@@ -553,13 +550,24 @@ describe('when testing decodeNftTransferData', () => {
     })
   })
 
-  describe('and the call is a safeTransferFrom with a data argument', () => {
+  describe('and the call is a safeTransferFrom with an empty data argument', () => {
     beforeEach(() => {
       call = { functionName: 'safeTransferFrom', args: ['0xfrom', '0xto', BigInt(9), '0x'], payable: false, forwardsCall: false }
     })
 
     it('should return the source, tokenId and destination', () => {
       expect(decodeNftTransferData(call)).toEqual({ fromAddress: '0xfrom', tokenId: '9', toAddress: '0xto' })
+    })
+  })
+
+  describe('and the call is a safeTransferFrom that hands the recipient data', () => {
+    beforeEach(() => {
+      // The recipient's callback receives those bytes; the gift screen would not show them.
+      call = { functionName: 'safeTransferFrom', args: ['0xfrom', '0xto', BigInt(9), '0xdeadbeef'], payable: false, forwardsCall: false }
+    })
+
+    it('should return null so the generic review shows the data', () => {
+      expect(decodeNftTransferData(call)).toBeNull()
     })
   })
 
@@ -575,7 +583,7 @@ describe('when testing decodeNftTransferData', () => {
       }
     })
 
-    it('should return null so the generic review previews it', () => {
+    it('should return null so the generic review explains it', () => {
       expect(decodeNftTransferData(call)).toBeNull()
     })
   })
@@ -609,240 +617,6 @@ describe('when testing decodeNftTransferData', () => {
 
     it('should return null', () => {
       expect(decodeNftTransferData(call)).toBeNull()
-    })
-  })
-})
-
-describe('when checking whether an NFT simulation exactly matches the branded gift', () => {
-  let result: SimulationResponseBody
-  let signerAddress: string
-  let contractAddress: string
-  let transfer: { fromAddress: string; tokenId: string; toAddress: string }
-
-  beforeEach(() => {
-    signerAddress = '0x0000000000000000000000000000000000000001'
-    contractAddress = '0x0000000000000000000000000000000000000002'
-    transfer = {
-      fromAddress: signerAddress,
-      tokenId: '7',
-      toAddress: '0x0000000000000000000000000000000000000003'
-    }
-    result = {
-      status: 'success',
-      assetChanges: [
-        {
-          type: 'transfer',
-          standard: 'erc721',
-          from: signerAddress,
-          to: transfer.toAddress,
-          amount: '1',
-          rawAmount: '1',
-          tokenId: transfer.tokenId,
-          contractAddress,
-          symbol: null,
-          name: 'Wearable',
-          decimals: null,
-          logoUrl: null,
-          dollarValue: null
-        }
-      ],
-      approvalChanges: [],
-      balanceChanges: [],
-      events: []
-    }
-  })
-
-  afterEach(() => {
-    jest.resetAllMocks()
-  })
-
-  describe('and the only effect is the displayed transfer from the connected signer', () => {
-    it('should allow the specialized gift view', () => {
-      expect(isExactNftTransferSimulation(result, signerAddress, contractAddress, transfer)).toBe(true)
-    })
-  })
-
-  describe('and a receiver callback moves another asset', () => {
-    beforeEach(() => {
-      result.assetChanges.push({
-        ...result.assetChanges[0],
-        standard: 'erc20',
-        tokenId: null,
-        contractAddress: '0x0000000000000000000000000000000000000004'
-      })
-    })
-
-    it('should require the generic simulation summary', () => {
-      expect(isExactNftTransferSimulation(result, signerAddress, contractAddress, transfer)).toBe(false)
-    })
-  })
-
-  describe('and the transfer grants an approval', () => {
-    beforeEach(() => {
-      result.approvalChanges.push({
-        kind: 'approvalForAll',
-        standard: 'erc721',
-        owner: signerAddress,
-        spender: transfer.toAddress,
-        amount: null,
-        rawAmount: null,
-        isUnlimited: true,
-        tokenId: null,
-        approved: true,
-        contractAddress,
-        symbol: null,
-        name: null
-      })
-    })
-
-    it('should require the generic simulation summary', () => {
-      expect(isExactNftTransferSimulation(result, signerAddress, contractAddress, transfer)).toBe(false)
-    })
-  })
-
-  describe('and the calldata transfers an NFT owned by another account', () => {
-    beforeEach(() => {
-      transfer.fromAddress = '0x0000000000000000000000000000000000000005'
-    })
-
-    it('should require the generic simulation summary', () => {
-      expect(isExactNftTransferSimulation(result, signerAddress, contractAddress, transfer)).toBe(false)
-    })
-  })
-
-  describe('and the simulation reverted', () => {
-    beforeEach(() => {
-      result.status = 'reverted'
-    })
-
-    it('should require the generic simulation summary', () => {
-      expect(isExactNftTransferSimulation(result, signerAddress, contractAddress, transfer)).toBe(false)
-    })
-  })
-
-  describe('and the token goes to a recipient other than the one on screen', () => {
-    beforeEach(() => {
-      result.assetChanges[0].to = '0x0000000000000000000000000000000000000009'
-    })
-
-    it('should require the generic simulation summary', () => {
-      expect(isExactNftTransferSimulation(result, signerAddress, contractAddress, transfer)).toBe(false)
-    })
-  })
-
-  describe('and the token moves on a contract other than the one being called', () => {
-    beforeEach(() => {
-      result.assetChanges[0].contractAddress = '0x0000000000000000000000000000000000000009'
-    })
-
-    it('should require the generic simulation summary', () => {
-      expect(isExactNftTransferSimulation(result, signerAddress, contractAddress, transfer)).toBe(false)
-    })
-  })
-
-  describe('and a different token than the one on screen moves', () => {
-    beforeEach(() => {
-      result.assetChanges[0].tokenId = '8'
-    })
-
-    it('should require the generic simulation summary', () => {
-      expect(isExactNftTransferSimulation(result, signerAddress, contractAddress, transfer)).toBe(false)
-    })
-  })
-
-  describe('and the server reports the same token id in another notation', () => {
-    beforeEach(() => {
-      result.assetChanges[0].tokenId = '0x7'
-    })
-
-    it('should still allow the specialized gift view', () => {
-      expect(isExactNftTransferSimulation(result, signerAddress, contractAddress, transfer)).toBe(true)
-    })
-  })
-
-  describe('and the server reports a token id that is not a number', () => {
-    beforeEach(() => {
-      result.assetChanges[0].tokenId = 'seven'
-    })
-
-    it('should require the generic simulation summary', () => {
-      expect(isExactNftTransferSimulation(result, signerAddress, contractAddress, transfer)).toBe(false)
-    })
-  })
-
-  describe.each<['mint' | 'burn']>([['mint'], ['burn']])('and the only change is a %s rather than a transfer', type => {
-    beforeEach(() => {
-      result.assetChanges[0].type = type
-    })
-
-    it('should require the generic simulation summary', () => {
-      expect(isExactNftTransferSimulation(result, signerAddress, contractAddress, transfer)).toBe(false)
-    })
-  })
-
-  describe('and the asset is not an ERC-721 token', () => {
-    beforeEach(() => {
-      result.assetChanges[0].standard = 'erc1155'
-    })
-
-    it('should require the generic simulation summary', () => {
-      expect(isExactNftTransferSimulation(result, signerAddress, contractAddress, transfer)).toBe(false)
-    })
-  })
-
-  describe('and the receiver emitted an event of its own', () => {
-    beforeEach(() => {
-      // e.g. a receiver acting on a permission it already holds, which moves no asset but logs.
-      result.events = [
-        { name: 'Transfer', address: contractAddress },
-        { name: 'UpdateOperator', address: '0x0000000000000000000000000000000000000009' }
-      ]
-    })
-
-    it('should require the generic simulation summary', () => {
-      expect(isExactNftTransferSimulation(result, signerAddress, contractAddress, transfer)).toBe(false)
-    })
-  })
-
-  describe("and the only events are the collection's own", () => {
-    beforeEach(() => {
-      result.events = [
-        { name: 'Approval', address: contractAddress },
-        { name: 'Transfer', address: contractAddress.toUpperCase() }
-      ]
-    })
-
-    it('should allow the specialized gift view', () => {
-      expect(isExactNftTransferSimulation(result, signerAddress, contractAddress, transfer)).toBe(true)
-    })
-  })
-
-  describe('and the response carries no events list at all', () => {
-    beforeEach(() => {
-      result = { ...result, events: undefined as unknown as SimulationResponseBody['events'] }
-    })
-
-    it('should require the generic simulation summary rather than read a missing list as an empty one', () => {
-      expect(isExactNftTransferSimulation(result, signerAddress, contractAddress, transfer)).toBe(false)
-    })
-  })
-
-  describe('and the addresses only differ in casing between the calldata and the simulation', () => {
-    beforeEach(() => {
-      // The decoder returns EIP-55 checksummed addresses; the preview server lowercases.
-      signerAddress = '0x0000000000000000000000000000000000000AbC'
-      contractAddress = '0x0000000000000000000000000000000000000DeF'
-      transfer = { fromAddress: signerAddress, tokenId: '7', toAddress: '0x0000000000000000000000000000000000000FeD' }
-      result.assetChanges[0] = {
-        ...result.assetChanges[0],
-        from: signerAddress.toLowerCase(),
-        to: transfer.toAddress.toLowerCase(),
-        contractAddress: contractAddress.toLowerCase()
-      }
-    })
-
-    it('should allow the specialized gift view', () => {
-      expect(isExactNftTransferSimulation(result, signerAddress, contractAddress, transfer)).toBe(true)
     })
   })
 })
@@ -1440,87 +1214,6 @@ describe('when building the signin deep link', () => {
 
     it('should url-encode the identity id in the signin param', () => {
       expect(getSigninDeeplink(deepLink, identityId, false)).toBe('decentraland://open?signin=a%26b%3Dc')
-    })
-  })
-})
-
-describe('when testing buildSendTransactionSimulationPayload', () => {
-  let signerAddress: string
-  let contract: KnownContract
-  let transaction: Extract<RequestClassification, { kind: 'dcl_transaction' }>
-
-  beforeEach(() => {
-    signerAddress = '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd'
-    contract = {
-      name: 'MANAToken' as KnownContract['name'],
-      address: '0xa1c57f48f0deb89f569dfbe6e2b7f46d33606fd4',
-      chainId: 137,
-      abi: [],
-      domainName: '(PoS) Decentraland MANA',
-      domainVersion: '1',
-      supportsMetaTransactions: true,
-      calldataField: 'functionSignature'
-    }
-  })
-
-  describe('and the transaction will be relayed as a meta-transaction', () => {
-    beforeEach(() => {
-      transaction = {
-        kind: 'dcl_transaction',
-        contract,
-        call: { functionName: 'transfer', args: [], payable: false, forwardsCall: false },
-        to: contract.address,
-        data: '0xa9059cbb',
-        value: '0x0',
-        chainId: 137,
-        relayed: true,
-        branded: 'tip'
-      }
-    })
-
-    it('should simulate on the meta-transaction chain', () => {
-      expect(buildSendTransactionSimulationPayload(transaction, signerAddress).chainId).toBe(ChainId.MATIC_MAINNET)
-    })
-
-    it('should preview the contract calling itself, as the relay makes the inner call', () => {
-      expect(buildSendTransactionSimulationPayload(transaction, signerAddress)).toMatchObject({
-        from: contract.address,
-        to: contract.address
-      })
-    })
-
-    it('should append the connected signer to the calldata as the meta-transaction sender', () => {
-      expect(buildSendTransactionSimulationPayload(transaction, signerAddress).data).toBe(`0xa9059cbb${signerAddress.slice(2)}`)
-    })
-
-    it('should preview without value because the relay forwards none', () => {
-      expect(buildSendTransactionSimulationPayload(transaction, signerAddress).value).toBe('0')
-    })
-  })
-
-  describe('and the transaction is sent by the wallet on the connected chain', () => {
-    beforeEach(() => {
-      transaction = {
-        kind: 'dcl_transaction',
-        contract: { ...contract, chainId: 1 },
-        call: { functionName: 'approve', args: [], payable: false, forwardsCall: false },
-        to: contract.address,
-        data: '0x095ea7b3',
-        value: '0x0',
-        chainId: 1,
-        relayed: false,
-        branded: null
-      }
-    })
-
-    it('should simulate on the connected chain as the connected signer with the reviewed fields', () => {
-      expect(buildSendTransactionSimulationPayload(transaction, signerAddress)).toEqual({
-        chainId: 1,
-        from: signerAddress,
-        to: contract.address,
-        data: '0x095ea7b3',
-        value: '0x0'
-      })
     })
   })
 })

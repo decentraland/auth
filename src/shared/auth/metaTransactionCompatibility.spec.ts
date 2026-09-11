@@ -3,7 +3,6 @@ import { ChainId } from '@dcl/schemas/dist/dapps/chain-id'
 import { ContractName, ErrorCode, MetaTransactionError, getContract, sendMetaTransaction } from 'decentraland-transactions'
 import { RequestClassification, classifyRequest } from '../../components/Pages/RequestPage/classifyRequest'
 import { ContractResolution, getCollectionContract, getKnownDecentralandContract } from './decentralandContracts'
-import { buildMetaTransactionSimulationPayload } from './metaTransactionSimulation'
 import { resolveMetaTransactionTypedData } from './metaTransactionTypedData'
 import { assertSignatureParamsAreCanonical } from './signMethodGuard'
 
@@ -138,17 +137,6 @@ describe('when decentraland-transactions builds a meta-transaction request', () 
           from: USER,
           verifyingContract: contract.address,
           chainId
-        })
-      })
-
-      it('should preview the contract calling itself with the signer appended, as executeMetaTransaction will', () => {
-        const resolved = resolveMetaTransactionTypedData(JSON.parse((signParams as string[])[1]), METHOD)
-        expect(buildMetaTransactionSimulationPayload(resolved.chainId, resolved.verifyingContract, resolved.calldata, USER)).toEqual({
-          chainId,
-          from: contract.address,
-          to: contract.address,
-          data: `${calldata}${USER.slice(2)}`,
-          value: '0'
         })
       })
 

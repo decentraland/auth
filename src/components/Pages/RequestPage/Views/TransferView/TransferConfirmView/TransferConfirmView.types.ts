@@ -10,7 +10,7 @@ type BaseProps = {
   approveBlocked?: boolean
   /** Chain the transfer executes on, for the recipient's block-explorer link. */
   chainId?: number
-  /** Called addresses that had no code when the preview was checked. */
+  /** Called addresses that had no code when the review checked them. */
   callbackAddresses?: string[]
   callbackAcknowledged?: boolean
   onCallbackAcknowledgedChange?: (checked: boolean) => void

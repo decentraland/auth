@@ -10,7 +10,7 @@ import styles from './Views.module.css'
  * reason stays in `error`, in English, for the developer of the requesting scene: it is the same
  * text the request was answered with.
  */
-type SigningErrorKind = 'malformed_transaction' | 'malformed_signature' | 'unsupported_contract' | 'impersonated_sign_in' | 'wallet_error'
+type SigningErrorKind = 'malformed_transaction' | 'malformed_signature' | 'impersonated_sign_in' | 'wallet_error'
 
 type Props = {
   error: React.ReactNode

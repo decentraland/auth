@@ -496,7 +496,7 @@ describe('resolveMetaTransactionTypedData', () => {
       delete typedData.domain.salt
     })
 
-    it('should throw a MalformedSignatureRequestError because the call cannot be simulated on any chain', () => {
+    it('should throw a MalformedSignatureRequestError because the call is bound to no chain', () => {
       expect(() => resolveMetaTransactionTypedData(typedData, METHOD)).toThrow(MalformedSignatureRequestError)
     })
   })

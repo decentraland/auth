@@ -2,28 +2,17 @@ import { AuthIdentity } from '@dcl/crypto'
 import signedFetch from 'decentraland-crypto-fetch'
 import { RequestInteractionType, TrackingEvents } from '../../modules/analytics/types'
 import { config } from '../../modules/config'
-import { isErrorWithMessage } from '../errors'
-import { readTextWithCap } from '../http'
 import { trackEvent } from '../utils/analytics'
 import { handleError } from '../utils/errorHandler'
-import {
-  DifferentSenderError,
-  ExpiredRequestError,
-  RequestFulfilledError,
-  RequestNotFoundError,
-  SimulationUnavailableError
-} from './errors'
-import type { SimulationRejectionCode } from './errors'
+import { DifferentSenderError, ExpiredRequestError, RequestFulfilledError, RequestNotFoundError } from './errors'
 import {
   assertMethodIsAllowed,
   assertRequestIsNotImpersonatingSignIn,
   assertSignatureParamsAreCanonical,
   assertTransactionParamsAreCanonical
 } from './signMethodGuard'
-import { parseSimulationResponse } from './simulationResponse'
-import { IdentityResponse, OutcomeError, OutcomeResponse, RecoverResponse, SimulationRequestBody, SimulationResponseBody } from './types'
+import { IdentityResponse, OutcomeError, OutcomeResponse, RecoverResponse } from './types'
 
-const SIMULATION_TIMEOUT_MS = 10_000
 export const createAuthServerHttpClient = (authServerUrl?: string) => {
   const baseUrl = authServerUrl ?? config.get('AUTH_SERVER_URL')
 
@@ -187,10 +176,10 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
       // payload, which would yield an auth chain that impersonates the user.
       assertRequestIsNotImpersonatingSignIn(recoverResponse.method, recoverResponse.params)
 
-      // Reject params the preview and the wallet would read from different positions.
+      // Reject params the review and the wallet would read from different positions.
       assertSignatureParamsAreCanonical(recoverResponse.method, recoverResponse.params, signerAddress)
 
-      // Reject transaction params the preview cannot read or that the wallet would not execute as shown.
+      // Reject transaction params the review cannot read or that the wallet would not execute as shown.
       assertTransactionParamsAreCanonical(recoverResponse.method, recoverResponse.params)
 
       trackEvent(TrackingEvents.REQUEST_INTERACTION, {
@@ -211,87 +200,6 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
     }
   }
 
-  /**
-   * Asks the auth server to simulate a transaction (or meta-transaction inner call) and
-   * return a normalized summary of asset transfers and approvals. This is best-effort and
-   * fails open: any non-200 response, timeout, or network error throws
-   * SimulationUnavailableError, which the UI renders as "details unavailable" rather than
-   * blocking the approval. Deliberately not routed through handleError/Sentry.
-   */
-  // A rejection body is a short object; anything larger than this is not one and is not read further.
-  const MAX_REJECTION_BODY_BYTES = 4 * 1024
-
-  /**
-   * Upper bound on a successful summary. `parseSimulationResponse` bounds how many rows the review will
-   * take, but it can only do that once the body has been buffered and parsed — and the body is derived
-   * from calldata the requester chose, so its size is theirs to pick. Read under a cap first, and an
-   * oversized answer costs the page nothing past the bytes read.
-   *
-   * 2 MB against what a conforming server can send: every collection is bounded (1,024 movements, 1,024
-   * permissions, 512 events, 512 balance rows), which projects to ~1.04 MB with realistic field values.
-   * So this cannot refuse an answer the DTO parser would have accepted — anything past it was going to be
-   * refused for its row counts a moment later anyway.
-   */
-  const MAX_SIMULATION_BODY_BYTES = 2 * 1024 * 1024
-
-  const REJECTION_CODES: ReadonlySet<string> = new Set<SimulationRejectionCode>([
-    'invalid_request',
-    'upstream_rejected',
-    'quota_exceeded',
-    'upstream_rate_limited'
-  ])
-
-  const readRejectionCode = async (response: Response): Promise<SimulationRejectionCode | undefined> => {
-    try {
-      const body: unknown = JSON.parse(await readTextWithCap(response, MAX_REJECTION_BODY_BYTES))
-      const code = typeof body === 'object' && body !== null ? (body as { code?: unknown }).code : undefined
-      return typeof code === 'string' && REJECTION_CODES.has(code) ? (code as SimulationRejectionCode) : undefined
-    } catch {
-      return undefined
-    }
-  }
-
-  const simulateTransaction = async (body: SimulationRequestBody): Promise<SimulationResponseBody> => {
-    let response: Response
-    try {
-      response = await fetch(baseUrl + '/simulations', {
-        method: 'POST',
-        headers: {
-          // eslint-disable-next-line @typescript-eslint/naming-convention
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(SIMULATION_TIMEOUT_MS)
-      })
-    } catch (e) {
-      throw new SimulationUnavailableError(isErrorWithMessage(e) ? e.message : undefined)
-    }
-
-    if (!response.ok) {
-      // The server says why in the body (`code`), so a caller can tell the request being refused from the
-      // provider refusing it; a body that cannot be read leaves the code unknown.
-      throw new SimulationUnavailableError(`status ${response.status}`, response.status, await readRejectionCode(response))
-    }
-
-    // Read under the cap, then parse: `response.json()` would buffer and parse the whole body before
-    // anything could refuse it (see MAX_SIMULATION_BODY_BYTES). An overrun degrades like an outage, which
-    // is the fallback the review already handles.
-    let parsed: unknown
-    try {
-      parsed = JSON.parse(await readTextWithCap(response, MAX_SIMULATION_BODY_BYTES))
-    } catch (e) {
-      throw new SimulationUnavailableError(isErrorWithMessage(e) ? e.message : 'invalid response')
-    }
-    // Checked, not cast: the review reads these rows directly, so a body that does not honour the DTO must
-    // degrade like an outage rather than reach a consumer that assumes a field is there (see
-    // parseSimulationResponse).
-    const result = parseSimulationResponse(parsed)
-    if (!result) {
-      throw new SimulationUnavailableError('the response is not a simulation summary')
-    }
-    return result
-  }
-
   const checkHealth = async (): Promise<{ timestamp: number }> => {
     try {
       const response = await fetch(baseUrl + '/health/live', {
@@ -310,5 +218,5 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
     }
   }
 
-  return { recover, sendSuccessfulOutcome, sendFailedOutcome, checkHealth, postIdentity, simulateTransaction }
+  return { recover, sendSuccessfulOutcome, sendFailedOutcome, checkHealth, postIdentity }
 }

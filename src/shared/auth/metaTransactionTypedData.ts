@@ -81,7 +81,7 @@ function parseChainId(value: unknown): number | undefined {
  *
  * EIP-712 hashes only the fields `types[primaryType]` declares. Anything else in `message` is
  * ignored by the wallet, so a request could declare (and sign) one call while carrying a second,
- * undeclared call for the preview to simulate. The same holds for the domain: a `salt` the
+ * undeclared call for the review to describe. The same holds for the domain: a `salt` the
  * `EIP712Domain` struct does not declare names a chain the signature is not bound to. The struct
  * therefore decides which field is the calldata, the message may hold nothing but the declared
  * fields, the domain may carry only the standard fields and its struct must be declared, exactly
@@ -116,7 +116,7 @@ function resolveMetaTransactionTypedData(typedData: unknown, method: string): Me
   }
 
   // 2. The message must carry exactly the declared fields. An undeclared field is never signed,
-  //    so its only possible purpose is to mislead the preview.
+  //    so its only possible purpose is to mislead the review.
   const declaredNames = schema.fields.map(field => field.name)
   const messageKeys = Object.keys(message)
   if (messageKeys.length !== declaredNames.length || declaredNames.some(name => !messageKeys.includes(name))) {
@@ -138,7 +138,7 @@ function resolveMetaTransactionTypedData(typedData: unknown, method: string): Me
   // Decentraland contracts encode the chain id in the domain `salt` (bytes32); `chainId` is the
   // standard EIP-712 field. Both are signed when present (2b below makes sure the struct declares
   // them), so if they name different chains the payload is at best broken and there is no right
-  // chain to preview on.
+  // chain to review it on.
   const chainIdFromSalt = parseChainId(domain.salt)
   const chainIdFromDomain = parseChainId(domain.chainId)
   if (chainIdFromSalt !== undefined && chainIdFromDomain !== undefined && chainIdFromSalt !== chainIdFromDomain) {
@@ -151,7 +151,7 @@ function resolveMetaTransactionTypedData(typedData: unknown, method: string): Me
 
   // 2b. The domain must be signed whole, and as the standard defines it. EIP-712 hashes only the
   //     fields `types.EIP712Domain` declares, so a request could carry a `salt` — the chain this
-  //     preview runs on — that the wallet never signs, declare a field the domain lacks, or declare a
+  //     call runs on — that the wallet never signs, declare a field the domain lacks, or declare a
   //     field under a type the contract does not hash. The domain may only carry the standard fields,
   //     and the struct must be declared: wallets disagree on an absent one (viem derives it from the
   //     domain's keys, eth-sig-util hashes an empty struct), so the binding proved below with viem
@@ -181,7 +181,7 @@ function resolveMetaTransactionTypedData(typedData: unknown, method: string): Me
   }
 
   // 3. Prove the structure: hash the request as received and a payload rebuilt from nothing but the
-  //    resolved fields. The wallet signs the former; the simulation runs the latter. Equal hashes mean
+  //    resolved fields. The wallet signs the former; the review describes the latter. Equal hashes mean
   //    no unsigned field rides along; the spelling of each value is judged by the checks above.
   const canonical = {
     domain,

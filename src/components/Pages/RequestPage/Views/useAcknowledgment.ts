@@ -1,9 +1,9 @@
 import { useCallback, useState } from 'react'
 
 /**
- * The acknowledgment checkbox of a review, bound to a statement: the request, the preview and every
- * notice shown alongside it, folded into one string by the view. A tick is given to that statement
- * only. When any part of it changes (another request, a re-simulation that showed something else, a
+ * The acknowledgment checkbox of a review, bound to a statement: the request, the payload and every
+ * notice shown alongside it, folded into one string by the page. A tick is given to that statement
+ * only. When any part of it changes (another request, a re-review that found another callback, a
  * different reason), the tick no longer counts and the view asks again.
  *
  * Derived, never synced: `acknowledged` is computed from the stored statement on every render. An

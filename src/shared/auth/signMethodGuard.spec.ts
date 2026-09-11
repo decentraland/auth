@@ -1,6 +1,5 @@
 import { DOMAIN_TYPE, OFFCHAIN_META_TRANSACTION_TYPE } from 'decentraland-transactions'
 import { ImpersonatedSignInError, MalformedSignatureRequestError, MalformedTransactionRequestError, UnsupportedMethodError } from './errors'
-import { buildMetaTransactionSimulationPayload } from './metaTransactionSimulation'
 import {
   assertMethodIsAllowed,
   assertRequestIsNotImpersonatingSignIn,
@@ -810,18 +809,11 @@ describe('assertTransactionParamsAreCanonical', () => {
     })
   })
 
-  describe('when data is exactly at the preview limit', () => {
-    // Mirrors SIMULATION `data` maxLength in auth-server's request schema (ports/server/validations.ts).
-    const previewServerMaxDataCharacters = 200_000
+  describe('when data is exactly at the calldata limit', () => {
     const largestAcceptedData = `0x${'ab'.repeat(96 * 1024)}`
 
     it('should not throw', () => {
       expect(() => assertTransactionParamsAreCanonical(method, [{ to, data: largestAcceptedData }])).not.toThrow()
-    })
-
-    it('should still fit the preview server limit once the meta-transaction sender is appended for a relayed call', () => {
-      const relayed = buildMetaTransactionSimulationPayload(137, to, largestAcceptedData, '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd')
-      expect(String(relayed.data).length).toBeLessThanOrEqual(previewServerMaxDataCharacters)
     })
   })
 })

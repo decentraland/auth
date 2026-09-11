@@ -7,7 +7,7 @@ import { ADDRESS_REGEX } from './address'
 import { CALLDATA_REGEX } from './hex'
 import { MetaTransactionCalldataField } from './metaTransactionTypedData'
 
-/** A Decentraland contract deployment the auth site is willing to preview calls to. */
+/** A Decentraland contract deployment the auth site is willing to decode and review calls to. */
 type KnownContract = {
   name: ContractName
   /** Lowercased. */
@@ -49,9 +49,10 @@ type DecodedCall = {
 // non-safe ERC721 functions of the collections and the name registrar (per the OpenZeppelin code they derive
 // from) only write balances, owners and allowances: the recipient, spender or operator they are handed runs
 // no code inside the transaction, so a contract wallet there (a Safe, a DAO treasury, an exchange deposit)
-// changes nothing about what the preview shows. Every other function keeps the conservative reading, since
-// `safeTransferFrom` calls its recipient and the marketplaces, bids and rentals call the registry they are
-// given. Checked by name: no registry contract declares one of these names with another meaning.
+// changes nothing about what the call does beyond its arguments. Every other function keeps the conservative
+// reading, since `safeTransferFrom` calls its recipient and the marketplaces, bids and rentals call the
+// registry they are given. Checked by name: no registry contract declares one of these names with another
+// meaning.
 const NON_CALLING_FUNCTIONS: ReadonlySet<string> = new Set([
   'transfer',
   'transferFrom',
@@ -69,7 +70,7 @@ const NON_CALLING_FUNCTIONS: ReadonlySet<string> = new Set([
 // CollectionManager stores the collection's `_creator` and its items' `beneficiary`; CollectionStore mints
 // to `beneficiaries` with `_mint`, which runs no receiver hook. ERC-721 safe transfers invoke only their
 // recipient, never `from`. A contract wallet in any of these skipped positions runs no code inside the
-// transaction, so it does not make the preview unreliable.
+// transaction, so it cannot make the call do more than its arguments say.
 //
 // Deliberately not here: a trade's or listing's `signer` (both the off-chain marketplace and Rentals accept
 // EIP-1271 contract signatures, so a contract signer is called to validate), a trade's `beneficiary` (an
@@ -90,14 +91,13 @@ const NON_CALLED_ARGUMENTS: Readonly<Record<string, ReadonlySet<string>>> = {
 // payable entry points (`executeMetaTransaction` on every meta-transaction contract, `Forwarder.forwardCall`)
 // and the non-payable ones (`CollectionManager.manageCollection` and `Committee.manageCollection` run
 // `_data` on a collection through the forwarder; `DCLRegistrar.forwardToResolver` runs `bytes` on the
-// resolver). The previewed kinds refuse all of them: a function name and a simulation say nothing about
+// resolver). The decoded kinds refuse all of them: a function name and its arguments say nothing about
 // the inner selector, and access control is the contract's business, not a reason to review less.
 //
 // Deliberately not here: `CollectionFactory.createCollection(bytes32, bytes _data)`. Its `_data` is also
 // executed, but by the proxy it deploys, whose implementation is Decentraland's collection code behind a
 // DAO-controlled beacon: it is the collection's `initialize`, not a call into code the requester chose.
-// The simulation and the no-visible-effects acknowledgment still gate it, and refusing it would break the
-// Builder's collection deployment.
+// Its bytes are shown as bytes, and refusing it would break the Builder's collection deployment.
 const FORWARDING_FUNCTIONS: ReadonlySet<string> = new Set([
   'executeMetaTransaction',
   'forwardCall',
@@ -161,9 +161,8 @@ let staticContractIndex: Map<number, Map<string, KnownContract>> | null = null
 
 /**
  * Every Decentraland contract with a fixed address, indexed by chain and then by lowercased address.
- * Built once from the decentraland-transactions registry, for the chains the auth-server simulator can
- * preview a call on: a Decentraland contract on any other chain cannot be previewed, so it is not
- * "known" here either. Per chain on purpose: the same address is a
+ * Built once from the decentraland-transactions registry, for the chains the page can review a call on: a
+ * Decentraland contract on any other chain cannot be reviewed, so it is not "known" here either. Per chain on purpose: the same address is a
  * different contract on other chains (e.g. the Polygon CollectionFactoryV3 address is the Mumbai
  * ChainlinkOracle), so the chain-agnostic `getContractName` must never be used for recognition.
  * Registry entries without an address (`ERC20`, `ERC721`, `ERC721CollectionV2`) are ABI templates
@@ -349,9 +348,10 @@ const NO_SKIPPED_ARGUMENTS: ReadonlySet<string> = new Set()
 // Marketplace Verifications gives these two selectors defined semantics: a minimum balance and token
 // ownership. Every other selector is a custom staticcall(selector, caller, value), even on a recognized
 // contract. In particular, getNonce(address) accepts its first argument and ignores the extra bytes:
-// the preview reads nonce 0 as false, but executeMetaTransaction increments it to 1 before the same
-// check, which then passes. Recognizing the target alone therefore cannot vouch for a custom check.
-const PREVIEWABLE_EXTERNAL_CHECK_SELECTORS: ReadonlySet<string> = new Set([
+// a check made before the call reads nonce 0 as false, but executeMetaTransaction increments it to 1
+// before the same check, which then passes. Recognizing the target alone therefore cannot vouch for a
+// custom check.
+const KNOWN_EXTERNAL_CHECK_SELECTORS: ReadonlySet<string> = new Set([
   toFunctionSelector('balanceOf(address)'),
   toFunctionSelector('ownerOf(uint256)')
 ])
@@ -373,14 +373,14 @@ function collectInto(value: unknown, chainId: number, depth: number, result: Cal
     typeof value.selector === 'string' &&
     typeof value.value === 'string' &&
     typeof value.required === 'boolean' &&
-    !PREVIEWABLE_EXTERNAL_CHECK_SELECTORS.has(value.selector.toLowerCase())
+    !KNOWN_EXTERNAL_CHECK_SELECTORS.has(value.selector.toLowerCase())
   ) {
     result.opaque = true
   }
   if (isExternalCallLike(value)) {
     // The target is a counterparty in its own right; the payload it runs is read only when the target is a
     // Decentraland contract whose ABI decodes it canonically. Anything else stays unread, and unread means
-    // the preview cannot be vouched for.
+    // the call cannot be vouched for.
     result.addresses.add(value.target.toLowerCase())
     const target = getKnownDecentralandContract(value.target, chainId)
     const nested =
@@ -416,7 +416,7 @@ function collectCallArguments(call: DecodedCall, chainId: number, depth: number,
  * A function that never calls its address arguments (see NON_CALLING_FUNCTIONS) reaches nothing, and an
  * argument a function only records (see NON_CALLED_ARGUMENTS) is left out, at the top level and nested
  * alike. `opaque` is true when a nested payload could not be read or an external check uses a custom
- * selector whose semantics cannot be previewed safely. The caller must not vouch for either. Only calldata
+ * selector whose semantics cannot be read safely. The caller must not vouch for either. Only calldata
  * declared as a nested call is followed: a plain `bytes` argument (a safe transfer's `data`, a factory's `createCollection` initializer,
  * a trade's `extra`) is not a call this page is asked to review, see FORWARDING_FUNCTIONS for the ones that
  * are refused outright.

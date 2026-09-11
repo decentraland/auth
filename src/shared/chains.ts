@@ -17,9 +17,9 @@ type SupportedChain = {
 }
 
 /**
- * The chains the auth-server simulator can preview a call on, and everything the page says about
- * them. The one place both the contract index and the display helpers read from, so a chain cannot
- * be previewable but unnamed, or named but not indexed.
+ * The chains the page can review a Decentraland contract call on, and everything it says about them. The
+ * one place both the contract index and the display helpers read from, so a chain cannot be reviewable but
+ * unnamed, or named but not indexed.
  */
 const SUPPORTED_CHAINS: ReadonlyMap<number, SupportedChain> = new Map([
   [

@@ -1,7 +1,6 @@
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/catalyst.schemas'
 import { Rarity } from '@dcl/schemas'
 import { Profile as ProfileComponent } from 'decentraland-ui2'
-import { SimulationResponseBody } from '../../../shared/auth'
 
 type NFTTransferData = {
   imageUrl: string
@@ -49,15 +48,8 @@ type TypedDataPayload = {
   message?: Record<string, unknown>
 }
 
-/** Lifecycle of the best-effort simulation shown for a Decentraland contract call. */
-type SimulationState =
-  | { status: 'idle' }
-  | { status: 'loading' }
-  | { status: 'ready'; result: SimulationResponseBody }
-  | { status: 'unavailable' }
-
 /** Lifecycle of the wallet-side fee estimate for a transaction the user pays gas for. */
 type GasEstimateState = { status: 'loading' } | { status: 'ready'; cost: bigint } | { status: 'unavailable' }
 
 export { TransferType }
-export type { GasEstimateState, PlaceLocation, MANATransferData, NFTTransferData, ProfileAvatar, TypedDataPayload, SimulationState }
+export type { GasEstimateState, PlaceLocation, MANATransferData, NFTTransferData, ProfileAvatar, TypedDataPayload }

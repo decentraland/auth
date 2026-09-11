@@ -47,7 +47,7 @@ function isRetiredSignInMethod(method: string): boolean {
  * canonical spelling is what callers must dispatch on. Dispatch downstream is case-SENSITIVE
  * (RequestPage switches on `eth_sendTransaction` exactly and forwards the method verbatim to the
  * wallet), so an oddly-cased method that only passed the gate would otherwise skip the whole
- * transaction path — simulation, meta-transaction relay, gas estimate — and then dead-end at a
+ * transaction path — classification, meta-transaction relay, gas estimate — and then dead-end at a
  * wallet that doesn't recognize it.
  */
 function assertMethodIsAllowed(method: string): string {
@@ -150,7 +150,7 @@ function assertRequestIsNotImpersonatingSignIn(method: string, params: unknown[]
   }
 }
 
-// Methods whose params the wallet and the preview both read by position; see assertSignatureParamsAreCanonical.
+// Methods whose params the wallet and the review both read by position; see assertSignatureParamsAreCanonical.
 const POSITIONAL_SIGNATURE_METHODS = new Set(['personal_sign', 'eth_signtypeddata_v3', 'eth_signtypeddata_v4'])
 
 function isSigner(param: unknown, signer: string): boolean {
@@ -232,10 +232,10 @@ function hasExcessiveTypedDataDepth(value: unknown, depth = 0): boolean {
  * Rejects signature params that are not in the canonical EIP-1193 order for their method.
  * Typed data must be `[signer, typedData]`; personal_sign must be `[message, signer]`.
  * The shape of the typed data itself is not judged here. Whether it is a Decentraland
- * MetaTransaction the page can preview, or anything else, is decided by the request classifier:
+ * MetaTransaction the page can decode, or anything else, is decided by the request classifier:
  * a MetaTransaction that deviates from what a Decentraland contract signs is rejected there when
  * it names a Decentraland contract, and shown as an unverified signature when it names one
- * Decentraland does not recognize, since nothing is previewed for it that could diverge.
+ * Decentraland does not recognize, since nothing is decoded for it that could diverge.
  */
 function assertSignatureParamsAreCanonical(method: string, params: unknown[] | undefined, signerAddress: string): void {
   const normalizedMethod = method.toLowerCase()
@@ -284,19 +284,18 @@ function assertSignatureParamsAreCanonical(method: string, params: unknown[] | u
 }
 
 // Fields other than `data` that carry calldata. viem forwards them and thirdweb concatenates
-// `extraCallData` onto `data`, so a request using them would execute bytes the preview never read.
+// `extraCallData` onto `data`, so a request using them would execute bytes the review never read.
 const CALLDATA_ALIASES = ['input', 'extraCallData']
 // A transaction's `data` field: hex-encoded whole bytes, possibly none (a plain value transfer sends
 // `0x`). Not the shared CALLDATA_REGEX of the contract decoder, which requires a 4-byte selector: that
 // one judges a call, this one judges a field, and a transfer has no call.
 const TRANSACTION_DATA_REGEX = /^0x([0-9a-fA-F]{2})*$/
 // A JSON-RPC quantity: hex, or the decimal form some clients send. Shared with the request page's
-// toHexQuantity, which turns either form into the canonical hex the wallet and the preview are handed,
+// toHexQuantity, which turns either form into the canonical hex the wallet and the review are handed,
 // so the guard and the normalizer judge a quantity the same way.
 const QUANTITY_REGEX = /^(0x[0-9a-fA-F]{1,64}|[0-9]{1,78})$/
-// Below the preview server's limit even with the meta-transaction sender appended, so anything
-// accepted here can always be previewed. Legitimate Decentraland calls are far smaller; without a
-// cap, oversized calldata is a deterministic way to make the preview unavailable.
+// Far above any legitimate Decentraland call, and small enough that decoding and displaying the calldata
+// stays cheap: without a cap, oversized calldata is a deterministic way to stall the review.
 const MAX_CALLDATA_BYTES = 96 * 1024
 // The same bound for what a signature request asks to sign (a personal_sign message, or typed data as
 // the string or object it arrives as). Legitimate payloads are far smaller; without a cap, the review
@@ -304,10 +303,9 @@ const MAX_CALLDATA_BYTES = 96 * 1024
 const MAX_SIGNATURE_PAYLOAD_CHARS = 96 * 1024
 
 /**
- * Rejects eth_sendTransaction params that are not a single transaction object the preview can read
+ * Rejects eth_sendTransaction params that are not a single transaction object the review can read
  * and the wallet would execute as shown. Every rule here fails closed at recover time, so the request
- * is answered with invalid params instead of degrading to an unavailable preview that a later click
- * would still execute.
+ * is answered with invalid params instead of reaching a review that a later click would still execute.
  */
 function assertTransactionParamsAreCanonical(method: string, params: unknown[] | undefined): void {
   if (method.toLowerCase() !== 'eth_sendtransaction') {
@@ -336,7 +334,7 @@ function assertTransactionParamsAreCanonical(method: string, params: unknown[] |
       return reject('"data" must be hex-encoded bytes')
     }
     if ((fields.data.length - 2) / 2 > MAX_CALLDATA_BYTES) {
-      return reject('"data" is too large to preview')
+      return reject('"data" is too large to review')
     }
   }
   if (fields.value !== undefined && (typeof fields.value !== 'string' || !QUANTITY_REGEX.test(fields.value))) {

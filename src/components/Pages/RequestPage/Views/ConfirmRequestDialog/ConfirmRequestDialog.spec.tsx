@@ -76,7 +76,7 @@ describe('when rendering the ConfirmRequestDialog', () => {
 
     it('should show the fee as unavailable instead of an amount', () => {
       render(<ConfirmRequestDialog {...props} />)
-      expect(screen.getByTestId('confirm-request-gas')).toHaveTextContent('request.unverified.fact_fee_unavailable')
+      expect(screen.getByTestId('confirm-request-gas')).toHaveTextContent('request.transaction_dialog.fee_unavailable')
     })
   })
 
