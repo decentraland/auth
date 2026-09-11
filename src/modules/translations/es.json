@@ -205,6 +205,7 @@
     "signing_error": {
       "title": "Hubo un error al intentar enviar la solicitud.",
       "description": "Regresa a la {explorerText} para intentar de nuevo, o contacta a soporte si el error persiste.",
+      "malformed_request": "Esta solicitud fue rechazada: no indica para qué cuenta es, o cuándo caduca, así que no puede revisarse de forma segura.",
       "malformed_transaction": "Esta transacción fue rechazada: apunta a un contrato de Decentraland pero no tiene la forma de una acción de Decentraland, así que no puede revisarse con seguridad.",
       "malformed_signature": "Esta firma fue rechazada: no tiene la forma de nada que un contrato de Decentraland firme, así que no puede revisarse con seguridad.",
       "unsupported_contract": "Esta solicitud fue rechazada: alcanza un contrato que no es de Decentraland, así que lo que hace no puede revisarse aquí.",

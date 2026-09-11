@@ -1,13 +1,6 @@
 import { test, expect } from '@playwright/test'
-import {
-  injectMockWallet,
-  mockApiRoutes,
-  MOCK_REQUEST_ID
-} from '../helpers/setup'
-import {
-  recoverRequestDifferentSenderResponse,
-  recoverRequestExpiredResponse
-} from '../fixtures/mock-responses'
+import { injectMockWallet, mockApiRoutes, MOCK_REQUEST_ID, MOCK_WALLET } from '../helpers/setup'
+import { recoverRequestDifferentSenderResponse, recoverRequestExpiredResponse } from '../fixtures/mock-responses'
 
 // A valid UUID v4 route id — the client's correlation id required by the deep-link handoff.
 const DEEP_LINK_REQUEST_ID = '123e4567-e89b-42d3-a456-426614174000'
@@ -117,6 +110,7 @@ test.describe('Retired dcl_personal_sign sign-in (unmigrated client)', () => {
           contentType: 'application/json',
           body: JSON.stringify({
             requestId: MOCK_REQUEST_ID,
+            sender: MOCK_WALLET,
             expiration: new Date(Date.now() + 600_000).toISOString(),
             method: 'dcl_personal_sign',
             params: ['Sign this message to verify your identity']

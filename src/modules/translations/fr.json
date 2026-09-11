@@ -205,6 +205,7 @@
     "signing_error": {
       "title": "Une erreur est survenue lors de la soumission de la demande.",
       "description": "Retournez au {explorerText} pour réessayer, ou contactez le support si l'erreur persiste.",
+      "malformed_request": "Cette requête a été refusée : elle n’indique pas pour quel compte elle est, ni quand elle expire, elle ne peut donc pas être examinée en toute sécurité.",
       "malformed_transaction": "Cette transaction a été refusée : elle vise un contrat Decentraland mais n'a pas la forme d'une action Decentraland, elle ne peut donc pas être vérifiée en toute sécurité.",
       "malformed_signature": "Cette signature a été refusée : elle n'a la forme d'aucune signature attendue par un contrat Decentraland, elle ne peut donc pas être vérifiée en toute sécurité.",
       "unsupported_contract": "Cette demande a été refusée : elle atteint un contrat qui n'appartient pas à Decentraland, donc ce qu'elle fait ne peut pas être vérifié ici.",

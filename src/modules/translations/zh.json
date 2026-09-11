@@ -205,6 +205,7 @@
     "signing_error": {
       "title": "提交请求时发生错误。",
       "description": "返回 {explorerText} 重试，如果错误持续存在，请联系客服。",
+      "malformed_request": "此请求已被拒绝：它没有说明适用于哪个账户，也没有说明何时过期，因此无法安全审核。",
       "malformed_transaction": "此交易已被拒绝：它指向一个 Decentraland 合约，但不符合 Decentraland 操作的格式，因此无法安全审查。",
       "malformed_signature": "此签名已被拒绝：它不符合任何 Decentraland 合约所签署的格式，因此无法安全审查。",
       "unsupported_contract": "此请求已被拒绝：它涉及一个不属于 Decentraland 的合约，因此无法在此审查其行为。",

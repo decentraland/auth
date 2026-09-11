@@ -205,6 +205,7 @@
     "signing_error": {
       "title": "Si è verificato un errore durante l'invio della richiesta.",
       "description": "Torna al {explorerText} per riprovare, o contatta il supporto se l'errore persiste.",
+      "malformed_request": "Questa richiesta è stata rifiutata: non indica per quale account è, né quando scade, quindi non può essere esaminata in sicurezza.",
       "malformed_transaction": "Questa transazione è stata rifiutata: punta a un contratto Decentraland ma non ha la forma di un'azione Decentraland, quindi non può essere esaminata in sicurezza.",
       "malformed_signature": "Questa firma è stata rifiutata: non ha la forma di nulla che un contratto Decentraland firmi, quindi non può essere esaminata in sicurezza.",
       "unsupported_contract": "Questa richiesta è stata rifiutata: raggiunge un contratto che non appartiene a Decentraland, quindi ciò che fa non può essere esaminato qui.",
