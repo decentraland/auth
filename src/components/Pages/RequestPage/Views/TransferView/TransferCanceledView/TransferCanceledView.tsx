@@ -5,7 +5,7 @@ import { Box, Profile } from 'decentraland-ui2'
 import { TransferAlert, TransferAssetImage, TransferLayout, TransferSecondaryText } from '../../../../../Transfer'
 import { CenteredContent, ItemName, Label, Title } from '../../../../../Transfer/Transfer.styled'
 import { type MANATransferData, type NFTTransferData, type ProfileAvatar, TransferType } from '../../../types'
-import { ColumnContainer, PlaceLocationName, PlaceNote, SceneName } from '../TransferTipComponents.styled'
+import { ColumnContainer, PlaceDetails, PlaceLocationName, PlaceNote, SceneName } from '../TransferTipComponents.styled'
 import { TransferCanceledViewProps } from './TransferCanceledView.types'
 
 const TransferCanceledView = memo((props: TransferCanceledViewProps) => {
@@ -44,15 +44,17 @@ const TransferCanceledView = memo((props: TransferCanceledViewProps) => {
             <Label>{t('transfer.canceled.creator_of')}</Label>
             <TransferAssetImage src={(transferData as MANATransferData).sceneImageUrl} alt={(transferData as MANATransferData).sceneName} />
             <SceneName>{(transferData as MANATransferData).sceneName}</SceneName>
-            {sceneLocation ? (
-              <PlaceLocationName data-testid="place-location">
-                {sceneLocation.kind === 'world'
-                  ? t('transfer.place_world', { name: sceneLocation.name })
-                  : t('transfer.place_genesis_city', { position: sceneLocation.position })}
-              </PlaceLocationName>
-            ) : null}
-            {/* Same block, same limit as on the confirmation (see TransferConfirmView). */}
-            <PlaceNote data-testid="place-not-verified">{t('transfer.place_not_verified')}</PlaceNote>
+            <PlaceDetails data-testid="place-details">
+              {sceneLocation ? (
+                <PlaceLocationName data-testid="place-location">
+                  {sceneLocation.kind === 'world'
+                    ? t('transfer.place_world', { name: sceneLocation.name })
+                    : t('transfer.place_genesis_city', { position: sceneLocation.position })}
+                </PlaceLocationName>
+              ) : null}
+              {/* Same block, same limit as on the confirmation (see TransferConfirmView). */}
+              <PlaceNote data-testid="place-not-verified">{t('transfer.place_not_verified')}</PlaceNote>
+            </PlaceDetails>
             <TransferAlert />
           </>
         )}

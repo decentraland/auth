@@ -17,27 +17,38 @@ const ColumnContainer = styled(Box)<{ alignItems?: 'center' | 'flex-start' | 'fl
   gap: theme.spacing(1.25)
 }))
 
-// Where the place is: the parcel it occupies, or the world name that addresses it. Said plainly under the
-// title, because this is the part of the block that identifies anything (see PlaceLocation).
+// The place's identity and what it is worth, as one block. Set on a panel of its own because these screens
+// are bright: text alone was washed out against them, and this is the part the user is asked to check
+// rather than admire. Dark and translucent, as the Cancel button on the same screens already is.
+const PlaceDetails = styled(Box)(({ theme }) => ({
+  alignItems: 'center',
+  backgroundColor: 'rgba(0, 0, 0, 0.45)',
+  borderRadius: theme.spacing(1.5),
+  display: 'flex',
+  flexDirection: 'column',
+  marginTop: theme.spacing(2),
+  maxWidth: theme.spacing(58),
+  padding: theme.spacing(1.75, 2.5)
+}))
+
+// Where the place is: the parcel it occupies, or the world name that addresses it. The line the user is
+// meant to compare with where they actually are, so it leads the panel (see PlaceLocation).
 const PlaceLocationName = styled(Typography)(({ theme }) => ({
-  fontSize: theme.typography.pxToRem(16),
-  fontWeight: 500,
+  fontSize: theme.typography.pxToRem(17),
+  fontWeight: 600,
   letterSpacing: '0.04em',
-  marginTop: theme.spacing(1),
   textAlign: 'center'
 }))
 
-// What the place block is and is not. Directly under the place it qualifies, so the claim and its limit are
-// read together rather than the claim alone — and legible over a bright background, which the secondary
-// colour at reduced opacity was not: a note nobody can read states nothing.
+// What that identity is worth: which half of the block is established and which is not. Under the location
+// it qualifies, so the claim and its limit are read together rather than the claim alone.
 const PlaceNote = styled(Typography)(({ theme }) => ({
   color: theme.palette.text.primary,
-  fontSize: theme.typography.pxToRem(14),
+  fontSize: theme.typography.pxToRem(13),
   lineHeight: 1.5,
-  marginTop: theme.spacing(1),
-  maxWidth: theme.spacing(55),
-  opacity: 0.95,
+  marginTop: theme.spacing(0.75),
+  opacity: 0.85,
   textAlign: 'center'
 }))
 
-export { SceneName, ColumnContainer, PlaceLocationName, PlaceNote }
+export { SceneName, ColumnContainer, PlaceDetails, PlaceLocationName, PlaceNote }
