@@ -13,6 +13,7 @@ import {
 import { config } from '../config'
 import { DeploymentError } from './errors'
 import {
+  fetchProfile,
   fetchProfileWithConsistencyCheck,
   fetchProfiles,
   redeployExistingProfile,
@@ -724,6 +725,80 @@ describe('when fetching the profiles of many addresses', () => {
       const profiles = await fetchProfiles(addresses)
 
       expect(profiles.get(addresses[120])?.avatars?.[0].name).toBe('survivor')
+    })
+  })
+})
+
+// The profile shown next to one address, which is trusted to be that address's and to be safe to put on a
+// screen beside an amount. Neither is the endpoint's to promise, so both are checked here.
+describe('when fetching the profile of a single address to show beside it', () => {
+  const ADDRESS = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa5678'
+  let getAvatarDetails: jest.Mock
+
+  const profileOf = (overrides: Record<string, unknown>) => ({ avatars: [{ hasClaimedName: true, ...overrides }] })
+
+  beforeEach(() => {
+    getAvatarDetails = jest.fn()
+    ;(createLambdasClient as jest.Mock).mockReturnValue({ getAvatarDetails })
+  })
+
+  describe('and the profile is the one asked for', () => {
+    it('should return it, matching the reported address however it is cased', async () => {
+      getAvatarDetails.mockResolvedValue(profileOf({ ethAddress: ADDRESS.toUpperCase(), name: 'Alice' }))
+
+      const profile = await fetchProfile(ADDRESS)
+
+      expect(profile?.avatars?.[0].name).toBe('Alice')
+    })
+
+    it('should accept a profile that reports its address as userId instead', async () => {
+      getAvatarDetails.mockResolvedValue(profileOf({ userId: ADDRESS, name: 'Alice' }))
+
+      const profile = await fetchProfile(ADDRESS)
+
+      expect(profile?.avatars?.[0].name).toBe('Alice')
+    })
+  })
+
+  describe('and the profile reports a different address', () => {
+    it('should refuse it rather than pair the name with the address that was asked about', async () => {
+      getAvatarDetails.mockResolvedValue(profileOf({ ethAddress: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb5678', name: 'Alice' }))
+
+      expect(await fetchProfile(ADDRESS)).toBeNull()
+    })
+  })
+
+  describe('and the profile reports no address at all', () => {
+    it('should refuse it, since it is evidence about nobody', async () => {
+      getAvatarDetails.mockResolvedValue(profileOf({ name: 'Alice' }))
+
+      expect(await fetchProfile(ADDRESS)).toBeNull()
+    })
+  })
+
+  describe('and the name carries characters that would lay out the line around it', () => {
+    it('should format it once here, so no consumer can render the raw value', async () => {
+      getAvatarDetails.mockResolvedValue(profileOf({ ethAddress: ADDRESS, name: '  Alice\u202egnitsopmi  ' }))
+
+      const profile = await fetchProfile(ADDRESS)
+
+      expect(profile?.avatars?.[0].name).toBe('Alice\\u202egnitsopmi')
+    })
+
+    it('should cut a name long enough to push the rest of the screen aside', async () => {
+      getAvatarDetails.mockResolvedValue(profileOf({ ethAddress: ADDRESS, name: 'A'.repeat(500) }))
+
+      const profile = await fetchProfile(ADDRESS)
+
+      expect((profile?.avatars?.[0].name ?? '').length).toBeLessThanOrEqual(41)
+    })
+  })
+
+  describe('and the address has no profile', () => {
+    it('should return null, as before', async () => {
+      getAvatarDetails.mockResolvedValue({ error: 'Profile not found' })
+
+      expect(await fetchProfile(ADDRESS)).toBeNull()
     })
   })
 })

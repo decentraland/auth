@@ -962,6 +962,41 @@ describe('when rendering the SimulationSummary', () => {
       render(<SimulationSummary simulation={simulation} userAddress={USER} profiles={{ [recipient]: 'CoolCreator' }} />)
       expect(screen.getByText(/CoolCreator/)).toBeInTheDocument()
     })
+
+    // A name is not an identity: only a claimed one is unique, and an unclaimed one is free for anyone to
+    // set, so it is shown with the address it belongs to rather than in place of it.
+    it('should keep the address on the line next to the name it belongs to', () => {
+      const recipient = '0x1234567890abcdef1234567890abcdef12345678'
+      render(<SimulationSummary simulation={simulation} userAddress={USER} profiles={{ [recipient]: 'CoolCreator' }} />)
+
+      expect(screen.getByText('0x1234…5678')).toBeInTheDocument()
+    })
+
+    // jsdom lays nothing out, so whether the address survives a narrow row is measured in the browser (see
+    // the e2e suite). What can be checked here is the rule that makes it survive: the name is what shrinks
+    // and takes the ellipsis, and the address sits outside that element and does not shrink at all.
+    it('should keep the address out of the element that truncates, and let it hold its width', () => {
+      const recipient = '0x1234567890abcdef1234567890abcdef12345678'
+      render(<SimulationSummary simulation={simulation} userAddress={USER} profiles={{ [recipient]: 'CoolCreator' }} />)
+
+      const address = screen.getByTestId('counterparty-address')
+      const truncating = screen.getByText('CoolCreator').closest('span')
+      expect(truncating).not.toContainElement(address)
+      expect(getComputedStyle(address).flexShrink).toBe('0')
+    })
+
+    it('should isolate the name, so text inside it cannot reorder the line that says where this goes', () => {
+      const recipient = '0x1234567890abcdef1234567890abcdef12345678'
+      render(<SimulationSummary simulation={simulation} userAddress={USER} profiles={{ [recipient]: 'CoolCreator' }} />)
+
+      expect(screen.getByText('CoolCreator').tagName).toBe('BDI')
+    })
+
+    it('should name an account with no profile by its address alone, with nothing repeated', () => {
+      render(<SimulationSummary simulation={simulation} userAddress={USER} profiles={{}} />)
+
+      expect(screen.getAllByText('0x1234…5678')).toHaveLength(1)
+    })
   })
 
   describe('and a chain id is provided for explorer links', () => {

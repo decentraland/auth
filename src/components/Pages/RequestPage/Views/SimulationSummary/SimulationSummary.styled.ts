@@ -113,6 +113,35 @@ const SkeletonRow = styled(Box)(({ theme }) => ({
   gap: theme.spacing(1.5)
 }))
 
+// The address a name belongs to, beside it. Subdued, since the name is what is read first, and never
+// wrapped away from it.
+// The name and the address it belongs to, laid out so the address is the part that survives. The row clips
+// what overflows it, and a long name is a single unbreakable box: left to itself it pushed the address out
+// of the visible area entirely, which left the half anyone can set standing alone — the opposite of what
+// showing them together is for. So the name shrinks and takes the ellipsis, and the address does not.
+const CounterpartyPair = styled('span')({
+  display: 'inline-flex',
+  flexWrap: 'wrap',
+  maxWidth: '100%',
+  minWidth: 0,
+  verticalAlign: 'bottom'
+})
+
+const CounterpartyName = styled('span')({
+  minWidth: 0,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap'
+})
+
+const CounterpartyAddress = styled('span')(({ theme }) => ({
+  color: theme.palette.text.secondary,
+  flexShrink: 0,
+  marginLeft: theme.spacing(0.75),
+  opacity: 0.8,
+  whiteSpace: 'nowrap'
+}))
+
 const ExplorerLink = styled('a')(({ theme }) => ({
   color: 'inherit',
   textDecoration: 'underline',
@@ -272,6 +301,9 @@ export {
   DirectionIndicator,
   EventList,
   EventRow,
+  CounterpartyAddress,
+  CounterpartyName,
+  CounterpartyPair,
   ExplorerLink,
   GasFooter,
   GasNote,

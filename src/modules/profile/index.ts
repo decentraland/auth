@@ -4,6 +4,7 @@ import { Profile, ProfileAvatarsItem } from 'dcl-catalyst-client/dist/client/spe
 import { AuthIdentity, Authenticator } from '@dcl/crypto'
 import { Entity, EntityType } from '@dcl/schemas'
 import { createFetcher } from '../../shared/fetcher'
+import { formatUntrustedLabel } from '../../shared/text'
 import { config } from '../config'
 import { deployWithCatalystRotation } from './deploy'
 import { DeploymentError } from './errors'
@@ -63,9 +64,34 @@ async function fetchProfileWithStatus(address: string, fetcher?: IFetchComponent
   }
 }
 
+/**
+ * The profile of one address, for showing next to that address.
+ *
+ * Two things are required of the answer that `fetchProfileWithStatus` does not require, because they
+ * matter when a name is put on screen beside an address and not when deciding whether a user needs
+ * onboarding:
+ *
+ * - it must be that address's. The endpoint is asked about one address and its answer is read as being
+ *   about that address; a response that reports another one — a mixed-up cache, a compromised catalyst —
+ *   would otherwise pair a real recipient with an unrelated identity, which is exactly what a name shown
+ *   beside an address is trusted not to do. A profile that reports no address at all is refused for the
+ *   same reason: it is not evidence about anyone (see fetchProfiles, which attributes the same way).
+ * - the name must be safe to display. It is free text the profile's owner wrote, with no length or
+ *   character limit in the schema, and it lands on a screen whose other lines are the amount and the
+ *   recipient. Formatted once here, where the profile enters the app, so no consumer can render the raw
+ *   value — including decentraland-ui2's Profile, which renders the name it is handed.
+ *
+ * Both are refusals of the profile, never of the request: the screens fall back to naming the account by
+ * its address, which is what they show for an address that has no profile at all.
+ */
 async function fetchProfile(address: string, fetcher?: IFetchComponent): Promise<Profile | null> {
   const { profile } = await fetchProfileWithStatus(address, fetcher)
-  return profile
+  if (!profile) return null
+  const avatars = profile.avatars ?? []
+  const requested = address.toLowerCase()
+  const owned = avatars.filter(avatar => (avatar.ethAddress ?? avatar.userId)?.toLowerCase() === requested)
+  if (owned.length === 0) return null
+  return { ...profile, avatars: owned.map(avatar => ({ ...avatar, name: formatUntrustedLabel(avatar.name) })) }
 }
 
 /**

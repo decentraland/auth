@@ -76,3 +76,34 @@ describe('getProfileDisplayName', () => {
     })
   })
 })
+
+describe('getProfileDisplayName, when the name is text the profile owner wrote', () => {
+  const address = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa5678'
+
+  describe('and it carries characters that would lay out the line around it', () => {
+    it('should reveal them rather than be laid out by them', () => {
+      const profile = { avatars: [{ name: 'Alice\u202egnitsopmi', hasClaimedName: true }] } as never
+
+      expect(getProfileDisplayName(profile, address)).toBe('Alice\\u202egnitsopmi')
+    })
+  })
+
+  describe('and it is long enough to push the rest of the screen aside', () => {
+    it('should cut it, and still qualify an unclaimed one with the address', () => {
+      const profile = { avatars: [{ name: 'A'.repeat(500), hasClaimedName: false }] } as never
+
+      const name = getProfileDisplayName(profile, address)
+
+      expect(name).toMatch(/^A+…#5678$/)
+      expect((name ?? '').length).toBeLessThanOrEqual(46)
+    })
+  })
+
+  describe('and it is nothing but whitespace', () => {
+    it('should read as having no name, rather than as the qualifier alone', () => {
+      const profile = { avatars: [{ name: '   ', hasClaimedName: false }] } as never
+
+      expect(getProfileDisplayName(profile, address)).toBeNull()
+    })
+  })
+})

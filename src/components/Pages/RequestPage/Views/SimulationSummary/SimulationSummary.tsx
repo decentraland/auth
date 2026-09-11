@@ -25,6 +25,9 @@ import {
   ChangeMeta,
   ChangeRow,
   ChangeText,
+  CounterpartyAddress,
+  CounterpartyName,
+  CounterpartyPair,
   DirectionIndicator,
   EventList,
   EventRow,
@@ -49,10 +52,8 @@ import {
 
 type Translate = (key: string, opts?: Record<string, string | number>) => string
 
-const counterpartyLabel = (address: string | null, profiles: Record<string, string>): string => {
-  if (!address) return ''
-  return profiles[address.toLowerCase()] || shortenAddress(address)
-}
+const counterpartyName = (address: string | null, profiles: Record<string, string>): string | undefined =>
+  address ? profiles[address.toLowerCase()] : undefined
 
 // Groups the integer part of a numeric string with thousands separators, e.g. "1000000" → "1,000,000".
 const groupThousands = (intPart: string): string => intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
@@ -155,10 +156,14 @@ const AddressLink = ({
   const badge = verified ? (
     <VerifiedBadge aria-label={t('request.transaction_dialog.verified_contract')}>✓ Decentraland</VerifiedBadge>
   ) : null
+  // Every label here is text somebody else wrote — a token's name, a place's title, a profile's name —
+  // so it is isolated: a right-to-left override inside one would otherwise reorder the line it sits on,
+  // and these lines say what is being sent and to whom. The text is escaped before it arrives
+  // (formatUntrustedLabel); this makes the layout independent of it too.
   if (!url) {
     return (
       <>
-        {label}
+        <bdi>{label}</bdi>
         {badge}
       </>
     )
@@ -171,10 +176,38 @@ const AddressLink = ({
         rel="noopener noreferrer"
         title={t('request.transaction_dialog.view_on_explorer', { explorer: getExplorerName(chainId) })}
       >
-        {label}
+        <bdi>{label}</bdi>
       </ExplorerLink>
       {badge}
     </>
+  )
+}
+
+/**
+ * A counterparty, named as itself. A profile name is not an identity — only a claimed name is unique, and
+ * an unclaimed one is free for anyone to set — so it never replaces the address on these lines: the name
+ * links to the explorer and the address it belongs to is shown next to it. An account with no profile is
+ * named by its address alone, as before.
+ */
+const CounterpartyLink = ({
+  address,
+  chainId,
+  profiles,
+  verified
+}: {
+  address: string | null
+  chainId?: number
+  profiles: Record<string, string>
+  verified?: boolean
+}) => {
+  const name = counterpartyName(address, profiles)
+  return (
+    <CounterpartyPair>
+      <CounterpartyName>
+        <AddressLink address={address} chainId={chainId} label={name || shortenAddress(address)} verified={verified} />
+      </CounterpartyName>
+      {name ? <CounterpartyAddress data-testid="counterparty-address">{shortenAddress(address)}</CounterpartyAddress> : null}
+    </CounterpartyPair>
   )
 }
 
@@ -214,12 +247,7 @@ const AssetRow = ({
     meta = (
       <>
         {outgoing ? t('request.transaction_dialog.to_prefix') : t('request.transaction_dialog.from_prefix')}{' '}
-        <AddressLink
-          address={counterparty}
-          chainId={chainId}
-          label={counterpartyLabel(counterparty, profiles)}
-          verified={isVerified(counterparty)}
-        />
+        <CounterpartyLink address={counterparty} chainId={chainId} profiles={profiles} verified={isVerified(counterparty)} />
       </>
     )
   }
@@ -274,14 +302,7 @@ const ApprovalItem = ({
   const { t } = useTranslation()
   const token = formatUntrustedLabel(approval.name || approval.symbol) || shortenAddress(approval.contractAddress)
   const spenderVerified = !!approval.spender && verified.has(approval.spender.toLowerCase())
-  const spender = (
-    <AddressLink
-      address={approval.spender}
-      chainId={chainId}
-      label={counterpartyLabel(approval.spender, profiles)}
-      verified={spenderVerified}
-    />
-  )
+  const spender = <CounterpartyLink address={approval.spender} chainId={chainId} profiles={profiles} verified={spenderVerified} />
 
   const symbol = formatUntrustedLabel(approval.symbol) || token
   const isRevocation = isApprovalRevocation(approval)
