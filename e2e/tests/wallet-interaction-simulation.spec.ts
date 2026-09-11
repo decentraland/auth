@@ -57,7 +57,7 @@ test.describe('Web2 transaction simulation & signature preview views', () => {
   // single unbreakable box: before this was laid out for, it pushed the address out of the visible area and
   // left the spoofable half standing alone. jsdom lays nothing out, so this is measured here.
   test.describe('when a counterparty carries a long profile name', () => {
-    test('should keep the address it belongs to inside the row, however narrow the panel', async ({ page }) => {
+    test('should keep every address inside the box that clips it, however narrow the panel', async ({ page }) => {
       await page.setViewportSize({ width: 390, height: 900 })
       await page.goto(testView('simulationSummaryLongName'))
 
@@ -67,15 +67,35 @@ test.describe('Web2 transaction simulation & signature preview views', () => {
       const count = await addresses.count()
       expect(count).toBeGreaterThan(0)
       for (let index = 0; index < count; index++) {
-        const address = addresses.nth(index)
-        await expect(address).toHaveText(/^0x[0-9a-fA-F]{4}…[0-9a-fA-F]{4}$/)
-        const box = await address.boundingBox()
-        expect(box, 'the address has no box').not.toBeNull()
-        // Inside the viewport rather than clipped past the edge of the row that holds it.
-        expect(box!.x).toBeGreaterThanOrEqual(0)
-        expect(box!.x + box!.width).toBeLessThanOrEqual(390)
-        expect(box!.width).toBeGreaterThan(0)
+        await expect(addresses.nth(index)).toBeVisible()
+        await expect(addresses.nth(index)).toHaveText(/^0x[0-9a-fA-F]{4}…[0-9a-fA-F]{4}$/)
       }
+
+      // Measured against the box that would cut it — the nearest ancestor that hides its overflow — rather
+      // than against the viewport: what went wrong was a row clipping its own contents, and a row narrower
+      // than the window would clip an address that sits well inside the window.
+      const clipped = await addresses.evaluateAll(nodes =>
+        nodes.map(node => {
+          let clipper = node.parentElement
+          while (clipper && getComputedStyle(clipper).overflow === 'visible' && clipper.parentElement) {
+            clipper = clipper.parentElement
+          }
+          const box = node.getBoundingClientRect()
+          const bounds = (clipper ?? document.documentElement).getBoundingClientRect()
+          return {
+            text: node.textContent ?? '',
+            empty: box.width === 0 || box.height === 0,
+            outside:
+              box.left < bounds.left - 0.5 ||
+              box.right > bounds.right + 0.5 ||
+              box.top < bounds.top - 0.5 ||
+              box.bottom > bounds.bottom + 0.5
+          }
+        })
+      )
+
+      expect(clipped.filter(address => address.empty)).toEqual([])
+      expect(clipped.filter(address => address.outside)).toEqual([])
     })
   })
 
