@@ -74,10 +74,12 @@
       "warning_signature_login": "Vous connecter à un autre site ou une autre application en votre nom.",
       "warning_trust": "Ne continuez que si vous faites confiance à la scène ou à l'application qui l'a demandé.",
       "payload_label": "Voici exactement ce qui sera envoyé à votre portefeuille :",
+      "payload_label_relayed": "Voici exactement l'action qui sera effectuée :",
       "payload_to": "À",
       "payload_value": "Valeur",
       "payload_data": "Données",
       "payload_chain": "Chaîne",
+      "relayed_note": "Votre portefeuille vous demandera de signer cette action. Decentraland la soumet pour vous et prend en charge les frais.",
       "scroll_hint": "Faites défiler le contenu jusqu'à la fin avant de continuer.",
       "acknowledge": "J'ai lu tout ce qui précède et j'assume l'entière responsabilité de ce que cette action fera avec mon portefeuille, y compris toute perte d'actifs.",
       "review_restarted_notice": "Le réseau de votre portefeuille a changé ou n'a pas pu être vérifié, cette demande a donc été réexaminée sur le réseau actuel."

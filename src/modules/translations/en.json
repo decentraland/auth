@@ -74,10 +74,12 @@
       "warning_signature_login": "Log you in to another site or app as you.",
       "warning_trust": "Only continue if you trust the scene or app that asked for this.",
       "payload_label": "This is exactly what will be sent to your wallet:",
+      "payload_label_relayed": "This is exactly the action that will be performed:",
       "payload_to": "To",
       "payload_value": "Value",
       "payload_data": "Data",
       "payload_chain": "Chain",
+      "relayed_note": "Your wallet will ask you to sign this action. Decentraland submits it for you and covers the gas.",
       "scroll_hint": "Scroll to the end of the content before continuing.",
       "acknowledge": "I have read everything above and I take full responsibility for what this action does with my wallet, including any loss of assets.",
       "review_restarted_notice": "Your wallet's network changed or couldn't be verified, so this request was reviewed again on the current network."

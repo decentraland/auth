@@ -165,7 +165,9 @@ function getActionPayload(classification: RequestClassification): ActionRequestP
         to: classification.to,
         data: classification.data,
         value: classification.value,
-        chainId: classification.chainId
+        chainId: classification.chainId,
+        // A relayed call reaches the wallet as a meta-transaction to sign, not as this transaction to send.
+        relayed: classification.kind === 'dcl_transaction' && classification.relayed
       }
     case 'native_transfer':
       return { kind: 'transaction', to: classification.to, data: '0x', value: classification.value, chainId: classification.chainId }
@@ -271,12 +273,24 @@ export const RequestPage = () => {
   // the replacement review must not stay wedged behind it. The old action, for its part, releases only the
   // lock it took, so it cannot unlock an action the new run has in flight.
   const settlingRunRef = useRef(0)
-  // Whether an Allow, from any run, has handed the request to the wallet and not heard back. Past that
-  // point the transaction may be broadcast or the payload signed whatever the page does next, so no run
-  // may answer the request again until it settles: a replacement review is shown busy instead. Before that
-  // point an in-flight Allow dispatches nothing once its run is replaced (see canStillDispatch), which is
-  // why the settle lock alone can be scoped to the run.
-  const isDispatchingRef = useRef(false)
+  // The requests an Allow has handed to the wallet and not heard back about. Past that point the
+  // transaction may be broadcast or the payload signed whatever the page does next, so nothing may answer
+  // that request again until it settles, and a review of it is shown busy rather than actionable. Keyed by
+  // request, not page-wide: another request has its own outcome to deliver and cannot be double-answered by
+  // this one, so it is never blocked on this one's account. Before dispatch an in-flight Allow answers
+  // nothing once its run is replaced (see canStillDispatch), which is why the settle lock is run-scoped.
+  //
+  // The ref is what the handlers read, before their first await; the state is what the render reads, so a
+  // dispatch that settles always releases the screen even when the review it belonged to is long gone.
+  const dispatchingRequestsRef = useRef<ReadonlySet<string>>(new Set())
+  const [dispatchingRequests, setDispatchingRequests] = useState<ReadonlySet<string>>(new Set())
+  const setRequestDispatching = useCallback((id: string, dispatching: boolean) => {
+    const next = new Set(dispatchingRequestsRef.current)
+    if (dispatching) next.add(id)
+    else next.delete(id)
+    dispatchingRequestsRef.current = next
+    setDispatchingRequests(next)
+  }, [])
   // Which review the page is on: bumped by the load effect whenever the request id or the account changes.
   // Allow and Deny capture it when they start and, after every await, touch no view, loading or settle
   // state unless it is still current: a late wallet or server result belongs to the review that started
@@ -912,10 +926,9 @@ export const RequestPage = () => {
         setMutableCallbackAcknowledged(false)
         // An Allow the previous run left in flight keeps its lock to itself (see settlingRunRef), so the
         // review that replaces it starts unlocked and at rest, whatever became of the wallet the old provider
-        // was asking. Unless that Allow had already handed the request to the wallet: then the request may
-        // execute whatever this page does, no run may answer it again until the wallet has spoken, and the
-        // replacement is shown busy until then (see isDispatchingRef).
-        setIsLoading(isDispatchingRef.current)
+        // was asking. A request already handed to the wallet is shown busy by the render instead, for as long
+        // as that lasts and for whichever review is on screen (see dispatchingRequestsRef).
+        setIsLoading(false)
         // Everything else the previous run derived goes too, and the page says it is deciding again. Each
         // of these already blocked approval on its own — an unverified counterparty set, an acknowledgment
         // whose statement no longer matches — but only as a side effect of what it happens to gate.
@@ -986,7 +999,12 @@ export const RequestPage = () => {
     // once the request has been answered or has expired. Checked and set before the first await (see
     // isSettlingRef, settlingRunRef).
     const run = reviewRunRef.current
-    if ((isSettlingRef.current && settlingRunRef.current === run) || isDispatchingRef.current || hasCompletedRef.current) return
+    if (
+      (isSettlingRef.current && settlingRunRef.current === run) ||
+      dispatchingRequestsRef.current.has(requestId) ||
+      hasCompletedRef.current
+    )
+      return
     isSettlingRef.current = true
     settlingRunRef.current = run
     // The review this answer belongs to. Once the page has moved on to another request or account, the
@@ -1075,7 +1093,12 @@ export const RequestPage = () => {
     // And the review it was clicked on. A load that runs again for the same request and account leaves the
     // generation alone by design, so this is what tells that review from the one that replaced it.
     const run = reviewRunRef.current
-    if ((isSettlingRef.current && settlingRunRef.current === run) || isDispatchingRef.current || hasCompletedRef.current) return
+    if (
+      (isSettlingRef.current && settlingRunRef.current === run) ||
+      dispatchingRequestsRef.current.has(requestId) ||
+      hasCompletedRef.current
+    )
+      return
     // Every gate the review is subject to, enforced here rather than trusted to whichever button was
     // pressed. The Allow buttons render the same value, so in the ordinary case this changes nothing; what
     // it stops is a press that reaches this handler while the gates do not hold — the confirmation dialog
@@ -1123,12 +1146,12 @@ export const RequestPage = () => {
     // the transaction is broadcast, or the payload is signed — so any later failure is a delivery
     // problem, never a rejection. See the catch below.
     let hasWalletResult = false
-    // Flips the moment the request is handed to the wallet, and holds the page-wide dispatch guard until
-    // this action has settled (see isDispatchingRef).
+    // Flips the moment the request is handed to the wallet, and holds this request's dispatch guard until
+    // the action has settled (see dispatchingRequestsRef).
     let hasDispatched = false
     const markDispatched = () => {
       hasDispatched = true
-      isDispatchingRef.current = true
+      setRequestDispatching(requestId, true)
     }
     try {
       if (!walletClient) {
@@ -1335,13 +1358,14 @@ export const RequestPage = () => {
         setView(View.WALLET_INTERACTION_ERROR)
       }
     } finally {
-      if (hasDispatched) isDispatchingRef.current = false
-      // The review on screen owns its loading and settle state; a stale action leaves both alone. So does
-      // one from a run that has since been replaced, unless it had reached the wallet: the replacement was
-      // then shown busy on its behalf (see the load effect), and is released now that the wallet answered.
-      if (!isStaleAction()) {
-        if (settlingRunRef.current === run) isSettlingRef.current = false
-        if (settlingRunRef.current === run || hasDispatched) setIsLoading(false)
+      // Released for every review of this request, whatever became of the one that dispatched it: the
+      // screen reads this, so a review that was shown busy on its behalf is freed here.
+      if (hasDispatched) setRequestDispatching(requestId, false)
+      // The review on screen owns its loading and settle state; a stale action, or one from a run that has
+      // since been replaced, leaves both alone.
+      if (!isStaleAction() && settlingRunRef.current === run) {
+        isSettlingRef.current = false
+        setIsLoading(false)
       }
     }
   }, [isUserUsingWeb2Wallet, nftTransferData, manaTransferData, requestId, identity, showInteractionCompleteView, restartReview])
@@ -1413,8 +1437,12 @@ export const RequestPage = () => {
   //
   // `isLoading` is deliberately not part of it: that says an approval is already running, which is the
   // handler's own re-entry guard (isSettlingRef), not a property of the review.
+  // This request is with the wallet and has not been answered. Whatever review of it is on screen, it is
+  // busy rather than actionable, and stays that way until the wallet answers.
+  const isRequestDispatching = dispatchingRequests.has(requestId)
   const isReviewActionable = (() => {
     if (classification === null) return false
+    if (isRequestDispatching) return false
     // Unlike the request id and the account, a replaced connection gates the answers rather than the
     // rendering: the review is still what the user was last shown, and a completed or failed screen must
     // not blink back to loading because the wallet swapped a provider object.
@@ -1443,7 +1471,10 @@ export const RequestPage = () => {
     }
   })()
   isReviewActionableRef.current = isReviewActionable
-  const approveBlocked = isLoading || !isReviewActionable
+  // The spinner the views and the confirmation dialog show: this action's own, or the one a dispatch for this
+  // request left behind.
+  const isBusy = isLoading || isRequestDispatching
+  const approveBlocked = isBusy || !isReviewActionable
 
   // What the confirmation dialog says the request will cost: covered by the relay, or the wallet's own
   // estimate for a plain send. Signatures are gasless and show no line.
@@ -1464,7 +1495,7 @@ export const RequestPage = () => {
       open={isTransactionModalOpen}
       kind={isTransactionRequest ? 'transaction' : 'signature'}
       gas={confirmGas}
-      isLoading={isLoading}
+      isLoading={isBusy}
       onCancel={() => setIsTransactionModalOpen(false)}
       onConfirm={onApproveWalletInteraction}
     />
@@ -1524,7 +1555,7 @@ export const RequestPage = () => {
           <TransferConfirmView
             type={TransferType.GIFT}
             transferData={nftTransferData}
-            isLoading={isLoading}
+            isLoading={isBusy}
             chainId={reviewedChainId}
             callbackAddresses={mutableCallbackAddresses}
             callbackAcknowledged={isMutableCallbackAcknowledged}
@@ -1542,7 +1573,7 @@ export const RequestPage = () => {
           <TransferConfirmView
             type={TransferType.TIP}
             transferData={manaTransferData}
-            isLoading={isLoading}
+            isLoading={isBusy}
             chainId={reviewedChainId}
             callbackAddresses={mutableCallbackAddresses}
             callbackAcknowledged={isMutableCallbackAcknowledged}
@@ -1564,7 +1595,7 @@ export const RequestPage = () => {
             payload={getActionPayload(classification)}
             acknowledged={isAcknowledged}
             approveBlocked={approveBlocked}
-            isLoading={isLoading}
+            isLoading={isBusy}
             reviewRestarted={reviewRestartReason !== null}
             onAcknowledgedChange={setAcknowledged}
             onDeny={onDenyWalletInteraction}

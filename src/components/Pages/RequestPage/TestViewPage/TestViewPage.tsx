@@ -219,6 +219,22 @@ export const TestViewPage = () => {
           />
         )
       },
+      // Gas covered by Decentraland: the wallet is asked to sign a meta-transaction wrapping this call, so
+      // the block is worded as the action rather than as the bytes the wallet receives.
+      actionRelayedTransaction: {
+        label: 'ActionRequest (transaction relayed by Decentraland)',
+        element: (
+          <ActionRequestView
+            requestId={DEFAULT_REQUEST_ID}
+            payload={{ kind: 'transaction', to: MARKETPLACE_ADDRESS, data: executeOrderData, value: '0x0', chainId: 137, relayed: true }}
+            approveBlocked={!acknowledged}
+            acknowledged={acknowledged}
+            onAcknowledgedChange={setAcknowledged}
+            onDeny={noop}
+            onApprove={noop}
+          />
+        )
+      },
       actionNativeTransfer: {
         label: 'ActionRequest (plain value transfer)',
         element: (

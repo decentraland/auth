@@ -8,6 +8,12 @@ type ActionRequestPayload =
       value: string
       /** The chain the transaction executes on. */
       chainId: number
+      /**
+       * True when Decentraland relays the call as a meta-transaction and covers the gas. The wallet is then
+       * asked to sign typed data wrapping this call rather than to send it, so the block is worded as the
+       * action that will be performed instead of as the bytes the wallet receives.
+       */
+      relayed?: boolean
     }
   | {
       kind: 'typed_data'

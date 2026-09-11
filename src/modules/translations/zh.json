@@ -74,10 +74,12 @@
       "warning_signature_login": "以你的身份登录其他网站或应用。",
       "warning_trust": "只有在你信任发起此请求的场景或应用时才继续。",
       "payload_label": "以下是将发送到你钱包的完整内容：",
+      "payload_label_relayed": "以下是将要执行的完整操作：",
       "payload_to": "接收方",
       "payload_value": "数值",
       "payload_data": "数据",
       "payload_chain": "链",
+      "relayed_note": "你的钱包会请你为此操作签名。Decentraland 会代你提交并承担 gas 费用。",
       "scroll_hint": "请滚动到内容末尾后再继续。",
       "acknowledge": "我已阅读上述全部内容，并对此操作对我的钱包造成的任何后果（包括任何资产损失）承担全部责任。",
       "review_restarted_notice": "你的钱包网络已更改或无法验证，因此此请求已在当前网络上重新审核。"

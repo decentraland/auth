@@ -74,10 +74,12 @@
       "warning_signature_login": "Iniciar sesión en otro sitio o aplicación como tú.",
       "warning_trust": "Continúa solo si confías en la escena o aplicación que lo solicitó.",
       "payload_label": "Esto es exactamente lo que se enviará a tu wallet:",
+      "payload_label_relayed": "Esta es exactamente la acción que se realizará:",
       "payload_to": "Para",
       "payload_value": "Valor",
       "payload_data": "Datos",
       "payload_chain": "Cadena",
+      "relayed_note": "Tu wallet te pedirá que firmes esta acción. Decentraland la envía por ti y cubre el gas.",
       "scroll_hint": "Desplázate hasta el final del contenido antes de continuar.",
       "acknowledge": "He leído todo lo anterior y asumo toda la responsabilidad por lo que esta acción haga con mi wallet, incluida cualquier pérdida de activos.",
       "review_restarted_notice": "La red de tu wallet cambió o no pudo verificarse, así que esta solicitud se revisó de nuevo en la red actual."

@@ -102,6 +102,9 @@ export const ActionRequestView = ({
   const { t } = useTranslation()
   // Formatting is linear in the payload's size; done once per payload, not per render.
   const content = useMemo(() => formatPayload(payload, t), [payload, t])
+  // Decentraland relays this call and covers the gas, so what the wallet will show is a signature over a
+  // meta-transaction wrapping it. The block is the action, not the bytes the wallet receives, and says so.
+  const isRelayed = payload.kind === 'transaction' && payload.relayed === true
 
   // Measured before paint and on every scroll, so the checkbox is never enabled for a frame the measurement
   // has not seen; a payload that fits the box without scrolling counts as read. Re-measured when the window
@@ -136,7 +139,9 @@ export const ActionRequestView = ({
       </Box>
       <Statement data-testid="action-statement">{t('request.action.statement')}</Statement>
       <Content data-testid="action-request" data-kind={payload.kind}>
-        <PayloadLabel id="action-payload-label">{t('request.action.payload_label')}</PayloadLabel>
+        <PayloadLabel id="action-payload-label">
+          {t(isRelayed ? 'request.action.payload_label_relayed' : 'request.action.payload_label')}
+        </PayloadLabel>
         <PayloadFrame more={!readToEnd}>
           <PayloadBlock
             ref={payloadRef}
@@ -149,6 +154,7 @@ export const ActionRequestView = ({
             {content}
           </PayloadBlock>
         </PayloadFrame>
+        {isRelayed ? <Hint data-testid="action-relayed-note">{t('request.action.relayed_note')}</Hint> : null}
         {readToEnd ? null : <Hint data-testid="action-scroll-hint">{t('request.action.scroll_hint')}</Hint>}
         {reviewRestarted ? (
           <ReviewRestartedNotice severity="info" role="status" data-testid="review-restarted-notice">

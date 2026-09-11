@@ -208,6 +208,36 @@ describe('when rendering the ActionRequestView', () => {
     })
   })
 
+  describe('and the transaction is relayed by Decentraland', () => {
+    beforeEach(() => {
+      props = { ...props, payload: { kind: 'transaction', to: TO, data: DATA, value: '0x0', chainId: 137, relayed: true } }
+    })
+
+    it('should word the block as the action performed, not as what the wallet receives', () => {
+      render(<ActionRequestView {...props} />)
+      expect(screen.getByText('request.action.payload_label_relayed')).toBeInTheDocument()
+      expect(screen.queryByText('request.action.payload_label')).not.toBeInTheDocument()
+    })
+
+    it('should say the wallet will ask for a signature and that the gas is covered', () => {
+      render(<ActionRequestView {...props} />)
+      expect(screen.getByTestId('action-relayed-note')).toHaveTextContent('request.action.relayed_note')
+    })
+
+    it('should still warn about what a transaction can do, since that is what executes', () => {
+      render(<ActionRequestView {...props} />)
+      expect(screen.getByTestId('action-warnings')).toHaveTextContent('request.action.warning_transaction_assets')
+    })
+  })
+
+  describe('and the transaction is sent by the wallet itself', () => {
+    it('should word the block as what the wallet receives and show no relay note', () => {
+      render(<ActionRequestView {...props} />)
+      expect(screen.getByText('request.action.payload_label')).toBeInTheDocument()
+      expect(screen.queryByTestId('action-relayed-note')).not.toBeInTheDocument()
+    })
+  })
+
   describe('and the payload is typed data', () => {
     beforeEach(() => {
       props = { ...props, payload: { kind: 'typed_data', raw: '{"primaryType":"Permit","message":{"value":"1"}}' } }

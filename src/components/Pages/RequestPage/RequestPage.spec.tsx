@@ -602,7 +602,9 @@ describe('RequestPage', () => {
           to: CONTRACT,
           data: '0x1234',
           value: '0',
-          chainId: 1
+          chainId: 1,
+          // The wallet sends this one itself, so the block is worded as the bytes it receives.
+          relayed: false
         })
       })
 
@@ -2033,7 +2035,9 @@ describe('RequestPage', () => {
         to: CONTRACT,
         data: '0xabcd',
         value: '0x0',
-        chainId: 137
+        chainId: 137,
+        // Relayed, so the view words the block as the action and says a signature will be asked for.
+        relayed: true
       })
     })
 
@@ -2637,9 +2641,14 @@ describe('RequestPage', () => {
       NavigateToOther = () => {
         const navigate = useNavigate()
         return (
-          <button data-testid="go-to-other" onClick={() => navigate(`/auth/requests/${otherRequestId}?targetConfigId=default`)}>
-            other
-          </button>
+          <>
+            <button data-testid="go-to-other" onClick={() => navigate(`/auth/requests/${otherRequestId}?targetConfigId=default`)}>
+              other
+            </button>
+            <button data-testid="go-to-first" onClick={() => navigate(`/auth/requests/${REQUEST_ID}?targetConfigId=default`)}>
+              first
+            </button>
+          </>
         )
       }
       renderMountedPage = () =>
@@ -2675,6 +2684,61 @@ describe('RequestPage', () => {
     afterEach(() => {
       mockRecover.mockReset()
       mockGetCounterpartyAddresses.mockReset()
+    })
+
+    // A dispatch belongs to the request it was given to. Another request has its own outcome to deliver and
+    // cannot be double-answered by it, so it must be reviewable on its own terms; and whatever review of the
+    // dispatching request is on screen is busy, not dead, and is released when the wallet answers.
+    describe('and a wallet call for the previous request is still unresolved', () => {
+      let releaseRelay: (hash: string) => void
+
+      beforeEach(() => {
+        mockRecover.mockResolvedValue(recovered('eth_sendTransaction', [{ to: CONTRACT, data: '0xabcd', value: '0x0' }]))
+        releaseRelay = () => undefined
+        jest
+          .mocked(sendMetaTransaction)
+          .mockReset()
+          .mockImplementationOnce(() => new Promise(resolve => (releaseRelay = resolve)))
+        mockSendFailedOutcome.mockReset().mockResolvedValue({})
+      })
+
+      it('should leave the new request fully reviewable, and answer it under its own id', async () => {
+        renderMountedPage()
+        await approveActionRequest()
+        await waitFor(() => expect(jest.mocked(sendMetaTransaction)).toHaveBeenCalledTimes(1))
+
+        await userEvent.click(screen.getByTestId('go-to-other'))
+        await screen.findByTestId('action-request')
+        await waitFor(() => expect(mockRecover.mock.calls.some(call => call[0] === otherRequestId)).toBe(true))
+
+        await userEvent.click(screen.getByTestId('action-deny'))
+
+        await waitFor(() => expect(mockSendFailedOutcome).toHaveBeenCalledTimes(1))
+        expect(mockSendFailedOutcome).toHaveBeenCalledWith(otherRequestId, SIGNER, { code: -32003, message: 'Transaction rejected' })
+        releaseRelay('0xhash')
+      })
+
+      it('should release a review of the dispatching request once the wallet answers, rather than leave it busy', async () => {
+        renderMountedPage()
+        await approveActionRequest()
+        await waitFor(() => expect(jest.mocked(sendMetaTransaction)).toHaveBeenCalledTimes(1))
+
+        // Away and back again, in the same page: the request is still with the wallet, so its review is busy.
+        await userEvent.click(screen.getByTestId('go-to-other'))
+        await screen.findByTestId('action-request')
+        await userEvent.click(screen.getByTestId('go-to-first'))
+        const returned = await screen.findByTestId('action-request')
+        await userEvent.click(screen.getByTestId('action-acknowledge'))
+        expect(returned).toHaveAttribute('data-approve-blocked', 'true')
+
+        mockSendSuccessfulOutcome.mockResolvedValue({})
+        await act(async () => {
+          releaseRelay('0xhash')
+        })
+
+        // The wallet answered, so nothing is held on its account any more.
+        await waitFor(() => expect(screen.getByTestId('action-request')).toHaveAttribute('data-approve-blocked', 'false'))
+      })
     })
 
     describe('and Deny is still waiting for its outcome to be delivered when the id changes', () => {

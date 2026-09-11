@@ -66,6 +66,18 @@ test.describe('Generic request review', () => {
     })
   })
 
+  test.describe('when Decentraland relays the transaction and covers the gas', () => {
+    test('should word the block as the action performed and say the wallet will ask for a signature', async ({ page }) => {
+      await page.goto(testView('actionRelayedTransaction'))
+
+      await expect(page.getByText('This is exactly the action that will be performed:')).toBeVisible({ timeout: 15_000 })
+      await expect(page.getByText('This is exactly what will be sent to your wallet:')).toBeHidden()
+      await expect(page.getByTestId('action-relayed-note')).toContainText('Your wallet will ask you to sign this action')
+      await expect(page.getByTestId('action-relayed-note')).toContainText('covers the gas')
+      await expect(page.getByTestId('action-payload')).toContainText('To: 0x1234567890abcdef1234567890abcdef12345678')
+    })
+  })
+
   test.describe('when the request is typed data', () => {
     test('should show the JSON the wallet will read, whole, in a box of fixed height that scrolls', async ({ page }) => {
       await page.goto(testView('actionTypedData'))
