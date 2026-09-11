@@ -52,6 +52,33 @@ test.describe('Web2 transaction simulation & signature preview views', () => {
     })
   })
 
+  // A profile name is free text and the address is what binds it to an account, so the address is the half
+  // that must survive a narrow panel. The row clips what overflows it, and a name at the length cap is a
+  // single unbreakable box: before this was laid out for, it pushed the address out of the visible area and
+  // left the spoofable half standing alone. jsdom lays nothing out, so this is measured here.
+  test.describe('when a counterparty carries a long profile name', () => {
+    test('should keep the address it belongs to inside the row, however narrow the panel', async ({ page }) => {
+      await page.setViewportSize({ width: 390, height: 900 })
+      await page.goto(testView('simulationSummaryLongName'))
+
+      const addresses = page.getByTestId('counterparty-address')
+      await expect(addresses.first()).toBeVisible({ timeout: 15_000 })
+
+      const count = await addresses.count()
+      expect(count).toBeGreaterThan(0)
+      for (let index = 0; index < count; index++) {
+        const address = addresses.nth(index)
+        await expect(address).toHaveText(/^0x[0-9a-fA-F]{4}…[0-9a-fA-F]{4}$/)
+        const box = await address.boundingBox()
+        expect(box, 'the address has no box').not.toBeNull()
+        // Inside the viewport rather than clipped past the edge of the row that holds it.
+        expect(box!.x).toBeGreaterThanOrEqual(0)
+        expect(box!.x + box!.width).toBeLessThanOrEqual(390)
+        expect(box!.width).toBeGreaterThan(0)
+      }
+    })
+  })
+
   test.describe('when the simulation predicts a revert', () => {
     test('should show the failure warning with the revert reason', async ({ page }) => {
       await page.goto(testView('simulationSummaryReverted'))

@@ -26,6 +26,8 @@ import {
   ChangeRow,
   ChangeText,
   CounterpartyAddress,
+  CounterpartyName,
+  CounterpartyPair,
   DirectionIndicator,
   EventList,
   EventRow,
@@ -200,10 +202,12 @@ const CounterpartyLink = ({
 }) => {
   const name = counterpartyName(address, profiles)
   return (
-    <>
-      <AddressLink address={address} chainId={chainId} label={name || shortenAddress(address)} verified={verified} />
-      {name ? <CounterpartyAddress>{shortenAddress(address)}</CounterpartyAddress> : null}
-    </>
+    <CounterpartyPair>
+      <CounterpartyName>
+        <AddressLink address={address} chainId={chainId} label={name || shortenAddress(address)} verified={verified} />
+      </CounterpartyName>
+      {name ? <CounterpartyAddress data-testid="counterparty-address">{shortenAddress(address)}</CounterpartyAddress> : null}
+    </CounterpartyPair>
   )
 }
 
