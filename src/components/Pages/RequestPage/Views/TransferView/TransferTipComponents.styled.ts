@@ -27,14 +27,16 @@ const PlaceLocationName = styled(Typography)(({ theme }) => ({
   textAlign: 'center'
 }))
 
-// What the place block is and is not. Small and directly under the place it qualifies, so the claim and
-// its limit are read together rather than the claim alone.
+// What the place block is and is not. Directly under the place it qualifies, so the claim and its limit are
+// read together rather than the claim alone — and legible over a bright background, which the secondary
+// colour at reduced opacity was not: a note nobody can read states nothing.
 const PlaceNote = styled(Typography)(({ theme }) => ({
-  color: theme.palette.text.secondary,
-  fontSize: theme.typography.pxToRem(13),
+  color: theme.palette.text.primary,
+  fontSize: theme.typography.pxToRem(14),
+  lineHeight: 1.5,
   marginTop: theme.spacing(1),
   maxWidth: theme.spacing(55),
-  opacity: 0.8,
+  opacity: 0.95,
   textAlign: 'center'
 }))
 
