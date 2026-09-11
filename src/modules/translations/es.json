@@ -101,6 +101,7 @@
       "on_network": "en {network}",
       "acknowledge_risk": "Entiendo que esto otorga acceso a mis activos",
       "acknowledge_no_visible_effects": "Entiendo que la vista previa no muestra cambios en mis activos y que esto aun así puede cambiar configuraciones o roles que no veo aquí",
+      "acknowledge_reverted": "Entiendo que esta acción falla ahora mismo y que, si eso cambia antes de enviarse, podría hacer algo que esta vista previa no mostró",
       "callback_code_notice": "Una dirección utilizada por esta llamada no tiene código de contrato ahora. Podría desplegarse código allí antes de que se ejecute la llamada, haciendo que la ejecución difiera de esta vista previa.",
       "acknowledge_callback_code": "Entiendo que el código desplegado después de esta vista previa podría cambiar lo que hace esta llamada y acepto este riesgo.",
       "approval_can_spend_symbol": "puede gastar {symbol}",
@@ -240,6 +241,9 @@
     }
   },
   "transfer": {
+    "place_genesis_city": "Genesis City {position}",
+    "place_world": "Mundo {name}",
+    "place_not_verified": "Esta cuenta desplegó el lugar que se muestra arriba. Decentraland no puede saber si es el lugar que te pidió pagar: compara la ubicación con dónde estás.",
     "confirm": {
       "sending_tip": "Enviando propina de {manaAmount} para",
       "confirm_tip": "Confirmar propina de {manaAmount} para",

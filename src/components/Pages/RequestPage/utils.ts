@@ -19,6 +19,7 @@ import { getHttpsUrl } from '../../../shared/urls'
 import { isRecord } from '../../../shared/utils/isRecord'
 import { isMobile } from '../LoginPage/utils'
 import { NFT_TRANSFER_FUNCTIONS, RequestClassification } from './classifyRequest'
+import type { PlaceLocation } from './types'
 
 /**
  * Builds the simulation request body for a Decentraland transaction. A relayed call is previewed the way
@@ -540,12 +541,55 @@ async function fetchNftMetadata(
   }
 }
 
+/** A Genesis City parcel: two integers, as the Places API writes a base position. */
+const BASE_POSITION_PATTERN = /^-?\d{1,4},-?\d{1,4}$/
+
+/**
+ * The place's location, or null when the API describes one that names no place the user could be in.
+ *
+ * A Genesis City position is worth showing only if the recipient provably controls it, and the protocol
+ * does guarantee that: a scene's `base` must be one of its `parcels` (SceneParcels), those parcels must
+ * equal the deployment's pointers (sceneParcelsMatchPointersValidateFn), and a deployment is refused
+ * unless its deployer holds LAND over every pointer (checkLAND).
+ *
+ * The position is still read back from `positions` — the pointers themselves — rather than from
+ * `base_position`, which the Places service takes from the scene's own metadata. Same reason the preview
+ * DTO is checked instead of trusted: the guarantee belongs to the deployment path, and this is a row from
+ * a service that has been storing them since before that path looked the way it does now. The declared
+ * base is used whenever it is one of the pointers, which for anything the validator has seen is always.
+ */
+function getPlaceLocation(place: {
+  world?: unknown
+  // eslint-disable-next-line @typescript-eslint/naming-convention -- the Places API's own field names
+  world_name?: unknown
+  // eslint-disable-next-line @typescript-eslint/naming-convention -- the Places API's own field names
+  base_position?: unknown
+  positions?: unknown
+}): PlaceLocation | null {
+  if (place.world === true) {
+    // A world's base position is always "0,0" and says nothing; its name is what addresses it, and a world
+    // is deployed under a NAME its deployer owns.
+    const name = formatUntrustedLabel(place.world_name, 64)
+    return name ? { kind: 'world', name } : null
+  }
+  const owned = Array.isArray(place.positions) ? place.positions.filter((p): p is string => typeof p === 'string') : []
+  const parcels = owned.map(parcel => parcel.trim()).filter(parcel => BASE_POSITION_PATTERN.test(parcel))
+  if (parcels.length === 0) {
+    return null
+  }
+  const declared = typeof place.base_position === 'string' ? place.base_position.trim() : ''
+  return { kind: 'genesis', position: parcels.includes(declared) ? declared : parcels[0] }
+}
+
 /**
  * Fetches place information by creator address from the Places API
  * @param creatorAddress The creator's Ethereum address
- * @returns Object containing place name and image URL if exactly one place is found, null otherwise
+ * @returns Object containing place name, image URL and location if exactly one identifiable place is
+ * found, null otherwise
  */
-async function fetchPlaceByCreatorAddress(creatorAddress: string): Promise<{ sceneName: string; sceneImageUrl: string } | null> {
+async function fetchPlaceByCreatorAddress(
+  creatorAddress: string
+): Promise<{ sceneName: string; sceneImageUrl: string; sceneLocation: PlaceLocation } | null> {
   try {
     const placesApiUrl = config.get('PLACES_API_URL')
     const response = await fetch(`${placesApiUrl}/api/places?creator_address=${creatorAddress.toLowerCase()}`)
@@ -570,11 +614,20 @@ async function fetchPlaceByCreatorAddress(creatorAddress: string): Promise<{ sce
 
     const place = data.data[0]
 
+    // A place nothing locates is not worth showing: the title and the image are the parts anyone can copy,
+    // so without the parcel or the world name there is nothing on the block the user could check. Treated
+    // like no place at all, which the tip view already shows as an unnamed one.
+    const sceneLocation = getPlaceLocation(place)
+    if (!sceneLocation) {
+      return null
+    }
+
     // The place's title and image are written by whoever deployed the scene at the recipient the request
     // chose, and sit next to the amount the user confirms: shown as an untrusted label and an https image.
     return {
       sceneName: formatUntrustedLabel(place.title) || 'Unknown Place',
-      sceneImageUrl: getHttpsUrl(place.image) ?? ''
+      sceneImageUrl: getHttpsUrl(place.image) ?? '',
+      sceneLocation
     }
   } catch (error) {
     console.error('Error fetching place by creator address:', error)
@@ -597,5 +650,6 @@ export {
   decodeManaTransferData,
   fetchNftMetadata,
   fetchPlaceByCreatorAddress,
+  getPlaceLocation,
   buildSendTransactionSimulationPayload
 }

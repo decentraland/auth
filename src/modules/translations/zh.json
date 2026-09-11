@@ -101,6 +101,7 @@
       "on_network": "在 {network} 上",
       "acknowledge_risk": "我了解这会授予对我资产的访问权限",
       "acknowledge_no_visible_effects": "我了解预览未显示我的资产有任何变化，而此交易仍可能更改我在此处看不到的设置或角色",
+      "acknowledge_reverted": "我理解此操作目前会失败；如果在发送之前情况发生变化，它可能会执行此预览未显示的操作",
       "callback_code_notice": "此调用使用的某个地址目前没有合约代码。在调用执行前，该地址可能会被部署代码，导致实际执行结果与此预览不同。",
       "acknowledge_callback_code": "我理解在此预览后部署的代码可能改变此调用的行为，并接受此风险。",
       "approval_can_spend_symbol": "可以使用 {symbol}",
@@ -240,6 +241,9 @@
     }
   },
   "transfer": {
+    "place_genesis_city": "Genesis City {position}",
+    "place_world": "世界 {name}",
+    "place_not_verified": "此账户部署了上方显示的地点。Decentraland 无法判断它是否就是请求你付款的地点——请将位置与你所在的位置核对。",
     "confirm": {
       "sending_tip": "正在发送 {manaAmount} 小费给",
       "confirm_tip": "确认 {manaAmount} 小费给",

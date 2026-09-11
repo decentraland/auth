@@ -6,7 +6,7 @@ import { TransferAlert, TransferAssetImage, TransferLayout } from '../../../../.
 import { CenteredContent, ItemName, Label, Title } from '../../../../../Transfer/Transfer.styled'
 import { TransferType } from '../../../types'
 import type { MANATransferData, NFTTransferData, ProfileAvatar } from '../../../types'
-import { SceneName } from '../TransferTipComponents.styled'
+import { PlaceDetails, PlaceLocationName, PlaceNote, SceneName } from '../TransferTipComponents.styled'
 import { TransferCompletedViewProps } from './TransferCompletedView.types'
 import { SceneImageWrapper, SuccessAnimation } from './TransferCompletedView.styled'
 
@@ -24,6 +24,8 @@ const TransferCompletedView = (props: TransferCompletedViewProps) => {
   }, [])
   const { type, transferData } = props
   const isTip = type === TransferType.TIP
+  // Bound once so the kind narrows it: what the block is worth checking against (see PlaceLocation).
+  const sceneLocation = isTip ? ((transferData as MANATransferData).sceneLocation ?? null) : null
   const recipientAvatar = transferData.recipientProfile?.avatars?.[0]
 
   return (
@@ -55,10 +57,31 @@ const TransferCompletedView = (props: TransferCompletedViewProps) => {
               {successAnimation ? <SuccessAnimation animationData={successAnimation} loop={true} /> : null}
             </SceneImageWrapper>
             <SceneName>{(transferData as MANATransferData).sceneName}</SceneName>
+            <PlaceDetails data-testid="place-details">
+              {sceneLocation ? (
+                <PlaceLocationName data-testid="place-location">
+                  {sceneLocation.kind === 'world'
+                    ? t('transfer.place_world', { name: sceneLocation.name })
+                    : t('transfer.place_genesis_city', { position: sceneLocation.position })}
+                </PlaceLocationName>
+              ) : null}
+              {/* Same block, same limit as on the confirmation (see TransferConfirmView). */}
+              <PlaceNote data-testid="place-not-verified">{t('transfer.place_not_verified')}</PlaceNote>
+            </PlaceDetails>
           </>
         ) : (
           <>
-            <Profile address={transferData.toAddress} avatar={recipientAvatar as ProfileAvatar} size="huge" inline />
+            {/* The account that now holds the NFT, named as the confirmation screen named it. */}
+            <Profile
+              address={transferData.toAddress}
+              avatar={recipientAvatar as ProfileAvatar}
+              size="huge"
+              inline
+              showBothNameAndAddress
+              shortenAddress
+              showCopyButton
+              highlightName
+            />
             <Box>
               <SceneImageWrapper isGift>
                 <TransferAssetImage

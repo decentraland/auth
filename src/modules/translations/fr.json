@@ -101,6 +101,7 @@
       "on_network": "sur {network}",
       "acknowledge_risk": "Je comprends que cela donne accès à mes actifs",
       "acknowledge_no_visible_effects": "Je comprends que l'aperçu ne montre aucun changement sur mes actifs et que cela peut néanmoins modifier des paramètres ou des rôles que je ne vois pas ici",
+      "acknowledge_reverted": "Je comprends que cette action échoue actuellement et que, si cela change avant son envoi, elle pourrait faire quelque chose que cet aperçu n’a pas montré",
       "callback_code_notice": "Une adresse utilisée par cet appel ne contient actuellement aucun code de contrat. Du code pourrait y être déployé avant l’exécution de l’appel, ce qui pourrait produire un résultat différent de cet aperçu.",
       "acknowledge_callback_code": "Je comprends que du code déployé après cet aperçu pourrait modifier les effets de cet appel et j’accepte ce risque.",
       "approval_can_spend_symbol": "peut dépenser {symbol}",
@@ -240,6 +241,9 @@
     }
   },
   "transfer": {
+    "place_genesis_city": "Genesis City {position}",
+    "place_world": "Monde {name}",
+    "place_not_verified": "Ce compte a déployé le lieu affiché ci-dessus. Decentraland ne peut pas savoir s’il s’agit du lieu qui vous a demandé de payer : comparez l’emplacement avec l’endroit où vous êtes.",
     "confirm": {
       "sending_tip": "Envoi d'un pourboire de {manaAmount} pour",
       "confirm_tip": "Confirmer le pourboire de {manaAmount} pour",

@@ -101,6 +101,11 @@ const avatar: Avatar = {
   muted: []
 }
 
+// A recipient whose name is not claimed, which is the case the gift screens have to disambiguate: Profile
+// appends the last four characters of the address to such a name, and any account ending in those four reads
+// the same, so the screens name the address too (see TransferConfirmView).
+const unclaimedNameAvatar: Avatar = { ...avatar, hasClaimedName: false, name: 'MotherHacker' }
+
 const nftData: NFTTransferData = {
   contractAddress: '0x0000000000000000000000000000000000000000',
   description: 'Test description',
@@ -119,6 +124,8 @@ const manaData: MANATransferData = {
   manaAmount: '10 MANA',
   sceneImageUrl: 'https://peer.decentraland.org/content/contents/bafybeietrfx6arffgapt65jkawued7mcsu75uuloodf3drxbvq2pfpggei',
   sceneName: 'Test Scene',
+  // Where the place is, which is the part of the block a scene cannot make up (see PlaceLocation).
+  sceneLocation: { kind: 'genesis', position: '-3,-2' } as const,
   toAddress: '0x0000000000000000000000000000000000000000',
   recipientProfile: {
     avatars: [avatar]
@@ -426,10 +433,10 @@ const simulationStablecoinTrade: SimulationResponseBody = {
 }
 
 export {
-  COLLECTION_ADDRESS,
   avatar,
-  manaData,
+  COLLECTION_ADDRESS,
   MANA_CONTRACT_ADDRESS,
+  manaData,
   MARKETPLACE_ADDRESS,
   metaTxRaw,
   nftData,
@@ -441,6 +448,7 @@ export {
   simulationReverted,
   simulationStablecoinTrade,
   simulationSuccess,
+  unclaimedNameAvatar,
   unknownMetaTxRaw,
   USER_ADDRESS
 }

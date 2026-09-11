@@ -108,9 +108,13 @@ export const WalletInteraction = ({
           label={
             isPreviewUnavailable
               ? t('request.wallet_interaction.acknowledge_preview_unavailable')
-              : isPreviewWithoutVisibleEffects
-                ? t('request.transaction_dialog.acknowledge_no_visible_effects')
-                : t('request.transaction_dialog.acknowledge_risk')
+              : isReverted
+                ? // The preview's verdict is about the state it ran on. Whatever makes the call stop
+                  // failing before it is mined leaves it doing something this screen never showed.
+                  t('request.transaction_dialog.acknowledge_reverted')
+                : isPreviewWithoutVisibleEffects
+                  ? t('request.transaction_dialog.acknowledge_no_visible_effects')
+                  : t('request.transaction_dialog.acknowledge_risk')
           }
         />
       ) : null}
