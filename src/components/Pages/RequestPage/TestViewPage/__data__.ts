@@ -101,6 +101,11 @@ const avatar: Avatar = {
   muted: []
 }
 
+// A recipient whose name is not claimed, which is the case the gift screens have to disambiguate: Profile
+// appends the last four characters of the address to such a name, and any account ending in those four reads
+// the same, so the screens name the address too (see TransferConfirmView).
+const unclaimedNameAvatar: Avatar = { ...avatar, hasClaimedName: false, name: 'MotherHacker' }
+
 const nftData: NFTTransferData = {
   contractAddress: '0x0000000000000000000000000000000000000000',
   description: 'Test description',
@@ -426,10 +431,10 @@ const simulationStablecoinTrade: SimulationResponseBody = {
 }
 
 export {
-  COLLECTION_ADDRESS,
   avatar,
-  manaData,
+  COLLECTION_ADDRESS,
   MANA_CONTRACT_ADDRESS,
+  manaData,
   MARKETPLACE_ADDRESS,
   metaTxRaw,
   nftData,
@@ -441,6 +446,7 @@ export {
   simulationReverted,
   simulationStablecoinTrade,
   simulationSuccess,
+  unclaimedNameAvatar,
   unknownMetaTxRaw,
   USER_ADDRESS
 }

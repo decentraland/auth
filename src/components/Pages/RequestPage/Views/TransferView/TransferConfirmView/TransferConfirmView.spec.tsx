@@ -1,6 +1,7 @@
 import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Rarity } from '@dcl/schemas'
+import { DclThemeProvider, darkTheme } from 'decentraland-ui2'
 import { TransferType } from '../../../types'
 import type { MANATransferData, NFTTransferData } from '../../../types'
 import { TransferConfirmView } from './TransferConfirmView'
@@ -12,15 +13,19 @@ jest.mock('@dcl/hooks', () => ({
   })
 }))
 
-jest.mock('decentraland-ui2', () => ({
-  ...jest.requireActual('decentraland-ui2'),
-  Profile: () => null
-}))
-
 // TransferLayout renders the WebGL AnimatedBackground, which jsdom can't run.
 jest.mock('../../../../../AnimatedBackground', () => ({
   AnimatedBackground: () => null
 }))
+
+// Profile reads the Decentraland theme, and it is rendered for real here: who the transfer goes to is what
+// this screen exists to state, so what it actually says has to be asserted rather than stubbed away.
+const renderView = (viewProps: TransferConfirmViewProps) =>
+  render(
+    <DclThemeProvider theme={darkTheme}>
+      <TransferConfirmView {...viewProps} />
+    </DclThemeProvider>
+  )
 
 describe('when confirming a branded transfer', () => {
   let props: TransferConfirmViewProps
@@ -59,7 +64,7 @@ describe('when confirming a branded transfer', () => {
     })
 
     it('should show the processing state instead of the buttons while the prompt is open', async () => {
-      render(<TransferConfirmView {...props} />)
+      renderView(props)
       await userEvent.click(screen.getByTestId('transfer-confirm-button'))
       expect(screen.queryByTestId('transfer-confirm-button')).not.toBeInTheDocument()
       expect(screen.getByText('transfer.confirm.processing_authorization')).toBeInTheDocument()
@@ -73,7 +78,7 @@ describe('when confirming a branded transfer', () => {
     })
 
     it('should hand the buttons back so the user can still deny or confirm', async () => {
-      render(<TransferConfirmView {...props} />)
+      renderView(props)
       await userEvent.click(screen.getByTestId('transfer-confirm-button'))
       expect(screen.getByTestId('transfer-confirm-button')).toBeInTheDocument()
       expect(screen.getByTestId('transfer-cancel-button')).toBeInTheDocument()
@@ -86,7 +91,7 @@ describe('when confirming a branded transfer', () => {
     })
 
     it('should show the processing state', () => {
-      render(<TransferConfirmView {...props} />)
+      renderView(props)
       expect(screen.getByText('transfer.confirm.processing_authorization')).toBeInTheDocument()
       expect(screen.queryByTestId('transfer-confirm-button')).not.toBeInTheDocument()
     })
@@ -98,12 +103,12 @@ describe('when confirming a branded transfer', () => {
     })
 
     it('should warn that code can appear before execution', () => {
-      render(<TransferConfirmView {...props} />)
+      renderView(props)
       expect(screen.getByTestId('callback-code-warning')).toHaveTextContent('request.transaction_dialog.callback_code_notice')
     })
 
     it('should report callback consent to the page', async () => {
-      render(<TransferConfirmView {...props} />)
+      renderView(props)
       await userEvent.click(screen.getByRole('checkbox', { name: 'request.transaction_dialog.acknowledge_callback_code' }))
       expect(onCallbackAcknowledgedChange).toHaveBeenCalledWith(true)
     })
@@ -112,7 +117,7 @@ describe('when confirming a branded transfer', () => {
     // be checked here is the cause: a notice with a negative bottom margin drags whatever follows it up over
     // itself, and the checkbox follows its warning.
     it('should lay the warning and its checkbox out in one group, with no notice pulling the next one over it', () => {
-      render(<TransferConfirmView {...props} />)
+      renderView(props)
       const group = screen.getByTestId('transfer-notices')
       const warning = screen.getByTestId('callback-code-warning')
       const checkbox = screen.getByRole('checkbox', { name: 'request.transaction_dialog.acknowledge_callback_code' })
@@ -138,7 +143,7 @@ describe('when confirming a branded transfer', () => {
       })
 
       it('should keep both notices and the checkbox in the group, none pulling the next over it', () => {
-        render(<TransferConfirmView {...props} />)
+        renderView(props)
         const group = screen.getByTestId('transfer-notices')
         expect(group).toContainElement(screen.getByTestId('gifting-warning'))
         expect(group).toContainElement(screen.getByTestId('callback-code-warning'))
@@ -146,6 +151,79 @@ describe('when confirming a branded transfer', () => {
         for (const notice of Array.from(group.children)) {
           expect(parseFloat(getComputedStyle(notice).marginBottom || '0')).toBeGreaterThanOrEqual(0)
         }
+      })
+    })
+  })
+
+  // A display name is not an identity. Only a claimed name is unique; an unclaimed one is free to copy, and
+  // Profile disambiguates it with the last four characters of the address — 65,536 of which exist, so a
+  // vanity address is enough to make an attacker's account read exactly like the intended recipient's. The
+  // screen must therefore also say which address the NFT is being sent to.
+  describe('and the transfer is a gift', () => {
+    const INTENDED = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa5678'
+    const IMPERSONATOR = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb5678'
+
+    const giftTo = (toAddress: string, avatar?: { name: string; hasClaimedName: boolean }): TransferConfirmViewProps => ({
+      type: TransferType.GIFT,
+      transferData: {
+        imageUrl: 'https://example.com/nft.png',
+        tokenId: '1',
+        toAddress,
+        contractAddress: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd',
+        name: 'Hat',
+        description: 'A hat',
+        rarity: Rarity.COMMON,
+        recipientProfile: avatar ? ({ avatars: [avatar] } as NFTTransferData['recipientProfile']) : undefined
+      },
+      isLoading: false,
+      onApprove,
+      onDeny
+    })
+
+    describe('and the recipient has a name they have not claimed', () => {
+      it('should show the address it is being sent to alongside that name', () => {
+        renderView(giftTo(INTENDED, { name: 'Alice', hasClaimedName: false }))
+
+        expect(screen.getByText('Alice#5678')).toBeInTheDocument()
+        expect(screen.getByText('0xaaaa\u20265678')).toBeInTheDocument()
+      })
+
+      it('should offer the full address to copy, so it can be checked rather than trusted', async () => {
+        renderView(giftTo(INTENDED, { name: 'Alice', hasClaimedName: false }))
+        const writeText = jest.fn()
+        Object.assign(navigator, { clipboard: { writeText } })
+
+        await userEvent.click(screen.getByLabelText('Copy address'))
+
+        expect(writeText).toHaveBeenCalledWith(INTENDED)
+      })
+
+      it('should read differently for another account wearing the same name and address ending', () => {
+        const { unmount } = renderView(giftTo(INTENDED, { name: 'Alice', hasClaimedName: false }))
+        const intended = document.body.textContent
+        unmount()
+
+        renderView(giftTo(IMPERSONATOR, { name: 'Alice', hasClaimedName: false }))
+
+        expect(document.body.textContent).not.toEqual(intended)
+        expect(screen.getByText('0xbbbb\u20265678')).toBeInTheDocument()
+      })
+    })
+
+    describe('and the recipient has a claimed name', () => {
+      it('should still show the address, since the name alone says nothing about where it goes', () => {
+        renderView(giftTo(INTENDED, { name: 'Alice', hasClaimedName: true }))
+
+        expect(screen.getByText('Alice')).toBeInTheDocument()
+        expect(screen.getByText('0xaaaa\u20265678')).toBeInTheDocument()
+      })
+    })
+
+    describe('and the recipient has no profile at all', () => {
+      it('should name them by their address', () => {
+        renderView(giftTo(INTENDED))
+
+        expect(screen.getByText('0xaaaa\u20265678')).toBeInTheDocument()
       })
     })
   })
