@@ -101,6 +101,7 @@
       "on_network": "su {network}",
       "acknowledge_risk": "Capisco che questo concede l'accesso ai miei asset",
       "acknowledge_no_visible_effects": "Capisco che l'anteprima non mostra modifiche ai miei asset e che questo può comunque cambiare impostazioni o ruoli che non vedo qui",
+      "acknowledge_reverted": "Comprendo che questa azione ora non riesce e che, se ciò cambia prima dell’invio, potrebbe fare qualcosa che questa anteprima non ha mostrato",
       "callback_code_notice": "Un indirizzo utilizzato da questa chiamata non contiene attualmente codice di contratto. Potrebbe esservi distribuito del codice prima dell’esecuzione della chiamata, producendo un risultato diverso da questa anteprima.",
       "acknowledge_callback_code": "Comprendo che il codice distribuito dopo questa anteprima potrebbe modificare gli effetti della chiamata e accetto questo rischio.",
       "approval_can_spend_symbol": "può spendere {symbol}",

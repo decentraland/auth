@@ -2091,6 +2091,68 @@ describe('RequestPage', () => {
     })
   })
 
+  // A revert is the one previewed outcome that describes the state rather than the call: it says the call
+  // fails against the state the simulation ran on, and nothing about the state it will be mined against.
+  // The signature path has always asked for that (a bearer authorization can be relayed later); a
+  // transaction waits too — in the mempool, or on the gas tank's own submission — so it asks as well.
+  describe.each([true, false])('when a Decentraland transaction is previewed as reverting, relayed: %s', relayed => {
+    beforeEach(() => {
+      mockConnectionData = { ...mockConnectionData, providerType: ProviderType.INJECTED }
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockGetAddresses.mockResolvedValue([SIGNER])
+      mockRecover.mockResolvedValue(recovered('eth_sendTransaction', [{ to: CONTRACT, data: '0xabcd', value: '0x0' }]))
+      mockClassifyRequest.mockResolvedValue(dclTransaction({ relayed }))
+      mockSimulateTransaction.mockResolvedValue(simulationOf({ status: 'reverted', error: 'Trade not effective yet' }))
+      jest.mocked(sendMetaTransaction).mockResolvedValue('0xrelayedhash')
+      mockWalletRequest.mockResolvedValue('0xhash')
+      mockSendSuccessfulOutcome.mockResolvedValue({})
+    })
+
+    const settledView = async () => {
+      const view = await screen.findByTestId('wallet-interaction')
+      await waitFor(() => expect(view).toHaveAttribute('data-sim', 'ready'))
+      if (!relayed) {
+        await waitFor(() => expect(view).toHaveAttribute('data-gas-status', 'ready'))
+      }
+      return view
+    }
+
+    const dispatched = () =>
+      relayed
+        ? jest.mocked(sendMetaTransaction).mock.calls.length
+        : mockWalletRequest.mock.calls.filter(([{ method }]) => method === 'eth_sendTransaction').length
+
+    it('should ask for an acknowledgment, since the preview only says it fails against today state', async () => {
+      renderRequestPage()
+      const view = await settledView()
+
+      expect(view).toHaveAttribute('data-requires-acknowledgment', 'true')
+      expect(view).toHaveAttribute('data-approve-blocked', 'true')
+    })
+
+    it('should send nothing if Allow is pressed before it is given', async () => {
+      renderRequestPage()
+      await settledView()
+
+      // Pressed raw on purpose: the double's button is not disabled, so this is the press the page's own
+      // approval handler has to refuse.
+      await userEvent.click(screen.getByTestId('wallet-interaction-approve'))
+
+      expect(dispatched()).toBe(0)
+    })
+
+    it('should send it once the user acknowledges that it fails today', async () => {
+      renderRequestPage()
+      const view = await settledView()
+
+      await userEvent.click(screen.getByTestId('wallet-interaction-acknowledge'))
+      await waitFor(() => expect(view).toHaveAttribute('data-approve-blocked', 'false'))
+      await userEvent.click(screen.getByTestId('wallet-interaction-approve'))
+
+      await waitFor(() => expect(dispatched()).toBe(1))
+    })
+  })
+
   describe('when the request is a plain value transfer', () => {
     beforeEach(() => {
       mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
