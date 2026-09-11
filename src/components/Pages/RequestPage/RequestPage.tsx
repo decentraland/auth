@@ -3,6 +3,7 @@ import { useParams, useSearchParams } from 'react-router-dom'
 import { createPublicClient, createWalletClient, custom } from 'viem'
 import { mainnet } from 'viem/chains'
 import { ChainId } from '@dcl/schemas/dist/dapps/chain-id'
+import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
 import { sendMetaTransaction } from 'decentraland-transactions'
 import { useNavigateWithSearchParams } from '../../../hooks/navigation'
 import { useTargetConfig } from '../../../hooks/targetConfig'
@@ -619,6 +620,12 @@ export const RequestPage = () => {
         const request = await authServerClient.current.recover(requestId, signerAddress)
 
         if (isStale()) return
+
+        // Thirdweb's adapter only signs typed data through v4; v3 falls through to its public RPC.
+        // Refuse it before asking for consent, without changing the signing method's semantics.
+        if (providerType === ProviderType.THIRDWEB && request.method === 'eth_signTypedData_v3') {
+          throw new UnsupportedMethodError(request.method)
+        }
 
         requestRef.current = request
         recoveredRequestIdRef.current = requestId
@@ -1264,19 +1271,16 @@ export const RequestPage = () => {
       await authServerClient.current.sendSuccessfulOutcome(requestId, signerAddress, result)
       if (isStaleAction()) return
       hasCompletedRef.current = true
-
-      // A side effect of an outcome the server has already accepted, so its failure is its own
-      // concern: report it under its own context rather than as an outcome-delivery problem, and
-      // complete either way.
-      if (manaTransferData && result && identity) {
-        try {
-          await sendTipNotification(identity, result)
-        } catch (notificationError) {
-          handleError(notificationError, 'Error sending the tip notification')
-        }
-        if (isStaleAction()) return
-      }
+      clearTimeout(timeoutRef.current)
       showInteractionCompleteView()
+
+      // Notification delivery cannot delay or change a completed request. The helper bounds the fetch;
+      // handle a rejection here as well so a background failure never becomes an unhandled promise.
+      if (manaTransferData && result && identity) {
+        void sendTipNotification(identity, result).catch(notificationError => {
+          handleError(notificationError, 'Error sending the tip notification')
+        })
+      }
     } catch (e) {
       // Every branch reports, then shows the result. Reporting (Sentry, the failed outcome) belongs to the
       // reviewed request and goes ahead; showing belongs to the review on screen and is skipped once this

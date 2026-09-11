@@ -23,6 +23,7 @@ import {
   collectCallAddresses
 } from '../../../shared/auth'
 import { extractReferrerFromSearchParameters, getAuthRequestId, isBridgeOnlyEnabled } from '../../../shared/locations'
+import { sendTipNotification } from '../../../shared/notifications'
 import { trackEvent } from '../../../shared/utils/analytics'
 import { FeatureFlagsContext } from '../../FeatureFlagsProvider'
 import { RequestClassification } from './classifyRequest'
@@ -140,7 +141,7 @@ jest.mock('../../../modules/config', () => ({
   config: { get: jest.fn().mockReturnValue('10000') }
 }))
 jest.mock('../../../shared/notifications', () => ({
-  sendTipNotification: jest.fn()
+  sendTipNotification: jest.fn().mockResolvedValue(undefined)
 }))
 
 // --- Viem ---
@@ -537,6 +538,65 @@ describe('RequestPage', () => {
     beforeEach(() => {
       mockGetAddresses.mockResolvedValue([SIGNER])
       mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'User' }] })
+    })
+
+    describe('and Thirdweb receives a typed-data v3 request', () => {
+      beforeEach(async () => {
+        mockConnectionData = { ...mockConnectionData, providerType: ProviderType.THIRDWEB }
+        mockRecover.mockResolvedValueOnce(recovered('eth_signTypedData_v3', [SIGNER, '{"primaryType":"Permit"}']))
+        mockSendFailedOutcome.mockResolvedValueOnce({})
+        renderRequestPage()
+        await screen.findByTestId('recover-error')
+      })
+
+      it('should report an unsupported method to the requester', () => {
+        expect(mockSendFailedOutcome).toHaveBeenCalledWith(REQUEST_ID, SIGNER, {
+          code: -32601,
+          message: 'The "eth_signTypedData_v3" method is not supported'
+        })
+      })
+
+      it('should refuse before building a review or asking the wallet', () => {
+        expect(mockClassifyRequest).not.toHaveBeenCalled()
+        expect(mockWalletRequest).not.toHaveBeenCalled()
+        expect(screen.queryByTestId('confirm-request-dialog')).not.toBeInTheDocument()
+      })
+    })
+
+    describe('and an external wallet receives a typed-data v3 request', () => {
+      beforeEach(async () => {
+        mockRecover.mockResolvedValueOnce(recovered('eth_signTypedData_v3', [SIGNER, '{"primaryType":"Permit"}']))
+        mockWalletRequest.mockResolvedValueOnce('0xsignature')
+        mockSendSuccessfulOutcome.mockResolvedValueOnce({})
+        renderRequestPage()
+        await approveActionRequest()
+      })
+
+      it('should continue signing with the requested v3 method', () => {
+        expect(mockWalletRequest).toHaveBeenCalledWith({
+          method: 'eth_signTypedData_v3',
+          params: [SIGNER, '{"primaryType":"Permit"}']
+        })
+      })
+    })
+
+    describe('and Thirdweb receives a typed-data v4 request', () => {
+      beforeEach(async () => {
+        mockConnectionData = { ...mockConnectionData, providerType: ProviderType.THIRDWEB }
+        mockRecover.mockResolvedValueOnce(recovered('eth_signTypedData_v4', [SIGNER, '{"primaryType":"Permit"}']))
+        mockWalletRequest.mockResolvedValueOnce('0xsignature')
+        mockSendSuccessfulOutcome.mockResolvedValueOnce({})
+        renderRequestPage()
+        await approveActionRequest()
+        await userEvent.click(await screen.findByTestId('confirm-request-confirm'))
+      })
+
+      it('should continue signing v4 after confirmation', () => {
+        expect(mockWalletRequest).toHaveBeenCalledWith({
+          method: 'eth_signTypedData_v4',
+          params: [SIGNER, '{"primaryType":"Permit"}']
+        })
+      })
     })
 
     describe('and recovery fails with an UnsupportedMethodError (the retired dcl_personal_sign sign-in)', () => {
@@ -2256,6 +2316,49 @@ describe('RequestPage', () => {
       await userEvent.click(screen.getByTestId('confirm-request-confirm'))
       await screen.findByTestId('transfer-completed')
       expect(sendMetaTransaction).toHaveBeenCalledTimes(1)
+    })
+
+    describe('and notification delivery is still pending after success', () => {
+      let user: ReturnType<typeof userEvent.setup>
+      let rejectNotification: (error: Error) => void
+
+      beforeEach(() => {
+        jest.useFakeTimers()
+        user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime })
+        mockConnectionData = { ...mockConnectionData, providerType: ProviderType.INJECTED }
+        mockRecover.mockResolvedValue({
+          ...recovered('eth_sendTransaction', [{ to: '0xmanacontract', data: '0xa9059cbb', value: '0x0' }]),
+          expiration: new Date(Date.now() + 60_000).toISOString()
+        })
+        jest.mocked(sendTipNotification).mockReturnValueOnce(
+          new Promise<void>((_resolve, reject) => {
+            rejectNotification = reject
+          })
+        )
+      })
+
+      afterEach(() => {
+        jest.useRealTimers()
+      })
+
+      it('should show completion immediately and keep it past the request expiry', async () => {
+        renderRequestPage()
+        await user.click(await screen.findByTestId('transfer-confirm-approve'))
+        expect(await screen.findByTestId('transfer-completed')).toBeInTheDocument()
+        expect(sendTipNotification).toHaveBeenCalledTimes(1)
+        act(() => jest.advanceTimersByTime(61_000))
+        expect(screen.getByTestId('transfer-completed')).toBeInTheDocument()
+        expect(screen.queryByTestId('timeout-error')).not.toBeInTheDocument()
+      })
+
+      it('should preserve success if the notification later rejects', async () => {
+        renderRequestPage()
+        await user.click(await screen.findByTestId('transfer-confirm-approve'))
+        await screen.findByTestId('transfer-completed')
+        await act(async () => rejectNotification(new Error('Notification unavailable')))
+        expect(screen.getByTestId('transfer-completed')).toBeInTheDocument()
+        expect(mockSendFailedOutcome).not.toHaveBeenCalled()
+      })
     })
 
     describe('and the recipient lookups fail', () => {

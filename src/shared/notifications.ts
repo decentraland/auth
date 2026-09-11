@@ -3,6 +3,8 @@ import { Events } from '@dcl/schemas'
 import signedFetch from 'decentraland-crypto-fetch'
 import { config } from '../modules/config'
 
+const TIP_NOTIFICATION_TIMEOUT_MS = 10_000
+
 export interface BlockchainEventPayload {
   type: Events.SubType.Blockchain
   transactionHash: string
@@ -40,7 +42,8 @@ export async function sendTipNotification(identity: AuthIdentity, transactionHas
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(payload),
-      identity
+      identity,
+      signal: AbortSignal.timeout(TIP_NOTIFICATION_TIMEOUT_MS)
     })
 
     if (!response.ok) {

@@ -1,4 +1,5 @@
-import { MetaTransactionError } from 'decentraland-transactions'
+import { ErrorCode, MetaTransactionError, sendMetaTransaction } from 'decentraland-transactions'
+import { isUserRejectedTransaction } from '../errors'
 import { ReviewedSignerMismatchError, bindProviderToSigner } from './signerBoundProvider'
 
 const SIGNER = '0xD9b96b5DC720fc52BEDE1ec3B40A930e15F70Ddd'
@@ -118,6 +119,57 @@ describe('when binding a provider to the reviewed signer', () => {
 
     it('should refuse to bind rather than forward through a path the binding does not read', () => {
       expect(() => bindProviderToSigner({ send }, SIGNER)).toThrow('no EIP-1193 request method')
+    })
+  })
+
+  describe('and the real relay library encounters a wallet cancellation', () => {
+    let networkRequest: jest.Mock
+    let outcome: unknown
+
+    beforeEach(async () => {
+      request.mockResolvedValueOnce([SIGNER]).mockResolvedValueOnce('0x').mockRejectedValueOnce({ code: 4001, message: 'User rejected' })
+      networkRequest = jest.fn().mockResolvedValueOnce('0x0')
+      outcome = await sendMetaTransaction({ request: bound.request }, { request: networkRequest }, '0xabcd', {
+        address: OTHER,
+        abi: [],
+        name: 'Test',
+        version: '1',
+        chainId: 137
+      }).catch(error => error)
+    })
+
+    it('should preserve the cancellation code through the relay library', () => {
+      expect(outcome).toMatchObject({ code: ErrorCode.USER_DENIED, message: 'User rejected' })
+    })
+
+    it('should let the page recognize the result as a cancellation', () => {
+      expect(isUserRejectedTransaction(outcome)).toBe(true)
+    })
+  })
+
+  describe('and the wallet rejects without an error message', () => {
+    beforeEach(() => {
+      request.mockRejectedValueOnce({ code: 4001 })
+    })
+
+    it('should preserve the cancellation with a fallback message', async () => {
+      await expect(bound.request({ method: 'eth_signTypedData_v4', params: [SIGNER, '{}'] })).rejects.toMatchObject({
+        code: ErrorCode.USER_DENIED,
+        message: 'User rejected the request.'
+      })
+    })
+  })
+
+  describe('and the wallet fails for a reason other than cancellation', () => {
+    let failure: Error
+
+    beforeEach(() => {
+      failure = new Error('RPC unavailable')
+      request.mockRejectedValueOnce(failure)
+    })
+
+    it('should preserve the original failure', async () => {
+      await expect(bound.request({ method: 'eth_signTypedData_v4', params: [SIGNER, '{}'] })).rejects.toBe(failure)
     })
   })
 })
