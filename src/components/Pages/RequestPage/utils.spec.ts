@@ -1547,7 +1547,18 @@ describe('when fetching the place of a tip recipient', () => {
       jest.mocked(fetch).mockResolvedValueOnce({
         ok: true,
         json: () =>
-          Promise.resolve({ ok: true, data: [{ title: `  Genesis\u202EPlaza ${'x'.repeat(60)}`, image: 'https://cdn.example/plaza.png' }] })
+          Promise.resolve({
+            ok: true,
+            data: [
+              {
+                title: `  Genesis\u202EPlaza ${'x'.repeat(60)}`,
+                image: 'https://cdn.example/plaza.png',
+                world: false,
+                base_position: '-3,-2',
+                positions: ['-3,-2', '-3,-1']
+              }
+            ]
+          })
       } as unknown as Response)
     })
 
@@ -1569,12 +1580,20 @@ describe('when fetching the place of a tip recipient', () => {
     beforeEach(() => {
       jest.mocked(fetch).mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({ ok: true, data: [{ title: 'Plaza', image: 'javascript:alert(1)' }] })
+        json: () =>
+          Promise.resolve({
+            ok: true,
+            data: [{ title: 'Plaza', image: 'javascript:alert(1)', world: false, base_position: '-3,-2', positions: ['-3,-2'] }]
+          })
       } as unknown as Response)
     })
 
     it('should drop the image', async () => {
-      await expect(fetchPlaceByCreatorAddress(CREATOR)).resolves.toEqual({ sceneName: 'Plaza', sceneImageUrl: '' })
+      await expect(fetchPlaceByCreatorAddress(CREATOR)).resolves.toEqual({
+        sceneName: 'Plaza',
+        sceneImageUrl: '',
+        sceneLocation: { kind: 'genesis', position: '-3,-2' }
+      })
     })
   })
 
@@ -1582,12 +1601,113 @@ describe('when fetching the place of a tip recipient', () => {
     beforeEach(() => {
       jest.mocked(fetch).mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({ ok: true, data: [{ image: 'https://cdn.example/plaza.png' }] })
+        json: () =>
+          Promise.resolve({
+            ok: true,
+            data: [{ image: 'https://cdn.example/plaza.png', world: false, base_position: '10,-20', positions: ['10,-20'] }]
+          })
       } as unknown as Response)
     })
 
     it('should name it Unknown Place', async () => {
       await expect(fetchPlaceByCreatorAddress(CREATOR)).resolves.toMatchObject({ sceneName: 'Unknown Place' })
+    })
+  })
+
+  // A title and an image are written by whoever deployed the scene and neither is unique. A Genesis City
+  // parcel is held by whoever owns that LAND and a world is addressed by a NAME that is an NFT, so the
+  // location is what the user can check against where they actually are.
+  describe('and the place is in Genesis City', () => {
+    beforeEach(() => {
+      jest.mocked(fetch).mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            ok: true,
+            data: [{ title: 'Plaza', world: false, world_name: null, base_position: '-3,-2', positions: ['-3,-2', '-2,-2'] }]
+          })
+      } as unknown as Response)
+    })
+
+    it('should report the parcel it occupies', async () => {
+      await expect(fetchPlaceByCreatorAddress(CREATOR)).resolves.toMatchObject({
+        sceneLocation: { kind: 'genesis', position: '-3,-2' }
+      })
+    })
+  })
+
+  describe('and the place is a world', () => {
+    beforeEach(() => {
+      jest.mocked(fetch).mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          // A world's base position is always "0,0" and says nothing; its name is what addresses it.
+          Promise.resolve({
+            ok: true,
+            data: [{ title: 'Rat Scape', world: true, world_name: 'MetadyneLabs.dcl.eth', base_position: '0,0' }]
+          })
+      } as unknown as Response)
+    })
+
+    it('should report the name that addresses it, not its meaningless base position', async () => {
+      await expect(fetchPlaceByCreatorAddress(CREATOR)).resolves.toMatchObject({
+        sceneLocation: { kind: 'world', name: 'MetadyneLabs.dcl.eth' }
+      })
+    })
+  })
+
+  describe('and a world carries a name that would lay out the line around it', () => {
+    beforeEach(() => {
+      jest.mocked(fetch).mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ ok: true, data: [{ title: 'W', world: true, world_name: 'evil\u202Ehte.lcd' }] })
+      } as unknown as Response)
+    })
+
+    it('should reveal what it carries rather than be laid out by it', async () => {
+      await expect(fetchPlaceByCreatorAddress(CREATOR)).resolves.toMatchObject({
+        sceneLocation: { kind: 'world', name: 'evil\\u202ehte.lcd' }
+      })
+    })
+  })
+
+  // `positions` are the deployment's pointers, and a scene is refused unless its deployer holds LAND over
+  // every one of them. `base_position` is the scene's own metadata, which nothing ties to those pointers,
+  // so a place naming a parcel it does not occupy is shown at one it does.
+  describe('and the place names a base position it does not occupy', () => {
+    beforeEach(() => {
+      jest.mocked(fetch).mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            ok: true,
+            data: [{ title: 'Not Genesis Plaza', world: false, base_position: '-3,-2', positions: ['80,80', '80,81'] }]
+          })
+      } as unknown as Response)
+    })
+
+    it('should show a parcel the recipient provably holds, not the one the scene claims', async () => {
+      await expect(fetchPlaceByCreatorAddress(CREATOR)).resolves.toMatchObject({
+        sceneLocation: { kind: 'genesis', position: '80,80' }
+      })
+    })
+  })
+
+  describe.each([
+    ['it occupies no parcels', { title: 'Plaza', world: false, base_position: '1,2' }],
+    ['its parcels are not coordinates', { title: 'Plaza', world: false, positions: ['somewhere'] }],
+    ['its parcels carry more than two', { title: 'Plaza', world: false, positions: ['1,2,3'] }],
+    ['the world has no name', { title: 'Plaza', world: true, world_name: '' }]
+  ])('and the place cannot be located because %s', (_case, place) => {
+    beforeEach(() => {
+      jest.mocked(fetch).mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ ok: true, data: [place] })
+      } as unknown as Response)
+    })
+
+    it('should return null, since a name and an image identify nobody on their own', async () => {
+      await expect(fetchPlaceByCreatorAddress(CREATOR)).resolves.toBeNull()
     })
   })
 

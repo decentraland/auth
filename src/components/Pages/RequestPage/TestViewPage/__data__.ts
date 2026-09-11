@@ -124,6 +124,8 @@ const manaData: MANATransferData = {
   manaAmount: '10 MANA',
   sceneImageUrl: 'https://peer.decentraland.org/content/contents/bafybeietrfx6arffgapt65jkawued7mcsu75uuloodf3drxbvq2pfpggei',
   sceneName: 'Test Scene',
+  // Where the place is, which is the part of the block a scene cannot make up (see PlaceLocation).
+  sceneLocation: { kind: 'genesis', position: '-3,-2' } as const,
   toAddress: '0x0000000000000000000000000000000000000000',
   recipientProfile: {
     avatars: [avatar]

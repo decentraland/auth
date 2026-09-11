@@ -968,7 +968,10 @@ export const RequestPage = () => {
                   sceneName: placeInfo?.sceneName || 'Unknown Place',
                   sceneImageUrl:
                     placeInfo?.sceneImageUrl ||
-                    'https://peer.decentraland.org/content/contents/bafkreidj26s7aenyxfthfdibnqonzqm5ptc4iamml744gmcyuokewkr76y'
+                    'https://peer.decentraland.org/content/contents/bafkreidj26s7aenyxfthfdibnqonzqm5ptc4iamml744gmcyuokewkr76y',
+                  // Null when no place was identified, and then the views show no location and the name
+                  // stands for nothing (see fetchPlaceByCreatorAddress).
+                  sceneLocation: placeInfo?.sceneLocation ?? null
                 })
                 setView(View.WALLET_MANA_INTERACTION)
                 return

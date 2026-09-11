@@ -20,12 +20,16 @@ const ItemName = styled(Box)(({ theme }) => ({
   unicodeBidi: 'isolate'
 }))
 
+// Over the bright background these screens use, the secondary text colour at reduced opacity came out too
+// faint to read. It is the label for what sits under it, so it is kept quieter than a title by weight and
+// size rather than by washing its colour out.
 const Label = styled(Typography)(({ theme }) => ({
-  color: theme.palette.text.secondary,
+  color: theme.palette.text.primary,
   fontSize: theme.typography.pxToRem(18),
   fontWeight: 400,
+  letterSpacing: '0.08em',
   marginTop: theme.spacing(6.25),
-  opacity: 0.8
+  opacity: 0.95
 }))
 
 const Title = styled(Typography)(({ theme }) => ({

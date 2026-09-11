@@ -9,7 +9,8 @@ import { TransferConfirmViewProps } from './TransferConfirmView.types'
 
 jest.mock('@dcl/hooks', () => ({
   useTranslation: () => ({
-    t: (key: string) => key
+    // Values are rendered too, so a test can assert that what the copy interpolates is what reaches it.
+    t: (key: string, values?: Record<string, string | number>) => (values ? `${key} ${JSON.stringify(values)}` : key)
   })
 }))
 
@@ -225,6 +226,79 @@ describe('when confirming a branded transfer', () => {
 
         expect(screen.getByText('0xaaaa\u20265678')).toBeInTheDocument()
       })
+    })
+  })
+
+  // The place is looked up by the recipient address alone and its name and image are written by whoever
+  // deployed it, so its position under the amount must not be allowed to imply that the payment was asked
+  // for from there (see fetchPlaceByCreatorAddress).
+  describe('and the tip shows a place the recipient deployed', () => {
+    // Built explicitly rather than spread: the props are a union on `type`, and spreading loses the
+    // discriminant that says which transferData this is.
+    const tipAt = (sceneLocation: MANATransferData['sceneLocation']): TransferConfirmViewProps => ({
+      type: TransferType.TIP,
+      transferData: { ...transferData, sceneLocation },
+      isLoading: false,
+      onApprove,
+      onDeny,
+      onCallbackAcknowledgedChange
+    })
+
+    it('should name the parcel the place occupies, which is what the user can check', () => {
+      renderView(tipAt({ kind: 'genesis', position: '-3,-2' }))
+
+      expect(screen.getByTestId('place-location')).toHaveTextContent('transfer.place_genesis_city {"position":"-3,-2"}')
+    })
+
+    it('should name a world by the name that addresses it', () => {
+      renderView(tipAt({ kind: 'world', name: 'flagtag.dcl.eth' }))
+
+      expect(screen.getByTestId('place-location')).toHaveTextContent('transfer.place_world {"name":"flagtag.dcl.eth"}')
+    })
+
+    it('should show no location when the place could not be located', () => {
+      renderView(tipAt(null))
+
+      expect(screen.queryByTestId('place-location')).not.toBeInTheDocument()
+      // The caveat stands either way: it is what says the name and the image prove nothing.
+      expect(screen.getByTestId('place-not-verified')).toBeInTheDocument()
+    })
+
+    it('should say the place is not verified as the one that asked for the payment', () => {
+      renderView(props)
+
+      expect(screen.getByTestId('place-not-verified')).toHaveTextContent('transfer.place_not_verified')
+    })
+
+    it('should keep the recipient address on screen next to it, which is what was verified', () => {
+      renderView(props)
+
+      expect(screen.getByText('transfer.confirm.creator_of')).toBeInTheDocument()
+      expect(screen.getByTestId('place-not-verified')).toBeInTheDocument()
+    })
+  })
+
+  describe('and the transfer is a gift, which shows no place', () => {
+    beforeEach(() => {
+      props = {
+        ...props,
+        type: TransferType.GIFT,
+        transferData: {
+          imageUrl: 'https://example.com/nft.png',
+          tokenId: '1',
+          toAddress: transferData.toAddress,
+          contractAddress: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd',
+          name: 'Hat',
+          description: 'A hat',
+          rarity: Rarity.COMMON
+        }
+      }
+    })
+
+    it('should show no place note, since there is no place claim to qualify', () => {
+      renderView(props)
+
+      expect(screen.queryByTestId('place-not-verified')).not.toBeInTheDocument()
     })
   })
 })
