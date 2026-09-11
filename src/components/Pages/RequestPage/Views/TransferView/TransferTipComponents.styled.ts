@@ -17,6 +17,16 @@ const ColumnContainer = styled(Box)<{ alignItems?: 'center' | 'flex-start' | 'fl
   gap: theme.spacing(1.25)
 }))
 
+// Where the place is: the parcel it occupies, or the world name that addresses it. Said plainly under the
+// title, because this is the part of the block that identifies anything (see PlaceLocation).
+const PlaceLocationName = styled(Typography)(({ theme }) => ({
+  fontSize: theme.typography.pxToRem(16),
+  fontWeight: 500,
+  letterSpacing: '0.04em',
+  marginTop: theme.spacing(1),
+  textAlign: 'center'
+}))
+
 // What the place block is and is not. Small and directly under the place it qualifies, so the claim and
 // its limit are read together rather than the claim alone.
 const PlaceNote = styled(Typography)(({ theme }) => ({
@@ -28,4 +38,4 @@ const PlaceNote = styled(Typography)(({ theme }) => ({
   textAlign: 'center'
 }))
 
-export { SceneName, ColumnContainer, PlaceNote }
+export { SceneName, ColumnContainer, PlaceLocationName, PlaceNote }

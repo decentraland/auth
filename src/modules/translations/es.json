@@ -241,7 +241,9 @@
     }
   },
   "transfer": {
-    "place_not_verified": "Decentraland no puede comprobar que este sea el lugar que solicitó este pago: solo se verificó la dirección de arriba. Los nombres y las imágenes de los lugares se pueden copiar.",
+    "place_genesis_city": "Genesis City {position}",
+    "place_world": "Mundo {name}",
+    "place_not_verified": "Decentraland no puede comprobar que este sea el lugar que solicitó este pago. Un nombre y una imagen se pueden copiar: la ubicación es lo que lo identifica, así que compárala con dónde estás.",
     "confirm": {
       "sending_tip": "Enviando propina de {manaAmount} para",
       "confirm_tip": "Confirmar propina de {manaAmount} para",

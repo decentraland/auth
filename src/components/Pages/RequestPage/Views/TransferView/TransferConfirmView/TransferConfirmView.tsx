@@ -6,7 +6,7 @@ import { TransferActionButtons, TransferAssetImage, TransferLayout, TransferLoad
 import { CenteredContent, ItemName, Label, Notices, Title, WarningAlert } from '../../../../../Transfer/Transfer.styled'
 import { TransferType } from '../../../types'
 import type { MANATransferData, NFTTransferData, ProfileAvatar } from '../../../types'
-import { PlaceNote, SceneName } from '../TransferTipComponents.styled'
+import { PlaceLocationName, PlaceNote, SceneName } from '../TransferTipComponents.styled'
 import { TransferConfirmViewProps } from './TransferConfirmView.types'
 
 const TransferConfirmView = (props: TransferConfirmViewProps) => {
@@ -14,6 +14,8 @@ const TransferConfirmView = (props: TransferConfirmViewProps) => {
   const [isAwaitingApproval, setIsAwaitingApproval] = useState(false)
   const { type, transferData } = props
   const isTip = type === TransferType.TIP
+  // Bound once so the kind narrows it: what the block is worth checking against (see PlaceLocation).
+  const sceneLocation = isTip ? ((transferData as MANATransferData).sceneLocation ?? null) : null
   const recipientAvatar = transferData.recipientProfile?.avatars?.[0]
   // Processing while the approval is being asked of the wallet (an external wallet's own prompt is open)
   // or while the page executes it (a web2 user confirmed their dialog). Not while that dialog is open:
@@ -62,6 +64,13 @@ const TransferConfirmView = (props: TransferConfirmViewProps) => {
             <Label>{t('transfer.confirm.creator_of')}</Label>
             <TransferAssetImage src={(transferData as MANATransferData).sceneImageUrl} alt={(transferData as MANATransferData).sceneName} />
             <SceneName>{(transferData as MANATransferData).sceneName}</SceneName>
+            {sceneLocation ? (
+              <PlaceLocationName data-testid="place-location">
+                {sceneLocation.kind === 'world'
+                  ? t('transfer.place_world', { name: sceneLocation.name })
+                  : t('transfer.place_genesis_city', { position: sceneLocation.position })}
+              </PlaceLocationName>
+            ) : null}
             {/* The place is looked up by the recipient address alone (see fetchPlaceByCreatorAddress).
                 Nothing ties it to the scene that asked for this payment, and its name and image are
                 written by whoever deployed it, so the screen says what the block is worth rather than
