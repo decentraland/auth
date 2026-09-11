@@ -196,6 +196,22 @@ export const TestViewPage = () => {
           </PreviewSurface>
         )
       },
+      // A counterparty with a profile name at the length cap, which is where the name and the address it
+      // belongs to compete for one line. Shown so the pairing can be looked at, narrow widths included:
+      // a name that pushed its address off the row would leave the spoofable half standing alone.
+      simulationSummaryLongName: {
+        label: 'SimulationSummary (counterparty with a long profile name)',
+        element: (
+          <PreviewSurface>
+            <SimulationSummary
+              simulation={{ status: 'ready', result: simulationSuccess }}
+              userAddress={USER_ADDRESS}
+              chainId={137}
+              profiles={{ [MARKETPLACE_ADDRESS.toLowerCase()]: 'Decentraland Marketplace Officia…#8f4d' }}
+            />
+          </PreviewSurface>
+        )
+      },
       simulationSummaryReverted: {
         label: 'SimulationSummary (Reverted)',
         element: (
