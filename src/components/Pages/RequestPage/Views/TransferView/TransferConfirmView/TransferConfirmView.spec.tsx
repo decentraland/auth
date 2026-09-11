@@ -245,19 +245,19 @@ describe('when confirming a branded transfer', () => {
     })
 
     it('should name the parcel the place occupies, which is what the user can check', () => {
-      render(<TransferConfirmView {...tipAt({ kind: 'genesis', position: '-3,-2' })} />)
+      renderView(tipAt({ kind: 'genesis', position: '-3,-2' }))
 
       expect(screen.getByTestId('place-location')).toHaveTextContent('transfer.place_genesis_city {"position":"-3,-2"}')
     })
 
     it('should name a world by the name that addresses it', () => {
-      render(<TransferConfirmView {...tipAt({ kind: 'world', name: 'flagtag.dcl.eth' })} />)
+      renderView(tipAt({ kind: 'world', name: 'flagtag.dcl.eth' }))
 
       expect(screen.getByTestId('place-location')).toHaveTextContent('transfer.place_world {"name":"flagtag.dcl.eth"}')
     })
 
     it('should show no location when the place could not be located', () => {
-      render(<TransferConfirmView {...tipAt(null)} />)
+      renderView(tipAt(null))
 
       expect(screen.queryByTestId('place-location')).not.toBeInTheDocument()
       // The caveat stands either way: it is what says the name and the image prove nothing.
@@ -265,13 +265,13 @@ describe('when confirming a branded transfer', () => {
     })
 
     it('should say the place is not verified as the one that asked for the payment', () => {
-      render(<TransferConfirmView {...props} />)
+      renderView(props)
 
       expect(screen.getByTestId('place-not-verified')).toHaveTextContent('transfer.place_not_verified')
     })
 
     it('should keep the recipient address on screen next to it, which is what was verified', () => {
-      render(<TransferConfirmView {...props} />)
+      renderView(props)
 
       expect(screen.getByText('transfer.confirm.creator_of')).toBeInTheDocument()
       expect(screen.getByTestId('place-not-verified')).toBeInTheDocument()
@@ -296,7 +296,7 @@ describe('when confirming a branded transfer', () => {
     })
 
     it('should show no place note, since there is no place claim to qualify', () => {
-      render(<TransferConfirmView {...props} />)
+      renderView(props)
 
       expect(screen.queryByTestId('place-not-verified')).not.toBeInTheDocument()
     })
