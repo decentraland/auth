@@ -243,7 +243,7 @@
   "transfer": {
     "place_genesis_city": "Genesis City {position}",
     "place_world": "Mondo {name}",
-    "place_not_verified": "Decentraland non può verificare che questo sia il luogo che ha richiesto questo pagamento. Un nome e un'immagine possono essere copiati: è la posizione a identificarlo, quindi confrontala con dove ti trovi.",
+    "place_not_verified": "Questo account ha pubblicato il luogo mostrato sopra. Decentraland non può sapere se è il luogo che ti ha chiesto di pagare: confronta la posizione con dove ti trovi.",
     "confirm": {
       "sending_tip": "Invio mancia di {manaAmount} per",
       "confirm_tip": "Conferma mancia di {manaAmount} per",

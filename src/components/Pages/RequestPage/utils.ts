@@ -544,21 +544,41 @@ async function fetchNftMetadata(
 /** A Genesis City parcel: two integers, as the Places API writes a base position. */
 const BASE_POSITION_PATTERN = /^-?\d{1,4},-?\d{1,4}$/
 
-/** The place's location, or null when the API describes one that names no place the user could be in. */
+/**
+ * The place's location, or null when the API describes one that names no place the user could be in.
+ *
+ * A Genesis City position is worth showing only if the recipient provably controls it, and the protocol
+ * does guarantee that: a scene's `base` must be one of its `parcels` (SceneParcels), those parcels must
+ * equal the deployment's pointers (sceneParcelsMatchPointersValidateFn), and a deployment is refused
+ * unless its deployer holds LAND over every pointer (checkLAND).
+ *
+ * The position is still read back from `positions` — the pointers themselves — rather than from
+ * `base_position`, which the Places service takes from the scene's own metadata. Same reason the preview
+ * DTO is checked instead of trusted: the guarantee belongs to the deployment path, and this is a row from
+ * a service that has been storing them since before that path looked the way it does now. The declared
+ * base is used whenever it is one of the pointers, which for anything the validator has seen is always.
+ */
 function getPlaceLocation(place: {
   world?: unknown
   // eslint-disable-next-line @typescript-eslint/naming-convention -- the Places API's own field names
   world_name?: unknown
   // eslint-disable-next-line @typescript-eslint/naming-convention -- the Places API's own field names
   base_position?: unknown
+  positions?: unknown
 }): PlaceLocation | null {
   if (place.world === true) {
-    // A world's base position is always "0,0" and says nothing; its name is what addresses it.
+    // A world's base position is always "0,0" and says nothing; its name is what addresses it, and a world
+    // is deployed under a NAME its deployer owns.
     const name = formatUntrustedLabel(place.world_name, 64)
     return name ? { kind: 'world', name } : null
   }
-  const position = typeof place.base_position === 'string' ? place.base_position.trim() : ''
-  return BASE_POSITION_PATTERN.test(position) ? { kind: 'genesis', position } : null
+  const owned = Array.isArray(place.positions) ? place.positions.filter((p): p is string => typeof p === 'string') : []
+  const parcels = owned.map(parcel => parcel.trim()).filter(parcel => BASE_POSITION_PATTERN.test(parcel))
+  if (parcels.length === 0) {
+    return null
+  }
+  const declared = typeof place.base_position === 'string' ? place.base_position.trim() : ''
+  return { kind: 'genesis', position: parcels.includes(declared) ? declared : parcels[0] }
 }
 
 /**
