@@ -21,12 +21,14 @@ describe('when rendering the UnverifiedRequestView', () => {
   let onDeny: jest.Mock
   let onApprove: jest.Mock
   let onAcknowledgedChange: jest.Mock
+  let onCallbackAcknowledgedChange: jest.Mock
   let props: UnverifiedRequestViewProps
 
   beforeEach(() => {
     onDeny = jest.fn()
     onApprove = jest.fn()
     onAcknowledgedChange = jest.fn()
+    onCallbackAcknowledgedChange = jest.fn()
   })
 
   afterEach(() => {
@@ -193,12 +195,56 @@ describe('when rendering the UnverifiedRequestView', () => {
 
     describe('and the review replaced one invalidated by a network change', () => {
       beforeEach(() => {
-        props = { ...props, reviewRestarted: true }
+        props = { ...props, reviewRestartedReason: 'network' as const }
       })
 
       it('should tell the user why the page reloaded', () => {
         render(<UnverifiedRequestView {...props} />)
-        expect(screen.getByTestId('review-restarted-notice')).toBeInTheDocument()
+        expect(screen.getByTestId('review-restarted-notice')).toHaveTextContent('request.wallet_interaction.review_restarted_notice')
+      })
+    })
+
+    describe('and the review replaced one whose recipient turned out to have code', () => {
+      beforeEach(() => {
+        props = { ...props, reviewRestartedReason: 'recipient_gained_code' as const }
+      })
+
+      it('should say that, rather than blame the network', () => {
+        render(<UnverifiedRequestView {...props} />)
+        expect(screen.getByTestId('review-restarted-notice')).toHaveTextContent(
+          'request.wallet_interaction.review_restarted_recipient_code_notice'
+        )
+      })
+    })
+
+    // A transfer is only a transfer while its recipient has no code, and that was read once. The screen says
+    // so and takes a consent for it that the risk acknowledgment does not stand in for.
+    describe('and an address it reaches had no code when it was read', () => {
+      beforeEach(() => {
+        props = { ...props, callbackAddresses: [CONTRACT], onCallbackAcknowledgedChange, acknowledged: true, approveBlocked: true }
+      })
+
+      it('should explain the limitation and render an unchecked consent of its own', () => {
+        render(<UnverifiedRequestView {...props} />)
+
+        expect(screen.getByTestId('recipient-code-warning')).toHaveTextContent('request.unverified.recipient_code_notice')
+        expect(screen.getByRole('checkbox', { name: 'request.unverified.acknowledge_recipient_code' })).not.toBeChecked()
+        expect(screen.getByRole('button', { name: 'common.allow' })).toBeDisabled()
+      })
+
+      it('should report that consent to the page, and not as the risk acknowledgment', async () => {
+        render(<UnverifiedRequestView {...props} />)
+
+        await userEvent.click(screen.getByRole('checkbox', { name: 'request.unverified.acknowledge_recipient_code' }))
+
+        expect(onCallbackAcknowledgedChange).toHaveBeenCalledWith(true)
+        expect(onAcknowledgedChange).not.toHaveBeenCalled()
+      })
+
+      it('should render it from what the page says was consented to', () => {
+        render(<UnverifiedRequestView {...{ ...props, callbackAcknowledged: true }} />)
+
+        expect(screen.getByRole('checkbox', { name: 'request.unverified.acknowledge_recipient_code' })).toBeChecked()
       })
     })
   })

@@ -67,6 +67,7 @@
       "preview_unavailable_warning": "由于预览服务暂时不可用，我们无法检查此交易的作用。请仅在您信任发起该请求的场景时批准。",
       "acknowledge_preview_unavailable": "我了解预览不可用，并且我在未查看此交易作用的情况下进行批准",
       "review_restarted_notice": "你的钱包网络已更改或无法验证，因此此交易已在当前网络上重新审核。",
+      "review_restarted_recipient_code_notice": "收款地址上出现了合约代码，因此此请求已按对合约的调用重新审核，而不再视为简单转账。",
       "calls_function": "在 {contractName} 上调用 {functionName}"
     },
     "transaction_dialog": {
@@ -173,6 +174,8 @@
       "message_scroll_hint": "请滚动到消息末尾后再继续。",
       "acknowledge_transaction": "我理解 Decentraland 无法检查此交易，我仍然选择发送",
       "acknowledge_native_transfer": "我理解我正在发送 {amount} {symbol}，且此操作无法撤销",
+      "recipient_code_notice": "该地址目前没有合约代码。它是由场景指定的，并且在此转账执行之前可能会被部署代码——届时转账将运行该代码，而不只是把资金记入某个账户。",
+      "acknowledge_recipient_code": "我理解在转账执行之前该地址可能出现代码，并接受此风险",
       "acknowledge_meta_transaction": "我理解此签名允许该合约随时代表我执行操作，且其效果无法检查",
       "acknowledge_signature": "我理解 Decentraland 无法检查此签名授权了什么",
       "tabs_label": "请求详情",

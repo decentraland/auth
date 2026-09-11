@@ -1,4 +1,4 @@
-import { SimulationState } from '../../types'
+import { ReviewRestartedNotice, SimulationState } from '../../types'
 
 /** What the review says about gas: covered by the relay, or the wallet's own fee estimate. */
 type WalletInteractionGas =
@@ -46,10 +46,10 @@ interface WalletInteractionProps {
   /** True when the simulation predicts the transaction would revert. */
   isReverted?: boolean
   /**
-   * True when this review replaced one that was invalidated because the wallet's network changed or
-   * could not be verified. Shown as a notice so the user knows why the page reloaded.
+   * Why this review replaced an earlier one, when it did — the wallet's network changed or could not be
+   * verified. Shown as a notice so the user knows why the page reloaded. Null on a first review.
    */
-  reviewRestarted?: boolean
+  reviewRestartedReason?: ReviewRestartedNotice | null
   onDeny: () => void
   onApprove: () => void
 }

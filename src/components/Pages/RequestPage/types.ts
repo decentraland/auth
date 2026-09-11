@@ -47,5 +47,12 @@ type SimulationState =
 /** Lifecycle of the wallet-side fee estimate for a transaction the user pays gas for. */
 type GasEstimateState = { status: 'loading' } | { status: 'ready'; cost: bigint } | { status: 'unavailable' }
 
+/**
+ * Why the review on screen replaced an earlier one, as the fresh review's notice words it: the wallet's
+ * network moved or could not be read, or contract code appeared at the recipient of what had been reviewed
+ * as a simple transfer (see restartReview in RequestPage).
+ */
+type ReviewRestartedNotice = 'network' | 'recipient_gained_code'
+
 export { TransferType }
-export type { GasEstimateState, MANATransferData, NFTTransferData, ProfileAvatar, TypedDataPayload, SimulationState }
+export type { GasEstimateState, ReviewRestartedNotice, MANATransferData, NFTTransferData, ProfileAvatar, TypedDataPayload, SimulationState }

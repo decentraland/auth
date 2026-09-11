@@ -118,9 +118,12 @@ export const UnverifiedRequestView = ({
   payload,
   approveBlocked = true,
   acknowledged = false,
+  callbackAddresses = [],
+  callbackAcknowledged = false,
   isLoading = false,
-  reviewRestarted = false,
+  reviewRestartedReason = null,
   onAcknowledgedChange,
+  onCallbackAcknowledgedChange,
   onDeny,
   onApprove
 }: UnverifiedRequestViewProps) => {
@@ -342,10 +345,36 @@ export const UnverifiedRequestView = ({
           </Panel>
         )}
 
-        {reviewRestarted ? (
+        {reviewRestartedReason ? (
           <ReviewRestartedNotice severity="info" role="status" data-testid="review-restarted-notice">
-            {t('request.wallet_interaction.review_restarted_notice')}
+            {t(
+              reviewRestartedReason === 'recipient_gained_code'
+                ? 'request.wallet_interaction.review_restarted_recipient_code_notice'
+                : 'request.wallet_interaction.review_restarted_notice'
+            )}
           </ReviewRestartedNotice>
+        ) : null}
+
+        {callbackAddresses.length > 0 ? (
+          // The absence of code at the recipient is what makes this a transfer rather than a call, and it
+          // was true when it was read, not necessarily when the transaction executes. Said here and
+          // consented to on its own: the acknowledgment below speaks for the transfer the screen describes,
+          // not for code that may replace it.
+          <>
+            <WarningsAlert severity="warning" role="alert" data-testid="recipient-code-warning">
+              {t('request.unverified.recipient_code_notice')}
+            </WarningsAlert>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={callbackAcknowledged}
+                  onChange={event => onCallbackAcknowledgedChange?.(event.target.checked)}
+                  data-testid="recipient-code-acknowledgment"
+                />
+              }
+              label={t('request.unverified.acknowledge_recipient_code')}
+            />
+          </>
         ) : null}
 
         {acknowledgmentBlocked ? (
