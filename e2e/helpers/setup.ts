@@ -13,9 +13,7 @@ import {
   featureFlagsResponse,
   explorerFeatureFlagsResponse,
   emptyProfileResponse,
-  existingProfileResponse,
-  simulationSuccessResponse,
-  simulationRevertedResponse
+  existingProfileResponse
 } from '../fixtures/mock-responses'
 
 type SetupOptions = {
@@ -23,8 +21,6 @@ type SetupOptions = {
   hasProfile?: boolean
   /** Whether ONBOARDING_TO_EXPLORER FF is enabled (default: true) */
   onboardingToExplorer?: boolean
-  /** How the mocked POST /simulations endpoint responds (default: 'success') */
-  simulation?: 'success' | 'reverted' | 'error'
 }
 
 /**
@@ -49,8 +45,7 @@ export async function injectMockWallet(context: BrowserContext) {
 export async function mockApiRoutes(page: Page, options: SetupOptions = {}) {
   const {
     hasProfile = true,
-    onboardingToExplorer = true,
-    simulation = 'success'
+    onboardingToExplorer = true
   } = options
 
   // Auth server: recover request
@@ -85,18 +80,6 @@ export async function mockApiRoutes(page: Page, options: SetupOptions = {}) {
     }
 
     return route.continue()
-  })
-
-  // Auth server: transaction simulation
-  await page.route('**/simulations', async route => {
-    if (simulation === 'error') {
-      return route.fulfill({ status: 502, contentType: 'application/json', body: JSON.stringify({ error: 'Simulation unavailable' }) })
-    }
-    return route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify(simulation === 'reverted' ? simulationRevertedResponse : simulationSuccessResponse)
-    })
   })
 
   // Auth server: identity handoff (the login mechanism that replaced dcl_personal_sign)

@@ -40,17 +40,17 @@ const NFT_TRANSFER_FUNCTIONS: ReadonlySet<string> = new Set(['transferFrom', 'sa
 // pay gas for them. The one definition the page and the unverified view both read.
 const TRANSACTION_KINDS: ReadonlySet<string> = new Set(['dcl_transaction', 'unknown_transaction', 'native_transfer'])
 
-/** Which branded screen a Decentraland transaction may use instead of the generic simulation review. */
+/** Which branded screen a Decentraland transaction may use instead of the generic review of the raw payload. */
 type BrandedTransaction = 'tip' | 'gift_candidate' | null
 
 /**
- * Why a transaction was not previewed. Analytics only. A call to a Decentraland contract that deviates from
+ * Why a transaction was not decoded. Analytics only. A call to a Decentraland contract that deviates from
  * the shape the SDK builds is not among these: it is refused (see classifyTransaction).
  */
 type UnknownTransactionReason = 'unknown_contract' | 'unverified_recipient'
 
 /**
- * Why a well-formed MetaTransaction was not previewed. Analytics only. A MetaTransaction for a Decentraland
+ * Why a well-formed MetaTransaction was not decoded. Analytics only. A MetaTransaction for a Decentraland
  * contract that deviates from the shape the SDK builds is not among these: it is refused (see
  * classifyTypedData); one for an unknown contract that is not even shaped like a MetaTransaction is plain
  * unknown typed data.
@@ -67,8 +67,8 @@ const META_TRANSACTION_TYPE_NAMES: ReadonlySet<string> = new Set(['EIP712Domain'
  * What a recovered request is, decided once before any view renders. The kind chooses the view, the
  * acknowledgment gates and what the approve button dispatches; nothing is re-derived at approval.
  *
- * Only the `dcl_*` kinds are previewed. Everything else is shown as exactly what it is: a request
- * Decentraland cannot check, with a warning, a mandatory acknowledgment and the raw payload.
+ * Only the `dcl_*` kinds are decoded, so a tip or a gift can be recognized and given its own screen. Everything
+ * else is shown as exactly what it is: the raw payload, behind a mandatory acknowledgment.
  */
 type RequestClassification =
   | {
@@ -118,13 +118,13 @@ type ClassificationContext = {
   resolveContract: (address: string, chainId: number) => Promise<ContractResolution>
 }
 
-/** The two previewed kinds: a call to a Decentraland contract, simulated and decoded. */
+/** The two decoded kinds: a call to a Decentraland contract, read against its ABI. */
 type DecentralandClassification = Extract<RequestClassification, { kind: 'dcl_transaction' | 'dcl_meta_transaction' }>
 
 /** The kinds that send a transaction, whatever the target. */
 type TransactionClassification = Extract<RequestClassification, { kind: 'dcl_transaction' | 'unknown_transaction' | 'native_transfer' }>
 
-/** Whether the classification is one of the previewed Decentraland kinds. */
+/** Whether the classification is one of the decoded Decentraland kinds. */
 function isDecentralandClassification(classification: RequestClassification): classification is DecentralandClassification {
   return classification.kind === 'dcl_transaction' || classification.kind === 'dcl_meta_transaction'
 }
@@ -152,8 +152,8 @@ function carriesOnlyTheMetaTransaction(typedData: TypedDataPayload): boolean {
  * Whether `domain` is exactly the domain the contract hashes: the four fields decentraland-transactions
  * puts in every domain (`name`, `version`, `verifyingContract`, `salt`) with the registry's values, and
  * nothing else; and a declared struct that is exactly the library's `DOMAIN_TYPE`. A domain that
- * differs produces a signature the contract rejects, which is harmless, but it must not be shown under
- * a Decentraland preview either.
+ * differs produces a signature the contract rejects, which is harmless, but it must not be shown as a
+ * Decentraland call either.
  */
 function isDecentralandDomain(typedData: TypedDataPayload, contract: KnownContract, chainId: number): boolean {
   const domain = typedData.domain

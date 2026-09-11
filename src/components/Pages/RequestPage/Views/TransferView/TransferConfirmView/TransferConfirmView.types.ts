@@ -8,7 +8,9 @@ type BaseProps = {
    * both the generic and the branded screens render it (see isReviewActionable in RequestPage).
    */
   approveBlocked?: boolean
-  /** Called addresses that had no code when the preview was checked. */
+  /** Chain the transfer executes on, for the recipient's block-explorer link. */
+  chainId?: number
+  /** Called addresses that had no code when the review checked them. */
   callbackAddresses?: string[]
   callbackAcknowledged?: boolean
   onCallbackAcknowledgedChange?: (checked: boolean) => void

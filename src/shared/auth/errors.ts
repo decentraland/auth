@@ -61,7 +61,7 @@ class UnsupportedMethodError extends Error {
 /**
  * Thrown when a signature request's params are not in the canonical EIP-1193 shape for the method,
  * or when a MetaTransaction payload is not shaped the way a Decentraland contract signs it. The
- * preview and the wallet read params by position, and EIP-712 signs only the fields the struct
+ * review and the wallet read params by position, and EIP-712 signs only the fields the struct
  * declares, so any other shape could show one payload and sign another. `reason` says which rule
  * was broken; it is safe to display.
  */
@@ -77,8 +77,8 @@ class MalformedSignatureRequestError extends Error {
 
 /**
  * Thrown when an eth_sendTransaction request's params are not a single transaction object the
- * preview can read and the wallet would execute as shown: calldata outside `data`, a `to` that is
- * not an address, `data` that is not hex-encoded bytes or is too large to preview, or a `value`
+ * review can read and the wallet would execute as shown: calldata outside `data`, a `to` that is
+ * not an address, `data` that is not hex-encoded bytes or is too large to review, or a `value`
  * that is not a quantity. `reason` says which rule was broken; it is safe to display.
  */
 class MalformedTransactionRequestError extends Error {
@@ -90,51 +90,6 @@ class MalformedTransactionRequestError extends Error {
     this.name = 'MalformedTransactionRequestError'
   }
 }
-
-/**
- * Thrown when a Decentraland contract call reaches beyond Decentraland's own contracts: it hands the
- * transaction a contract Decentraland does not own (the NFT of a marketplace order or an off-chain trade,
- * the recipient of a safe transfer, a nested call that could not be read), or its preview moves an asset
- * no Decentraland contract issues (an ERC-1155). The page previews Decentraland code only, so such a
- * request is refused rather than shown. `reason` says what was reached; it is safe to display.
- */
-class UnsupportedContractError extends Error {
-  readonly skipReporting = true
-  constructor(
-    public readonly method: string,
-    public readonly reason: string
-  ) {
-    super(`The "${method}" request reaches beyond Decentraland's contracts: ${reason}`)
-    this.name = 'UnsupportedContractError'
-  }
-}
-
-/**
- * Thrown when the transaction-simulation endpoint is unreachable, times out, or
- * returns a non-200 response. The approval UI treats this as "details unavailable"
- * and falls back to the default confirmation — simulation is never allowed to block
- * or fail an approval. `status` carries the HTTP status when there was a response, so a
- * caller can tell the server rejecting the call itself (400) from an outage.
- */
-class SimulationUnavailableError extends Error {
-  readonly skipReporting = true
-  constructor(
-    reason?: string,
-    public readonly status?: number,
-    /**
-     * The server's own account of a rejection, when it gave one. On a 400, `invalid_request` (the request
-     * itself was refused) or `upstream_rejected` (the simulation provider refused it). On a 429,
-     * `quota_exceeded` (this service's own rate limit, per-IP or the shared global cap) or
-     * `upstream_rate_limited` (the provider's).
-     */
-    public readonly code?: SimulationRejectionCode
-  ) {
-    super(`Transaction simulation unavailable${reason ? `: ${reason}` : ''}`)
-    this.name = 'SimulationUnavailableError'
-  }
-}
-
-type SimulationRejectionCode = 'invalid_request' | 'upstream_rejected' | 'quota_exceeded' | 'upstream_rate_limited'
 
 /**
  * Thrown when classifying an eth_sendTransaction needs to know whether its target is a Decentraland
@@ -160,8 +115,5 @@ export {
   ImpersonatedSignInError,
   UnsupportedMethodError,
   MalformedSignatureRequestError,
-  MalformedTransactionRequestError,
-  SimulationUnavailableError,
-  UnsupportedContractError
+  MalformedTransactionRequestError
 }
-export type { SimulationRejectionCode }

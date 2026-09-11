@@ -89,7 +89,7 @@ describe('when looking up a known contract', () => {
     })
   })
 
-  describe('and the chain is not one the simulator supports', () => {
+  describe('and the chain is not one the page reviews calls on', () => {
     beforeEach(() => {
       result = getKnownDecentralandContract(getContract(ContractName.MANAToken, POLYGON).address, 56)
     })

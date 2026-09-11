@@ -24,12 +24,12 @@ export const ConfirmRequestDialog = ({ open, kind, gas, isLoading = false, onCan
     } else if (gas.status === 'ready') {
       gasLine = t('request.transaction_dialog.fee_estimate', {
         cost: formatEther(gas.cost),
-        symbol: getNativeSymbol(gas.chainId) || t('request.unverified.native_currency')
+        symbol: getNativeSymbol(gas.chainId) || t('request.transaction_dialog.native_currency')
       })
     } else if (gas.status === 'unavailable') {
-      gasLine = t('request.unverified.fact_fee_unavailable')
+      gasLine = t('request.transaction_dialog.fee_unavailable')
     } else {
-      gasLine = t('request.unverified.fact_fee_loading')
+      gasLine = t('request.transaction_dialog.fee_loading')
     }
   }
 

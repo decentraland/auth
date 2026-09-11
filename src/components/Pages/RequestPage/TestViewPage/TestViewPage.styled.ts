@@ -31,14 +31,4 @@ const ViewSelect = styled(TextField)(({ theme }) => ({
   }
 }))
 
-const PreviewSurface = styled(Box)(({ theme }) => ({
-  backgroundColor: theme.palette.background.paper,
-  border: `1px solid ${theme.palette.divider}`,
-  borderRadius: theme.shape.borderRadius,
-  boxShadow: theme.shadows[4],
-  margin: '15vh auto 0',
-  maxWidth: theme.spacing(60),
-  padding: theme.spacing(3)
-}))
-
-export { FloatingBar, PreviewSurface, ViewSelect }
+export { FloatingBar, ViewSelect }

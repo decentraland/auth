@@ -5,45 +5,15 @@ import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
 import { Provider, connection } from 'decentraland-connect'
 import { ContractName, getContract } from 'decentraland-transactions'
 import { config } from '../../../modules/config'
-import {
-  DecodedCall,
-  SimulationRequestBody,
-  SimulationResponseBody,
-  buildMetaTransactionSimulationPayload,
-  collectCallAddresses
-} from '../../../shared/auth'
+import { DecodedCall, collectCallAddresses } from '../../../shared/auth'
 import { isErrorWithMessage } from '../../../shared/errors'
 import { ResponseTooLargeError, readTextWithCap } from '../../../shared/http'
 import { formatUntrustedLabel } from '../../../shared/text'
 import { getHttpsUrl } from '../../../shared/urls'
 import { isRecord } from '../../../shared/utils/isRecord'
 import { isMobile } from '../LoginPage/utils'
-import { NFT_TRANSFER_FUNCTIONS, RequestClassification } from './classifyRequest'
+import { NFT_TRANSFER_FUNCTIONS } from './classifyRequest'
 import type { PlaceLocation } from './types'
-
-/**
- * Builds the simulation request body for a Decentraland transaction. A relayed call is previewed the way
- * the contract will execute it on the meta-transaction chain (the contract calling itself with the signer
- * appended, no value); a plain call is previewed on the connected chain as the connected signer, never as
- * the request-supplied `from`, which web2 wallets ignore anyway and which would otherwise let the preview
- * attribute the effects to another account.
- */
-function buildSendTransactionSimulationPayload(
-  transaction: Extract<RequestClassification, { kind: 'dcl_transaction' }>,
-  signerAddress: string
-): SimulationRequestBody {
-  if (transaction.relayed) {
-    return buildMetaTransactionSimulationPayload(transaction.chainId, transaction.to, transaction.data, signerAddress)
-  }
-  return {
-    chainId: transaction.chainId,
-    from: signerAddress,
-    to: transaction.to,
-    data: transaction.data,
-    // The same canonical hex the wallet is dispatched (see buildTransactionParams).
-    value: transaction.value
-  }
-}
 
 // Native-protocol confirmation dialogs need enough time for the user to react. A 500 ms window
 // produced false negatives: the timeout could render the failure view while the browser prompt
@@ -289,10 +259,10 @@ function getMetaTransactionChainId(): ChainId {
 
 /**
  * Reads the sender, the recipient and the token id out of a decoded ERC-721 transfer. Only `transferFrom`
- * and `safeTransferFrom` qualify: the branded gift view previews exactly those, so any other call is left
- * to the generic review and its simulation.
+ * and a `safeTransferFrom` carrying no data qualify: the branded gift view describes exactly those, so any
+ * other call is left to the generic review of the raw payload.
  * @param call The call decoded against the collection ABI
- * @returns The transfer source, destination and token id, or null when the call is not a single-token transfer
+ * @returns The transfer source, destination and token id, or null when the call is not the plain transfer of one token
  */
 function decodeNftTransferData(call: DecodedCall): { fromAddress: string; tokenId: string; toAddress: string } | null {
   if (!NFT_TRANSFER_FUNCTIONS.has(call.functionName)) {
@@ -302,9 +272,14 @@ function decodeNftTransferData(call: DecodedCall): { fromAddress: string; tokenI
   // transferFrom(address from, address to, uint256 tokenId)
   // safeTransferFrom(address from, address to, uint256 tokenId)
   // safeTransferFrom(address from, address to, uint256 tokenId, bytes data)
-  const [fromAddress, toAddress, tokenId] = call.args
+  const [fromAddress, toAddress, tokenId, data] = call.args
   if (typeof fromAddress !== 'string' || typeof toAddress !== 'string' || typeof tokenId !== 'bigint') {
     console.error('Failed to decode transaction data')
+    return null
+  }
+  // A safe transfer that hands the recipient data is more than the gift of a token: the generic review shows
+  // those bytes, the gift screen would not.
+  if (data !== undefined && data !== '0x') {
     return null
   }
 
@@ -323,78 +298,17 @@ type Counterparties = { addresses: string[]; opaque: boolean }
  * A Decentraland contract calls the addresses it is given: a collection
  * calls the recipient of a safe transfer (`onERC721Received`), the marketplaces and bids call the NFT
  * registry of an order (`ownerOf`, `safeTransferFrom`, a fingerprint check), the credits manager runs the
- * marketplace call nested in its `externalCall`. Whatever code sits there runs inside the transaction, and
- * a simulation cannot be relied on to show what it does: the code can tell a preview from the real thing
- * (the preview's tx.origin is the contract, its gas price is zero and the nonce has not moved) and behave
- * differently in each. The page therefore previews a call only when every such address is a Decentraland
- * contract or has no code, and nothing the call carries went unread, and refuses the request otherwise
- * (see verifyCounterparties and collectCallAddresses). Arrays, structs and declared nested calls are walked; a plain `bytes`
- * argument is not a call (the one that deploys code, `createCollection`, is a deliberate exception noted
- * next to FORWARDING_FUNCTIONS).
+ * marketplace call nested in its `externalCall`. Whatever code sits there runs inside the transaction and
+ * can do what the arguments never say, so the review can stand behind the arguments only when every such
+ * address is a Decentraland contract or has no code, and nothing the call carries went unread; the request
+ * is refused otherwise (see verifyCounterparties and collectCallAddresses). Arrays, structs and declared
+ * nested calls are walked; a plain `bytes` argument is not a call (the one that deploys code,
+ * `createCollection`, is a deliberate exception noted next to FORWARDING_FUNCTIONS).
  */
 function getCounterpartyAddresses(call: DecodedCall, chainId: number): Counterparties {
   const { addresses, opaque } = collectCallAddresses(call, chainId)
   addresses.delete(ZERO_ADDRESS)
   return { addresses: [...addresses], opaque }
-}
-
-/** Whether two token ids name the same token, whatever notation each side uses (decimal, hex). */
-function isSameTokenId(left: string | null, right: string): boolean {
-  if (left === null) {
-    return false
-  }
-  try {
-    return BigInt(left) === BigInt(right)
-  } catch {
-    return false
-  }
-}
-
-/**
- * Whether a simulation shows the branded NFT view to describe every visible effect of the transaction.
- * `safeTransferFrom` can invoke an arbitrary receiver callback, so recognizing the collection and the
- * selector is not enough: any additional transfer, approval, or event from a contract other than the
- * collection must use the generic summary instead of being hidden behind the specialized gift screen.
- * A receiver acting on a permission it already holds emits only its own events, which is why those are
- * judged too. Net dollar changes are not: the token leaving the account is one, and it is expected.
- *
- * The events are evidence of what no other contract did only while the list is complete. It is: the server
- * refuses a response it cannot report in full rather than truncating one. A response that carries no list
- * at all still proves nothing, so that is checked rather than read as an empty list — the branded view
- * stands in for the whole transaction, and may only do so on evidence covering the whole transaction.
- *
- * The token id is compared numerically because the two sides come from different sources: the decoder
- * prints the calldata's uint256 in decimal, while the preview server passes the simulator's notation
- * through. A notation difference must not silently hide the gift view for every transfer.
- */
-function isExactNftTransferSimulation(
-  result: SimulationResponseBody,
-  signerAddress: string,
-  contractAddress: string,
-  transfer: { fromAddress: string; tokenId: string; toAddress: string }
-): boolean {
-  const signer = signerAddress.toLowerCase()
-  const collection = contractAddress.toLowerCase()
-  if (
-    result.status !== 'success' ||
-    transfer.fromAddress.toLowerCase() !== signer ||
-    result.assetChanges.length !== 1 ||
-    result.approvalChanges.length !== 0 ||
-    !Array.isArray(result.events) ||
-    result.events.some(event => event.address.toLowerCase() !== collection)
-  ) {
-    return false
-  }
-
-  const [change] = result.assetChanges
-  return (
-    change.type === 'transfer' &&
-    change.standard === 'erc721' &&
-    change.from?.toLowerCase() === signer &&
-    change.to?.toLowerCase() === transfer.toAddress.toLowerCase() &&
-    change.contractAddress?.toLowerCase() === collection &&
-    isSameTokenId(change.tokenId, transfer.tokenId)
-  )
 }
 
 /**
@@ -553,9 +467,9 @@ const BASE_POSITION_PATTERN = /^-?\d{1,4},-?\d{1,4}$/
  * unless its deployer holds LAND over every pointer (checkLAND).
  *
  * The position is still read back from `positions` — the pointers themselves — rather than from
- * `base_position`, which the Places service takes from the scene's own metadata. Same reason the preview
- * DTO is checked instead of trusted: the guarantee belongs to the deployment path, and this is a row from
- * a service that has been storing them since before that path looked the way it does now. The declared
+ * `base_position`, which the Places service takes from the scene's own metadata. The guarantee belongs to
+ * the deployment path, and this is a row from a service that has been storing them since before that path
+ * looked the way it does now, so it is checked instead of trusted. The declared
  * base is used whenever it is one of the pointers, which for anything the validator has seen is always.
  */
 function getPlaceLocation(place: {
@@ -646,10 +560,8 @@ export {
   getMetaTransactionChainId,
   decodeNftTransferData,
   getCounterpartyAddresses,
-  isExactNftTransferSimulation,
   decodeManaTransferData,
   fetchNftMetadata,
   fetchPlaceByCreatorAddress,
-  getPlaceLocation,
-  buildSendTransactionSimulationPayload
+  getPlaceLocation
 }

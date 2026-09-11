@@ -1,4 +1,5 @@
 import { ErrorCode, MetaTransactionError, Provider } from 'decentraland-transactions'
+import { isErrorWithMessage, isUserRejectedTransaction } from '../errors'
 import { isRecord } from '../utils/isRecord'
 
 /**
@@ -79,7 +80,17 @@ function bindProviderToSigner(provider: Provider, signer: string): Provider {
           throw mismatch(from)
         }
       }
-      const data = await forward(args)
+      let data: unknown
+      try {
+        data = await forward(args)
+      } catch (error) {
+        // The relay library preserves its own errors but replaces other error codes with "unknown".
+        // Preserve wallet cancellation before that boundary, independently of the wallet's wording.
+        if (isUserRejectedTransaction(error)) {
+          throw new MetaTransactionError(isErrorWithMessage(error) ? error.message : 'User rejected the request.', ErrorCode.USER_DENIED)
+        }
+        throw error
+      }
       if (ACCOUNT_METHODS.has(args.method)) {
         const accounts = unwrapResult(data)
         const [account] = Array.isArray(accounts) ? accounts : []

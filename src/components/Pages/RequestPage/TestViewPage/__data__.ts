@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/naming-convention -- EIP-712 type names (EIP712Domain, MetaTransaction, Permit) are fixed by the standard and the contracts */
 import { Rarity } from '@dcl/schemas'
 import { Avatar } from '@dcl/schemas/dist/platform/profile/avatar'
-import { SimulationResponseBody } from '../../../../shared/auth'
 import { MANATransferData, NFTTransferData } from '../types'
 
 const avatar: Avatar = {
@@ -138,182 +137,6 @@ const MARKETPLACE_ADDRESS = '0x1234567890abcdef1234567890abcdef12345678'
 const USDC_ADDRESS = '0x2791bca1f2de4661ed88a30c99a7a9449aa84174'
 const COLLECTION_ADDRESS = '0xfef5c99885c3036e591b6e6db52482891834a5f4'
 
-const simulationSuccess: SimulationResponseBody = {
-  status: 'success',
-  assetChanges: [
-    {
-      type: 'transfer',
-      standard: 'erc20',
-      from: USER_ADDRESS,
-      to: MARKETPLACE_ADDRESS,
-      amount: '100',
-      rawAmount: '100000000000000000000',
-      tokenId: null,
-      contractAddress: '0x0f5d2fb29fb7d3cfee444a200298f468908cc942',
-      symbol: 'MANA',
-      name: 'Decentraland MANA',
-      decimals: 18,
-      logoUrl: null,
-      dollarValue: '42.00'
-    },
-    {
-      type: 'transfer',
-      standard: 'erc20',
-      from: USER_ADDRESS,
-      to: MARKETPLACE_ADDRESS,
-      amount: '250.5',
-      rawAmount: '250500000',
-      tokenId: null,
-      contractAddress: USDC_ADDRESS,
-      symbol: 'USDC',
-      name: 'USD Coin',
-      decimals: 6,
-      logoUrl: null,
-      dollarValue: '250.50'
-    },
-    {
-      type: 'transfer',
-      standard: 'native',
-      from: USER_ADDRESS,
-      to: MARKETPLACE_ADDRESS,
-      amount: '1.5',
-      rawAmount: '1500000000000000000',
-      tokenId: null,
-      contractAddress: null,
-      symbol: 'MATIC',
-      name: null,
-      decimals: 18,
-      logoUrl: null,
-      dollarValue: '1.05'
-    },
-    {
-      type: 'transfer',
-      standard: 'erc20',
-      from: MARKETPLACE_ADDRESS,
-      to: USER_ADDRESS,
-      amount: '0.05',
-      rawAmount: '50000000000000000',
-      tokenId: null,
-      contractAddress: '0x7ceb23fd6bc0add59e62ac25578270cff1b9f619',
-      symbol: 'WETH',
-      name: 'Wrapped Ether',
-      decimals: 18,
-      logoUrl: null,
-      dollarValue: '160.00'
-    },
-    {
-      type: 'mint',
-      standard: 'erc721',
-      from: null,
-      to: USER_ADDRESS,
-      amount: null,
-      rawAmount: null,
-      tokenId: '512',
-      contractAddress: COLLECTION_ADDRESS,
-      symbol: 'WEAR',
-      name: 'Fancy Hat',
-      decimals: null,
-      logoUrl: null,
-      dollarValue: null
-    }
-  ],
-  approvalChanges: [
-    {
-      kind: 'approval',
-      standard: 'erc20',
-      owner: USER_ADDRESS,
-      spender: MARKETPLACE_ADDRESS,
-      amount: '500',
-      rawAmount: '500000000',
-      isUnlimited: false,
-      tokenId: null,
-      approved: null,
-      contractAddress: USDC_ADDRESS,
-      symbol: 'USDC',
-      name: 'USD Coin'
-    },
-    {
-      kind: 'approval',
-      standard: 'erc20',
-      owner: USER_ADDRESS,
-      spender: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd',
-      amount: null,
-      rawAmount: '115792089237316195423570985008687907853269984665640564039457584007913129639935',
-      isUnlimited: true,
-      tokenId: null,
-      approved: null,
-      contractAddress: '0x0f5d2fb29fb7d3cfee444a200298f468908cc942',
-      symbol: 'MANA',
-      name: 'Decentraland MANA'
-    },
-    {
-      kind: 'approvalForAll',
-      standard: 'erc721',
-      owner: USER_ADDRESS,
-      spender: MARKETPLACE_ADDRESS,
-      amount: null,
-      rawAmount: null,
-      isUnlimited: true,
-      tokenId: null,
-      approved: true,
-      contractAddress: COLLECTION_ADDRESS,
-      symbol: null,
-      name: 'Fancy Wearables'
-    },
-    {
-      kind: 'approvalForAll',
-      standard: 'erc721',
-      owner: USER_ADDRESS,
-      spender: '0x9999999999999999999999999999999999999999',
-      amount: null,
-      rawAmount: null,
-      isUnlimited: false,
-      tokenId: null,
-      approved: false,
-      contractAddress: '0x1111111111111111111111111111111111111111',
-      symbol: null,
-      name: 'Old Wearables'
-    },
-    {
-      kind: 'approval',
-      standard: 'erc721',
-      owner: USER_ADDRESS,
-      spender: MARKETPLACE_ADDRESS,
-      amount: null,
-      rawAmount: null,
-      isUnlimited: false,
-      tokenId: '7',
-      approved: null,
-      contractAddress: COLLECTION_ADDRESS,
-      symbol: null,
-      name: 'Fancy Wearables'
-    }
-  ],
-  balanceChanges: [{ address: USER_ADDRESS, dollarValue: '-133.55' }],
-  events: [
-    { name: 'Transfer', address: '0x0f5d2fb29fb7d3cfee444a200298f468908cc942' },
-    { name: 'Approval', address: USDC_ADDRESS },
-    { name: null, address: MARKETPLACE_ADDRESS }
-  ]
-}
-
-const simulationReverted: SimulationResponseBody = {
-  status: 'reverted',
-  error: 'ERC20: transfer amount exceeds balance',
-  assetChanges: [],
-  approvalChanges: [],
-  balanceChanges: [],
-  events: []
-}
-
-const simulationNoChanges: SimulationResponseBody = {
-  status: 'success',
-  assetChanges: [],
-  approvalChanges: [],
-  balanceChanges: [],
-  events: [{ name: 'ConfigUpdated', address: MARKETPLACE_ADDRESS }]
-}
-
 const MANA_CONTRACT_ADDRESS = '0xa1c57f48f0deb89f569dfbe6e2b7f46d33606fd4'
 
 // The exact typed data decentraland-transactions builds for a MANA transfer meta-transaction.
@@ -348,9 +171,6 @@ const metaTxRaw = JSON.stringify(
   null,
   2
 )
-
-// A MetaTransaction for a contract Decentraland does not know, with a copied domain name.
-const unknownMetaTxRaw = metaTxRaw.replace(MANA_CONTRACT_ADDRESS, '0xabcdefabcdefabcdefabcdefabcdefabcdefef01')
 
 // An unlimited USDC Permit: typed data Auth does not interpret.
 const permitRaw = JSON.stringify(
@@ -391,46 +211,11 @@ const personalSignHex = `0x${Array.from(new TextEncoder().encode(personalSignTex
   .join('')}`
 const personalSignDigestHex = `0x${'9f'.repeat(32)}`
 
-// A trade on the off-chain marketplace paying 10 USDT (Polygon) for a wearable: the stablecoin is named from
-// the known-token table, the wearable from its collection.
-const simulationStablecoinTrade: SimulationResponseBody = {
-  status: 'success',
-  assetChanges: [
-    {
-      type: 'transfer',
-      standard: 'erc20',
-      from: USER_ADDRESS,
-      to: '0x9d2e7d8b9e4a0f1c3b5a6d7e8f9a0b1c2d3e4f5a',
-      amount: '10',
-      rawAmount: '10000000',
-      tokenId: null,
-      contractAddress: '0xc2132d05d31c914a87c6611c10748aeb04b58e8f',
-      symbol: 'USDT0',
-      name: 'USDT0',
-      decimals: 6,
-      logoUrl: null,
-      dollarValue: '10.00'
-    },
-    {
-      type: 'transfer',
-      standard: 'erc721',
-      from: '0x9d2e7d8b9e4a0f1c3b5a6d7e8f9a0b1c2d3e4f5a',
-      to: USER_ADDRESS,
-      amount: null,
-      rawAmount: null,
-      tokenId: '412',
-      contractAddress: COLLECTION_ADDRESS,
-      symbol: null,
-      name: 'Rare Helmet',
-      decimals: null,
-      logoUrl: null,
-      dollarValue: null
-    }
-  ],
-  approvalChanges: [],
-  balanceChanges: [],
-  events: []
-}
+// The calldata of a relayed marketplace purchase (executeOrder), the kind of payload the generic review shows whole.
+const executeOrderData =
+  '0xae7b0333000000000000000000000000fef5c99885c3036e591b6e6db52482891834a5f4' +
+  '0000000000000000000000000000000000000000000000000000000000000007' +
+  '0000000000000000000000000000000000000000000000056bc75e2d63100000'
 
 export {
   avatar,
@@ -444,11 +229,7 @@ export {
   personalSignDigestHex,
   personalSignHex,
   personalSignText,
-  simulationNoChanges,
-  simulationReverted,
-  simulationStablecoinTrade,
-  simulationSuccess,
+  executeOrderData,
   unclaimedNameAvatar,
-  unknownMetaTxRaw,
   USER_ADDRESS
 }
