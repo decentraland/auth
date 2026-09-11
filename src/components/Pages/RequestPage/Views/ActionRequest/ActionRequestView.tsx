@@ -107,16 +107,20 @@ export const ActionRequestView = ({
   // has not seen; a payload that fits the box without scrolling counts as read. Re-measured when the window
   // changes size (a phone turning sideways changes how much of the box shows) and when the payload changes,
   // which also puts the box back at the top: a new payload starts unread.
+  //
+  // Latching, never unset: reaching the bottom once is what the gate asks for, and the reader who goes back
+  // up to re-read a line has done more of it, not less. Only a different payload starts the gate over.
   const payloadRef = useRef<HTMLDivElement>(null)
   const [readToEnd, setReadToEnd] = useState(false)
   const measure = useCallback(() => {
     const element = payloadRef.current
     if (!element) return
-    setReadToEnd(element.scrollHeight - element.scrollTop - element.clientHeight <= SCROLL_END_TOLERANCE)
+    if (element.scrollHeight - element.scrollTop - element.clientHeight <= SCROLL_END_TOLERANCE) setReadToEnd(true)
   }, [])
   useLayoutEffect(() => {
     const element = payloadRef.current
     if (element) element.scrollTop = 0
+    setReadToEnd(false)
     measure()
   }, [measure, content])
   useEffect(() => {

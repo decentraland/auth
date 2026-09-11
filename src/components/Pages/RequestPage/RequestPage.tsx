@@ -195,6 +195,10 @@ export const RequestPage = () => {
   // is what the approve path reads, so it dispatches on exactly what was reviewed.
   const [classification, setClassification] = useState<RequestClassification | null>(null)
   const classificationRef = useRef<RequestClassification | null>(null)
+  // The RPC method the wallet will be asked, as the request was recovered (canonical casing). Part of the
+  // acknowledgment statement: the two typed-data methods share a classification and a payload, so without
+  // it a re-review that recovered the same typed data under the other method would inherit the tick.
+  const [reviewedMethod, setReviewedMethod] = useState<string>()
   // The wallet-side fee estimate of a transaction the user pays gas for. Null when no estimate applies.
   const [gasEstimate, setGasEstimate] = useState<GasEstimateState | null>(null)
   const [nftTransferData, setNftTransferData] = useState<NFTTransferData | null>(null)
@@ -262,6 +266,17 @@ export const RequestPage = () => {
   // before their first await, so opposing clicks in the same tick, or a second click before React disables
   // the buttons, cannot start a second operation: one request gets one answer.
   const isSettlingRef = useRef(false)
+  // The review run that holds the settle lock (see reviewRunRef). A run that replaced it ignores a lock the
+  // earlier run still holds: an Allow parked on a wallet the app has since discarded may never settle, and
+  // the replacement review must not stay wedged behind it. The old action, for its part, releases only the
+  // lock it took, so it cannot unlock an action the new run has in flight.
+  const settlingRunRef = useRef(0)
+  // Whether an Allow, from any run, has handed the request to the wallet and not heard back. Past that
+  // point the transaction may be broadcast or the payload signed whatever the page does next, so no run
+  // may answer the request again until it settles: a replacement review is shown busy instead. Before that
+  // point an in-flight Allow dispatches nothing once its run is replaced (see canStillDispatch), which is
+  // why the settle lock alone can be scoped to the run.
+  const isDispatchingRef = useRef(false)
   // Which review the page is on: bumped by the load effect whenever the request id or the account changes.
   // Allow and Deny capture it when they start and, after every await, touch no view, loading or settle
   // state unless it is still current: a late wallet or server result belongs to the review that started
@@ -449,6 +464,7 @@ export const RequestPage = () => {
       setError(undefined)
       setErrorKind(null)
       setClassification(null)
+      setReviewedMethod(undefined)
       setAreCounterpartiesVerified(false)
       setMutableCallbackAddresses([])
       setMutableCallbackAcknowledged(false)
@@ -796,6 +812,7 @@ export const RequestPage = () => {
         if (isStale()) return
         classificationRef.current = classified
         setClassification(classified)
+        setReviewedMethod(request.method)
         trackEvent(TrackingEvents.REQUEST_CLASSIFIED, { requestId, ...describeClassification(classified) })
 
         switch (classified.kind) {
@@ -893,12 +910,20 @@ export const RequestPage = () => {
         setAreCounterpartiesVerified(false)
         setMutableCallbackAddresses([])
         setMutableCallbackAcknowledged(false)
+        // An Allow the previous run left in flight keeps its lock to itself (see settlingRunRef), so the
+        // review that replaces it starts unlocked and at rest, whatever became of the wallet the old provider
+        // was asking. Unless that Allow had already handed the request to the wallet: then the request may
+        // execute whatever this page does, no run may answer it again until the wallet has spoken, and the
+        // replacement is shown busy until then (see isDispatchingRef).
+        setIsLoading(isDispatchingRef.current)
         // Everything else the previous run derived goes too, and the page says it is deciding again. Each
         // of these already blocked approval on its own — an unverified counterparty set, an acknowledgment
-        // whose statement no longer matches — but only as a side effect of what it happens to gate. Dropping them says it once: no part of the previous review is on screen or
-        // actionable while its replacement is being worked out.
+        // whose statement no longer matches — but only as a side effect of what it happens to gate.
+        // Dropping them says it once: no part of the previous review is on screen or actionable while its
+        // replacement is being worked out.
         setClassification(null)
         classificationRef.current = null
+        setReviewedMethod(undefined)
         setGasEstimate(null)
         setNftTransferData(null)
         setManaTransferData(null)
@@ -957,10 +982,13 @@ export const RequestPage = () => {
     // wallet that was current when it was pressed, and that load has already left the review alone on its
     // account — backing out then would leave nothing to redo it.
     if (!isReviewConnectionCurrentRef.current) return
-    // One answer per request: not while Allow or an earlier Deny is in flight, and not once the request
-    // has been answered or has expired. Checked and set before the first await (see isSettlingRef).
-    if (isSettlingRef.current || hasCompletedRef.current) return
+    // One answer per request: not while Allow or an earlier Deny of this same review is in flight, and not
+    // once the request has been answered or has expired. Checked and set before the first await (see
+    // isSettlingRef, settlingRunRef).
+    const run = reviewRunRef.current
+    if ((isSettlingRef.current && settlingRunRef.current === run) || isDispatchingRef.current || hasCompletedRef.current) return
     isSettlingRef.current = true
+    settlingRunRef.current = run
     // The review this answer belongs to. Once the page has moved on to another request or account, the
     // outcome already sent stands, but nothing here may touch the review now on screen.
     const generation = reviewGenerationRef.current
@@ -997,7 +1025,8 @@ export const RequestPage = () => {
     } catch (error) {
       console.error('Failed to send denied notification:', error)
     } finally {
-      if (!isStaleAction()) isSettlingRef.current = false
+      // Only the lock this action took: a replacement run may hold its own by now.
+      if (!isStaleAction() && settlingRunRef.current === run) isSettlingRef.current = false
     }
     if (isStaleAction()) return
 
@@ -1043,7 +1072,10 @@ export const RequestPage = () => {
     // disabled synchronously, so a double click or opposing clicks could otherwise re-enter before
     // React flips isLoading), and not once the request has been answered or has expired. Checked and
     // set before the first await (see isSettlingRef).
-    if (isSettlingRef.current || hasCompletedRef.current) return
+    // And the review it was clicked on. A load that runs again for the same request and account leaves the
+    // generation alone by design, so this is what tells that review from the one that replaced it.
+    const run = reviewRunRef.current
+    if ((isSettlingRef.current && settlingRunRef.current === run) || isDispatchingRef.current || hasCompletedRef.current) return
     // Every gate the review is subject to, enforced here rather than trusted to whichever button was
     // pressed. The Allow buttons render the same value, so in the ordinary case this changes nothing; what
     // it stops is a press that reaches this handler while the gates do not hold — the confirmation dialog
@@ -1051,14 +1083,12 @@ export const RequestPage = () => {
     // a re-review began behind it (see isReviewActionable).
     if (!isReviewActionableRef.current) return
     isSettlingRef.current = true
+    settlingRunRef.current = run
     // The review this action belongs to. Once the page has moved on to another request or account, the
     // wallet result and its outcome delivery still complete for the request that was reviewed, but nothing
     // here may touch the review now on screen or its settle state.
     const generation = reviewGenerationRef.current
     const isStaleAction = () => reviewGenerationRef.current !== generation
-    // And the review it was clicked on. A load that runs again for the same request and account leaves the
-    // generation alone by design, so this is what tells that review from the one that replaced it.
-    const run = reviewRunRef.current
     // Whether the request may still be signed or sent, re-read after every await that precedes a dispatch.
     // Each of those awaits is a window: the expiration timer can fire in it (which settles the request and
     // shows the timeout screen without moving the generation, so `isStaleAction` alone does not see it),
@@ -1093,6 +1123,13 @@ export const RequestPage = () => {
     // the transaction is broadcast, or the payload is signed — so any later failure is a delivery
     // problem, never a rejection. See the catch below.
     let hasWalletResult = false
+    // Flips the moment the request is handed to the wallet, and holds the page-wide dispatch guard until
+    // this action has settled (see isDispatchingRef).
+    let hasDispatched = false
+    const markDispatched = () => {
+      hasDispatched = true
+      isDispatchingRef.current = true
+    }
     try {
       if (!walletClient) {
         throw new Error('Provider not created')
@@ -1143,6 +1180,7 @@ export const RequestPage = () => {
         // The library reads the active account again and signs and submits for whatever it gets back.
         // Bound to the signer verified above, it can only act for the account that reviewed the request;
         // a wallet that switched accounts in between fails with ReviewedSignerMismatchError (see catch).
+        markDispatched()
         result = await sendMetaTransaction(
           bindProviderToSigner(connectedProvider, signerAddress),
           networkProvider,
@@ -1172,6 +1210,7 @@ export const RequestPage = () => {
           )
           return
         }
+        markDispatched()
         result = await walletClient.request({
           method: 'eth_sendTransaction',
           // Also bind the request to the reviewed chain. This is defense in depth for injected
@@ -1190,6 +1229,7 @@ export const RequestPage = () => {
         // Signatures carry no `to` address and are never relayed. The wallet is handed the reviewed bytes
         // themselves, never a fresh reading of the request, in the exact shape its schema gives the method
         // (see toWalletSignatureRequest).
+        markDispatched()
         result = await forwardSignatureRequest(walletClient, toWalletSignatureRequest(method, reviewed, signerAddress))
       }
 
@@ -1295,10 +1335,13 @@ export const RequestPage = () => {
         setView(View.WALLET_INTERACTION_ERROR)
       }
     } finally {
-      // The review on screen owns its loading and settle state; a stale action leaves both alone.
+      if (hasDispatched) isDispatchingRef.current = false
+      // The review on screen owns its loading and settle state; a stale action leaves both alone. So does
+      // one from a run that has since been replaced, unless it had reached the wallet: the replacement was
+      // then shown busy on its behalf (see the load effect), and is released now that the wallet answered.
       if (!isStaleAction()) {
-        setIsLoading(false)
-        isSettlingRef.current = false
+        if (settlingRunRef.current === run) isSettlingRef.current = false
+        if (settlingRunRef.current === run || hasDispatched) setIsLoading(false)
       }
     }
   }, [isUserUsingWeb2Wallet, nftTransferData, manaTransferData, requestId, identity, showInteractionCompleteView, restartReview])
@@ -1342,15 +1385,16 @@ export const RequestPage = () => {
 
   // A typed-data payload's fingerprint is its whole JSON, so it is computed once per classification.
   const payloadFingerprint = useMemo(() => (classification ? getPayloadFingerprint(classification) : ''), [classification])
-  // The exact screen the user is asked to acknowledge, folded into one string: this request, this payload,
-  // and every notice shown next to them. A tick counts for that string only, so anything that changes what
-  // is on screen — another request, a re-review that found another callback — stops it counting and the
+  // The exact screen the user is asked to acknowledge, folded into one string: this request, the method the
+  // wallet will be asked, this payload, and every notice shown next to them. A tick counts for that string
+  // only, so anything that changes what is on screen or what is dispatched — another request, a re-review
+  // that recovered the request under another method or found another callback — stops it counting and the
   // review asks again (see useAcknowledgment). One statement for every view rather than one composed inside
   // each: a view whose statement left out something it displayed would carry a tick across a change the
   // user never saw.
   const acknowledgmentStatement = useMemo(
-    () => [requestId, classification?.kind ?? '', payloadFingerprint, mutableCallbackAddresses.join(',')].join('|'),
-    [requestId, classification?.kind, payloadFingerprint, mutableCallbackAddresses]
+    () => [requestId, reviewedMethod ?? '', classification?.kind ?? '', payloadFingerprint, mutableCallbackAddresses.join(',')].join('|'),
+    [requestId, reviewedMethod, classification?.kind, payloadFingerprint, mutableCallbackAddresses]
   )
   const { acknowledged: isAcknowledged, setAcknowledged } = useAcknowledgment(acknowledgmentStatement)
   const { acknowledged: isMutableCallbackAcknowledged, setAcknowledged: setMutableCallbackAcknowledged } =

@@ -105,6 +105,15 @@ test.describe('Generic request review', () => {
       await expect(allow).toBeDisabled()
       await checkbox.check()
       await expect(allow).toBeEnabled()
+
+      // Going back up to re-read a line does not take the consent away: the box was read through once.
+      await payload.evaluate(node => {
+        node.scrollTop = 0
+      })
+      await expect(checkbox).toBeEnabled()
+      await expect(checkbox).toBeChecked()
+      await expect(allow).toBeEnabled()
+      await expect(page.getByTestId('action-scroll-hint')).toBeHidden()
     })
 
     test('should show a Decentraland meta-transaction the same way and warn that a signature never expires', async ({ page }) => {

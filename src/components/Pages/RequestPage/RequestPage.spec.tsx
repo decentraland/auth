@@ -3251,6 +3251,97 @@ describe('RequestPage', () => {
       expect(jest.mocked(sendMetaTransaction)).not.toHaveBeenCalled()
       expect(mockSendSuccessfulOutcome).not.toHaveBeenCalled()
     })
+
+    // The old Allow is parked on a wallet the app has discarded, and that wallet may never answer. The
+    // settle lock it took belongs to its review run, so the replacement review must not stay wedged
+    // behind it: both of its buttons have to work without the held read ever resolving.
+    describe('and the wallet the previous Allow is waiting on never answers', () => {
+      let replacement: HTMLElement
+
+      beforeEach(async () => {
+        mockSendFailedOutcome.mockResolvedValue({})
+        const { rerender } = renderRequestPage()
+        await clearActionRequestGates()
+        await userEvent.click(screen.getByTestId('action-approve'))
+        await waitFor(() => expect(mockGetAddresses).toHaveBeenCalledTimes(2))
+
+        mockConnectionData = { ...mockConnectionData, provider: { isMagic: false, refreshed: true } }
+        rerenderRequestPage(rerender)
+        await waitFor(() => expect(mockRecover.mock.calls.length).toBeGreaterThanOrEqual(2))
+        replacement = await screen.findByTestId('action-request')
+      })
+
+      it('should render the replacement review at rest, not still loading from the previous Allow', async () => {
+        await userEvent.click(screen.getByTestId('action-acknowledge'))
+        await waitFor(() => expect(replacement).toHaveAttribute('data-approve-blocked', 'false'))
+      })
+
+      it('should let the replacement review be denied', async () => {
+        await userEvent.click(screen.getByTestId('action-deny'))
+
+        await waitFor(() => expect(mockSendFailedOutcome).toHaveBeenCalledTimes(1))
+        expect(mockSendFailedOutcome).toHaveBeenCalledWith(REQUEST_ID, SIGNER, { code: -32003, message: 'Transaction rejected' })
+        expect(await screen.findByTestId('denied-wallet-interaction')).toBeInTheDocument()
+      })
+
+      it('should let the replacement review be approved, once, with its own consent', async () => {
+        await approveActionRequest()
+
+        await waitFor(() => expect(mockSendSuccessfulOutcome).toHaveBeenCalledTimes(1))
+        expect(jest.mocked(sendMetaTransaction)).toHaveBeenCalledTimes(1)
+        expect(await screen.findByTestId('wallet-interaction-complete')).toBeInTheDocument()
+      })
+    })
+
+    // Past the point where the wallet was asked, the transaction may execute whatever the page does next, so
+    // the replacement review must not be able to answer the request a second time: it is shown busy until
+    // the wallet has spoken, and then the one outcome is delivered and the page completes.
+    describe('and the previous Allow had already handed the request to the wallet', () => {
+      let releaseRelay: (hash: string) => void
+      let replacement: HTMLElement
+
+      beforeEach(async () => {
+        mockSendFailedOutcome.mockResolvedValue({})
+        mockGetAddresses.mockReset().mockResolvedValue([SIGNER])
+        releaseRelay = () => undefined
+        jest
+          .mocked(sendMetaTransaction)
+          .mockReset()
+          .mockImplementationOnce(() => new Promise(resolve => (releaseRelay = resolve)))
+        const { rerender } = renderRequestPage()
+        await approveActionRequest()
+        await waitFor(() => expect(jest.mocked(sendMetaTransaction)).toHaveBeenCalledTimes(1))
+
+        mockConnectionData = { ...mockConnectionData, provider: { isMagic: false, refreshed: true } }
+        rerenderRequestPage(rerender)
+        await waitFor(() => expect(mockRecover.mock.calls.length).toBeGreaterThanOrEqual(2))
+        replacement = await screen.findByTestId('action-request')
+      })
+
+      it('should show the replacement review busy and refuse to dispatch or deny again while the wallet has not answered', async () => {
+        expect(replacement).toHaveAttribute('data-approve-blocked', 'true')
+
+        await userEvent.click(screen.getByTestId('action-acknowledge'))
+        await userEvent.click(screen.getByTestId('action-approve'))
+        await userEvent.click(screen.getByTestId('action-deny'))
+
+        expect(replacement).toHaveAttribute('data-approve-blocked', 'true')
+        expect(jest.mocked(sendMetaTransaction)).toHaveBeenCalledTimes(1)
+        expect(mockSendFailedOutcome).not.toHaveBeenCalled()
+        expect(mockSendSuccessfulOutcome).not.toHaveBeenCalled()
+      })
+
+      it('should deliver the one outcome and complete once the wallet answers', async () => {
+        await act(async () => {
+          releaseRelay('0xrelayedhash')
+        })
+
+        await waitFor(() => expect(mockSendSuccessfulOutcome).toHaveBeenCalledTimes(1))
+        expect(mockSendSuccessfulOutcome).toHaveBeenCalledWith(REQUEST_ID, SIGNER, '0xrelayedhash')
+        expect(await screen.findByTestId('wallet-interaction-complete')).toBeInTheDocument()
+        expect(jest.mocked(sendMetaTransaction)).toHaveBeenCalledTimes(1)
+      })
+    })
   })
   describe('when a request was acknowledged and the provider is replaced for the same account', () => {
     beforeEach(() => {
@@ -3274,6 +3365,39 @@ describe('RequestPage', () => {
       expect(await screen.findByTestId('loading-request')).toBeInTheDocument()
       expect(screen.queryByTestId('action-request')).not.toBeInTheDocument()
       expect(mockWalletRequest).not.toHaveBeenCalled()
+    })
+
+    // The two typed-data methods share a classification and a payload, so only the method itself tells a
+    // v3 request from a v4 one. The tick was given to one wallet operation; the replacement asks for another.
+    describe('and the replacement recovers the same typed data under the other method', () => {
+      const TYPED_DATA = '{"primaryType":"Permit"}'
+
+      beforeEach(() => {
+        mockRecover.mockResolvedValue(recovered('eth_signTypedData_v3', [SIGNER, TYPED_DATA]))
+      })
+
+      it('should stop counting the acknowledgment and ask again before signing under the new method', async () => {
+        const { rerender } = renderRequestPage()
+        await clearActionRequestGates()
+
+        mockRecover.mockResolvedValue(recovered('eth_signTypedData_v4', [SIGNER, TYPED_DATA]))
+        mockConnectionData = { ...mockConnectionData, provider: { isMagic: false, refreshed: true } }
+        rerenderRequestPage(rerender)
+        await waitFor(() => expect(mockRecover.mock.calls.length).toBeGreaterThanOrEqual(2))
+        const replacement = await screen.findByTestId('action-request')
+
+        // Same payload on screen, but the earlier tick no longer counts.
+        expect(replacement).toHaveAttribute('data-payload', JSON.stringify({ kind: 'typed_data', raw: TYPED_DATA }))
+        expect(replacement).toHaveAttribute('data-acknowledged', 'false')
+        expect(replacement).toHaveAttribute('data-approve-blocked', 'true')
+        await userEvent.click(screen.getByTestId('action-approve'))
+        expect(mockWalletRequest).not.toHaveBeenCalled()
+
+        await approveActionRequest()
+
+        await waitFor(() => expect(mockWalletRequest).toHaveBeenCalledTimes(1))
+        expect(mockWalletRequest).toHaveBeenCalledWith({ method: 'eth_signTypedData_v4', params: [SIGNER, TYPED_DATA] })
+      })
     })
   })
 })

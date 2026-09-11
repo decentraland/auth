@@ -123,6 +123,38 @@ describe('when rendering the ActionRequestView', () => {
       render(<ActionRequestView {...props} />)
       expect(screen.getByTestId('action-deny-button')).toBeEnabled()
     })
+
+    it('should keep them enabled when the reader scrolls back up, since the end was already reached', () => {
+      render(<ActionRequestView {...props} />)
+      const block = screen.getByTestId('action-payload')
+      Object.defineProperty(block, 'scrollTop', { configurable: true, value: 680 })
+      fireEvent.scroll(block)
+
+      // Back to the top to re-read a line: the gate asked for one pass and got it.
+      Object.defineProperty(block, 'scrollTop', { configurable: true, value: 0 })
+      fireEvent.scroll(block)
+
+      expect(screen.getByRole('checkbox')).toBeEnabled()
+      expect(screen.getByTestId('action-approve-button')).toBeEnabled()
+      expect(screen.queryByTestId('action-scroll-hint')).not.toBeInTheDocument()
+    })
+
+    describe('and the payload is replaced by another', () => {
+      it('should ask for the new one to be read to its end', () => {
+        const { rerender } = render(<ActionRequestView {...props} />)
+        const block = screen.getByTestId('action-payload')
+        // Writable, unlike the cases above: the view puts the box back at the top for a new payload, and a
+        // read-only stub would swallow that and leave the old scroll position in place.
+        Object.defineProperty(block, 'scrollTop', { configurable: true, writable: true, value: 680 })
+        fireEvent.scroll(block)
+        expect(screen.getByRole('checkbox')).toBeEnabled()
+
+        rerender(<ActionRequestView {...{ ...props, payload: { kind: 'typed_data', raw: '{"primaryType":"Permit"}' } }} />)
+
+        expect(screen.getByRole('checkbox')).toBeDisabled()
+        expect(screen.getByTestId('action-scroll-hint')).toBeInTheDocument()
+      })
+    })
   })
 
   it('should report a tick to the page rather than decide for itself what it enables', async () => {

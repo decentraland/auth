@@ -32,7 +32,7 @@ test.describe('Previous connection: returning user with persisted wallet', () =>
 
     // ConnectionProvider restores wallet → RequestPage sees account → shows the approval screen.
     // Should NOT redirect to /login since the wallet is already available.
-    await expect(page.locator('[data-testid="unverified-approve-button"]')).toBeVisible({ timeout: 20_000 })
+    await expect(page.locator('[data-testid="action-approve-button"]')).toBeVisible({ timeout: 20_000 })
   })
 
   test('Web: returning existing user with redirectTo → skips login page entirely', async ({ page }) => {
