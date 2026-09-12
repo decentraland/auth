@@ -801,4 +801,104 @@ describe('when fetching the profile of a single address to show beside it', () =
       expect(await fetchProfile(ADDRESS)).toBeNull()
     })
   })
+  describe('when caller cancellation interrupts a profile repair', () => {
+    let controller: AbortController
+    let profile: Profile
+    let identity: AuthIdentity
+    let entity: Entity
+    let deploy: jest.Mock
+
+    beforeEach(() => {
+      jest.resetAllMocks()
+      controller = new AbortController()
+      profile = createMockProfile()
+      identity = createMockIdentity()
+      entity = createMockEntity()
+      deploy = jest.fn()
+      jest.mocked(getCatalystServersFromCache).mockReturnValue([
+        { address: 'https://catalyst1.zone', owner: '0xowner', id: 'first' },
+        { address: 'https://catalyst2.zone', owner: '0xowner', id: 'second' }
+      ])
+      jest
+        .mocked(createContentClient)
+        .mockReturnValue({ fetchEntitiesByPointers: jest.fn().mockResolvedValue([entity]), deploy } as unknown as ReturnType<
+          typeof createContentClient
+        >)
+      jest.mocked(Authenticator.signPayload).mockReturnValue([])
+    })
+
+    afterEach(() => {
+      jest.resetAllMocks()
+    })
+
+    describe.each(['profile', 'content'] as const)('and %s entity construction was pending', path => {
+      beforeEach(() => {
+        jest.mocked(DeploymentBuilder.buildEntity).mockImplementationOnce(async () => {
+          controller.abort()
+          return createMockDeploymentResult()
+        })
+      })
+
+      it('should stop before signing or deploying and never build fallback metadata', async () => {
+        await expect(
+          path === 'profile'
+            ? redeployExistingProfile(profile, DEFAULT_MOCK_ADDRESS, identity, [], controller.signal)
+            : redeployExistingProfileWithContentServerData('https://catalyst1.zone', DEFAULT_MOCK_ADDRESS, identity, [], controller.signal)
+        ).rejects.toMatchObject({ name: 'AbortError' })
+        expect(Authenticator.signPayload).not.toHaveBeenCalled()
+        expect(deploy).not.toHaveBeenCalled()
+        expect(DeploymentBuilder.buildEntity).toHaveBeenCalledTimes(1)
+      })
+    })
+
+    describe('and the content entity read was pending', () => {
+      beforeEach(() => {
+        jest.mocked(createContentClient).mockReturnValue({
+          fetchEntitiesByPointers: jest.fn().mockImplementation(async () => {
+            controller.abort()
+            return [entity]
+          })
+        } as unknown as ReturnType<typeof createContentClient>)
+      })
+      it('should stop before building an entity', async () => {
+        await expect(
+          redeployExistingProfileWithContentServerData('https://catalyst1.zone', DEFAULT_MOCK_ADDRESS, identity, [], controller.signal)
+        ).rejects.toMatchObject({ name: 'AbortError' })
+        expect(DeploymentBuilder.buildEntity).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and the authenticated content repair request was pending', () => {
+      beforeEach(() => {
+        jest.mocked(DeploymentBuilder.buildEntity).mockResolvedValue(createMockDeploymentResult())
+        deploy.mockImplementationOnce(async () => {
+          controller.abort()
+          throw controller.signal.reason
+        })
+      })
+      it('should stop without rotating catalysts or stripping wearables for a fallback', async () => {
+        await expect(
+          redeployExistingProfileWithContentServerData('https://catalyst1.zone', DEFAULT_MOCK_ADDRESS, identity, [], controller.signal)
+        ).rejects.toMatchObject({ name: 'AbortError' })
+        expect(deploy).toHaveBeenCalledTimes(1)
+        expect(DeploymentBuilder.buildEntity).toHaveBeenCalledTimes(1)
+      })
+    })
+
+    describe('and a catalyst consistency response arrives after cancellation', () => {
+      beforeEach(() => {
+        jest.mocked(createLambdasClient).mockReturnValue({
+          getAvatarDetails: jest.fn().mockImplementation(async () => {
+            controller.abort()
+            return profile
+          })
+        } as unknown as ReturnType<typeof createLambdasClient>)
+      })
+      it('should preserve cancellation rather than return an indeterminate profile result', async () => {
+        await expect(fetchProfileWithConsistencyCheck(DEFAULT_MOCK_ADDRESS, [], undefined, controller.signal)).rejects.toBe(
+          controller.signal.reason
+        )
+      })
+    })
+  })
 })

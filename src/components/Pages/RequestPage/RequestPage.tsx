@@ -21,6 +21,7 @@ import {
   ExpiredRequestError,
   IdentityResponse,
   ImpersonatedSignInError,
+  InvalidRequestExpirationError,
   MalformedSignatureRequestError,
   MalformedTransactionRequestError,
   OutcomeError,
@@ -32,6 +33,7 @@ import {
   bindProviderToSigner,
   createAuthServerHttpClient,
   getKnownToken,
+  getRequestExpirationTimestamp,
   isRecognizedDecentralandContract,
   resolveKnownDecentralandContract
 } from '../../../shared/auth'
@@ -218,6 +220,8 @@ export const RequestPage = () => {
   // Chain a tip or a gift executes on, for the recipient's block-explorer link.
   const [reviewedChainId, setReviewedChainId] = useState<number>()
   const requestRef = useRef<RecoverResponse>()
+  const requestExpirationRef = useRef<number>()
+  const requestLoadStartedRef = useRef<number>()
   const viewRef = useRef(view)
   viewRef.current = view
   // The current value of `isReviewActionable`, for the approval handler to read at the moment it acts. It
@@ -331,6 +335,19 @@ export const RequestPage = () => {
   const [errorKind, setErrorKind] = useState<SigningErrorKind | null>(null)
   const [identityId, setIdentityId] = useState<string>()
   const timeoutRef = useRef<NodeJS.Timeout>()
+  // Every expiry path settles and reports through the same transition. An overdue timer or a
+  // delayed wallet/relay continuation cannot report twice or replace an already completed outcome.
+  const expireRequest = useCallback(() => {
+    if (hasCompletedRef.current) return
+    hasCompletedRef.current = true
+    clearTimeout(timeoutRef.current)
+    getAnalytics()?.track(TrackingEvents.REQUEST_EXPIRED, {
+      browserTime: Date.now(),
+      requestTime: requestExpirationRef.current,
+      timeTheSiteStartedLoading: requestLoadStartedRef.current
+    })
+    setView(View.TIMEOUT)
+  }, [])
   const requestId = params.requestId ?? ''
   // Whether the profile check has cleared this very (request id, account); see profileReadyFor.
   const isProfileReady = profileReadyFor !== null && profileReadyFor.requestId === requestId && profileReadyFor.account === account
@@ -394,12 +411,13 @@ export const RequestPage = () => {
     }
 
     let cancelled = false
+    const controller = new AbortController()
 
     const checkProfile = async () => {
       const redirectTo = buildRequestPageUrl(requestId, targetConfigId, { isDeepLinkFlow, isBridgeOnly, authRequestId })
       const referrer = extractReferrerFromSearchParameters(searchParams)
       try {
-        const profile = await ensureProfile(account, identityRef.current, { redirectTo, referrer })
+        const profile = await ensureProfile(account, identityRef.current, { redirectTo, referrer, signal: controller.signal })
 
         if (!cancelled && profile) {
           setProfileReadyFor({ requestId, account })
@@ -418,6 +436,7 @@ export const RequestPage = () => {
 
     return () => {
       cancelled = true
+      controller.abort()
     }
   }, [
     ensureProfile,
@@ -579,7 +598,8 @@ export const RequestPage = () => {
     }
 
     const loadRequest = async () => {
-      const timeTheSiteStartedLoading = Date.now()
+      requestLoadStartedRef.current = Date.now()
+      requestExpirationRef.current = undefined
       const publicClient = createPublicClient({ transport: custom(provider) })
       publicClientRef.current = publicClient
       walletClientRef.current = createWalletClient({ chain: mainnet, transport: custom(provider) })
@@ -626,30 +646,31 @@ export const RequestPage = () => {
           throw new UnsupportedMethodError(request.method)
         }
 
+        // Keep the public response's string field compatible, while the timer and every dispatch
+        // check share this one validated numeric deadline. Also fail closed for alternate clients.
+        const expiration = getRequestExpirationTimestamp(request.expiration)
+        requestExpirationRef.current = expiration
         requestRef.current = request
         recoveredRequestIdRef.current = requestId
         recoveredSignerRef.current = signerAddress.toLowerCase()
 
-        // Initialize the timeout to display the timeout view when the request expires.
-        // Guard against an unparseable expiration: `new Date(...).getTime()` would be NaN,
-        // which setTimeout coerces to 0 and fires the timeout view immediately.
-        // A negative delay (a request that is already past its expiration) is intentional:
-        // setTimeout coerces it to 0 so the timeout view shows right away.
-        const expirationDelay = new Date(request.expiration).getTime() - Date.now()
-        if (!Number.isNaN(expirationDelay)) {
-          timeoutRef.current = setTimeout(() => {
-            getAnalytics()?.track(TrackingEvents.REQUEST_EXPIRED, {
-              browserTime: Date.now(),
-              requestTime: new Date(request.expiration).getTime(),
-              timeTheSiteStartedLoading
-            })
-            // Expiry is terminal: it settles the request like an answer does, so nothing that resolves
-            // later (the classification, a branded lookup, the counterparty check) can put an actionable
-            // review back on screen, and neither Allow nor Deny can act on the expired request.
-            hasCompletedRef.current = true
-            setView(View.TIMEOUT)
-          }, expirationDelay)
+        const expirationDelay = expiration - Date.now()
+        if (expirationDelay <= 0) {
+          expireRequest()
+          return
         }
+        const scheduleExpiry = () => {
+          if (isStale()) return
+          const remaining = expiration - Date.now()
+          if (remaining <= 0) {
+            expireRequest()
+          } else {
+            // Browser timers use a signed 32-bit delay. Recheck long deadlines in chunks rather
+            // than letting an overflowing delay expire a valid request immediately.
+            timeoutRef.current = setTimeout(scheduleExpiry, Math.min(remaining, 2_147_483_647))
+          }
+        }
+        scheduleExpiry()
 
         // Whether a tip or a gift may be shown as one. The branded screens name a recipient and an amount and
         // nothing else, so they may stand in for the raw payload only when nothing the call reaches could do
@@ -861,7 +882,14 @@ export const RequestPage = () => {
           setView(View.DIFFERENT_ACCOUNT)
           return
         } else if (e instanceof ExpiredRequestError) {
-          setView(View.TIMEOUT)
+          if (e.expiration) requestExpirationRef.current = getRequestExpirationTimestamp(e.expiration)
+          expireRequest()
+          return
+        } else if (e instanceof InvalidRequestExpirationError) {
+          hasCompletedRef.current = true
+          setError(e.message)
+          setView(View.LOADING_ERROR)
+          await reportRejectedRequest(RPC_INVALID_PARAMS, e.message)
           return
         } else if (e instanceof RequestFulfilledError) {
           // Request was already consumed successfully — not an error, stop re-fetching
@@ -970,7 +998,8 @@ export const RequestPage = () => {
     isDeepLinkFlow,
     isInvalidDeepLinkId,
     skipSetup,
-    reviewAttempt
+    reviewAttempt,
+    expireRequest
   ])
 
   useEffect(() => {
@@ -1130,8 +1159,17 @@ export const RequestPage = () => {
     // its own asynchronous preparation, so its pre-sign callback checks validity without this shared
     // actionable gate (which the reservation closes). Once the wallet is asked, its outcome must still
     // be delivered whatever has happened to the review (see hasWalletResult).
-    const canStillDispatch = () =>
-      !isStaleAction() && reviewRunRef.current === run && !hasCompletedRef.current && isReviewActionableRef.current
+    const expiration = requestExpirationRef.current
+    const canStillDispatch = () => {
+      if (isStaleAction() || reviewRunRef.current !== run || hasCompletedRef.current || !isReviewActionableRef.current) return false
+      // Background tabs and clock corrections can leave the expiry timer overdue. Every dispatch
+      // checks the deadline itself, after confirming that this action still owns the review on screen.
+      if (expiration === undefined || Date.now() >= expiration) {
+        expireRequest()
+        return false
+      }
+      return true
+    }
     // The account that reviewed this request, fixed now. The ref moves on to the next review's account
     // while this action is in flight; every comparison and every outcome below uses this value, never the
     // ref, so a late rejection can neither pass the check against another account nor be delivered under it.
@@ -1214,7 +1252,6 @@ export const RequestPage = () => {
         // Bound to the signer verified above, it can only act for the account that reviewed the request;
         // a wallet that switched accounts in between fails with ReviewedSignerMismatchError (see catch).
         markDispatched()
-        const expiration = new Date(requestRef.current.expiration).getTime()
         result = await sendMetaTransaction(
           bindProviderToSigner(connectedProvider, signerAddress, () => {
             // This request already holds the dispatch reservation, so the shared actionable gate is
@@ -1222,10 +1259,8 @@ export const RequestPage = () => {
             if (isStaleAction() || reviewRunRef.current !== run || !isReviewConnectionCurrentRef.current || hasCompletedRef.current) {
               throw new ReviewedRequestInvalidatedError()
             }
-            if (Date.now() >= expiration) {
-              hasCompletedRef.current = true
-              clearTimeout(timeoutRef.current)
-              setView(View.TIMEOUT)
+            if (expiration === undefined || Date.now() >= expiration) {
+              expireRequest()
               throw new ReviewedRequestInvalidatedError()
             }
           }),
@@ -1396,7 +1431,16 @@ export const RequestPage = () => {
         setIsLoading(false)
       }
     }
-  }, [isUserUsingWeb2Wallet, nftTransferData, manaTransferData, requestId, identity, showInteractionCompleteView, restartReview])
+  }, [
+    isUserUsingWeb2Wallet,
+    nftTransferData,
+    manaTransferData,
+    requestId,
+    identity,
+    showInteractionCompleteView,
+    restartReview,
+    expireRequest
+  ])
 
   // Allow, on every review: web2 users get a confirmation dialog first, since their wallet has no
   // prompt of its own; external wallets go straight to theirs.
@@ -1564,15 +1608,31 @@ export const RequestPage = () => {
     case View.WALLET_INTERACTION_COMPLETE:
       return <WalletInteractionComplete />
     case View.WALLET_NFT_INTERACTION_COMPLETE:
-      return nftTransferData ? <TransferCompletedView type={TransferType.GIFT} transferData={nftTransferData} /> : null
+      return nftTransferData ? (
+        <TransferCompletedView type={TransferType.GIFT} transferData={nftTransferData} />
+      ) : (
+        <WalletInteractionComplete />
+      )
     case View.WALLET_MANA_INTERACTION_COMPLETE:
-      return manaTransferData ? <TransferCompletedView type={TransferType.TIP} transferData={manaTransferData} /> : null
+      return manaTransferData ? (
+        <TransferCompletedView type={TransferType.TIP} transferData={manaTransferData} />
+      ) : (
+        <WalletInteractionComplete />
+      )
     case View.WALLET_INTERACTION_DENIED:
       return <DeniedWalletInteraction />
     case View.WALLET_NFT_INTERACTION_DENIED:
-      return nftTransferData ? <TransferCanceledView type={TransferType.GIFT} transferData={nftTransferData} /> : null
+      return nftTransferData ? (
+        <TransferCanceledView type={TransferType.GIFT} transferData={nftTransferData} />
+      ) : (
+        <DeniedWalletInteraction />
+      )
     case View.WALLET_MANA_INTERACTION_DENIED:
-      return manaTransferData ? <TransferCanceledView type={TransferType.TIP} transferData={manaTransferData} /> : null
+      return manaTransferData ? (
+        <TransferCanceledView type={TransferType.TIP} transferData={manaTransferData} />
+      ) : (
+        <DeniedWalletInteraction />
+      )
     case View.LOADING_REQUEST:
       return <LoadingRequest />
 

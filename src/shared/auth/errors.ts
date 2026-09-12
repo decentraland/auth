@@ -17,6 +17,14 @@ class ExpiredRequestError extends Error {
   }
 }
 
+class InvalidRequestExpirationError extends Error {
+  readonly skipReporting = true
+  constructor() {
+    super('The request expiration must be a valid timestamp')
+    this.name = 'InvalidRequestExpirationError'
+  }
+}
+
 class RequestNotFoundError extends Error {
   readonly skipReporting = true
   constructor(public readonly requestId: string) {
@@ -110,6 +118,7 @@ export {
   ContractLookupUnavailableError,
   DifferentSenderError,
   ExpiredRequestError,
+  InvalidRequestExpirationError,
   RequestNotFoundError,
   RequestFulfilledError,
   ImpersonatedSignInError,
