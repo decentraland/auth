@@ -81,6 +81,7 @@
       "payload_data": "Data",
       "payload_chain": "Chain",
       "relayed_note": "Your wallet will ask you to sign this action. Decentraland submits it for you and covers the gas.",
+      "raw_message_warning": "This message cannot be displayed reliably as text. The exact bytes to be signed are shown below in hexadecimal. Only approve if you understand what you are signing.",
       "scroll_hint": "Scroll to the end of the content before continuing.",
       "acknowledge": "I have read everything above and I take full responsibility for what this action does with my wallet, including any loss of assets.",
       "review_restarted_notice": "Your wallet's network changed or couldn't be verified, so this request was reviewed again on the current network."
@@ -169,6 +170,9 @@
       "confirm_gift": "Confirm Gift for",
       "creator_of": "CREATOR OF",
       "view_recipient_on_explorer": "View recipient on {explorer}",
+      "asset_network": "Network",
+      "asset_contract": "Contract",
+      "asset_token_id": "Token ID",
       "processing_authorization": "Processing Authorization",
       "gifting_warning": "Gifting an item cannot be undone."
     },

@@ -81,6 +81,7 @@
       "payload_data": "数据",
       "payload_chain": "链",
       "relayed_note": "你的钱包会请你为此操作签名。Decentraland 会代你提交并承担 gas 费用。",
+      "raw_message_warning": "此消息无法可靠地显示为文本。下方以十六进制显示将要签名的确切字节。只有在理解签名内容时才应批准。",
       "scroll_hint": "请滚动到内容末尾后再继续。",
       "acknowledge": "我已阅读上述全部内容，并对此操作对我的钱包造成的任何后果（包括任何资产损失）承担全部责任。",
       "review_restarted_notice": "你的钱包网络已更改或无法验证，因此此请求已在当前网络上重新审核。"
@@ -169,6 +170,9 @@
       "confirm_gift": "确认礼物给",
       "creator_of": "创作者",
       "view_recipient_on_explorer": "在 {explorer} 上查看接收方",
+      "asset_network": "网络",
+      "asset_contract": "合约",
+      "asset_token_id": "代币 ID",
       "processing_authorization": "正在处理授权",
       "gifting_warning": "赠送物品无法撤销。"
     },
