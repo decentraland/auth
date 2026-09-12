@@ -181,6 +181,39 @@ describe('when confirming a branded transfer', () => {
       onDeny
     })
 
+    describe('and the asset has a metadata name', () => {
+      let giftProps: TransferConfirmViewProps
+      let tokenId: string
+
+      beforeEach(() => {
+        tokenId = '115792089237316195423570985008687907853269984665640564039457584007913129639935'
+        giftProps = {
+          ...giftTo(INTENDED),
+          type: TransferType.GIFT,
+          transferData: { ...giftTo(INTENDED).transferData, tokenId } as NFTTransferData,
+          chainId: 137
+        }
+      })
+
+      it('should display the full contract address independently of the metadata name', () => {
+        renderView(giftProps)
+
+        expect(screen.getByText('0xabcdefabcdefabcdefabcdefabcdefabcdefabcd')).toBeVisible()
+      })
+
+      it('should display the exact token ID without truncation', () => {
+        renderView(giftProps)
+
+        expect(screen.getByText(tokenId)).toBeVisible()
+      })
+
+      it('should display the reviewed network name and chain ID', () => {
+        renderView(giftProps)
+
+        expect(screen.getByText('Polygon (137)')).toBeVisible()
+      })
+    })
+
     describe('and the recipient has a name they have not claimed', () => {
       it('should show the address it is being sent to alongside that name', () => {
         renderView(giftTo(INTENDED, { name: 'Alice', hasClaimedName: false }))

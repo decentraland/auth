@@ -169,6 +169,9 @@
       "confirm_gift": "Confirmar regalo para",
       "creator_of": "CREADOR DE",
       "view_recipient_on_explorer": "Ver destinatario en {explorer}",
+      "asset_network": "Red",
+      "asset_contract": "Contrato",
+      "asset_token_id": "ID del token",
       "processing_authorization": "Procesando autorización",
       "gifting_warning": "Regalar un artículo no se puede deshacer."
     },

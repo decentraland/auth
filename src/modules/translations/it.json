@@ -169,6 +169,9 @@
       "confirm_gift": "Conferma regalo per",
       "creator_of": "CREATORE DI",
       "view_recipient_on_explorer": "Vedi il destinatario su {explorer}",
+      "asset_network": "Rete",
+      "asset_contract": "Contratto",
+      "asset_token_id": "ID del token",
       "processing_authorization": "Elaborazione autorizzazione",
       "gifting_warning": "Regalare un oggetto è irreversibile."
     },
