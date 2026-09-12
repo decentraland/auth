@@ -24,6 +24,17 @@ class ReviewedSignerMismatchError extends MetaTransactionError {
   }
 }
 
+/** Stops relay preparation once the review that authorized it is no longer valid. */
+class ReviewedRequestInvalidatedError extends MetaTransactionError {
+  readonly skipReporting = true
+
+  constructor() {
+    super('The request review is no longer valid', ErrorCode.UNKNOWN)
+    Object.setPrototypeOf(this, ReviewedRequestInvalidatedError.prototype)
+    this.name = 'ReviewedRequestInvalidatedError'
+  }
+}
+
 type RpcArguments = { method: string; params?: unknown[] }
 
 // The account reads a wallet library makes before signing and submitting for whatever they return.
@@ -52,8 +63,10 @@ function unwrapResult(data: unknown): unknown {
  * would otherwise sign as an account that never saw the request, while the outcome was reported under
  * the one that did. Bound this way, the signer verified at review time is the only one the library can
  * act for, through the signing and the submission steps alike.
+ * The optional synchronous `beforeSigning` hook may refuse a review invalidated during the library's
+ * asynchronous preparation, immediately before any signing or transaction request reaches the wallet.
  */
-function bindProviderToSigner(provider: Provider, signer: string): Provider {
+function bindProviderToSigner(provider: Provider, signer: string, beforeSigning?: () => void): Provider {
   const expected = signer.toLowerCase()
   const isSigner = (value: unknown): boolean => typeof value === 'string' && value.toLowerCase() === expected
   const mismatch = (value: unknown): ReviewedSignerMismatchError =>
@@ -80,6 +93,9 @@ function bindProviderToSigner(provider: Provider, signer: string): Provider {
           throw mismatch(from)
         }
       }
+      // The relay performs asynchronous RPC reads before asking for a signature. Revalidate consent at
+      // the actual wallet boundary, synchronously with forwarding, rather than when those reads began.
+      if (signerIndex !== undefined || args.method === 'eth_sendTransaction') beforeSigning?.()
       let data: unknown
       try {
         data = await forward(args)
@@ -103,4 +119,4 @@ function bindProviderToSigner(provider: Provider, signer: string): Provider {
   }
 }
 
-export { ReviewedSignerMismatchError, bindProviderToSigner }
+export { ReviewedRequestInvalidatedError, ReviewedSignerMismatchError, bindProviderToSigner }

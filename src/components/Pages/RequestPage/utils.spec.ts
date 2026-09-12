@@ -1257,7 +1257,9 @@ describe('when fetching the place of a tip recipient', () => {
 
     it('should ask the API for the recipient as creator, lowercased', async () => {
       await fetchPlaceByCreatorAddress(CREATOR)
-      expect(fetch).toHaveBeenCalledWith(`https://places.example/api/places?creator_address=${CREATOR.toLowerCase()}`)
+      expect(fetch).toHaveBeenCalledWith(`https://places.example/api/places?creator_address=${CREATOR.toLowerCase()}`, {
+        signal: expect.any(AbortSignal)
+      })
     })
 
     it('should return the title as an untrusted label, trimmed, with hidden characters revealed and the length capped', async () => {
@@ -1432,6 +1434,43 @@ describe('when fetching the place of a tip recipient', () => {
     it('should return null and drain the body', async () => {
       await expect(fetchPlaceByCreatorAddress(CREATOR)).resolves.toBeNull()
       expect(cancel).toHaveBeenCalled()
+    })
+  })
+
+  describe.each(['headers', 'body'])('and the API stalls while waiting for %s', stage => {
+    let controller: AbortController
+    let result: Promise<Awaited<ReturnType<typeof fetchPlaceByCreatorAddress>>>
+    let timeoutSpy: jest.SpyInstance
+
+    beforeEach(() => {
+      jest.useFakeTimers()
+      controller = new AbortController()
+      // Native AbortSignal.timeout uses a clock outside Jest's fake timers. Keep its abort behavior,
+      // but schedule it on the test clock so the deadline can be exercised without a real ten-second wait.
+      timeoutSpy = jest.spyOn(AbortSignal, 'timeout').mockImplementationOnce(milliseconds => {
+        setTimeout(() => controller.abort(new DOMException('Timed out', 'TimeoutError')), milliseconds)
+        return controller.signal
+      })
+      jest.spyOn(console, 'error').mockImplementation(() => undefined)
+      jest.mocked(fetch).mockImplementationOnce((_url, init) => {
+        const pending = new Promise<never>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(init.signal?.reason), { once: true })
+        })
+        return stage === 'headers' ? pending : Promise.resolve({ ok: true, json: () => pending } as unknown as Response)
+      })
+      result = fetchPlaceByCreatorAddress(CREATOR)
+    })
+
+    afterEach(() => {
+      timeoutSpy.mockRestore()
+      jest.mocked(console.error).mockRestore()
+      jest.useRealTimers()
+    })
+
+    it('should give up after ten seconds so the tip can continue without scene details', async () => {
+      await jest.advanceTimersByTimeAsync(10_000)
+      await expect(result).resolves.toBeNull()
+      expect(controller.signal.aborted).toBe(true)
     })
   })
 

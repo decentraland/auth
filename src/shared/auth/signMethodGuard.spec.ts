@@ -181,6 +181,32 @@ describe('assertRequestIsNotImpersonatingSignIn', () => {
     })
   })
 
+  describe.each(['1234567890abcdef1234567890abcdef12345678', '1234567890ABCDEF1234567890ABCDEF12345678'])(
+    'when the identity authority is the unprefixed address %s',
+    authority => {
+      let params: unknown[]
+
+      beforeEach(() => {
+        signInPayload = ['Decentraland Login', `Ephemeral address: ${authority}`, 'Expiration: 2100-01-01T00:00:00.000Z'].join('\n')
+        params = [signInPayload]
+      })
+
+      it('should reject the identity authorization', () => {
+        expect(() => assertRequestIsNotImpersonatingSignIn('personal_sign', params)).toThrow(ImpersonatedSignInError)
+      })
+
+      describe('and the message is encoded as wallet bytes', () => {
+        beforeEach(() => {
+          params = ['0x' + Buffer.from(signInPayload, 'utf8').toString('hex')]
+        })
+
+        it('should reject the identity authorization', () => {
+          expect(() => assertRequestIsNotImpersonatingSignIn('personal_sign', params)).toThrow(ImpersonatedSignInError)
+        })
+      })
+    }
+  )
+
   describe('when the method is personal_sign and the sign-in payload is hex-encoded UTF-8', () => {
     let params: unknown[]
 

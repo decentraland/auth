@@ -26,6 +26,7 @@ import {
   OutcomeError,
   RecoverResponse,
   RequestFulfilledError,
+  ReviewedRequestInvalidatedError,
   ReviewedSignerMismatchError,
   UnsupportedMethodError,
   bindProviderToSigner,
@@ -274,12 +275,10 @@ export const RequestPage = () => {
   // the replacement review must not stay wedged behind it. The old action, for its part, releases only the
   // lock it took, so it cannot unlock an action the new run has in flight.
   const settlingRunRef = useRef(0)
-  // The requests an Allow has handed to the wallet and not heard back about. Past that point the
-  // transaction may be broadcast or the payload signed whatever the page does next, so nothing may answer
-  // that request again until it settles, and a review of it is shown busy rather than actionable. Keyed by
-  // request, not page-wide: another request has its own outcome to deliver and cannot be double-answered by
-  // this one, so it is never blocked on this one's account. Before dispatch an in-flight Allow answers
-  // nothing once its run is replaced (see canStillDispatch), which is why the settle lock is run-scoped.
+  // Requests reserved by an Allow handed to the wallet or the relay SDK. The relay reservation includes
+  // its asynchronous preparation; its provider revalidates the review immediately before signing. Once
+  // the wallet has been asked, execution can complete whatever the page does next. Until the operation
+  // settles, every review of that request stays busy. Other request ids remain independently actionable.
   //
   // The ref is what the handlers read, before their first await; the state is what the render reads, so a
   // dispatch that settles always releases the screen even when the review it belonged to is long gone.
@@ -298,7 +297,7 @@ export const RequestPage = () => {
   // it, not to the one on screen (see onDenyWalletInteraction, onApproveWalletInteraction).
   const reviewGenerationRef = useRef(0)
   /**
-   * Which load produced the review on screen. Advanced by every load, including one that runs again for
+   * Which load produced the review on screen. Invalidated on cleanup and advanced by every load, including one that runs again for
    * the same request and the same account — where `reviewGenerationRef` deliberately does not move,
    * because that tracks the settlement scope (whose outcome an in-flight action may still deliver) rather
    * than which review is being looked at.
@@ -954,6 +953,9 @@ export const RequestPage = () => {
 
     return () => {
       cancelled = true
+      // An approval still preparing a relay must not start signing after this review is discarded,
+      // including when the page unmounts. Already dispatched wallet results still deliver their outcome.
+      reviewRunRef.current += 1
       clearTimeout(timeoutRef.current)
     }
   }, [
@@ -1124,9 +1126,10 @@ export const RequestPage = () => {
     // shows the timeout screen without moving the generation, so `isStaleAction` alone does not see it),
     // a re-review can begin and even finish in it — which is why the run is checked as well as the gates,
     // since the gates are shared and a settled replacement makes them true again, while only the run says
-    // whether they are true for the review this click was given to. Never consulted after a dispatch — past
-    // that point the transaction is broadcast or the payload is signed, and the outcome must still be
-    // delivered whatever has happened to the review (see hasWalletResult).
+    // whether they are true for the review this click was given to. The relay reserves dispatch before
+    // its own asynchronous preparation, so its pre-sign callback checks validity without this shared
+    // actionable gate (which the reservation closes). Once the wallet is asked, its outcome must still
+    // be delivered whatever has happened to the review (see hasWalletResult).
     const canStillDispatch = () =>
       !isStaleAction() && reviewRunRef.current === run && !hasCompletedRef.current && isReviewActionableRef.current
     // The account that reviewed this request, fixed now. The ref moves on to the next review's account
@@ -1153,8 +1156,8 @@ export const RequestPage = () => {
     // the transaction is broadcast, or the payload is signed — so any later failure is a delivery
     // problem, never a rejection. See the catch below.
     let hasWalletResult = false
-    // Flips the moment the request is handed to the wallet, and holds this request's dispatch guard until
-    // the action has settled (see dispatchingRequestsRef).
+    // Reserves the request before handing it to the wallet or relay SDK, and holds the guard until the
+    // action settles. A relay still checks validity after its preparation, at the actual signing boundary.
     let hasDispatched = false
     const markDispatched = () => {
       hasDispatched = true
@@ -1211,8 +1214,21 @@ export const RequestPage = () => {
         // Bound to the signer verified above, it can only act for the account that reviewed the request;
         // a wallet that switched accounts in between fails with ReviewedSignerMismatchError (see catch).
         markDispatched()
+        const expiration = new Date(requestRef.current.expiration).getTime()
         result = await sendMetaTransaction(
-          bindProviderToSigner(connectedProvider, signerAddress),
+          bindProviderToSigner(connectedProvider, signerAddress, () => {
+            // This request already holds the dispatch reservation, so the shared actionable gate is
+            // false on its behalf. Check the review itself again after the SDK's account/nonce reads.
+            if (isStaleAction() || reviewRunRef.current !== run || !isReviewConnectionCurrentRef.current || hasCompletedRef.current) {
+              throw new ReviewedRequestInvalidatedError()
+            }
+            if (Date.now() >= expiration) {
+              hasCompletedRef.current = true
+              clearTimeout(timeoutRef.current)
+              setView(View.TIMEOUT)
+              throw new ReviewedRequestInvalidatedError()
+            }
+          }),
           networkProvider,
           reviewed.data,
           contract,
@@ -1265,14 +1281,19 @@ export const RequestPage = () => {
 
       hasWalletResult = true
 
+      // Execution is complete even while its outcome is being delivered. A slow delivery must not
+      // leave the expiry timer armed or make an already executed interaction appear to have expired.
+      if (!isStaleAction()) {
+        hasCompletedRef.current = true
+        clearTimeout(timeoutRef.current)
+        showInteractionCompleteView()
+      }
+
       trackClick(ClickEvents.APPROVE_WALLET_INTERACTION, {
         method: requestRef.current?.method
       })
       await authServerClient.current.sendSuccessfulOutcome(requestId, signerAddress, result)
       if (isStaleAction()) return
-      hasCompletedRef.current = true
-      clearTimeout(timeoutRef.current)
-      showInteractionCompleteView()
 
       // Notification delivery cannot delay or change a completed request. The helper bounds the fetch;
       // handle a rejection here as well so a background failure never becomes an unhandled promise.
@@ -1282,6 +1303,9 @@ export const RequestPage = () => {
         })
       }
     } catch (e) {
+      // No wallet action took place: expiry or a replacement review invalidated the relay during its
+      // preparation. Leave that review's view and outcome alone.
+      if (e instanceof ReviewedRequestInvalidatedError) return
       // Every branch reports, then shows the result. Reporting (Sentry, the failed outcome) belongs to the
       // reviewed request and goes ahead; showing belongs to the review on screen and is skipped once this
       // action is stale.
