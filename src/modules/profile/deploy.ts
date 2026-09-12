@@ -14,18 +14,21 @@ interface DeploymentEntity {
 interface DeployWithCatalystRotationOptions {
   entity: DeploymentEntity
   disabledCatalysts?: string[]
+  signal?: AbortSignal
 }
 
-async function deployWithCatalystRotation({ entity, disabledCatalysts }: DeployWithCatalystRotationOptions): Promise<void> {
+async function deployWithCatalystRotation({ entity, disabledCatalysts, signal }: DeployWithCatalystRotationOptions): Promise<void> {
+  signal?.throwIfAborted()
   const catalystUrls = getCatalystUrlsForRotation(disabledCatalysts)
   // Give each request a timeout so a stalled catalyst aborts (a retryable error) instead of
   // hanging the whole rotation forever, letting it advance to the next catalyst.
-  const fetcher = createFetcher({ timeout: Number(config.get('PROFILE_CONSISTENCY_CHECK_TIMEOUT')) || 10000 })
+  const fetcher = createFetcher({ timeout: Number(config.get('PROFILE_CONSISTENCY_CHECK_TIMEOUT')) || 10000, signal })
 
   for (let attempt = 0; attempt < catalystUrls.length; attempt++) {
     const catalystUrl = catalystUrls[attempt]
 
     try {
+      signal?.throwIfAborted()
       const client = createContentClient({ url: catalystUrl, fetcher })
       const response = (await client.deploy({
         entityId: entity.entityId,
@@ -33,8 +36,10 @@ async function deployWithCatalystRotation({ entity, disabledCatalysts }: DeployW
         authChain: entity.authChain
       })) as Response
 
+      signal?.throwIfAborted()
       if (!response.ok) {
         const responseBody = await response.text().catch(() => 'Unable to read response body')
+        signal?.throwIfAborted()
         throw new DeploymentError(
           `Deployment failed with status ${response.status}: ${responseBody}`,
           response.status,
@@ -45,6 +50,8 @@ async function deployWithCatalystRotation({ entity, disabledCatalysts }: DeployW
 
       return
     } catch (error) {
+      // Caller cancellation is final, not a catalyst failure to retry or wrap.
+      signal?.throwIfAborted()
       const isLastAttempt = attempt === catalystUrls.length - 1
       const shouldRetry = isLastAttempt ? false : isRetryableError(error)
 

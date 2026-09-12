@@ -214,6 +214,62 @@ describe('when connection work overlaps a newer session', () => {
       })
     })
 
+    describe.each([
+      ['disconnect', []],
+      ['accountsChanged', ['0x3333333333333333333333333333333333333333']]
+    ])('and the replacement emits %s while signing listeners are removed', (event, accounts) => {
+      let replacementProvider: EventEmitter
+      let replacement: ConnectionData
+      let removeListenerSpy: jest.SpyInstance
+
+      beforeEach(() => {
+        replacementProvider = new EventEmitter()
+        replacement = { ...connectionData, provider: replacementProvider as unknown as ConnectionData['provider'] }
+        jest.mocked(getIdentitySignature).mockResolvedValueOnce(identity)
+        removeListenerSpy = jest.spyOn(replacementProvider, 'removeListener').mockImplementationOnce((name, listener) => {
+          EventEmitter.prototype.removeListener.call(replacementProvider, name, listener)
+          replacementProvider.emit(event, accounts)
+          return replacementProvider
+        })
+      })
+
+      afterEach(() => {
+        removeListenerSpy.mockRestore()
+      })
+
+      it('should reject the superseded identity and reflect the provider event', async () => {
+        await act(async () => {
+          await expect(hook.result.current.getIdentitySignature(replacement)).rejects.toThrow('Connection changed while creating identity')
+          resolveIdentity(identity)
+          await expect(pending).rejects.toThrow('Connection changed while creating identity')
+        })
+        expect(hook.result.current.account).toBe(accounts[0])
+        expect(hook.result.current.identity).toBeUndefined()
+      })
+    })
+
+    describe('and the replacement changes chain immediately after identity completion', () => {
+      let replacementProvider: EventEmitter
+      let replacement: ConnectionData
+
+      beforeEach(() => {
+        replacementProvider = new EventEmitter()
+        replacement = { ...connectionData, provider: replacementProvider as unknown as ConnectionData['provider'] }
+        jest.mocked(getIdentitySignature).mockResolvedValueOnce(identity)
+      })
+
+      it('should observe the chain before React commits its next render', async () => {
+        await act(async () => {
+          await hook.result.current.getIdentitySignature(replacement)
+          replacementProvider.emit('chainChanged', '0x89')
+          resolveIdentity(identity)
+          await expect(pending).rejects.toThrow('Connection changed while creating identity')
+        })
+        expect(hook.result.current.chainId).toBe(137)
+        expect(replacementProvider.listenerCount('chainChanged')).toBe(1)
+      })
+    })
+
     describe('and the wallet repeats the current account', () => {
       beforeEach(() => {
         act(() => {
