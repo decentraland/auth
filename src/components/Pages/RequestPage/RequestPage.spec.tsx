@@ -3946,6 +3946,113 @@ describe('RequestPage', () => {
     }
   )
 
+  describe.each(['personal_sign', 'eth_signTypedData_v4'])('when the wallet is still answering a %s request at its deadline', method => {
+    let user: ReturnType<typeof userEvent.setup>
+    let resolveWallet: (result: string) => void
+    let rejectWallet: (error: Error) => void
+    let deadline: number
+    let rejection: Error
+
+    beforeEach(async () => {
+      jest.useFakeTimers()
+      user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime })
+      deadline = Date.now() + 60_000
+      rejection = new Error('User rejected the signature')
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'User' }] })
+      mockGetAddresses.mockResolvedValue([SIGNER])
+      mockRecover.mockResolvedValue({
+        ...recovered(method, method === 'personal_sign' ? ['hello', SIGNER] : [SIGNER, '{"primaryType":"Mail"}']),
+        expiration: new Date(deadline).toISOString()
+      })
+      mockWalletRequest.mockImplementationOnce(
+        () =>
+          new Promise<string>((resolve, reject) => {
+            resolveWallet = resolve
+            rejectWallet = reject
+          })
+      )
+      mockSendSuccessfulOutcome.mockResolvedValue({})
+      renderRequestPage()
+      await user.click(await screen.findByTestId('action-acknowledge'))
+      await waitFor(() => expect(screen.getByTestId('action-request')).toHaveAttribute('data-approve-blocked', 'false'))
+      await user.click(screen.getByTestId('action-approve'))
+      await waitFor(() => expect(mockWalletRequest).toHaveBeenCalledTimes(1))
+    })
+
+    afterEach(() => jest.useRealTimers())
+
+    describe.each(['delivered', 'delayed'])('and the expiry timer is %s', timer => {
+      beforeEach(() => {
+        if (timer === 'delivered') act(() => jest.advanceTimersByTime(deadline - Date.now() + 1))
+        else jest.setSystemTime(deadline + 1)
+      })
+
+      it('should discard the late signature and preserve expiry without sending an outcome', async () => {
+        await act(async () => resolveWallet('0xsignature'))
+        expect(screen.getByTestId('timeout-error')).toBeInTheDocument()
+        expect(mockSendSuccessfulOutcome).not.toHaveBeenCalled()
+        expect(mockSendFailedOutcome).not.toHaveBeenCalled()
+        act(() => jest.advanceTimersByTime(60_000))
+        expect(mockExpiryTrack.mock.calls.filter(([event]) => event === TrackingEvents.REQUEST_EXPIRED)).toHaveLength(1)
+      })
+
+      it('should preserve expiry after a late wallet rejection without sending a failed outcome', async () => {
+        mockIsUserRejectedTransaction.mockReturnValue(true)
+        await act(async () => rejectWallet(rejection))
+        expect(screen.getByTestId('timeout-error')).toBeInTheDocument()
+        expect(mockSendSuccessfulOutcome).not.toHaveBeenCalled()
+        expect(mockSendFailedOutcome).not.toHaveBeenCalled()
+        expect(mockExpiryTrack.mock.calls.filter(([event]) => event === TrackingEvents.REQUEST_EXPIRED)).toHaveLength(1)
+      })
+    })
+  })
+
+  describe('when a dispatched direct transaction finishes after its deadline', () => {
+    let user: ReturnType<typeof userEvent.setup>
+    let resolveWallet: (hash: string) => void
+    let deadline: number
+
+    beforeEach(async () => {
+      jest.useFakeTimers()
+      user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime })
+      deadline = Date.now() + 60_000
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'User' }] })
+      mockGetAddresses.mockResolvedValue([SIGNER])
+      mockRecover.mockResolvedValue({
+        ...recovered('eth_sendTransaction', [{ to: CONTRACT, data: '0xabcd', value: '0x0' }]),
+        expiration: new Date(deadline).toISOString()
+      })
+      mockWalletRequest.mockImplementationOnce(
+        () =>
+          new Promise<string>(resolve => {
+            resolveWallet = resolve
+          })
+      )
+      mockSendSuccessfulOutcome.mockResolvedValue({})
+      renderRequestPage()
+      await user.click(await screen.findByTestId('action-acknowledge'))
+      await waitFor(() => expect(screen.getByTestId('action-request')).toHaveAttribute('data-approve-blocked', 'false'))
+      await user.click(screen.getByTestId('action-approve'))
+      await waitFor(() => expect(mockWalletRequest).toHaveBeenCalledTimes(1))
+    })
+
+    afterEach(() => jest.useRealTimers())
+
+    describe.each(['delivered', 'delayed'])('and the expiry timer is %s', timer => {
+      beforeEach(() => {
+        if (timer === 'delivered') act(() => jest.advanceTimersByTime(deadline - Date.now() + 1))
+        else jest.setSystemTime(deadline + 1)
+      })
+
+      it('should report the broadcast transaction hash and show completion', async () => {
+        await act(async () => resolveWallet('0xtransactionhash'))
+        expect(mockSendSuccessfulOutcome).toHaveBeenCalledWith(REQUEST_ID, SIGNER, '0xtransactionhash')
+        expect(mockSendFailedOutcome).not.toHaveBeenCalled()
+        expect(screen.getByTestId('wallet-interaction-complete')).toBeInTheDocument()
+      })
+    })
+  })
+
   describe('when the profile check outlives its review', () => {
     let page: ReturnType<typeof renderRequestPage>
     let signal: AbortSignal

@@ -228,6 +228,7 @@ export const RequestPage = () => {
   // is assigned during render, like `viewRef`, because the handler is created before the value is derived.
   const isReviewActionableRef = useRef(false)
   const hasCompletedRef = useRef(false)
+  const hasExpiredRef = useRef(false)
   // The request id and account whose state this mounted page currently holds (see the load effect).
   // The refs are read by the effect; the state drives rendering, so a route or account change is
   // caught on its own render.
@@ -340,6 +341,7 @@ export const RequestPage = () => {
   const expireRequest = useCallback(() => {
     if (hasCompletedRef.current) return
     hasCompletedRef.current = true
+    hasExpiredRef.current = true
     clearTimeout(timeoutRef.current)
     getAnalytics()?.track(TrackingEvents.REQUEST_EXPIRED, {
       browserTime: Date.now(),
@@ -480,6 +482,7 @@ export const RequestPage = () => {
       setReviewRestartReason(pendingReviewRestartRef.current ?? null)
       pendingReviewRestartRef.current = undefined
       hasCompletedRef.current = false
+      hasExpiredRef.current = false
       // A new review is a new settlement scope: an action still pending for the previous one may finish
       // its own outcome delivery but no longer speaks for this page (see reviewGenerationRef).
       isSettlingRef.current = false
@@ -1157,9 +1160,19 @@ export const RequestPage = () => {
     // since the gates are shared and a settled replacement makes them true again, while only the run says
     // whether they are true for the review this click was given to. The relay reserves dispatch before
     // its own asynchronous preparation, so its pre-sign callback checks validity without this shared
-    // actionable gate (which the reservation closes). Once the wallet is asked, its outcome must still
-    // be delivered whatever has happened to the review (see hasWalletResult).
+    // actionable gate (which the reservation closes). A signature is also checked before releasing it;
+    // a transaction already broadcast by the wallet must still have its actual outcome delivered.
     const expiration = requestExpirationRef.current
+    // A signature remains under our control until it is released to the requester or relay. Keep an
+    // expired review terminal even if the clock moves backwards after the timeout was displayed.
+    const hasExpired = () => {
+      const expired = expiration === undefined || Date.now() >= expiration || (!isStaleAction() && hasExpiredRef.current)
+      if (expired && !isStaleAction()) expireRequest()
+      return expired
+    }
+    const assertSignatureCanBeReleased = () => {
+      if (hasExpired()) throw new ReviewedRequestInvalidatedError()
+    }
     const canStillDispatch = () => {
       if (isStaleAction() || reviewRunRef.current !== run || hasCompletedRef.current || !isReviewActionableRef.current) return false
       // Background tabs and clock corrections can leave the expiry timer overdue. Every dispatch
@@ -1191,8 +1204,8 @@ export const RequestPage = () => {
       return 'sent'
     }
     // Flips once the wallet has executed the request. Past that point the action is irreversible —
-    // the transaction is broadcast, or the payload is signed — so any later failure is a delivery
-    // problem, never a rejection. See the catch below.
+    // the transaction is broadcast, or an unexpired signature is ready to be delivered — so any
+    // later failure is a delivery problem, never a rejection. See the catch below.
     let hasWalletResult = false
     // Reserves the request before handing it to the wallet or relay SDK, and holds the guard until the
     // action settles. A relay still checks validity after its preparation, at the actual signing boundary.
@@ -1253,17 +1266,22 @@ export const RequestPage = () => {
         // a wallet that switched accounts in between fails with ReviewedSignerMismatchError (see catch).
         markDispatched()
         result = await sendMetaTransaction(
-          bindProviderToSigner(connectedProvider, signerAddress, () => {
-            // This request already holds the dispatch reservation, so the shared actionable gate is
-            // false on its behalf. Check the review itself again after the SDK's account/nonce reads.
-            if (isStaleAction() || reviewRunRef.current !== run || !isReviewConnectionCurrentRef.current || hasCompletedRef.current) {
-              throw new ReviewedRequestInvalidatedError()
-            }
-            if (expiration === undefined || Date.now() >= expiration) {
-              expireRequest()
-              throw new ReviewedRequestInvalidatedError()
-            }
-          }),
+          bindProviderToSigner(
+            connectedProvider,
+            signerAddress,
+            () => {
+              // This request already holds the dispatch reservation, so the shared actionable gate is
+              // false on its behalf. Check the review itself again after the SDK's account/nonce reads.
+              if (isStaleAction() || reviewRunRef.current !== run || !isReviewConnectionCurrentRef.current || hasCompletedRef.current) {
+                throw new ReviewedRequestInvalidatedError()
+              }
+              if (expiration === undefined || Date.now() >= expiration) {
+                expireRequest()
+                throw new ReviewedRequestInvalidatedError()
+              }
+            },
+            assertSignatureCanBeReleased
+          ),
           networkProvider,
           reviewed.data,
           contract,
@@ -1312,8 +1330,11 @@ export const RequestPage = () => {
         // (see toWalletSignatureRequest).
         markDispatched()
         result = await forwardSignatureRequest(walletClient, toWalletSignatureRequest(method, reviewed, signerAddress))
+        assertSignatureCanBeReleased()
       }
 
+      // A returned transaction hash means the wallet or relay already submitted the transaction.
+      // Expiry cannot undo that side effect; preserve its real outcome instead of reporting a rejection.
       hasWalletResult = true
 
       // Execution is complete even while its outcome is being delivered. A slow delivery must not
@@ -1341,6 +1362,8 @@ export const RequestPage = () => {
       // No wallet action took place: expiry or a replacement review invalidated the relay during its
       // preparation. Leave that review's view and outcome alone.
       if (e instanceof ReviewedRequestInvalidatedError) return
+      // A late rejection or preparation failure must not replace an expired review or answer it again.
+      if (!hasWalletResult && hasExpired()) return
       // Every branch reports, then shows the result. Reporting (Sentry, the failed outcome) belongs to the
       // reviewed request and goes ahead; showing belongs to the review on screen and is skipped once this
       // action is stale.
