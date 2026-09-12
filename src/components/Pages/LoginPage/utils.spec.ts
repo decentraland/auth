@@ -1,11 +1,12 @@
-import { WalletConnectV2Connector, connection } from 'decentraland-connect'
+import { waitFor } from '@testing-library/react'
+import { WalletConnectV2Connector, connection, getConfiguration } from 'decentraland-connect'
 import { ConnectionOptionType, SignInOptionsMode } from '../../Connection/Connection.types'
 import { FeatureFlagsKeys, SignInPrimaryOptionVariant } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
 import type { FeatureFlagsVariants } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
-import { connectToProvider, getSignInOptionsMode } from './utils'
+import { connectToProvider, connectToSocialProvider, getSignInOptionsMode } from './utils'
 
 jest.mock('decentraland-connect', () => ({
-  connection: { connect: jest.fn() },
+  connection: { connect: jest.fn(), disconnect: jest.fn() },
   getConfiguration: jest.fn(),
   // eslint-disable-next-line @typescript-eslint/naming-convention -- mirrors the exported class name
   WalletConnectV2Connector: { clearStorage: jest.fn() }
@@ -168,6 +169,57 @@ describe('connectToProvider', () => {
       await connectToProvider(ConnectionOptionType.COINBASE)
 
       expect(mockClearStorage).not.toHaveBeenCalled()
+    })
+  })
+})
+
+let mockMagic: { user: { isLoggedIn: jest.Mock; logout: jest.Mock }; oauth2: { loginWithRedirect: jest.Mock } }
+
+jest.mock('magic-sdk', () => ({ Magic: jest.fn() }))
+// eslint-disable-next-line @typescript-eslint/naming-convention
+jest.mock('@magic-ext/oauth2', () => ({ OAuthExtension: jest.fn() }))
+
+describe('when preparing a cancellable social login', () => {
+  let controller: AbortController
+  let resolveSession: (loggedIn: boolean) => void
+  let pending: Promise<void>
+
+  beforeEach(async () => {
+    controller = new AbortController()
+    mockMagic = { user: { isLoggedIn: jest.fn(), logout: jest.fn() }, oauth2: { loginWithRedirect: jest.fn() } }
+    jest.requireMock('magic-sdk').Magic.mockImplementation(() => mockMagic)
+    jest.mocked(getConfiguration).mockReturnValue({ magic: { apiKey: 'test-key' } } as ReturnType<typeof getConfiguration>)
+    mockMagic.user.isLoggedIn.mockReturnValueOnce(
+      new Promise(resolve => {
+        resolveSession = resolve
+      })
+    )
+    pending = connectToSocialProvider(ConnectionOptionType.GOOGLE, false, undefined, undefined, controller.signal)
+    await waitFor(() => expect(mockMagic.user.isLoggedIn).toHaveBeenCalled())
+  })
+
+  afterEach(() => {
+    jest.resetAllMocks()
+  })
+
+  describe('and the user cancels during the session check', () => {
+    beforeEach(() => {
+      controller.abort()
+    })
+
+    it('should not log out or redirect after the session check resolves', async () => {
+      resolveSession(true)
+      await expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+      expect(mockMagic.user.logout).not.toHaveBeenCalled()
+      expect(mockMagic.oauth2.loginWithRedirect).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('and the login remains active', () => {
+    it('should start the selected OAuth flow', async () => {
+      resolveSession(false)
+      await pending
+      expect(mockMagic.oauth2.loginWithRedirect).toHaveBeenCalledWith(expect.objectContaining({ provider: 'google' }))
     })
   })
 })
