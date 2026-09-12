@@ -81,6 +81,7 @@
       "payload_data": "Datos",
       "payload_chain": "Cadena",
       "relayed_note": "Tu wallet te pedirá que firmes esta acción. Decentraland la envía por ti y cubre el gas.",
+      "raw_message_warning": "Este mensaje no se puede mostrar de forma fiable como texto. Los bytes exactos que se firmarán se muestran abajo en hexadecimal. Aprueba solo si entiendes lo que estás firmando.",
       "scroll_hint": "Desplázate hasta el final del contenido antes de continuar.",
       "acknowledge": "He leído todo lo anterior y asumo toda la responsabilidad por lo que esta acción haga con mi wallet, incluida cualquier pérdida de activos.",
       "review_restarted_notice": "La red de tu wallet cambió o no pudo verificarse, así que esta solicitud se revisó de nuevo en la red actual."
