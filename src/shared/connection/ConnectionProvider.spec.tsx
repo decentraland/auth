@@ -214,6 +214,81 @@ describe('when connection work overlaps a newer session', () => {
       })
     })
 
+    describe('and a caller sharing the pending signature cancels', () => {
+      let controller: AbortController
+      let joining: Promise<AuthIdentity>
+
+      beforeEach(() => {
+        controller = new AbortController()
+        act(() => {
+          joining = hook.result.current.getIdentitySignature(connectionData, { signal: controller.signal })
+        })
+        controller.abort()
+      })
+
+      it('should reject that caller without invalidating the original login', async () => {
+        await act(async () => {
+          resolveIdentity(identity)
+          await expect(joining).rejects.toMatchObject({ name: 'AbortError' })
+          await expect(pending).resolves.toBe(identity)
+        })
+        expect(hook.result.current.identity).toBe(identity)
+        expect(getIdentitySignature).toHaveBeenCalledTimes(1)
+      })
+    })
+
+    describe('and a replacement login is cancelled by its caller', () => {
+      let controller: AbortController
+      let cancelled: Promise<AuthIdentity>
+      let resolveCancelled: (identity: AuthIdentity) => void
+
+      beforeEach(() => {
+        controller = new AbortController()
+        jest.mocked(getIdentitySignature).mockReturnValueOnce(
+          new Promise(resolve => {
+            resolveCancelled = resolve
+          })
+        )
+        act(() => {
+          cancelled = hook.result.current.getIdentitySignature(
+            { ...connectionData, account: '0x2222222222222222222222222222222222222222' },
+            { signal: controller.signal }
+          )
+        })
+        controller.abort()
+      })
+
+      it('should prevent the cancelled identity from being stored, returned or committed', async () => {
+        expect(jest.mocked(getIdentitySignature).mock.calls[1][3]).toThrow()
+        await act(async () => {
+          resolveCancelled(identity)
+          await expect(cancelled).rejects.toMatchObject({ name: 'AbortError' })
+          resolveIdentity(identity)
+          await expect(pending).rejects.toThrow('Connection changed while creating identity')
+        })
+        expect(hook.result.current.account).toBe(connectionData.account)
+      })
+
+      describe('and a newer login is already active', () => {
+        beforeEach(async () => {
+          jest.mocked(getIdentitySignature).mockResolvedValueOnce(identity)
+          await act(async () => {
+            await hook.result.current.getIdentitySignature(connectionData)
+          })
+        })
+
+        it('should preserve the newer login while the cancelled operation settles', async () => {
+          await act(async () => {
+            resolveCancelled(identity)
+            await expect(cancelled).rejects.toMatchObject({ name: 'AbortError' })
+            resolveIdentity(identity)
+            await expect(pending).rejects.toThrow('Connection changed while creating identity')
+          })
+          expect(jest.mocked(getIdentitySignature).mock.calls[2][3]).not.toThrow()
+        })
+      })
+    })
+
     describe('and the wallet repeats the current account', () => {
       beforeEach(() => {
         act(() => {

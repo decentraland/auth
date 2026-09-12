@@ -79,7 +79,9 @@ export const QuickSetupPage = () => {
   const { track: trackReferral } = useTrackReferral()
   const hasTrackedReferral = useRef(false)
   const initializedAccountRef = useRef<string | null>(null)
-  const [initialized, setInitialized] = useState(false)
+  const [initializedFor, setInitializedFor] = useState<string | null>(null)
+  // Profile readiness belongs to the checked account; a replacement is blocked on its first render.
+  const initialized = !!account && !!identity && !isConnecting && initializedFor === account
 
   const [inheritedEmail] = useState<string | null>(() => getStoredEmail())
   const [name, setName] = useState('')
@@ -129,9 +131,10 @@ export const QuickSetupPage = () => {
     }
 
     if (initializedAccountRef.current === account) return
-    initializedAccountRef.current = account
+    let cancelled = false
     ;(async () => {
       const { profile, couldNotDetermine } = await fetchProfileWithStatus(account)
+      if (cancelled) return
 
       // If we couldn't determine whether a profile exists (catalyst outage), bail out rather than
       // risk overwriting an existing profile with a default one — the whole point of this guard.
@@ -158,21 +161,27 @@ export const QuickSetupPage = () => {
       if (referrer && EthAddress.validate(referrer) && !hasTrackedReferral.current) {
         try {
           await trackReferral(referrer, 'POST')
+          if (cancelled) return
           hasTrackedReferral.current = true
         } catch {
           // Error is already handled in trackReferral
         }
       }
 
-      setInitialized(true)
+      if (cancelled) return
+      initializedAccountRef.current = account
+      setInitializedFor(account)
     })()
+    return () => {
+      cancelled = true
+    }
   }, [account, identity, isConnecting, navigate, redirect, redirectTo, referrer, trackReferral, inheritedEmail])
 
   // Enforce the alphanumeric charset rule the other flows use (SetupPage uses /^[a-zA-Z0-9]+$/), in
   // addition to the existing length limit. Empty names are handled by the non-empty check in canSubmit.
   const isNameValid = /^[a-zA-Z0-9]+$/.test(name)
   const nameError = name.length > MAX_NAME_LENGTH || (name.length > 0 && !isNameValid)
-  const canSubmit = name.trim().length > 0 && agree && !nameError && !deploying
+  const canSubmit = initialized && name.trim().length > 0 && agree && !nameError && !deploying
 
   const handleRandomize = useCallback(() => {
     setProfile(getRandomDefaultProfile(bodyType))

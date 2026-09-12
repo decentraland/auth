@@ -65,10 +65,20 @@ export const MobileAuthPage = () => {
   const [isTestAuthSession, setIsTestAuthSession] = useState(false)
 
   const hasStartedInit = useRef(false)
+  const isMountedRef = useRef(false)
+  const initializationReadyRef = useRef(false)
+  const [initializationReady, setInitializationReady] = useState(false)
+
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
 
   const initiateAuth = useCallback(
     async (selectedConnectionType: ConnectionOptionType, options: { fromClick?: boolean } = { fromClick: true }) => {
-      if (!flagInitialized) return
+      if (!flagInitialized || !initializationReadyRef.current || !isMountedRef.current) return
 
       setConnectionType(selectedConnectionType)
 
@@ -147,14 +157,19 @@ export const MobileAuthPage = () => {
       // Step 1: Clear cached sessions
       try {
         const magic = await createMagicInstance(isMagicTest)
-        if (await magic?.user.isLoggedIn()) {
+        if (!isMountedRef.current) return
+        const isLoggedIn = await magic?.user.isLoggedIn()
+        if (!isMountedRef.current) return
+        if (isLoggedIn) {
           await magic?.user.logout()
+          if (!isMountedRef.current) return
         }
 
         localStorage.removeItem('dcl_magic_user_email')
 
         // Clear any Thirdweb in-app wallet session so each visit starts fresh.
         await disconnectWallet()
+        if (!isMountedRef.current) return
         localStorage.removeItem('dcl_thirdweb_user_email')
 
         const keysToRemove: string[] = []
@@ -168,6 +183,10 @@ export const MobileAuthPage = () => {
       } catch (err) {
         console.warn('Failed to clear cached sessions:', err)
       }
+
+      if (!isMountedRef.current) return
+      initializationReadyRef.current = true
+      setInitializationReady(true)
 
       // Step 2: Auto-initiate auth if provider param is present.
       // fromClick: false → no LOGIN_CLICK is sent because the user didn't click anything on this app;
@@ -210,6 +229,7 @@ export const MobileAuthPage = () => {
 
   const handleEmailSubmit = useCallback(
     async (email: string) => {
+      if (!initializationReadyRef.current || !isMountedRef.current) return
       setCurrentEmail(email)
       setIsEmailLoading(true)
       setEmailError(null)
@@ -316,6 +336,15 @@ export const MobileAuthPage = () => {
     },
     [trackLoginSuccess]
   )
+
+  // Both manual and automatic login must wait for the same session cleanup.
+  if (!flagInitialized || !initializationReady) {
+    return (
+      <Main component="main">
+        <ConnectionLayout state={ConnectionLayoutState.LOADING_MAGIC} providerType={null} onTryAgain={handleTryAgain} />
+      </Main>
+    )
+  }
 
   // Provider selection view
   if (view === 'selection') {

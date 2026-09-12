@@ -16,8 +16,8 @@ type ConnectionState = {
 
 type ConnectionContextValue = ConnectionState & {
   /**
-   * Generates (or retrieves from localStorage) an identity for the currently
-   * connected wallet, then automatically refreshes the connection context.
+   * Generates a fresh identity for the connected wallet and refreshes the connection context.
+   * An optional signal cancels persistence and completion of an abandoned login attempt.
    *
    * When called without arguments, it internally calls `tryPreviousConnection()`
    * to obtain the provider and account.
@@ -25,7 +25,7 @@ type ConnectionContextValue = ConnectionState & {
    * When a `ConnectionResponse` is passed (e.g. from a preceding `connection.connect()`
    * call), it reuses that response directly, avoiding a redundant reconnection.
    */
-  getIdentitySignature: (existingConnection?: ConnectionResponse) => Promise<AuthIdentity>
+  getIdentitySignature: (existingConnection?: ConnectionResponse, options?: { signal?: AbortSignal }) => Promise<AuthIdentity>
 }
 
 const defaultState: ConnectionState = {
@@ -79,97 +79,109 @@ const ConnectionProvider = ({ children }: PropsWithChildren) => {
     })
   }, [])
 
-  const getIdentitySignature = useCallback(async (existingConnection?: ConnectionResponse): Promise<AuthIdentity> => {
-    // Key the in-flight dedup by account. When no existing connection is provided we
-    // fall back to a shared key, since that path always resolves to the single
-    // "previous" connection (preserving "create identity once per login").
-    const inflightKey = existingConnection?.account?.toLowerCase() ?? '__previous__'
+  const getIdentitySignature = useCallback(
+    async (existingConnection?: ConnectionResponse, options?: { signal?: AbortSignal }): Promise<AuthIdentity> => {
+      const signal = options?.signal
+      signal?.throwIfAborted()
+      // Key the in-flight dedup by account. When no existing connection is provided we
+      // fall back to a shared key, since that path always resolves to the single
+      // "previous" connection (preserving "create identity once per login").
+      const inflightKey = existingConnection?.account?.toLowerCase() ?? '__previous__'
 
-    // If an identity generation for this account is already in progress, return the
-    // same promise to avoid prompting the user for a duplicate wallet signature.
-    const inflight = inflightIdentityRef.current
-    if (
-      inflight?.key === inflightKey &&
-      inflight.provider === existingConnection?.provider &&
-      inflight.generation === connectionGenerationRef.current
-    ) {
-      const identity = await inflight.promise
-      if (inflight.generation !== connectionGenerationRef.current) throw new Error('Connection changed while creating identity')
-      return identity
-    }
-
-    const generation = ++connectionGenerationRef.current
-    signingConnectionRef.current = existingConnection
-    // Login now owns connection restoration, including failure. Do not leave consumers waiting
-    // for an initial restore whose result this operation has superseded.
-    setState(previous => ({ ...previous, isLoading: false }))
-    const assertCurrentConnection = () => {
-      if (generation !== connectionGenerationRef.current) throw new Error('Connection changed while creating identity')
-    }
-    const promise = (async () => {
-      const connectionResponse = existingConnection ?? (await connection.tryPreviousConnection())
-      assertCurrentConnection()
-
-      if (!connectionResponse.account || !connectionResponse.provider || !connectionResponse.providerType) {
-        throw new Error('No active connection found')
+      // If an identity generation for this account is already in progress, return the
+      // same promise to avoid prompting the user for a duplicate wallet signature.
+      const inflight = inflightIdentityRef.current
+      if (
+        inflight?.key === inflightKey &&
+        inflight.provider === existingConnection?.provider &&
+        inflight.generation === connectionGenerationRef.current
+      ) {
+        const identity = await inflight.promise
+        signal?.throwIfAborted()
+        if (inflight.generation !== connectionGenerationRef.current) throw new Error('Connection changed while creating identity')
+        return identity
       }
 
-      // A newly connected provider is not in context yet. Observe it during the wallet prompt,
-      // so an account change or disconnect cannot install the identity of the abandoned login.
-      signingConnectionRef.current = connectionResponse
-      const provider = connectionResponse.provider
-      let chainId = connectionResponse.chainId
-      const invalidate = () => {
+      const generation = ++connectionGenerationRef.current
+      signingConnectionRef.current = existingConnection
+      // Login now owns connection restoration, including failure. Do not leave consumers waiting
+      // for an initial restore whose result this operation has superseded.
+      setState(previous => ({ ...previous, isLoading: false }))
+      const assertCurrentConnection = () => {
+        signal?.throwIfAborted()
+        if (generation !== connectionGenerationRef.current) throw new Error('Connection changed while creating identity')
+      }
+      const invalidateCancelledOperation = () => {
         if (generation === connectionGenerationRef.current) ++connectionGenerationRef.current
       }
-      const handleAccountsChanged = (accounts: string[]) => {
-        if (accounts[0]?.toLowerCase() !== connectionResponse.account?.toLowerCase()) invalidate()
-      }
-      const handleChainChanged = (value: string) => {
-        chainId = parseInt(value, 16)
-      }
-      if (typeof provider.on === 'function') {
-        provider.on('accountsChanged', handleAccountsChanged)
-        provider.on('disconnect', invalidate)
-        provider.on('chainChanged', handleChainChanged)
-      }
+      signal?.addEventListener('abort', invalidateCancelledOperation, { once: true })
+      const promise = (async () => {
+        const connectionResponse = existingConnection ?? (await connection.tryPreviousConnection())
+        assertCurrentConnection()
+
+        if (!connectionResponse.account || !connectionResponse.provider || !connectionResponse.providerType) {
+          throw new Error('No active connection found')
+        }
+
+        // A newly connected provider is not in context yet. Observe it during the wallet prompt,
+        // so an account change or disconnect cannot install the identity of the abandoned login.
+        signingConnectionRef.current = connectionResponse
+        const provider = connectionResponse.provider
+        let chainId = connectionResponse.chainId
+        const invalidate = () => {
+          if (generation === connectionGenerationRef.current) ++connectionGenerationRef.current
+        }
+        const handleAccountsChanged = (accounts: string[]) => {
+          if (accounts[0]?.toLowerCase() !== connectionResponse.account?.toLowerCase()) invalidate()
+        }
+        const handleChainChanged = (value: string) => {
+          chainId = parseInt(value, 16)
+        }
+        if (typeof provider.on === 'function') {
+          provider.on('accountsChanged', handleAccountsChanged)
+          provider.on('disconnect', invalidate)
+          provider.on('chainChanged', handleChainChanged)
+        }
+
+        try {
+          const identity = await getIdentitySignatureUtil(connectionResponse.account, provider, undefined, assertCurrentConnection)
+          assertCurrentConnection()
+          currentAccountRef.current = connectionResponse.account
+          currentProviderRef.current = provider
+          setState({
+            isLoading: false,
+            account: connectionResponse.account,
+            identity,
+            provider,
+            providerType: connectionResponse.providerType,
+            chainId
+          })
+          return identity
+        } finally {
+          if (typeof provider.removeListener === 'function') {
+            provider.removeListener('accountsChanged', handleAccountsChanged)
+            provider.removeListener('disconnect', invalidate)
+            provider.removeListener('chainChanged', handleChainChanged)
+          }
+        }
+      })()
+
+      inflightIdentityRef.current = { key: inflightKey, provider: existingConnection?.provider, generation, promise }
 
       try {
-        const identity = await getIdentitySignatureUtil(connectionResponse.account, provider, undefined, assertCurrentConnection)
+        const identity = await promise
         assertCurrentConnection()
-        currentAccountRef.current = connectionResponse.account
-        currentProviderRef.current = provider
-        setState({
-          isLoading: false,
-          account: connectionResponse.account,
-          identity,
-          provider,
-          providerType: connectionResponse.providerType,
-          chainId
-        })
         return identity
       } finally {
-        if (typeof provider.removeListener === 'function') {
-          provider.removeListener('accountsChanged', handleAccountsChanged)
-          provider.removeListener('disconnect', invalidate)
-          provider.removeListener('chainChanged', handleChainChanged)
+        signal?.removeEventListener('abort', invalidateCancelledOperation)
+        if (inflightIdentityRef.current?.promise === promise) {
+          inflightIdentityRef.current = undefined
+          signingConnectionRef.current = undefined
         }
       }
-    })()
-
-    inflightIdentityRef.current = { key: inflightKey, provider: existingConnection?.provider, generation, promise }
-
-    try {
-      const identity = await promise
-      assertCurrentConnection()
-      return identity
-    } finally {
-      if (inflightIdentityRef.current?.promise === promise) {
-        inflightIdentityRef.current = undefined
-        signingConnectionRef.current = undefined
-      }
-    }
-  }, [])
+    },
+    []
+  )
 
   useEffect(() => {
     fetchConnectionData()
