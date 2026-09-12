@@ -67,9 +67,8 @@ jest.mock('../../../hooks/useAnalytics', () => ({
     trackClick: jest.fn()
   })
 }))
-jest.mock('../../../modules/analytics/segment', () => ({
-  getAnalytics: () => null
-}))
+let mockExpiryTrack: jest.Mock
+jest.mock('../../../modules/analytics/segment', () => ({ getAnalytics: () => ({ track: mockExpiryTrack }) }))
 
 // --- Auth Server Client & contract recognition ---
 const mockRecover = jest.fn()
@@ -428,6 +427,7 @@ const waitForRecoverCalls = (count: number) =>
 
 describe('RequestPage', () => {
   beforeEach(() => {
+    mockExpiryTrack = jest.fn()
     mockSkipSetup = false
     mockFlags = {}
     mockFlagsInitialized = true
@@ -460,6 +460,94 @@ describe('RequestPage', () => {
 
   afterEach(() => {
     jest.clearAllMocks()
+  })
+
+  describe.each([undefined, '', 'not-a-date'])('when a recovered request has invalid expiration %p', expiration => {
+    beforeEach(() => {
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'User' }] })
+      mockGetAddresses.mockResolvedValue([SIGNER])
+      mockRecover.mockResolvedValue({ ...recovered('personal_sign', ['hello', SIGNER]), expiration })
+      mockSendFailedOutcome.mockResolvedValue({})
+    })
+
+    it('should refuse the request before showing a review or asking the wallet', async () => {
+      renderRequestPage()
+      await waitFor(() =>
+        expect(mockSendFailedOutcome).toHaveBeenCalledWith(REQUEST_ID, SIGNER, {
+          code: -32602,
+          message: 'The request expiration must be a valid timestamp'
+        })
+      )
+      expect(mockClassifyRequest).not.toHaveBeenCalled()
+      expect(mockWalletRequest).not.toHaveBeenCalled()
+      expect(screen.queryByTestId('action-request')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('when a direct transaction deadline passes before the browser timer runs', () => {
+    let user: ReturnType<typeof userEvent.setup>
+    let deadline: number
+    let resolveAccount: (addresses: string[]) => void
+
+    beforeEach(() => {
+      jest.useFakeTimers()
+      user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime })
+      deadline = Date.now() + 60_000
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'User' }] })
+      mockGetAddresses.mockResolvedValueOnce([SIGNER]).mockImplementationOnce(
+        () =>
+          new Promise(resolve => {
+            resolveAccount = resolve
+          })
+      )
+      mockRecover.mockResolvedValue({
+        ...recovered('eth_sendTransaction', [{ to: CONTRACT, data: '0xabcd' }]),
+        expiration: new Date(deadline).toISOString()
+      })
+      mockClassifyRequest.mockResolvedValue(unknownTransaction())
+    })
+
+    afterEach(() => jest.useRealTimers())
+
+    it('should report expiry once and prevent wallet dispatch after the delayed account read', async () => {
+      renderRequestPage()
+      await user.click(await screen.findByTestId('action-acknowledge'))
+      await waitFor(() => expect(screen.getByTestId('action-request')).toHaveAttribute('data-approve-blocked', 'false'))
+      await user.click(screen.getByTestId('action-approve'))
+      await waitFor(() => expect(mockGetAddresses).toHaveBeenCalledTimes(2))
+      jest.setSystemTime(deadline + 1)
+      await act(async () => resolveAccount([SIGNER]))
+      expect(screen.getByTestId('timeout-error')).toBeInTheDocument()
+      expect(mockWalletRequest).not.toHaveBeenCalled()
+      act(() => jest.advanceTimersByTime(60_000))
+      expect(mockExpiryTrack.mock.calls.filter(([event]) => event === TrackingEvents.REQUEST_EXPIRED)).toEqual([
+        [TrackingEvents.REQUEST_EXPIRED, expect.objectContaining({ requestTime: deadline })]
+      ])
+    })
+  })
+
+  describe('when a valid deadline exceeds the browser timer range', () => {
+    let deadline: number
+
+    beforeEach(() => {
+      jest.useFakeTimers()
+      deadline = Date.now() + 3_000_000_000
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'User' }] })
+      mockGetAddresses.mockResolvedValue([SIGNER])
+      mockRecover.mockResolvedValue({ ...recovered('personal_sign', ['hello', SIGNER]), expiration: new Date(deadline).toISOString() })
+    })
+
+    afterEach(() => jest.useRealTimers())
+
+    it('should keep the review available until the actual deadline', async () => {
+      renderRequestPage()
+      expect(await screen.findByTestId('action-request')).toBeInTheDocument()
+      act(() => jest.advanceTimersByTime(2_147_483_647))
+      expect(screen.getByTestId('action-request')).toBeInTheDocument()
+      act(() => jest.advanceTimersByTime(deadline - Date.now()))
+      expect(screen.getByTestId('timeout-error')).toBeInTheDocument()
+      expect(mockExpiryTrack.mock.calls.filter(([event]) => event === TrackingEvents.REQUEST_EXPIRED)).toHaveLength(1)
+    })
   })
 
   describe('when the connection is still loading', () => {
@@ -3684,6 +3772,7 @@ describe('RequestPage', () => {
       expect(walletRequest.mock.calls.some(([args]) => args.method === 'eth_signTypedData_v4')).toBe(false)
       act(() => jest.advanceTimersByTime(61000))
       expect(screen.getByTestId('timeout-error')).toBeInTheDocument()
+      expect(mockExpiryTrack.mock.calls.filter(([event]) => event === TrackingEvents.REQUEST_EXPIRED)).toHaveLength(1)
       await act(async () => resolveNonce('0x0'))
       expect(walletRequest.mock.calls.some(([args]) => args.method === 'eth_signTypedData_v4')).toBe(false)
       expect(fetchSpy).not.toHaveBeenCalled()
@@ -3722,6 +3811,8 @@ describe('RequestPage', () => {
       expect(fetchSpy).not.toHaveBeenCalled()
       expect(mockSendFailedOutcome).not.toHaveBeenCalled()
       expect(screen.getByTestId('timeout-error')).toBeInTheDocument()
+      act(() => jest.advanceTimersByTime(61000))
+      expect(mockExpiryTrack.mock.calls.filter(([event]) => event === TrackingEvents.REQUEST_EXPIRED)).toHaveLength(1)
     })
 
     it('should discard preparation when the connection replaces the reviewed provider', async () => {

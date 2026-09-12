@@ -68,6 +68,24 @@ describe('useEnsureProfile', () => {
       })
     })
 
+    describe('and cancellation aborts a pending consistency operation', () => {
+      let controller: AbortController
+      let hook: ReturnType<typeof renderHook<ReturnType<typeof useEnsureProfile>, undefined>>
+      beforeEach(() => {
+        controller = new AbortController()
+        hook = renderHook(() => useEnsureProfile())
+        mockCheckProfileConsistency.mockImplementationOnce(async () => {
+          controller.abort()
+          throw controller.signal.reason
+        })
+      })
+      it('should finish quietly without navigation and pass the signal into repair work', async () => {
+        await expect(hook.result.current.ensureProfile(account, identity, { ...options, signal: controller.signal })).resolves.toBeNull()
+        expect(mockCheckProfileConsistency).toHaveBeenCalledWith(account, identity, expect.any(Object), controller.signal)
+        expect(mockNavigateToSetup).not.toHaveBeenCalled()
+      })
+    })
+
     describe('and the request is already cancelled', () => {
       let controller: AbortController
       let hook: ReturnType<typeof renderHook<ReturnType<typeof useEnsureProfile>, undefined>>
@@ -191,7 +209,7 @@ describe('useEnsureProfile', () => {
       it('should pass the fetcher to checkProfileConsistency', async () => {
         const { result } = renderHook(() => useEnsureProfile())
         await result.current.ensureProfile(account, identity, options)
-        expect(mockCheckProfileConsistency).toHaveBeenCalledWith(account, identity, expect.any(Object))
+        expect(mockCheckProfileConsistency).toHaveBeenCalledWith(account, identity, expect.any(Object), undefined)
       })
     })
   })

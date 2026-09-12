@@ -59,6 +59,73 @@ const ConnectionProvider = ({ children }: PropsWithChildren) => {
     promise: Promise<AuthIdentity>
   }>()
 
+  const providerListenersCleanupRef = useRef<() => void>()
+
+  // Install durable listeners before publishing a provider, rather than waiting for a React
+  // effect. Signing listeners can then be removed without missing events during that handoff.
+  const observeProvider = useCallback((provider: ConnectionResponse['provider'] | undefined) => {
+    providerListenersCleanupRef.current?.()
+    providerListenersCleanupRef.current = undefined
+    if (!provider) return
+
+    const handleAccountsChanged = (accounts: string[]) => {
+      if (currentProviderRef.current !== provider) return
+      const account = accounts[0]
+      const signingConnection = signingConnectionRef.current
+      // Keep the visible connection accurate if its replacement fails, without invalidating
+      // the replacement provider's independent identity operation.
+      const isSigningWithAnotherProvider = signingConnection && signingConnection.provider !== provider
+      const expectedAccount = signingConnection?.provider === provider ? signingConnection.account : currentAccountRef.current
+      if (!isSigningWithAnotherProvider && (!account || account.toLowerCase() !== expectedAccount?.toLowerCase())) {
+        ++connectionGenerationRef.current
+      }
+      currentAccountRef.current = account
+      if (!account) {
+        currentProviderRef.current = undefined
+        providerListenersCleanupRef.current?.()
+        providerListenersCleanupRef.current = undefined
+        // Wallet disconnected — clear all connection state so downstream consumers
+        // (e.g. RequestPage checking !provider || !providerType) detect the disconnect.
+        setState(prev =>
+          prev.provider !== provider
+            ? prev
+            : {
+                ...prev,
+                account: undefined,
+                identity: undefined,
+                provider: undefined,
+                providerType: undefined,
+                chainId: undefined
+              }
+        )
+        return
+      }
+
+      const identity = getCachedIdentity(account)
+      setState(prev => (prev.provider !== provider ? prev : { ...prev, account, identity }))
+    }
+
+    const handleChainChanged = (chainId: string) => {
+      if (currentProviderRef.current !== provider) return
+      setState(prev => (prev.provider !== provider ? prev : { ...prev, chainId: parseInt(chainId, 16) }))
+    }
+
+    if (typeof provider.on !== 'function') return
+
+    const handleDisconnect = () => handleAccountsChanged([])
+    provider.on('accountsChanged', handleAccountsChanged)
+    provider.on('chainChanged', handleChainChanged)
+    provider.on('disconnect', handleDisconnect)
+
+    providerListenersCleanupRef.current = () => {
+      if (typeof provider.removeListener === 'function') {
+        provider.removeListener('accountsChanged', handleAccountsChanged)
+        provider.removeListener('chainChanged', handleChainChanged)
+        provider.removeListener('disconnect', handleDisconnect)
+      }
+    }
+  }, [])
+
   /**
    * Fetches the current connection data (account, identity, provider, etc.)
    * and updates the context state on mount, unless a login has superseded the restore.
@@ -69,6 +136,7 @@ const ConnectionProvider = ({ children }: PropsWithChildren) => {
     if (generation !== connectionGenerationRef.current) return
     currentAccountRef.current = connectionData?.account
     currentProviderRef.current = connectionData?.provider
+    observeProvider(connectionData?.provider)
     setState({
       isLoading: false,
       account: connectionData?.account,
@@ -77,7 +145,7 @@ const ConnectionProvider = ({ children }: PropsWithChildren) => {
       providerType: connectionData?.providerType,
       chainId: connectionData?.chainId
     })
-  }, [])
+  }, [observeProvider])
 
   const getIdentitySignature = useCallback(
     async (existingConnection?: ConnectionResponse, options?: { signal?: AbortSignal }): Promise<AuthIdentity> => {
@@ -148,6 +216,7 @@ const ConnectionProvider = ({ children }: PropsWithChildren) => {
           assertCurrentConnection()
           currentAccountRef.current = connectionResponse.account
           currentProviderRef.current = provider
+          observeProvider(provider)
           setState({
             isLoading: false,
             account: connectionResponse.account,
@@ -180,7 +249,7 @@ const ConnectionProvider = ({ children }: PropsWithChildren) => {
         }
       }
     },
-    []
+    [observeProvider]
   )
 
   useEffect(() => {
@@ -188,69 +257,11 @@ const ConnectionProvider = ({ children }: PropsWithChildren) => {
     return () => {
       ++connectionGenerationRef.current
       inflightIdentityRef.current = undefined
+      currentProviderRef.current = undefined
+      currentAccountRef.current = undefined
+      observeProvider(undefined)
     }
-  }, [fetchConnectionData])
-
-  // Listen for wallet changes (account or chain switches) on the provider
-  useEffect(() => {
-    const provider = state.provider
-    if (!provider) return
-
-    const handleAccountsChanged = (accounts: string[]) => {
-      if (currentProviderRef.current !== provider) return
-      const account = accounts[0]
-      const signingConnection = signingConnectionRef.current
-      // Keep the visible connection accurate if its replacement fails, without invalidating
-      // the replacement provider's independent identity operation.
-      const isSigningWithAnotherProvider = signingConnection && signingConnection.provider !== provider
-      const expectedAccount = signingConnection?.provider === provider ? signingConnection.account : currentAccountRef.current
-      if (!isSigningWithAnotherProvider && (!account || account.toLowerCase() !== expectedAccount?.toLowerCase())) {
-        ++connectionGenerationRef.current
-      }
-      currentAccountRef.current = account
-      if (!account) {
-        currentProviderRef.current = undefined
-        // Wallet disconnected — clear all connection state so downstream consumers
-        // (e.g. RequestPage checking !provider || !providerType) detect the disconnect.
-        setState(prev =>
-          prev.provider !== provider
-            ? prev
-            : {
-                ...prev,
-                account: undefined,
-                identity: undefined,
-                provider: undefined,
-                providerType: undefined,
-                chainId: undefined
-              }
-        )
-        return
-      }
-
-      const identity = getCachedIdentity(account)
-      setState(prev => (prev.provider !== provider ? prev : { ...prev, account, identity }))
-    }
-
-    const handleChainChanged = (chainId: string) => {
-      if (currentProviderRef.current !== provider) return
-      setState(prev => (prev.provider !== provider ? prev : { ...prev, chainId: parseInt(chainId, 16) }))
-    }
-
-    if (typeof provider.on !== 'function') return
-
-    const handleDisconnect = () => handleAccountsChanged([])
-    provider.on('accountsChanged', handleAccountsChanged)
-    provider.on('chainChanged', handleChainChanged)
-    provider.on('disconnect', handleDisconnect)
-
-    return () => {
-      if (typeof provider.removeListener === 'function') {
-        provider.removeListener('accountsChanged', handleAccountsChanged)
-        provider.removeListener('chainChanged', handleChainChanged)
-        provider.removeListener('disconnect', handleDisconnect)
-      }
-    }
-  }, [state.provider])
+  }, [fetchConnectionData, observeProvider])
 
   const value = useMemo<ConnectionContextValue>(() => ({ ...state, getIdentitySignature }), [state, getIdentitySignature])
 
