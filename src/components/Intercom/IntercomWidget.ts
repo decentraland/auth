@@ -6,6 +6,18 @@ const intercomWindow = window as unknown as IntercomWindow
 // or offline script surfaces an error to the caller instead of hanging forever.
 const INJECT_TIMEOUT_MS = 10000
 
+/**
+ * Builds a rejection that `handleError` will not report (see `shouldSkipReporting` in
+ * shared/utils/errorHandler).
+ *
+ * The widget script is routinely blocked by ad and tracking blockers, privacy-focused browsers
+ * and ISP-level filtering: the observed failures span every browser and every release, and a
+ * third of them come from a single country. Nothing is broken on our side, and the site is fully
+ * usable without support chat — so the caller still gets a rejection to act on, but it does not
+ * belong in Sentry.
+ */
+const unreportable = (message: string): Error => Object.assign(new Error(message), { skipReporting: true })
+
 class IntercomWidget {
   private _appId: string | undefined
   private _settings: IntercomSettings | undefined
@@ -68,7 +80,7 @@ class IntercomWidget {
 
       // Ensure the promise always settles so a blocked/offline script rejects
       // (surfacing to the caller's catch) instead of hanging forever.
-      const timeoutId = setTimeout(() => reject(new Error('Timed out loading the Intercom widget script')), INJECT_TIMEOUT_MS)
+      const timeoutId = setTimeout(() => reject(unreportable('Timed out loading the Intercom widget script')), INJECT_TIMEOUT_MS)
 
       script.addEventListener(
         'load',
@@ -82,7 +94,7 @@ class IntercomWidget {
         'error',
         () => {
           clearTimeout(timeoutId)
-          reject(new Error('Failed to load the Intercom widget script'))
+          reject(unreportable('Failed to load the Intercom widget script'))
         },
         true
       )
