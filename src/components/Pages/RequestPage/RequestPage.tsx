@@ -394,12 +394,13 @@ export const RequestPage = () => {
     }
 
     let cancelled = false
+    const controller = new AbortController()
 
     const checkProfile = async () => {
       const redirectTo = buildRequestPageUrl(requestId, targetConfigId, { isDeepLinkFlow, isBridgeOnly, authRequestId })
       const referrer = extractReferrerFromSearchParameters(searchParams)
       try {
-        const profile = await ensureProfile(account, identityRef.current, { redirectTo, referrer })
+        const profile = await ensureProfile(account, identityRef.current, { redirectTo, referrer, signal: controller.signal })
 
         if (!cancelled && profile) {
           setProfileReadyFor({ requestId, account })
@@ -418,6 +419,7 @@ export const RequestPage = () => {
 
     return () => {
       cancelled = true
+      controller.abort()
     }
   }, [
     ensureProfile,
@@ -1130,8 +1132,19 @@ export const RequestPage = () => {
     // its own asynchronous preparation, so its pre-sign callback checks validity without this shared
     // actionable gate (which the reservation closes). Once the wallet is asked, its outcome must still
     // be delivered whatever has happened to the review (see hasWalletResult).
-    const canStillDispatch = () =>
-      !isStaleAction() && reviewRunRef.current === run && !hasCompletedRef.current && isReviewActionableRef.current
+    const expiration = new Date(requestRef.current?.expiration ?? '').getTime()
+    const canStillDispatch = () => {
+      if (isStaleAction() || reviewRunRef.current !== run || hasCompletedRef.current || !isReviewActionableRef.current) return false
+      // Background tabs and clock corrections can leave the expiry timer overdue. Every dispatch
+      // checks the deadline itself, after confirming that this action still owns the review on screen.
+      if (Date.now() >= expiration) {
+        hasCompletedRef.current = true
+        clearTimeout(timeoutRef.current)
+        setView(View.TIMEOUT)
+        return false
+      }
+      return true
+    }
     // The account that reviewed this request, fixed now. The ref moves on to the next review's account
     // while this action is in flight; every comparison and every outcome below uses this value, never the
     // ref, so a late rejection can neither pass the check against another account nor be delivered under it.
@@ -1214,7 +1227,6 @@ export const RequestPage = () => {
         // Bound to the signer verified above, it can only act for the account that reviewed the request;
         // a wallet that switched accounts in between fails with ReviewedSignerMismatchError (see catch).
         markDispatched()
-        const expiration = new Date(requestRef.current.expiration).getTime()
         result = await sendMetaTransaction(
           bindProviderToSigner(connectedProvider, signerAddress, () => {
             // This request already holds the dispatch reservation, so the shared actionable gate is
@@ -1564,15 +1576,31 @@ export const RequestPage = () => {
     case View.WALLET_INTERACTION_COMPLETE:
       return <WalletInteractionComplete />
     case View.WALLET_NFT_INTERACTION_COMPLETE:
-      return nftTransferData ? <TransferCompletedView type={TransferType.GIFT} transferData={nftTransferData} /> : null
+      return nftTransferData ? (
+        <TransferCompletedView type={TransferType.GIFT} transferData={nftTransferData} />
+      ) : (
+        <WalletInteractionComplete />
+      )
     case View.WALLET_MANA_INTERACTION_COMPLETE:
-      return manaTransferData ? <TransferCompletedView type={TransferType.TIP} transferData={manaTransferData} /> : null
+      return manaTransferData ? (
+        <TransferCompletedView type={TransferType.TIP} transferData={manaTransferData} />
+      ) : (
+        <WalletInteractionComplete />
+      )
     case View.WALLET_INTERACTION_DENIED:
       return <DeniedWalletInteraction />
     case View.WALLET_NFT_INTERACTION_DENIED:
-      return nftTransferData ? <TransferCanceledView type={TransferType.GIFT} transferData={nftTransferData} /> : null
+      return nftTransferData ? (
+        <TransferCanceledView type={TransferType.GIFT} transferData={nftTransferData} />
+      ) : (
+        <DeniedWalletInteraction />
+      )
     case View.WALLET_MANA_INTERACTION_DENIED:
-      return manaTransferData ? <TransferCanceledView type={TransferType.TIP} transferData={manaTransferData} /> : null
+      return manaTransferData ? (
+        <TransferCanceledView type={TransferType.TIP} transferData={manaTransferData} />
+      ) : (
+        <DeniedWalletInteraction />
+      )
     case View.LOADING_REQUEST:
       return <LoadingRequest />
 

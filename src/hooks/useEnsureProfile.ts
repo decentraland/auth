@@ -27,13 +27,17 @@ export const useEnsureProfile = () => {
         redirectTo: string
         referrer: string | null
         navigateOptions?: { replace?: boolean }
+        /** Prevents a discarded request's profile lookup from navigating its replacement. */
+        signal?: AbortSignal
       }
     ): Promise<Profile | null> => {
+      if (options.signal?.aborted) return null
       const fetcherWithTimeout = createFetcher({
         timeout: Number(config.get('PROFILE_CONSISTENCY_CHECK_TIMEOUT')) || 10000
       })
 
       const { profile, couldNotDetermine } = await checkProfileConsistency(account, identity, fetcherWithTimeout)
+      if (options.signal?.aborted) return null
 
       // The catalysts couldn't be reached, so we don't know whether a profile exists. Throw
       // instead of navigating to setup: routing an existing user into onboarding here would let

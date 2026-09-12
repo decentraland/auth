@@ -5,7 +5,7 @@ import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-rou
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import * as viem from 'viem'
-import { ProviderType } from '@dcl/schemas'
+import { ProviderType, Rarity } from '@dcl/schemas'
 import { sendMetaTransaction } from 'decentraland-transactions'
 import { TrackingEvents } from '../../../modules/analytics/types'
 import { fetchProfile } from '../../../modules/profile'
@@ -3734,6 +3734,147 @@ describe('RequestPage', () => {
       expect(fetchSpy).not.toHaveBeenCalled()
       expect(mockSendSuccessfulOutcome).not.toHaveBeenCalled()
       expect(mockSendFailedOutcome).not.toHaveBeenCalled()
+    })
+  })
+  describe.each(['tip', 'gift_candidate'] as const)('when a %s finishes after its provider was replaced', branded => {
+    let page: ReturnType<typeof renderRequestPage>
+    let resolveRelay: (hash: string) => void
+    let rejectRelay: (error: Error) => void
+
+    beforeEach(async () => {
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'User' }] })
+      mockGetAddresses.mockResolvedValue([SIGNER])
+      mockRecover.mockResolvedValue(recovered('eth_sendTransaction', [{ to: CONTRACT, data: '0xabcd', value: '0x0' }]))
+      mockClassifyRequest.mockResolvedValue(dclTransaction({ branded }))
+      jest.mocked(decodeManaTransferData).mockReturnValueOnce({ manaAmount: '1', toAddress: SIGNER })
+      jest.mocked(decodeNftTransferData).mockReturnValueOnce({ fromAddress: SIGNER, tokenId: '1', toAddress: SIGNER })
+      jest.mocked(fetchNftMetadata).mockResolvedValueOnce({ imageUrl: '', name: 'Gift', description: '', rarity: Rarity.COMMON })
+      jest.mocked(fetchProfile).mockResolvedValueOnce(null)
+      jest.requireMock('./utils').fetchPlaceByCreatorAddress.mockResolvedValueOnce(null)
+      jest.mocked(sendMetaTransaction).mockImplementationOnce(
+        () =>
+          new Promise((resolve, reject) => {
+            resolveRelay = resolve
+            rejectRelay = reject
+          })
+      )
+      mockSendSuccessfulOutcome.mockResolvedValue({})
+      mockSendFailedOutcome.mockResolvedValue({})
+      page = renderRequestPage()
+      await userEvent.click(await screen.findByTestId('transfer-confirm-approve'))
+      await waitFor(() => expect(sendMetaTransaction).toHaveBeenCalledTimes(1))
+      mockRecover.mockImplementation(() => new Promise(() => undefined))
+      mockConnectionData = { ...mockConnectionData, provider: { refreshed: true } }
+      rerenderRequestPage(page.rerender)
+      await waitFor(() => expect(mockRecover.mock.calls.length).toBeGreaterThanOrEqual(2))
+      await screen.findByTestId('loading-request')
+    })
+
+    afterEach(() => {
+      jest.mocked(decodeManaTransferData).mockReset()
+      jest.mocked(decodeNftTransferData).mockReset()
+      jest.mocked(fetchNftMetadata).mockReset()
+      jest.mocked(fetchProfile).mockReset()
+      jest.requireMock('./utils').fetchPlaceByCreatorAddress.mockReset()
+    })
+
+    it('should show generic completion when the replacement cleared the branded details', async () => {
+      await act(async () => resolveRelay('0xrelayedhash'))
+      expect(screen.getByTestId('wallet-interaction-complete')).toBeInTheDocument()
+      expect(mockSendSuccessfulOutcome).toHaveBeenCalledWith(REQUEST_ID, SIGNER, '0xrelayedhash')
+    })
+
+    describe('and the wallet rejects the action', () => {
+      beforeEach(() => {
+        mockIsUserRejectedTransaction.mockReturnValue(true)
+      })
+
+      it('should show generic denial when the replacement cleared the branded details', async () => {
+        await act(async () => rejectRelay(new Error('User rejected')))
+        expect(screen.getByTestId('denied-wallet-interaction')).toBeInTheDocument()
+        expect(mockSendFailedOutcome).toHaveBeenCalledWith(REQUEST_ID, SIGNER, { code: -32003, message: 'Transaction rejected' })
+      })
+    })
+  })
+
+  describe.each(['personal_sign', 'eth_signTypedData_v4', 'eth_sendTransaction'])(
+    'when a %s approval crosses its deadline before the timer runs',
+    method => {
+      let user: ReturnType<typeof userEvent.setup>
+      let releaseRead: () => void
+
+      beforeEach(() => {
+        jest.useFakeTimers()
+        user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime })
+        mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'User' }] })
+        mockGetAddresses.mockResolvedValue([SIGNER])
+        mockRecover.mockResolvedValue({
+          ...recovered(
+            method,
+            method === 'personal_sign'
+              ? ['hello', SIGNER]
+              : method === 'eth_sendTransaction'
+                ? [{ to: CONTRACT, data: '0xabcd', value: '0x0' }]
+                : [SIGNER, '{"primaryType":"Mail"}']
+          ),
+          expiration: new Date(Date.now() + 60_000).toISOString()
+        })
+        if (method === 'eth_sendTransaction') {
+          mockGetChainId.mockResolvedValueOnce(1).mockImplementationOnce(
+            () =>
+              new Promise(resolve => {
+                releaseRead = () => resolve(1)
+              })
+          )
+        } else {
+          mockGetAddresses.mockResolvedValueOnce([SIGNER]).mockImplementationOnce(
+            () =>
+              new Promise(resolve => {
+                releaseRead = () => resolve([SIGNER])
+              })
+          )
+        }
+      })
+
+      afterEach(() => {
+        jest.useRealTimers()
+      })
+
+      it('should expire the review without dispatching or reporting an outcome', async () => {
+        renderRequestPage()
+        await user.click(await screen.findByTestId('action-acknowledge'))
+        await user.click(screen.getByTestId('action-approve'))
+        await waitFor(() => expect(method === 'eth_sendTransaction' ? mockGetChainId : mockGetAddresses).toHaveBeenCalledTimes(2))
+        jest.setSystemTime(Date.now() + 61_000)
+        await act(async () => releaseRead())
+        expect(screen.getByTestId('timeout-error')).toBeInTheDocument()
+        expect(mockWalletRequest).not.toHaveBeenCalled()
+        expect(mockSendSuccessfulOutcome).not.toHaveBeenCalled()
+        expect(mockSendFailedOutcome).not.toHaveBeenCalled()
+      })
+    }
+  )
+
+  describe('when the profile check outlives its review', () => {
+    let page: ReturnType<typeof renderRequestPage>
+    let signal: AbortSignal
+
+    beforeEach(async () => {
+      mockEnsureProfile.mockImplementation(() => new Promise(() => undefined))
+      page = renderRequestPage()
+      await waitFor(() => expect(mockEnsureProfile).toHaveBeenCalled())
+      signal = mockEnsureProfile.mock.calls[0][2].signal
+    })
+
+    it('should cancel the pending check when the page unmounts', () => {
+      page.unmount()
+      expect(signal.aborted).toBe(true)
+    })
+
+    it('should cancel the previous check when the reviewing account changes', () => {
+      mockConnectionData = { ...mockConnectionData, account: '0xnewwallet' }
+      rerenderRequestPage(page.rerender)
+      expect(signal.aborted).toBe(true)
     })
   })
 })
