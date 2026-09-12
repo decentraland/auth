@@ -169,6 +169,9 @@
       "confirm_gift": "确认礼物给",
       "creator_of": "创作者",
       "view_recipient_on_explorer": "在 {explorer} 上查看接收方",
+      "asset_network": "网络",
+      "asset_contract": "合约",
+      "asset_token_id": "代币 ID",
       "processing_authorization": "正在处理授权",
       "gifting_warning": "赠送物品无法撤销。"
     },

@@ -169,6 +169,9 @@
       "confirm_gift": "Confirmer le cadeau pour",
       "creator_of": "CRÉATEUR DE",
       "view_recipient_on_explorer": "Voir le destinataire sur {explorer}",
+      "asset_network": "Réseau",
+      "asset_contract": "Contrat",
+      "asset_token_id": "Identifiant du token",
       "processing_authorization": "Traitement de l'autorisation",
       "gifting_warning": "Offrir un objet est irréversible."
     },

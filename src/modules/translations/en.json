@@ -169,6 +169,9 @@
       "confirm_gift": "Confirm Gift for",
       "creator_of": "CREATOR OF",
       "view_recipient_on_explorer": "View recipient on {explorer}",
+      "asset_network": "Network",
+      "asset_contract": "Contract",
+      "asset_token_id": "Token ID",
       "processing_authorization": "Processing Authorization",
       "gifting_warning": "Gifting an item cannot be undone."
     },

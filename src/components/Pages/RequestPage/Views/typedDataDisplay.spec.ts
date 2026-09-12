@@ -43,6 +43,16 @@ describe('when formatting typed data for display', () => {
     })
   })
 
+  describe('and keys and values carry default-ignorable combining characters', () => {
+    beforeEach(() => {
+      formatted = formatTypedDataForDisplay('{"message":{"sign\u034fature":"value\u034f"}}')
+    })
+
+    it('should reveal the characters in both field names and values', () => {
+      expect(formatted).toBe('{\n  "message": {\n    "sign\\u034fature": "value\\u034f"\n  }\n}')
+    })
+  })
+
   describe('and a value carries a character outside the basic plane that is hidden', () => {
     beforeEach(() => {
       formatted = formatTypedDataForDisplay('{"tag":"a\u{E0041}b"}')
