@@ -1,6 +1,7 @@
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/catalyst.schemas'
 import { Rarity } from '@dcl/schemas'
 import { Profile as ProfileComponent } from 'decentraland-ui2'
+import type { CreditsPurchase } from './creditsPurchase'
 
 type NFTTransferData = {
   imageUrl: string
@@ -33,6 +34,20 @@ type MANATransferData = {
   sceneLocation?: PlaceLocation | null
 }
 
+/** The cosmetic half of a purchase screen: what the item looks like and is called. */
+type PurchasedItemMetadata = { imageUrl: string; name: string; rarity: Rarity }
+
+/**
+ * What the dedicated credits approval shows. The purchase is the verified half — every field of it comes
+ * out of the bytes the signature covers (see recognizeCreditsPurchase) — and the metadata is the cosmetic
+ * half, null when the catalyst could not answer and the item is named by its identifiers instead. Nothing
+ * in the metadata can change what is signed, and the screen never lets it stand in for a fact.
+ */
+type CreditsPurchaseData = {
+  purchase: CreditsPurchase
+  metadata: PurchasedItemMetadata | null
+}
+
 type ProfileAvatar = Parameters<typeof ProfileComponent>[0]['avatar']
 
 enum TransferType {
@@ -52,4 +67,13 @@ type TypedDataPayload = {
 type GasEstimateState = { status: 'loading' } | { status: 'ready'; cost: bigint } | { status: 'unavailable' }
 
 export { TransferType }
-export type { GasEstimateState, PlaceLocation, MANATransferData, NFTTransferData, ProfileAvatar, TypedDataPayload }
+export type {
+  CreditsPurchaseData,
+  GasEstimateState,
+  PlaceLocation,
+  MANATransferData,
+  NFTTransferData,
+  ProfileAvatar,
+  PurchasedItemMetadata,
+  TypedDataPayload
+}

@@ -7,6 +7,8 @@ import {
   CloseWindow,
   ConfirmRequestDialog,
   ContinueInApp,
+  CreditsPurchaseOutcomeView,
+  CreditsPurchaseView,
   DeniedWalletInteraction,
   DifferentAccountError,
   LoadingRequest,
@@ -19,6 +21,7 @@ import {
   TransferConfirmView,
   WalletInteractionComplete
 } from '../Views'
+import { creditsPurchaseData, creditsPurchaseWithoutMetadata } from './__creditsData__'
 import {
   MARKETPLACE_ADDRESS,
   USER_ADDRESS,
@@ -56,6 +59,63 @@ export const TestViewPage = () => {
       continueInApp: {
         label: 'ContinueInApp',
         element: <ContinueInApp autoStart={false} onContinue={noop} requestId={DEFAULT_REQUEST_ID} deepLinkUrl="decentraland://" />
+      },
+      creditsPurchase: {
+        label: 'CreditsPurchaseView (verified purchase)',
+        element: (
+          <CreditsPurchaseView purchaseData={creditsPurchaseData} chainId={137} isLoading={false} onDeny={noop} onApprove={asyncNoop} />
+        )
+      },
+      // The same purchase when the catalyst could not name the item: every fact is still on screen, and the
+      // item is named by the identifiers out of the signed trade.
+      creditsPurchaseWithoutMetadata: {
+        label: 'CreditsPurchaseView (item metadata unavailable)',
+        element: (
+          <CreditsPurchaseView
+            purchaseData={creditsPurchaseWithoutMetadata}
+            chainId={137}
+            isLoading={false}
+            onDeny={noop}
+            onApprove={asyncNoop}
+          />
+        )
+      },
+      // The delayed-code consent, gated here as RequestPage gates it, so the e2e suite can measure that the
+      // notice, the checkbox and the buttons stack without overlapping.
+      creditsPurchaseCallbackConsent: {
+        label: 'CreditsPurchaseView (address without code — asks the delayed-code consent)',
+        element: (
+          <CreditsPurchaseView
+            purchaseData={creditsPurchaseData}
+            chainId={137}
+            isLoading={false}
+            callbackAddresses={[creditsPurchaseData.purchase.seller]}
+            callbackAcknowledged={acknowledged}
+            approveBlocked={!acknowledged}
+            onCallbackAcknowledgedChange={setAcknowledged}
+            onDeny={noop}
+            onApprove={asyncNoop}
+          />
+        )
+      },
+      // The three things that can become of a signature the wallet produced. They are separate screens
+      // because they are separate situations: one to wait through, one that is done, and one where the app
+      // never received it and approving again would be exactly the wrong instinct.
+      creditsPurchaseSigning: {
+        label: 'CreditsPurchaseOutcomeView (signature created, being delivered)',
+        element: <CreditsPurchaseOutcomeView purchaseData={creditsPurchaseData} outcome="signed" delivery="delivering" />
+      },
+      creditsPurchaseSigned: {
+        label: 'CreditsPurchaseOutcomeView (signature delivered)',
+        element: <CreditsPurchaseOutcomeView purchaseData={creditsPurchaseData} outcome="signed" delivery="delivered" />
+      },
+      creditsPurchaseDeliveryFailed: {
+        label: 'CreditsPurchaseOutcomeView (signature created, delivery failed)',
+        element: <CreditsPurchaseOutcomeView purchaseData={creditsPurchaseData} outcome="signed" delivery="failed" />
+      },
+      creditsPurchaseCanceled: {
+        label: 'CreditsPurchaseOutcomeView (canceled)',
+        element: <CreditsPurchaseOutcomeView purchaseData={creditsPurchaseData} outcome="canceled" />
       },
       deniedWalletInteraction: { label: 'DeniedWalletInteraction', element: <DeniedWalletInteraction /> },
       differentAccountError: { label: 'DifferentAccountError', element: <DifferentAccountError requestId={DEFAULT_REQUEST_ID} /> },
