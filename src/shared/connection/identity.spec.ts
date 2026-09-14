@@ -126,6 +126,37 @@ describe('getIdentitySignature', () => {
     jest.clearAllMocks()
   })
 
+  describe('when a connection becomes obsolete while the wallet signature is pending', () => {
+    let resolveIdentity: (identity: AuthIdentity) => void
+    let freshIdentity: AuthIdentity
+    let isCurrent: boolean
+    let pending: Promise<AuthIdentity>
+    let assertCurrentConnection: jest.Mock
+
+    beforeEach(async () => {
+      freshIdentity = createMockIdentity()
+      isCurrent = true
+      assertCurrentConnection = jest.fn(() => {
+        if (!isCurrent) throw new Error('Connection changed')
+      })
+      setupGenerateIdentityMocks(freshIdentity)
+      mockAuthenticator.initializeAuthChain.mockReturnValueOnce(
+        new Promise(resolve => {
+          resolveIdentity = resolve
+        })
+      )
+      pending = getIdentitySignature(address, provider, undefined, assertCurrentConnection)
+      await Promise.resolve()
+      isCurrent = false
+    })
+
+    it('should reject without replacing the stored identity', async () => {
+      resolveIdentity(freshIdentity)
+      await expect(pending).rejects.toThrow('Connection changed')
+      expect(mockLocalStorageStoreIdentity).not.toHaveBeenCalled()
+    })
+  })
+
   describe('when no cached identity exists', () => {
     it('should generate and store a new identity', async () => {
       const freshIdentity = createMockIdentity()

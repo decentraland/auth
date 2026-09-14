@@ -24,9 +24,12 @@ export const useProfileConsistency = () => {
     async (
       account: string,
       identity: AuthIdentity | undefined | null,
-      fetcher?: IFetchComponent
+      fetcher?: IFetchComponent,
+      signal?: AbortSignal
     ): Promise<CheckProfileConsistencyResult> => {
-      const consistencyResult = await fetchProfileWithConsistencyCheck(account, disabledCatalysts, fetcher)
+      signal?.throwIfAborted()
+      const consistencyResult = await fetchProfileWithConsistencyCheck(account, disabledCatalysts, fetcher, signal)
+      signal?.throwIfAborted()
 
       // Propagate the indeterminate state without attempting any redeploy — there is no profile
       // to redeploy and the caller must not treat this as "no profile".
@@ -40,21 +43,30 @@ export const useProfileConsistency = () => {
 
       if (!consistencyResult.isConsistent && consistencyResult.profile && identity) {
         try {
-          await redeployExistingProfile(consistencyResult.profile, account, identity, disabledCatalysts)
+          await redeployExistingProfile(consistencyResult.profile, account, identity, disabledCatalysts, signal)
         } catch (error) {
+          signal?.throwIfAborted()
           console.warn('Profile redeployment failed:', error)
 
           // If the profile was fetched from a specific catalyst, try redeploying with content server data
           if (consistencyResult.profileFetchedFrom) {
             try {
-              await redeployExistingProfileWithContentServerData(consistencyResult.profileFetchedFrom, account, identity, disabledCatalysts)
+              await redeployExistingProfileWithContentServerData(
+                consistencyResult.profileFetchedFrom,
+                account,
+                identity,
+                disabledCatalysts,
+                signal
+              )
             } catch (contentServerError) {
+              signal?.throwIfAborted()
               console.warn('Profile redeployment with content server data also failed:', contentServerError)
             }
           }
         }
       }
 
+      signal?.throwIfAborted()
       return {
         profile: consistencyResult.profile,
         isConsistent: consistencyResult.isConsistent,

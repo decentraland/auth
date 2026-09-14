@@ -153,8 +153,10 @@ async function fetchProfiles(addresses: string[], fetcher?: IFetchComponent): Pr
 async function fetchProfileWithConsistencyCheck(
   address: string,
   disabledCatalysts: string[],
-  fetcher?: IFetchComponent
+  fetcher?: IFetchComponent,
+  signal?: AbortSignal
 ): Promise<ConsistencyResult> {
+  signal?.throwIfAborted()
   try {
     // Determine network based on environment
     const environment = config.get('ENVIRONMENT')
@@ -168,8 +170,11 @@ async function fetchProfileWithConsistencyCheck(
     const profileResults: (ProfileResult | ProfileResultError)[] = await Promise.all(
       catalystUrls.map(async url => {
         try {
-          const client = createLambdasClient({ url: url + '/lambdas', fetcher: fetcher ?? createFetcher() })
+          // A custom fetcher owns transport cancellation (ensureProfile binds its signal there).
+          // The checks after reads also protect callers whose fetcher cannot abort an in-flight read.
+          const client = createLambdasClient({ url: url + '/lambdas', fetcher: fetcher ?? createFetcher({ signal }) })
           const profile = await client.getAvatarDetails(address)
+          signal?.throwIfAborted()
           // The catalyst client does not throw on non-OK responses (e.g. 404).
           // It parses the JSON body regardless of status, so a 404 returns
           // { error: "Not Found", message: "Profile not found" } instead of throwing.
@@ -179,6 +184,7 @@ async function fetchProfileWithConsistencyCheck(
           }
           return { profile, url }
         } catch (error) {
+          signal?.throwIfAborted()
           // Exceptions (network errors, timeouts, 500s) are not "not found"
           return {
             error: normalizeErrorMessage(error),
@@ -188,6 +194,7 @@ async function fetchProfileWithConsistencyCheck(
       })
     )
 
+    signal?.throwIfAborted()
     const profilesWithUrls = profileResults.filter(isProfileResult)
     const profileErrors = profileResults.filter(isProfileResultError)
     const notFoundErrors = profileErrors.filter(error => error.isNotFound)
@@ -227,6 +234,7 @@ async function fetchProfileWithConsistencyCheck(
       profileFetchedFrom: newest.url
     }
   } catch (error) {
+    signal?.throwIfAborted()
     console.error('Profile consistency check failed:', error)
     // The whole check threw (e.g. catalyst discovery failed). We can't determine whether the
     // user has a profile, so mark it indeterminate rather than treating it as "no profile" —
@@ -243,8 +251,10 @@ async function redeployExistingProfile(
   profile: Profile,
   connectedAccount: string,
   connectedAccountIdentity: AuthIdentity,
-  disabledCatalysts: string[] = []
+  disabledCatalysts: string[] = [],
+  signal?: AbortSignal
 ): Promise<void> {
+  signal?.throwIfAborted()
   // Don't redeploy snapshot files, remove snapshot references from avatar
   const metadata = buildProfileMetadataWithoutSnapshots(profile)
 
@@ -255,13 +265,15 @@ async function redeployExistingProfile(
     timestamp: Date.now()
   })
 
+  signal?.throwIfAborted()
   await deployWithCatalystRotation({
     entity: {
       entityId: deploymentEntity.entityId,
       files: deploymentEntity.files,
       authChain: Authenticator.signPayload(connectedAccountIdentity, deploymentEntity.entityId)
     },
-    disabledCatalysts
+    disabledCatalysts,
+    signal
   })
 }
 
@@ -269,10 +281,13 @@ async function redeployExistingProfileWithContentServerData(
   catalystUrl: string,
   connectedAccount: string,
   connectedAccountIdentity: AuthIdentity,
-  disabledCatalysts: string[] = []
+  disabledCatalysts: string[] = [],
+  signal?: AbortSignal
 ): Promise<void> {
-  const client = createContentClient({ url: catalystUrl + '/content', fetcher: createFetcher() })
+  signal?.throwIfAborted()
+  const client = createContentClient({ url: catalystUrl + '/content', fetcher: createFetcher({ signal }) })
   const entity = (await client.fetchEntitiesByPointers([connectedAccount]))?.[0]
+  signal?.throwIfAborted()
   if (!entity) {
     throw new Error('Profile entity not found')
   }
@@ -288,13 +303,15 @@ async function redeployExistingProfileWithContentServerData(
       timestamp: Date.now()
     })
 
+    signal?.throwIfAborted()
     await deployWithCatalystRotation({
       entity: {
         entityId: deploymentEntity.entityId,
         files: deploymentEntity.files,
         authChain: Authenticator.signPayload(connectedAccountIdentity, deploymentEntity.entityId)
       },
-      disabledCatalysts
+      disabledCatalysts,
+      signal
     })
   }
 
@@ -303,6 +320,7 @@ async function redeployExistingProfileWithContentServerData(
   try {
     await buildEntityAndDeploy(metadata)
   } catch (error) {
+    signal?.throwIfAborted()
     if (error instanceof DeploymentError && error.statusCode === 400) {
       throw error
     }

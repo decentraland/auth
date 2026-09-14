@@ -78,9 +78,11 @@ function getCachedIdentity(address: string): AuthIdentity | undefined {
 async function getIdentitySignature(
   address: string,
   provider: Provider,
-  expirationInMinutes: number = ONE_MONTH_IN_MINUTES
+  expirationInMinutes: number = ONE_MONTH_IN_MINUTES,
+  assertCurrentConnection?: () => void
 ): Promise<AuthIdentity> {
   const identity = await generateIdentity(address, provider, expirationInMinutes)
+  assertCurrentConnection?.()
   localStorageStoreIdentity(address, identity)
   return identity
 }
