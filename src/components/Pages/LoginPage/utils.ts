@@ -38,26 +38,33 @@ async function connectToSocialProvider(
   connectionOption: ConnectionOptionType,
   isTesting?: boolean,
   redirectTo?: string,
-  isMobileFlow?: boolean
+  isMobileFlow?: boolean,
+  signal?: AbortSignal
 ): Promise<void> {
+  signal?.throwIfAborted()
   const MAGIC_KEY = isTesting ? getConfiguration().magic_test.apiKey : getConfiguration().magic.apiKey
   const providerType = fromConnectionOptionToProviderType(connectionOption, isTesting)
 
   if (ProviderType.MAGIC === providerType || ProviderType.MAGIC_TEST === providerType) {
     // eslint-disable-next-line @typescript-eslint/naming-convention
     const { Magic } = await import('magic-sdk')
+    signal?.throwIfAborted()
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
     // eslint-disable-next-line @typescript-eslint/naming-convention
     const { OAuthExtension } = await import('@magic-ext/oauth2')
+    signal?.throwIfAborted()
     const magic = new Magic(MAGIC_KEY, {
       extensions: [new OAuthExtension()]
     })
     // Clear existing session before starting new OAuth flow (mirrors MobileAuthPage fix)
     const isLoggedIn = await magic.user.isLoggedIn()
+    signal?.throwIfAborted()
     if (isLoggedIn) {
       await magic.user.logout()
+      signal?.throwIfAborted()
       await connection.disconnect()
+      signal?.throwIfAborted()
     }
 
     // Clear BOTH stored emails unconditionally so a previous Thirdweb/OTP user's email can't leak
@@ -75,6 +82,8 @@ async function connectToSocialProvider(
 
     const oauthProvider = connectionOption === ConnectionOptionType.X ? 'twitter' : (connectionOption as OAuthProvider)
 
+    // The SDK owns navigation once dispatched; its redirect API has no cancellation option.
+    // Check cancellation throughout preparation so abandoned work never starts that handoff.
     await magic?.oauth2.loginWithRedirect({
       provider: oauthProvider,
       redirectURI: url.href,

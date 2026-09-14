@@ -24,6 +24,7 @@ import { config } from './modules/config'
 import { translations } from './modules/translations'
 import { getAnalytics } from './modules/analytics/segment'
 import { setupMobileAnalytics } from './modules/analytics/setupMobileAnalytics'
+import { setupAnalyticsPrivacy } from './modules/analytics/setupAnalyticsPrivacy'
 import './modules/analytics/snippet'
 import './modules/analytics/sentry'
 import { getMobileSession } from './shared/mobile'
@@ -47,6 +48,7 @@ const getInitialLocale = (): string => {
 const initialLocale = getInitialLocale()
 
 const analytics = getAnalytics()
+setupAnalyticsPrivacy(analytics)
 analytics?.load(config.get('SEGMENT_API_KEY'))
 
 setupMobileAnalytics(analytics, getMobileSession())
