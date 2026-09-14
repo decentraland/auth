@@ -39,7 +39,7 @@ jobs:
           npm --version
 
       - name: Set package.json version
-        uses: decentraland/oddish-action@0074f2d535c43b5c83f136525304a6277166d77f # master @ feat/support-npm-trusted-publishing
+        uses: decentraland/oddish-action@v1
         with:
           deterministic-snapshot: true
           only-update-versions: true
@@ -82,7 +82,7 @@ jobs:
         # skips writing `_authToken` to `.npmrc` and lets npm 11 do the handshake.
         # Requires a Trusted Publisher entry for `build-release.yaml` at
         # https://www.npmjs.com/package/@dcl/auth-site/access
-        uses: decentraland/oddish-action@0074f2d535c43b5c83f136525304a6277166d77f # master @ feat/support-npm-trusted-publishing
+        uses: decentraland/oddish-action@v1
         with:
           cwd: './dist'
           deterministic-snapshot: true
