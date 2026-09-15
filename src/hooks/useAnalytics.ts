@@ -2,6 +2,7 @@
 import { useCallback } from 'react'
 import { ConnectionOptionType } from '../components/Connection'
 import { AvatarShape } from '../components/Pages/AvatarSetupPage/AvatarSetupPage.types'
+import { consumeLoginMethod, rememberLoginMethod } from '../modules/analytics/loginMethod'
 import { ClickEvents, ConnectionType, TrackingEvents } from '../modules/analytics/types'
 import { TRACKING_DELAY } from '../shared/constants'
 import { wait } from '../shared/time'
@@ -15,21 +16,26 @@ interface ClickData {
 
 export const useAnalytics = () => {
   const trackLoginClick = useCallback((data: { method?: ConnectionOptionType; type: ConnectionType | string }) => {
+    // Remembered here, not in each flow, so the success event can name the provider even when the
+    // login finishes on a different page load. Doing it at the single point every flow already goes
+    // through is what keeps the guarantee from depending on anyone remembering it.
+    rememberLoginMethod(data.method)
     trackEvent(TrackingEvents.LOGIN_CLICK, data)
   }, [])
 
   const trackLoginSuccess = useCallback(
     async (data: { ethAddress?: string; type: ConnectionType | string; method?: ConnectionOptionType }) => {
-      // `method` is currently only sent from the mobile flow. On desktop every login is preceded by
-      // a user click in this app, so LOGIN_CLICK already carries `method` and the LOGIN_SUCCESS that
-      // follows can be correlated by session — `method` on success is redundant there. On mobile,
-      // entries through a deep link from the partner app are automatic (no click in this app), so
-      // there is no preceding LOGIN_CLICK to attribute the provider, and `method` has to ride on
-      // LOGIN_SUCCESS itself.
+      // `method` names the provider the user actually logged in with, and it has to be on this event:
+      // correlating success back to the preceding click by session only works for someone querying raw
+      // Segment, and it breaks entirely for social logins, which return on a fresh page load after the
+      // OAuth redirect. Callers that know the method pass it (the mobile deep-link entry has no click
+      // to fall back on); everyone else gets it from the click that started this attempt.
+      const method = data.method ?? consumeLoginMethod()
+
       await trackWithDelay(TrackingEvents.LOGIN_SUCCESS, {
         eth_address: data.ethAddress,
         type: data.type,
-        ...(data.method && { method: data.method })
+        ...(method && { method })
       })
 
       if (data.ethAddress) {
