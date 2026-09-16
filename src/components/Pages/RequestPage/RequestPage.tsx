@@ -724,11 +724,25 @@ export const RequestPage = () => {
           }
         }
 
+        // The recipient's profile is decoration on the branded screens: they name the recipient by address,
+        // and a profile only adds its name and avatar. So a lookup that fails for any reason costs the name,
+        // never the screen. fetchProfile already answers null for a profile it cannot get or vouch for; this
+        // holds even if it ever threw.
+        const fetchOptionalProfile = async (address: string) => {
+          try {
+            return await fetchProfile(address)
+          } catch (e) {
+            console.error('Error fetching the recipient profile, naming the recipient by address only', e)
+            return null
+          }
+        }
+
         // The review of a call to a Decentraland contract: the branded tip and gift screens when the call is
         // one of those and everything it reaches is Decentraland's, the generic review of the raw payload
         // otherwise. The branded screens are a convenience over the generic review, not a gate: when one of
         // their lookups fails (a counterparty, token metadata, recipient profile, place), the generic review
-        // stands.
+        // stands. Whichever screen it is, it is the first one shown: the review stays on the loading screen
+        // while a branded one is built, so the raw payload of a tip or a gift never shows before its screen.
         const reviewDecentralandTransaction = async (transaction: DecentralandTransaction) => {
           setReviewedChainId(transaction.chainId)
 
@@ -740,7 +754,7 @@ export const RequestPage = () => {
                 const manaData = decodeManaTransferData(transaction.call)
                 if (manaData) {
                   const [recipientProfile, placeInfo] = await Promise.all([
-                    fetchProfile(manaData.toAddress),
+                    fetchOptionalProfile(manaData.toAddress),
                     fetchPlaceByCreatorAddress(manaData.toAddress)
                   ])
                   if (isStale()) return
@@ -767,44 +781,48 @@ export const RequestPage = () => {
             }
           }
 
-          // The generic review is shown at once, so Deny is available and Allow is a tick away. A gift
-          // candidate is upgraded to the branded view only once the contracts it reaches were checked and the
-          // token's metadata is in.
+          // A gift is built the way a tip is: nothing is shown until the contracts it reaches were checked
+          // and the token's metadata and the recipient's profile are in, and the gift screen is then the
+          // first thing on screen. Only the signer's own token is a gift: a transfer from any other account
+          // gets the generic review, whose payload says whose token it is.
+          if (transaction.branded === 'gift_candidate') {
+            const transferData = decodeNftTransferData(transaction.call)
+            if (transferData && transferData.fromAddress.toLowerCase() === signerAddress.toLowerCase()) {
+              try {
+                const verified = await verifyCounterparties(transaction.call, transaction.chainId)
+                if (isStale()) return
+                if (verified) {
+                  const [metadata, recipientProfile] = await Promise.all([
+                    fetchNftMetadata(transaction.to, transaction.contract.abi, transferData.tokenId),
+                    fetchOptionalProfile(transferData.toAddress)
+                  ])
+                  if (isStale()) return
+
+                  setNftTransferData({
+                    imageUrl: metadata.imageUrl,
+                    tokenId: transferData.tokenId,
+                    toAddress: transferData.toAddress,
+                    contractAddress: transaction.to,
+                    name: metadata.name,
+                    description: metadata.description,
+                    rarity: metadata.rarity,
+                    recipientProfile: recipientProfile || undefined
+                  })
+                  setView(View.WALLET_NFT_INTERACTION)
+                  return
+                }
+              } catch (e) {
+                if (isStale()) return
+                console.error('Error building the branded gift view, falling back to the generic review', e)
+              }
+            }
+          }
+
+          // The generic review of the raw payload: what every other Decentraland call gets, and what a tip
+          // or a gift falls back to when its screen could not be built.
           setView(View.WALLET_INTERACTION)
           if (!transaction.relayed) {
             void estimateTransactionFee(transaction)
-          }
-
-          if (transaction.branded !== 'gift_candidate') return
-          const transferData = decodeNftTransferData(transaction.call)
-          // Only the signer's own token is a gift: a transfer from any other account stays on the generic
-          // review, whose payload says whose token it is.
-          if (!transferData || transferData.fromAddress.toLowerCase() !== signerAddress.toLowerCase()) return
-          try {
-            // The user may have answered from the generic review while the check ran; their answer stands.
-            const verified = await verifyCounterparties(transaction.call, transaction.chainId)
-            if (isStale() || !verified) return
-
-            const [metadata, recipientProfile] = await Promise.all([
-              fetchNftMetadata(transaction.to, transaction.contract.abi, transferData.tokenId),
-              fetchProfile(transferData.toAddress)
-            ])
-            if (isStale()) return
-
-            setNftTransferData({
-              imageUrl: metadata.imageUrl,
-              tokenId: transferData.tokenId,
-              toAddress: transferData.toAddress,
-              contractAddress: transaction.to,
-              name: metadata.name,
-              description: metadata.description,
-              rarity: metadata.rarity,
-              recipientProfile: recipientProfile || undefined
-            })
-            setView(View.WALLET_NFT_INTERACTION)
-          } catch (e) {
-            if (isStale()) return
-            console.error('Error building the branded gift view, keeping the generic review', e)
           }
         }
 
