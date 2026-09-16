@@ -872,6 +872,35 @@ describe('when testing fetchNftMetadata', () => {
     })
   })
 
+  describe('and the tokenURI read does not answer', () => {
+    let outcome: Promise<void>
+
+    beforeEach(() => {
+      jest.useFakeTimers()
+      mockPublicClient = {
+        getChainId: jest.fn().mockResolvedValue(1),
+        readContract: jest.fn().mockReturnValueOnce(new Promise(() => undefined))
+      }
+      jest.mocked(createPublicClient).mockReturnValue(mockPublicClient)
+      outcome = expect(fetchNftMetadata(contractAddress, contractABI, tokenId)).rejects.toThrow('Token URI lookup timed out')
+    })
+
+    afterEach(() => {
+      jest.useRealTimers()
+    })
+
+    it('should stop waiting so the gift can fall back to the generic review instead of loading until expiry', async () => {
+      await jest.advanceTimersByTimeAsync(10_000)
+      await outcome
+    })
+
+    it('should not fetch any metadata', async () => {
+      await jest.advanceTimersByTimeAsync(10_000)
+      await outcome
+      expect(global.fetch).not.toHaveBeenCalled()
+    })
+  })
+
   describe('and fetching the metadata fails', () => {
     let tokenUri: string
 

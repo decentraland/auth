@@ -224,6 +224,8 @@ jest.mock('./Views', () => ({
       data-chain={props.chainId ?? ''}
       data-callbacks={JSON.stringify(props.callbackAddresses ?? [])}
       data-callback-acknowledged={String(props.callbackAcknowledged)}
+      data-recipient={props.transferData?.toAddress ?? ''}
+      data-recipient-name={props.transferData?.recipientProfile?.avatars?.[0]?.name ?? ''}
     >
       <button data-testid="transfer-confirm-approve" onClick={props.onApprove}>
         confirm
@@ -2264,6 +2266,54 @@ describe('RequestPage', () => {
       expect(mockGetCounterpartyAddresses).toHaveBeenCalledWith(expect.objectContaining({ functionName: 'transfer' }), 137)
     })
 
+    describe('and the recipient profile cannot be fetched', () => {
+      beforeEach(() => {
+        jest.mocked(fetchProfile).mockRejectedValueOnce(new Error('catalyst unavailable'))
+        jest.spyOn(console, 'error').mockImplementation(() => undefined)
+      })
+
+      afterEach(() => {
+        jest.mocked(fetchProfile).mockReset()
+        jest.mocked(console.error).mockRestore()
+      })
+
+      it('should still show the tip view, naming the recipient by address alone', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('transfer-confirm')
+        expect(view).toHaveAttribute('data-recipient', '0xrecipient')
+        expect(view).toHaveAttribute('data-recipient-name', '')
+      })
+    })
+
+    describe('and the recipient profile is still loading', () => {
+      let settleProfile: (profile: Awaited<ReturnType<typeof fetchProfile>>) => void
+
+      beforeEach(() => {
+        settleProfile = () => undefined
+        jest
+          .mocked(fetchProfile)
+          .mockReturnValue(new Promise<Awaited<ReturnType<typeof fetchProfile>>>(resolve => (settleProfile = resolve)))
+      })
+
+      afterEach(() => {
+        jest.mocked(fetchProfile).mockReset()
+      })
+
+      it('should keep the loading screen rather than show the raw payload before the tip view', async () => {
+        renderRequestPage()
+        await waitFor(() => expect(fetchProfile).toHaveBeenCalledWith('0xrecipient'))
+        expect(screen.getByTestId('loading-request')).toBeInTheDocument()
+        expect(screen.queryByTestId('action-request')).not.toBeInTheDocument()
+      })
+
+      it('should show the tip view once the profile is in', async () => {
+        renderRequestPage()
+        await waitFor(() => expect(fetchProfile).toHaveBeenCalledWith('0xrecipient'))
+        settleProfile(null)
+        expect(await screen.findByTestId('transfer-confirm')).toBeInTheDocument()
+      })
+    })
+
     describe('and the check finds the call reaches a contract that is not Decentraland', () => {
       beforeEach(() => {
         mockGetCounterpartyAddresses.mockReturnValue({ addresses: ['0xother'], opaque: false })
@@ -2411,22 +2461,6 @@ describe('RequestPage', () => {
         expect(mockSendFailedOutcome).not.toHaveBeenCalled()
       })
     })
-
-    describe('and the recipient lookups fail', () => {
-      beforeEach(() => {
-        jest.mocked(fetchProfile).mockRejectedValue(new Error('catalyst down'))
-      })
-
-      afterEach(() => {
-        jest.mocked(fetchProfile).mockReset()
-      })
-
-      it('should fall back to the generic review instead of a bare confirmation', async () => {
-        renderRequestPage()
-        expect(await screen.findByTestId('action-request')).toBeInTheDocument()
-        expect(screen.queryByTestId('transfer-confirm')).not.toBeInTheDocument()
-      })
-    })
   })
 
   describe('when the request is a transfer on a verified Decentraland collection', () => {
@@ -2473,6 +2507,62 @@ describe('RequestPage', () => {
 
       expect(jest.mocked(decodeNftTransferData)).toHaveBeenCalledWith(expect.objectContaining({ functionName: 'safeTransferFrom' }))
       expect(jest.mocked(fetchNftMetadata)).toHaveBeenCalledWith(COLLECTION, expect.anything(), '1')
+    })
+
+    describe('and the recipient has a profile', () => {
+      beforeEach(() => {
+        jest.mocked(fetchProfile).mockResolvedValueOnce({ avatars: [{ name: 'Recipient', ethAddress: '0xrecipient' }] } as any)
+      })
+
+      it('should name the recipient by the profile next to the address', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('transfer-confirm')
+        expect(view).toHaveAttribute('data-recipient', '0xrecipient')
+        expect(view).toHaveAttribute('data-recipient-name', 'Recipient')
+      })
+    })
+
+    describe('and the recipient profile cannot be fetched', () => {
+      beforeEach(() => {
+        jest.mocked(fetchProfile).mockRejectedValueOnce(new Error('catalyst unavailable'))
+        jest.spyOn(console, 'error').mockImplementation(() => undefined)
+      })
+
+      afterEach(() => {
+        jest.mocked(console.error).mockRestore()
+      })
+
+      it('should still show the gift view, naming the recipient by address alone', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('transfer-confirm')
+        expect(view).toHaveAttribute('data-recipient', '0xrecipient')
+        expect(view).toHaveAttribute('data-recipient-name', '')
+      })
+    })
+
+    describe('and the token metadata is still loading', () => {
+      let settleMetadata: (metadata: Awaited<ReturnType<typeof fetchNftMetadata>>) => void
+
+      beforeEach(() => {
+        settleMetadata = () => undefined
+        jest
+          .mocked(fetchNftMetadata)
+          .mockReturnValue(new Promise<Awaited<ReturnType<typeof fetchNftMetadata>>>(resolve => (settleMetadata = resolve)))
+      })
+
+      it('should keep the loading screen rather than show the raw payload before the gift view', async () => {
+        renderRequestPage()
+        await waitFor(() => expect(fetchNftMetadata).toHaveBeenCalledTimes(1))
+        expect(screen.getByTestId('loading-request')).toBeInTheDocument()
+        expect(screen.queryByTestId('action-request')).not.toBeInTheDocument()
+      })
+
+      it('should show the gift view once the metadata is in', async () => {
+        renderRequestPage()
+        await waitFor(() => expect(fetchNftMetadata).toHaveBeenCalledTimes(1))
+        settleMetadata({ imageUrl: 'x', name: 'n', description: 'd', rarity: 'common' } as any)
+        expect(await screen.findByTestId('transfer-confirm')).toBeInTheDocument()
+      })
     })
 
     describe("and the token being transferred is not the signer's", () => {
@@ -2660,29 +2750,25 @@ describe('RequestPage', () => {
         mockIsAddressWithoutCode.mockReturnValue(new Promise<boolean>(resolve => (settleCodeRead = resolve)))
       })
 
-      it('should show the generic review, a tick away from Allow, rather than the branded view or a bare spinner', async () => {
+      it('should keep the loading screen rather than show the raw payload before the branded view', async () => {
         renderRequestPage()
-        await clearActionRequestGates()
+        await waitFor(() => expect(mockIsAddressWithoutCode).toHaveBeenCalledWith('0xrecipient', 137))
+        expect(screen.getByTestId('loading-request')).toBeInTheDocument()
+        expect(screen.queryByTestId('action-request')).not.toBeInTheDocument()
         expect(screen.queryByTestId('transfer-confirm')).not.toBeInTheDocument()
       })
 
-      it('should upgrade to the branded view only once the check has passed', async () => {
+      it('should not read the token metadata before the check has passed', async () => {
         renderRequestPage()
-        await screen.findByTestId('action-request')
+        await waitFor(() => expect(mockIsAddressWithoutCode).toHaveBeenCalledWith('0xrecipient', 137))
         expect(fetchNftMetadata).not.toHaveBeenCalled()
+      })
+
+      it('should show the branded view once the check has passed', async () => {
+        renderRequestPage()
+        await waitFor(() => expect(mockIsAddressWithoutCode).toHaveBeenCalledWith('0xrecipient', 137))
         settleCodeRead(true)
         expect(await screen.findByTestId('transfer-confirm')).toBeInTheDocument()
-      })
-
-      it('should keep a denial given before the check passed', async () => {
-        renderRequestPage()
-        await userEvent.click(await screen.findByTestId('action-deny'))
-        await screen.findByTestId('denied-wallet-interaction')
-        settleCodeRead(true)
-        await waitFor(() => expect(mockSendFailedOutcome).toHaveBeenCalledTimes(1))
-        expect(fetchNftMetadata).not.toHaveBeenCalled()
-        expect(screen.getByTestId('denied-wallet-interaction')).toBeInTheDocument()
-        expect(screen.queryByTestId('transfer-confirm')).not.toBeInTheDocument()
       })
     })
 

@@ -353,13 +353,19 @@ async function fetchNftMetadata(
   const networkProvider = await getTrustedNetworkProvider(chainId)
   const publicClient = createPublicClient({ transport: custom(networkProvider) })
 
-  // Use the provided contract ABI to interact with the NFT contract
-  const tokenUri = (await publicClient.readContract({
-    address: contractAddress as `0x${string}`,
-    abi: contractABI,
-    functionName: 'tokenURI',
-    args: [BigInt(tokenId)]
-  })) as string
+  // Bounded like the other RPC reads: the gift screen is built before anything is shown, so a hung read
+  // would otherwise hold the request on the loading screen until it expires. Past the deadline the gift
+  // screen is given up and the generic review takes over (the RPC call itself is not aborted).
+  const tokenUri = (await withTimeout(
+    publicClient.readContract({
+      address: contractAddress as `0x${string}`,
+      abi: contractABI,
+      functionName: 'tokenURI',
+      args: [BigInt(tokenId)]
+    }),
+    COLLECTION_LOOKUP_TIMEOUT_MS,
+    'Token URI lookup'
+  )) as string
 
   if (!tokenUri) {
     throw new Error(`No tokenURI returned for token ${tokenId} at contract ${contractAddress}`)
