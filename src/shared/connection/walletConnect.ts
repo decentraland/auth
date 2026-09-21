@@ -73,4 +73,45 @@ function canRelayPersonalSign(provider: unknown): boolean {
   return methods === undefined || methods.includes(PERSONAL_SIGN_METHOD)
 }
 
-export { canRelayPersonalSign, getApprovedEip155Methods }
+/**
+ * What `UniversalProvider.request()` throws when it has no session: every call is guarded by
+ * `if (!this.session) throw new Error('Please call connect() before request()')`.
+ */
+const MISSING_SESSION_MESSAGE = 'please call connect() before request()'
+
+function isMissingSessionError(error: unknown): boolean {
+  return error instanceof Error && error.message.toLowerCase().includes(MISSING_SESSION_MESSAGE)
+}
+
+type RequestingProvider = { request: (args: { method: string }) => Promise<unknown> }
+
+function canRequest(provider: unknown): provider is RequestingProvider {
+  return isRecord(provider) && typeof provider.request === 'function'
+}
+
+/**
+ * Whether a WalletConnect connection can actually be used.
+ *
+ * The account and the session are persisted separately, so a connection can come back reporting an
+ * address while its session is gone. Signing with that provider fails locally, before anything is
+ * sent to the wallet, which the user experiences as the page claiming they did not confirm a
+ * prompt that was never shown.
+ *
+ * `eth_chainId` is resolved by the provider itself, so this costs no relay round trip — it only
+ * reaches the guard above. Fails open: any other error (and a provider we cannot probe) counts as
+ * live, so this can only ever reject a session we know is missing.
+ */
+async function hasLiveWalletConnectSession(provider: unknown): Promise<boolean> {
+  if (!canRequest(provider)) {
+    return true
+  }
+
+  try {
+    await provider.request({ method: 'eth_chainId' })
+    return true
+  } catch (error) {
+    return !isMissingSessionError(error)
+  }
+}
+
+export { canRelayPersonalSign, getApprovedEip155Methods, hasLiveWalletConnectSession, isMissingSessionError }

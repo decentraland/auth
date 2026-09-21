@@ -147,6 +147,47 @@ describe('connectToProvider', () => {
     })
   })
 
+  describe('and WalletConnect reports a connection whose session is gone', () => {
+    let sessionlessProvider: { request: jest.Mock }
+    let liveProvider: { request: jest.Mock }
+
+    beforeEach(() => {
+      // What UniversalProvider throws for every request once its session is missing.
+      sessionlessProvider = { request: jest.fn().mockRejectedValue(new Error('Please call connect() before request()')) }
+      liveProvider = { request: jest.fn().mockResolvedValue('0x1') }
+      mockConnect
+        .mockResolvedValueOnce({ account: '0xabc', provider: sessionlessProvider })
+        .mockResolvedValueOnce({ account: '0xdef', provider: liveProvider })
+    })
+
+    it('should re-pair instead of handing back a provider that can never sign', async () => {
+      const result = await connectToProvider(ConnectionOptionType.WALLET_CONNECT)
+
+      expect(result.provider).toBe(liveProvider)
+    })
+
+    it('should clear the stored session before re-pairing', async () => {
+      await connectToProvider(ConnectionOptionType.WALLET_CONNECT)
+
+      expect(mockClearStorage).toHaveBeenCalledTimes(2)
+    })
+  })
+
+  describe('and the WalletConnect session is alive', () => {
+    let liveProvider: { request: jest.Mock }
+
+    beforeEach(() => {
+      liveProvider = { request: jest.fn().mockResolvedValue('0x1') }
+      mockConnect.mockResolvedValue({ account: '0xabc', provider: liveProvider })
+    })
+
+    it('should connect once, without re-pairing', async () => {
+      await connectToProvider(ConnectionOptionType.WALLET_CONNECT)
+
+      expect(mockConnect).toHaveBeenCalledTimes(1)
+    })
+  })
+
   describe('when connecting to MetaMask Mobile', () => {
     beforeEach(() => {
       mockConnect.mockResolvedValue({ account: '0xabc', provider: {} })
