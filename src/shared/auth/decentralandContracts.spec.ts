@@ -108,6 +108,34 @@ describe('when looking up a known contract', () => {
       expect(result).toBeNull()
     })
   })
+
+  describe.each([
+    { chainName: 'Polygon', chainId: POLYGON, supportsMetaTransactions: true, calldataField: 'functionData' },
+    { chainName: 'Ethereum', chainId: ETHEREUM, supportsMetaTransactions: false, calldataField: null }
+  ])(
+    'and the address is the latest off-chain marketplace on $chainName mainnet',
+    ({ chainId, supportsMetaTransactions, calldataField }) => {
+      let marketplace: ContractData
+
+      beforeEach(() => {
+        marketplace = getContract(ContractName.OffChainMarketplaceV3, chainId)
+        result = getKnownDecentralandContract(marketplace.address, chainId)
+      })
+
+      it('should return the contract with the EIP-712 domain the registry states and its meta-transaction support', () => {
+        expect(result).toEqual(
+          expect.objectContaining({
+            name: ContractName.OffChainMarketplaceV3,
+            chainId,
+            domainName: marketplace.name,
+            domainVersion: marketplace.version,
+            supportsMetaTransactions,
+            calldataField
+          })
+        )
+      })
+    }
+  )
 })
 
 describe('when reading the meta-transaction support of an ABI', () => {

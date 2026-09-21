@@ -28,13 +28,15 @@ const TOKEN_FUNCTION_SIGNATURES = new Set([
 /**
  * Functions that take `bytes` without handing them to another contract as a call: signatures, fingerprints,
  * callback data, a deposit amount, the collection initializer the factory runs on Decentraland's own
- * implementation (see FORWARDING_FUNCTIONS), and the nested call the walk follows (`useCredits`).
+ * implementation (see FORWARDING_FUNCTIONS), the nested call the walk follows (`useCredits`), and the coupon
+ * payload the coupon manager and the discount coupon only ever `abi.decode` (`applyCoupon`).
  */
 const NON_FORWARDING_BYTES_FUNCTIONS = new Set([
   'accept',
   'acceptListing',
   'acceptOffer',
   'acceptWithCoupon',
+  'applyCoupon',
   'cancelSignature',
   'createCollection',
   'deposit',
