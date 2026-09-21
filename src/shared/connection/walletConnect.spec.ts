@@ -1,4 +1,4 @@
-import { canRelayPersonalSign, getApprovedEip155Methods } from './walletConnect'
+import { canRelayPersonalSign, getApprovedEip155Methods, hasLiveWalletConnectSession, isMissingSessionError } from './walletConnect'
 
 const buildSession = (namespaces: Record<string, { methods?: unknown }>) => ({ namespaces })
 
@@ -106,6 +106,68 @@ describe('canRelayPersonalSign', () => {
 
     it('should fail open and report the wallet as capable', () => {
       expect(canRelayPersonalSign(provider)).toBe(true)
+    })
+  })
+})
+
+describe('isMissingSessionError', () => {
+  describe('when the provider states it has no session', () => {
+    it('should match the message UniversalProvider guards every request with', () => {
+      expect(isMissingSessionError(new Error('Please call connect() before request()'))).toBe(true)
+    })
+  })
+
+  describe('when the failure is anything else', () => {
+    it('should not match another stale-session message', () => {
+      expect(isMissingSessionError(new Error("session topic doesn't exist: abc"))).toBe(false)
+    })
+
+    it('should not match a non-Error value carrying the same text', () => {
+      expect(isMissingSessionError('Please call connect() before request()')).toBe(false)
+    })
+  })
+})
+
+describe('hasLiveWalletConnectSession', () => {
+  describe('when the provider answers the probe', () => {
+    let provider: unknown
+
+    beforeEach(() => {
+      provider = { request: jest.fn().mockResolvedValue('0x1') }
+    })
+
+    it('should report the session as usable', async () => {
+      await expect(hasLiveWalletConnectSession(provider)).resolves.toBe(true)
+    })
+  })
+
+  describe('when the provider reports it has no session', () => {
+    let provider: unknown
+
+    beforeEach(() => {
+      provider = { request: jest.fn().mockRejectedValue(new Error('Please call connect() before request()')) }
+    })
+
+    it('should report the session as unusable, so the caller can re-pair instead of signing', async () => {
+      await expect(hasLiveWalletConnectSession(provider)).resolves.toBe(false)
+    })
+  })
+
+  describe('when the probe fails for an unrelated reason', () => {
+    let provider: unknown
+
+    beforeEach(() => {
+      provider = { request: jest.fn().mockRejectedValue(new Error('Network request failed')) }
+    })
+
+    it('should fail open and keep the connection', async () => {
+      await expect(hasLiveWalletConnectSession(provider)).resolves.toBe(true)
+    })
+  })
+
+  describe('when the provider cannot be probed at all', () => {
+    it('should fail open and keep the connection', async () => {
+      await expect(hasLiveWalletConnectSession(undefined)).resolves.toBe(true)
     })
   })
 })

@@ -3,6 +3,7 @@ import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
 import { Env } from '@dcl/ui-env'
 import { ConnectionResponse, WalletConnectV2Connector, connection, getConfiguration } from 'decentraland-connect'
 import { config } from '../../../modules/config'
+import { hasLiveWalletConnectSession } from '../../../shared/connection/walletConnect'
 import { extractReferrerFromSearchParameters } from '../../../shared/locations'
 import { ConnectionOptionType, SignInOptionsMode } from '../../Connection'
 import { FeatureFlagsKeys, SignInPrimaryOptionVariant } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
@@ -138,7 +139,20 @@ async function connectToProvider(connectionOption: ConnectionOptionType): Promis
       WalletConnectV2Connector.clearStorage()
     }
 
-    const connectionData = await connection.connect(providerType)
+    let connectionData = await connection.connect(providerType)
+
+    // A WalletConnect connection can come back with an address but no session: the account and
+    // the session are persisted separately, and the connector's own liveness probe reads a
+    // missing session as "not proven dead" and keeps it. Signing with that provider throws
+    // locally, before anything reaches the wallet, which the user sees as the page claiming they
+    // did not confirm a prompt that was never shown. Re-pairing once recovers it; the probe costs
+    // no relay round trip and only fires on a session we know is missing.
+    if (providerType === ProviderType.WALLET_CONNECT_V2 && !(await hasLiveWalletConnectSession(connectionData.provider))) {
+      console.warn('WalletConnect reported a connection with no session — re-pairing')
+      WalletConnectV2Connector.clearStorage()
+      connectionData = await connection.connect(providerType)
+    }
+
     if (!connectionData.account || !connectionData.provider) {
       throw new Error('Could not get provider')
     }
