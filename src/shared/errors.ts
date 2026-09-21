@@ -6,6 +6,25 @@ function isErrorWithName(error: unknown): error is Error {
   return error !== undefined && error !== null && typeof error === 'object' && 'name' in error
 }
 
+/**
+ * Thrown when the connected wallet cannot be asked to sign the login message.
+ *
+ * WalletConnect only relays the methods the wallet approved for the session; anything else is
+ * answered by a public RPC node that cannot sign, so the request never reaches the wallet and no
+ * confirmation prompt is ever shown. Detecting it up front keeps the user from retrying a
+ * connection that can never succeed.
+ */
+class WalletSignatureUnsupportedError extends Error {
+  constructor() {
+    super('The connected wallet did not approve the signing method required to log in')
+    this.name = 'WalletSignatureUnsupportedError'
+  }
+}
+
+function isWalletSignatureUnsupportedError(error: unknown): error is WalletSignatureUnsupportedError {
+  return isErrorWithName(error) && error.name === 'WalletSignatureUnsupportedError'
+}
+
 type RPCError = {
   error: {
     code: number
@@ -156,12 +175,14 @@ function isChainMismatchRejection(error: unknown): boolean {
 
 export type { RPCError }
 export {
+  WalletSignatureUnsupportedError,
   isErrorWithMessage,
   isErrorWithName,
   isRpcError,
   isMagicRpcError,
   isMagicExtensionError,
   isUserRejectedTransaction,
+  isWalletSignatureUnsupportedError,
   isExpectedWalletError,
   isChainMismatchRejection
 }

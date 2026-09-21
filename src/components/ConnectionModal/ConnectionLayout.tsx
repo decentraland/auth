@@ -27,6 +27,9 @@ const getConnectionLayoutMessage = (loadingState: ConnectionLayoutState, provide
     case ConnectionLayoutState.ERROR_LOCKED_WALLET: {
       return t('connection_layout.error_locked_wallet')
     }
+    case ConnectionLayoutState.ERROR_WALLET_SIGNATURE_UNSUPPORTED: {
+      return t('connection_layout.error_wallet_signature_unsupported')
+    }
     case ConnectionLayoutState.CONNECTING_WALLET:
     case ConnectionLayoutState.WAITING_FOR_SIGNATURE: {
       return providerType === ProviderType.MAGIC || providerType === ProviderType.MAGIC_TEST
@@ -55,6 +58,7 @@ const ConnectionLayout = React.memo((props: ConnectionLayoutProps) => {
   const isError =
     state === ConnectionLayoutState.ERROR ||
     state === ConnectionLayoutState.ERROR_LOCKED_WALLET ||
+    state === ConnectionLayoutState.ERROR_WALLET_SIGNATURE_UNSUPPORTED ||
     state === ConnectionLayoutState.ERROR_GENERIC
 
   const handleTryAgain = useCallback(() => {

@@ -5,6 +5,7 @@ export type ConnectionModalProps = {
   open: boolean
   state: ConnectionLayoutState
   providerType: ProviderType | null
+  errorDetail?: string | null
   onClose?: () => unknown
   onTryAgain: () => unknown
 }

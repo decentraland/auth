@@ -1,4 +1,10 @@
-import { isChainMismatchRejection, isExpectedWalletError, isUserRejectedTransaction } from './errors'
+import {
+  WalletSignatureUnsupportedError,
+  isChainMismatchRejection,
+  isExpectedWalletError,
+  isUserRejectedTransaction,
+  isWalletSignatureUnsupportedError
+} from './errors'
 
 /**
  * `@web3-react/injected-connector` throws this when the user dismisses the wallet prompt during
@@ -63,6 +69,33 @@ describe('isUserRejectedTransaction', () => {
       expect(isUserRejectedTransaction(null)).toBe(false)
       expect(isUserRejectedTransaction(undefined)).toBe(false)
       expect(isUserRejectedTransaction('The user rejected the request.')).toBe(false)
+    })
+  })
+})
+
+describe('isWalletSignatureUnsupportedError', () => {
+  describe('when the wallet could not be asked to sign the login message', () => {
+    it('should match the error the login throws', () => {
+      expect(isWalletSignatureUnsupportedError(new WalletSignatureUnsupportedError())).toBe(true)
+    })
+
+    it('should match by name, since minification rewrites the class', () => {
+      const minified = new Error('The connected wallet did not approve the signing method required to log in')
+      minified.name = 'WalletSignatureUnsupportedError'
+
+      expect(isWalletSignatureUnsupportedError(minified)).toBe(true)
+    })
+  })
+
+  describe('when the failure is anything else', () => {
+    it('should not match a user rejection', () => {
+      expect(isWalletSignatureUnsupportedError({ code: 4001, message: 'User rejected the request.' })).toBe(false)
+    })
+
+    it('should not match non-object values', () => {
+      expect(isWalletSignatureUnsupportedError(null)).toBe(false)
+      expect(isWalletSignatureUnsupportedError(undefined)).toBe(false)
+      expect(isWalletSignatureUnsupportedError('WalletSignatureUnsupportedError')).toBe(false)
     })
   })
 })

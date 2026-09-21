@@ -54,6 +54,7 @@
   "connection_layout": {
     "error": "Vous n'avez pas confirmé cette action dans votre extension de portefeuille numérique. Pour continuer, veuillez réessayer.",
     "error_locked_wallet": "Votre portefeuille est actuellement verrouillé. Pour continuer, veuillez déverrouiller votre portefeuille et réessayer.",
+    "error_wallet_signature_unsupported": "Votre portefeuille ne peut pas signer la demande de connexion à Decentraland. Pour continuer, veuillez vous connecter avec un autre portefeuille.",
     "waiting_for_signature": "Confirmez dans votre extension de portefeuille numérique pour continuer.",
     "waiting_for_signature_magic": "Presque terminé ! Confirmez votre demande de connexion à Decentraland",
     "validating_sign_in": "Un instant, nous vérifions vos identifiants de connexion...",

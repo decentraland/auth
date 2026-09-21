@@ -5,7 +5,7 @@ import { ConnectionLayout } from './ConnectionLayout'
 import { ConnectionModalProps } from './ConnectionModal.types'
 
 export const ConnectionModal = (props: ConnectionModalProps) => {
-  const { open, state, providerType, onClose, onTryAgain } = props
+  const { open, state, providerType, errorDetail, onClose, onTryAgain } = props
 
   return (
     <dclModal.Modal
@@ -17,7 +17,7 @@ export const ConnectionModal = (props: ConnectionModalProps) => {
       size="small"
       onClose={onClose}
     >
-      <ConnectionLayout state={state} providerType={providerType} onTryAgain={onTryAgain} />
+      <ConnectionLayout state={state} providerType={providerType} errorDetail={errorDetail} onTryAgain={onTryAgain} />
     </dclModal.Modal>
   )
 }

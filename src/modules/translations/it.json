@@ -54,6 +54,7 @@
   "connection_layout": {
     "error": "Non hai confermato questa azione nella tua estensione del portafoglio digitale. Per continuare, riprova.",
     "error_locked_wallet": "Il tuo portafoglio è attualmente bloccato. Per continuare, sblocca il tuo portafoglio e riprova.",
+    "error_wallet_signature_unsupported": "Il tuo portafoglio non può firmare la richiesta di accesso a Decentraland. Per continuare, connettiti con un altro portafoglio.",
     "waiting_for_signature": "Conferma nella tua estensione del portafoglio digitale per continuare.",
     "waiting_for_signature_magic": "Quasi fatto! Conferma la tua richiesta di accesso a Decentraland",
     "validating_sign_in": "Un momento, stiamo verificando le tue credenziali di accesso...",
