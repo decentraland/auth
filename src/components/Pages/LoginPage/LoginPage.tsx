@@ -22,7 +22,12 @@ import { useEnsureProfile } from '../../../hooks/useEnsureProfile'
 import { usePostLoginRedirect } from '../../../hooks/usePostLoginRedirect'
 import { ConnectionType } from '../../../modules/analytics/types'
 import { useCurrentConnectionData } from '../../../shared/connection'
-import { isErrorWithName, isUserRejectedTransaction } from '../../../shared/errors'
+import {
+  isErrorWithName,
+  isExpectedWalletError,
+  isUserRejectedTransaction,
+  isWalletSignatureUnsupportedError
+} from '../../../shared/errors'
 import { extractReferrerFromSearchParameters } from '../../../shared/locations'
 import { markReturningUser } from '../../../shared/onboarding/markReturningUser'
 import { trackCheckpoint } from '../../../shared/onboarding/trackCheckpoint'
@@ -59,6 +64,7 @@ export const LoginPage = () => {
   )
 
   const [loadingState, setLoadingState] = useState(ConnectionLayoutState.CONNECTING_WALLET)
+  const [connectionErrorDetail, setConnectionErrorDetail] = useState<string | null>(null)
   const [showConnectionLayout, setShowConnectionLayout] = useState(false)
   const [showClockSyncModal, setShowClockSyncModal] = useState(false)
   const [showEmailLoginModal, setShowEmailLoginModal] = useState(false)
@@ -233,6 +239,7 @@ export const LoginPage = () => {
             throw new Error('No wallet extension detected. Please install MetaMask or another Ethereum wallet.')
           }
           setShowConnectionLayout(true)
+          setConnectionErrorDetail(null)
           setLoadingState(ConnectionLayoutState.CONNECTING_WALLET)
           const connectionData = await connectToProvider(connectionType)
 
@@ -270,19 +277,38 @@ export const LoginPage = () => {
       } catch (error) {
         if (isUserRejectedTransaction(error)) {
           console.info('User rejected login signature in wallet — not reporting to Sentry')
-        } else {
-          handleError(error, 'Error during login connection', {
-            sentryTags: {
-              isWeb2Wallet: isLoggingInThroughSocial,
-              connectionType
-            }
-          })
+          setConnectionErrorDetail(null)
+          setLoadingState(ConnectionLayoutState.ERROR)
+          return
         }
 
-        if (isErrorWithName(error) && error.name === 'ErrorUnlockingWallet') {
+        const errorMessage = handleError(error, 'Error during login connection', {
+          sentryTags: {
+            isWeb2Wallet: isLoggingInThroughSocial,
+            connectionType
+          }
+        })
+
+        if (isWalletSignatureUnsupportedError(error)) {
+          // Deliberately left out of `isExpectedWalletError`, so `handleError` above still reports
+          // it: this is not an app bug, but we have no other way to learn how many users hit a
+          // wallet that does not approve `personal_sign` for the session.
+          setConnectionErrorDetail(null)
+          setLoadingState(ConnectionLayoutState.ERROR_WALLET_SIGNATURE_UNSUPPORTED)
+        } else if (isErrorWithName(error) && error.name === 'ErrorUnlockingWallet') {
+          setConnectionErrorDetail(null)
           setLoadingState(ConnectionLayoutState.ERROR_LOCKED_WALLET)
-        } else {
+        } else if (isExpectedWalletError(error)) {
+          // A prompt already open for this origin or a dismissed chooser: the wallet is fine and a
+          // retry is the right next step, so the existing copy fits and the raw message adds nothing.
+          setConnectionErrorDetail(null)
           setLoadingState(ConnectionLayoutState.ERROR)
+        } else {
+          // Only an explicit rejection gets the "you did not confirm in your wallet" copy. Using it
+          // for every failure points the user at a wallet that never prompted and leaves retrying —
+          // which fails identically — as the only way out.
+          setConnectionErrorDetail(errorMessage || null)
+          setLoadingState(ConnectionLayoutState.ERROR_GENERIC)
         }
       }
     },
@@ -305,6 +331,7 @@ export const LoginPage = () => {
   const handleOnCloseConnectionModal = useCallback(() => {
     setShowConnectionLayout(false)
     setCurrentConnectionType(undefined)
+    setConnectionErrorDetail(null)
     setLoadingState(ConnectionLayoutState.CONNECTING_WALLET)
   }, [setShowConnectionLayout])
 
@@ -487,6 +514,7 @@ export const LoginPage = () => {
       <ConnectionModal
         open={showConnectionLayout}
         state={loadingState}
+        errorDetail={connectionErrorDetail}
         onClose={handleOnCloseConnectionModal}
         onTryAgain={handleTryAgain}
         providerType={currentConnectionType ? fromConnectionOptionToProviderType(currentConnectionType) : null}

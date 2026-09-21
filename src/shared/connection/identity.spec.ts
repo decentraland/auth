@@ -3,6 +3,7 @@ import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
 import { AuthIdentity, Authenticator } from '@dcl/crypto'
 import { localStorageGetIdentity, localStorageStoreIdentity } from '@dcl/single-sign-on-client'
 import { Provider } from 'decentraland-connect'
+import { WalletSignatureUnsupportedError } from '../errors'
 import { getCachedIdentity, getIdentitySignature } from './identity'
 
 jest.mock('@dcl/single-sign-on-client')
@@ -10,7 +11,10 @@ jest.mock('@dcl/crypto')
 jest.mock('viem/accounts')
 jest.mock('viem', () => ({
   createWalletClient: jest.fn(),
-  custom: jest.fn()
+  custom: jest.fn(),
+  // Real implementation: the signing account is checksummed before it goes on the wire, and a
+  // stub would hide whether that actually happens.
+  getAddress: jest.requireActual('viem').getAddress
 }))
 jest.mock('viem/chains', () => ({
   mainnet: {}
@@ -203,5 +207,119 @@ describe('getIdentitySignature', () => {
       expect(mockLocalStorageStoreIdentity).toHaveBeenNthCalledWith(2, address, secondIdentity)
       expect(mockAuthenticator.initializeAuthChain).toHaveBeenCalledTimes(2)
     })
+  })
+})
+
+describe('when the connected wallet cannot relay the login signature', () => {
+  const address = '0x1234567890abcdef1234567890abcdef12345678'
+  // A WalletConnect session whose approved eip155 namespace leaves personal_sign out. The
+  // universal provider would answer it from a public RPC node, so the wallet never prompts.
+  const provider = {
+    session: { namespaces: { eip155: { methods: ['eth_sendTransaction', 'eth_signTypedData_v4'] } } }
+  } as unknown as Provider
+
+  beforeEach(() => {
+    mockLocalStorageGetIdentity.mockReturnValue(null)
+    setupGenerateIdentityMocks(createMockIdentity())
+  })
+
+  afterEach(() => {
+    jest.clearAllMocks()
+  })
+
+  it('should reject with a WalletSignatureUnsupportedError instead of asking the wallet to sign', async () => {
+    await expect(getIdentitySignature(address, provider)).rejects.toBeInstanceOf(WalletSignatureUnsupportedError)
+  })
+
+  it('should not build an auth chain', async () => {
+    await expect(getIdentitySignature(address, provider)).rejects.toThrow()
+
+    expect(mockAuthenticator.initializeAuthChain).not.toHaveBeenCalled()
+  })
+})
+
+describe('when the wallet reports no accounts for the chain it is connected on', () => {
+  const address = '0x1234567890abcdef1234567890abcdef12345678'
+  const provider = {} as Provider
+  let signMessage: jest.Mock
+
+  beforeEach(() => {
+    signMessage = jest.fn().mockResolvedValue('0xsignature')
+    mockLocalStorageGetIdentity.mockReturnValue(null)
+    mockGeneratePrivateKey.mockReturnValue(VALID_PRIVATE_KEY as `0x${string}`)
+    mockPrivateKeyToAccount.mockReturnValue({
+      address: VALID_ADDRESS as `0x${string}`,
+      publicKey: VALID_PUBLIC_KEY as `0x${string}`
+    } as ReturnType<typeof privateKeyToAccount>)
+    mockAuthenticator.initializeAuthChain.mockResolvedValue(createMockIdentity())
+    mockCreateWalletClient.mockReturnValue({
+      // WalletConnect answers eth_accounts from the approved session and filters it by the chain
+      // the provider is on, so an empty list here is not a disconnected wallet.
+      getAddresses: jest.fn().mockResolvedValue([]),
+      signMessage
+    } as unknown as ReturnType<typeof createWalletClient>)
+  })
+
+  afterEach(() => {
+    jest.clearAllMocks()
+  })
+
+  it('should sign the login message with the account the connection was established with', async () => {
+    await getIdentitySignature(address, provider)
+    const signer = mockAuthenticator.initializeAuthChain.mock.calls[0][3]
+
+    await signer('Decentraland Login')
+
+    expect(signMessage).toHaveBeenCalledWith({
+      account: '0x1234567890AbcdEF1234567890aBcdef12345678',
+      message: 'Decentraland Login'
+    })
+  })
+})
+
+describe('when the caller passes the connected account in lower case', () => {
+  // The mobile flows lowercase the address before handing it over.
+  const lowercaseAddress = '0x875efbf78ce670d1f0961783b2073f0e45a05e66'
+  const checksummedAddress = '0x875EFBF78ce670D1F0961783B2073f0e45a05E66'
+  const provider = {} as Provider
+  let signMessage: jest.Mock
+
+  beforeEach(() => {
+    signMessage = jest.fn().mockResolvedValue('0xsignature')
+    mockLocalStorageGetIdentity.mockReturnValue(null)
+    mockGeneratePrivateKey.mockReturnValue(VALID_PRIVATE_KEY as `0x${string}`)
+    mockPrivateKeyToAccount.mockReturnValue({
+      address: VALID_ADDRESS as `0x${string}`,
+      publicKey: VALID_PUBLIC_KEY as `0x${string}`
+    } as ReturnType<typeof privateKeyToAccount>)
+    mockAuthenticator.initializeAuthChain.mockResolvedValue(createMockIdentity())
+    mockCreateWalletClient.mockReturnValue({
+      getAddresses: jest.fn().mockResolvedValue([checksummedAddress]),
+      signMessage
+    } as unknown as ReturnType<typeof createWalletClient>)
+  })
+
+  afterEach(() => {
+    jest.clearAllMocks()
+  })
+
+  it('should send the checksummed address to the wallet, matching what the provider reports', async () => {
+    await getIdentitySignature(lowercaseAddress, provider)
+    const signer = mockAuthenticator.initializeAuthChain.mock.calls[0][3]
+
+    await signer('Decentraland Login')
+
+    expect(signMessage).toHaveBeenCalledWith({ account: checksummedAddress, message: 'Decentraland Login' })
+  })
+
+  it('should keep building the auth chain with the address exactly as it was passed in', async () => {
+    await getIdentitySignature(lowercaseAddress, provider)
+
+    expect(mockAuthenticator.initializeAuthChain).toHaveBeenCalledWith(
+      lowercaseAddress,
+      expect.anything(),
+      expect.any(Number),
+      expect.any(Function)
+    )
   })
 })

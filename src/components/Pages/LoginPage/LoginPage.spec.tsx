@@ -2,13 +2,18 @@ import { render, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { AuthIdentity } from '@dcl/crypto'
 import { ConnectionResponse } from 'decentraland-connect'
+import { isUserRejectedTransaction, isWalletSignatureUnsupportedError } from '../../../shared/errors'
 import { checkClockSync } from '../../../shared/utils/clockSync'
+import { handleError } from '../../../shared/utils/errorHandler'
 import { ConnectionOptionType } from '../../Connection'
 import { ConnectionLayoutState } from '../../ConnectionModal/ConnectionLayout.type'
 import { LoginPage } from './LoginPage'
 import { connectToSocialProvider, isSocialLogin } from './utils'
 
 const mockCheckClockSync = checkClockSync as jest.Mock
+const mockHandleError = handleError as jest.Mock
+const mockIsUserRejectedTransaction = isUserRejectedTransaction as jest.Mock
+const mockIsWalletSignatureUnsupportedError = isWalletSignatureUnsupportedError as unknown as jest.Mock
 
 // --- Mocks ---
 
@@ -110,7 +115,9 @@ jest.mock('../../../shared/utils/errorHandler', () => ({
 
 jest.mock('../../../shared/errors', () => ({
   isErrorWithName: jest.fn().mockReturnValue(false),
-  isUserRejectedTransaction: jest.fn().mockReturnValue(false)
+  isExpectedWalletError: jest.fn().mockReturnValue(false),
+  isUserRejectedTransaction: jest.fn().mockReturnValue(false),
+  isWalletSignatureUnsupportedError: jest.fn().mockReturnValue(false)
 }))
 
 jest.mock('../../../shared/locations', () => ({
@@ -146,7 +153,14 @@ jest.mock('../../ClockSyncModal', () => ({
 
 jest.mock('../../ConnectionModal', () => ({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ConnectionModal: (props: any) => <div data-testid="connection-modal" data-open={String(props.open)} data-state={props.state} />
+  ConnectionModal: (props: any) => (
+    <div
+      data-testid="connection-modal"
+      data-open={String(props.open)}
+      data-state={props.state}
+      data-error-detail={props.errorDetail ?? ''}
+    />
+  )
 }))
 
 jest.mock('../../EmailLoginModal', () => ({
@@ -310,6 +324,144 @@ describe('LoginPage', () => {
     })
   })
 
+  describe('when the wallet fails to sign the login message', () => {
+    let connectionResponse: ConnectionResponse
+
+    beforeEach(() => {
+      connectionResponse = createMockConnectionResponse()
+      mockConnectToProvider.mockResolvedValue(connectionResponse)
+      mockCheckClockSync.mockResolvedValue(true)
+      mockIsUserRejectedTransaction.mockReturnValue(false)
+      mockIsWalletSignatureUnsupportedError.mockReturnValue(false)
+      mockHandleError.mockReturnValue('Request expired. Please try again.')
+      mockGetIdentitySignature.mockRejectedValue(new Error('Request expired. Please try again.'))
+
+      Object.defineProperty(window, 'ethereum', { value: {}, writable: true, configurable: true })
+    })
+
+    afterEach(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      delete (window as any).ethereum
+    })
+
+    it('should not blame the user for a confirmation the wallet never showed', async () => {
+      render(<LoginPage />)
+
+      await waitFor(() => {
+        expect(capturedOnConnect).toBeDefined()
+      })
+
+      capturedOnConnect!(ConnectionOptionType.METAMASK)
+
+      await waitFor(() => {
+        const modal = document.querySelector('[data-testid="connection-modal"]')
+        expect(modal?.getAttribute('data-state')).toBe(ConnectionLayoutState.ERROR_GENERIC)
+      })
+    })
+
+    it('should surface the underlying error so support can act on it', async () => {
+      render(<LoginPage />)
+
+      await waitFor(() => {
+        expect(capturedOnConnect).toBeDefined()
+      })
+
+      capturedOnConnect!(ConnectionOptionType.METAMASK)
+
+      await waitFor(() => {
+        const modal = document.querySelector('[data-testid="connection-modal"]')
+        expect(modal?.getAttribute('data-error-detail')).toBe('Request expired. Please try again.')
+      })
+    })
+  })
+
+  describe('and the wallet did not approve the signing method the login needs', () => {
+    let connectionResponse: ConnectionResponse
+
+    beforeEach(() => {
+      connectionResponse = createMockConnectionResponse()
+      mockConnectToProvider.mockResolvedValue(connectionResponse)
+      mockCheckClockSync.mockResolvedValue(true)
+      mockIsUserRejectedTransaction.mockReturnValue(false)
+      mockIsWalletSignatureUnsupportedError.mockReturnValue(true)
+      mockHandleError.mockReturnValue('The connected wallet did not approve the signing method required to log in')
+      mockGetIdentitySignature.mockRejectedValue(new Error('unsupported'))
+
+      Object.defineProperty(window, 'ethereum', { value: {}, writable: true, configurable: true })
+    })
+
+    afterEach(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      delete (window as any).ethereum
+    })
+
+    it('should tell the user to connect a different wallet instead of retrying the same one', async () => {
+      render(<LoginPage />)
+
+      await waitFor(() => {
+        expect(capturedOnConnect).toBeDefined()
+      })
+
+      capturedOnConnect!(ConnectionOptionType.METAMASK)
+
+      await waitFor(() => {
+        const modal = document.querySelector('[data-testid="connection-modal"]')
+        expect(modal?.getAttribute('data-state')).toBe(ConnectionLayoutState.ERROR_WALLET_SIGNATURE_UNSUPPORTED)
+      })
+    })
+  })
+
+  describe('and the user rejected the signature in the wallet', () => {
+    let connectionResponse: ConnectionResponse
+
+    beforeEach(() => {
+      connectionResponse = createMockConnectionResponse()
+      mockConnectToProvider.mockResolvedValue(connectionResponse)
+      mockCheckClockSync.mockResolvedValue(true)
+      mockIsUserRejectedTransaction.mockReturnValue(true)
+      mockGetIdentitySignature.mockRejectedValue({ code: 4001, message: 'User rejected the request.' })
+
+      Object.defineProperty(window, 'ethereum', { value: {}, writable: true, configurable: true })
+    })
+
+    afterEach(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      delete (window as any).ethereum
+    })
+
+    it('should keep the did-not-confirm message, which is accurate for a rejection', async () => {
+      render(<LoginPage />)
+
+      await waitFor(() => {
+        expect(capturedOnConnect).toBeDefined()
+      })
+
+      capturedOnConnect!(ConnectionOptionType.METAMASK)
+
+      await waitFor(() => {
+        const modal = document.querySelector('[data-testid="connection-modal"]')
+        expect(modal?.getAttribute('data-state')).toBe(ConnectionLayoutState.ERROR)
+      })
+    })
+
+    it('should not report the rejection to Sentry', async () => {
+      render(<LoginPage />)
+
+      await waitFor(() => {
+        expect(capturedOnConnect).toBeDefined()
+      })
+
+      capturedOnConnect!(ConnectionOptionType.METAMASK)
+
+      await waitFor(() => {
+        const modal = document.querySelector('[data-testid="connection-modal"]')
+        expect(modal?.getAttribute('data-state')).toBe(ConnectionLayoutState.ERROR)
+      })
+
+      expect(mockHandleError).not.toHaveBeenCalled()
+    })
+  })
+
   describe('when an email login completes successfully', () => {
     let freshIdentity: AuthIdentity
 
@@ -439,10 +591,12 @@ describe('LoginPage', () => {
 
       capturedOnConnect!(ConnectionOptionType.GOOGLE)
 
+      // ERROR_GENERIC, not ERROR: an OAuth provider failing has nothing to do with confirming
+      // something in a wallet, so the did-not-confirm copy would be actively misleading here.
       await waitFor(() => {
         const modal = document.querySelector('[data-testid="connection-modal"]')
         expect(modal?.getAttribute('data-open')).toBe('true')
-        expect(modal?.getAttribute('data-state')).toBe(ConnectionLayoutState.ERROR)
+        expect(modal?.getAttribute('data-state')).toBe(ConnectionLayoutState.ERROR_GENERIC)
       })
     })
   })
