@@ -224,6 +224,12 @@ export const LoginPage = () => {
         type: providerType
       })
 
+      // Whether the wallet was ever asked to sign. Everything before that point is the connect
+      // phase, where no confirmation prompt exists yet — so a failure there must never be reported
+      // as the user not confirming one. The #517 reporter saw exactly that: the did-not-confirm
+      // modal while the WalletConnect QR was still on screen, before they had opened their wallet.
+      let hasAskedWalletToSign = false
+
       try {
         if (isLoggingInThroughSocial) {
           // CP2 reached is tracked from CallbackPage after the OAuth redirect returns
@@ -255,6 +261,7 @@ export const LoginPage = () => {
           })
 
           setLoadingState(ConnectionLayoutState.WAITING_FOR_SIGNATURE)
+          hasAskedWalletToSign = true
           const freshIdentity = await getIdentitySignature(connectionData)
 
           // Clear any stored social login emails since this is a wallet login
@@ -275,19 +282,22 @@ export const LoginPage = () => {
           }
         }
       } catch (error) {
-        if (isUserRejectedTransaction(error)) {
-          console.info('User rejected login signature in wallet — not reporting to Sentry')
-          setConnectionErrorDetail(null)
-          setLoadingState(ConnectionLayoutState.ERROR)
-          return
+        const isRejection = isUserRejectedTransaction(error)
+        if (isRejection) {
+          console.info('User rejected the login in their wallet — not reporting to Sentry')
         }
 
-        const errorMessage = handleError(error, 'Error during login connection', {
-          sentryTags: {
-            isWeb2Wallet: isLoggingInThroughSocial,
-            connectionType
-          }
-        })
+        // A rejection is the user's own action, so it stays out of Sentry. Everything else is
+        // reported, including the two states below that have their own copy.
+        const errorMessage = isRejection
+          ? null
+          : handleError(error, 'Error during login connection', {
+              sentryTags: {
+                isWeb2Wallet: isLoggingInThroughSocial,
+                connectionType,
+                phase: hasAskedWalletToSign ? 'signing' : 'connecting'
+              }
+            })
 
         if (isWalletSignatureUnsupportedError(error)) {
           // Deliberately left out of `isExpectedWalletError`, so `handleError` above still reports
@@ -298,16 +308,18 @@ export const LoginPage = () => {
         } else if (isErrorWithName(error) && error.name === 'ErrorUnlockingWallet') {
           setConnectionErrorDetail(null)
           setLoadingState(ConnectionLayoutState.ERROR_LOCKED_WALLET)
-        } else if (isExpectedWalletError(error)) {
-          // A prompt already open for this origin or a dismissed chooser: the wallet is fine and a
-          // retry is the right next step, so the existing copy fits and the raw message adds nothing.
+        } else if (!hasAskedWalletToSign) {
+          // The connect phase never showed the user anything to confirm, so it gets connection
+          // copy. The technical reason is still surfaced unless it is a condition we already
+          // understand (a dismissed chooser, a prompt already open), where it adds only noise.
+          setConnectionErrorDetail(isRejection || isExpectedWalletError(error) ? null : errorMessage)
+          setLoadingState(ConnectionLayoutState.ERROR_CONNECTION_FAILED)
+        } else if (isRejection || isExpectedWalletError(error)) {
+          // Past this point the wallet really was asked to sign, so the did-not-confirm copy fits.
           setConnectionErrorDetail(null)
           setLoadingState(ConnectionLayoutState.ERROR)
         } else {
-          // Only an explicit rejection gets the "you did not confirm in your wallet" copy. Using it
-          // for every failure points the user at a wallet that never prompted and leaves retrying —
-          // which fails identically — as the only way out.
-          setConnectionErrorDetail(errorMessage || null)
+          setConnectionErrorDetail(errorMessage)
           setLoadingState(ConnectionLayoutState.ERROR_GENERIC)
         }
       }
