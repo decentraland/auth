@@ -54,6 +54,7 @@
   "connection_layout": {
     "error": "You did not confirm this action in your digital wallet extension. To continue, please try again.",
     "error_locked_wallet": "Your wallet is currently locked. To continue, please unlock your wallet and try again.",
+    "error_wallet_signature_unsupported": "Your wallet can't sign the Decentraland login request. To continue, please connect with a different wallet.",
     "waiting_for_signature": "Confirm in your digital wallet extension to continue.",
     "waiting_for_signature_magic": "Almost done! Confirm your request to login Decentraland",
     "validating_sign_in": "Just a moment, we're verifying your login credentials...",

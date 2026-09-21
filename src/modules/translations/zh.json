@@ -54,6 +54,7 @@
   "connection_layout": {
     "error": "您未在数字钱包扩展程序中确认此操作。要继续，请重试。",
     "error_locked_wallet": "您的钱包当前已锁定。要继续，请解锁钱包后重试。",
+    "error_wallet_signature_unsupported": "您的钱包无法签署 Decentraland 的登录请求。要继续，请使用其他钱包连接。",
     "waiting_for_signature": "请在数字钱包扩展程序中确认以继续。",
     "waiting_for_signature_magic": "即将完成！请确认您的登录请求",
     "validating_sign_in": "请稍候，我们正在验证您的登录凭据...",

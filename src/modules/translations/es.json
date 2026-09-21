@@ -54,6 +54,7 @@
   "connection_layout": {
     "error": "No confirmaste esta acción en la extensión de tu billetera digital. Para continuar, por favor inténtalo de nuevo.",
     "error_locked_wallet": "Tu billetera está actualmente bloqueada. Para continuar, por favor desbloquea tu billetera e inténtalo de nuevo.",
+    "error_wallet_signature_unsupported": "Tu billetera no puede firmar la solicitud de inicio de sesión de Decentraland. Para continuar, conéctate con otra billetera.",
     "waiting_for_signature": "Confirma en la extensión de tu billetera digital para continuar.",
     "waiting_for_signature_magic": "¡Casi listo! Confirma tu solicitud para iniciar sesión en Decentraland",
     "validating_sign_in": "Un momento, estamos verificando tus credenciales de inicio de sesión...",

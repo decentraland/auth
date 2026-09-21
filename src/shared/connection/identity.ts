@@ -1,9 +1,11 @@
-import { createWalletClient, custom } from 'viem'
+import { createWalletClient, custom, getAddress } from 'viem'
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
 import { mainnet } from 'viem/chains'
 import { AuthIdentity, Authenticator } from '@dcl/crypto'
 import { localStorageGetIdentity, localStorageStoreIdentity } from '@dcl/single-sign-on-client'
 import { Provider } from 'decentraland-connect'
+import { WalletSignatureUnsupportedError } from '../errors'
+import { canRelayPersonalSign } from './walletConnect'
 
 const ONE_MONTH_IN_MINUTES = 60 * 24 * 30
 
@@ -44,17 +46,30 @@ async function generateIdentity(
   provider: Provider,
   expirationInMinutes: number = ONE_MONTH_IN_MINUTES
 ): Promise<AuthIdentity> {
+  if (!canRelayPersonalSign(provider)) {
+    throw new WalletSignatureUnsupportedError()
+  }
+
   const walletClient = createWalletClient({
     chain: mainnet,
     transport: custom(provider)
   })
-  const [account] = await walletClient.getAddresses()
 
-  if (!account) {
-    throw new Error('No account found in wallet provider')
-  }
+  // Sign with the account the connection was established with instead of re-reading it from
+  // `eth_accounts`. That call is not a round trip to the wallet on WalletConnect: the universal
+  // provider answers it from the approved session and filters the accounts by the chain it is
+  // currently on, so it comes back empty whenever the two disagree — aborting the login before
+  // the wallet is ever asked to sign. It is also the address the auth chain is built with, so
+  // signing with anything else would produce an identity that fails validation.
+  // `getAddress` both validates the shape and normalizes the casing. Callers pass the connected
+  // account in whatever casing they hold it — the mobile flows lowercase it first — while providers
+  // report it checksummed, and this keeps the value on the wire the one the provider itself gave
+  // us instead of making each wallet's casing tolerance part of whether login works. A malformed
+  // address fails here, with viem naming it, rather than as an opaque RPC error later. The auth
+  // chain still gets the address exactly as it was passed in.
+  const signerAccount = getAddress(address)
 
-  return generateIdentityWithSigner(address, message => walletClient.signMessage({ account, message }), expirationInMinutes)
+  return generateIdentityWithSigner(address, message => walletClient.signMessage({ account: signerAccount, message }), expirationInMinutes)
 }
 
 /**
