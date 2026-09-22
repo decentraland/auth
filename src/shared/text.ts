@@ -1,9 +1,10 @@
 // Characters a reader cannot see, or that change how the text around them is laid out: controls other than
 // tab, newline and carriage return (C0 and C1), format characters such as zero-width and bidi controls,
-// surrogates, private-use and unassigned code points, and the line and paragraph separators. Defined by
-// Unicode category rather than by enumerated ranges. The one pattern behind every rule that asks whether text
-// can be read as it is shown.
-const HIDDEN_CHARACTER_PATTERN = '(?![\\t\\n\\r])[\\p{C}\\p{Zl}\\p{Zp}]'
+// surrogates, private-use and unassigned code points, and the line and paragraph separators. Default-ignorable
+// characters also include combining marks and letters outside category C (such as grapheme joiners,
+// variation selectors and Hangul fillers). Their bytes must remain visible too. Defined by Unicode properties
+// rather than enumerated ranges, shared by every rule that asks whether text can be read as it is shown.
+const HIDDEN_CHARACTER_PATTERN = '(?![\\t\\n\\r])[\\p{C}\\p{Zl}\\p{Zp}\\p{Default_Ignorable_Code_Point}]'
 const HIDDEN_CHARACTER_REGEX = new RegExp(HIDDEN_CHARACTER_PATTERN, 'gu')
 
 const capitalize = (str: string) => str.charAt(0).toUpperCase() + str.slice(1)

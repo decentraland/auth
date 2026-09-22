@@ -83,6 +83,7 @@
       "payload_data": "Données",
       "payload_chain": "Chaîne",
       "relayed_note": "Votre portefeuille vous demandera de signer cette action. Decentraland la soumet pour vous et prend en charge les frais.",
+      "raw_message_warning": "Ce message ne peut pas être affiché de manière fiable sous forme de texte. Les octets exacts à signer sont affichés ci-dessous en hexadécimal. N’approuvez que si vous comprenez ce que vous signez.",
       "scroll_hint": "Faites défiler le contenu jusqu'à la fin avant de continuer.",
       "acknowledge": "J'ai lu tout ce qui précède et j'assume l'entière responsabilité de ce que cette action fera avec mon portefeuille, y compris toute perte d'actifs.",
       "review_restarted_notice": "Le réseau de votre portefeuille a changé ou n'a pas pu être vérifié, cette demande a donc été réexaminée sur le réseau actuel."
@@ -171,6 +172,9 @@
       "confirm_gift": "Confirmer le cadeau pour",
       "creator_of": "CRÉATEUR DE",
       "view_recipient_on_explorer": "Voir le destinataire sur {explorer}",
+      "asset_network": "Réseau",
+      "asset_contract": "Contrat",
+      "asset_token_id": "Identifiant du token",
       "processing_authorization": "Traitement de l'autorisation",
       "gifting_warning": "Offrir un objet est irréversible."
     },

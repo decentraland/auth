@@ -83,6 +83,7 @@
       "payload_data": "Dati",
       "payload_chain": "Catena",
       "relayed_note": "Il tuo wallet ti chiederà di firmare questa azione. Decentraland la invia per te e copre il gas.",
+      "raw_message_warning": "Questo messaggio non può essere visualizzato in modo affidabile come testo. I byte esatti da firmare sono mostrati sotto in formato esadecimale. Approva solo se comprendi cosa stai firmando.",
       "scroll_hint": "Scorri fino alla fine del contenuto prima di continuare.",
       "acknowledge": "Ho letto tutto quanto sopra e mi assumo la piena responsabilità di ciò che questa azione farà con il mio wallet, inclusa qualsiasi perdita di asset.",
       "review_restarted_notice": "La rete del tuo wallet è cambiata o non è stato possibile verificarla, quindi questa richiesta è stata riesaminata sulla rete attuale."
@@ -171,6 +172,9 @@
       "confirm_gift": "Conferma regalo per",
       "creator_of": "CREATORE DI",
       "view_recipient_on_explorer": "Vedi il destinatario su {explorer}",
+      "asset_network": "Rete",
+      "asset_contract": "Contratto",
+      "asset_token_id": "ID del token",
       "processing_authorization": "Elaborazione autorizzazione",
       "gifting_warning": "Regalare un oggetto è irreversibile."
     },

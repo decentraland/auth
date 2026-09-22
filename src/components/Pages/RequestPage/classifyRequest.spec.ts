@@ -891,6 +891,21 @@ describe('when classifying a request', () => {
   })
 
   describe('and it is a personal_sign', () => {
+    describe.each(['plaintext', 'hex'] as const)('and %s carries a default-ignorable combining character', encoding => {
+      let message: string
+      let hex: string
+
+      beforeEach(async () => {
+        message = 'Confirm\u034f this message'
+        hex = stringToHex(message)
+        classification = await classifyRequest(personalSignRequest(encoding === 'hex' ? hex : message), context)
+      })
+
+      it('should expose the signed bytes instead of hiding part of the message', () => {
+        expect(classification).toEqual({ kind: 'personal_sign', text: null, hex })
+      })
+    })
+
     describe('and the message is hex-encoded text', () => {
       beforeEach(async () => {
         classification = await classifyRequest(personalSignRequest(`0x${stringToHex('Hello, world').slice(2).toUpperCase()}`), context)
