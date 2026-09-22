@@ -2,6 +2,7 @@ import { browserTracingIntegration, init, replayIntegration, setTag, setUser } f
 import { Env } from '@dcl/ui-env/dist/env'
 import { getMobileSession, isMobileSession } from '../../shared/mobile'
 import { config } from '../config'
+import { isOauthCallbackPath, sanitizeTelemetryData } from './privacy'
 
 const mobile = isMobileSession()
 const dsn = mobile ? config.get('SENTRY_DSN_MOBILE') : config.get('SENTRY_DSN')
@@ -12,7 +13,15 @@ init({
   dsn,
   // Explicitly mask all text and media in Session Replay. This surface renders email/OTP
   // inputs and sign-in verification codes, so we never want replays to capture their values.
-  integrations: [browserTracingIntegration(), replayIntegration({ maskAllText: true, blockAllMedia: true })],
+  integrations: [
+    browserTracingIntegration(),
+    // Replay's DOM recorder metadata cannot be scrubbed through beforeAddRecordingEvent. Do not
+    // record callback documents while their URL still carries the authorization response.
+    ...(!isOauthCallbackPath(window.location.pathname)
+      ? [replayIntegration({ maskAllText: true, blockAllMedia: true, beforeAddRecordingEvent: sanitizeTelemetryData })]
+      : []),
+    { name: 'AuthUrlPrivacy', processEvent: sanitizeTelemetryData }
+  ],
   // Performance Monitoring
   tracesSampleRate: 0.001,
   // Session Replay
