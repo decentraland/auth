@@ -114,4 +114,32 @@ async function hasLiveWalletConnectSession(provider: unknown): Promise<boolean> 
   }
 }
 
-export { canRelayPersonalSign, getApprovedEip155Methods, hasLiveWalletConnectSession, isMissingSessionError }
+/**
+ * wagmi persists its own connection state — the active connector and account — under this prefix,
+ * independently of the WalletConnect session.
+ */
+const WAGMI_STORAGE_PREFIX = 'wagmi.'
+
+/**
+ * Clears wagmi's persisted connection state.
+ *
+ * `WalletConnectV2Connector.clearStorage()` removes the `wc@2:` and `@appkit` keys but not these,
+ * so the next AppKit restores a connection whose WalletConnect session no longer exists. That
+ * split state is what produces a provider that reports an account and can never sign, and it also
+ * sends the connector down its recovery path, building a second AppKit — and a second relay
+ * connection — while the first is still alive. Clearing both together keeps the account and the
+ * session from ever disagreeing.
+ */
+function clearWagmiStorage(): void {
+  try {
+    Object.keys(localStorage)
+      .filter(key => key.startsWith(WAGMI_STORAGE_PREFIX))
+      .forEach(key => localStorage.removeItem(key))
+  } catch (error) {
+    // Storage can be unavailable (private mode, blocked cookies). The connection attempt should
+    // still go ahead; the worst case is the state we were trying to drop surviving.
+    console.warn('Could not clear the stored wagmi connection state', error)
+  }
+}
+
+export { canRelayPersonalSign, clearWagmiStorage, getApprovedEip155Methods, hasLiveWalletConnectSession, isMissingSessionError }
