@@ -1,4 +1,10 @@
-import { canRelayPersonalSign, getApprovedEip155Methods, hasLiveWalletConnectSession, isMissingSessionError } from './walletConnect'
+import {
+  canRelayPersonalSign,
+  clearWagmiStorage,
+  getApprovedEip155Methods,
+  hasLiveWalletConnectSession,
+  isMissingSessionError
+} from './walletConnect'
 
 const buildSession = (namespaces: Record<string, { methods?: unknown }>) => ({ namespaces })
 
@@ -168,6 +174,54 @@ describe('hasLiveWalletConnectSession', () => {
   describe('when the provider cannot be probed at all', () => {
     it('should fail open and keep the connection', async () => {
       await expect(hasLiveWalletConnectSession(undefined)).resolves.toBe(true)
+    })
+  })
+})
+
+describe('clearWagmiStorage', () => {
+  describe('when wagmi has persisted a connection', () => {
+    beforeEach(() => {
+      localStorage.clear()
+      localStorage.setItem('wagmi.store', '{"state":{"connections":{}}}')
+      localStorage.setItem('wagmi.recentConnectorId', '"walletConnect"')
+      localStorage.setItem('single-sign-on-0xabc', '{}')
+    })
+
+    afterEach(() => {
+      localStorage.clear()
+    })
+
+    it('should remove every wagmi key, so no account outlives its WalletConnect session', () => {
+      clearWagmiStorage()
+
+      expect(Object.keys(localStorage).filter(key => key.startsWith('wagmi.'))).toEqual([])
+    })
+
+    it('should leave unrelated keys alone', () => {
+      clearWagmiStorage()
+
+      expect(localStorage.getItem('single-sign-on-0xabc')).toBe('{}')
+    })
+  })
+
+  describe('when storage is unavailable', () => {
+    let removeItemSpy: jest.SpyInstance
+
+    beforeEach(() => {
+      localStorage.clear()
+      localStorage.setItem('wagmi.store', '{}')
+      removeItemSpy = jest.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
+        throw new Error('Access is denied for this document')
+      })
+    })
+
+    afterEach(() => {
+      removeItemSpy.mockRestore()
+      localStorage.clear()
+    })
+
+    it('should not throw, so the connection attempt still goes ahead', () => {
+      expect(() => clearWagmiStorage()).not.toThrow()
     })
   })
 })

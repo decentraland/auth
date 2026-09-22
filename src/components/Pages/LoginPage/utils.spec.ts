@@ -133,6 +133,14 @@ describe('connectToProvider', () => {
       expect(mockClearStorage).toHaveBeenCalled()
     })
 
+    it("should drop wagmi's persisted connection too, so no account outlives the session", async () => {
+      localStorage.setItem('wagmi.store', '{"state":{}}')
+
+      await connectToProvider(ConnectionOptionType.WALLET_CONNECT)
+
+      expect(localStorage.getItem('wagmi.store')).toBeNull()
+    })
+
     it('should clear the stored session before connecting, so the session cannot be reused', async () => {
       await connectToProvider(ConnectionOptionType.WALLET_CONNECT)
 

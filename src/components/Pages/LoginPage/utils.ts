@@ -3,7 +3,7 @@ import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
 import { Env } from '@dcl/ui-env'
 import { ConnectionResponse, WalletConnectV2Connector, connection, getConfiguration } from 'decentraland-connect'
 import { config } from '../../../modules/config'
-import { hasLiveWalletConnectSession } from '../../../shared/connection/walletConnect'
+import { clearWagmiStorage, hasLiveWalletConnectSession } from '../../../shared/connection/walletConnect'
 import { extractReferrerFromSearchParameters } from '../../../shared/locations'
 import { ConnectionOptionType, SignInOptionsMode } from '../../Connection'
 import { FeatureFlagsKeys, SignInPrimaryOptionVariant } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
@@ -137,6 +137,7 @@ async function connectToProvider(connectionOption: ConnectionOptionType): Promis
       // restores go through `connection.tryPreviousConnection()` and never reach this function, so
       // the session reuse the handoff depends on is untouched.
       WalletConnectV2Connector.clearStorage()
+      clearWagmiStorage()
     }
 
     let connectionData = await connection.connect(providerType)
@@ -150,6 +151,7 @@ async function connectToProvider(connectionOption: ConnectionOptionType): Promis
     if (providerType === ProviderType.WALLET_CONNECT_V2 && !(await hasLiveWalletConnectSession(connectionData.provider))) {
       console.warn('WalletConnect reported a connection with no session — re-pairing')
       WalletConnectV2Connector.clearStorage()
+      clearWagmiStorage()
       connectionData = await connection.connect(providerType)
     }
 
