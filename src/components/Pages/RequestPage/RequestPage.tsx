@@ -59,6 +59,7 @@ import {
   getPayloadFingerprint,
   isTransactionClassification
 } from './classifyRequest'
+import { MILLISECONDS_PER_SECOND } from './creditsPurchase'
 import { CreditsPurchaseData, GasEstimateState, MANATransferData, NFTTransferData, TransferType } from './types'
 import {
   decodeManaTransferData,
@@ -95,7 +96,7 @@ import {
   TransferConfirmView,
   WalletInteractionComplete
 } from './Views'
-import type { ActionRequestPayload, SigningErrorKind } from './Views'
+import type { ActionRequestPayload, SignatureDelivery, SigningErrorKind } from './Views'
 import { ConfirmRequestGas } from './Views/ConfirmRequestDialog'
 import { useAcknowledgment } from './Views/useAcknowledgment'
 import { forwardSignatureRequest, toWalletSignatureRequest } from './walletSignatureRequest'
@@ -159,8 +160,6 @@ const INTERACTION_VIEWS = new Set([
   View.WALLET_CREDITS_INTERACTION
 ])
 
-const MILLISECONDS_PER_SECOND = 1000
-
 // One credit is a fixed ten US cents, and the credits ledger accounts in cents, so a price derived in
 // credits is compared against it in cents. Same peg the decoder divides by (USD_WEI_PER_CREDIT).
 const CENTS_PER_CREDIT = 10n
@@ -173,13 +172,6 @@ const RPC_INVALID_PARAMS = -32602
 type ReviewRestartReason = 'network_changed' | 'network_unreadable' | 'network_unrecorded' | 'wallet_rejected_chain' | 'lookup_unavailable'
 
 type DecentralandTransaction = Extract<RequestClassification, { kind: 'dcl_transaction' }>
-
-/**
- * What happened to a signature after the wallet produced it. Creating a signature and delivering it are two
- * different events and the second one can fail on its own, so the screen that reports the first must not
- * speak for the second.
- */
-type SignatureDelivery = 'delivering' | 'delivered' | 'failed'
 
 /**
  * Exactly what the wallet will be handed for a classified request, for the generic review to show whole:

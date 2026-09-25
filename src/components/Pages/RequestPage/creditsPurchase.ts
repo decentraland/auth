@@ -41,7 +41,7 @@ function minimum(...values: readonly bigint[]): bigint {
 // The trade checks store their timestamps in seconds (the contract compares them with block.timestamp).
 // marketplace-server hands them out in milliseconds and the Explorer normalizes before encoding, so what
 // is signed is always seconds.
-const SECONDS_PER_MILLISECOND = 1000
+const MILLISECONDS_PER_SECOND = 1000
 
 // At most this many credits may be spent in one purchase. The credits-server signs exactly one ephemeral
 // credit per transaction (a longer list is consumed in order and its tail is never reported, see the shop's
@@ -157,7 +157,7 @@ function isEmptyBytes(value: unknown): boolean {
 
 /** Timestamps are signed in seconds; a value large enough to be milliseconds is not one this screen reads. */
 function isSeconds(value: bigint): boolean {
-  return value < BigInt(Number.MAX_SAFE_INTEGER) / BigInt(SECONDS_PER_MILLISECOND)
+  return value < BigInt(Number.MAX_SAFE_INTEGER) / BigInt(MILLISECONDS_PER_SECOND)
 }
 
 /**
@@ -433,6 +433,7 @@ export {
   ASSET_TYPE_ERC20,
   ASSET_TYPE_ERC721,
   ASSET_TYPE_USD_PEGGED_MANA,
+  MILLISECONDS_PER_SECOND,
   USD_WEI_PER_CREDIT,
   recognizeCreditsPurchase,
   toCredits
