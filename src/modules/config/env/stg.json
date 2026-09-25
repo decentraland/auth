@@ -13,6 +13,7 @@
   "WEARABLE_PREVIEW_URL": "https://wearable-preview.decentraland.today",
   "DOWNLOAD_URL": "https://decentraland.zone/download",
   "META_TRANSACTION_SERVER_URL": "https://transactions-api.decentraland.today",
+  "CREDITS_SERVER_URL": "https://credits.decentraland.org",
   "PLACES_API_URL": "https://places.decentraland.today",
   "PROFILE_CONSISTENCY_CHECK_TIMEOUT": "10000",
   "EVENTS_NOTIFIER_URL": "https://events-notifier.decentraland.zone",

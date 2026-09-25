@@ -194,6 +194,53 @@
       "default_text": "You can close this tab and return to the Decentraland app."
     }
   },
+  "credits_purchase": {
+    "unnamed_item": "Item #{id}",
+    "item_identifiers": "Collection {collection} · item {id}",
+    "token_identifiers": "Contract {collection} · token {id}",
+    "confirm": {
+      "title": "Confirm your purchase",
+      "processing_title": "Confirming your purchase",
+      "price_label": "PRICE",
+      "price": "{credits} credits",
+      "quantity": "QUANTITY 1",
+      "delivered_to": "Delivered to your account {address}",
+      "approve": "Confirm purchase",
+      "processing": "Processing Authorization"
+    },
+    "signed": {
+      "title_delivering": "Signature created",
+      "description_delivering": "Sending it back to Decentraland…",
+      "title": "Signature sent",
+      "description": "Your signature was sent back to Decentraland. Go back to the app to see whether the purchase goes through — this page can't tell you.",
+      "title_failed": "Signature not delivered",
+      "description_failed": "Your signature was created, but Decentraland couldn't be reached to receive it. Go back to the app and check there before approving anything again.",
+      "price_label": "AUTHORIZED FOR"
+    },
+    "canceled": {
+      "title": "Purchase canceled",
+      "description": "Nothing was signed and no credits were spent.",
+      "price_label": "WOULD HAVE COST"
+    },
+    "details": {
+      "title": "Technical details",
+      "collection": "Collection",
+      "token_contract": "Token contract",
+      "item_id": "Item id",
+      "token_id": "Token id",
+      "recipient": "Delivered to",
+      "seller": "Listed by",
+      "payment_beneficiary": "Payment goes to",
+      "price_usd_wei": "Signed price (USD wei, 1e18 = $1)",
+      "max_credited_mana": "Most the credit may pay (MANA, not credits)",
+      "credits_manager": "Credits contract",
+      "marketplace": "Marketplace contract",
+      "payment_token": "Payment token",
+      "expires_at": "Authorization expires",
+      "trade_expires_at": "Listing expires",
+      "network": "Network"
+    }
+  },
   "setup": {
     "welcome": "Welcome to Decentraland!",
     "journey_begins": "Your journey begins here",

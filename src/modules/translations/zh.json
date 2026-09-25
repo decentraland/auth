@@ -194,6 +194,53 @@
       "default_text": "您可以关闭此标签页并返回 Decentraland 应用。"
     }
   },
+  "credits_purchase": {
+    "unnamed_item": "物品 #{id}",
+    "item_identifiers": "合集 {collection} · 物品 {id}",
+    "token_identifiers": "合约 {collection} · 代币 {id}",
+    "confirm": {
+      "title": "确认你的购买",
+      "processing_title": "正在确认你的购买",
+      "price_label": "价格",
+      "price": "{credits} 信用点",
+      "quantity": "数量 1",
+      "delivered_to": "将发送至你的账户 {address}",
+      "approve": "确认购买",
+      "processing": "正在处理授权"
+    },
+    "signed": {
+      "title_delivering": "签名已创建",
+      "description_delivering": "正在发回 Decentraland…",
+      "title": "签名已发送",
+      "description": "你的签名已发回 Decentraland。请返回应用查看购买是否完成 — 本页面无法告诉你。",
+      "title_failed": "签名未送达",
+      "description_failed": "签名已创建，但无法联系到 Decentraland 接收它。请返回应用查看后再决定是否重新批准。",
+      "price_label": "授权金额"
+    },
+    "canceled": {
+      "title": "购买已取消",
+      "description": "未签署任何内容，也未花费任何信用点。",
+      "price_label": "原价"
+    },
+    "details": {
+      "title": "技术细节",
+      "collection": "合集",
+      "token_contract": "代币合约",
+      "item_id": "物品 ID",
+      "token_id": "代币 ID",
+      "recipient": "发送至",
+      "seller": "挂单账户",
+      "payment_beneficiary": "款项发往",
+      "price_usd_wei": "签名价格（USD wei，1e18 = 1 美元）",
+      "max_credited_mana": "信用点最多可支付（MANA，非信用点）",
+      "credits_manager": "信用点合约",
+      "marketplace": "市场合约",
+      "payment_token": "支付代币",
+      "expires_at": "授权过期时间",
+      "trade_expires_at": "挂单过期时间",
+      "network": "网络"
+    }
+  },
   "setup": {
     "welcome": "欢迎来到 Decentraland！",
     "journey_begins": "您的旅程从这里开始",

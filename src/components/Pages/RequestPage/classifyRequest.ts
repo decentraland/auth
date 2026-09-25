@@ -20,6 +20,7 @@ import {
 import { SUPPORTED_CHAIN_IDS } from '../../../shared/chains'
 import { HIDDEN_CHARACTER_PATTERN } from '../../../shared/text'
 import { isRecord } from '../../../shared/utils/isRecord'
+import { CreditsRecognition, MILLISECONDS_PER_SECOND, recognizeCreditsPurchase } from './creditsPurchase'
 import { buildTransactionParams } from './transactionParams'
 import { TypedDataPayload } from './types'
 
@@ -94,6 +95,12 @@ type RequestClassification =
       chainId: number
       typedData: TypedDataPayload
       raw: string
+      /**
+       * Whether this is a credits purchase the dedicated approval may stand in for, decided here from the
+       * bytes alone (see recognizeCreditsPurchase). Everything else — a credits call of another shape
+       * included — stays on the generic review.
+       */
+      credits: CreditsRecognition
     }
   | {
       kind: 'unknown_meta_transaction'
@@ -414,7 +421,12 @@ async function classifyTypedData(method: string, params: unknown[], context: Cla
     calldata: resolved.calldata,
     chainId: resolved.chainId,
     typedData,
-    raw
+    raw,
+    credits: recognizeCreditsPurchase(knownContract, call, {
+      signerAddress: context.signerAddress,
+      chainId: resolved.chainId,
+      nowSeconds: Date.now() / MILLISECONDS_PER_SECOND
+    })
   }
 }
 
@@ -500,7 +512,12 @@ function describeClassification(classification: RequestClassification): Record<s
         branded: classification.branded
       }
     case 'dcl_meta_transaction':
-      return { kind: classification.kind, contractName: classification.contract.name, functionName: classification.call.functionName }
+      return {
+        kind: classification.kind,
+        contractName: classification.contract.name,
+        functionName: classification.call.functionName,
+        credits: classification.credits.status === 'unsupported' ? classification.credits.reason : classification.credits.status
+      }
     case 'unknown_transaction':
     case 'unknown_meta_transaction':
       return { kind: classification.kind, reason: classification.reason }
