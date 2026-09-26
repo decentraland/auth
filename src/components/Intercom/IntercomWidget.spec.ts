@@ -1,5 +1,17 @@
+import { captureException } from '@sentry/react'
+import { handleError } from '../../shared/utils/errorHandler'
 import { IntercomWidget } from './IntercomWidget'
 import { IntercomWindow } from './Intercom.types'
+
+jest.mock('@sentry/react', () => ({
+  captureException: jest.fn()
+}))
+
+jest.mock('../../shared/utils/analytics', () => ({
+  trackEvent: jest.fn()
+}))
+
+const mockCaptureException = captureException as jest.Mock
 
 const APP_ID = 'test-app-id'
 const WIDGET_SRC = `https://widget.intercom.io/widget/${APP_ID}`
@@ -54,6 +66,45 @@ describe('IntercomWidget#inject', () => {
       jest.advanceTimersByTime(10000)
 
       await assertion
+    })
+  })
+
+  // The suppression only holds if the error inject() produces is the shape handleError skips.
+  // These lock that end-to-end contract so a future refactor of either side can't silently
+  // start reporting (or over-broaden the suppression to genuine failures).
+  describe('when the rejected error reaches handleError (as the caller does)', () => {
+    let consoleErrorSpy: jest.SpyInstance
+
+    beforeEach(() => {
+      mockCaptureException.mockClear()
+      // handleError logs non-skipped errors to console.error; keep test output clean.
+      consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined)
+    })
+
+    afterEach(() => {
+      consoleErrorSpy.mockRestore()
+    })
+
+    it('should not be reported to Sentry', async () => {
+      const widget = new IntercomWidget()
+      widget.init(APP_ID)
+
+      const injection = widget.inject()
+      getInjectedScript()!.dispatchEvent(new Event('error'))
+
+      try {
+        await injection
+      } catch (error) {
+        handleError(error, 'Could not render intercom', { skipTracking: true })
+      }
+
+      expect(mockCaptureException).not.toHaveBeenCalled()
+    })
+
+    it('should still report an ordinary error, so suppression is not over-broad', () => {
+      handleError(new Error('some genuine failure'), 'Could not render intercom', { skipTracking: true })
+
+      expect(mockCaptureException).toHaveBeenCalledTimes(1)
     })
   })
 })
