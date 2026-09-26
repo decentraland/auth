@@ -68,7 +68,7 @@ class IntercomWidget {
 
       // Ensure the promise always settles so a blocked/offline script rejects
       // (surfacing to the caller's catch) instead of hanging forever.
-      const timeoutId = setTimeout(() => reject(new Error('Timed out loading the Intercom widget script')), INJECT_TIMEOUT_MS)
+      const timeoutId = setTimeout(() => reject(widgetLoadError('Timed out loading the Intercom widget script')), INJECT_TIMEOUT_MS)
 
       script.addEventListener(
         'load',
@@ -82,7 +82,7 @@ class IntercomWidget {
         'error',
         () => {
           clearTimeout(timeoutId)
-          reject(new Error('Failed to load the Intercom widget script'))
+          reject(widgetLoadError('Failed to load the Intercom widget script'))
         },
         true
       )
@@ -147,6 +147,14 @@ function isMobile() {
   const navigator = window.navigator
 
   return !!navigator && (/Mobi/i.test(navigator.userAgent) || /Android/i.test(navigator.userAgent))
+}
+
+// The Intercom widget is a non-critical support widget whose third-party script is routinely
+// blocked or slowed by ad-blockers and low-end mobile browsers. A load/timeout failure is an
+// expected, non-actionable condition, so the rejection carries `skipReporting` and handleError
+// (via shouldSkipReporting) keeps it out of Sentry — the same marker the shared/auth errors use.
+function widgetLoadError(message: string): Error & { skipReporting: true } {
+  return Object.assign(new Error(message), { skipReporting: true as const })
 }
 
 function insertScript({ type = 'text/javascript', async = true, ...props }) {
