@@ -431,6 +431,9 @@ function classifyPersonalSign(params: unknown[]): RequestClassification {
     hex = message.toLowerCase()
     try {
       text = hexToString(hex as `0x${string}`)
+      // UTF-8 decoding can discard a leading byte-order mark or replace malformed bytes. Only
+      // show text if it preserves every signed byte; otherwise the review must show the hex.
+      if (stringToHex(text) !== hex) text = null
     } catch {
       text = null
     }

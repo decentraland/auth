@@ -5,6 +5,7 @@ import { config } from '../../modules/config'
 import { trackEvent } from '../utils/analytics'
 import { handleError } from '../utils/errorHandler'
 import { DifferentSenderError, ExpiredRequestError, RequestFulfilledError, RequestNotFoundError } from './errors'
+import { getRequestExpirationTimestamp } from './expiration'
 import {
   assertMethodIsAllowed,
   assertRequestIsNotImpersonatingSignIn,
@@ -160,7 +161,8 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
         throw new DifferentSenderError(signerAddress, recoverResponse.sender)
       }
 
-      if (recoverResponse.expiration && new Date(recoverResponse.expiration) < new Date()) {
+      const expiration = getRequestExpirationTimestamp(recoverResponse.expiration)
+      if (expiration <= Date.now()) {
         throw new ExpiredRequestError(requestId, recoverResponse.expiration)
       }
 

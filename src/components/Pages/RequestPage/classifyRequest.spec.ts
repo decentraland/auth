@@ -915,6 +915,45 @@ describe('when classifying a request', () => {
       })
     })
 
+    describe('and the hex-encoded text starts with a byte-order mark', () => {
+      let hex: string
+
+      beforeEach(async () => {
+        hex = stringToHex('\uFEFFexample authorization')
+        classification = await classifyRequest(personalSignRequest(hex), context)
+      })
+
+      it('should expose every signed byte instead of text with the mark removed', () => {
+        expect(classification).toEqual({ kind: 'personal_sign', text: null, hex })
+      })
+    })
+
+    describe('and the hex contains malformed UTF-8', () => {
+      let hex: string
+
+      beforeEach(async () => {
+        hex = '0xc328'
+        classification = await classifyRequest(personalSignRequest(hex), context)
+      })
+
+      it('should expose the original bytes without decoding a replacement character', () => {
+        expect(classification).toEqual({ kind: 'personal_sign', text: null, hex })
+      })
+    })
+
+    describe('and the hex contains readable multibyte UTF-8', () => {
+      let message: string
+
+      beforeEach(async () => {
+        message = 'Confirmaci\u00f3n \u{1F30E}'
+        classification = await classifyRequest(personalSignRequest(stringToHex(message)), context)
+      })
+
+      it('should preserve readable text and the original signed bytes', () => {
+        expect(classification).toEqual({ kind: 'personal_sign', text: message, hex: stringToHex(message) })
+      })
+    })
+
     describe('and the message is hex with an uppercase 0X prefix', () => {
       let message: string
 

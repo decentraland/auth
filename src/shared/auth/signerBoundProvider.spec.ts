@@ -199,4 +199,91 @@ describe('when binding a provider to the reviewed signer', () => {
       expect(request.mock.calls.map(([args]) => args.method)).toEqual(['eth_requestAccounts', 'eth_getCode'])
     })
   })
+
+  describe('and the request expires while the relay waits for a wallet signature', () => {
+    let failure: ReviewedRequestInvalidatedError
+    let expired: boolean
+    let resolveSignature: (signature: string) => void
+    let signatureRequested: Promise<void>
+    let markSignatureRequested: () => void
+    let signature: string
+    let relay: Promise<string>
+    let fetchSpy: jest.SpyInstance
+    let networkRequest: jest.Mock
+
+    beforeEach(async () => {
+      failure = new ReviewedRequestInvalidatedError()
+      expired = false
+      signature = `0x${'11'.repeat(64)}1b`
+      signatureRequested = new Promise(resolve => {
+        markSignatureRequested = resolve
+      })
+      request
+        .mockResolvedValueOnce([SIGNER])
+        .mockResolvedValueOnce('0x')
+        .mockImplementationOnce(() => {
+          markSignatureRequested()
+          return new Promise<string>(resolve => {
+            resolveSignature = resolve
+          })
+        })
+      networkRequest = jest.fn().mockResolvedValueOnce('0x0')
+      fetchSpy = jest.spyOn(globalThis, 'fetch').mockResolvedValue({ json: async () => ({ txHash: '0xtransaction' }) } as Response)
+      bound = bindProviderToSigner({ request }, SIGNER, undefined, () => {
+        if (expired) throw failure
+      }) as typeof bound
+      relay = sendMetaTransaction({ request: bound.request }, { request: networkRequest }, '0xabcd', {
+        address: OTHER,
+        abi: [],
+        name: 'Test',
+        version: '1',
+        chainId: 137
+      })
+      await signatureRequested
+    })
+
+    afterEach(() => {
+      fetchSpy.mockRestore()
+    })
+
+    it('should stop the real relay before posting the expired signature', async () => {
+      expired = true
+      resolveSignature(signature)
+      await expect(relay).rejects.toBe(failure)
+      expect(fetchSpy).not.toHaveBeenCalled()
+    })
+
+    describe('and the signature instead arrives before expiry', () => {
+      it('should let the real relay submit the signed transaction', async () => {
+        resolveSignature(signature)
+        await expect(relay).resolves.toBe('0xtransaction')
+        expect(fetchSpy).toHaveBeenCalledTimes(1)
+      })
+    })
+  })
+
+  describe('and a broadcast transaction returns after the signature deadline', () => {
+    let afterSigning: jest.Mock
+    let resolveTransaction: (hash: string) => void
+    let transaction: Promise<unknown>
+
+    beforeEach(() => {
+      afterSigning = jest.fn(() => {
+        throw new ReviewedRequestInvalidatedError()
+      })
+      request.mockReturnValueOnce(
+        new Promise<string>(resolve => {
+          resolveTransaction = resolve
+        })
+      )
+      bound = bindProviderToSigner({ request }, SIGNER, undefined, afterSigning) as typeof bound
+      transaction = bound.request({ method: 'eth_sendTransaction', params: [{ from: SIGNER, to: OTHER }] })
+    })
+
+    it('should preserve the transaction hash without running the signature-only check', async () => {
+      resolveTransaction('0xbroadcast')
+      await expect(transaction).resolves.toBe('0xbroadcast')
+      expect(afterSigning).not.toHaveBeenCalled()
+    })
+  })
 })

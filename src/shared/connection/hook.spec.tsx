@@ -249,7 +249,7 @@ describe('useCurrentConnectionData', () => {
           await result.current.getIdentitySignature()
         })
 
-        expect(getIdentitySignatureUtil).toHaveBeenCalledWith('0xabc', mockProvider)
+        expect(getIdentitySignatureUtil).toHaveBeenCalledWith('0xabc', mockProvider, undefined, expect.any(Function))
       })
 
       it('should not call getCurrentConnectionData again after generating the identity', async () => {
@@ -324,7 +324,7 @@ describe('useCurrentConnectionData', () => {
           await result.current.getIdentitySignature(existingConnection)
         })
 
-        expect(getIdentitySignatureUtil).toHaveBeenCalledWith('0xdef', mockProvider)
+        expect(getIdentitySignatureUtil).toHaveBeenCalledWith('0xdef', mockProvider, undefined, expect.any(Function))
       })
     })
 

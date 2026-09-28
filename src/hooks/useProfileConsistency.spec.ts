@@ -67,7 +67,7 @@ describe('useProfileConsistency', () => {
       it('should attempt to redeploy the profile', async () => {
         const { result } = renderHook(() => useProfileConsistency())
         await result.current.checkProfileConsistency(account, identity)
-        expect(redeployExistingProfile).toHaveBeenCalledWith(mockProfile, account, identity, mockDisabledCatalysts)
+        expect(redeployExistingProfile).toHaveBeenCalledWith(mockProfile, account, identity, mockDisabledCatalysts, undefined)
       })
 
       it('should return the profile with inconsistent status', async () => {
@@ -127,7 +127,8 @@ describe('useProfileConsistency', () => {
             'https://catalyst.example.com',
             account,
             identity,
-            mockDisabledCatalysts
+            mockDisabledCatalysts,
+            undefined
           )
         })
       })
@@ -214,7 +215,55 @@ describe('useProfileConsistency', () => {
       it('should pass the fetcher to fetchProfileWithConsistencyCheck', async () => {
         const { result } = renderHook(() => useProfileConsistency())
         await result.current.checkProfileConsistency(account, identity, mockFetcher)
-        expect(fetchProfileWithConsistencyCheck).toHaveBeenCalledWith(account, mockDisabledCatalysts, mockFetcher)
+        expect(fetchProfileWithConsistencyCheck).toHaveBeenCalledWith(account, mockDisabledCatalysts, mockFetcher, undefined)
+      })
+    })
+  })
+  describe('when the caller cancels consistency work', () => {
+    let controller: AbortController
+    let hook: ReturnType<typeof renderHook<ReturnType<typeof useProfileConsistency>, undefined>>
+    let profile: Profile
+    let identity: AuthIdentity
+
+    beforeEach(() => {
+      controller = new AbortController()
+      profile = { avatars: [] } as unknown as Profile
+      identity = { authChain: [] } as unknown as AuthIdentity
+      hook = renderHook(() => useProfileConsistency())
+    })
+
+    describe('and a pending consistency read completes', () => {
+      beforeEach(() => {
+        jest.mocked(fetchProfileWithConsistencyCheck).mockImplementationOnce(async () => {
+          controller.abort()
+          return { profile, isConsistent: false }
+        })
+      })
+
+      it('should reject without beginning an authenticated repair', async () => {
+        await expect(
+          hook.result.current.checkProfileConsistency('0xaccount', identity, undefined, controller.signal)
+        ).rejects.toMatchObject({ name: 'AbortError' })
+        expect(redeployExistingProfile).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and a repair is already pending', () => {
+      beforeEach(() => {
+        jest
+          .mocked(fetchProfileWithConsistencyCheck)
+          .mockResolvedValueOnce({ profile, isConsistent: false, profileFetchedFrom: 'https://catalyst.example' })
+        jest.mocked(redeployExistingProfile).mockImplementationOnce(async () => {
+          controller.abort()
+          throw controller.signal.reason
+        })
+      })
+
+      it('should reject without retrying through the content server fallback', async () => {
+        await expect(
+          hook.result.current.checkProfileConsistency('0xaccount', identity, undefined, controller.signal)
+        ).rejects.toMatchObject({ name: 'AbortError' })
+        expect(redeployExistingProfileWithContentServerData).not.toHaveBeenCalled()
       })
     })
   })

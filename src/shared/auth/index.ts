@@ -1,4 +1,5 @@
 export * from './address'
+export * from './expiration'
 export {
   collectCallAddresses,
   decodeKnownContractCall,

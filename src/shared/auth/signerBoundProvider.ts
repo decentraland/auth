@@ -65,8 +65,11 @@ function unwrapResult(data: unknown): unknown {
  * act for, through the signing and the submission steps alike.
  * The optional synchronous `beforeSigning` hook may refuse a review invalidated during the library's
  * asynchronous preparation, immediately before any signing or transaction request reaches the wallet.
+ * `afterSigning` checks a signature before releasing it to the relay after the wallet resolves. It
+ * deliberately does not run for eth_sendTransaction: that result may describe an already broadcast
+ * transaction and must not be discarded as though no action took place.
  */
-function bindProviderToSigner(provider: Provider, signer: string, beforeSigning?: () => void): Provider {
+function bindProviderToSigner(provider: Provider, signer: string, beforeSigning?: () => void, afterSigning?: () => void): Provider {
   const expected = signer.toLowerCase()
   const isSigner = (value: unknown): boolean => typeof value === 'string' && value.toLowerCase() === expected
   const mismatch = (value: unknown): ReviewedSignerMismatchError =>
@@ -107,6 +110,7 @@ function bindProviderToSigner(provider: Provider, signer: string, beforeSigning?
         }
         throw error
       }
+      if (signerIndex !== undefined) afterSigning?.()
       if (ACCOUNT_METHODS.has(args.method)) {
         const accounts = unwrapResult(data)
         const [account] = Array.isArray(accounts) ? accounts : []

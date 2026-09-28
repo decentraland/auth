@@ -46,18 +46,97 @@ const ConnectionContext = createContext<ConnectionContextValue>(defaultValue)
 
 const ConnectionProvider = ({ children }: PropsWithChildren) => {
   const [state, setState] = useState<ConnectionState>(defaultState)
-  // Tracks in-flight identity generation promises keyed by account so that
-  // concurrent callers for the SAME account share a single wallet signature prompt,
-  // while callers for DIFFERENT accounts never receive the wrong account's identity.
-  const inflightIdentityRef = useRef<Map<string, Promise<AuthIdentity>>>(new Map())
+  // Only the latest connection operation may commit or return an identity. Matching callers
+  // share its wallet prompt; a different account or provider starts a new operation.
+  const connectionGenerationRef = useRef(0)
+  const currentAccountRef = useRef(state.account)
+  const currentProviderRef = useRef(state.provider)
+  const signingConnectionRef = useRef<ConnectionResponse>()
+  const inflightIdentityRef = useRef<{
+    key: string
+    provider: ConnectionResponse['provider'] | undefined
+    generation: number
+    promise: Promise<AuthIdentity>
+  }>()
+
+  const providerListenersCleanupRef = useRef<() => void>()
+
+  // Install durable listeners before publishing a provider, rather than waiting for a React
+  // effect. Signing listeners can then be removed without missing events during that handoff.
+  const observeProvider = useCallback((provider: ConnectionResponse['provider'] | undefined) => {
+    providerListenersCleanupRef.current?.()
+    providerListenersCleanupRef.current = undefined
+    if (!provider) return
+
+    const handleAccountsChanged = (accounts: string[]) => {
+      if (currentProviderRef.current !== provider) return
+      const account = accounts[0]
+      const signingConnection = signingConnectionRef.current
+      // Keep the visible connection accurate if its replacement fails, without invalidating
+      // the replacement provider's independent identity operation.
+      const isSigningWithAnotherProvider = signingConnection && signingConnection.provider !== provider
+      const expectedAccount = signingConnection?.provider === provider ? signingConnection.account : currentAccountRef.current
+      if (!isSigningWithAnotherProvider && (!account || account.toLowerCase() !== expectedAccount?.toLowerCase())) {
+        ++connectionGenerationRef.current
+      }
+      currentAccountRef.current = account
+      if (!account) {
+        currentProviderRef.current = undefined
+        providerListenersCleanupRef.current?.()
+        providerListenersCleanupRef.current = undefined
+        // Wallet disconnected — clear all connection state so downstream consumers
+        // (e.g. RequestPage checking !provider || !providerType) detect the disconnect.
+        setState(prev =>
+          prev.provider !== provider
+            ? prev
+            : {
+                ...prev,
+                account: undefined,
+                identity: undefined,
+                provider: undefined,
+                providerType: undefined,
+                chainId: undefined
+              }
+        )
+        return
+      }
+
+      const identity = getCachedIdentity(account)
+      setState(prev => (prev.provider !== provider ? prev : { ...prev, account, identity }))
+    }
+
+    const handleChainChanged = (chainId: string) => {
+      if (currentProviderRef.current !== provider) return
+      setState(prev => (prev.provider !== provider ? prev : { ...prev, chainId: parseInt(chainId, 16) }))
+    }
+
+    if (typeof provider.on !== 'function') return
+
+    const handleDisconnect = () => handleAccountsChanged([])
+    provider.on('accountsChanged', handleAccountsChanged)
+    provider.on('chainChanged', handleChainChanged)
+    provider.on('disconnect', handleDisconnect)
+
+    providerListenersCleanupRef.current = () => {
+      if (typeof provider.removeListener === 'function') {
+        provider.removeListener('accountsChanged', handleAccountsChanged)
+        provider.removeListener('chainChanged', handleChainChanged)
+        provider.removeListener('disconnect', handleDisconnect)
+      }
+    }
+  }, [])
 
   /**
    * Fetches the current connection data (account, identity, provider, etc.)
-   * and updates the context state. Used on mount and when the provider emits
-   * wallet change events (accountsChanged, chainChanged).
+   * and updates the context state on mount, unless a login has superseded the restore.
    */
   const fetchConnectionData = useCallback(async () => {
+    const generation = connectionGenerationRef.current
     const connectionData = await getCurrentConnectionData()
+    if (generation !== connectionGenerationRef.current) return
+    currentAccountRef.current = connectionData?.account
+    currentProviderRef.current = connectionData?.provider
+    observeProvider(connectionData?.provider)
     setState({
       isLoading: false,
       account: connectionData?.account,
@@ -66,98 +145,114 @@ const ConnectionProvider = ({ children }: PropsWithChildren) => {
       providerType: connectionData?.providerType,
       chainId: connectionData?.chainId
     })
-  }, [])
+  }, [observeProvider])
 
-  const getIdentitySignature = useCallback(async (existingConnection?: ConnectionResponse): Promise<AuthIdentity> => {
-    // Key the in-flight dedup by account. When no existing connection is provided we
-    // fall back to a shared key, since that path always resolves to the single
-    // "previous" connection (preserving "create identity once per login").
-    const inflightKey = existingConnection?.account?.toLowerCase() ?? '__previous__'
+  const getIdentitySignature = useCallback(
+    async (existingConnection?: ConnectionResponse): Promise<AuthIdentity> => {
+      // Key the in-flight dedup by account. When no existing connection is provided we
+      // fall back to a shared key, since that path always resolves to the single
+      // "previous" connection (preserving "create identity once per login").
+      const inflightKey = existingConnection?.account?.toLowerCase() ?? '__previous__'
 
-    // If an identity generation for this account is already in progress, return the
-    // same promise to avoid prompting the user for a duplicate wallet signature.
-    const inflight = inflightIdentityRef.current.get(inflightKey)
-    if (inflight) {
-      return inflight
-    }
-
-    const promise = (async () => {
-      const connectionResponse = existingConnection ?? (await connection.tryPreviousConnection())
-
-      // Validate that all required fields are present, including providerType,
-      // to prevent downstream consumers from seeing an incomplete connection state.
-      if (!connectionResponse.account || !connectionResponse.provider || !connectionResponse.providerType) {
-        throw new Error('No active connection found')
+      // If an identity generation for this account is already in progress, return the
+      // same promise to avoid prompting the user for a duplicate wallet signature.
+      const inflight = inflightIdentityRef.current
+      if (
+        inflight?.key === inflightKey &&
+        inflight.provider === existingConnection?.provider &&
+        inflight.generation === connectionGenerationRef.current
+      ) {
+        const identity = await inflight.promise
+        if (inflight.generation !== connectionGenerationRef.current) throw new Error('Connection changed while creating identity')
+        return identity
       }
 
-      const identity = await getIdentitySignatureUtil(connectionResponse.account, connectionResponse.provider)
+      const generation = ++connectionGenerationRef.current
+      signingConnectionRef.current = existingConnection
+      // Login now owns connection restoration, including failure. Do not leave consumers waiting
+      // for an initial restore whose result this operation has superseded.
+      setState(previous => ({ ...previous, isLoading: false }))
+      const assertCurrentConnection = () => {
+        if (generation !== connectionGenerationRef.current) throw new Error('Connection changed while creating identity')
+      }
+      const promise = (async () => {
+        const connectionResponse = existingConnection ?? (await connection.tryPreviousConnection())
+        assertCurrentConnection()
 
-      setState({
-        isLoading: false,
-        account: connectionResponse.account,
-        identity,
-        provider: connectionResponse.provider,
-        providerType: connectionResponse.providerType,
-        chainId: connectionResponse.chainId
-      })
+        if (!connectionResponse.account || !connectionResponse.provider || !connectionResponse.providerType) {
+          throw new Error('No active connection found')
+        }
 
-      return identity
-    })()
+        // A newly connected provider is not in context yet. Observe it during the wallet prompt,
+        // so an account change or disconnect cannot install the identity of the abandoned login.
+        signingConnectionRef.current = connectionResponse
+        const provider = connectionResponse.provider
+        let chainId = connectionResponse.chainId
+        const invalidate = () => {
+          if (generation === connectionGenerationRef.current) ++connectionGenerationRef.current
+        }
+        const handleAccountsChanged = (accounts: string[]) => {
+          if (accounts[0]?.toLowerCase() !== connectionResponse.account?.toLowerCase()) invalidate()
+        }
+        const handleChainChanged = (value: string) => {
+          chainId = parseInt(value, 16)
+        }
+        if (typeof provider.on === 'function') {
+          provider.on('accountsChanged', handleAccountsChanged)
+          provider.on('disconnect', invalidate)
+          provider.on('chainChanged', handleChainChanged)
+        }
 
-    inflightIdentityRef.current.set(inflightKey, promise)
+        try {
+          const identity = await getIdentitySignatureUtil(connectionResponse.account, provider, undefined, assertCurrentConnection)
+          assertCurrentConnection()
+          currentAccountRef.current = connectionResponse.account
+          currentProviderRef.current = provider
+          observeProvider(provider)
+          setState({
+            isLoading: false,
+            account: connectionResponse.account,
+            identity,
+            provider,
+            providerType: connectionResponse.providerType,
+            chainId
+          })
+          return identity
+        } finally {
+          if (typeof provider.removeListener === 'function') {
+            provider.removeListener('accountsChanged', handleAccountsChanged)
+            provider.removeListener('disconnect', invalidate)
+            provider.removeListener('chainChanged', handleChainChanged)
+          }
+        }
+      })()
 
-    try {
-      return await promise
-    } finally {
-      inflightIdentityRef.current.delete(inflightKey)
-    }
-  }, [])
+      inflightIdentityRef.current = { key: inflightKey, provider: existingConnection?.provider, generation, promise }
+
+      try {
+        const identity = await promise
+        assertCurrentConnection()
+        return identity
+      } finally {
+        if (inflightIdentityRef.current?.promise === promise) {
+          inflightIdentityRef.current = undefined
+          signingConnectionRef.current = undefined
+        }
+      }
+    },
+    [observeProvider]
+  )
 
   useEffect(() => {
     fetchConnectionData()
-  }, [fetchConnectionData])
-
-  // Listen for wallet changes (account or chain switches) on the provider
-  useEffect(() => {
-    const provider = state.provider
-    if (!provider) return
-
-    const handleAccountsChanged = (accounts: string[]) => {
-      const account = accounts[0]
-      if (!account) {
-        // Wallet disconnected — clear all connection state so downstream consumers
-        // (e.g. RequestPage checking !provider || !providerType) detect the disconnect.
-        setState(prev => ({
-          ...prev,
-          account: undefined,
-          identity: undefined,
-          provider: undefined,
-          providerType: undefined,
-          chainId: undefined
-        }))
-        return
-      }
-
-      const identity = getCachedIdentity(account)
-      setState(prev => ({ ...prev, account, identity }))
-    }
-
-    const handleChainChanged = (chainId: string) => {
-      setState(prev => ({ ...prev, chainId: parseInt(chainId, 16) }))
-    }
-
-    if (typeof provider.on !== 'function') return
-
-    provider.on('accountsChanged', handleAccountsChanged)
-    provider.on('chainChanged', handleChainChanged)
-
     return () => {
-      if (typeof provider.removeListener === 'function') {
-        provider.removeListener('accountsChanged', handleAccountsChanged)
-        provider.removeListener('chainChanged', handleChainChanged)
-      }
+      ++connectionGenerationRef.current
+      inflightIdentityRef.current = undefined
+      currentProviderRef.current = undefined
+      currentAccountRef.current = undefined
+      observeProvider(undefined)
     }
-  }, [state.provider])
+  }, [fetchConnectionData, observeProvider])
 
   const value = useMemo<ConnectionContextValue>(() => ({ ...state, getIdentitySignature }), [state, getIdentitySignature])
 

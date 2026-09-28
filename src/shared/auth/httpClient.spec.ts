@@ -7,6 +7,7 @@ import {
   DifferentSenderError,
   ExpiredRequestError,
   ImpersonatedSignInError,
+  InvalidRequestExpirationError,
   MalformedSignatureRequestError,
   MalformedTransactionRequestError,
   RequestFulfilledError,
@@ -141,6 +142,16 @@ describe('createAuthServerClient', () => {
 
       it('should throw a DifferentSenderError', async () => {
         await expect(client.recover(mockRequestId, mockSignerAddress)).rejects.toBeInstanceOf(DifferentSenderError)
+      })
+    })
+
+    describe.each([undefined, null, '', ' ', 'not-a-date', '999999-01-01', 0])('when the expiration is %p', expiration => {
+      beforeEach(() => {
+        mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ ...mockResponse, expiration }) })
+      })
+
+      it('should reject the malformed deadline before returning a request', async () => {
+        await expect(client.recover(mockRequestId, mockSignerAddress)).rejects.toBeInstanceOf(InvalidRequestExpirationError)
       })
     })
 
