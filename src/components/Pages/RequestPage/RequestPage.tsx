@@ -51,6 +51,7 @@ import { sendTipNotification } from '../../../shared/notifications'
 import { identifyUser, trackEvent } from '../../../shared/utils/analytics'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { FeatureFlagsContext } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
+import { fetchAuthorizedCharge, verifyAuthorizedCharge } from './authorizedCharge'
 import {
   RequestClassification,
   classifyRequest,
@@ -58,12 +59,14 @@ import {
   getPayloadFingerprint,
   isTransactionClassification
 } from './classifyRequest'
-import { GasEstimateState, MANATransferData, NFTTransferData, TransferType } from './types'
+import { MILLISECONDS_PER_SECOND } from './creditsPurchase'
+import { CreditsPurchaseData, GasEstimateState, MANATransferData, NFTTransferData, TransferType } from './types'
 import {
   decodeManaTransferData,
   decodeNftTransferData,
   fetchNftMetadata,
   fetchPlaceByCreatorAddress,
+  fetchPurchasedAssetMetadata,
   getConnectedProvider,
   getCounterpartyAddresses,
   getExplorerDeeplink,
@@ -78,6 +81,8 @@ import {
   ClientLoginError,
   ConfirmRequestDialog,
   ContinueInApp,
+  CreditsPurchaseOutcomeView,
+  CreditsPurchaseView,
   DeniedWalletInteraction,
   DifferentAccountError,
   LoadingRequest,
@@ -91,7 +96,7 @@ import {
   TransferConfirmView,
   WalletInteractionComplete
 } from './Views'
-import type { ActionRequestPayload, SigningErrorKind } from './Views'
+import type { ActionRequestPayload, SignatureDelivery, SigningErrorKind } from './Views'
 import { ConfirmRequestGas } from './Views/ConfirmRequestDialog'
 import { useAcknowledgment } from './Views/useAcknowledgment'
 import { forwardSignatureRequest, toWalletSignatureRequest } from './walletSignatureRequest'
@@ -114,13 +119,18 @@ enum View {
   WALLET_INTERACTION,
   WALLET_NFT_INTERACTION,
   WALLET_MANA_INTERACTION,
+  // The dedicated approval for a credits purchase, and the two ways it ends. Its "complete" is a signature
+  // returned to the app, never a settled purchase (see CreditsPurchaseOutcomeView).
+  WALLET_CREDITS_INTERACTION,
   WALLET_INTERACTION_DENIED,
   WALLET_NFT_INTERACTION_DENIED,
   WALLET_MANA_INTERACTION_DENIED,
+  WALLET_CREDITS_INTERACTION_DENIED,
   WALLET_INTERACTION_ERROR,
   WALLET_INTERACTION_COMPLETE,
   WALLET_NFT_INTERACTION_COMPLETE,
-  WALLET_MANA_INTERACTION_COMPLETE
+  WALLET_MANA_INTERACTION_COMPLETE,
+  WALLET_CREDITS_INTERACTION_COMPLETE
 }
 
 // Terminal views that should not trigger a re-fetch of the request
@@ -131,9 +141,11 @@ const TERMINAL_VIEWS = new Set([
   View.WALLET_INTERACTION_COMPLETE,
   View.WALLET_NFT_INTERACTION_COMPLETE,
   View.WALLET_MANA_INTERACTION_COMPLETE,
+  View.WALLET_CREDITS_INTERACTION_COMPLETE,
   View.WALLET_INTERACTION_DENIED,
   View.WALLET_NFT_INTERACTION_DENIED,
   View.WALLET_MANA_INTERACTION_DENIED,
+  View.WALLET_CREDITS_INTERACTION_DENIED,
   View.WALLET_INTERACTION_ERROR,
   View.TIMEOUT,
   View.LOADING_ERROR,
@@ -141,7 +153,16 @@ const TERMINAL_VIEWS = new Set([
 ])
 
 // The views on which a request is still being reviewed, and whose expiry timer therefore stays armed.
-const INTERACTION_VIEWS = new Set([View.WALLET_INTERACTION, View.WALLET_NFT_INTERACTION, View.WALLET_MANA_INTERACTION])
+const INTERACTION_VIEWS = new Set([
+  View.WALLET_INTERACTION,
+  View.WALLET_NFT_INTERACTION,
+  View.WALLET_MANA_INTERACTION,
+  View.WALLET_CREDITS_INTERACTION
+])
+
+// One credit is a fixed ten US cents, and the credits ledger accounts in cents, so a price derived in
+// credits is compared against it in cents. Same peg the decoder divides by (USD_WEI_PER_CREDIT).
+const CENTS_PER_CREDIT = 10n
 
 // Reported to the client when a request is rejected at recover time, before it reaches the wallet.
 const RPC_METHOD_NOT_SUPPORTED = -32601
@@ -207,6 +228,14 @@ export const RequestPage = () => {
   const [gasEstimate, setGasEstimate] = useState<GasEstimateState | null>(null)
   const [nftTransferData, setNftTransferData] = useState<NFTTransferData | null>(null)
   const [manaTransferData, setManaTransferData] = useState<MANATransferData | null>(null)
+  // The verified purchase the dedicated credits approval shows, once the payload was recognized as one and
+  // every contract it reaches was checked. Null for every other request, and for a credits request whose
+  // shape this page will not vouch for — those stay on the generic review.
+  const [creditsPurchaseData, setCreditsPurchaseData] = useState<CreditsPurchaseData | null>(null)
+  // What has become of a signature the wallet already produced: it is being handed back to the app, it got
+  // there, or it did not. Only ever set after the wallet has answered, and never a reason to sign again —
+  // the screens read it so none of them claims a delivery that has not happened (see CreditsPurchaseOutcomeView).
+  const [signatureDelivery, setSignatureDelivery] = useState<SignatureDelivery>('delivering')
   // The confirmation dialog web2 users get on every Allow (see handleApproveWalletInteraction).
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false)
   // Whether every contract a tip or a gift reaches is Decentraland's (see verifyCounterparties). The
@@ -264,6 +293,11 @@ export const RequestPage = () => {
   // meta-transactions are excluded from that check: their execution chain is fixed by
   // getMetaTransactionChainId rather than by the wallet's active chain.
   const reviewedWalletChainIdRef = useRef<number>()
+  // The moment this review stops being valid, in epoch milliseconds: the request's own expiry, or something
+  // it depends on that lapses sooner (a credits purchase's credit, external call or trade). The approval
+  // reads it directly before dispatching, because a timer can fire late and every await before the dispatch
+  // is a window the deadline can pass in.
+  const reviewDeadlineRef = useRef<number>(Number.POSITIVE_INFINITY)
   // Guards against re-entrant approvals (e.g. a fast double-click on the confirm dialog),
   // which would otherwise fire two transactions before `isLoading` re-renders the buttons.
   // Whether Allow or Deny is answering the request right now. Both handlers check and set it synchronously
@@ -485,6 +519,8 @@ export const RequestPage = () => {
       setGasEstimate(null)
       setNftTransferData(null)
       setManaTransferData(null)
+      setCreditsPurchaseData(null)
+      setSignatureDelivery('delivering')
       setIsTransactionModalOpen(false)
       setReviewedChainId(undefined)
     }
@@ -630,17 +666,27 @@ export const RequestPage = () => {
         recoveredRequestIdRef.current = requestId
         recoveredSignerRef.current = signerAddress.toLowerCase()
 
-        // Initialize the timeout to display the timeout view when the request expires.
-        // Guard against an unparseable expiration: `new Date(...).getTime()` would be NaN,
-        // which setTimeout coerces to 0 and fires the timeout view immediately.
-        // A negative delay (a request that is already past its expiration) is intentional:
-        // setTimeout coerces it to 0 so the timeout view shows right away.
-        const expirationDelay = new Date(request.expiration).getTime() - Date.now()
-        if (!Number.isNaN(expirationDelay)) {
+        /**
+         * Arms the review's expiry, and re-arms it when something the review depends on expires sooner than
+         * the request does.
+         *
+         * Guard against an unparseable expiration: `new Date(...).getTime()` would be NaN, which setTimeout
+         * coerces to 0 and fires the timeout view immediately. A negative delay (a deadline already past) is
+         * intentional: setTimeout coerces it to 0 so the timeout view shows right away.
+         *
+         * Only ever brought FORWARD. A later deadline cannot extend a review — the request's own expiry is
+         * the outer bound and nothing inside it may outlive it.
+         */
+        const armExpiry = (deadlineMs: number) => {
+          if (Number.isNaN(deadlineMs) || deadlineMs >= reviewDeadlineRef.current) {
+            return
+          }
+          reviewDeadlineRef.current = deadlineMs
+          clearTimeout(timeoutRef.current)
           timeoutRef.current = setTimeout(() => {
             getAnalytics()?.track(TrackingEvents.REQUEST_EXPIRED, {
               browserTime: Date.now(),
-              requestTime: new Date(request.expiration).getTime(),
+              requestTime: deadlineMs,
               timeTheSiteStartedLoading
             })
             // Expiry is terminal: it settles the request like an answer does, so nothing that resolves
@@ -648,8 +694,10 @@ export const RequestPage = () => {
             // review back on screen, and neither Allow nor Deny can act on the expired request.
             hasCompletedRef.current = true
             setView(View.TIMEOUT)
-          }, expirationDelay)
+          }, deadlineMs - Date.now())
         }
+        reviewDeadlineRef.current = Number.POSITIVE_INFINITY
+        armExpiry(new Date(request.expiration).getTime())
 
         // Whether a tip or a gift may be shown as one. The branded screens name a recipient and an amount and
         // nothing else, so they may stand in for the raw payload only when nothing the call reaches could do
@@ -826,6 +874,96 @@ export const RequestPage = () => {
           }
         }
 
+        /**
+         * The review of a meta-transaction signature: the dedicated credits approval when the payload is a
+         * purchase this page can vouch for whole, the generic review of the raw payload otherwise.
+         *
+         * The classification has already decided whether the bytes are a purchase (see
+         * recognizeCreditsPurchase) — what is left is what cannot be read out of them: that every contract
+         * the call reaches is Decentraland's, and that the collection the item comes from is one of
+         * Decentraland's rather than an address that merely has no code. Only then is the branded screen
+         * shown; the item's name and picture are fetched after that and cannot decide anything, so a
+         * catalyst that cannot answer leaves the purchase named by its identifiers rather than sending an
+         * otherwise verified purchase to the raw payload.
+         *
+         * Nothing is shown while this runs: unlike the gift, whose generic review stands until the branded
+         * one is ready, a purchase summary that appeared with a price and then changed is worse than a
+         * spinner, and every check here is bounded (see withTimeout in utils).
+         */
+        const reviewMetaTransaction = async (metaTransaction: Extract<RequestClassification, { kind: 'dcl_meta_transaction' }>) => {
+          const showGenericReview = () => setView(View.WALLET_INTERACTION)
+          if (metaTransaction.credits.status !== 'recognized') {
+            showGenericReview()
+            return
+          }
+          const purchase = metaTransaction.credits.purchase
+          setReviewedChainId(metaTransaction.chainId)
+          try {
+            const verified = await verifyCounterparties(metaTransaction.call, metaTransaction.chainId)
+            if (isStale()) return
+            if (!verified) {
+              showGenericReview()
+              return
+            }
+            // The item's own contract, asked of the collection factories rather than left to the counterparty
+            // check. That check clears an address that merely has no code — the right answer for a recipient,
+            // and the wrong one for the collection the buyer is paying to receive an item from, which has to
+            // be a collection Decentraland deployed or there is nothing to receive. A lookup that cannot
+            // answer throws and is caught below, so an outage is never read as a yes.
+            const isCollection = await isDecentralandCollection(purchase.asset.contractAddress)
+            if (isStale()) return
+            if (!isCollection) {
+              showGenericReview()
+              return
+            }
+          } catch (e) {
+            if (isStale()) return
+            console.error('The contracts a credits purchase reaches could not be checked, falling back to the generic review', e)
+            showGenericReview()
+            return
+          }
+
+          /**
+           * What the purchase actually debits, proved against the credits ledger before any price goes on
+           * screen.
+           *
+           * The bytes prove what the ITEM costs; they cannot prove what the BALANCE loses. The credits-server
+           * records an intent in cents against the credit's salt, taken from a price the client supplied and
+           * never checked against the item — so a credit authorized for one amount spends fine on a trade
+           * priced at another, and every structural check above still passes. The salt is in the signed
+           * payload, so the charge is read against it and the two numbers must agree exactly. Anything else,
+           * including a credits-server that cannot answer, leaves the request on the generic review: this
+           * screen states a price as a fact, and a fact nothing stands behind must not be stated at all.
+           */
+          const identity = identityRef.current
+          const chargeVerdict = identity
+            ? verifyAuthorizedCharge(await fetchAuthorizedCharge(purchase.creditSalt, identity), purchase.credits * CENTS_PER_CREDIT)
+            : 'unavailable'
+          if (isStale()) return
+          if (chargeVerdict !== 'verified') {
+            trackEvent(TrackingEvents.REQUEST_CLASSIFIED, { requestId, type: 'credits_charge_unverified', reason: chargeVerdict })
+            showGenericReview()
+            return
+          }
+
+          // The whole purchase is void once the soonest of the credit, the external call and the trade
+          // lapses, and that can happen well before the auth request itself expires. Bring the review's
+          // deadline forward so the screen stops being actionable at the right moment rather than the late
+          // one; the approval checks the same deadline again before it signs.
+          armExpiry(Number(purchase.expiresAt) * MILLISECONDS_PER_SECOND)
+
+          // Cosmetic, and the only part that may fail without costing the branded screen.
+          let metadata: CreditsPurchaseData['metadata'] = null
+          try {
+            metadata = await fetchPurchasedAssetMetadata(purchase.asset, metaTransaction.chainId)
+          } catch (e) {
+            console.info('The purchased item could not be named:', e instanceof Error ? e.message : String(e))
+          }
+          if (isStale()) return
+          setCreditsPurchaseData({ purchase, metadata })
+          setView(View.WALLET_CREDITS_INTERACTION)
+        }
+
         // The chain the wallet is on decides where a plain transaction executes and which registry
         // deployment its target is judged against, so it is read before classifying.
         let connectedChainId: number | undefined
@@ -856,6 +994,9 @@ export const RequestPage = () => {
         switch (classified.kind) {
           case 'dcl_transaction':
             await reviewDecentralandTransaction(classified)
+            break
+          case 'dcl_meta_transaction':
+            await reviewMetaTransaction(classified)
             break
           case 'native_transfer':
           case 'unknown_transaction':
@@ -964,6 +1105,8 @@ export const RequestPage = () => {
         setGasEstimate(null)
         setNftTransferData(null)
         setManaTransferData(null)
+        setCreditsPurchaseData(null)
+        setSignatureDelivery('delivering')
         setView(View.LOADING_REQUEST)
       }
       loadRequest()
@@ -1005,10 +1148,12 @@ export const RequestPage = () => {
       setView(View.WALLET_NFT_INTERACTION_COMPLETE)
     } else if (manaTransferData) {
       setView(View.WALLET_MANA_INTERACTION_COMPLETE)
+    } else if (creditsPurchaseData) {
+      setView(View.WALLET_CREDITS_INTERACTION_COMPLETE)
     } else {
       setView(View.WALLET_INTERACTION_COMPLETE)
     }
-  }, [nftTransferData, manaTransferData])
+  }, [nftTransferData, manaTransferData, creditsPurchaseData])
 
   const onDenyWalletInteraction = useCallback(async () => {
     // Only the request this page recovered can be answered. If the route has moved on to another id,
@@ -1076,15 +1221,17 @@ export const RequestPage = () => {
     if (isStaleAction()) return
 
     setIsLoading(false)
-    // Set appropriate view based on whether it's an NFT transfer or MANA transfer
+    // Set appropriate view based on which branded flow the request turned out to be.
     if (nftTransferData) {
       setView(View.WALLET_NFT_INTERACTION_DENIED)
     } else if (manaTransferData) {
       setView(View.WALLET_MANA_INTERACTION_DENIED)
+    } else if (creditsPurchaseData) {
+      setView(View.WALLET_CREDITS_INTERACTION_DENIED)
     } else {
       setView(View.WALLET_INTERACTION_DENIED)
     }
-  }, [nftTransferData, manaTransferData, requestId])
+  }, [nftTransferData, manaTransferData, creditsPurchaseData, requestId])
 
   const restartReview = useCallback(
     (reason: ReviewRestartReason, { notice = true }: { notice?: boolean } = {}) => {
@@ -1293,6 +1440,17 @@ export const RequestPage = () => {
         // Signatures carry no `to` address and are never relayed. The wallet is handed the reviewed bytes
         // themselves, never a fresh reading of the request, in the exact shape its schema gives the method
         // (see toWalletSignatureRequest).
+        //
+        // The deadline is read here rather than left to the timer. Every await between the click and this
+        // point is a window it can pass in — the account read above, a confirmation dialog the user left
+        // open — and a purchase whose credit, external call or trade has lapsed signs bytes that can only
+        // revert, against a credit the ledger may already have released. A timer fires late; this does not.
+        if (Date.now() >= reviewDeadlineRef.current) {
+          hasCompletedRef.current = true
+          clearTimeout(timeoutRef.current)
+          setView(View.TIMEOUT)
+          return
+        }
         markDispatched()
         result = await forwardSignatureRequest(walletClient, toWalletSignatureRequest(method, reviewed, signerAddress))
       }
@@ -1301,16 +1459,28 @@ export const RequestPage = () => {
 
       // Execution is complete even while its outcome is being delivered. A slow delivery must not
       // leave the expiry timer armed or make an already executed interaction appear to have expired.
+      // What the screen may claim about the delivery is a separate question, and the answer is not yet
+      // known here: `signatureDelivery` says so until it is (see SignatureDelivery).
       if (!isStaleAction()) {
         hasCompletedRef.current = true
         clearTimeout(timeoutRef.current)
+        setSignatureDelivery('delivering')
         showInteractionCompleteView()
       }
 
       trackClick(ClickEvents.APPROVE_WALLET_INTERACTION, {
         method: requestRef.current?.method
       })
-      await authServerClient.current.sendSuccessfulOutcome(requestId, signerAddress, result)
+      try {
+        await authServerClient.current.sendSuccessfulOutcome(requestId, signerAddress, result)
+      } catch (deliveryError) {
+        // The signature exists and the app never got it. Say that, and say nothing else: it is not a
+        // rejection, it is not a completed purchase, and it must never be produced a second time — the
+        // catch below deliberately leaves an executed request alone (see hasWalletResult).
+        if (!isStaleAction()) setSignatureDelivery('failed')
+        throw deliveryError
+      }
+      if (!isStaleAction()) setSignatureDelivery('delivered')
       if (isStaleAction()) return
 
       // Notification delivery cannot delay or change a completed request. The helper bounds the fetch;
@@ -1369,6 +1539,8 @@ export const RequestPage = () => {
           setView(View.WALLET_NFT_INTERACTION_DENIED)
         } else if (manaTransferData) {
           setView(View.WALLET_MANA_INTERACTION_DENIED)
+        } else if (creditsPurchaseData) {
+          setView(View.WALLET_CREDITS_INTERACTION_DENIED)
         } else {
           setView(View.WALLET_INTERACTION_DENIED)
         }
@@ -1512,6 +1684,12 @@ export const RequestPage = () => {
         return (
           manaTransferData !== null && areCounterpartiesVerified && (mutableCallbackAddresses.length === 0 || isMutableCallbackAcknowledged)
         )
+      case View.WALLET_CREDITS_INTERACTION:
+        return (
+          creditsPurchaseData !== null &&
+          areCounterpartiesVerified &&
+          (mutableCallbackAddresses.length === 0 || isMutableCallbackAcknowledged)
+        )
       default:
         return false
     }
@@ -1585,12 +1763,18 @@ export const RequestPage = () => {
       return nftTransferData ? <TransferCompletedView type={TransferType.GIFT} transferData={nftTransferData} /> : null
     case View.WALLET_MANA_INTERACTION_COMPLETE:
       return manaTransferData ? <TransferCompletedView type={TransferType.TIP} transferData={manaTransferData} /> : null
+    case View.WALLET_CREDITS_INTERACTION_COMPLETE:
+      return creditsPurchaseData ? (
+        <CreditsPurchaseOutcomeView purchaseData={creditsPurchaseData} outcome="signed" delivery={signatureDelivery} />
+      ) : null
     case View.WALLET_INTERACTION_DENIED:
       return <DeniedWalletInteraction />
     case View.WALLET_NFT_INTERACTION_DENIED:
       return nftTransferData ? <TransferCanceledView type={TransferType.GIFT} transferData={nftTransferData} /> : null
     case View.WALLET_MANA_INTERACTION_DENIED:
       return manaTransferData ? <TransferCanceledView type={TransferType.TIP} transferData={manaTransferData} /> : null
+    case View.WALLET_CREDITS_INTERACTION_DENIED:
+      return creditsPurchaseData ? <CreditsPurchaseOutcomeView purchaseData={creditsPurchaseData} outcome="canceled" /> : null
     case View.LOADING_REQUEST:
       return <LoadingRequest />
 
@@ -1621,6 +1805,23 @@ export const RequestPage = () => {
             transferData={manaTransferData}
             isLoading={isBusy}
             chainId={reviewedChainId}
+            callbackAddresses={mutableCallbackAddresses}
+            callbackAcknowledged={isMutableCallbackAcknowledged}
+            approveBlocked={approveBlocked}
+            onCallbackAcknowledgedChange={setMutableCallbackAcknowledged}
+            onDeny={onDenyWalletInteraction}
+            onApprove={handleApproveWalletInteraction}
+          />
+        </>
+      ) : null
+    case View.WALLET_CREDITS_INTERACTION:
+      return creditsPurchaseData ? (
+        <>
+          {confirmDialog}
+          <CreditsPurchaseView
+            purchaseData={creditsPurchaseData}
+            chainId={reviewedChainId}
+            isLoading={isBusy}
             callbackAddresses={mutableCallbackAddresses}
             callbackAcknowledged={isMutableCallbackAcknowledged}
             approveBlocked={approveBlocked}

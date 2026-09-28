@@ -194,6 +194,53 @@
       "default_text": "Vous pouvez fermer cet onglet et retourner à l'application Decentraland."
     }
   },
+  "credits_purchase": {
+    "unnamed_item": "Article n° {id}",
+    "item_identifiers": "Collection {collection} · article {id}",
+    "token_identifiers": "Contrat {collection} · jeton {id}",
+    "confirm": {
+      "title": "Confirmez votre achat",
+      "processing_title": "Confirmation de votre achat",
+      "price_label": "PRIX",
+      "price": "{credits} crédits",
+      "quantity": "QUANTITÉ 1",
+      "delivered_to": "Livré sur votre compte {address}",
+      "approve": "Confirmer l'achat",
+      "processing": "Traitement de l'autorisation"
+    },
+    "signed": {
+      "title_delivering": "Signature créée",
+      "description_delivering": "Envoi à Decentraland en cours…",
+      "title": "Signature envoyée",
+      "description": "Votre signature a été renvoyée à Decentraland. Retournez dans l'application pour voir si l'achat aboutit : cette page ne peut pas vous le dire.",
+      "title_failed": "Signature non transmise",
+      "description_failed": "Votre signature a été créée, mais Decentraland n'a pas pu être joint pour la recevoir. Retournez dans l'application et vérifiez-y avant d'approuver quoi que ce soit à nouveau.",
+      "price_label": "AUTORISÉ POUR"
+    },
+    "canceled": {
+      "title": "Achat annulé",
+      "description": "Rien n'a été signé et aucun crédit n'a été dépensé.",
+      "price_label": "AURAIT COÛTÉ"
+    },
+    "details": {
+      "title": "Détails techniques",
+      "collection": "Collection",
+      "token_contract": "Contrat du jeton",
+      "item_id": "Id de l'article",
+      "token_id": "Id du jeton",
+      "recipient": "Livré à",
+      "seller": "Mis en vente par",
+      "payment_beneficiary": "Le paiement va à",
+      "price_usd_wei": "Prix signé (USD wei, 1e18 = 1 $)",
+      "max_credited_mana": "Maximum que le crédit peut payer (MANA, pas des crédits)",
+      "credits_manager": "Contrat de crédits",
+      "marketplace": "Contrat de la place de marché",
+      "payment_token": "Jeton de paiement",
+      "expires_at": "L'autorisation expire",
+      "trade_expires_at": "L'annonce expire",
+      "network": "Réseau"
+    }
+  },
   "setup": {
     "welcome": "Bienvenue sur Decentraland !",
     "journey_begins": "Votre aventure commence ici",

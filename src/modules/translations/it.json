@@ -194,6 +194,53 @@
       "default_text": "Puoi chiudere questa scheda e tornare all'applicazione Decentraland."
     }
   },
+  "credits_purchase": {
+    "unnamed_item": "Oggetto n. {id}",
+    "item_identifiers": "Collezione {collection} · oggetto {id}",
+    "token_identifiers": "Contratto {collection} · token {id}",
+    "confirm": {
+      "title": "Conferma il tuo acquisto",
+      "processing_title": "Conferma dell'acquisto in corso",
+      "price_label": "PREZZO",
+      "price": "{credits} crediti",
+      "quantity": "QUANTITÀ 1",
+      "delivered_to": "Consegnato al tuo account {address}",
+      "approve": "Conferma acquisto",
+      "processing": "Elaborazione dell'autorizzazione"
+    },
+    "signed": {
+      "title_delivering": "Firma creata",
+      "description_delivering": "Invio a Decentraland in corso…",
+      "title": "Firma inviata",
+      "description": "La tua firma è stata rimandata a Decentraland. Torna all'app per vedere se l'acquisto va a buon fine: questa pagina non può dirtelo.",
+      "title_failed": "Firma non consegnata",
+      "description_failed": "La tua firma è stata creata, ma non è stato possibile contattare Decentraland per riceverla. Torna all'app e controlla lì prima di approvare di nuovo.",
+      "price_label": "AUTORIZZATO PER"
+    },
+    "canceled": {
+      "title": "Acquisto annullato",
+      "description": "Non è stato firmato nulla e non è stato speso alcun credito.",
+      "price_label": "SAREBBE COSTATO"
+    },
+    "details": {
+      "title": "Dettagli tecnici",
+      "collection": "Collezione",
+      "token_contract": "Contratto del token",
+      "item_id": "Id dell'oggetto",
+      "token_id": "Id del token",
+      "recipient": "Consegnato a",
+      "seller": "Messo in vendita da",
+      "payment_beneficiary": "Il pagamento va a",
+      "price_usd_wei": "Prezzo firmato (USD wei, 1e18 = 1 $)",
+      "max_credited_mana": "Massimo che il credito può pagare (MANA, non crediti)",
+      "credits_manager": "Contratto dei crediti",
+      "marketplace": "Contratto del marketplace",
+      "payment_token": "Token di pagamento",
+      "expires_at": "L'autorizzazione scade",
+      "trade_expires_at": "L'inserzione scade",
+      "network": "Rete"
+    }
+  },
   "setup": {
     "welcome": "Benvenuto su Decentraland!",
     "journey_begins": "Il tuo viaggio inizia qui",
