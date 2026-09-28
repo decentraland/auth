@@ -400,6 +400,8 @@ const creditsPurchase = (overrides: Record<string, unknown> = {}) => ({
   maxCreditedValueWei: 1000000000000000000n,
   externalCallExpiresAt: 4102444800n,
   tradeExpiresAt: 4102444800n,
+  // The earliest of the three above, as the decoder derives it; the page arms its expiry from this one.
+  expiresAt: 4102444800n,
   ...overrides
 })
 const creditsMetaTransaction = (credits: Record<string, unknown> = { status: 'recognized', purchase: creditsPurchase() }) =>
