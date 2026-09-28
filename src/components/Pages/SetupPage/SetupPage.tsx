@@ -64,7 +64,7 @@ export const SetupPage = () => {
   const initializedAccountRef = useRef<string | null>(null)
   const [urlSearchParams] = useSearchParams()
   const { initialized: initializedFlags } = useContext(FeatureFlagsContext)
-  const [initialized, setInitialized] = useState(false)
+  const [initializedFor, setInitializedFor] = useState<string | null>(null)
   const [view, setView] = useState(View.RANDOMIZE)
   const [profile, setProfile] = useState(getRandomDefaultProfile())
   const [name, setName] = useState('')
@@ -76,6 +76,8 @@ export const SetupPage = () => {
   const isMobile = useMobileMediaQuery()
   const { url: redirectTo, redirect } = useAfterLoginRedirection()
   const { isLoading: isConnecting, account, identity } = useCurrentConnectionData()
+  // Profile readiness belongs to the checked account; a replacement is blocked on its first render.
+  const initialized = !!account && !!identity && !isConnecting && initializedFor === account
   const navigate = useNavigateWithSearchParams()
   const referrer = urlSearchParams.get('referrer')
   const {
@@ -218,7 +220,7 @@ export const SetupPage = () => {
       setShowErrors(true)
 
       // If any of the fields has an error, don't submit.
-      if (nameError || emailError || agreeError) {
+      if (!initialized || nameError || emailError || agreeError) {
         return
       }
 
@@ -287,6 +289,7 @@ export const SetupPage = () => {
       }
     },
     [
+      initialized,
       nameError,
       emailError,
       agreeError,
@@ -319,10 +322,11 @@ export const SetupPage = () => {
     // re-fetch the profile, re-fire the CP3 "reached" checkpoint, or overwrite an email the user
     // is editing with the stored one.
     if (initializedAccountRef.current === account) return
-    initializedAccountRef.current = account
+    let cancelled = false
     ;(async () => {
       // Check if the wallet is connected.
       const { profile, couldNotDetermine } = await fetchProfileWithStatus(account)
+      if (cancelled) return
 
       // If we couldn't determine whether a profile exists (catalyst outage), bail out rather than
       // risk overwriting an existing profile with a default one — the whole point of this guard.
@@ -356,14 +360,20 @@ export const SetupPage = () => {
       if (referrer && EthAddress.validate(referrer) && !hasTrackedReferral.current) {
         try {
           await trackReferral(referrer, 'POST')
+          if (cancelled) return
           hasTrackedReferral.current = true
         } catch {
           // Error is already handled in trackReferral
         }
       }
 
-      setInitialized(true)
+      if (cancelled) return
+      initializedAccountRef.current = account
+      setInitializedFor(account)
     })()
+    return () => {
+      cancelled = true
+    }
   }, [redirect, navigate, account, identity, isConnecting, initializedFlags, referrer])
 
   if (!initialized) {

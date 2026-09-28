@@ -70,9 +70,11 @@ const AvatarSetupPage: React.FC = () => {
   const initializedAccountRef = useRef<string | null>(null)
   const [urlSearchParams] = useSearchParams()
   const { initialized: initializedFlags } = useContext(FeatureFlagsContext)
-  const [initialized, setInitialized] = useState(false)
+  const [initializedFor, setInitializedFor] = useState<string | null>(null)
   const { url: redirectTo, redirect } = useAfterLoginRedirection()
   const { isLoading: isConnecting, account, identity } = useCurrentConnectionData()
+  // Profile readiness belongs to the checked account; a replacement is blocked on its first render.
+  const initialized = !!account && !!identity && !isConnecting && initializedFor === account
   const navigate = useNavigateWithSearchParams()
   const referrer = urlSearchParams.get('referrer')
   const { track: trackReferral } = useTrackReferral()
@@ -251,7 +253,7 @@ const AvatarSetupPage: React.FC = () => {
       // If any of the fields has an error, don't submit. Mirror the button-disable logic: besides the
       // charset check, the username must be non-empty and within the character limit. Otherwise a name
       // over the max restored from sessionStorage on reload would auto-continue and deploy.
-      if (emailError || agreeError || hasUsernameError || !state.username) {
+      if (!initialized || emailError || agreeError || hasUsernameError || !state.username) {
         return
       }
 
@@ -346,6 +348,7 @@ const AvatarSetupPage: React.FC = () => {
       }
     },
     [
+      initialized,
       emailError,
       agreeError,
       hasUsernameError,
@@ -375,55 +378,62 @@ const AvatarSetupPage: React.FC = () => {
     [trackCheckTermsOfService]
   )
 
-  const initializeAvatarSetup = useCallback(async () => {
-    if (!account || !identity) {
-      console.warn('No previous connection found')
-      return redirect()
-    }
-
-    const { profile, couldNotDetermine } = await fetchProfileWithStatus(account)
-
-    // If we couldn't determine whether a profile exists (catalyst outage), bail out rather than
-    // risk overwriting an existing profile with a default one — the whole point of this guard.
-    if (couldNotDetermine) {
-      console.warn('Could not determine whether a profile exists; skipping setup to avoid overwrite')
-      return redirect()
-    }
-
-    if (profile && isProfileComplete(profile)) {
-      console.warn('Profile already exists')
-      return redirect()
-    }
-
-    // Try to get stored email from web2 auth (Magic or Thirdweb)
-    const storedEmail = getStoredEmail()
-    if (storedEmail) {
-      setState(prev => ({ ...prev, email: storedEmail, isEmailInherited: true }))
-    }
-
-    trackCheckpoint({
-      checkpointId: 3,
-      action: 'reached',
-      source: 'auth',
-      userIdentifier: storedEmail || account.toLowerCase(),
-      identifierType: storedEmail ? 'email' : 'wallet',
-      email: storedEmail || undefined,
-      wallet: account.toLowerCase()
-    })
-
-    if (referrer && EthAddress.validate(referrer) && !hasTrackedReferral.current) {
-      try {
-        await trackReferral(referrer, 'POST')
-        hasTrackedReferral.current = true
-      } catch {
-        // Error is already handled in trackReferral. Don't let a transient referral failure
-        // abort initialization — the one-shot init guard means this runs once per account, so a
-        // throw here would otherwise leave the user stuck on the loading spinner with no retry.
+  const initializeAvatarSetup = useCallback(
+    async (isCancelled: () => boolean) => {
+      if (!account || !identity) {
+        console.warn('No previous connection found')
+        return redirect()
       }
-    }
 
-    setInitialized(true)
-  }, [account, identity, referrer, redirect, trackReferral])
+      const { profile, couldNotDetermine } = await fetchProfileWithStatus(account)
+      if (isCancelled()) return
+
+      // If we couldn't determine whether a profile exists (catalyst outage), bail out rather than
+      // risk overwriting an existing profile with a default one — the whole point of this guard.
+      if (couldNotDetermine) {
+        console.warn('Could not determine whether a profile exists; skipping setup to avoid overwrite')
+        return redirect()
+      }
+
+      if (profile && isProfileComplete(profile)) {
+        console.warn('Profile already exists')
+        return redirect()
+      }
+
+      // Try to get stored email from web2 auth (Magic or Thirdweb)
+      const storedEmail = getStoredEmail()
+      if (storedEmail) {
+        setState(prev => ({ ...prev, email: storedEmail, isEmailInherited: true }))
+      }
+
+      trackCheckpoint({
+        checkpointId: 3,
+        action: 'reached',
+        source: 'auth',
+        userIdentifier: storedEmail || account.toLowerCase(),
+        identifierType: storedEmail ? 'email' : 'wallet',
+        email: storedEmail || undefined,
+        wallet: account.toLowerCase()
+      })
+
+      if (referrer && EthAddress.validate(referrer) && !hasTrackedReferral.current) {
+        try {
+          await trackReferral(referrer, 'POST')
+          if (isCancelled()) return
+          hasTrackedReferral.current = true
+        } catch {
+          // Error is already handled in trackReferral. Don't let a transient referral failure
+          // abort initialization — the one-shot init guard means this runs once per account, so a
+          // throw here would otherwise leave the user stuck on the loading spinner with no retry.
+        }
+      }
+
+      if (isCancelled()) return
+      initializedAccountRef.current = account
+      setInitializedFor(account)
+    },
+    [account, identity, referrer, redirect, trackReferral]
+  )
 
   useEffect(() => {
     window.addEventListener('message', handleMessage, false)
@@ -454,14 +464,18 @@ const AvatarSetupPage: React.FC = () => {
     // re-check WebGPU, re-fetch the profile, re-fire the CP3 "reached" checkpoint, or overwrite an
     // inherited email that had just been resolved.
     if (initializedAccountRef.current === account) return
-    initializedAccountRef.current = account
+    let cancelled = false
 
     checkWebGpuSupport().then(hasWebGPU => {
+      if (cancelled) return
       if (!hasWebGPU) {
         return navigate(locations.setup(redirectTo, referrer))
       }
-      initializeAvatarSetup()
+      initializeAvatarSetup(() => cancelled)
     })
+    return () => {
+      cancelled = true
+    }
   }, [initializeAvatarSetup, account, identity, isConnecting, initializedFlags, navigate, redirectTo, referrer])
 
   if (!initialized) {

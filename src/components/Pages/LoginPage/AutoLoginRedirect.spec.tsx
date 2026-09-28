@@ -1,5 +1,8 @@
 /* eslint-disable import/order */
-import { render, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
+
+import { StrictMode } from 'react'
+import userEvent from '@testing-library/user-event'
 
 const mockEnsureProfile = jest.fn()
 const mockRedirect = jest.fn()
@@ -9,6 +12,7 @@ const mockGetIdentitySignature = jest.fn()
 const mockCheckClockSync = jest.fn()
 const mockNavigate = jest.fn()
 let mockSkipSetup = false
+let mockIsSocial = false
 
 jest.mock('react-router-dom', () => ({
   ...jest.requireActual('react-router-dom'),
@@ -20,7 +24,7 @@ jest.mock('@dcl/hooks', () => ({
 }))
 
 jest.mock('decentraland-ui2', () => ({
-  Button: ({ children }: { children: React.ReactNode }) => <button>{children}</button>,
+  Button: ({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) => <button onClick={onClick}>{children}</button>,
   CircularProgress: () => <div data-testid="circular-progress" />
 }))
 
@@ -84,7 +88,7 @@ jest.mock('./utils', () => ({
   connectToProvider: (type: string) => mockConnectToProvider(type),
   connectToSocialProvider: (...args: unknown[]) => mockConnectToSocialProvider(...args),
   isMagicTestMode: () => false,
-  isSocialLogin: () => false
+  isSocialLogin: () => mockIsSocial
 }))
 
 import { AutoLoginRedirect } from './AutoLoginRedirect'
@@ -106,6 +110,7 @@ const setSearch = (search: string) => {
 beforeEach(() => {
   ;(window as { ethereum?: unknown }).ethereum = {}
   mockSkipSetup = false
+  mockIsSocial = false
   mockConnectToProvider.mockResolvedValue({ account: ACCOUNT })
   mockGetIdentitySignature.mockResolvedValue({ authChain: [] })
   mockCheckClockSync.mockResolvedValue(true)
@@ -159,5 +164,134 @@ describe('when the redirect targets an Explorer request', () => {
 
     await waitFor(() => expect(mockRedirect).toHaveBeenCalled())
     expect(mockEnsureProfile).not.toHaveBeenCalled()
+  })
+})
+
+describe('when cancelling auto-login while connection is pending', () => {
+  let resolveConnect: (value: { account: string }) => void
+  let view: ReturnType<typeof render>
+
+  beforeEach(async () => {
+    setSearch('loginMethod=metamask&redirectTo=%2Fauth%2Frequests%2Fabandoned')
+    mockConnectToProvider.mockReturnValueOnce(
+      new Promise(resolve => {
+        resolveConnect = resolve
+      })
+    )
+    view = render(<AutoLoginRedirect connectionType={ConnectionOptionType.METAMASK} />)
+    await waitFor(() => expect(mockConnectToProvider).toHaveBeenCalled())
+  })
+
+  it('should stop signing and redirection after Cancel', async () => {
+    await userEvent.click(screen.getByRole('button', { name: 'auto_login.cancel' }))
+    await act(async () => {
+      resolveConnect({ account: ACCOUNT })
+    })
+    expect(mockGetIdentitySignature).not.toHaveBeenCalled()
+    expect(mockRedirect).not.toHaveBeenCalled()
+  })
+
+  it('should stop signing after the page unmounts', async () => {
+    view.unmount()
+    await act(async () => {
+      resolveConnect({ account: ACCOUNT })
+    })
+    expect(mockGetIdentitySignature).not.toHaveBeenCalled()
+  })
+})
+
+describe('when cancelling while identity signing is pending', () => {
+  let resolveIdentity: (value: { authChain: unknown[] }) => void
+
+  beforeEach(async () => {
+    setSearch('loginMethod=metamask&redirectTo=%2Fauth%2Frequests%2Fabandoned')
+    mockGetIdentitySignature.mockReturnValueOnce(
+      new Promise(resolve => {
+        resolveIdentity = resolve
+      })
+    )
+    render(<AutoLoginRedirect connectionType={ConnectionOptionType.METAMASK} />)
+    await waitFor(() => expect(mockGetIdentitySignature).toHaveBeenCalled())
+  })
+
+  it('should abort the identity operation and discard its completion', async () => {
+    await userEvent.click(screen.getByRole('button', { name: 'auto_login.cancel' }))
+    expect(mockGetIdentitySignature.mock.calls[0][1].signal.aborted).toBe(true)
+    await act(async () => {
+      resolveIdentity({ authChain: [] })
+    })
+    expect(mockRedirect).not.toHaveBeenCalled()
+    expect(mockCheckClockSync).not.toHaveBeenCalled()
+  })
+})
+
+describe('when cancelling during the profile check', () => {
+  let resolveProfile: (value: { avatars: unknown[] }) => void
+
+  beforeEach(async () => {
+    setSearch('loginMethod=metamask')
+    mockEnsureProfile.mockReturnValueOnce(
+      new Promise(resolve => {
+        resolveProfile = resolve
+      })
+    )
+    render(<AutoLoginRedirect connectionType={ConnectionOptionType.METAMASK} />)
+    await waitFor(() => expect(mockEnsureProfile).toHaveBeenCalled())
+  })
+
+  it('should abort profile navigation and discard the late result', async () => {
+    await userEvent.click(screen.getByRole('button', { name: 'auto_login.cancel' }))
+    expect(mockEnsureProfile.mock.calls[0][2].signal.aborted).toBe(true)
+    await act(async () => {
+      resolveProfile({ avatars: [] })
+    })
+    expect(mockRedirect).not.toHaveBeenCalled()
+  })
+})
+
+describe('when auto-login mounts in StrictMode', () => {
+  beforeEach(() => {
+    setSearch('loginMethod=metamask&redirectTo=%2Fauth%2Frequests%2Fcurrent')
+  })
+
+  it('should complete one effective login', async () => {
+    render(
+      <StrictMode>
+        <AutoLoginRedirect connectionType={ConnectionOptionType.METAMASK} />
+      </StrictMode>
+    )
+    await waitFor(() => expect(mockRedirect).toHaveBeenCalledTimes(1))
+    expect(mockConnectToProvider).toHaveBeenCalledTimes(1)
+    expect(mockGetIdentitySignature).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('when cancelling a pending social login handoff', () => {
+  let replaceLocation: jest.Mock
+  let resolveSocial: () => void
+
+  beforeEach(async () => {
+    mockIsSocial = true
+    setSearch('loginMethod=google&redirectTo=%2Fauth%2Frequests%2Fabandoned&targetConfigId=ios')
+    replaceLocation = jest.fn()
+    Object.defineProperty(window.location, 'replace', { value: replaceLocation })
+    mockConnectToSocialProvider.mockReturnValueOnce(
+      new Promise<void>(resolve => {
+        resolveSocial = resolve
+      })
+    )
+    render(<AutoLoginRedirect connectionType={ConnectionOptionType.GOOGLE} />)
+    await waitFor(() => expect(mockConnectToSocialProvider).toHaveBeenCalled())
+  })
+
+  it('should replace the document with the local login page and cancel preparation', async () => {
+    await userEvent.click(screen.getByRole('button', { name: 'auto_login.cancel' }))
+    expect(replaceLocation).toHaveBeenCalledWith('http://localhost/auth/login?redirectTo=%2Fauth%2Frequests%2Fabandoned&targetConfigId=ios')
+    expect(mockConnectToSocialProvider.mock.calls[0][4].aborted).toBe(true)
+    expect(mockNavigate).not.toHaveBeenCalled()
+    await act(async () => {
+      resolveSocial()
+    })
+    expect(mockRedirect).not.toHaveBeenCalled()
   })
 })

@@ -34,7 +34,7 @@ export const AutoLoginRedirect = ({ connectionType }: Props) => {
   const { ensureProfile } = useEnsureProfile()
   const navigate = useNavigate()
 
-  const hasStarted = useRef(false)
+  const loginControllerRef = useRef<AbortController>()
   const [phase, setPhase] = useState<Phase>('redirecting')
   // Use a ref for skipSetup so the startLogin callback always reads the latest value.
   // The callback fires once via useEffect, but skipSetup may change after FF loads.
@@ -57,14 +57,27 @@ export const AutoLoginRedirect = ({ connectionType }: Props) => {
   const referrer = useMemo(() => extractReferrerFromSearchParameters(new URLSearchParams(window.location.search)), [])
 
   const handleCancel = useCallback(() => {
+    loginControllerRef.current?.abort()
     // Navigate to login page without loginMethod — shows full login UI.
     // Uses navigate() to respect the basename (/auth).
     const params = new URLSearchParams(window.location.search)
     params.delete('loginMethod')
+    if (isSocial) {
+      // Magic owns navigation after loginWithRedirect dispatches and cannot abort it. A document
+      // navigation discards that pending SDK work; keep the current same-origin login destination.
+      const loginUrl = new URL(window.location.href)
+      loginUrl.search = params.toString()
+      window.location.replace(loginUrl.href)
+      return
+    }
     navigate(locations.login({ queryParams: params }), { replace: true })
-  }, [navigate])
+  }, [navigate, isSocial])
 
   const startLogin = useCallback(async () => {
+    loginControllerRef.current?.abort()
+    const controller = new AbortController()
+    loginControllerRef.current = controller
+    const { signal } = controller
     const connectionTypeForTracking = isSocial ? ConnectionType.WEB2 : ConnectionType.WEB3
 
     try {
@@ -72,7 +85,7 @@ export const AutoLoginRedirect = ({ connectionType }: Props) => {
 
       if (isSocial) {
         // Social (Magic OAuth) — redirect to provider, CallbackPage handles the rest
-        await connectToSocialProvider(connectionType, isMagicTest, rawRedirectTo)
+        await connectToSocialProvider(connectionType, isMagicTest, rawRedirectTo, undefined, signal)
         // If we get here, the browser should be redirecting to Google/Discord/etc.
         return
       }
@@ -87,6 +100,7 @@ export const AutoLoginRedirect = ({ connectionType }: Props) => {
       }
 
       const connectionData = await connectToProvider(connectionType)
+      if (signal.aborted) return
       const ethAddress = connectionData.account?.toLowerCase() ?? ''
 
       // MetaMask connected — now verify and redirect
@@ -103,7 +117,8 @@ export const AutoLoginRedirect = ({ connectionType }: Props) => {
         metadata: { loginMethod: connectionType }
       })
 
-      const freshIdentity = await getIdentitySignature(connectionData)
+      const freshIdentity = await getIdentitySignature(connectionData, { signal })
+      if (signal.aborted) return
 
       // Clear stale social login emails since this is a wallet login
       localStorage.removeItem('dcl_thirdweb_user_email')
@@ -114,9 +129,13 @@ export const AutoLoginRedirect = ({ connectionType }: Props) => {
         type: connectionTypeForTracking
       })
 
+      if (signal.aborted) return
+
       // Check clock sync — if drift is too large, fall back to full LoginPage
       // which has the ClockSyncModal UI
-      if (!(await checkClockSync())) {
+      const isClockSynchronized = await checkClockSync()
+      if (signal.aborted) return
+      if (!isClockSynchronized) {
         handleCancel()
         return
       }
@@ -130,14 +149,16 @@ export const AutoLoginRedirect = ({ connectionType }: Props) => {
         const profile = await ensureProfile(connectionData.account, freshIdentity, {
           redirectTo,
           referrer,
-          navigateOptions: { replace: true }
+          navigateOptions: { replace: true },
+          signal
         })
-        if (!profile) return
+        if (signal.aborted || !profile) return
       }
 
       markReturningUser(connectionData.account ?? '')
       redirect()
     } catch (error) {
+      if (signal.aborted) return
       if (isUserRejectedTransaction(error)) {
         // User cancelled the signature in wallet — navigate to login with walletError param
         // so LoginPage can show the WalletErrorModal. Uses navigate() to respect basename.
@@ -166,19 +187,25 @@ export const AutoLoginRedirect = ({ connectionType }: Props) => {
     handleCancel
   ])
 
+  const startLoginRef = useRef(startLogin)
+  startLoginRef.current = startLogin
+
   useEffect(() => {
-    if (hasStarted.current) return
-    hasStarted.current = true
-    startLogin()
-  }, [startLogin])
+    let cancelled = false
+    // StrictMode cleans up its first effect before this continuation, so only the live mount
+    // starts a wallet connection. Dependency changes must not restart an active login.
+    void Promise.resolve().then(() => {
+      if (!cancelled) void startLoginRef.current()
+    })
+    return () => {
+      cancelled = true
+      loginControllerRef.current?.abort()
+    }
+  }, [])
 
   const handleErrorTryAgain = useCallback(() => {
     setPhase('redirecting')
-    // Keep hasStarted true so the mount effect can't fire a second concurrent
-    // startLogin() if startLogin's identity deps change (e.g. a feature-flag poll
-    // flips skipSetup). We invoke startLogin() directly here for the retry.
-    hasStarted.current = true
-    startLogin()
+    void startLogin()
   }, [startLogin])
 
   if (phase === 'error') {

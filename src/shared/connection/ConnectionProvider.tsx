@@ -16,8 +16,8 @@ type ConnectionState = {
 
 type ConnectionContextValue = ConnectionState & {
   /**
-   * Generates (or retrieves from localStorage) an identity for the currently
-   * connected wallet, then automatically refreshes the connection context.
+   * Generates a fresh identity for the connected wallet and refreshes the connection context.
+   * An optional signal cancels persistence and completion of an abandoned login attempt.
    *
    * When called without arguments, it internally calls `tryPreviousConnection()`
    * to obtain the provider and account.
@@ -25,7 +25,7 @@ type ConnectionContextValue = ConnectionState & {
    * When a `ConnectionResponse` is passed (e.g. from a preceding `connection.connect()`
    * call), it reuses that response directly, avoiding a redundant reconnection.
    */
-  getIdentitySignature: (existingConnection?: ConnectionResponse) => Promise<AuthIdentity>
+  getIdentitySignature: (existingConnection?: ConnectionResponse, options?: { signal?: AbortSignal }) => Promise<AuthIdentity>
 }
 
 const defaultState: ConnectionState = {
@@ -148,7 +148,9 @@ const ConnectionProvider = ({ children }: PropsWithChildren) => {
   }, [observeProvider])
 
   const getIdentitySignature = useCallback(
-    async (existingConnection?: ConnectionResponse): Promise<AuthIdentity> => {
+    async (existingConnection?: ConnectionResponse, options?: { signal?: AbortSignal }): Promise<AuthIdentity> => {
+      const signal = options?.signal
+      signal?.throwIfAborted()
       // Key the in-flight dedup by account. When no existing connection is provided we
       // fall back to a shared key, since that path always resolves to the single
       // "previous" connection (preserving "create identity once per login").
@@ -163,6 +165,7 @@ const ConnectionProvider = ({ children }: PropsWithChildren) => {
         inflight.generation === connectionGenerationRef.current
       ) {
         const identity = await inflight.promise
+        signal?.throwIfAborted()
         if (inflight.generation !== connectionGenerationRef.current) throw new Error('Connection changed while creating identity')
         return identity
       }
@@ -173,8 +176,13 @@ const ConnectionProvider = ({ children }: PropsWithChildren) => {
       // for an initial restore whose result this operation has superseded.
       setState(previous => ({ ...previous, isLoading: false }))
       const assertCurrentConnection = () => {
+        signal?.throwIfAborted()
         if (generation !== connectionGenerationRef.current) throw new Error('Connection changed while creating identity')
       }
+      const invalidateCancelledOperation = () => {
+        if (generation === connectionGenerationRef.current) ++connectionGenerationRef.current
+      }
+      signal?.addEventListener('abort', invalidateCancelledOperation, { once: true })
       const promise = (async () => {
         const connectionResponse = existingConnection ?? (await connection.tryPreviousConnection())
         assertCurrentConnection()
@@ -234,6 +242,7 @@ const ConnectionProvider = ({ children }: PropsWithChildren) => {
         assertCurrentConnection()
         return identity
       } finally {
+        signal?.removeEventListener('abort', invalidateCancelledOperation)
         if (inflightIdentityRef.current?.promise === promise) {
           inflightIdentityRef.current = undefined
           signingConnectionRef.current = undefined
