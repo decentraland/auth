@@ -100,10 +100,19 @@ const mockIsAddressWithoutCode = jest.fn()
 const mockGetCounterpartyAddresses = jest.fn()
 const mockResolveKnownDecentralandContract = jest.fn()
 const mockIsDecentralandCollection = jest.fn()
+const mockFetchPurchasedAssetMetadata = jest.fn()
+const mockFetchAuthorizedCharge = jest.fn()
 const mockClassifyRequest = jest.fn()
 jest.mock('./classifyRequest', () => ({
   ...jest.requireActual('./classifyRequest'),
   classifyRequest: (...args: any[]) => mockClassifyRequest(...args)
+}))
+
+// The credits ledger lookup: real verdict logic, mocked transport. What the charge turns out to be is what
+// these tests vary; how a verdict is reached from it is authorizedCharge.spec's job.
+jest.mock('./authorizedCharge', () => ({
+  ...jest.requireActual('./authorizedCharge'),
+  fetchAuthorizedCharge: (...args: any[]) => mockFetchAuthorizedCharge(...args)
 }))
 
 // --- Shared modules ---
@@ -237,6 +246,32 @@ jest.mock('./Views', () => ({
   ),
   TransferCompletedView: () => <div data-testid="transfer-completed">Transfer Completed</div>,
   TransferCanceledView: () => <div data-testid="transfer-canceled">Transfer Canceled</div>,
+  CreditsPurchaseView: (props: any) => (
+    <div
+      data-testid="credits-purchase"
+      data-approve-blocked={String(props.approveBlocked)}
+      data-credits={String(props.purchaseData?.purchase?.credits)}
+      data-recipient={props.purchaseData?.purchase?.recipient ?? ''}
+      data-item={props.purchaseData?.purchase?.asset?.itemId ?? ''}
+      data-name={props.purchaseData?.metadata?.name ?? ''}
+      data-chain={props.chainId ?? ''}
+      data-callbacks={JSON.stringify(props.callbackAddresses ?? [])}
+      data-callback-acknowledged={String(props.callbackAcknowledged)}
+    >
+      <button data-testid="credits-purchase-approve" onClick={props.onApprove}>
+        confirm purchase
+      </button>
+      <button data-testid="credits-purchase-callback-acknowledge" onClick={() => props.onCallbackAcknowledgedChange?.(true)}>
+        acknowledge callback risk
+      </button>
+      <button data-testid="credits-purchase-deny" onClick={props.onDeny}>
+        cancel
+      </button>
+    </div>
+  ),
+  CreditsPurchaseOutcomeView: (props: any) => (
+    <div data-testid="credits-purchase-outcome" data-outcome={props.outcome} data-delivery={props.delivery ?? ''} />
+  ),
   ConfirmRequestDialog: (props: any) =>
     props.open ? (
       <div
@@ -260,6 +295,7 @@ jest.mock('./utils', () => ({
   decodeManaTransferData: jest.fn().mockReturnValue(null),
   decodeNftTransferData: jest.fn().mockReturnValue(null),
   fetchNftMetadata: jest.fn(),
+  fetchPurchasedAssetMetadata: (...args: any[]) => mockFetchPurchasedAssetMetadata(...args),
   fetchPlaceByCreatorAddress: jest.fn(),
   getConnectedProvider: (...args: any[]) => mockGetConnectedProvider(...args),
   getExplorerDeeplink: jest.fn().mockReturnValue('decentraland://open'),
@@ -301,6 +337,9 @@ const REQUEST_ID = 'test-request-123'
 const SIGNER = '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd'
 const CONTRACT = '0xcontract'
 const COLLECTION = '0xcollection'
+const CREDITS_MANAGER = '0xcreditsmanager'
+const MARKETPLACE = '0xmarketplace'
+const SELLER = '0xseller'
 const HELLO_HEX = '0x68656c6c6f'
 // The deep-link handoff requires a valid UUID v4 route id (the client's correlation id).
 const DEEP_LINK_REQUEST_ID = '123e4567-e89b-42d3-a456-426614174000'
@@ -340,8 +379,32 @@ const dclMetaTransaction = (overrides: Record<string, unknown> = {}): RequestCla
     chainId: 137,
     typedData: { primaryType: 'MetaTransaction' },
     raw: '{"primaryType":"MetaTransaction"}',
+    credits: { status: 'unrelated' },
     ...overrides
   }) as RequestClassification
+const CREDIT_SALT = `0x${'ab'.repeat(32)}`
+
+const creditsPurchase = (overrides: Record<string, unknown> = {}) => ({
+  creditSalt: CREDIT_SALT,
+  creditExpiresAt: 4102444800n,
+  creditsManagerAddress: CREDITS_MANAGER,
+  marketplaceAddress: MARKETPLACE,
+  marketplaceName: 'OffChainMarketplaceV2',
+  asset: { kind: 'collection_item', contractAddress: COLLECTION, itemId: '0' },
+  recipient: SIGNER.toLowerCase(),
+  seller: SELLER,
+  paymentBeneficiary: SELLER,
+  paymentTokenAddress: CONTRACT,
+  priceUsdWei: 700000000000000000n,
+  credits: 7n,
+  maxCreditedValueWei: 1000000000000000000n,
+  externalCallExpiresAt: 4102444800n,
+  tradeExpiresAt: 4102444800n,
+  ...overrides
+})
+const creditsMetaTransaction = (credits: Record<string, unknown> = { status: 'recognized', purchase: creditsPurchase() }) =>
+  dclMetaTransaction({ call: { functionName: 'useCredits', args: [], payable: false, forwardsCall: false }, credits })
+
 const unknownTransaction = (overrides: Record<string, unknown> = {}): RequestClassification =>
   ({
     kind: 'unknown_transaction',
@@ -455,6 +518,9 @@ describe('RequestPage', () => {
     mockGetCounterpartyAddresses.mockReturnValue({ addresses: [], opaque: false })
     mockResolveKnownDecentralandContract.mockResolvedValue({ status: 'not_found' })
     mockIsDecentralandCollection.mockResolvedValue(false)
+    mockFetchPurchasedAssetMetadata.mockResolvedValue({ imageUrl: 'https://peer/thumb.png', name: 'UpperHead AHL', rarity: 'epic' })
+    // The ledger agrees with the trade unless a test says otherwise: 7 credits is 70 cents.
+    mockFetchAuthorizedCharge.mockResolvedValue({ status: 'found', charge: { cents: 70, lines: 1, status: 'pending' } })
     mockGetChainId.mockResolvedValue(1)
     mockEstimateFeesPerGas.mockResolvedValue({ gasPrice: BigInt(1) })
     mockEstimateGas.mockResolvedValue(BigInt(21000))
@@ -2869,6 +2935,381 @@ describe('RequestPage', () => {
           params: [SIGNER, '{"primaryType":"MetaTransaction"}']
         })
       )
+    })
+  })
+
+  describe('when the request is a credits purchase', () => {
+    beforeEach(() => {
+      mockEnsureProfile.mockResolvedValue({ avatars: [{ name: 'TestUser' }] })
+      mockRecover.mockResolvedValue(recovered('eth_signTypedData_v4', [SIGNER, '{"primaryType":"MetaTransaction"}']))
+      mockGetAddresses.mockResolvedValue([SIGNER])
+      mockClassifyRequest.mockResolvedValue(creditsMetaTransaction())
+      // Everything the call reaches is Decentraland's, and the collection the item comes from is one too.
+      mockGetCounterpartyAddresses.mockReturnValue({ addresses: [MARKETPLACE], opaque: false })
+      mockGetKnownDecentralandContract.mockReturnValue({ name: 'OffChainMarketplaceV2' })
+      mockIsDecentralandCollection.mockResolvedValue(true)
+      mockWalletRequest.mockResolvedValue('0xsignature')
+      mockSendSuccessfulOutcome.mockResolvedValue({})
+      mockSendFailedOutcome.mockResolvedValue({})
+    })
+
+    it('should show the dedicated approval with the credits, the item and the recipient read from the payload', async () => {
+      renderRequestPage()
+      const view = await screen.findByTestId('credits-purchase')
+      expect(view).toHaveAttribute('data-credits', '7')
+      expect(view).toHaveAttribute('data-item', '0')
+      expect(view).toHaveAttribute('data-recipient', SIGNER.toLowerCase())
+      expect(view).toHaveAttribute('data-name', 'UpperHead AHL')
+      expect(view).toHaveAttribute('data-approve-blocked', 'false')
+    })
+
+    it("should look the charge up by the signed credit's salt, as the connected identity", async () => {
+      renderRequestPage()
+      await screen.findByTestId('credits-purchase')
+      expect(mockFetchAuthorizedCharge).toHaveBeenCalledTimes(1)
+      expect(mockFetchAuthorizedCharge).toHaveBeenCalledWith(CREDIT_SALT, mockConnectionData.identity)
+    })
+
+    it('should never show an incomplete purchase: nothing but the loading screen until every check answered', async () => {
+      let resolveCollection: (value: boolean) => void = () => undefined
+      mockIsDecentralandCollection.mockReturnValue(
+        new Promise<boolean>(resolve => {
+          resolveCollection = resolve
+        })
+      )
+      renderRequestPage()
+      expect(await screen.findByTestId('loading-request')).toBeInTheDocument()
+      expect(screen.queryByTestId('credits-purchase')).not.toBeInTheDocument()
+      await act(async () => {
+        resolveCollection(true)
+      })
+      expect(await screen.findByTestId('credits-purchase')).toBeInTheDocument()
+    })
+
+    it('should keep the branded screen when only the cosmetic details could not be read', async () => {
+      mockFetchPurchasedAssetMetadata.mockRejectedValue(new Error('catalyst is down'))
+      renderRequestPage()
+      const view = await screen.findByTestId('credits-purchase')
+      expect(view).toHaveAttribute('data-credits', '7')
+      expect(view).toHaveAttribute('data-name', '')
+    })
+
+    it('should sign the reviewed payload once, and only after the purchase was confirmed', async () => {
+      renderRequestPage()
+      await screen.findByTestId('credits-purchase')
+      expect(mockWalletRequest).not.toHaveBeenCalled()
+      await userEvent.click(screen.getByTestId('credits-purchase-approve'))
+      await waitFor(() =>
+        expect(mockWalletRequest).toHaveBeenCalledWith({
+          method: 'eth_signTypedData_v4',
+          params: [SIGNER, '{"primaryType":"MetaTransaction"}']
+        })
+      )
+      expect(mockWalletRequest).toHaveBeenCalledTimes(1)
+    })
+
+    it('should produce one request for a double click', async () => {
+      renderRequestPage()
+      await screen.findByTestId('credits-purchase')
+      const approve = screen.getByTestId('credits-purchase-approve')
+      await act(async () => {
+        fireEvent.click(approve)
+        fireEvent.click(approve)
+      })
+      await waitFor(() => expect(mockWalletRequest).toHaveBeenCalledTimes(1))
+    })
+
+    it('should say the signature was returned rather than that the purchase settled', async () => {
+      renderRequestPage()
+      await screen.findByTestId('credits-purchase')
+      await userEvent.click(screen.getByTestId('credits-purchase-approve'))
+      const outcome = await screen.findByTestId('credits-purchase-outcome')
+      expect(outcome).toHaveAttribute('data-outcome', 'signed')
+    })
+
+    it('should show the purchase as canceled when the user refuses it, and report the rejection', async () => {
+      renderRequestPage()
+      await screen.findByTestId('credits-purchase')
+      await userEvent.click(screen.getByTestId('credits-purchase-deny'))
+      const outcome = await screen.findByTestId('credits-purchase-outcome')
+      expect(outcome).toHaveAttribute('data-outcome', 'canceled')
+      expect(mockSendFailedOutcome).toHaveBeenCalledWith(REQUEST_ID, SIGNER, { code: -32003, message: 'Transaction rejected' })
+    })
+
+    it('should not sign again when delivering the outcome of an already produced signature fails', async () => {
+      mockSendSuccessfulOutcome.mockRejectedValue(new Error('delivery failed'))
+      renderRequestPage()
+      await screen.findByTestId('credits-purchase')
+      await userEvent.click(screen.getByTestId('credits-purchase-approve'))
+      await waitFor(() => expect(mockSendSuccessfulOutcome).toHaveBeenCalled())
+      expect(mockWalletRequest).toHaveBeenCalledTimes(1)
+      expect(mockSendFailedOutcome).not.toHaveBeenCalled()
+    })
+
+    describe('and the credits ledger charges more than the trade on screen is worth', () => {
+      beforeEach(() => {
+        // The attack the charge check exists for: a credit authorized for 100 credits, spent on the
+        // 7-credit trade being reviewed. Every structural check still passes.
+        mockFetchAuthorizedCharge.mockResolvedValue({ status: 'found', charge: { cents: 1000, lines: 1, status: 'pending' } })
+      })
+
+      it('should refuse to state a price and show the payload instead', async () => {
+        renderRequestPage()
+        await screen.findByTestId('action-request')
+        expect(screen.queryByTestId('credits-purchase')).not.toBeInTheDocument()
+      })
+    })
+
+    describe('and the credit pays for several lines of one checkout', () => {
+      beforeEach(() => {
+        mockFetchAuthorizedCharge.mockResolvedValue({ status: 'found', charge: { cents: 70, lines: 3, status: 'pending' } })
+      })
+
+      it('should refuse to summarize the group as this one purchase', async () => {
+        renderRequestPage()
+        await screen.findByTestId('action-request')
+        expect(screen.queryByTestId('credits-purchase')).not.toBeInTheDocument()
+      })
+    })
+
+    describe('and the credits ledger cannot be reached', () => {
+      beforeEach(() => {
+        mockFetchAuthorizedCharge.mockResolvedValue({ status: 'unavailable' })
+      })
+
+      it('should refuse to state a price rather than fall back to the trade price', async () => {
+        renderRequestPage()
+        await screen.findByTestId('action-request')
+        expect(screen.queryByTestId('credits-purchase')).not.toBeInTheDocument()
+      })
+    })
+
+    describe('and the buyer holds no authorization for that credit', () => {
+      beforeEach(() => {
+        mockFetchAuthorizedCharge.mockResolvedValue({ status: 'not_found' })
+      })
+
+      it('should refuse to state a price', async () => {
+        renderRequestPage()
+        await screen.findByTestId('action-request')
+        expect(screen.queryByTestId('credits-purchase')).not.toBeInTheDocument()
+      })
+    })
+
+    describe('and the credit expires before the auth request does', () => {
+      beforeEach(() => {
+        // The auth request is good for a while; the credit lapses in a moment. The review must die with the
+        // credit, not with the request.
+        mockRecover.mockResolvedValue({
+          ...recovered('eth_signTypedData_v4', [SIGNER, '{"primaryType":"MetaTransaction"}']),
+          expiration: new Date(Date.now() + 600_000).toISOString()
+        })
+        mockClassifyRequest.mockResolvedValue(
+          creditsMetaTransaction({
+            status: 'recognized',
+            purchase: creditsPurchase({ expiresAt: BigInt(Math.floor(Date.now() / 1000) + 1) })
+          })
+        )
+      })
+
+      it('should expire the review when the credit does, not when the request does', async () => {
+        renderRequestPage()
+        await screen.findByTestId('credits-purchase')
+        expect(await screen.findByTestId('timeout-error', undefined, { timeout: 4000 })).toBeInTheDocument()
+      })
+
+      it('should not sign once that deadline has passed', async () => {
+        renderRequestPage()
+        await screen.findByTestId('credits-purchase')
+        await screen.findByTestId('timeout-error', undefined, { timeout: 4000 })
+        expect(mockWalletRequest).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and the credit lapses after Confirm was pressed but before the wallet is asked', () => {
+      let releaseAccountRead: (accounts: string[]) => void
+      let creditDeadlineSeconds: number
+
+      beforeEach(() => {
+        // The window this guard exists for: the deadline passes DURING the approval, between the click and
+        // the dispatch. No timer is run — the point is that a late timer must not be what stops it, so the
+        // clock is moved and the handler has to notice on its own.
+        creditDeadlineSeconds = Math.floor(Date.now() / 1000) + 300
+        mockRecover.mockResolvedValue({
+          ...recovered('eth_signTypedData_v4', [SIGNER, '{"primaryType":"MetaTransaction"}']),
+          expiration: new Date(Date.now() + 3_600_000).toISOString()
+        })
+        mockClassifyRequest.mockResolvedValue(
+          creditsMetaTransaction({
+            status: 'recognized',
+            purchase: creditsPurchase({ expiresAt: BigInt(creditDeadlineSeconds) })
+          })
+        )
+        // The review's own account read resolves; the approval's is held open until the test lets it go.
+        mockGetAddresses.mockResolvedValueOnce([SIGNER]).mockImplementation(
+          () =>
+            new Promise<string[]>(resolve => {
+              releaseAccountRead = resolve
+            })
+        )
+      })
+
+      afterEach(() => {
+        jest.restoreAllMocks()
+      })
+
+      const approveAcrossTheDeadline = async () => {
+        renderRequestPage()
+        await screen.findByTestId('credits-purchase')
+        await userEvent.click(screen.getByTestId('credits-purchase-approve'))
+        // The approval is now parked on the account read. Move the clock past the credit's expiry without
+        // letting any timer fire, then let the approval continue.
+        await waitFor(() => expect(mockGetAddresses).toHaveBeenCalledTimes(2))
+        jest.spyOn(Date, 'now').mockReturnValue((creditDeadlineSeconds + 1) * 1000)
+        await act(async () => {
+          releaseAccountRead([SIGNER])
+        })
+      }
+
+      it('should never hand the payload to the wallet', async () => {
+        await approveAcrossTheDeadline()
+
+        await waitFor(() => expect(screen.getByTestId('timeout-error')).toBeInTheDocument())
+        expect(mockWalletRequest).not.toHaveBeenCalled()
+      })
+
+      it('should show the expired view rather than a purchase that still looks live', async () => {
+        await approveAcrossTheDeadline()
+
+        expect(await screen.findByTestId('timeout-error')).toBeInTheDocument()
+        expect(screen.queryByTestId('credits-purchase')).not.toBeInTheDocument()
+      })
+
+      it('should answer the request with nothing at all', async () => {
+        await approveAcrossTheDeadline()
+
+        await waitFor(() => expect(screen.getByTestId('timeout-error')).toBeInTheDocument())
+        expect(mockSendSuccessfulOutcome).not.toHaveBeenCalled()
+        expect(mockSendFailedOutcome).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and the outcome of an approved purchase has not been delivered yet', () => {
+      let resolveOutcome: () => void
+      let rejectOutcome: (error: Error) => void
+
+      beforeEach(() => {
+        mockSendSuccessfulOutcome.mockImplementation(
+          () =>
+            new Promise<void>((resolve, reject) => {
+              resolveOutcome = resolve
+              rejectOutcome = reject
+            })
+        )
+      })
+
+      it('should say the signature is on its way, never that it arrived', async () => {
+        renderRequestPage()
+        await screen.findByTestId('credits-purchase')
+        await userEvent.click(screen.getByTestId('credits-purchase-approve'))
+        const outcome = await screen.findByTestId('credits-purchase-outcome')
+        expect(outcome).toHaveAttribute('data-delivery', 'delivering')
+      })
+
+      it('should say it arrived once the auth server has it', async () => {
+        renderRequestPage()
+        await screen.findByTestId('credits-purchase')
+        await userEvent.click(screen.getByTestId('credits-purchase-approve'))
+        await screen.findByTestId('credits-purchase-outcome')
+        await act(async () => {
+          resolveOutcome()
+        })
+        await waitFor(() => expect(screen.getByTestId('credits-purchase-outcome')).toHaveAttribute('data-delivery', 'delivered'))
+      })
+
+      it('should say it was not delivered when the delivery fails, and never sign again', async () => {
+        renderRequestPage()
+        await screen.findByTestId('credits-purchase')
+        await userEvent.click(screen.getByTestId('credits-purchase-approve'))
+        await screen.findByTestId('credits-purchase-outcome')
+        await act(async () => {
+          rejectOutcome(new Error('the auth server is unreachable'))
+        })
+        await waitFor(() => expect(screen.getByTestId('credits-purchase-outcome')).toHaveAttribute('data-delivery', 'failed'))
+        expect(mockWalletRequest).toHaveBeenCalledTimes(1)
+        expect(mockSendFailedOutcome).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and the call reaches a contract that is not Decentraland', () => {
+      beforeEach(() => {
+        mockGetCounterpartyAddresses.mockReturnValue({ addresses: ['0xstranger'], opaque: false })
+        mockGetKnownDecentralandContract.mockReturnValue(null)
+        mockIsAddressWithoutCode.mockResolvedValue(false)
+        mockIsDecentralandCollection.mockResolvedValue(false)
+      })
+
+      it('should fall back to the generic review of the raw payload', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('action-request')
+        expect(view).toHaveAttribute('data-payload', JSON.stringify({ kind: 'typed_data', raw: '{"primaryType":"MetaTransaction"}' }))
+        expect(screen.queryByTestId('credits-purchase')).not.toBeInTheDocument()
+      })
+    })
+
+    describe('and the item comes from an address that is not a Decentraland collection', () => {
+      beforeEach(() => {
+        // The counterparty check clears it as an address without code; the purchase screen must not.
+        mockIsDecentralandCollection.mockResolvedValue(false)
+      })
+
+      it('should fall back to the generic review of the raw payload', async () => {
+        renderRequestPage()
+        await screen.findByTestId('action-request')
+        expect(screen.queryByTestId('credits-purchase')).not.toBeInTheDocument()
+      })
+    })
+
+    describe('and the collection lookup cannot answer', () => {
+      beforeEach(() => {
+        mockIsDecentralandCollection.mockRejectedValue(new Error('the factories are unreachable'))
+      })
+
+      it('should fall back to the generic review rather than vouching on a guess', async () => {
+        renderRequestPage()
+        await screen.findByTestId('action-request')
+        expect(screen.queryByTestId('credits-purchase')).not.toBeInTheDocument()
+      })
+    })
+
+    describe('and the payload is a credits call the page will not vouch for', () => {
+      beforeEach(() => {
+        mockClassifyRequest.mockResolvedValue(creditsMetaTransaction({ status: 'unsupported', reason: 'own_wallet_spend' }))
+      })
+
+      it('should show the generic review, with no branding and no relaxed gates', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('action-request')
+        expect(view).toHaveAttribute('data-approve-blocked', 'true')
+        expect(screen.queryByTestId('credits-purchase')).not.toBeInTheDocument()
+      })
+    })
+
+    describe('and an address the call reaches had no code when it was checked', () => {
+      beforeEach(() => {
+        mockGetCounterpartyAddresses.mockReturnValue({ addresses: [SELLER], opaque: false })
+        mockGetKnownDecentralandContract.mockReturnValue(null)
+        mockIsAddressWithoutCode.mockResolvedValue(true)
+      })
+
+      it('should ask for the delayed-code consent before the purchase may be confirmed', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('credits-purchase')
+        expect(view).toHaveAttribute('data-callbacks', JSON.stringify([SELLER]))
+        expect(view).toHaveAttribute('data-approve-blocked', 'true')
+        await userEvent.click(screen.getByTestId('credits-purchase-callback-acknowledge'))
+        await waitFor(() => expect(screen.getByTestId('credits-purchase')).toHaveAttribute('data-approve-blocked', 'false'))
+      })
     })
   })
 

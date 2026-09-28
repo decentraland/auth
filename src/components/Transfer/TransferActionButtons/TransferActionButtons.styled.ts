@@ -4,6 +4,9 @@ import { Box, styled } from 'decentraland-ui2'
 const ButtonsContainer = styled(Box)(({ theme }) => ({
   display: 'flex',
   gap: theme.spacing(2.5),
+  // 520px is the row's size on a window that has it; a phone does not, and a button that runs off the side
+  // of the screen is a decision the user cannot make.
+  maxWidth: '100%',
   width: '520px',
   marginTop: theme.spacing(8.75)
 }))

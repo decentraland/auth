@@ -13,6 +13,7 @@ import {
   getMetaTransactionSalt
 } from '../../../shared/auth'
 import { ClassificationContext, RequestClassification, classifyRequest, getPayloadFingerprint } from './classifyRequest'
+import { buildCreditsPurchaseRequest, buildTrade, buildUseCreditsArgs, marketplaceContract } from './TestViewPage/creditsPurchaseVectors'
 
 const POLYGON = 137
 const ETHEREUM = 1
@@ -971,6 +972,69 @@ describe('when classifying a request', () => {
 
     it('should throw an unsupported method error', async () => {
       await expect(classifyRequest(request, context)).rejects.toThrow('not supported')
+    })
+  })
+  describe('and the request is an Explorer credits purchase', () => {
+    let purchaseRequest: ReturnType<typeof buildCreditsPurchaseRequest>
+
+    beforeEach(() => {
+      purchaseRequest = buildCreditsPurchaseRequest({ from: USER })
+      // Resolve the way the page does: anything in the registry for this chain is that contract.
+      resolveContract.mockImplementation((address: string, chainId: number) => {
+        const known = getKnownDecentralandContract(address, chainId)
+        return known ? found(known) : notFound
+      })
+    })
+
+    it('should read the whole payload end to end: the salt domain, the useCredits call and the nested accept', async () => {
+      const classification = await classifyRequest(typedDataRequest(purchaseRequest.typedData), context)
+
+      expect(classification.kind).toBe('dcl_meta_transaction')
+      if (classification.kind !== 'dcl_meta_transaction') throw new Error('not a meta transaction')
+      expect(classification.contract.name).toBe(ContractName.CreditsManager)
+      expect(classification.call.functionName).toBe('useCredits')
+      expect(classification.credits.status).toBe('recognized')
+      if (classification.credits.status !== 'recognized') throw new Error('not recognized')
+      expect(classification.credits.purchase.credits).toBe(7n)
+      expect(classification.credits.purchase.marketplaceAddress).toBe(marketplaceContract.address.toLowerCase())
+      expect(classification.credits.purchase.recipient).toBe(USER.toLowerCase())
+    })
+
+    it('should refuse a payload whose domain names another verifying contract', async () => {
+      const altered = buildCreditsPurchaseRequest({ from: USER, verifyingContract: getContract(ContractName.BidV2, POLYGON).address })
+
+      await expect(classifyRequest(typedDataRequest(altered.typedData), context)).rejects.toBeInstanceOf(MalformedSignatureRequestError)
+    })
+
+    it('should refuse a payload whose domain salt names another chain', async () => {
+      const altered = buildCreditsPurchaseRequest({ from: USER, chainId: AMOY })
+
+      await expect(classifyRequest(typedDataRequest(altered.typedData), context)).rejects.toBeInstanceOf(MalformedSignatureRequestError)
+    })
+
+    it('should refuse a payload whose domain name is not the one the contract hashes', async () => {
+      const altered = buildCreditsPurchaseRequest({ from: USER, domainName: 'Decentraland Credits ' })
+
+      await expect(classifyRequest(typedDataRequest(altered.typedData), context)).rejects.toBeInstanceOf(MalformedSignatureRequestError)
+    })
+
+    it('should refuse a payload that signs for another account', async () => {
+      const altered = buildCreditsPurchaseRequest({ from: RECIPIENT })
+
+      await expect(classifyRequest(typedDataRequest(altered.typedData), context)).rejects.toBeInstanceOf(MalformedSignatureRequestError)
+    })
+
+    it('should classify a purchase it cannot vouch for without refusing it', async () => {
+      const ownWalletSpend = buildCreditsPurchaseRequest({
+        from: USER,
+        args: buildUseCreditsArgs({ buyer: USER, maxUncreditedValue: 1n, trades: [buildTrade({ buyer: USER })] })
+      })
+
+      const classification = await classifyRequest(typedDataRequest(ownWalletSpend.typedData), context)
+
+      expect(classification.kind).toBe('dcl_meta_transaction')
+      if (classification.kind !== 'dcl_meta_transaction') throw new Error('not a meta transaction')
+      expect(classification.credits).toEqual({ status: 'unsupported', reason: 'own_wallet_spend' })
     })
   })
 })

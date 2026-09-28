@@ -5,7 +5,7 @@ import { ProviderType } from '@dcl/schemas/dist/dapps/provider-type'
 import { Provider, connection } from 'decentraland-connect'
 import { ContractName, getContract } from 'decentraland-transactions'
 import { config } from '../../../modules/config'
-import { DecodedCall, collectCallAddresses } from '../../../shared/auth'
+import { DecodedCall, collectCallAddresses, getCollectionContract } from '../../../shared/auth'
 import { isErrorWithMessage } from '../../../shared/errors'
 import { ResponseTooLargeError, readTextWithCap } from '../../../shared/http'
 import { formatUntrustedLabel } from '../../../shared/text'
@@ -13,6 +13,7 @@ import { getHttpsUrl } from '../../../shared/urls'
 import { isRecord } from '../../../shared/utils/isRecord'
 import { isMobile } from '../LoginPage/utils'
 import { NFT_TRANSFER_FUNCTIONS } from './classifyRequest'
+import type { CreditsPurchaseAsset } from './creditsPurchase'
 import type { PlaceLocation } from './types'
 
 // Native-protocol confirmation dialogs need enough time for the user to react. A 500 ms window
@@ -160,6 +161,17 @@ const MAX_METADATA_BYTES = 256 * 1024
 const METADATA_FETCH_TIMEOUT_MS = 10_000
 // Optional scene details must not keep a tip waiting for the Places service until the request expires.
 const PLACES_FETCH_TIMEOUT_MS = 10_000
+// Cosmetic item details must not keep the purchase review waiting for a catalyst until the request expires.
+const ITEM_METADATA_FETCH_TIMEOUT_MS = 10_000
+// One wearable or emote entity. Real entities are a few kilobytes; the cap is what a hostile mirror cannot
+// make the page buffer past.
+const MAX_ITEM_ENTITY_BYTES = 256 * 1024
+// How the catalyst addresses a collection's item on each chain the review runs on. A collection item has no
+// token yet, so its metadata is addressed by this pointer rather than by a tokenURI.
+const ITEM_URN_NETWORKS: ReadonlyMap<number, string> = new Map([
+  [ChainId.MATIC_MAINNET, 'matic'],
+  [ChainId.MATIC_AMOY, 'amoy']
+])
 
 /** Rejects when `promise` has not settled within `timeoutMs`. */
 function withTimeout<T>(promise: PromiseLike<T> | T, timeoutMs: number, label: string): Promise<T> {
@@ -463,6 +475,88 @@ async function fetchNftMetadata(
   }
 }
 
+/**
+ * The catalyst pointer for one item of a Decentraland collection, or null on a chain whose collections the
+ * catalyst does not index. Built from the collection address and item id read out of the signed trade, so
+ * the metadata that comes back is the metadata of what will actually be delivered.
+ */
+function getCollectionItemUrn(contractAddress: string, itemId: string, chainId: number): string | null {
+  const network = ITEM_URN_NETWORKS.get(chainId)
+  return network ? `urn:decentraland:${network}:collections-v2:${contractAddress.toLowerCase()}:${itemId}` : null
+}
+
+/**
+ * The name, rarity and thumbnail of a collection item, read from the catalyst the site is configured with.
+ *
+ * Cosmetic only, and treated as such: the purchase this describes is decided by the decoded call, never by
+ * what comes back here, and every field is either dropped or shown as an untrusted label. The catalyst is
+ * the one place the page asks — the item's own collection cannot answer for an item that has no token yet,
+ * and a URL the request chose would be a source the review has no reason to trust. Throws when the entity
+ * could not be read, so the caller falls back to naming the item by its identifiers.
+ */
+async function fetchCollectionItemMetadata(
+  contractAddress: string,
+  itemId: string,
+  chainId: number
+): Promise<{ imageUrl: string; name: string; rarity: Rarity }> {
+  const urn = getCollectionItemUrn(contractAddress, itemId, chainId)
+  if (!urn) {
+    throw new Error(`Collection items are not indexed on chain ${chainId}`)
+  }
+  const peerUrl = config.get('PEER_URL')
+  const response = await fetch(`${peerUrl}/content/entities/active`, {
+    method: 'POST',
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pointers: [urn] }),
+    signal: AbortSignal.timeout(ITEM_METADATA_FETCH_TIMEOUT_MS)
+  })
+  if (!response.ok) {
+    await response.body?.cancel().catch(() => undefined)
+    throw new Error(`Failed to fetch the entity for ${urn}: ${response.status} ${response.statusText}`)
+  }
+  const text = await readTextWithCap(response, MAX_ITEM_ENTITY_BYTES)
+  const entities: unknown = JSON.parse(text)
+  const entity: unknown = Array.isArray(entities) ? entities[0] : undefined
+  if (!isRecord(entity) || !isRecord(entity.metadata)) {
+    throw new Error(`No entity is deployed for ${urn}`)
+  }
+  const metadata = entity.metadata
+  // The thumbnail is served by content hash, so the URL the page builds is the catalyst's own and nothing
+  // the item's author wrote picks a host. A file the entity does not carry simply has no image.
+  const thumbnailFile = typeof metadata.thumbnail === 'string' ? metadata.thumbnail : 'thumbnail.png'
+  const thumbnail = Array.isArray(entity.content)
+    ? entity.content.find((file: unknown) => isRecord(file) && file.file === thumbnailFile)
+    : undefined
+  const imageUrl = isRecord(thumbnail) && typeof thumbnail.hash === 'string' ? `${peerUrl}/content/contents/${thumbnail.hash}` : ''
+  const rarityValue = typeof metadata.rarity === 'string' ? metadata.rarity.toLowerCase() : ''
+  return {
+    imageUrl: getHttpsUrl(imageUrl) ?? '',
+    name: formatUntrustedLabel(metadata.name, 64),
+    rarity: (Object.values(Rarity) as string[]).includes(rarityValue) ? (rarityValue as Rarity) : Rarity.COMMON
+  }
+}
+
+/**
+ * The cosmetic details of what a credits purchase delivers: the catalyst's entity for a collection item, the
+ * collection's own `tokenURI` metadata for a token being resold. Both are read from the identifiers in the
+ * signed trade. Throws when neither can answer, and the review then names the item by those identifiers.
+ */
+async function fetchPurchasedAssetMetadata(
+  asset: CreditsPurchaseAsset,
+  chainId: number
+): Promise<{ imageUrl: string; name: string; rarity: Rarity }> {
+  if (asset.kind === 'collection_item') {
+    return fetchCollectionItemMetadata(asset.contractAddress, asset.itemId, chainId)
+  }
+  const collection = getCollectionContract(asset.contractAddress, chainId)
+  if (!collection) {
+    throw new Error(`No collection ABI for chain ${chainId}`)
+  }
+  const { imageUrl, name, rarity } = await fetchNftMetadata(asset.contractAddress, collection.abi, asset.tokenId)
+  return { imageUrl, name, rarity }
+}
+
 /** A Genesis City parcel: two integers, as the Places API writes a base position. */
 const BASE_POSITION_PATTERN = /^-?\d{1,4},-?\d{1,4}$/
 
@@ -572,6 +666,9 @@ export {
   getCounterpartyAddresses,
   decodeManaTransferData,
   fetchNftMetadata,
+  fetchCollectionItemMetadata,
+  fetchPurchasedAssetMetadata,
+  getCollectionItemUrn,
   fetchPlaceByCreatorAddress,
   getPlaceLocation
 }
