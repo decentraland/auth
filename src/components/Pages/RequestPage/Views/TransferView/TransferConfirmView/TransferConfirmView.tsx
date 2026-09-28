@@ -2,14 +2,14 @@ import { useState } from 'react'
 import { useTranslation } from '@dcl/hooks'
 import { Rarity } from '@dcl/schemas'
 import { Checkbox, FormControlLabel, Profile } from 'decentraland-ui2'
-import { getExplorerAddressUrl, getExplorerName } from '../../../../../../shared/explorer'
+import { getExplorerAddressUrl, getExplorerName, getNetworkName } from '../../../../../../shared/explorer'
 import { TransferActionButtons, TransferAssetImage, TransferLayout, TransferLoadingState } from '../../../../../Transfer'
 import { CenteredContent, ItemName, Label, Notices, Title, WarningAlert } from '../../../../../Transfer/Transfer.styled'
 import { TransferType } from '../../../types'
 import type { MANATransferData, NFTTransferData, ProfileAvatar } from '../../../types'
 import { PlaceDetails, PlaceLocationName, PlaceNote, SceneName } from '../TransferTipComponents.styled'
 import { TransferConfirmViewProps } from './TransferConfirmView.types'
-import { RecipientExplorerLink } from './TransferConfirmView.styled'
+import { AssetDetails, RecipientExplorerLink } from './TransferConfirmView.styled'
 
 const TransferConfirmView = (props: TransferConfirmViewProps) => {
   const { t } = useTranslation()
@@ -113,6 +113,18 @@ const TransferConfirmView = (props: TransferConfirmViewProps) => {
               rarity={(transferData as NFTTransferData).rarity || Rarity.COMMON}
             />
             {(transferData as NFTTransferData).name && <ItemName>{(transferData as NFTTransferData).name}</ItemName>}
+            <AssetDetails>
+              {props.chainId !== undefined ? (
+                <>
+                  <dt>{t('transfer.confirm.asset_network')}</dt>
+                  <dd>{`${getNetworkName(props.chainId)} (${props.chainId})`.trim()}</dd>
+                </>
+              ) : null}
+              <dt>{t('transfer.confirm.asset_contract')}</dt>
+              <dd>{(transferData as NFTTransferData).contractAddress}</dd>
+              <dt>{t('transfer.confirm.asset_token_id')}</dt>
+              <dd>{(transferData as NFTTransferData).tokenId}</dd>
+            </AssetDetails>
           </>
         )}
         {showsGiftingWarning || asksCallbackConsent ? (

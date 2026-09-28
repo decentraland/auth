@@ -315,6 +315,11 @@ describe('when rendering the ActionRequestView', () => {
       expect(warnings).not.toHaveTextContent('request.action.warning_signature_bearer')
     })
 
+    it('should not show the raw-message warning', () => {
+      render(<ActionRequestView {...props} />)
+      expect(screen.queryByTestId('raw-message-warning')).not.toBeInTheDocument()
+    })
+
     it('should show the text', () => {
       render(<ActionRequestView {...props} />)
       expect(screen.getByTestId('action-payload')).toHaveTextContent('Welcome')
@@ -325,6 +330,11 @@ describe('when rendering the ActionRequestView', () => {
   describe('and the payload is a message that is not readable text', () => {
     beforeEach(() => {
       props = { ...props, payload: { kind: 'message', hex: `0x${'9f'.repeat(32)}`, text: null } }
+    })
+
+    it('should explain why the message is shown as hexadecimal', () => {
+      render(<ActionRequestView {...props} />)
+      expect(screen.getByTestId('raw-message-warning')).toHaveTextContent('request.action.raw_message_warning')
     })
 
     it('should show the bytes', () => {

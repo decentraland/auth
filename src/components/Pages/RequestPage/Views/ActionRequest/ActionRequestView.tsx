@@ -151,6 +151,11 @@ export const ActionRequestView = ({
             <MethodValue>{shownMethod}</MethodValue>
           </MethodRow>
         ) : null}
+        {payload.kind === 'message' && payload.text === null ? (
+          <WarningBox severity="warning" role="alert" data-testid="raw-message-warning">
+            {t('request.action.raw_message_warning')}
+          </WarningBox>
+        ) : null}
         <PayloadLabel id="action-payload-label">
           {t(isRelayed ? 'request.action.payload_label_relayed' : 'request.action.payload_label')}
         </PayloadLabel>
