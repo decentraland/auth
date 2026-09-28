@@ -8,9 +8,16 @@ export const MOCK_REQUEST_ID = 'e2e-test-request-id-1234'
 /** A valid UUID v4 — the client-generated correlation id the deep-link login handoff requires. */
 export const DEEP_LINK_REQUEST_ID = '123e4567-e89b-42d3-a456-426614174000'
 
-/** Auth server: GET /v2/requests/:id — recover a wallet signature request */
+/**
+ * Auth server: GET /v2/requests/:id — recover a wallet signature request.
+ *
+ * `sender` is what binds the request to the connected account, and the client refuses a request that does
+ * not name one (see assertRecoverResponseIsCanonical), so every fixture carries it exactly as the server
+ * sends it.
+ */
 export const recoverRequestResponse = {
   requestId: MOCK_REQUEST_ID,
+  sender: MOCK_WALLET,
   expiration: new Date(Date.now() + 600_000).toISOString(), // 10 min from now
   method: 'personal_sign',
   params: ['Sign this message to prove you own this wallet', MOCK_WALLET]
@@ -38,6 +45,7 @@ export const recoverRequestDifferentSenderResponse = {
 /** Auth server: GET /v2/requests/:id — recover with EXPIRED expiration */
 export const recoverRequestExpiredResponse = {
   requestId: MOCK_REQUEST_ID,
+  sender: MOCK_WALLET,
   expiration: new Date(Date.now() - 60_000).toISOString(), // 1 min in the past
   method: 'personal_sign',
   params: ['Sign this message to prove you own this wallet', MOCK_WALLET]

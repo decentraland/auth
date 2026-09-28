@@ -92,6 +92,22 @@ class MalformedTransactionRequestError extends Error {
 }
 
 /**
+ * Thrown when the recovered request itself is not the shape the review depends on: no account to bind it
+ * to, no readable expiration, no method, or parameters that are not a list. Unlike the malformed-params
+ * errors this is about the envelope rather than what is being signed, and it is what stops an absent field
+ * from reading as an absent restriction. `reason` says which rule was broken; it is safe to display.
+ */
+class MalformedRequestError extends Error {
+  constructor(
+    public readonly requestId: string,
+    public readonly reason: string
+  ) {
+    super(`The request ${requestId} is malformed: ${reason}`)
+    this.name = 'MalformedRequestError'
+  }
+}
+
+/**
  * Thrown when classifying an eth_sendTransaction needs to know whether its target is a Decentraland
  * wearable collection and the collection factories could not be asked (RPC failure or timeout). The
  * page shows a retryable error instead of a review: reading "unavailable" as "not Decentraland"
@@ -111,6 +127,7 @@ export {
   DifferentSenderError,
   ExpiredRequestError,
   RequestNotFoundError,
+  MalformedRequestError,
   RequestFulfilledError,
   ImpersonatedSignInError,
   UnsupportedMethodError,
