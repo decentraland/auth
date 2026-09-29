@@ -3,19 +3,28 @@ import { useTranslation } from '@dcl/hooks'
 import { Checkbox, FormControlLabel } from 'decentraland-ui2'
 import { TransferActionButtons, TransferLayout, TransferLoadingState } from '../../../../Transfer'
 import { Notices, WarningAlert } from '../../../../Transfer/Transfer.styled'
-import { CreditsMark } from './CreditsMark'
 import { CreditsPurchaseDetails } from './CreditsPurchaseDetails'
 import { CreditsPurchaseItem } from './CreditsPurchaseItem'
+import { CreditsPurchasePrice } from './CreditsPurchasePrice'
 import { CreditsPurchaseViewProps } from './CreditsPurchase.types'
-import { Price, PriceLabel, PriceRow, PurchaseContent, PurchaseFacts, PurchaseTitle, RecipientLabel } from './CreditsPurchase.styled'
+import {
+  PriceLabel,
+  PurchaseContent,
+  PurchaseFacts,
+  PurchaseTitle,
+  RecipientLabel,
+  RecipientLabelAfterNote
+} from './CreditsPurchase.styled'
 
 /**
  * The approval for a credits purchase: what is being bought, what it costs in credits, where it is delivered,
  * and one decision.
  *
  * Every fact on it was read out of the bytes the signature covers, so what the user agrees to is what will
- * execute — the item is the one the trade sends, the credits are the signed USD price divided by the peg, and
- * the recipient is the account the trade delivers to, which the page has already proved is the reviewing
+ * execute — the item is the one the trade or the store sends, the credits are the signed USD price divided by
+ * the peg (or, for a MANA price, the ledger's charge checked against that price at the live MANA/USD
+ * rate), and the
+ * recipient is the account the item is delivered to, which the page has already proved is the reviewing
  * signer. The item's name and picture are the one part that comes from elsewhere (the catalyst), and they
  * name the item rather than deciding anything; when they are missing the item is named by its identifiers and
  * the screen is otherwise unchanged.
@@ -33,6 +42,7 @@ const CreditsPurchaseView = (props: CreditsPurchaseViewProps) => {
   // back (see TransferConfirmView, which does the same).
   const isProcessing = isAwaitingApproval || props.isLoading
   const asksCallbackConsent = !isProcessing && (props.callbackAddresses?.length ?? 0) > 0
+  const Recipient = purchaseData.pricing.kind === 'converted' ? RecipientLabelAfterNote : RecipientLabel
 
   const handleApprove = async () => {
     setIsAwaitingApproval(true)
@@ -52,16 +62,11 @@ const CreditsPurchaseView = (props: CreditsPurchaseViewProps) => {
         <CreditsPurchaseItem purchaseData={purchaseData} />
         <PurchaseFacts>
           <PriceLabel>{t('credits_purchase.confirm.price_label')}</PriceLabel>
-          <PriceRow>
-            <CreditsMark size={32} data-testid="credits-purchase-mark" />
-            <Price data-testid="credits-purchase-price">
-              {t('credits_purchase.confirm.price', { credits: purchase.credits.toString() })}
-            </Price>
-          </PriceRow>
+          <CreditsPurchasePrice pricing={purchaseData.pricing} testIdPrefix="credits-purchase" />
           <PriceLabel data-testid="credits-purchase-quantity">{t('credits_purchase.confirm.quantity')}</PriceLabel>
-          <RecipientLabel data-testid="credits-purchase-recipient">
+          <Recipient data-testid="credits-purchase-recipient">
             {t('credits_purchase.confirm.delivered_to', { address: purchase.recipient })}
-          </RecipientLabel>
+          </Recipient>
         </PurchaseFacts>
         <CreditsPurchaseDetails purchaseData={purchaseData} chainId={props.chainId} />
         {asksCallbackConsent ? (

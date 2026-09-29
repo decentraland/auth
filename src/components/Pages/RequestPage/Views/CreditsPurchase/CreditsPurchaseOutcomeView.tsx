@@ -2,10 +2,10 @@ import { memo } from 'react'
 import { useTranslation } from '@dcl/hooks'
 import { Box } from 'decentraland-ui2'
 import { TransferLayout, TransferSecondaryText } from '../../../../Transfer'
-import { CreditsMark } from './CreditsMark'
 import { CreditsPurchaseItem } from './CreditsPurchaseItem'
+import { CreditsPurchasePrice } from './CreditsPurchasePrice'
 import { CreditsPurchaseOutcomeViewProps, SignatureDelivery } from './CreditsPurchase.types'
-import { Price, PriceLabel, PriceRow, PurchaseContent, PurchaseFacts, PurchaseTitle } from './CreditsPurchase.styled'
+import { PriceLabel, PurchaseContent, PurchaseFacts, PurchaseTitle } from './CreditsPurchase.styled'
 
 /**
  * How a purchase review ended, in the words the end actually deserves.
@@ -45,12 +45,7 @@ const CreditsPurchaseOutcomeView = memo(({ purchaseData, outcome, delivery = 'de
         <CreditsPurchaseItem purchaseData={purchaseData} />
         <PurchaseFacts>
           <PriceLabel>{t(isSigned ? 'credits_purchase.signed.price_label' : 'credits_purchase.canceled.price_label')}</PriceLabel>
-          <PriceRow>
-            <CreditsMark size={32} data-testid="credits-purchase-outcome-mark" />
-            <Price data-testid="credits-purchase-outcome-price">
-              {t('credits_purchase.confirm.price', { credits: purchaseData.purchase.credits.toString() })}
-            </Price>
-          </PriceRow>
+          <CreditsPurchasePrice pricing={purchaseData.pricing} testIdPrefix="credits-purchase-outcome" showNote={false} />
         </PurchaseFacts>
       </PurchaseContent>
     </TransferLayout>

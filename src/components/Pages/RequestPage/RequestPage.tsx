@@ -51,7 +51,7 @@ import { sendTipNotification } from '../../../shared/notifications'
 import { identifyUser, trackEvent } from '../../../shared/utils/analytics'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { FeatureFlagsContext } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
-import { fetchAuthorizedCharge, verifyAuthorizedCharge } from './authorizedCharge'
+import { fetchAuthorizedCharge, verifyApproximateCharge, verifyAuthorizedCharge } from './authorizedCharge'
 import {
   RequestClassification,
   classifyRequest,
@@ -59,8 +59,9 @@ import {
   getPayloadFingerprint,
   isTransactionClassification
 } from './classifyRequest'
+import { CENTS_PER_CREDIT, ManaUsdRate, approximateChargeBounds } from './creditsPricing'
 import { MILLISECONDS_PER_SECOND } from './creditsPurchase'
-import { CreditsPurchaseData, GasEstimateState, MANATransferData, NFTTransferData, TransferType } from './types'
+import { CreditsPurchaseData, CreditsPurchasePricing, GasEstimateState, MANATransferData, NFTTransferData, TransferType } from './types'
 import {
   decodeManaTransferData,
   decodeNftTransferData,
@@ -74,7 +75,8 @@ import {
   getNetworkProvider,
   getSigninDeeplink,
   isAddressWithoutCode,
-  isDecentralandCollection
+  isDecentralandCollection,
+  readManaUsdRate
 } from './utils'
 import {
   ActionRequestView,
@@ -159,10 +161,6 @@ const INTERACTION_VIEWS = new Set([
   View.WALLET_MANA_INTERACTION,
   View.WALLET_CREDITS_INTERACTION
 ])
-
-// One credit is a fixed ten US cents, and the credits ledger accounts in cents, so a price derived in
-// credits is compared against it in cents. Same peg the decoder divides by (USD_WEI_PER_CREDIT).
-const CENTS_PER_CREDIT = 10n
 
 // Reported to the client when a request is rejected at recover time, before it reaches the wallet.
 const RPC_METHOD_NOT_SUPPORTED = -32601
@@ -935,16 +933,56 @@ export const RequestPage = () => {
            * including a credits-server that cannot answer, leaves the request on the generic review: this
            * screen states a price as a fact, and a fact nothing stands behind must not be stated at all.
            */
+          //
+          // A USD-pegged price gives the credits exactly, and the charge must equal them. A MANA price gives
+          // them only at the MANA/USD rate, which is not in the bytes: it is read live from the feed the charge
+          // was quoted against, and the charge must be the same price quoted a moment earlier (see
+          // verifyApproximateCharge). The number the screen then states is the CHARGE — fixed on the ledger
+          // when the credit was authorized, and what the balance actually loses — never this page's own
+          // conversion, which may round to a different whole credit. A rate that cannot be read is the same as
+          // a ledger that cannot answer.
+          // The charge and the rate do not depend on each other, so the charge is asked for first and read
+          // after the rate, rather than one lookup waiting out the other's timeout. fetchAuthorizedCharge never
+          // rejects (an unreachable ledger is `unavailable`), so a charge left unread when the rate fails is
+          // simply discarded.
           const identity = identityRef.current
-          const chargeVerdict = identity
-            ? verifyAuthorizedCharge(await fetchAuthorizedCharge(purchase.creditSalt, identity), purchase.credits * CENTS_PER_CREDIT)
-            : 'unavailable'
+          const chargeLookup = identity
+            ? fetchAuthorizedCharge(purchase.creditSalt, identity)
+            : Promise.resolve({ status: 'unavailable' } as const)
+          let expectedCharge: { minCents: bigint; maxCents: bigint }
+          let rate: ManaUsdRate | null = null
+          if (purchase.price.kind === 'usd_pegged') {
+            const cents = purchase.price.credits * CENTS_PER_CREDIT
+            expectedCharge = { minCents: cents, maxCents: cents }
+          } else {
+            try {
+              rate = await readManaUsdRate(metaTransaction.chainId)
+            } catch (e) {
+              if (isStale()) return
+              console.error('The MANA/USD rate could not be read, falling back to the generic review', e)
+              trackEvent(TrackingEvents.REQUEST_CLASSIFIED, { requestId, stage: 'credits_rate_unavailable' })
+              showGenericReview()
+              return
+            }
+            if (isStale()) return
+            expectedCharge = approximateChargeBounds(purchase.price.manaWei, rate)
+          }
+
+          const charge = await chargeLookup
+          const chargeVerdict =
+            purchase.price.kind === 'usd_pegged'
+              ? verifyAuthorizedCharge(charge, expectedCharge.minCents)
+              : verifyApproximateCharge(charge, expectedCharge)
           if (isStale()) return
-          if (chargeVerdict !== 'verified') {
-            trackEvent(TrackingEvents.REQUEST_CLASSIFIED, { requestId, type: 'credits_charge_unverified', reason: chargeVerdict })
+          if (chargeVerdict !== 'verified' || charge.status !== 'found') {
+            trackEvent(TrackingEvents.REQUEST_CLASSIFIED, { requestId, stage: 'credits_charge_unverified', reason: chargeVerdict })
             showGenericReview()
             return
           }
+          const pricing: CreditsPurchasePricing =
+            purchase.price.kind === 'mana' && rate
+              ? { kind: 'converted', credits: BigInt(charge.charge.cents) / CENTS_PER_CREDIT, manaWei: purchase.price.manaWei, rate }
+              : { kind: 'exact', credits: BigInt(charge.charge.cents) / CENTS_PER_CREDIT }
 
           // The whole purchase is void once the soonest of the credit, the external call and the trade
           // lapses, and that can happen well before the auth request itself expires. Bring the review's
@@ -960,7 +998,7 @@ export const RequestPage = () => {
             console.info('The purchased item could not be named:', e instanceof Error ? e.message : String(e))
           }
           if (isStale()) return
-          setCreditsPurchaseData({ purchase, metadata })
+          setCreditsPurchaseData({ purchase, pricing, metadata })
           setView(View.WALLET_CREDITS_INTERACTION)
         }
 

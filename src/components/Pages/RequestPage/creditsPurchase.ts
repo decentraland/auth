@@ -1,4 +1,4 @@
-import { ContractName } from 'decentraland-transactions'
+import { ContractName, getContract } from 'decentraland-transactions'
 import { ADDRESS_REGEX, DecodedCall, KnownContract, decodeKnownContractCall, getKnownDecentralandContract } from '../../../shared/auth'
 import { isRecord } from '../../../shared/utils/isRecord'
 
@@ -17,14 +17,18 @@ const ASSET_TYPE_USD_PEGGED_MANA = 2n
 const ASSET_TYPE_ERC721 = 3n
 const ASSET_TYPE_COLLECTION_ITEM = 4n
 
-// The off-chain marketplace deployments a purchase may settle through: the contracts that verify a trade
-// signature and move the assets. The CreditsManager's own allowlist also holds the legacy marketplace and
-// the collection store, which take entirely different calls; those are not this screen's shape.
+// The off-chain marketplace deployments a resale or a listed item may settle through: the contracts that
+// verify a trade signature and move the assets. The CreditsManager's own allowlist also holds the legacy
+// marketplace, which takes an entirely different call; that is not this screen's shape.
 const PURCHASE_MARKETPLACES: ReadonlySet<string> = new Set([ContractName.OffChainMarketplace, ContractName.OffChainMarketplaceV2])
 
 // The one `accept` the dedicated screen stands in for. Read off the marketplace ABI rather than written
 // down, so it cannot drift from the contract the call is decoded against.
 const ACCEPT_FUNCTION = 'accept'
+
+// A primary sale: the collection store mints an item that is still on sale from its collection, at the MANA
+// price the creator set. The one call it takes is `buy`.
+const STORE_BUY_FUNCTION = 'buy'
 
 // A bytes32 of zeroes: no allowlist root, so the trade is open to whoever accepts it rather than gated by
 // a Merkle proof this screen cannot evaluate.
@@ -54,29 +58,41 @@ type CreditsPurchaseAsset =
   | { kind: 'collection_item'; contractAddress: string; itemId: string }
   | { kind: 'erc721'; contractAddress: string; tokenId: string }
 
+/**
+ * What the signed bytes say the item costs, in the unit they were signed in.
+ *
+ * `usd_pegged` is a price in USD wei, so its credits follow from the peg alone and are exact. `mana` is a
+ * price in MANA wei — every primary sale, and any listing priced in MANA — and its credits cannot be read
+ * from the bytes at all: they depend on the MANA/USD rate, which is not signed. The page converts it at the
+ * live oracle rate and says the number is approximate (see RequestPage and verifyApproximateCharge).
+ */
+type CreditsPurchasePrice = { kind: 'usd_pegged'; usdWei: bigint; credits: bigint } | { kind: 'mana'; manaWei: bigint }
+
+/** How the purchase settles: accepting a signed trade on the marketplace, or buying from the collection store. */
+type CreditsPurchaseVia = 'marketplace' | 'collection_store'
+
 /** A credits purchase, as read out of the bytes the signature covers and nothing else. */
 type CreditsPurchase = {
   /** The CreditsManager the signature is bound to. */
   creditsManagerAddress: string
-  /** The off-chain marketplace the purchase settles through, and its registry name. */
-  marketplaceAddress: string
-  marketplaceName: ContractName
+  via: CreditsPurchaseVia
+  /** The contract the purchase settles through (an off-chain marketplace, or the collection store). */
+  settlementAddress: string
+  settlementName: ContractName
   /** What the buyer receives. */
   asset: CreditsPurchaseAsset
   /** The account the asset is delivered to. Always the reviewing signer; see recognizeCreditsPurchase. */
   recipient: string
-  /** The account that listed the item and receives the payment. */
-  seller: string
-  /** Where the payment goes (the trade's received beneficiary). */
-  paymentBeneficiary: string
-  /** The token the trade settles in (the chain's MANA), and the USD-pegged price in USD wei. */
-  paymentTokenAddress: string
-  priceUsdWei: bigint
   /**
-   * What the purchase costs in credits: the USD-pegged price divided by the peg, rounded up, in BigInt.
-   * Derived from the signed price and the peg alone — never from a label the caller supplied.
+   * The account that listed the item, and where its payment goes (the trade's received beneficiary). A
+   * primary sale carries neither: the store pays the item's beneficiary as the collection records it, which
+   * is not in the signed bytes, so these are null rather than guessed.
    */
-  credits: bigint
+  seller: string | null
+  paymentBeneficiary: string | null
+  /** The token the purchase settles in: the chain's MANA, whatever unit the price is signed in. */
+  paymentTokenAddress: string
+  price: CreditsPurchasePrice
   /** The MANA the CreditsManager may draw from the credit (a cap, in MANA wei). Not a credits amount. */
   maxCreditedValueWei: bigint
   /**
@@ -85,12 +101,12 @@ type CreditsPurchase = {
    * says what the item costs, and only the salt says what the purchase debits.
    */
   creditSalt: string
-  /** Unix seconds after which the external call, and the trade, stop being valid. */
+  /** Unix seconds after which the external call, and the trade (a marketplace purchase only), stop being valid. */
   externalCallExpiresAt: bigint
-  tradeExpiresAt: bigint
+  tradeExpiresAt: bigint | null
   creditExpiresAt: bigint
   /**
-   * The soonest of the three, in unix seconds: the whole purchase is void once any of them passes. The page
+   * The soonest of them, in unix seconds: the whole purchase is void once any of them passes. The page
    * arms the review's expiry on it and checks it again at the moment of signing, so a credit that lapses
    * while the screen is open cannot be signed for (see RequestPage).
    */
@@ -111,6 +127,8 @@ type CreditsUnsupportedReason =
   | 'expired'
   | 'not_a_marketplace'
   | 'not_an_accept'
+  | 'not_a_store_buy'
+  | 'multiple_items'
   | 'multiple_trades'
   | 'gated_trade'
   | 'external_checks'
@@ -197,6 +215,179 @@ function readPurchasedAsset(asset: Record<string, unknown>): CreditsPurchaseAsse
   return null
 }
 
+/** The fields a settlement path contributes to a CreditsPurchase, or why the path does not apply. */
+type MarketplacePurchaseRead = Pick<
+  CreditsPurchase,
+  'asset' | 'recipient' | 'seller' | 'paymentBeneficiary' | 'paymentTokenAddress' | 'price'
+> & { tradeExpiresAt: bigint }
+type StorePurchaseRead = Pick<CreditsPurchase, 'asset' | 'recipient' | 'paymentTokenAddress' | 'price'>
+type ReadFailure = { reason: CreditsUnsupportedReason }
+
+/**
+ * Reads the `accept` of a marketplace purchase: exactly one trade, open to anyone, with no external checks,
+ * sending exactly one asset to the reviewing signer and receiving exactly one payment in the chain's MANA.
+ * The payment is either USD-pegged (its credits follow from the peg) or plain MANA (its credits need the
+ * oracle, and the page shows them as approximate).
+ */
+function readMarketplacePurchase(
+  accept: DecodedCall,
+  context: RecognizeCreditsPurchaseContext,
+  now: bigint
+): MarketplacePurchaseRead | ReadFailure {
+  const trade = onlyElement(accept.args[0])
+  if (trade === null) {
+    return { reason: Array.isArray(accept.args[0]) ? 'multiple_trades' : 'malformed_arguments' }
+  }
+  if (!isRecord(trade)) {
+    return { reason: 'malformed_arguments' }
+  }
+  const seller = toAddress(trade.signer)
+  const checks = trade.checks
+  if (seller === null || !isRecord(checks)) {
+    return { reason: 'malformed_arguments' }
+  }
+
+  // An allowlist root gates the trade on a Merkle proof, and an external check staticcalls a contract the
+  // request chose. Neither is readable from a purchase summary, so neither may hide behind one.
+  if (checks.allowedRoot !== ZERO_BYTES32 || !Array.isArray(checks.allowedProof) || checks.allowedProof.length > 0) {
+    return { reason: 'gated_trade' }
+  }
+  if (!Array.isArray(checks.externalChecks) || checks.externalChecks.length > 0) {
+    return { reason: 'external_checks' }
+  }
+
+  const tradeExpiresAt = toBigInt(checks.expiration)
+  const tradeEffectiveAt = toBigInt(checks.effective)
+  const uses = toBigInt(checks.uses)
+  if (tradeExpiresAt === null || tradeEffectiveAt === null || uses === null || !isSeconds(tradeExpiresAt)) {
+    return { reason: 'malformed_arguments' }
+  }
+  if (tradeExpiresAt <= now || tradeEffectiveAt > now || uses < 1n) {
+    return { reason: 'expired' }
+  }
+
+  const sent = onlyElement(trade.sent)
+  const received = onlyElement(trade.received)
+  if (sent === null || received === null) {
+    return { reason: Array.isArray(trade.sent) && Array.isArray(trade.received) ? 'multiple_assets' : 'malformed_arguments' }
+  }
+  if (!isRecord(sent) || !isRecord(received)) {
+    return { reason: 'malformed_arguments' }
+  }
+
+  const asset = readPurchasedAsset(sent)
+  if (!asset) {
+    return { reason: 'asset_type' }
+  }
+  // Where the item goes. The Explorer encodes the buyer here and nothing else, so anything else is not the
+  // purchase this screen describes — and a screen that told the buyer they were getting an item that goes
+  // to another account would be the worst thing it could say.
+  const recipient = toAddress(sent.beneficiary)
+  if (recipient === null || recipient !== context.signerAddress.toLowerCase()) {
+    return { reason: 'another_recipient' }
+  }
+
+  // The price, in the unit it is signed in: USD wei for a USD-pegged asset, MANA wei for a plain ERC-20.
+  // Either way it settles in the chain's MANA — the marketplace converts a USD-pegged price at accept time.
+  const priceAssetType = toBigInt(received.assetType)
+  if (priceAssetType === null) {
+    return { reason: 'malformed_arguments' }
+  }
+  if (priceAssetType !== ASSET_TYPE_USD_PEGGED_MANA && priceAssetType !== ASSET_TYPE_ERC20) {
+    return { reason: 'price_asset_type' }
+  }
+  const paymentTokenAddress = toAddress(received.contractAddress)
+  const paymentBeneficiary = toAddress(received.beneficiary)
+  const amount = toBigInt(received.value)
+  if (paymentTokenAddress === null || paymentBeneficiary === null || amount === null || !isEmptyBytes(received.extra)) {
+    return { reason: 'malformed_arguments' }
+  }
+  // Anything but the chain's MANA in that slot is not the payment this screen names — and for a plain ERC-20
+  // price it would also make the MANA/USD conversion meaningless.
+  const manaToken = getKnownDecentralandContract(paymentTokenAddress, context.chainId)
+  if (!manaToken || manaToken.name !== ContractName.MANAToken) {
+    return { reason: 'payment_token' }
+  }
+  if (amount <= 0n) {
+    return { reason: 'no_price' }
+  }
+
+  return {
+    asset,
+    recipient,
+    seller,
+    paymentBeneficiary,
+    paymentTokenAddress,
+    price:
+      priceAssetType === ASSET_TYPE_USD_PEGGED_MANA
+        ? { kind: 'usd_pegged', usdWei: amount, credits: toCredits(amount) }
+        : { kind: 'mana', manaWei: amount },
+    tradeExpiresAt
+  }
+}
+
+/**
+ * Reads the `buy` of a primary sale: exactly one item of exactly one collection, minted to the reviewing
+ * signer, at a MANA price. The store charges that price in the chain's MANA and pays the item's beneficiary
+ * as its collection records it; the price must match the collection's own, or the store reverts, so the
+ * signed number is the number that is charged.
+ *
+ * Whether the collection is one Decentraland deployed is not decidable from the bytes; the page asks the
+ * collection factories before it shows anything (see RequestPage).
+ */
+function readStorePurchase(buy: DecodedCall, context: RecognizeCreditsPurchaseContext): StorePurchaseRead | ReadFailure {
+  const item = onlyElement(buy.args[0])
+  if (item === null) {
+    return { reason: Array.isArray(buy.args[0]) ? 'multiple_items' : 'malformed_arguments' }
+  }
+  if (!isRecord(item)) {
+    return { reason: 'malformed_arguments' }
+  }
+  const collection = toAddress(item.collection)
+  if (collection === null) {
+    return { reason: 'malformed_arguments' }
+  }
+  const itemId = onlyElement(item.ids)
+  const price = onlyElement(item.prices)
+  const beneficiary = onlyElement(item.beneficiaries)
+  if (itemId === null || price === null || beneficiary === null) {
+    return {
+      reason:
+        Array.isArray(item.ids) && Array.isArray(item.prices) && Array.isArray(item.beneficiaries)
+          ? 'multiple_items'
+          : 'malformed_arguments'
+    }
+  }
+  const id = toBigInt(itemId)
+  const manaWei = toBigInt(price)
+  const recipient = toAddress(beneficiary)
+  if (id === null || manaWei === null || recipient === null) {
+    return { reason: 'malformed_arguments' }
+  }
+  // Same rule as a marketplace purchase: the item goes to the reviewing signer, or this is not the purchase
+  // the screen describes.
+  if (recipient !== context.signerAddress.toLowerCase()) {
+    return { reason: 'another_recipient' }
+  }
+  if (manaWei <= 0n) {
+    return { reason: 'no_price' }
+  }
+  // The store only takes the chain's MANA. Named from the registry so the details show the real token.
+  let paymentTokenAddress: string
+  try {
+    paymentTokenAddress = getContract(ContractName.MANAToken, context.chainId).address.toLowerCase()
+  } catch {
+    return { reason: 'payment_token' }
+  }
+
+  return {
+    asset: { kind: 'collection_item', contractAddress: collection, itemId: id.toString() },
+    recipient,
+    paymentTokenAddress,
+    price: { kind: 'mana', manaWei }
+  }
+}
+
 /**
  * Reads a credits purchase out of a decoded `CreditsManager.useCredits` call, or says why it is not one the
  * dedicated screen may stand in for.
@@ -211,12 +402,16 @@ function readPurchasedAsset(asset: Record<string, unknown>): CreditsPurchaseAsse
  *   than a signature that authorizes an arbitrary target;
  * - nothing is drawn from the buyer's own wallet (`maxUncreditedValue` is zero), so "paid with credits" is
  *   the whole truth;
- * - the external call is an `accept` of exactly one trade on an off-chain marketplace deployment, decoded
- *   against that marketplace's own ABI and proven to re-encode to the same bytes;
- * - the trade has no external checks and no allowlist root, so nothing is staticcalled and no proof decides
- *   whether it applies;
- * - it sends exactly one asset, to the reviewing signer, and receives exactly one USD-pegged payment in the
- *   chain's MANA, whose amount is the price the credits are counted from.
+ * - the external call is one of two things, decoded against the target's own ABI and proven to re-encode
+ *   to the same bytes:
+ *   - an `accept` of exactly one trade on an off-chain marketplace deployment, with no external checks and
+ *     no allowlist root, sending exactly one asset to the reviewing signer and receiving exactly one payment
+ *     in the chain's MANA, priced either USD-pegged or in MANA (see readMarketplacePurchase);
+ *   - a collection store `buy` of exactly one item, minted to the reviewing signer at a MANA price (see
+ *     readStorePurchase).
+ *
+ * A USD-pegged price is counted in credits from the peg, exactly. A MANA price is returned as MANA: its
+ * credits depend on a rate the bytes do not carry, and the page converts and labels them as approximate.
  *
  * Anything else is `unsupported` and goes to the generic review, which shows the payload whole. Nothing here
  * refuses a request: a CreditsManager call that is not this shape is still a request the user may approve
@@ -300,127 +495,74 @@ function recognizeCreditsPurchase(
       return unsupported('expired')
     }
 
-    // The contract the trade settles through, from the registry for this chain. A collection lookup is
-    // deliberately not consulted: a marketplace is never a factory-deployed collection, and this stays a
-    // pure read of the payload.
-    const marketplace = getKnownDecentralandContract(target, context.chainId)
-    if (!marketplace || !PURCHASE_MARKETPLACES.has(marketplace.name)) {
+    // The contract the purchase settles through, from the registry for this chain. A collection lookup is
+    // deliberately not consulted: neither a marketplace nor the store is a factory-deployed collection, and
+    // this stays a pure read of the payload.
+    const settlement = getKnownDecentralandContract(target, context.chainId)
+    if (!settlement) {
       return unsupported('not_a_marketplace')
     }
 
-    // The nested call, decoded against the marketplace's own ABI and proven canonical the same way the outer
-    // call was: `decodeKnownContractCall` re-encodes and compares, so trailing or padded bytes that read as
-    // one call and execute as another are refused rather than summarized.
+    // The nested call, decoded against the settlement contract's own ABI and proven canonical the same way
+    // the outer call was: `decodeKnownContractCall` re-encodes and compares, so trailing or padded bytes that
+    // read as one call and execute as another are refused rather than summarized.
     if (typeof externalCall.selector !== 'string' || typeof externalCall.data !== 'string') {
       return unsupported('malformed_arguments')
     }
-    const accept = decodeKnownContractCall(marketplace, `${externalCall.selector}${externalCall.data.slice(2)}`)
-    if (!accept || accept.functionName !== ACCEPT_FUNCTION) {
-      return unsupported('not_an_accept')
+    const nested = decodeKnownContractCall(settlement, `${externalCall.selector}${externalCall.data.slice(2)}`)
+
+    const common = {
+      creditsManagerAddress: contract.address,
+      settlementAddress: settlement.address,
+      settlementName: settlement.name,
+      maxCreditedValueWei: maxCreditedValue,
+      creditSalt,
+      externalCallExpiresAt,
+      creditExpiresAt
     }
 
-    const trade = onlyElement(accept.args[0])
-    if (trade === null) {
-      return Array.isArray(accept.args[0]) ? unsupported('multiple_trades') : unsupported('malformed_arguments')
-    }
-    if (!isRecord(trade)) {
-      return unsupported('malformed_arguments')
-    }
-    const seller = toAddress(trade.signer)
-    const checks = trade.checks
-    if (seller === null || !isRecord(checks)) {
-      return unsupported('malformed_arguments')
-    }
-
-    // An allowlist root gates the trade on a Merkle proof, and an external check staticcalls a contract the
-    // request chose. Neither is readable from a purchase summary, so neither may hide behind one.
-    if (checks.allowedRoot !== ZERO_BYTES32 || !Array.isArray(checks.allowedProof) || checks.allowedProof.length > 0) {
-      return unsupported('gated_trade')
-    }
-    if (!Array.isArray(checks.externalChecks) || checks.externalChecks.length > 0) {
-      return unsupported('external_checks')
-    }
-
-    const tradeExpiresAt = toBigInt(checks.expiration)
-    const tradeEffectiveAt = toBigInt(checks.effective)
-    const uses = toBigInt(checks.uses)
-    if (tradeExpiresAt === null || tradeEffectiveAt === null || uses === null || !isSeconds(tradeExpiresAt)) {
-      return unsupported('malformed_arguments')
-    }
-    if (tradeExpiresAt <= now || tradeEffectiveAt > now || uses < 1n) {
-      return unsupported('expired')
-    }
-
-    const sent = onlyElement(trade.sent)
-    const received = onlyElement(trade.received)
-    if (sent === null || received === null) {
-      return Array.isArray(trade.sent) && Array.isArray(trade.received)
-        ? unsupported('multiple_assets')
-        : unsupported('malformed_arguments')
-    }
-    if (!isRecord(sent) || !isRecord(received)) {
-      return unsupported('malformed_arguments')
-    }
-
-    const asset = readPurchasedAsset(sent)
-    if (!asset) {
-      return unsupported('asset_type')
-    }
-    // Where the item goes. The Explorer encodes the buyer here and nothing else, so anything else is not the
-    // purchase this screen describes — and a screen that told the buyer they were getting an item that goes
-    // to another account would be the worst thing it could say.
-    const recipient = toAddress(sent.beneficiary)
-    if (recipient === null || recipient !== context.signerAddress.toLowerCase()) {
-      return unsupported('another_recipient')
-    }
-
-    // The price. Only a USD-pegged asset carries one this screen can count credits from: a plain ERC-20 MANA
-    // price is a number of MANA, and turning it into credits needs the MANA/USD oracle the marketplace reads
-    // at settlement — a rate that is not in the signed bytes.
-    const priceAssetType = toBigInt(received.assetType)
-    if (priceAssetType === null) {
-      return unsupported('malformed_arguments')
-    }
-    if (priceAssetType !== ASSET_TYPE_USD_PEGGED_MANA) {
-      return unsupported(priceAssetType === ASSET_TYPE_ERC20 ? 'price_asset_type' : 'malformed_arguments')
-    }
-    const paymentTokenAddress = toAddress(received.contractAddress)
-    const paymentBeneficiary = toAddress(received.beneficiary)
-    const priceUsdWei = toBigInt(received.value)
-    if (paymentTokenAddress === null || paymentBeneficiary === null || priceUsdWei === null || !isEmptyBytes(received.extra)) {
-      return unsupported('malformed_arguments')
-    }
-    // A USD-pegged asset settles in the chain's MANA; the marketplace converts at accept time. Anything else
-    // in that slot is not the payment this screen names.
-    const manaToken = getKnownDecentralandContract(paymentTokenAddress, context.chainId)
-    if (!manaToken || manaToken.name !== ContractName.MANAToken) {
-      return unsupported('payment_token')
-    }
-    if (priceUsdWei <= 0n) {
-      return unsupported('no_price')
-    }
-
-    return {
-      status: 'recognized',
-      purchase: {
-        creditsManagerAddress: contract.address,
-        marketplaceAddress: marketplace.address,
-        marketplaceName: marketplace.name,
-        asset,
-        recipient,
-        seller,
-        paymentBeneficiary,
-        paymentTokenAddress,
-        priceUsdWei,
-        credits: toCredits(priceUsdWei),
-        maxCreditedValueWei: maxCreditedValue,
-        creditSalt,
-        externalCallExpiresAt,
-        tradeExpiresAt,
-        creditExpiresAt,
-        expiresAt: minimum(creditExpiresAt, externalCallExpiresAt, tradeExpiresAt)
+    if (PURCHASE_MARKETPLACES.has(settlement.name)) {
+      if (!nested || nested.functionName !== ACCEPT_FUNCTION) {
+        return unsupported('not_an_accept')
+      }
+      const read = readMarketplacePurchase(nested, context, now)
+      if ('reason' in read) {
+        return unsupported(read.reason)
+      }
+      return {
+        status: 'recognized',
+        purchase: {
+          ...common,
+          ...read,
+          via: 'marketplace',
+          expiresAt: minimum(creditExpiresAt, externalCallExpiresAt, read.tradeExpiresAt)
+        }
       }
     }
+
+    if (settlement.name === ContractName.CollectionStore) {
+      if (!nested || nested.functionName !== STORE_BUY_FUNCTION) {
+        return unsupported('not_a_store_buy')
+      }
+      const read = readStorePurchase(nested, context)
+      if ('reason' in read) {
+        return unsupported(read.reason)
+      }
+      return {
+        status: 'recognized',
+        purchase: {
+          ...common,
+          ...read,
+          via: 'collection_store',
+          seller: null,
+          paymentBeneficiary: null,
+          tradeExpiresAt: null,
+          expiresAt: minimum(creditExpiresAt, externalCallExpiresAt)
+        }
+      }
+    }
+
+    return unsupported('not_a_marketplace')
   } catch {
     // Every read above is defensive, but a decoded argument tree is still data the request wrote. Nothing
     // about it may throw its way past the recognizer into the page.
@@ -438,4 +580,11 @@ export {
   recognizeCreditsPurchase,
   toCredits
 }
-export type { CreditsPurchase, CreditsPurchaseAsset, CreditsRecognition, CreditsUnsupportedReason }
+export type {
+  CreditsPurchase,
+  CreditsPurchaseAsset,
+  CreditsPurchasePrice,
+  CreditsPurchaseVia,
+  CreditsRecognition,
+  CreditsUnsupportedReason
+}

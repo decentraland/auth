@@ -1,7 +1,7 @@
 import { AuthIdentity } from '@dcl/crypto'
 import signedFetch from 'decentraland-crypto-fetch'
 import { config } from '../../../modules/config'
-import { AuthorizedChargeResult, fetchAuthorizedCharge, verifyAuthorizedCharge } from './authorizedCharge'
+import { AuthorizedChargeResult, fetchAuthorizedCharge, verifyApproximateCharge, verifyAuthorizedCharge } from './authorizedCharge'
 
 // eslint-disable-next-line @typescript-eslint/naming-convention -- the ES-module interop flag is named by the spec
 jest.mock('decentraland-crypto-fetch', () => ({ __esModule: true, default: jest.fn() }))
@@ -89,6 +89,53 @@ describe('when checking what a credits purchase actually charges the buyer', () 
       // The trade price is a true statement about the item and a false one about the balance. An outage is
       // not permission to show it.
       expect(verifyAuthorizedCharge({ status: 'unavailable' }, SEVEN_CREDITS_IN_CENTS)).toBe('unavailable')
+    })
+  })
+})
+
+describe('when checking the charge of a purchase priced in MANA', () => {
+  // A primary sale QA bought on Amoy: 1.1 MANA, three credits at the day's rate, with the bounds
+  // approximateChargeBounds gives it (see creditsPricing.spec).
+  const BOUNDS = { minCents: 30n, maxCents: 40n }
+
+  describe('and the ledger charges a price inside the bounds', () => {
+    it('should verify the lower end, the upper end and anything between', () => {
+      expect(verifyApproximateCharge(found({ cents: 30 }), BOUNDS)).toBe('verified')
+      expect(verifyApproximateCharge(found({ cents: 40 }), BOUNDS)).toBe('verified')
+    })
+  })
+
+  describe('and the ledger charges a price outside the bounds', () => {
+    it('should call it a mismatch on either side', () => {
+      expect(verifyApproximateCharge(found({ cents: 20 }), BOUNDS)).toBe('mismatch')
+      expect(verifyApproximateCharge(found({ cents: 50 }), BOUNDS)).toBe('mismatch')
+    })
+
+    it('should refuse a credit authorized for a far larger purchase', () => {
+      expect(verifyApproximateCharge(found({ cents: 1000 }), BOUNDS)).toBe('mismatch')
+    })
+  })
+
+  describe('and the ledger charges nothing', () => {
+    it('should refuse it even when the bounds reach zero', () => {
+      // A MANA price of a few wei bounds to [0, 0]; a zero charge fits and must still not read as "0 credits".
+      expect(verifyApproximateCharge(found({ cents: 0 }), { minCents: 0n, maxCents: 0n })).toBe('mismatch')
+    })
+  })
+
+  describe('and the ledger charges a part of a credit', () => {
+    it('should refuse it even inside the bounds, rather than state it rounded down', () => {
+      // The screen states the charge in whole credits; 35 cents would read as three and debit three and a half.
+      expect(verifyApproximateCharge(found({ cents: 35 }), BOUNDS)).toBe('mismatch')
+    })
+  })
+
+  describe('and the authorization is not a single pending line', () => {
+    it('should hold the approximate check to the same rules as the exact one', () => {
+      expect(verifyApproximateCharge(found({ cents: 30, lines: 2 }), BOUNDS)).toBe('grouped')
+      expect(verifyApproximateCharge(found({ cents: 30, status: 'settled' }), BOUNDS)).toBe('not_pending')
+      expect(verifyApproximateCharge({ status: 'not_found' }, BOUNDS)).toBe('not_found')
+      expect(verifyApproximateCharge({ status: 'unavailable' }, BOUNDS)).toBe('unavailable')
     })
   })
 })

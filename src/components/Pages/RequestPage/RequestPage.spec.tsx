@@ -101,6 +101,7 @@ const mockGetCounterpartyAddresses = jest.fn()
 const mockResolveKnownDecentralandContract = jest.fn()
 const mockIsDecentralandCollection = jest.fn()
 const mockFetchPurchasedAssetMetadata = jest.fn()
+const mockReadManaUsdRate = jest.fn()
 const mockFetchAuthorizedCharge = jest.fn()
 const mockClassifyRequest = jest.fn()
 jest.mock('./classifyRequest', () => ({
@@ -250,7 +251,8 @@ jest.mock('./Views', () => ({
     <div
       data-testid="credits-purchase"
       data-approve-blocked={String(props.approveBlocked)}
-      data-credits={String(props.purchaseData?.purchase?.credits)}
+      data-credits={String(props.purchaseData?.pricing?.credits)}
+      data-pricing={props.purchaseData?.pricing?.kind ?? ''}
       data-recipient={props.purchaseData?.purchase?.recipient ?? ''}
       data-item={props.purchaseData?.purchase?.asset?.itemId ?? ''}
       data-name={props.purchaseData?.metadata?.name ?? ''}
@@ -304,7 +306,8 @@ jest.mock('./utils', () => ({
   getNetworkProvider: jest.fn().mockResolvedValue({ isNetworkProvider: true }),
   isAddressWithoutCode: (...args: any[]) => mockIsAddressWithoutCode(...args),
   getCounterpartyAddresses: (...args: any[]) => mockGetCounterpartyAddresses(...args),
-  isDecentralandCollection: (...args: any[]) => mockIsDecentralandCollection(...args)
+  isDecentralandCollection: (...args: any[]) => mockIsDecentralandCollection(...args),
+  readManaUsdRate: (...args: any[]) => mockReadManaUsdRate(...args)
 }))
 
 // Mock decentraland-transactions
@@ -388,15 +391,15 @@ const creditsPurchase = (overrides: Record<string, unknown> = {}) => ({
   creditSalt: CREDIT_SALT,
   creditExpiresAt: 4102444800n,
   creditsManagerAddress: CREDITS_MANAGER,
-  marketplaceAddress: MARKETPLACE,
-  marketplaceName: 'OffChainMarketplaceV2',
+  via: 'marketplace',
+  settlementAddress: MARKETPLACE,
+  settlementName: 'OffChainMarketplaceV2',
   asset: { kind: 'collection_item', contractAddress: COLLECTION, itemId: '0' },
   recipient: SIGNER.toLowerCase(),
   seller: SELLER,
   paymentBeneficiary: SELLER,
   paymentTokenAddress: CONTRACT,
-  priceUsdWei: 700000000000000000n,
-  credits: 7n,
+  price: { kind: 'usd_pegged', usdWei: 700000000000000000n, credits: 7n },
   maxCreditedValueWei: 1000000000000000000n,
   externalCallExpiresAt: 4102444800n,
   tradeExpiresAt: 4102444800n,
@@ -523,6 +526,8 @@ describe('RequestPage', () => {
     mockFetchPurchasedAssetMetadata.mockResolvedValue({ imageUrl: 'https://peer/thumb.png', name: 'UpperHead AHL', rarity: 'epic' })
     // The ledger agrees with the trade unless a test says otherwise: 7 credits is 70 cents.
     mockFetchAuthorizedCharge.mockResolvedValue({ status: 'found', charge: { cents: 70, lines: 1, status: 'pending' } })
+    // The Amoy feed's rate on the day the MANA-priced screens were built: $0.26960836 a MANA.
+    mockReadManaUsdRate.mockResolvedValue({ rate: 26960836n, decimals: 8 })
     mockGetChainId.mockResolvedValue(1)
     mockEstimateFeesPerGas.mockResolvedValue({ gasPrice: BigInt(1) })
     mockEstimateGas.mockResolvedValue(BigInt(21000))
@@ -3095,6 +3100,117 @@ describe('RequestPage', () => {
         renderRequestPage()
         await screen.findByTestId('action-request')
         expect(screen.queryByTestId('credits-purchase')).not.toBeInTheDocument()
+      })
+    })
+
+    describe('and the item is priced in USD-pegged MANA', () => {
+      it('should state the exact credits without reading the MANA/USD rate', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('credits-purchase')
+        expect(view).toHaveAttribute('data-pricing', 'exact')
+        expect(mockReadManaUsdRate).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and the item is a primary sale priced in MANA', () => {
+      beforeEach(() => {
+        // 1.1 MANA from the collection store: three credits at the Amoy rate mocked above, which is what the
+        // credits-server recorded for the purchases QA made of items like this one.
+        mockClassifyRequest.mockResolvedValue(
+          creditsMetaTransaction({
+            status: 'recognized',
+            purchase: creditsPurchase({
+              via: 'collection_store',
+              settlementName: 'CollectionStore',
+              seller: null,
+              paymentBeneficiary: null,
+              tradeExpiresAt: null,
+              price: { kind: 'mana', manaWei: 1100000000000000000n }
+            })
+          })
+        )
+        mockFetchAuthorizedCharge.mockResolvedValue({ status: 'found', charge: { cents: 30, lines: 1, status: 'pending' } })
+      })
+
+      it('should show the dedicated approval, priced in MANA and converted into the verified charge', async () => {
+        renderRequestPage()
+        const view = await screen.findByTestId('credits-purchase')
+        expect(view).toHaveAttribute('data-pricing', 'converted')
+        expect(view).toHaveAttribute('data-credits', '3')
+      })
+
+      describe('and the ledger charges a whole credit more than the conversion at the live rate', () => {
+        beforeEach(() => {
+          // 40 cents: inside the bounds for 1.1 MANA (a quote a little above today's rate rounds up to four
+          // credits), and exactly what the balance will lose. The page's own conversion says three.
+          mockFetchAuthorizedCharge.mockResolvedValue({ status: 'found', charge: { cents: 40, lines: 1, status: 'pending' } })
+        })
+
+        it('should state the charge the buyer is debited, not its own conversion', async () => {
+          renderRequestPage()
+          const view = await screen.findByTestId('credits-purchase')
+          expect(view).toHaveAttribute('data-credits', '4')
+        })
+      })
+
+      it('should read the rate on the chain the purchase settles on', async () => {
+        renderRequestPage()
+        await screen.findByTestId('credits-purchase')
+        expect(mockReadManaUsdRate).toHaveBeenCalledWith(137)
+      })
+
+      describe('and the ledger charges a price the item is not worth', () => {
+        beforeEach(() => {
+          // A credit authorized for 100 credits, spent on a three-credit item.
+          mockFetchAuthorizedCharge.mockResolvedValue({ status: 'found', charge: { cents: 1000, lines: 1, status: 'pending' } })
+        })
+
+        it('should refuse to state a price and show the payload instead', async () => {
+          renderRequestPage()
+          await screen.findByTestId('action-request')
+          expect(screen.queryByTestId('credits-purchase')).not.toBeInTheDocument()
+        })
+
+        it('should report which check stopped the review and why', async () => {
+          renderRequestPage()
+          await screen.findByTestId('action-request')
+          expect(trackEvent).toHaveBeenCalledWith(
+            TrackingEvents.REQUEST_CLASSIFIED,
+            expect.objectContaining({ stage: 'credits_charge_unverified', reason: 'mismatch' })
+          )
+        })
+      })
+
+      describe('and the collection it mints from is not one Decentraland deployed', () => {
+        beforeEach(() => {
+          mockIsDecentralandCollection.mockResolvedValue(false)
+        })
+
+        it('should show the payload instead, before reading any rate or charge', async () => {
+          renderRequestPage()
+          await screen.findByTestId('action-request')
+          expect(screen.queryByTestId('credits-purchase')).not.toBeInTheDocument()
+          expect(mockReadManaUsdRate).not.toHaveBeenCalled()
+          expect(mockFetchAuthorizedCharge).not.toHaveBeenCalled()
+        })
+      })
+
+      describe('and the MANA/USD rate cannot be read', () => {
+        beforeEach(() => {
+          mockReadManaUsdRate.mockRejectedValue(new Error('The MANA/USD round is incomplete'))
+        })
+
+        it('should refuse to state a price, whatever the ledger answers', async () => {
+          // The ledger is asked alongside the rate and answers with a charge that would verify; without a
+          // rate there is nothing to check it against, so it is not used.
+          renderRequestPage()
+          await screen.findByTestId('action-request')
+          expect(screen.queryByTestId('credits-purchase')).not.toBeInTheDocument()
+          expect(trackEvent).toHaveBeenCalledWith(
+            TrackingEvents.REQUEST_CLASSIFIED,
+            expect.objectContaining({ stage: 'credits_rate_unavailable' })
+          )
+        })
       })
     })
 

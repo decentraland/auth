@@ -1,6 +1,7 @@
 import { Profile } from 'dcl-catalyst-client/dist/client/specs/catalyst.schemas'
 import { Rarity } from '@dcl/schemas'
 import { Profile as ProfileComponent } from 'decentraland-ui2'
+import type { ManaUsdRate } from './creditsPricing'
 import type { CreditsPurchase } from './creditsPurchase'
 
 type NFTTransferData = {
@@ -38,13 +39,25 @@ type MANATransferData = {
 type PurchasedItemMetadata = { imageUrl: string; name: string; rarity: Rarity }
 
 /**
+ * The credits the screen states: always the charge the ledger holds for the credit, verified against the
+ * signed price (see RequestPage). `exact` is a USD-pegged price, whose credits the charge equals. `converted`
+ * is a MANA price: the charge was checked against that price at the live MANA/USD rate, and the MANA amount
+ * and the rate travel with it so the screen says what the item is priced in and how it was converted.
+ */
+type CreditsPurchasePricing =
+  | { kind: 'exact'; credits: bigint }
+  | { kind: 'converted'; credits: bigint; manaWei: bigint; rate: ManaUsdRate }
+
+/**
  * What the dedicated credits approval shows. The purchase is the verified half — every field of it comes
- * out of the bytes the signature covers (see recognizeCreditsPurchase) — and the metadata is the cosmetic
- * half, null when the catalyst could not answer and the item is named by its identifiers instead. Nothing
- * in the metadata can change what is signed, and the screen never lets it stand in for a fact.
+ * out of the bytes the signature covers (see recognizeCreditsPurchase) — and the pricing is the charge it
+ * was verified against (see CreditsPurchasePricing). The metadata is the cosmetic half, null when the
+ * catalyst could not answer and the item is named by its identifiers instead. Nothing in the metadata can
+ * change what is signed, and the screen never lets it stand in for a fact.
  */
 type CreditsPurchaseData = {
   purchase: CreditsPurchase
+  pricing: CreditsPurchasePricing
   metadata: PurchasedItemMetadata | null
 }
 
@@ -69,6 +82,7 @@ type GasEstimateState = { status: 'loading' } | { status: 'ready'; cost: bigint 
 export { TransferType }
 export type {
   CreditsPurchaseData,
+  CreditsPurchasePricing,
   GasEstimateState,
   PlaceLocation,
   MANATransferData,
