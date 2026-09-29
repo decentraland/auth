@@ -21,7 +21,7 @@ import {
   TransferConfirmView,
   WalletInteractionComplete
 } from '../Views'
-import { creditsPurchaseData, creditsPurchaseWithoutMetadata } from './__creditsData__'
+import { creditsManaListingData, creditsPrimarySaleData, creditsPurchaseData, creditsPurchaseWithoutMetadata } from './__creditsData__'
 import {
   MARKETPLACE_ADDRESS,
   USER_ADDRESS,
@@ -82,6 +82,22 @@ export const TestViewPage = () => {
       },
       // The delayed-code consent, gated here as RequestPage gates it, so the e2e suite can measure that the
       // notice, the checkbox and the buttons stack without overlapping.
+      creditsPurchasePrimarySale: {
+        label: 'CreditsPurchaseView (primary sale from the collection store, priced in MANA — charge checked at the day rate)',
+        element: (
+          <CreditsPurchaseView purchaseData={creditsPrimarySaleData} chainId={137} isLoading={false} onDeny={noop} onApprove={asyncNoop} />
+        )
+      },
+      creditsPurchaseManaListing: {
+        label: 'CreditsPurchaseView (marketplace listing priced in MANA — charge checked at the day rate)',
+        element: (
+          <CreditsPurchaseView purchaseData={creditsManaListingData} chainId={137} isLoading={false} onDeny={noop} onApprove={asyncNoop} />
+        )
+      },
+      creditsPurchasePrimarySaleSigned: {
+        label: 'CreditsPurchaseOutcomeView (primary sale signed, priced in MANA)',
+        element: <CreditsPurchaseOutcomeView purchaseData={creditsPrimarySaleData} outcome="signed" delivery="delivered" />
+      },
       creditsPurchaseCallbackConsent: {
         label: 'CreditsPurchaseView (address without code — asks the delayed-code consent)',
         element: (
@@ -89,7 +105,7 @@ export const TestViewPage = () => {
             purchaseData={creditsPurchaseData}
             chainId={137}
             isLoading={false}
-            callbackAddresses={[creditsPurchaseData.purchase.seller]}
+            callbackAddresses={[creditsPurchaseData.purchase.seller ?? creditsPurchaseData.purchase.recipient]}
             callbackAcknowledged={acknowledged}
             approveBlocked={!acknowledged}
             onCallbackAcknowledgedChange={setAcknowledged}

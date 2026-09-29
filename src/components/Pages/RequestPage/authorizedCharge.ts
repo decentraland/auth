@@ -3,6 +3,7 @@ import signedFetch from 'decentraland-crypto-fetch'
 import { config } from '../../../modules/config'
 import { readTextWithCap } from '../../../shared/http'
 import { isRecord } from '../../../shared/utils/isRecord'
+import { CENTS_PER_CREDIT } from './creditsPricing'
 
 // The buyer's own authorization is a small JSON object; anything larger is not it.
 const MAX_AUTHORIZATION_BYTES = 8 * 1024
@@ -125,6 +126,25 @@ type ChargeVerdict = 'verified' | 'unavailable' | 'not_found' | 'not_pending' | 
  * something other than `verified`, and the caller then shows the payload rather than a price.
  */
 function verifyAuthorizedCharge(result: AuthorizedChargeResult, expectedCents: bigint): ChargeVerdict {
+  return verifyChargeWithin(result, expectedCents, expectedCents)
+}
+
+/**
+ * The same verdict for a MANA price, whose credits this page can only compute at the live MANA/USD rate.
+ *
+ * The client quoted the charge at that same feed a moment before, so a charge that is this item's price
+ * lands within `bounds` (see approximateChargeBounds); one that is not — the credit authorized for one
+ * amount and spent on an item worth another — lands outside and the page shows the payload instead. Every
+ * other requirement is the exact check's: the authorization exists, is still pending, and is one line.
+ *
+ * A verified charge is then what the screen states: the bounds decide whether the charge is this item's,
+ * and the charge itself — not the page's conversion — is what the balance loses.
+ */
+function verifyApproximateCharge(result: AuthorizedChargeResult, bounds: { minCents: bigint; maxCents: bigint }): ChargeVerdict {
+  return verifyChargeWithin(result, bounds.minCents, bounds.maxCents)
+}
+
+function verifyChargeWithin(result: AuthorizedChargeResult, minCents: bigint, maxCents: bigint): ChargeVerdict {
   if (result.status === 'unavailable') return 'unavailable'
   if (result.status === 'not_found') return 'not_found'
   const { charge } = result
@@ -132,8 +152,12 @@ function verifyAuthorizedCharge(result: AuthorizedChargeResult, expectedCents: b
   // One signature, one trade, one item on screen. A salt covering several lines settles all of them at
   // once, and this screen has no way to describe the rest.
   if (charge.lines !== 1) return 'grouped'
-  return BigInt(charge.cents) === expectedCents ? 'verified' : 'mismatch'
+  const cents = BigInt(charge.cents)
+  // The ledger charges whole credits. A charge that is not one cannot be stated as a number of credits
+  // without rounding it one way or the other, and rounding a debit down would understate it.
+  if (cents % CENTS_PER_CREDIT !== 0n) return 'mismatch'
+  return cents >= minCents && cents <= maxCents ? 'verified' : 'mismatch'
 }
 
-export { fetchAuthorizedCharge, verifyAuthorizedCharge }
+export { fetchAuthorizedCharge, verifyApproximateCharge, verifyAuthorizedCharge }
 export type { AuthorizedCharge, AuthorizedChargeResult, ChargeVerdict }

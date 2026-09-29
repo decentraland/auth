@@ -167,4 +167,58 @@ test.describe('Credits purchase approval', () => {
     await expect(page.getByTestId('credits-purchase-outcome-title')).toHaveText('Purchase canceled')
     await expect(page.getByTestId('credits-purchase-outcome-description')).toContainText('no credits were spent')
   })
+
+  test('should state the charge of a primary sale priced in MANA, with the MANA price under it', async ({ page }) => {
+    await page.goto(testView('creditsPurchasePrimarySale'))
+
+    // 1.1 MANA at the harness rate of $0.2696 is 2.97 credits, charged as three.
+    await expect(page.getByTestId('credits-purchase-price')).toHaveText('3 credits')
+    await expect(page.getByTestId('credits-purchase-price-note')).toContainText('1.1 MANA')
+    await expect(page.getByTestId('credits-purchase-price-note')).toContainText("today's rate")
+  })
+
+  test('should keep the price, its MANA note and the buttons stacked and above the fold', async ({ page }) => {
+    await page.goto(testView('creditsPurchasePrimarySale'))
+
+    await expectStacked([
+      page.getByTestId('credits-purchase-price'),
+      page.getByTestId('credits-purchase-price-note'),
+      page.getByTestId('credits-purchase-recipient')
+    ])
+    const confirm = await boxOf(page.getByTestId('transfer-confirm-button'))
+    expect(confirm.y + confirm.height).toBeLessThanOrEqual(page.viewportSize()!.height)
+  })
+
+  test('should name the store contract and the rate once the details of a primary sale are opened', async ({ page }) => {
+    await page.goto(testView('creditsPurchasePrimarySale'))
+    await page.getByText('Technical details').click()
+
+    await expect(page.getByTestId('credits-purchase-detail-price-mana')).toContainText('1.1 MANA')
+    await expect(page.getByTestId('credits-purchase-detail-mana-usd-rate')).toContainText('1 MANA = 0.26960836 USD')
+    await expect(page.getByTestId('credits-purchase-detail-settlement')).toContainText('Collection store contract')
+    await expect(page.getByTestId('credits-purchase-detail-seller')).toHaveCount(0)
+  })
+
+  test('should state the charge of a marketplace listing priced in MANA too', async ({ page }) => {
+    await page.goto(testView('creditsPurchaseManaListing'))
+
+    // 2.6 MANA at $0.2696 is 7.01 credits, charged as eight.
+    await expect(page.getByTestId('credits-purchase-price')).toHaveText('8 credits')
+    await expect(page.getByTestId('credits-purchase-price-note')).toContainText('2.6 MANA')
+  })
+
+  test('should keep a primary sale on the screen of a phone, note included', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto(testView('creditsPurchasePrimarySale'))
+
+    await expect(page.getByTestId('credits-purchase-price-note')).toBeVisible()
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+    expect(overflow).toBeLessThanOrEqual(0)
+  })
+
+  test('should state the same charge on the outcome screen of a signed primary sale', async ({ page }) => {
+    await page.goto(testView('creditsPurchasePrimarySaleSigned'))
+
+    await expect(page.getByTestId('credits-purchase-outcome-price')).toHaveText('3 credits')
+  })
 })

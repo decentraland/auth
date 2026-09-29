@@ -995,8 +995,8 @@ describe('when classifying a request', () => {
       expect(classification.call.functionName).toBe('useCredits')
       expect(classification.credits.status).toBe('recognized')
       if (classification.credits.status !== 'recognized') throw new Error('not recognized')
-      expect(classification.credits.purchase.credits).toBe(7n)
-      expect(classification.credits.purchase.marketplaceAddress).toBe(marketplaceContract.address.toLowerCase())
+      expect(classification.credits.purchase.price).toEqual({ kind: 'usd_pegged', usdWei: 700000000000000000n, credits: 7n })
+      expect(classification.credits.purchase.settlementAddress).toBe(marketplaceContract.address.toLowerCase())
       expect(classification.credits.purchase.recipient).toBe(USER.toLowerCase())
     })
 

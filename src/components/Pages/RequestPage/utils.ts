@@ -13,6 +13,7 @@ import { getHttpsUrl } from '../../../shared/urls'
 import { isRecord } from '../../../shared/utils/isRecord'
 import { isMobile } from '../LoginPage/utils'
 import { NFT_TRANSFER_FUNCTIONS } from './classifyRequest'
+import type { ManaUsdRate } from './creditsPricing'
 import type { CreditsPurchaseAsset } from './creditsPurchase'
 import type { PlaceLocation } from './types'
 
@@ -653,6 +654,79 @@ async function fetchPlaceByCreatorAddress(
   }
 }
 
+// The MANA/USD feed is a Chainlink-style aggregator whose heartbeat is well under a day. A round older than
+// this is not a rate this page will put a number on; credits-server refuses to size a credit off one too.
+const MANA_USD_MAX_STALENESS_SECONDS = 24 * 60 * 60
+// How far ahead of this machine's clock a round may be dated before it is refused: clock drift, not more.
+const MANA_USD_MAX_CLOCK_SKEW_SECONDS = 5 * 60
+
+const MANA_USD_AGGREGATOR_ABI = [
+  { type: 'function', name: 'decimals', stateMutability: 'view', inputs: [], outputs: [{ name: '', type: 'uint8' }] },
+  {
+    type: 'function',
+    name: 'latestRoundData',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [
+      { name: 'roundId', type: 'uint80' },
+      { name: 'answer', type: 'int256' },
+      { name: 'startedAt', type: 'uint256' },
+      { name: 'updatedAt', type: 'uint256' },
+      { name: 'answeredInRound', type: 'uint80' }
+    ]
+  }
+] as const
+
+const MANA_USD_AGGREGATOR_GETTER_ABI = [
+  { type: 'function', name: 'manaUsdAggregator', stateMutability: 'view', inputs: [], outputs: [{ name: '', type: 'address' }] }
+] as const
+
+/**
+ * The live MANA/USD rate on `chainId`, read from the aggregator the off-chain marketplace itself converts
+ * USD-pegged prices with (`manaUsdAggregator()`), through Decentraland's own RPC.
+ *
+ * That aggregator is the rate this purchase is priced against everywhere else: the shop and the Explorer
+ * quote a MANA price to the credits-server with it, and the credits-server sizes the credit off the same
+ * feed. Taking its address from the marketplace in the registry, rather than from configuration, keeps this
+ * page from ever reading a different feed than the one the charge was computed with.
+ *
+ * Throws on an incomplete, stale or non-positive round and on a lookup that does not answer in time, so a
+ * rate this page cannot stand behind is never turned into a number on screen.
+ */
+async function readManaUsdRate(chainId: number): Promise<ManaUsdRate> {
+  const lookup = async (): Promise<ManaUsdRate> => {
+    const marketplace = getContract(ContractName.OffChainMarketplaceV2, chainId)
+    const networkProvider = await getTrustedNetworkProvider(chainId as ChainId)
+    const publicClient = createPublicClient({ transport: custom(networkProvider) })
+    const aggregator = await publicClient.readContract({
+      address: marketplace.address as `0x${string}`,
+      abi: MANA_USD_AGGREGATOR_GETTER_ABI,
+      functionName: 'manaUsdAggregator'
+    })
+    const [decimals, round] = await Promise.all([
+      publicClient.readContract({ address: aggregator, abi: MANA_USD_AGGREGATOR_ABI, functionName: 'decimals' }),
+      publicClient.readContract({ address: aggregator, abi: MANA_USD_AGGREGATOR_ABI, functionName: 'latestRoundData' })
+    ])
+    const [roundId, answer, , updatedAt, answeredInRound] = round
+    if (answeredInRound < roundId) {
+      throw new Error('The MANA/USD round is incomplete')
+    }
+    if (answer <= 0n) {
+      throw new Error('The MANA/USD rate is not positive')
+    }
+    const ageSeconds = Math.floor(Date.now() / 1000) - Number(updatedAt)
+    if (ageSeconds > MANA_USD_MAX_STALENESS_SECONDS) {
+      throw new Error(`The MANA/USD rate is ${ageSeconds}s old`)
+    }
+    // A round from the future is not a clock that drifted a little: it is a feed this page cannot date.
+    if (ageSeconds < -MANA_USD_MAX_CLOCK_SKEW_SECONDS) {
+      throw new Error(`The MANA/USD round is dated ${-ageSeconds}s in the future`)
+    }
+    return { rate: answer, decimals: Number(decimals) }
+  }
+  return withTimeout(lookup(), COLLECTION_LOOKUP_TIMEOUT_MS, 'MANA/USD rate lookup')
+}
+
 export {
   launchDeepLink,
   getExplorerDeeplink,
@@ -661,6 +735,7 @@ export {
   getNetworkProvider,
   isAddressWithoutCode,
   isDecentralandCollection,
+  readManaUsdRate,
   getMetaTransactionChainId,
   decodeNftTransferData,
   getCounterpartyAddresses,

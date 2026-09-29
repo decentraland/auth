@@ -26,15 +26,15 @@ const COLLECTION = '0xd0e9b1e87f94ecedf15db41ddb95f1825d5e3f3f'
 
 const purchase = (overrides: Partial<CreditsPurchase> = {}): CreditsPurchase => ({
   creditsManagerAddress: '0x8b3a40ca1b6f5cafc99d112a4d02e897d1fd8cc5',
-  marketplaceAddress: '0xa40b1d129b8906888720686f3a01921ddf37716f',
-  marketplaceName: 'OffChainMarketplaceV2' as CreditsPurchase['marketplaceName'],
+  via: 'marketplace',
+  settlementAddress: '0xa40b1d129b8906888720686f3a01921ddf37716f',
+  settlementName: 'OffChainMarketplaceV2' as CreditsPurchase['settlementName'],
   asset: { kind: 'collection_item', contractAddress: COLLECTION, itemId: '0' },
   recipient: BUYER,
   seller: SELLER,
   paymentBeneficiary: SELLER,
   paymentTokenAddress: '0xa1c57f48f0deb89f569dfbe6e2b7f46d33606fd4',
-  priceUsdWei: 700000000000000000n,
-  credits: 7n,
+  price: { kind: 'usd_pegged', usdWei: 700000000000000000n, credits: 7n },
   maxCreditedValueWei: 1000000000000000000n,
   creditSalt: `0x${'ab'.repeat(32)}`,
   externalCallExpiresAt: 4102444800n,
@@ -46,6 +46,7 @@ const purchase = (overrides: Partial<CreditsPurchase> = {}): CreditsPurchase => 
 
 const purchaseData = (overrides: Partial<CreditsPurchaseData> = {}): CreditsPurchaseData => ({
   purchase: purchase(),
+  pricing: { kind: 'exact', credits: 7n },
   metadata: { imageUrl: 'https://peer.decentraland.org/content/contents/hash', name: 'UpperHead AHL', rarity: Rarity.EPIC },
   ...overrides
 })
@@ -108,7 +109,7 @@ describe('when confirming a credits purchase', () => {
 
     expect(screen.getByTestId('credits-purchase-detail-collection')).toHaveTextContent(COLLECTION)
     expect(screen.getByTestId('credits-purchase-detail-price-usd-wei')).toHaveTextContent('700000000000000000')
-    expect(screen.getByTestId('credits-purchase-detail-marketplace')).toHaveTextContent('0xa40b1d129b8906888720686f3a01921ddf37716f')
+    expect(screen.getByTestId('credits-purchase-detail-settlement')).toHaveTextContent('0xa40b1d129b8906888720686f3a01921ddf37716f')
     expect(screen.getByTestId('credits-purchase-detail-seller')).toHaveTextContent(SELLER)
   })
 
@@ -199,5 +200,65 @@ describe('when a credits purchase review has ended', () => {
 
     expect(screen.getByTestId('credits-purchase-outcome-price')).toHaveTextContent('{"credits":"7"}')
     expect(screen.getByTestId('credits-purchase-outcome-mark')).toBeInTheDocument()
+  })
+})
+
+describe('when confirming a primary sale priced in MANA', () => {
+  const MANA_PRICE_WEI = 1100000000000000000n
+  const RATE = { rate: 26960836n, decimals: 8 }
+  const manaPriced = (): CreditsPurchaseData =>
+    purchaseData({
+      purchase: purchase({
+        via: 'collection_store',
+        settlementAddress: '0x214ffc0f0103735728dc66b61a22e4f163e275ae',
+        settlementName: 'CollectionStore' as CreditsPurchase['settlementName'],
+        seller: null,
+        paymentBeneficiary: null,
+        tradeExpiresAt: null,
+        price: { kind: 'mana', manaWei: MANA_PRICE_WEI }
+      }),
+      pricing: { kind: 'converted', credits: 3n, manaWei: MANA_PRICE_WEI, rate: RATE }
+    })
+
+  it('should state the verified charge as the price, as a plain number of credits', () => {
+    // The number is the ledger's charge, which is what the balance loses; only its relation to the MANA
+    // price depends on the day's rate, and the note under it says so.
+    renderView({ purchaseData: manaPriced(), onDeny: jest.fn(), onApprove: jest.fn() })
+    const price = screen.getByTestId('credits-purchase-price')
+    expect(price).toHaveTextContent('credits_purchase.confirm.price {"credits":"3"}')
+    expect(price).toHaveAttribute('data-pricing', 'converted')
+  })
+
+  it('should say under the price which MANA amount the credits were worked out from', () => {
+    renderView({ purchaseData: manaPriced(), onDeny: jest.fn(), onApprove: jest.fn() })
+    expect(screen.getByTestId('credits-purchase-price-note')).toHaveTextContent('credits_purchase.confirm.priced_in_mana {"mana":"1.1"}')
+  })
+
+  it('should list the signed MANA price, the rate used and the store contract in the details', async () => {
+    renderView({ purchaseData: manaPriced(), onDeny: jest.fn(), onApprove: jest.fn() })
+    await userEvent.click(screen.getByText('credits_purchase.details.title'))
+    expect(screen.getByTestId('credits-purchase-detail-price-mana')).toHaveTextContent('1.1 MANA')
+    expect(screen.getByTestId('credits-purchase-detail-mana-usd-rate')).toHaveTextContent('1 MANA = 0.26960836 USD')
+    expect(screen.getByTestId('credits-purchase-detail-settlement')).toHaveTextContent('credits_purchase.details.collection_store')
+  })
+
+  it('should not list a seller, a payment beneficiary or a trade expiry the store purchase does not have', async () => {
+    renderView({ purchaseData: manaPriced(), onDeny: jest.fn(), onApprove: jest.fn() })
+    await userEvent.click(screen.getByText('credits_purchase.details.title'))
+    expect(screen.queryByTestId('credits-purchase-detail-seller')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('credits-purchase-detail-payment-beneficiary')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('credits-purchase-detail-trade-expires')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('credits-purchase-detail-price-usd-wei')).not.toBeInTheDocument()
+    expect(screen.getByTestId('credits-purchase-detail-credit-expires')).toBeInTheDocument()
+  })
+
+  it('should state the same charge on the outcome screen, without repeating the note', () => {
+    render(
+      <DclThemeProvider theme={darkTheme}>
+        <CreditsPurchaseOutcomeView purchaseData={manaPriced()} outcome="signed" delivery="delivered" />
+      </DclThemeProvider>
+    )
+    expect(screen.getByTestId('credits-purchase-outcome-price')).toHaveTextContent('credits_purchase.confirm.price {"credits":"3"}')
+    expect(screen.queryByTestId('credits-purchase-outcome-price-note')).not.toBeInTheDocument()
   })
 })

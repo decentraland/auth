@@ -14,6 +14,8 @@ interface TrackingData {
   authRequestId?: string
   requestId?: string
   reason?: string
+  // Which check a review stopped at. Not `type`: that property never reaches the warehouse's event tables.
+  stage?: string
   feature?: string
   account?: string
   url?: string

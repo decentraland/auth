@@ -47,6 +47,19 @@ const PriceLabel = styled(Typography)(({ theme }) => ({
   textTransform: 'uppercase'
 }))
 
+// Under the price of an item priced in MANA: its MANA price and how it was turned into credits. Same readability rules as PriceLabel, not
+// uppercased, because it is a sentence rather than a label. One line on a desktop, so the note does not push
+// the buttons of a 720px-tall window below the fold; it wraps on a phone, where the screen scrolls anyway.
+const PriceNote = styled(Typography)(({ theme }) => ({
+  color: theme.palette.text.primary,
+  fontSize: theme.typography.pxToRem(14),
+  fontWeight: 400,
+  marginTop: theme.spacing(0.5),
+  maxWidth: '100%',
+  opacity: 0.95,
+  textAlign: 'center'
+}))
+
 // The identifiers an item is named by when its cosmetic details could not be read. Monospace, because what
 // it holds is an address and a number the user may want to compare character by character.
 const AssetIdentifiers = styled(Box)(({ theme }) => ({
@@ -69,6 +82,12 @@ const RecipientLabel = styled(Typography)(({ theme }) => ({
   maxWidth: '100%',
   opacity: 0.95,
   overflowWrap: 'anywhere'
+}))
+
+// The recipient line under a MANA-priced item's note. The note above already separates it from the price, so it
+// gives back half of the gap it keeps under an exact one.
+const RecipientLabelAfterNote = styled(RecipientLabel)(({ theme }) => ({
+  marginTop: theme.spacing(2)
 }))
 
 // The whole facts block: the price, what it buys, and where it goes, laid out in one column.
@@ -139,9 +158,11 @@ export {
   DetailsSummary,
   Price,
   PriceLabel,
+  PriceNote,
   PriceRow,
   PurchaseContent,
   PurchaseFacts,
   PurchaseTitle,
-  RecipientLabel
+  RecipientLabel,
+  RecipientLabelAfterNote
 }
