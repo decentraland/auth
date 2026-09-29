@@ -685,6 +685,10 @@ const MANA_USD_AGGREGATOR_GETTER_ABI = [
  * The live MANA/USD rate on `chainId`, read from the aggregator the off-chain marketplace itself converts
  * USD-pegged prices with (`manaUsdAggregator()`), through Decentraland's own RPC.
  *
+ * Always the V2 deployment's, even for a purchase that settles through V1: on Polygon and Amoy both
+ * deployments point at the same aggregator (read on chain when this was written). Were they ever to diverge,
+ * a charge quoted at the other feed would fall outside the bounds and the page would show the payload.
+ *
  * That aggregator is the rate this purchase is priced against everywhere else: the shop and the Explorer
  * quote a MANA price to the credits-server with it, and the credits-server sizes the credit off the same
  * feed. Taking its address from the marketplace in the registry, rather than from configuration, keeps this

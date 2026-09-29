@@ -64,6 +64,16 @@ describe('when bounding the charge a MANA price may carry on the ledger', () => 
     })
   })
 
+  describe('and the price is exactly a whole number of credits at the rate', () => {
+    it('should accept that number and one more, which is what the same price quoted after MANA rose is', () => {
+      // $0.10 exactly: one credit today, two after any rise at all. Wider than ±2% for a cheap item, on
+      // purpose; the screen states the charge itself, not this conversion.
+      const { minCents, maxCents } = approximateChargeBounds(MANA, { rate: 10_000_000n, decimals: 8 })
+      expect(minCents).toBe(10n)
+      expect(maxCents).toBe(20n)
+    })
+  })
+
   it('should only ever bound whole credits, which is how the ledger records a charge', () => {
     const { minCents, maxCents } = approximateChargeBounds(123_456_789_012_345_678n, AMOY_RATE)
     expect(minCents % 10n).toBe(0n)

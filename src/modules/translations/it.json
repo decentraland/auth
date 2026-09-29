@@ -203,7 +203,7 @@
       "processing_title": "Conferma dell'acquisto in corso",
       "price_label": "PREZZO",
       "price": "{credits} crediti",
-      "priced_in_mana": "Prezzo: {mana} MANA · convertito in crediti al cambio di oggi",
+      "priced_in_mana": "Prezzo: {mana} MANA · addebitato in crediti al cambio MANA/USD",
       "quantity": "QUANTITÀ 1",
       "delivered_to": "Consegnato al tuo account {address}",
       "approve": "Conferma acquisto",

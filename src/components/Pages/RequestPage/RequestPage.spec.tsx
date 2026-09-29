@@ -3200,11 +3200,12 @@ describe('RequestPage', () => {
           mockReadManaUsdRate.mockRejectedValue(new Error('The MANA/USD round is incomplete'))
         })
 
-        it('should refuse to state a price, without asking the ledger for a number it could not check', async () => {
+        it('should refuse to state a price, whatever the ledger answers', async () => {
+          // The ledger is asked alongside the rate and answers with a charge that would verify; without a
+          // rate there is nothing to check it against, so it is not used.
           renderRequestPage()
           await screen.findByTestId('action-request')
           expect(screen.queryByTestId('credits-purchase')).not.toBeInTheDocument()
-          expect(mockFetchAuthorizedCharge).not.toHaveBeenCalled()
           expect(trackEvent).toHaveBeenCalledWith(
             TrackingEvents.REQUEST_CLASSIFIED,
             expect.objectContaining({ stage: 'credits_rate_unavailable' })

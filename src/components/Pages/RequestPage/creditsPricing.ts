@@ -36,6 +36,12 @@ function approximateCredits(manaWei: bigint, rate: ManaUsdRate): bigint {
 /**
  * The range of charges, in cents, that are the same MANA price quoted a moment earlier: the price converted
  * at `rate` moved down and up by the tolerance, each rounded to a whole credit the way the charge is.
+ *
+ * Because both ends are whole credits, the range is wider than ±2% for a cheap item: a price that is exactly
+ * N credits today is N+1 after MANA rises by any amount, so the range is [N, N+1] — a 1-credit item accepts
+ * a 2-credit charge. That is intended. Such a charge is a real quote of this item, the screen states the
+ * charge itself rather than this conversion, and what the check exists to stop — a credit sized for a
+ * different item — is far outside it.
  */
 function approximateChargeBounds(manaWei: bigint, rate: ManaUsdRate): { minCents: bigint; maxCents: bigint } {
   const usdWei = manaWeiToUsdWei(manaWei, rate)
@@ -44,5 +50,5 @@ function approximateChargeBounds(manaWei: bigint, rate: ManaUsdRate): { minCents
   return { minCents: toCredits(low) * CENTS_PER_CREDIT, maxCents: toCredits(high) * CENTS_PER_CREDIT }
 }
 
-export { APPROXIMATE_CHARGE_TOLERANCE_BPS, CENTS_PER_CREDIT, approximateChargeBounds, approximateCredits, manaWeiToUsdWei }
+export { CENTS_PER_CREDIT, approximateChargeBounds, approximateCredits, manaWeiToUsdWei }
 export type { ManaUsdRate }

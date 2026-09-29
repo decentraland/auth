@@ -203,7 +203,7 @@
       "processing_title": "Confirming your purchase",
       "price_label": "PRICE",
       "price": "{credits} credits",
-      "priced_in_mana": "Priced at {mana} MANA · converted to credits at today's rate",
+      "priced_in_mana": "Priced at {mana} MANA · charged in credits at the MANA/USD rate",
       "quantity": "QUANTITY 1",
       "delivered_to": "Delivered to your account {address}",
       "approve": "Confirm purchase",

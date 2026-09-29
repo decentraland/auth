@@ -80,8 +80,7 @@ export const TestViewPage = () => {
           />
         )
       },
-      // The delayed-code consent, gated here as RequestPage gates it, so the e2e suite can measure that the
-      // notice, the checkbox and the buttons stack without overlapping.
+      // Priced in MANA: the note under the price, and the details a store purchase does and does not have.
       creditsPurchasePrimarySale: {
         label: 'CreditsPurchaseView (primary sale from the collection store, priced in MANA — charge checked at the day rate)',
         element: (
@@ -98,6 +97,8 @@ export const TestViewPage = () => {
         label: 'CreditsPurchaseOutcomeView (primary sale signed, priced in MANA)',
         element: <CreditsPurchaseOutcomeView purchaseData={creditsPrimarySaleData} outcome="signed" delivery="delivered" />
       },
+      // The delayed-code consent, gated here as RequestPage gates it, so the e2e suite can measure that the
+      // notice, the checkbox and the buttons stack without overlapping.
       creditsPurchaseCallbackConsent: {
         label: 'CreditsPurchaseView (address without code — asks the delayed-code consent)',
         element: (

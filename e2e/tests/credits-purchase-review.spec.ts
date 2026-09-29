@@ -174,7 +174,7 @@ test.describe('Credits purchase approval', () => {
     // 1.1 MANA at the harness rate of $0.2696 is 2.97 credits, charged as three.
     await expect(page.getByTestId('credits-purchase-price')).toHaveText('3 credits')
     await expect(page.getByTestId('credits-purchase-price-note')).toContainText('1.1 MANA')
-    await expect(page.getByTestId('credits-purchase-price-note')).toContainText("today's rate")
+    await expect(page.getByTestId('credits-purchase-price-note')).toContainText('MANA/USD rate')
   })
 
   test('should keep the price, its MANA note and the buttons stacked and above the fold', async ({ page }) => {

@@ -116,6 +116,13 @@ describe('when checking the charge of a purchase priced in MANA', () => {
     })
   })
 
+  describe('and the ledger charges nothing', () => {
+    it('should refuse it even when the bounds reach zero', () => {
+      // A MANA price of a few wei bounds to [0, 0]; a zero charge fits and must still not read as "0 credits".
+      expect(verifyApproximateCharge(found({ cents: 0 }), { minCents: 0n, maxCents: 0n })).toBe('mismatch')
+    })
+  })
+
   describe('and the ledger charges a part of a credit', () => {
     it('should refuse it even inside the bounds, rather than state it rounded down', () => {
       // The screen states the charge in whole credits; 35 cents would read as three and debit three and a half.

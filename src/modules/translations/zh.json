@@ -203,7 +203,7 @@
       "processing_title": "正在确认你的购买",
       "price_label": "价格",
       "price": "{credits} 信用点",
-      "priced_in_mana": "价格 {mana} MANA · 按今日汇率换算为积分",
+      "priced_in_mana": "价格 {mana} MANA · 按 MANA/USD 汇率以积分扣费",
       "quantity": "数量 1",
       "delivered_to": "将发送至你的账户 {address}",
       "approve": "确认购买",

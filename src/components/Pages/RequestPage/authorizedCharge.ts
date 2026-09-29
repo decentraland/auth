@@ -153,9 +153,10 @@ function verifyChargeWithin(result: AuthorizedChargeResult, minCents: bigint, ma
   // once, and this screen has no way to describe the rest.
   if (charge.lines !== 1) return 'grouped'
   const cents = BigInt(charge.cents)
-  // The ledger charges whole credits. A charge that is not one cannot be stated as a number of credits
-  // without rounding it one way or the other, and rounding a debit down would understate it.
-  if (cents % CENTS_PER_CREDIT !== 0n) return 'mismatch'
+  // The ledger charges whole credits, and at least one. A charge that is not a whole credit cannot be stated
+  // as a number of credits without rounding it, and rounding a debit down would understate it; a charge of
+  // nothing is not a purchase this screen can put a price on (a MANA price of a few wei bounds to zero).
+  if (cents === 0n || cents % CENTS_PER_CREDIT !== 0n) return 'mismatch'
   return cents >= minCents && cents <= maxCents ? 'verified' : 'mismatch'
 }
 

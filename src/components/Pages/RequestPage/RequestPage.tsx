@@ -941,6 +941,14 @@ export const RequestPage = () => {
           // when the credit was authorized, and what the balance actually loses — never this page's own
           // conversion, which may round to a different whole credit. A rate that cannot be read is the same as
           // a ledger that cannot answer.
+          // The charge and the rate do not depend on each other, so the charge is asked for first and read
+          // after the rate, rather than one lookup waiting out the other's timeout. fetchAuthorizedCharge never
+          // rejects (an unreachable ledger is `unavailable`), so a charge left unread when the rate fails is
+          // simply discarded.
+          const identity = identityRef.current
+          const chargeLookup = identity
+            ? fetchAuthorizedCharge(purchase.creditSalt, identity)
+            : Promise.resolve({ status: 'unavailable' } as const)
           let expectedCharge: { minCents: bigint; maxCents: bigint }
           let rate: ManaUsdRate | null = null
           if (purchase.price.kind === 'usd_pegged') {
@@ -960,8 +968,7 @@ export const RequestPage = () => {
             expectedCharge = approximateChargeBounds(purchase.price.manaWei, rate)
           }
 
-          const identity = identityRef.current
-          const charge = identity ? await fetchAuthorizedCharge(purchase.creditSalt, identity) : ({ status: 'unavailable' } as const)
+          const charge = await chargeLookup
           const chargeVerdict =
             purchase.price.kind === 'usd_pegged'
               ? verifyAuthorizedCharge(charge, expectedCharge.minCents)
