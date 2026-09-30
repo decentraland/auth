@@ -135,15 +135,6 @@ function isExpectedWalletError(error: unknown): boolean {
   // pending for this origin", which clears as soon as the user answers the prompt already open.
   if ((error as { code: unknown }).code === -32002) return true
 
-  // Same family as the case above, for a wallet that is still busy unlocking. Only the message
-  // tells it apart from other -32001 failures, so both must match.
-  if (
-    (error as { code: unknown }).code === -32001 &&
-    isErrorWithMessage(error) &&
-    error.message === 'Already processing unlock. Please wait.'
-  )
-    return true
-
   // decentraland-connect's WalletConnectV2Connector rejects with a bare Error when the user closes
   // the AppKit modal, so the message is the only signal it leaves.
   if (isErrorWithMessage(error) && error.message === 'User closed the modal without connecting') return true
@@ -152,19 +143,31 @@ function isExpectedWalletError(error: unknown): boolean {
 }
 
 /**
- * Detects a wallet whose user has switched dApp access off: EIP-1193 `4100` (Unauthorized), with the
- * message the wallet uses for exactly this state. It is a wallet setting, not a fault of ours, so it
- * stays out of Sentry.
+ * Wallet-side conditions that stay out of Sentry but, unlike {@link isExpectedWalletError}, keep
+ * their message on the login screen. The login screen blanks the error detail for expected wallet
+ * errors, and for these the wallet's own message is what tells the user what to do:
  *
- * It is kept apart from {@link isExpectedWalletError} on purpose. The login screen blanks the error
- * detail for expected wallet errors, and here the wallet's message is the one thing that tells the
- * user what to change. Other `4100` refusals (an account or method the user never authorized) can
- * point at our own requests, so they keep reporting.
+ * - EIP-1193 `4100` (Unauthorized) with "DApp interaction is disabled": the user switched dApp
+ *   access off in the wallet.
+ * - `-32001` with "Already processing unlock. Please wait.": the wallet is still busy unlocking.
+ *
+ * Both match on the code and the exact message. Other `4100` refusals (an account or method the
+ * user never authorized) can point at our own requests, and other `-32001` failures are not this
+ * state, so they keep reporting.
  */
-function isWalletDappAccessDisabled(error: unknown): boolean {
-  if (error === null || typeof error !== 'object') return false
+function isUnreportedWalletCondition(error: unknown): boolean {
+  if (!isErrorWithMessage(error)) return false
 
-  return (error as { code: unknown }).code === 4100 && isErrorWithMessage(error) && error.message === 'DApp interaction is disabled'
+  // A raw provider error carries the wallet's text in `message`. viem (the signing path) wraps it
+  // in its own error with a generic `message`, keeping the code and moving the wallet's text to
+  // `details`.
+  const { code, details } = error as { code?: unknown; details?: unknown }
+  const says = (text: string) => error.message === text || details === text
+
+  if (code === 4100 && says('DApp interaction is disabled')) return true
+  if (code === -32001 && says('Already processing unlock. Please wait.')) return true
+
+  return false
 }
 
 /**
@@ -209,6 +212,6 @@ export {
   isUserRejectedTransaction,
   isWalletSignatureUnsupportedError,
   isExpectedWalletError,
-  isWalletDappAccessDisabled,
+  isUnreportedWalletCondition,
   isChainMismatchRejection
 }

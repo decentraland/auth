@@ -137,6 +137,12 @@ describe('handleError → expected wallet conditions', () => {
       expect(mockCaptureException).toHaveBeenCalledTimes(1)
     })
 
+    it('should still report a -32001 failure that is not an unlock in progress', () => {
+      handleError({ code: -32001, message: 'Resource not found' }, 'context')
+
+      expect(mockCaptureException).toHaveBeenCalledTimes(1)
+    })
+
     it('should still report an unauthorized request that is not the dApp access setting', () => {
       handleError({ code: 4100, message: 'The requested account and/or method has not been authorized by the user.' }, 'context')
 
