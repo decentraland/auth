@@ -135,11 +135,36 @@ function isExpectedWalletError(error: unknown): boolean {
   // pending for this origin", which clears as soon as the user answers the prompt already open.
   if ((error as { code: unknown }).code === -32002) return true
 
+  // Same family as the case above, for a wallet that is still busy unlocking. Only the message
+  // tells it apart from other -32001 failures, so both must match.
+  if (
+    (error as { code: unknown }).code === -32001 &&
+    isErrorWithMessage(error) &&
+    error.message === 'Already processing unlock. Please wait.'
+  )
+    return true
+
   // decentraland-connect's WalletConnectV2Connector rejects with a bare Error when the user closes
   // the AppKit modal, so the message is the only signal it leaves.
   if (isErrorWithMessage(error) && error.message === 'User closed the modal without connecting') return true
 
   return false
+}
+
+/**
+ * Detects a wallet whose user has switched dApp access off: EIP-1193 `4100` (Unauthorized), with the
+ * message the wallet uses for exactly this state. It is a wallet setting, not a fault of ours, so it
+ * stays out of Sentry.
+ *
+ * It is kept apart from {@link isExpectedWalletError} on purpose. The login screen blanks the error
+ * detail for expected wallet errors, and here the wallet's message is the one thing that tells the
+ * user what to change. Other `4100` refusals (an account or method the user never authorized) can
+ * point at our own requests, so they keep reporting.
+ */
+function isWalletDappAccessDisabled(error: unknown): boolean {
+  if (error === null || typeof error !== 'object') return false
+
+  return (error as { code: unknown }).code === 4100 && isErrorWithMessage(error) && error.message === 'DApp interaction is disabled'
 }
 
 /**
@@ -184,5 +209,6 @@ export {
   isUserRejectedTransaction,
   isWalletSignatureUnsupportedError,
   isExpectedWalletError,
+  isWalletDappAccessDisabled,
   isChainMismatchRejection
 }

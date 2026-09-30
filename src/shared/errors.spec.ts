@@ -3,6 +3,7 @@ import {
   isChainMismatchRejection,
   isExpectedWalletError,
   isUserRejectedTransaction,
+  isWalletDappAccessDisabled,
   isWalletSignatureUnsupportedError
 } from './errors'
 
@@ -127,6 +128,16 @@ describe('isExpectedWalletError', () => {
     })
   })
 
+  describe('when the wallet is still busy unlocking', () => {
+    it('should classify it as expected', () => {
+      expect(isExpectedWalletError({ code: -32001, message: 'Already processing unlock. Please wait.' })).toBe(true)
+    })
+
+    it('should not classify another failure carrying the same code as expected', () => {
+      expect(isExpectedWalletError({ code: -32001, message: 'Resource not found' })).toBe(false)
+    })
+  })
+
   describe('when the failure is a genuine fault', () => {
     it('should not classify an internal rpc error as expected', () => {
       expect(isExpectedWalletError({ code: -32603, message: 'Internal error' })).toBe(false)
@@ -187,6 +198,40 @@ describe('isExpectedWalletError', () => {
         expect(isChainMismatchRejection(null)).toBe(false)
         expect(isChainMismatchRejection('chainId mismatch')).toBe(false)
       })
+    })
+  })
+})
+
+describe('isWalletDappAccessDisabled', () => {
+  describe('when the user has switched dApp access off in the wallet', () => {
+    it('should match the EIP-1193 unauthorized code with the wallet message', () => {
+      expect(isWalletDappAccessDisabled({ code: 4100, message: 'DApp interaction is disabled' })).toBe(true)
+    })
+
+    it('should match it once wrapped in an Error', () => {
+      expect(isWalletDappAccessDisabled(Object.assign(new Error('DApp interaction is disabled'), { code: 4100 }))).toBe(true)
+    })
+
+    it('should stay apart from the expected wallet errors, so the login screen keeps showing the message', () => {
+      expect(isExpectedWalletError({ code: 4100, message: 'DApp interaction is disabled' })).toBe(false)
+    })
+  })
+
+  describe('when the failure is some other refusal', () => {
+    it('should not match another unauthorized request', () => {
+      expect(
+        isWalletDappAccessDisabled({ code: 4100, message: 'The requested account and/or method has not been authorized by the user.' })
+      ).toBe(false)
+    })
+
+    it('should not match the message without the code', () => {
+      expect(isWalletDappAccessDisabled(new Error('DApp interaction is disabled'))).toBe(false)
+    })
+
+    it('should not match non-object values', () => {
+      expect(isWalletDappAccessDisabled(null)).toBe(false)
+      expect(isWalletDappAccessDisabled(undefined)).toBe(false)
+      expect(isWalletDappAccessDisabled('DApp interaction is disabled')).toBe(false)
     })
   })
 })

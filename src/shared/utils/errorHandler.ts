@@ -1,7 +1,7 @@
 import { captureException } from '@sentry/react'
 import { TrackingEvents } from '../../modules/analytics/types'
 import { DeploymentError } from '../../modules/profile/errors'
-import { isErrorWithMessage, isExpectedWalletError } from '../errors'
+import { isErrorWithMessage, isExpectedWalletError, isWalletDappAccessDisabled } from '../errors'
 import { trackEvent } from './analytics'
 import { ErrorContext, HandleErrorOptions, SentryExtra } from './errorHandler.types'
 
@@ -80,8 +80,10 @@ const handleError = (error: unknown, context: string, options?: HandleErrorOptio
   // Expected wallet conditions (locked wallet, a prompt already open, a dismissed modal) still
   // reach the console and the analytics event below — the login really did fail for the user —
   // but they are not faults of ours, so they stay out of Sentry. Left unfiltered they were the
-  // bulk of this project's volume and buried the failures worth acting on.
-  if (!isExpectedWalletError(error)) {
+  // bulk of this project's volume and buried the failures worth acting on. A wallet with dApp
+  // access switched off is the same kind of condition, kept in its own predicate so the login
+  // screen can still show the wallet's message.
+  if (!isExpectedWalletError(error) && !isWalletDappAccessDisabled(error)) {
     const deploymentExtra = getDeploymentErrorExtra(error)
     const { error: normalised, originalShape } = normaliseError(error)
 
