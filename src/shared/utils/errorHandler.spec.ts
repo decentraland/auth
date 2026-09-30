@@ -107,7 +107,9 @@ describe('handleError → expected wallet conditions', () => {
   const expectedConditions: [string, unknown][] = [
     ['a locked wallet', Object.assign(new Error('There was an error unlocking your wallet.'), { name: 'ErrorUnlockingWallet' })],
     ['a wallet prompt already pending', { code: -32002, message: "Request of type 'wallet_requestPermissions' already pending" }],
-    ['the WalletConnect modal being dismissed', new Error('User closed the modal without connecting')]
+    ['the WalletConnect modal being dismissed', new Error('User closed the modal without connecting')],
+    ['a wallet still busy unlocking', { code: -32001, message: 'Already processing unlock. Please wait.' }],
+    ['a wallet with dApp access switched off', { code: 4100, message: 'DApp interaction is disabled' }]
   ]
 
   it.each(expectedConditions)('should not report %s to Sentry', (_case, error) => {
@@ -131,6 +133,18 @@ describe('handleError → expected wallet conditions', () => {
   describe('and the failure is a genuine fault', () => {
     it('should still be reported', () => {
       handleError({ code: -32603, message: 'Internal error' }, 'context')
+
+      expect(mockCaptureException).toHaveBeenCalledTimes(1)
+    })
+
+    it('should still report a -32001 failure that is not an unlock in progress', () => {
+      handleError({ code: -32001, message: 'Resource not found' }, 'context')
+
+      expect(mockCaptureException).toHaveBeenCalledTimes(1)
+    })
+
+    it('should still report an unauthorized request that is not the dApp access setting', () => {
+      handleError({ code: 4100, message: 'The requested account and/or method has not been authorized by the user.' }, 'context')
 
       expect(mockCaptureException).toHaveBeenCalledTimes(1)
     })
