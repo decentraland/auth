@@ -136,3 +136,47 @@ describe('handleError → expected wallet conditions', () => {
     })
   })
 })
+
+describe('handleError → Magic network failures', () => {
+  const mockTrackEvent = trackEvent as jest.Mock
+  const magicNetworkFailure = Object.assign(new Error('Magic RPC Error: [-32603] Failed to fetch'), {
+    code: -32603,
+    rawMessage: 'Failed to fetch',
+    data: undefined
+  })
+
+  beforeEach(() => {
+    mockCaptureException.mockClear()
+    mockTrackEvent.mockClear()
+  })
+
+  it('should not report the browser failing to reach Magic to Sentry', () => {
+    handleError(magicNetworkFailure, 'context')
+
+    expect(mockCaptureException).not.toHaveBeenCalled()
+  })
+
+  it('should still track it, since the login did fail for the user', () => {
+    handleError(magicNetworkFailure, 'context')
+
+    expect(mockTrackEvent).toHaveBeenCalled()
+  })
+
+  it('should return the message so callers can still render it', () => {
+    expect(handleError(magicNetworkFailure, 'context')).toBe('Magic RPC Error: [-32603] Failed to fetch')
+  })
+
+  describe('and Magic reports a different internal error', () => {
+    it('should still be reported', () => {
+      const magicFault = Object.assign(new Error('Magic RPC Error: [-32603] Internal error'), {
+        code: -32603,
+        rawMessage: 'Internal error',
+        data: undefined
+      })
+
+      handleError(magicFault, 'context')
+
+      expect(mockCaptureException).toHaveBeenCalledTimes(1)
+    })
+  })
+})
