@@ -401,9 +401,8 @@ const creditsPurchase = (overrides: Record<string, unknown> = {}) => ({
   paymentTokenAddress: CONTRACT,
   price: { kind: 'usd_pegged', usdWei: 700000000000000000n, credits: 7n },
   maxCreditedValueWei: 1000000000000000000n,
-  externalCallExpiresAt: 4102444800n,
   tradeExpiresAt: 4102444800n,
-  // The earliest of the three above, as the decoder derives it; the page arms its expiry from this one.
+  // The earliest of the credit and trade deadlines, as the decoder derives it; the page arms its expiry from this one.
   expiresAt: 4102444800n,
   ...overrides
 })
@@ -2960,6 +2959,152 @@ describe('RequestPage', () => {
       mockSendFailedOutcome.mockResolvedValue({})
     })
 
+    describe('and the provider refreshes while the signature is pending', () => {
+      let releaseSignature: (value: string) => void
+      let rejectSignature: (error: Error) => void
+      let releaseRecovery: (value: ReturnType<typeof recovered>) => void
+      let rerender: ReturnType<typeof renderRequestPage>['rerender']
+      let replacementRequest: ReturnType<typeof recovered>
+
+      beforeEach(async () => {
+        releaseSignature = () => undefined
+        rejectSignature = () => undefined
+        releaseRecovery = () => undefined
+        replacementRequest = recovered('eth_signTypedData_v4', [SIGNER, '{"primaryType":"MetaTransaction"}'])
+        mockWalletRequest.mockImplementationOnce(
+          () =>
+            new Promise((resolve, reject) => {
+              releaseSignature = resolve
+              rejectSignature = reject
+            })
+        )
+        rerender = renderRequestPage().rerender
+        await screen.findByTestId('credits-purchase')
+        await userEvent.click(screen.getByTestId('credits-purchase-approve'))
+        await waitFor(() => expect(mockWalletRequest).toHaveBeenCalledTimes(1))
+        mockRecover.mockImplementation(() => new Promise(resolve => (releaseRecovery = resolve)))
+        mockConnectionData = { ...mockConnectionData, provider: { isMagic: false, refreshed: true } }
+        rerenderRequestPage(rerender)
+        await screen.findByTestId('loading-request')
+      })
+
+      describe('and the wallet produces the signature', () => {
+        beforeEach(async () => {
+          await act(async () => releaseSignature('0xsignature'))
+          await waitFor(() => expect(mockSendSuccessfulOutcome).toHaveBeenCalledTimes(1))
+          await act(async () => releaseRecovery(replacementRequest))
+        })
+
+        it('should preserve the signed purchase outcome after the replacement recovery finishes', () => {
+          expect(screen.getByTestId('credits-purchase-outcome')).toHaveAttribute('data-delivery', 'delivered')
+        })
+
+        it('should deliver the original signature once for the reviewed request', () => {
+          expect(mockSendSuccessfulOutcome).toHaveBeenCalledWith(REQUEST_ID, SIGNER, '0xsignature')
+        })
+      })
+
+      describe('and delivering the signature fails', () => {
+        beforeEach(async () => {
+          mockSendSuccessfulOutcome.mockRejectedValueOnce(new Error('outcome service unavailable'))
+          await act(async () => releaseSignature('0xsignature'))
+          await screen.findByTestId('credits-purchase-outcome')
+          await act(async () => releaseRecovery(replacementRequest))
+        })
+
+        it('should retain the purchase and report the failed delivery', () => {
+          expect(screen.getByTestId('credits-purchase-outcome')).toHaveAttribute('data-delivery', 'failed')
+        })
+
+        it('should not report the signed purchase as rejected', () => {
+          expect(mockSendFailedOutcome).not.toHaveBeenCalled()
+        })
+      })
+
+      describe('and the wallet rejects the signature', () => {
+        beforeEach(async () => {
+          mockIsUserRejectedTransaction.mockReturnValueOnce(true)
+          await act(async () => rejectSignature(new Error('user rejected')))
+          await screen.findByTestId('credits-purchase-outcome')
+          await act(async () => releaseRecovery(replacementRequest))
+        })
+
+        it('should preserve the canceled purchase outcome', () => {
+          expect(screen.getByTestId('credits-purchase-outcome')).toHaveAttribute('data-outcome', 'canceled')
+        })
+      })
+    })
+
+    describe('and another request replaces a purchase with a pending signature', () => {
+      let releaseSignature: (value: string) => void
+      let rejectSignature: (error: Error) => void
+      let navigateToOther: () => void
+      let Navigation: () => null
+      let otherRequestId: string
+
+      beforeEach(async () => {
+        otherRequestId = 'other-purchase-request'
+        releaseSignature = () => undefined
+        rejectSignature = () => undefined
+        navigateToOther = () => undefined
+        Navigation = () => {
+          const navigate = useNavigate()
+          navigateToOther = () => navigate(`/auth/requests/${otherRequestId}?targetConfigId=default`)
+          return null
+        }
+        mockWalletRequest.mockImplementationOnce(
+          () =>
+            new Promise((resolve, reject) => {
+              releaseSignature = resolve
+              rejectSignature = reject
+            })
+        )
+        render(
+          <MemoryRouter initialEntries={[`/auth/requests/${REQUEST_ID}?targetConfigId=default`]}>
+            <FeatureFlagsContext.Provider value={{ flags: mockFlags as any, variants: {} as any, initialized: mockFlagsInitialized }}>
+              <Navigation />
+              <Routes>
+                <Route path="/auth/requests/:requestId" element={<RequestPage />} />
+              </Routes>
+            </FeatureFlagsContext.Provider>
+          </MemoryRouter>
+        )
+        await screen.findByTestId('credits-purchase')
+        await userEvent.click(screen.getByTestId('credits-purchase-approve'))
+        await waitFor(() => expect(mockWalletRequest).toHaveBeenCalledTimes(1))
+        mockClassifyRequest.mockResolvedValue(dclMetaTransaction())
+        await act(async () => navigateToOther())
+        await screen.findByTestId('action-request')
+      })
+
+      describe('and the original wallet signature succeeds', () => {
+        beforeEach(async () => {
+          await act(async () => releaseSignature('0xsignature'))
+          await waitFor(() => expect(mockSendSuccessfulOutcome).toHaveBeenCalledTimes(1))
+        })
+
+        it('should deliver the signature only to the original request', () => {
+          expect(mockSendSuccessfulOutcome).toHaveBeenCalledWith(REQUEST_ID, SIGNER, '0xsignature')
+        })
+
+        it('should leave the replacement request on its own review', () => {
+          expect(screen.getByTestId('action-request')).toBeInTheDocument()
+        })
+      })
+
+      describe('and the original wallet signature is rejected', () => {
+        beforeEach(async () => {
+          mockIsUserRejectedTransaction.mockReturnValueOnce(true)
+          await act(async () => rejectSignature(new Error('user rejected')))
+          await waitFor(() => expect(mockSendFailedOutcome).toHaveBeenCalledTimes(1))
+        })
+
+        it('should leave the replacement request on its own review', () => {
+          expect(screen.getByTestId('action-request')).toBeInTheDocument()
+        })
+      })
+    })
+
     it('should show the dedicated approval with the credits, the item and the recipient read from the payload', async () => {
       renderRequestPage()
       const view = await screen.findByTestId('credits-purchase')
@@ -3225,7 +3370,10 @@ describe('RequestPage', () => {
         mockClassifyRequest.mockResolvedValue(
           creditsMetaTransaction({
             status: 'recognized',
-            purchase: creditsPurchase({ expiresAt: BigInt(Math.floor(Date.now() / 1000) + 1) })
+            purchase: creditsPurchase({
+              creditExpiresAt: BigInt(Math.floor(Date.now() / 1000) + 1),
+              expiresAt: BigInt(Math.floor(Date.now() / 1000) + 1)
+            })
           })
         )
       })
@@ -3241,6 +3389,42 @@ describe('RequestPage', () => {
         await screen.findByTestId('credits-purchase')
         await screen.findByTestId('timeout-error', undefined, { timeout: 4000 })
         expect(mockWalletRequest).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and the credit expires after the wallet was asked to sign', () => {
+      let releaseSignature: (value: string) => void
+      let creditDeadline: bigint
+
+      beforeEach(async () => {
+        creditDeadline = BigInt(Math.floor(Date.now() / 1000) + 2)
+        releaseSignature = () => undefined
+        mockRecover.mockResolvedValue({
+          ...recovered('eth_signTypedData_v4', [SIGNER, '{"primaryType":"MetaTransaction"}']),
+          expiration: new Date(Date.now() + 60_000).toISOString()
+        })
+        mockClassifyRequest.mockResolvedValue(
+          creditsMetaTransaction({
+            status: 'recognized',
+            purchase: creditsPurchase({ creditExpiresAt: creditDeadline, expiresAt: creditDeadline })
+          })
+        )
+        mockWalletRequest.mockImplementationOnce(() => new Promise(resolve => (releaseSignature = resolve)))
+        renderRequestPage()
+        await screen.findByTestId('credits-purchase')
+        await userEvent.click(screen.getByTestId('credits-purchase-approve'))
+        await waitFor(() => expect(mockWalletRequest).toHaveBeenCalledTimes(1))
+        await screen.findByTestId('timeout-error', undefined, { timeout: 4000 })
+        await act(async () => releaseSignature('0xsignature'))
+        await screen.findByTestId('credits-purchase-outcome')
+      })
+
+      it('should report the signature that was actually produced despite the elapsed review deadline', () => {
+        expect(screen.getByTestId('credits-purchase-outcome')).toHaveAttribute('data-delivery', 'delivered')
+      })
+
+      it('should never request a second signature', () => {
+        expect(mockWalletRequest).toHaveBeenCalledTimes(1)
       })
     })
 
@@ -3260,7 +3444,7 @@ describe('RequestPage', () => {
         mockClassifyRequest.mockResolvedValue(
           creditsMetaTransaction({
             status: 'recognized',
-            purchase: creditsPurchase({ expiresAt: BigInt(creditDeadlineSeconds) })
+            purchase: creditsPurchase({ creditExpiresAt: BigInt(creditDeadlineSeconds), expiresAt: BigInt(creditDeadlineSeconds) })
           })
         )
         // The review's own account read resolves; the approval's is held open until the test lets it go.

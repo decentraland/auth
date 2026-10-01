@@ -230,6 +230,10 @@ export const RequestPage = () => {
   // every contract it reaches was checked. Null for every other request, and for a credits request whose
   // shape this page will not vouch for — those stay on the generic review.
   const [creditsPurchaseData, setCreditsPurchaseData] = useState<CreditsPurchaseData | null>(null)
+  // A dispatched operation keeps the purchase it actually reviewed for its eventual outcome. A provider
+  // refresh clears the live review while that operation can still settle; its summary must survive that
+  // reset. Only a new request/account clears this snapshot, and stale operations cannot publish it.
+  const [creditsPurchaseOutcomeData, setCreditsPurchaseOutcomeData] = useState<CreditsPurchaseData | null>(null)
   // What has become of a signature the wallet already produced: it is being handed back to the app, it got
   // there, or it did not. Only ever set after the wallet has answered, and never a reason to sign again —
   // the screens read it so none of them claims a delivery that has not happened (see CreditsPurchaseOutcomeView).
@@ -292,7 +296,7 @@ export const RequestPage = () => {
   // getMetaTransactionChainId rather than by the wallet's active chain.
   const reviewedWalletChainIdRef = useRef<number>()
   // The moment this review stops being valid, in epoch milliseconds: the request's own expiry, or something
-  // it depends on that lapses sooner (a credits purchase's credit, external call or trade). The approval
+  // it depends on that lapses sooner (a credits purchase's credit or trade). The approval
   // reads it directly before dispatching, because a timer can fire late and every await before the dispatch
   // is a window the deadline can pass in.
   const reviewDeadlineRef = useRef<number>(Number.POSITIVE_INFINITY)
@@ -518,6 +522,7 @@ export const RequestPage = () => {
       setNftTransferData(null)
       setManaTransferData(null)
       setCreditsPurchaseData(null)
+      setCreditsPurchaseOutcomeData(null)
       setSignatureDelivery('delivering')
       setIsTransactionModalOpen(false)
       setReviewedChainId(undefined)
@@ -984,7 +989,7 @@ export const RequestPage = () => {
               ? { kind: 'converted', credits: BigInt(charge.charge.cents) / CENTS_PER_CREDIT, manaWei: purchase.price.manaWei, rate }
               : { kind: 'exact', credits: BigInt(charge.charge.cents) / CENTS_PER_CREDIT }
 
-          // The whole purchase is void once the soonest of the credit, the external call and the trade
+          // The whole purchase is void once the soonest of the credit and the trade
           // lapses, and that can happen well before the auth request itself expires. Bring the review's
           // deadline forward so the screen stops being actionable at the right moment rather than the late
           // one; the approval checks the same deadline again before it signs.
@@ -1187,6 +1192,7 @@ export const RequestPage = () => {
     } else if (manaTransferData) {
       setView(View.WALLET_MANA_INTERACTION_COMPLETE)
     } else if (creditsPurchaseData) {
+      setCreditsPurchaseOutcomeData(creditsPurchaseData)
       setView(View.WALLET_CREDITS_INTERACTION_COMPLETE)
     } else {
       setView(View.WALLET_INTERACTION_COMPLETE)
@@ -1265,6 +1271,7 @@ export const RequestPage = () => {
     } else if (manaTransferData) {
       setView(View.WALLET_MANA_INTERACTION_DENIED)
     } else if (creditsPurchaseData) {
+      setCreditsPurchaseOutcomeData(creditsPurchaseData)
       setView(View.WALLET_CREDITS_INTERACTION_DENIED)
     } else {
       setView(View.WALLET_INTERACTION_DENIED)
@@ -1481,7 +1488,7 @@ export const RequestPage = () => {
         //
         // The deadline is read here rather than left to the timer. Every await between the click and this
         // point is a window it can pass in — the account read above, a confirmation dialog the user left
-        // open — and a purchase whose credit, external call or trade has lapsed signs bytes that can only
+        // open — and a purchase whose credit or trade has lapsed signs bytes that can only
         // revert, against a credit the ledger may already have released. A timer fires late; this does not.
         if (Date.now() >= reviewDeadlineRef.current) {
           hasCompletedRef.current = true
@@ -1578,6 +1585,7 @@ export const RequestPage = () => {
         } else if (manaTransferData) {
           setView(View.WALLET_MANA_INTERACTION_DENIED)
         } else if (creditsPurchaseData) {
+          setCreditsPurchaseOutcomeData(creditsPurchaseData)
           setView(View.WALLET_CREDITS_INTERACTION_DENIED)
         } else {
           setView(View.WALLET_INTERACTION_DENIED)
@@ -1624,7 +1632,16 @@ export const RequestPage = () => {
         setIsLoading(false)
       }
     }
-  }, [isUserUsingWeb2Wallet, nftTransferData, manaTransferData, requestId, identity, showInteractionCompleteView, restartReview])
+  }, [
+    isUserUsingWeb2Wallet,
+    nftTransferData,
+    manaTransferData,
+    creditsPurchaseData,
+    requestId,
+    identity,
+    showInteractionCompleteView,
+    restartReview
+  ])
 
   // Allow, on every review: web2 users get a confirmation dialog first, since their wallet has no
   // prompt of its own; external wallets go straight to theirs.
@@ -1802,8 +1819,8 @@ export const RequestPage = () => {
     case View.WALLET_MANA_INTERACTION_COMPLETE:
       return manaTransferData ? <TransferCompletedView type={TransferType.TIP} transferData={manaTransferData} /> : null
     case View.WALLET_CREDITS_INTERACTION_COMPLETE:
-      return creditsPurchaseData ? (
-        <CreditsPurchaseOutcomeView purchaseData={creditsPurchaseData} outcome="signed" delivery={signatureDelivery} />
+      return creditsPurchaseOutcomeData ? (
+        <CreditsPurchaseOutcomeView purchaseData={creditsPurchaseOutcomeData} outcome="signed" delivery={signatureDelivery} />
       ) : null
     case View.WALLET_INTERACTION_DENIED:
       return <DeniedWalletInteraction />
@@ -1812,7 +1829,7 @@ export const RequestPage = () => {
     case View.WALLET_MANA_INTERACTION_DENIED:
       return manaTransferData ? <TransferCanceledView type={TransferType.TIP} transferData={manaTransferData} /> : null
     case View.WALLET_CREDITS_INTERACTION_DENIED:
-      return creditsPurchaseData ? <CreditsPurchaseOutcomeView purchaseData={creditsPurchaseData} outcome="canceled" /> : null
+      return creditsPurchaseOutcomeData ? <CreditsPurchaseOutcomeView purchaseData={creditsPurchaseOutcomeData} outcome="canceled" /> : null
     case View.LOADING_REQUEST:
       return <LoadingRequest />
 

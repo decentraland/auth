@@ -37,7 +37,6 @@ const purchase = (overrides: Partial<CreditsPurchase> = {}): CreditsPurchase => 
   price: { kind: 'usd_pegged', usdWei: 700000000000000000n, credits: 7n },
   maxCreditedValueWei: 1000000000000000000n,
   creditSalt: `0x${'ab'.repeat(32)}`,
-  externalCallExpiresAt: 4102444800n,
   tradeExpiresAt: 4102444800n,
   creditExpiresAt: 4102444800n,
   expiresAt: 4102444800n,
@@ -119,6 +118,20 @@ describe('when confirming a credits purchase', () => {
     const cap = screen.getByTestId('credits-purchase-detail-max-credited')
     expect(cap).toHaveTextContent('credits_purchase.details.max_credited_mana')
     expect(cap).toHaveTextContent('MANA')
+  })
+
+  describe('and the credit expires before the listing', () => {
+    let deadline: bigint
+
+    beforeEach(() => {
+      deadline = 1900000000n
+      props.purchaseData.purchase = purchase({ creditExpiresAt: deadline, expiresAt: deadline })
+      renderView(props)
+    })
+
+    it('should show the enforced purchase deadline as the authorization expiry', () => {
+      expect(screen.getByTestId('credits-purchase-detail-expires')).toHaveTextContent(new Date(Number(deadline) * 1000).toLocaleString())
+    })
   })
 
   describe('and the page has not cleared the gates for this review', () => {

@@ -1000,6 +1000,34 @@ describe('when classifying a request', () => {
       expect(classification.credits.purchase.recipient).toBe(USER.toLowerCase())
     })
 
+    describe.each([ContractName.OffChainMarketplace, ContractName.OffChainMarketplaceV2, ContractName.OffChainMarketplaceV3])(
+      'and it settles through %s with an unused zero external-call deadline',
+      settlementName => {
+        let settlementAddress: string
+
+        beforeEach(async () => {
+          settlementAddress = getContract(settlementName, POLYGON).address.toLowerCase()
+          purchaseRequest = buildCreditsPurchaseRequest({
+            from: USER,
+            args: buildUseCreditsArgs({ buyer: USER, externalCall: { target: settlementAddress, expiresAt: 0n } })
+          })
+          classification = await classifyRequest(typedDataRequest(purchaseRequest.typedData), context)
+        })
+
+        it('should recognize the purchase through the signed domain and both calldata decoders', () => {
+          expect(classification).toEqual(
+            expect.objectContaining({
+              kind: 'dcl_meta_transaction',
+              credits: {
+                status: 'recognized',
+                purchase: expect.objectContaining({ settlementName, settlementAddress, recipient: USER.toLowerCase() })
+              }
+            })
+          )
+        })
+      }
+    )
+
     it('should refuse a payload whose domain names another verifying contract', async () => {
       const altered = buildCreditsPurchaseRequest({ from: USER, verifyingContract: getContract(ContractName.BidV2, POLYGON).address })
 
