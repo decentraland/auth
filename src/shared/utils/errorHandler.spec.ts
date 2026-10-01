@@ -1,4 +1,5 @@
 import { captureException } from '@sentry/react'
+import { TrackingEvents } from '../../modules/analytics/types'
 import { trackEvent } from './analytics'
 import { handleError } from './errorHandler'
 
@@ -131,6 +132,53 @@ describe('handleError → expected wallet conditions', () => {
   describe('and the failure is a genuine fault', () => {
     it('should still be reported', () => {
       handleError({ code: -32603, message: 'Internal error' }, 'context')
+
+      expect(mockCaptureException).toHaveBeenCalledTimes(1)
+    })
+  })
+})
+
+describe('handleError → Magic network failures', () => {
+  const mockTrackEvent = trackEvent as jest.Mock
+  const magicNetworkFailure = Object.assign(new Error('Magic RPC Error: [-32603] Failed to fetch'), {
+    code: -32603,
+    rawMessage: 'Failed to fetch',
+    data: undefined
+  })
+
+  beforeEach(() => {
+    mockCaptureException.mockClear()
+    mockTrackEvent.mockClear()
+  })
+
+  it('should not report the browser failing to reach Magic to Sentry', () => {
+    handleError(magicNetworkFailure, 'context')
+
+    expect(mockCaptureException).not.toHaveBeenCalled()
+  })
+
+  it('should still track it, since the login did fail for the user', () => {
+    handleError(magicNetworkFailure, 'context')
+
+    expect(mockTrackEvent).toHaveBeenCalledWith(
+      TrackingEvents.LOGIN_ERROR,
+      expect.objectContaining({ error: 'Magic RPC Error: [-32603] Failed to fetch', context: 'context' })
+    )
+  })
+
+  it('should return the message so callers can still render it', () => {
+    expect(handleError(magicNetworkFailure, 'context')).toBe('Magic RPC Error: [-32603] Failed to fetch')
+  })
+
+  describe('and Magic reports a different internal error', () => {
+    it('should still be reported', () => {
+      const magicFault = Object.assign(new Error('Magic RPC Error: [-32603] Internal error'), {
+        code: -32603,
+        rawMessage: 'Internal error',
+        data: undefined
+      })
+
+      handleError(magicFault, 'context')
 
       expect(mockCaptureException).toHaveBeenCalledTimes(1)
     })
