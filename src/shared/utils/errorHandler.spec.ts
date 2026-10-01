@@ -1,4 +1,5 @@
 import { captureException } from '@sentry/react'
+import { TrackingEvents } from '../../modules/analytics/types'
 import { trackEvent } from './analytics'
 import { handleError } from './errorHandler'
 
@@ -159,7 +160,10 @@ describe('handleError → Magic network failures', () => {
   it('should still track it, since the login did fail for the user', () => {
     handleError(magicNetworkFailure, 'context')
 
-    expect(mockTrackEvent).toHaveBeenCalled()
+    expect(mockTrackEvent).toHaveBeenCalledWith(
+      TrackingEvents.LOGIN_ERROR,
+      expect.objectContaining({ error: 'Magic RPC Error: [-32603] Failed to fetch', context: 'context' })
+    )
   })
 
   it('should return the message so callers can still render it', () => {

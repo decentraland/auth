@@ -8,12 +8,6 @@ import {
 } from './errors'
 
 /**
- * `@web3-react/injected-connector` throws this when the user dismisses the wallet prompt during
- * `connection.connect()`. It carries no EIP-1193 `code`, and its `name` is assigned from
- * `this.constructor.name`, which minifies to a single letter in production — so the message is the
- * only stable signal.
- */
-/**
  * Mirrors the shape of Magic SDK's `MagicRPCError`: an `Error` carrying the JSON-RPC `code`, the
  * iframe's `rawMessage`, and `data`, with the message the SDK builds from them.
  */
@@ -30,6 +24,12 @@ class FakeMagicRPCError extends Error {
   }
 }
 
+/**
+ * `@web3-react/injected-connector` throws this when the user dismisses the wallet prompt during
+ * `connection.connect()`. It carries no EIP-1193 `code`, and its `name` is assigned from
+ * `this.constructor.name`, which minifies to a single letter in production — so the message is the
+ * only stable signal.
+ */
 class Web3ReactUserRejectedRequestError extends Error {
   constructor() {
     super()
