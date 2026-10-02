@@ -63,7 +63,8 @@
     const script = document.createElement('script')
     script.type = 'text/javascript'
     script.async = true
-    script.src = 'https://cdn.segment.com/analytics.js/v1/' + key + '/analytics.min.js'
+    // `_cdn` is also where the loaded analytics.js resolves its settings from, see modules/analytics/proxy.ts
+    script.src = (analytics._cdn || 'https://cdn.segment.com') + '/analytics.js/v1/' + key + '/analytics.min.js'
     // Insert our script next to the first script element.
     const first = document.getElementsByTagName('script')[0]
     first.parentNode.insertBefore(script, first)
