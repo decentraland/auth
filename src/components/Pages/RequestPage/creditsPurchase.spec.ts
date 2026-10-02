@@ -46,6 +46,121 @@ const recognizeArgs = (args: UseCreditsArgs, options?: Parameters<typeof recogni
 const reasonOf = (recognition: CreditsRecognition): string =>
   recognition.status === 'unsupported' ? recognition.reason : recognition.status
 
+describe.each([ChainId.MATIC_MAINNET, ChainId.MATIC_AMOY])('when recognizing a V3 purchase on chain %s', chainId => {
+  let recognition: CreditsRecognition
+  let settlementAddress: string
+
+  beforeEach(() => {
+    settlementAddress = getContract(ContractName.OffChainMarketplaceV3, chainId).address.toLowerCase()
+    const contract = getKnownDecentralandContract(getContract(ContractName.CreditsManager, chainId).address, chainId) as KnownContract
+    const trade = buildTrade()
+    const args = buildUseCreditsArgs({
+      target: settlementAddress,
+      trades: [
+        buildTrade({
+          received: [{ ...trade.received[0], contractAddress: getContract(ContractName.MANAToken, chainId).address }]
+        })
+      ]
+    })
+    recognition = recognizeArgs(args, { contract, chainId })
+  })
+
+  it('should describe the item and its price through the actual V3 deployment', () => {
+    expect(recognition).toMatchObject({
+      status: 'recognized',
+      purchase: {
+        settlementName: ContractName.OffChainMarketplaceV3,
+        settlementAddress,
+        asset: { kind: 'collection_item', contractAddress: COLLECTION, itemId: REAL_LISTING_ITEM_ID },
+        recipient: BUYER,
+        price: { kind: 'usd_pegged', usdWei: REAL_LISTING_PRICE_USD_WEI, credits: REAL_LISTING_CREDITS }
+      }
+    })
+  })
+})
+
+describe('when a marketplace payment uses its default beneficiary', () => {
+  let recognition: CreditsRecognition
+
+  beforeEach(() => {
+    const trade = buildTrade()
+    recognition = recognizeArgs(
+      buildUseCreditsArgs({
+        trades: [buildTrade({ received: [{ ...trade.received[0], beneficiary: '0x0000000000000000000000000000000000000000' }] })]
+      })
+    )
+  })
+
+  it('should identify the seller who actually receives the payment', () => {
+    expect(recognition).toMatchObject({ status: 'recognized', purchase: { paymentBeneficiary: SELLER } })
+  })
+
+  describe('and the trade names an explicit different beneficiary', () => {
+    beforeEach(() => {
+      const trade = buildTrade()
+      recognition = recognizeArgs(
+        buildUseCreditsArgs({ trades: [buildTrade({ received: [{ ...trade.received[0], beneficiary: BUYER }] })] })
+      )
+    })
+
+    it('should preserve the explicit payment destination', () => {
+      expect(recognition).toMatchObject({ status: 'recognized', purchase: { paymentBeneficiary: BUYER } })
+    })
+  })
+})
+
+describe.each<[string, bigint]>([
+  ['zero', 0n],
+  ['in the past', BigInt(NOW_SECONDS - 1)],
+  ['earlier than the real deadlines', BigInt(NOW_SECONDS + 1)],
+  ['the maximum uint256', 2n ** 256n - 1n]
+])('when an allowlisted purchase has its ignored external expiry %s', (_description, externalExpiry) => {
+  describe('and it settles through the marketplace', () => {
+    let recognition: CreditsRecognition
+
+    beforeEach(() => {
+      const args = buildUseCreditsArgs({ externalCall: { expiresAt: externalExpiry } })
+      args.credits = [{ ...args.credits[0], expiresAt: FAR_FUTURE - 5n }]
+      recognition = recognizeArgs(args)
+    })
+
+    it('should remain a purchase until the credit expires', () => {
+      expect(recognition).toMatchObject({ status: 'recognized', purchase: { expiresAt: FAR_FUTURE - 5n } })
+    })
+
+    describe('and the trade expires before the credit', () => {
+      beforeEach(() => {
+        const trade = buildTrade()
+        recognition = recognizeArgs(
+          buildUseCreditsArgs({
+            externalCall: { expiresAt: externalExpiry },
+            trades: [buildTrade({ checks: { ...trade.checks, expiration: FAR_FUTURE - 10n } })]
+          })
+        )
+      })
+
+      it('should stop being a purchase at the trade deadline', () => {
+        expect(recognition).toMatchObject({ status: 'recognized', purchase: { expiresAt: FAR_FUTURE - 10n } })
+      })
+    })
+  })
+
+  describe('and it settles through the collection store', () => {
+    let recognition: CreditsRecognition
+
+    beforeEach(() => {
+      const args = buildStoreUseCreditsArgs()
+      args.externalCall.expiresAt = externalExpiry
+      args.credits = [{ ...args.credits[0], expiresAt: FAR_FUTURE - 5n }]
+      recognition = recognizeArgs(args)
+    })
+
+    it('should remain a purchase until the credit expires', () => {
+      expect(recognition).toMatchObject({ status: 'recognized', purchase: { expiresAt: FAR_FUTURE - 5n } })
+    })
+  })
+})
+
 describe('when reading a credits purchase out of a useCredits call', () => {
   describe('and the payload is the Explorer golden vector', () => {
     it('should encode to the exact bytes the Explorer signs', () => {
@@ -163,7 +278,6 @@ describe('when reading a credits purchase out of a useCredits call', () => {
         () => buildUseCreditsArgs({ credits: [{ value: 1n, expiresAt: BigInt(NOW_SECONDS - 1), salt: ZERO_BYTES32 }] }),
         'expired'
       ],
-      ['the external call has expired', () => buildUseCreditsArgs({ externalCall: { expiresAt: BigInt(NOW_SECONDS - 1) } }), 'expired'],
       [
         'the listing has expired',
         () => buildUseCreditsArgs({ trades: [buildTrade({ checks: { expiration: BigInt(NOW_SECONDS - 1) } as never })] }),
@@ -459,16 +573,6 @@ describe('when reading a primary sale through the collection store', () => {
       expect(recognition.purchase.seller).toBeNull()
       expect(recognition.purchase.paymentBeneficiary).toBeNull()
       expect(recognition.purchase.tradeExpiresAt).toBeNull()
-    })
-
-    it('should expire with the soonest of the credit and the external call', () => {
-      const recognition = recognizeArgs(
-        buildStoreUseCreditsArgs({
-          credits: [{ value: 10n ** 18n, expiresAt: FAR_FUTURE - 5n, salt: pad('0x01', { size: 32 }) }]
-        })
-      )
-      if (recognition.status !== 'recognized') throw new Error(reasonOf(recognition))
-      expect(recognition.purchase.expiresAt).toBe(FAR_FUTURE - 5n)
     })
   })
 

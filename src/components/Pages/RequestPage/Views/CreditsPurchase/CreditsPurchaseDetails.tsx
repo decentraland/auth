@@ -17,11 +17,10 @@ function formatTimestamp(seconds: bigint): string {
  * Everything the summary above leaves out, folded away: the contracts the call reaches, the amounts in the
  * units they are signed in, and when the authorization stops being valid.
  *
- * Two of these are here because naming them wrongly is exactly how a purchase screen lies. The price is
- * shown in the unit it is signed in: USD wei, which the credits above divide by the peg, or MANA, which the
- * credits above convert at the rate listed with it — either way the arithmetic can be checked. The MANA cap is the most the CreditsManager may draw from the credit to settle
- * the trade; it is a different quantity in a different unit, and it is labelled as MANA so it can never be
- * read as what the purchase costs.
+ * The signed price and MANA cap are distinct from the verified ledger charge shown above. The rate is the
+ * one used to check a MANA-priced charge. Authorization expiry is the earliest deadline enforced by the
+ * credit and, for marketplace purchases, the trade; the external-call timestamp is only enforced for
+ * custom calls, which this screen does not recognize.
  */
 const CreditsPurchaseDetails = ({ purchaseData, chainId }: { purchaseData: CreditsPurchaseData; chainId?: number }) => {
   const { t } = useTranslation()
@@ -73,7 +72,7 @@ const CreditsPurchaseDetails = ({ purchaseData, chainId }: { purchaseData: Credi
       value: purchase.settlementAddress
     },
     { key: 'payment-token', label: t('credits_purchase.details.payment_token'), value: purchase.paymentTokenAddress },
-    { key: 'expires', label: t('credits_purchase.details.expires_at'), value: formatTimestamp(purchase.externalCallExpiresAt) },
+    { key: 'expires', label: t('credits_purchase.details.expires_at'), value: formatTimestamp(purchase.expiresAt) },
     ...optional(
       'trade-expires',
       t('credits_purchase.details.trade_expires_at'),
