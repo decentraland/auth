@@ -192,9 +192,11 @@ export async function mockApiRoutes(page: Page, options: SetupOptions = {}) {
     return route.continue()
   })
 
-  // Block Segment analytics to avoid noise
+  // Block Segment analytics to avoid noise, its own hosts and our first party proxy
   await page.route('**/api.segment.io/**', route => route.abort())
   await page.route('**/cdn.segment.com/**', route => route.abort())
+  await page.route('**/evs.e.decentraland.org/**', route => route.abort())
+  await page.route('**/api.e.decentraland.org/**', route => route.abort())
 
   // Block Sentry
   await page.route('**/sentry.io/**', route => route.abort())
