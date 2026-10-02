@@ -31,9 +31,32 @@ describe('when resolving the segment first party proxy', () => {
     })
   })
 
-  describe('and the cdn url carries a path and a trailing slash', () => {
-    it('should keep only the origin, analytics.js appends its own paths', () => {
-      expect(getSegmentProxy('https://evs.example.org/some/path/', undefined)).toEqual({ cdnUrl: 'https://evs.example.org' })
+  describe('and the cdn url is mounted under a path', () => {
+    it('should keep the path without a trailing slash, analytics.js uses it as a plain prefix', () => {
+      expect(getSegmentProxy('https://evs.example.org/segment/', undefined)).toEqual({ cdnUrl: 'https://evs.example.org/segment' })
+    })
+
+    it('should keep the bare origin when there is no path', () => {
+      expect(getSegmentProxy('https://evs.example.org/', undefined)).toEqual({ cdnUrl: 'https://evs.example.org' })
+    })
+  })
+
+  describe('and a value carries a query string or a fragment', () => {
+    it.each([
+      ['cdn url query', 'https://evs.example.org?k=1', undefined],
+      ['cdn url fragment', 'https://evs.example.org#frag', undefined],
+      ['api host query', undefined, 'api.example.org/v1?k=1'],
+      ['api host fragment', undefined, 'api.example.org/v1#frag']
+    ])('should drop the %s and warn about it, so the misconfiguration is visible', (_case, cdnUrl, apiHost) => {
+      getSegmentProxy(cdnUrl, apiHost)
+
+      expect(consoleWarn).toHaveBeenCalledWith(expect.stringContaining('query string or fragment'))
+    })
+
+    it('should still use the rest of the value', () => {
+      expect(getSegmentProxy(undefined, 'api.example.org/v1?k=1').loadOptions).toEqual({
+        integrations: { 'Segment.io': { apiHost: 'api.example.org/v1' } }
+      })
     })
   })
 

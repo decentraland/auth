@@ -3,7 +3,7 @@ const PROTOCOL_PREFIX = /^[a-z][a-z0-9+.-]*:\/\//i
 const TRAILING_SLASHES = /\/+$/
 
 type SegmentProxy = {
-  /** Origin analytics.js loads its bundle, settings and remote plugins from, instead of Segment's CDN. */
+  /** Base url analytics.js loads its bundle, settings and remote plugins from, instead of Segment's CDN. */
   cdnUrl?: string
   /** Load options that deliver the events to the proxy instead of Segment's ingestion endpoint. */
   loadOptions?: { integrations: { 'Segment.io': { apiHost: string } } }
@@ -23,6 +23,10 @@ function parseHttpsUrl(name: string, value: string): URL | undefined {
     return undefined
   }
 
+  if (url.search || url.hash) {
+    console.warn(`[Analytics] The ${name} "${value}" carries a query string or fragment, which is dropped`)
+  }
+
   return url
 }
 
@@ -37,7 +41,7 @@ function getSegmentProxy(cdnUrl?: string, apiHost?: string): SegmentProxy {
 
   const cdn = cdnUrl ? parseHttpsUrl('cdn url', cdnUrl) : undefined
   if (cdn) {
-    proxy.cdnUrl = cdn.origin
+    proxy.cdnUrl = `${cdn.origin}${cdn.pathname}`.replace(TRAILING_SLASHES, '')
   }
 
   const host = apiHost ? parseHttpsUrl('api host', PROTOCOL_PREFIX.test(apiHost) ? apiHost : `https://${apiHost}`) : undefined

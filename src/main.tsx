@@ -50,10 +50,11 @@ const initialLocale = getInitialLocale()
 const analytics = getAnalytics()
 const segmentProxy = getSegmentProxy(config.get('SEGMENT_CDN_URL', ''), config.get('SEGMENT_API_HOST', ''))
 if (analytics && segmentProxy.cdnUrl) {
-  // analytics.js resolves its settings and remote plugins from here, it can't infer it from a proxied bundle path
+  // Set explicitly so analytics.js resolves its settings and remote plugins from the proxy without relying on
+  // inferring the origin from the script tag
   ;(analytics as unknown as { _cdn?: string })._cdn = segmentProxy.cdnUrl
 }
-analytics?.load(config.get('SEGMENT_API_KEY'), segmentProxy.loadOptions as SegmentAnalytics.SegmentOpts | undefined)
+analytics?.load(config.get('SEGMENT_API_KEY'), segmentProxy.loadOptions)
 
 setupMobileAnalytics(analytics, getMobileSession())
 
