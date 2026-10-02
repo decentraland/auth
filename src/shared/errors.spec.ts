@@ -145,8 +145,33 @@ describe('isExpectedWalletError', () => {
     })
   })
 
+  describe('when the Ledger device has not been granted browser HID/WebUSB permission', () => {
+    it('should classify it as expected when viem formats the Ledger message into the error message', () => {
+      const error = Object.assign(
+        new Error(
+          'An internal error was received.\n\nDetails: No permitted Ledger device found. User must grant permission from the UI first.\nVersion: viem@2.43.4'
+        ),
+        {
+          code: -32603,
+          details: 'No permitted Ledger device found. User must grant permission from the UI first.'
+        }
+      )
+      expect(isExpectedWalletError(error)).toBe(true)
+    })
+
+    it('should classify it as expected when the Ledger message arrives only in details', () => {
+      expect(
+        isExpectedWalletError({
+          code: -32603,
+          message: 'An internal error was received.',
+          details: 'No permitted Ledger device found. User must grant permission from the UI first.'
+        })
+      ).toBe(true)
+    })
+  })
+
   describe('when the failure is a genuine fault', () => {
-    it('should not classify an internal rpc error as expected', () => {
+    it('should not classify an unrelated internal rpc error as expected', () => {
       expect(isExpectedWalletError({ code: -32603, message: 'Internal error' })).toBe(false)
     })
 
