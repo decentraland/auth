@@ -1,10 +1,30 @@
+import { UnauthorizedProviderError } from 'viem'
 import {
   WalletSignatureUnsupportedError,
   isChainMismatchRejection,
   isExpectedWalletError,
+  isMagicNetworkError,
+  isUnreportedWalletCondition,
   isUserRejectedTransaction,
   isWalletSignatureUnsupportedError
 } from './errors'
+
+/**
+ * Mirrors the shape of Magic SDK's `MagicRPCError`: an `Error` carrying the JSON-RPC `code`, the
+ * iframe's `rawMessage`, and `data`, with the message the SDK builds from them.
+ */
+class FakeMagicRPCError extends Error {
+  code: number
+  rawMessage: string
+  data: unknown
+
+  constructor(code: number, rawMessage: string) {
+    super(`Magic RPC Error: [${code}] ${rawMessage}`)
+    this.code = code
+    this.rawMessage = rawMessage
+    this.data = undefined
+  }
+}
 
 /**
  * `@web3-react/injected-connector` throws this when the user dismisses the wallet prompt during
@@ -187,6 +207,96 @@ describe('isExpectedWalletError', () => {
         expect(isChainMismatchRejection(null)).toBe(false)
         expect(isChainMismatchRejection('chainId mismatch')).toBe(false)
       })
+    })
+  })
+})
+
+describe('isUnreportedWalletCondition', () => {
+  describe('when the user has switched dApp access off in the wallet', () => {
+    it('should match the EIP-1193 unauthorized code with the wallet message', () => {
+      expect(isUnreportedWalletCondition({ code: 4100, message: 'DApp interaction is disabled' })).toBe(true)
+    })
+
+    it('should match it as an Error carrying the code', () => {
+      expect(isUnreportedWalletCondition(Object.assign(new Error('DApp interaction is disabled'), { code: 4100 }))).toBe(true)
+    })
+
+    it('should match it once viem wraps it on the signing path', () => {
+      const raw = Object.assign(new Error('DApp interaction is disabled'), { code: 4100 })
+
+      expect(isUnreportedWalletCondition(new UnauthorizedProviderError(raw))).toBe(true)
+    })
+
+    it('should not match a viem-wrapped unauthorized request with other details', () => {
+      const raw = Object.assign(new Error('Account not authorized'), { code: 4100 })
+
+      expect(isUnreportedWalletCondition(new UnauthorizedProviderError(raw))).toBe(false)
+    })
+  })
+
+  describe('when the wallet is still busy unlocking', () => {
+    it('should match the code with the wallet message', () => {
+      expect(isUnreportedWalletCondition({ code: -32001, message: 'Already processing unlock. Please wait.' })).toBe(true)
+    })
+  })
+
+  describe('when the login screen decides what to show', () => {
+    it('should stay apart from the expected wallet errors, so the wallet message is kept', () => {
+      expect(isExpectedWalletError({ code: 4100, message: 'DApp interaction is disabled' })).toBe(false)
+      expect(isExpectedWalletError({ code: -32001, message: 'Already processing unlock. Please wait.' })).toBe(false)
+    })
+  })
+
+  describe('when the failure is some other refusal', () => {
+    it('should not match another unauthorized request', () => {
+      expect(
+        isUnreportedWalletCondition({ code: 4100, message: 'The requested account and/or method has not been authorized by the user.' })
+      ).toBe(false)
+    })
+
+    it('should not match another failure carrying -32001', () => {
+      expect(isUnreportedWalletCondition({ code: -32001, message: 'Resource not found' })).toBe(false)
+    })
+
+    it('should not match the message without the code', () => {
+      expect(isUnreportedWalletCondition(new Error('DApp interaction is disabled'))).toBe(false)
+    })
+
+    it('should not match non-object values', () => {
+      expect(isUnreportedWalletCondition(null)).toBe(false)
+      expect(isUnreportedWalletCondition(undefined)).toBe(false)
+      expect(isUnreportedWalletCondition('DApp interaction is disabled')).toBe(false)
+    })
+  })
+})
+
+describe('isMagicNetworkError', () => {
+  describe('when the browser could not reach Magic', () => {
+    it.each(['Failed to fetch', 'Load failed', 'NetworkError when attempting to fetch resource.'])(
+      'should recognize the internal error carrying %p',
+      rawMessage => {
+        expect(isMagicNetworkError(new FakeMagicRPCError(-32603, rawMessage))).toBe(true)
+      }
+    )
+  })
+
+  describe('when the failure is anything else', () => {
+    it('should not match a Magic internal error with a different message', () => {
+      expect(isMagicNetworkError(new FakeMagicRPCError(-32603, 'Internal error'))).toBe(false)
+    })
+
+    it('should not match a network message under a different Magic code', () => {
+      expect(isMagicNetworkError(new FakeMagicRPCError(-32600, 'Failed to fetch'))).toBe(false)
+    })
+
+    it('should not match an rpc error that is not from Magic', () => {
+      expect(isMagicNetworkError({ code: -32603, message: 'Failed to fetch' })).toBe(false)
+    })
+
+    it('should not match non-object values', () => {
+      expect(isMagicNetworkError(null)).toBe(false)
+      expect(isMagicNetworkError(undefined)).toBe(false)
+      expect(isMagicNetworkError('Failed to fetch')).toBe(false)
     })
   })
 })

@@ -143,6 +143,52 @@ function isExpectedWalletError(error: unknown): boolean {
 }
 
 /**
+ * Wallet-side conditions that stay out of Sentry but, unlike {@link isExpectedWalletError}, keep
+ * their message on the login screen. The login screen blanks the error detail for expected wallet
+ * errors, and for these the wallet's own message is what tells the user what to do:
+ *
+ * - EIP-1193 `4100` (Unauthorized) with "DApp interaction is disabled": the user switched dApp
+ *   access off in the wallet.
+ * - `-32001` with "Already processing unlock. Please wait.": the wallet is still busy unlocking.
+ *
+ * Both match on the code and the exact message. Other `4100` refusals (an account or method the
+ * user never authorized) can point at our own requests, and other `-32001` failures are not this
+ * state, so they keep reporting.
+ */
+function isUnreportedWalletCondition(error: unknown): boolean {
+  if (!isErrorWithMessage(error)) return false
+
+  // A raw provider error carries the wallet's text in `message`. viem (the signing path) wraps it
+  // in its own error with a generic `message`, keeping the code and moving the wallet's text to
+  // `details`.
+  const { code, details } = error as { code?: unknown; details?: unknown }
+  const says = (text: string) => error.message === text || details === text
+
+  if (code === 4100 && says('DApp interaction is disabled')) return true
+  if (code === -32001 && says('Already processing unlock. Please wait.')) return true
+
+  return false
+}
+
+/**
+ * What each browser's `fetch` rejects with when the request never gets a response (offline, a
+ * blocking extension, a network that blocks the host): Chromium, Safari and Firefox respectively.
+ */
+const BROWSER_NETWORK_FAILURE_MESSAGES = new Set(['Failed to fetch', 'Load failed', 'NetworkError when attempting to fetch resource.'])
+
+/**
+ * Detects Magic SDK failing to reach Magic's own API. The request runs inside the Magic iframe; when
+ * the browser's fetch fails there, the iframe answers with JSON-RPC internal error -32603 carrying the
+ * browser's network-failure text, which the SDK surfaces as `Magic RPC Error: [-32603] Failed to fetch`.
+ * The login genuinely fails for the user, but the cause is their connection to Magic, not our code.
+ *
+ * Only that exact shape matches: any other -32603 from Magic is a real failure and keeps reporting.
+ */
+function isMagicNetworkError(error: unknown): boolean {
+  return isMagicRpcError(error) && error.code === -32603 && BROWSER_NETWORK_FAILURE_MESSAGES.has(error.rawMessage)
+}
+
+/**
  * Detects a wallet refusing an eth_sendTransaction because the request's `chainId` does not match its
  * active network: EIP-1474 invalid params, code -32602, with a message that names the chain. viem
  * wraps provider errors, so the code and message may sit on the error itself, on its `cause`, or on a
@@ -181,8 +227,10 @@ export {
   isRpcError,
   isMagicRpcError,
   isMagicExtensionError,
+  isMagicNetworkError,
   isUserRejectedTransaction,
   isWalletSignatureUnsupportedError,
   isExpectedWalletError,
+  isUnreportedWalletCondition,
   isChainMismatchRejection
 }
