@@ -1,7 +1,7 @@
 import { captureException } from '@sentry/react'
 import { TrackingEvents } from '../../modules/analytics/types'
 import { DeploymentError } from '../../modules/profile/errors'
-import { isErrorWithMessage, isExpectedWalletError, isMagicNetworkError } from '../errors'
+import { isErrorWithMessage, isExpectedWalletError, isMagicNetworkError, isUnreportedWalletCondition } from '../errors'
 import { trackEvent } from './analytics'
 import { ErrorContext, HandleErrorOptions, SentryExtra } from './errorHandler.types'
 
@@ -81,8 +81,11 @@ const handleError = (error: unknown, context: string, options?: HandleErrorOptio
   // reach the console and the analytics event below — the login really did fail for the user —
   // but they are not faults of ours, so they stay out of Sentry. Left unfiltered they were the
   // bulk of this project's volume and buried the failures worth acting on. The same goes for the
-  // browser failing to reach Magic at all: the user's network, not something we can fix.
-  if (!isExpectedWalletError(error) && !isMagicNetworkError(error)) {
+  // browser failing to reach Magic at all: the user's network, not something we can fix. The
+  // unreported wallet conditions (dApp access switched off, an unlock still in progress) are the
+  // same kind of condition, kept in their own predicate so the login screen still shows the
+  // wallet's message.
+  if (!isExpectedWalletError(error) && !isUnreportedWalletCondition(error) && !isMagicNetworkError(error)) {
     const deploymentExtra = getDeploymentErrorExtra(error)
     const { error: normalised, originalShape } = normaliseError(error)
 

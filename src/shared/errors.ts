@@ -143,6 +143,34 @@ function isExpectedWalletError(error: unknown): boolean {
 }
 
 /**
+ * Wallet-side conditions that stay out of Sentry but, unlike {@link isExpectedWalletError}, keep
+ * their message on the login screen. The login screen blanks the error detail for expected wallet
+ * errors, and for these the wallet's own message is what tells the user what to do:
+ *
+ * - EIP-1193 `4100` (Unauthorized) with "DApp interaction is disabled": the user switched dApp
+ *   access off in the wallet.
+ * - `-32001` with "Already processing unlock. Please wait.": the wallet is still busy unlocking.
+ *
+ * Both match on the code and the exact message. Other `4100` refusals (an account or method the
+ * user never authorized) can point at our own requests, and other `-32001` failures are not this
+ * state, so they keep reporting.
+ */
+function isUnreportedWalletCondition(error: unknown): boolean {
+  if (!isErrorWithMessage(error)) return false
+
+  // A raw provider error carries the wallet's text in `message`. viem (the signing path) wraps it
+  // in its own error with a generic `message`, keeping the code and moving the wallet's text to
+  // `details`.
+  const { code, details } = error as { code?: unknown; details?: unknown }
+  const says = (text: string) => error.message === text || details === text
+
+  if (code === 4100 && says('DApp interaction is disabled')) return true
+  if (code === -32001 && says('Already processing unlock. Please wait.')) return true
+
+  return false
+}
+
+/**
  * What each browser's `fetch` rejects with when the request never gets a response (offline, a
  * blocking extension, a network that blocks the host): Chromium, Safari and Firefox respectively.
  */
@@ -203,5 +231,6 @@ export {
   isUserRejectedTransaction,
   isWalletSignatureUnsupportedError,
   isExpectedWalletError,
+  isUnreportedWalletCondition,
   isChainMismatchRejection
 }
