@@ -171,6 +171,24 @@ function isUnreportedWalletCondition(error: unknown): boolean {
 }
 
 /**
+ * What each browser's `fetch` rejects with when the request never gets a response (offline, a
+ * blocking extension, a network that blocks the host): Chromium, Safari and Firefox respectively.
+ */
+const BROWSER_NETWORK_FAILURE_MESSAGES = new Set(['Failed to fetch', 'Load failed', 'NetworkError when attempting to fetch resource.'])
+
+/**
+ * Detects Magic SDK failing to reach Magic's own API. The request runs inside the Magic iframe; when
+ * the browser's fetch fails there, the iframe answers with JSON-RPC internal error -32603 carrying the
+ * browser's network-failure text, which the SDK surfaces as `Magic RPC Error: [-32603] Failed to fetch`.
+ * The login genuinely fails for the user, but the cause is their connection to Magic, not our code.
+ *
+ * Only that exact shape matches: any other -32603 from Magic is a real failure and keeps reporting.
+ */
+function isMagicNetworkError(error: unknown): boolean {
+  return isMagicRpcError(error) && error.code === -32603 && BROWSER_NETWORK_FAILURE_MESSAGES.has(error.rawMessage)
+}
+
+/**
  * Detects a wallet refusing an eth_sendTransaction because the request's `chainId` does not match its
  * active network: EIP-1474 invalid params, code -32602, with a message that names the chain. viem
  * wraps provider errors, so the code and message may sit on the error itself, on its `cause`, or on a
@@ -209,6 +227,7 @@ export {
   isRpcError,
   isMagicRpcError,
   isMagicExtensionError,
+  isMagicNetworkError,
   isUserRejectedTransaction,
   isWalletSignatureUnsupportedError,
   isExpectedWalletError,

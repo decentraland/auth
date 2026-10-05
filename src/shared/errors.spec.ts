@@ -3,10 +3,28 @@ import {
   WalletSignatureUnsupportedError,
   isChainMismatchRejection,
   isExpectedWalletError,
+  isMagicNetworkError,
   isUnreportedWalletCondition,
   isUserRejectedTransaction,
   isWalletSignatureUnsupportedError
 } from './errors'
+
+/**
+ * Mirrors the shape of Magic SDK's `MagicRPCError`: an `Error` carrying the JSON-RPC `code`, the
+ * iframe's `rawMessage`, and `data`, with the message the SDK builds from them.
+ */
+class FakeMagicRPCError extends Error {
+  code: number
+  rawMessage: string
+  data: unknown
+
+  constructor(code: number, rawMessage: string) {
+    super(`Magic RPC Error: [${code}] ${rawMessage}`)
+    this.code = code
+    this.rawMessage = rawMessage
+    this.data = undefined
+  }
+}
 
 /**
  * `@web3-react/injected-connector` throws this when the user dismisses the wallet prompt during
@@ -248,6 +266,37 @@ describe('isUnreportedWalletCondition', () => {
       expect(isUnreportedWalletCondition(null)).toBe(false)
       expect(isUnreportedWalletCondition(undefined)).toBe(false)
       expect(isUnreportedWalletCondition('DApp interaction is disabled')).toBe(false)
+    })
+  })
+})
+
+describe('isMagicNetworkError', () => {
+  describe('when the browser could not reach Magic', () => {
+    it.each(['Failed to fetch', 'Load failed', 'NetworkError when attempting to fetch resource.'])(
+      'should recognize the internal error carrying %p',
+      rawMessage => {
+        expect(isMagicNetworkError(new FakeMagicRPCError(-32603, rawMessage))).toBe(true)
+      }
+    )
+  })
+
+  describe('when the failure is anything else', () => {
+    it('should not match a Magic internal error with a different message', () => {
+      expect(isMagicNetworkError(new FakeMagicRPCError(-32603, 'Internal error'))).toBe(false)
+    })
+
+    it('should not match a network message under a different Magic code', () => {
+      expect(isMagicNetworkError(new FakeMagicRPCError(-32600, 'Failed to fetch'))).toBe(false)
+    })
+
+    it('should not match an rpc error that is not from Magic', () => {
+      expect(isMagicNetworkError({ code: -32603, message: 'Failed to fetch' })).toBe(false)
+    })
+
+    it('should not match non-object values', () => {
+      expect(isMagicNetworkError(null)).toBe(false)
+      expect(isMagicNetworkError(undefined)).toBe(false)
+      expect(isMagicNetworkError('Failed to fetch')).toBe(false)
     })
   })
 })
