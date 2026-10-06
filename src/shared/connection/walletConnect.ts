@@ -120,6 +120,9 @@ async function hasLiveWalletConnectSession(provider: unknown): Promise<boolean> 
  */
 const WAGMI_STORAGE_PREFIX = 'wagmi.'
 
+/** Prefix every WalletConnect v2 storage entry shares. */
+const WALLET_CONNECT_STORAGE_PREFIX = 'wc@2:'
+
 /**
  * Clears wagmi's persisted connection state.
  *
@@ -142,4 +145,45 @@ function clearWagmiStorage(): void {
   }
 }
 
-export { canRelayPersonalSign, clearWagmiStorage, getApprovedEip155Methods, hasLiveWalletConnectSession, isMissingSessionError }
+/**
+ * WalletConnect keeps its sessions in a single `wc@2:...//session` entry, whose value is an array —
+ * empty once the sessions are gone, while the surrounding `wc@2:` keys stay behind.
+ */
+const WALLET_CONNECT_SESSION_KEY_SUFFIX = '//session'
+
+/**
+ * Whether there is a WalletConnect session on disk worth restoring.
+ *
+ * Restoring a WalletConnect connection is not a passive read: with no live session the connector
+ * falls through to `openModalAndWaitForConnection()`, which opens the wallet chooser and arms a
+ * five-minute timer. On a page that only meant to look up the current account, that leaves an
+ * orphaned waiter running; when it expires it rejects with `Connection timeout`, landing on
+ * whatever the user happens to be doing at that moment — typically their first real login attempt,
+ * seconds after they clicked, which is why a reload or a second try appears to fix it.
+ *
+ * Returns true when the answer cannot be read, so an unreadable storage keeps today's behaviour.
+ */
+function hasStoredWalletConnectSession(): boolean {
+  try {
+    const sessionKey = Object.keys(localStorage).find(
+      key => key.startsWith(WALLET_CONNECT_STORAGE_PREFIX) && key.endsWith(WALLET_CONNECT_SESSION_KEY_SUFFIX)
+    )
+    if (!sessionKey) {
+      return false
+    }
+
+    const sessions: unknown = JSON.parse(localStorage.getItem(sessionKey) ?? '[]')
+    return !Array.isArray(sessions) || sessions.length > 0
+  } catch {
+    return true
+  }
+}
+
+export {
+  canRelayPersonalSign,
+  clearWagmiStorage,
+  getApprovedEip155Methods,
+  hasLiveWalletConnectSession,
+  hasStoredWalletConnectSession,
+  isMissingSessionError
+}
