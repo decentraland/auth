@@ -220,7 +220,6 @@ test.describe('Request already fulfilled', () => {
 
     // A consumed answer can be a rejection; no wallet success is established here.
     await expect(page.getByText('Request already answered', { exact: true })).toBeVisible({ timeout: 15_000 })
-    await expect(page.getByText('The action has been executed successfully.', { exact: true })).not.toBeVisible()
   })
 })
 

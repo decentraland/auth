@@ -241,6 +241,7 @@ jest.mock('./Views', () => ({
       <button data-testid="transfer-confirm-approve" onClick={props.onApprove}>
         confirm
       </button>
+      <button onClick={props.onDeny}>Deny transfer</button>
       <button data-testid="callback-acknowledge" onClick={() => props.onCallbackAcknowledgedChange?.(true)}>
         acknowledge callback risk
       </button>
@@ -2377,6 +2378,56 @@ describe('RequestPage', () => {
       })
     })
 
+    describe.each(['delivered', 'already_answered'] as const)('and Deny delivery is %s after a provider refresh', delivery => {
+      let resolveDenial: (value: object) => void
+      let rejectDenial: (error: Error) => void
+      let rerender: ReturnType<typeof renderRequestPage>['rerender']
+
+      beforeEach(async () => {
+        resolveDenial = () => undefined
+        rejectDenial = () => undefined
+        mockSendFailedOutcome.mockImplementationOnce(
+          () =>
+            new Promise((resolve, reject) => {
+              resolveDenial = resolve
+              rejectDenial = reject
+            })
+        )
+        rerender = renderRequestPage().rerender
+        await userEvent.click(await screen.findByRole('button', { name: 'Deny transfer' }))
+        await waitFor(() => expect(mockSendFailedOutcome).toHaveBeenCalledTimes(1))
+        mockConnectionData = { ...mockConnectionData, provider: { isMagic: false, refreshed: true } }
+        rerenderRequestPage(rerender)
+        if (delivery === 'delivered') {
+          await act(async () => resolveDenial({}))
+          await screen.findByTestId('transfer-canceled')
+        } else {
+          await act(async () => rejectDenial(new RequestFulfilledError(REQUEST_ID)))
+          await screen.findByTestId('request-already-answered')
+        }
+      })
+
+      it('should preserve the cancellation details or show the neutral already answered view', () => {
+        if (delivery === 'delivered') {
+          expect(screen.getByTestId('transfer-canceled')).toHaveAttribute('data-recipient', '0xrecipient')
+        } else {
+          expect(screen.queryByTestId('transfer-canceled')).not.toBeInTheDocument()
+        }
+      })
+
+      it('should deliver the denial once for the reviewed request and account', () => {
+        expect(mockSendFailedOutcome.mock.calls).toEqual([[REQUEST_ID, SIGNER, { code: -32003, message: 'Transaction rejected' }]])
+      })
+
+      it('should never execute a wallet or relay operation', () => {
+        expect([mockWalletRequest.mock.calls, jest.mocked(sendMetaTransaction).mock.calls]).toEqual([[], []])
+      })
+
+      it('should not recover the answered request again', () => {
+        expect(mockRecover).toHaveBeenCalledTimes(1)
+      })
+    })
+
     it('should show the donation transfer view', async () => {
       renderRequestPage()
       expect(await screen.findByTestId('transfer-confirm')).toBeInTheDocument()
@@ -2655,6 +2706,56 @@ describe('RequestPage', () => {
 
       it('should retain the reviewed recipient on the outcome screen', () => {
         expect(screen.getByTestId(`transfer-${outcome}`)).toHaveAttribute('data-recipient', '0xrecipient')
+      })
+    })
+
+    describe.each(['delivered', 'already_answered'] as const)('and Deny delivery is %s after a provider refresh', delivery => {
+      let resolveDenial: (value: object) => void
+      let rejectDenial: (error: Error) => void
+      let rerender: ReturnType<typeof renderRequestPage>['rerender']
+
+      beforeEach(async () => {
+        resolveDenial = () => undefined
+        rejectDenial = () => undefined
+        mockSendFailedOutcome.mockImplementationOnce(
+          () =>
+            new Promise((resolve, reject) => {
+              resolveDenial = resolve
+              rejectDenial = reject
+            })
+        )
+        rerender = renderRequestPage().rerender
+        await userEvent.click(await screen.findByRole('button', { name: 'Deny transfer' }))
+        await waitFor(() => expect(mockSendFailedOutcome).toHaveBeenCalledTimes(1))
+        mockConnectionData = { ...mockConnectionData, provider: { isMagic: false, refreshed: true } }
+        rerenderRequestPage(rerender)
+        if (delivery === 'delivered') {
+          await act(async () => resolveDenial({}))
+          await screen.findByTestId('transfer-canceled')
+        } else {
+          await act(async () => rejectDenial(new RequestFulfilledError(REQUEST_ID)))
+          await screen.findByTestId('request-already-answered')
+        }
+      })
+
+      it('should preserve the cancellation details or show the neutral already answered view', () => {
+        if (delivery === 'delivered') {
+          expect(screen.getByTestId('transfer-canceled')).toHaveAttribute('data-recipient', '0xrecipient')
+        } else {
+          expect(screen.queryByTestId('transfer-canceled')).not.toBeInTheDocument()
+        }
+      })
+
+      it('should deliver the denial once for the reviewed request and account', () => {
+        expect(mockSendFailedOutcome.mock.calls).toEqual([[REQUEST_ID, SIGNER, { code: -32003, message: 'Transaction rejected' }]])
+      })
+
+      it('should never execute a wallet or relay operation', () => {
+        expect([mockWalletRequest.mock.calls, jest.mocked(sendMetaTransaction).mock.calls]).toEqual([[], []])
+      })
+
+      it('should not recover the answered request again', () => {
+        expect(mockRecover).toHaveBeenCalledTimes(1)
       })
     })
 
