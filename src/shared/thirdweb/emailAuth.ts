@@ -38,21 +38,11 @@ const sendEmailOTP = async (email: string): Promise<void> => {
   const client = await getThirdwebClient()
   const { preAuthenticate } = await import('thirdweb/wallets')
 
-  try {
-    await preAuthenticate({
-      client,
-      strategy: 'email',
-      email
-    })
-  } catch (error) {
-    // thirdweb's server rejects some addresses our client-side check lets through and forwards its
-    // "Invalid email." message. That is a typo in user input, already shown as a translated error by
-    // the login page, so we skip Sentry reporting to reduce noise.
-    if (error instanceof Error && /invalid email/i.test(error.message)) {
-      ;(error as Error & { skipReporting: boolean }).skipReporting = true
-    }
-    throw error
-  }
+  await preAuthenticate({
+    client,
+    strategy: 'email',
+    email
+  })
 }
 
 /**
