@@ -190,6 +190,7 @@ jest.mock('./Views', () => ({
   DifferentAccountError: () => <div data-testid="different-account">Different Account</div>,
   OutdatedClientError: () => <div data-testid="outdated-client-error">Outdated Client</div>,
   RecoverError: () => <div data-testid="recover-error">Recover Error</div>,
+  RequestAlreadyAnswered: () => <div data-testid="request-already-answered">Request Already Answered</div>,
   SigningError: (props: any) => (
     <div data-testid="signing-error" data-kind={props.kind ?? ''}>
       Signing Error: {props.error}
@@ -245,8 +246,16 @@ jest.mock('./Views', () => ({
       </button>
     </div>
   ),
-  TransferCompletedView: () => <div data-testid="transfer-completed">Transfer Completed</div>,
-  TransferCanceledView: () => <div data-testid="transfer-canceled">Transfer Canceled</div>,
+  TransferCompletedView: (props: any) => (
+    <div data-testid="transfer-completed" data-recipient={props.transferData.toAddress}>
+      Transfer Completed
+    </div>
+  ),
+  TransferCanceledView: (props: any) => (
+    <div data-testid="transfer-canceled" data-recipient={props.transferData.toAddress}>
+      Transfer Canceled
+    </div>
+  ),
   CreditsPurchaseView: (props: any) => (
     <div
       data-testid="credits-purchase"
@@ -891,14 +900,15 @@ describe('RequestPage', () => {
         mockRecover.mockRejectedValue(new RequestFulfilledError(REQUEST_ID))
       })
 
-      it('should show the interaction complete view (request already consumed)', async () => {
+      it('should show the already answered view without claiming execution succeeded', async () => {
         renderRequestPage()
-        await waitFor(() => {
-          expect(mockRecover).toHaveBeenCalled()
-        })
-        await waitFor(() => {
-          expect(screen.getByTestId('wallet-interaction-complete')).toBeInTheDocument()
-        })
+        expect(await screen.findByTestId('request-already-answered')).toBeInTheDocument()
+      })
+
+      it('should never ask the wallet to execute the consumed request', async () => {
+        renderRequestPage()
+        await screen.findByTestId('request-already-answered')
+        expect(mockWalletRequest).not.toHaveBeenCalled()
       })
     })
 
@@ -2327,6 +2337,46 @@ describe('RequestPage', () => {
       jest.mocked(decodeManaTransferData).mockReturnValue(null)
     })
 
+    describe.each(['completed', 'canceled'] as const)('and the provider refreshes before the transfer is %s', outcome => {
+      let releaseTransfer: (hash: string) => void
+      let rejectTransfer: (error: Error) => void
+      let releaseRecovery: (request: ReturnType<typeof recovered>) => void
+      let rerender: ReturnType<typeof renderRequestPage>['rerender']
+
+      beforeEach(async () => {
+        mockConnectionData = { ...mockConnectionData, providerType: ProviderType.INJECTED }
+        releaseTransfer = () => undefined
+        rejectTransfer = () => undefined
+        releaseRecovery = () => undefined
+        jest.mocked(sendMetaTransaction).mockImplementationOnce(
+          () =>
+            new Promise((resolve, reject) => {
+              releaseTransfer = resolve
+              rejectTransfer = reject
+            })
+        )
+        rerender = renderRequestPage().rerender
+        await userEvent.click(await screen.findByTestId('transfer-confirm-approve'))
+        await waitFor(() => expect(sendMetaTransaction).toHaveBeenCalledTimes(1))
+        mockRecover.mockImplementationOnce(() => new Promise(resolve => (releaseRecovery = resolve)))
+        mockConnectionData = { ...mockConnectionData, provider: { isMagic: false, refreshed: true } }
+        rerenderRequestPage(rerender)
+        await screen.findByTestId('loading-request')
+        if (outcome === 'completed') {
+          await act(async () => releaseTransfer('0xrelayedhash'))
+        } else {
+          mockIsUserRejectedTransaction.mockReturnValueOnce(true)
+          await act(async () => rejectTransfer(new Error('user rejected')))
+        }
+        await screen.findByTestId(`transfer-${outcome}`)
+        await act(async () => releaseRecovery(recovered('eth_sendTransaction', [{ to: COLLECTION, data: '0x23b872dd', value: '0x0' }])))
+      })
+
+      it('should retain the reviewed recipient on the outcome screen', () => {
+        expect(screen.getByTestId(`transfer-${outcome}`)).toHaveAttribute('data-recipient', '0xrecipient')
+      })
+    })
+
     it('should show the donation transfer view', async () => {
       renderRequestPage()
       expect(await screen.findByTestId('transfer-confirm')).toBeInTheDocument()
@@ -2566,6 +2616,46 @@ describe('RequestPage', () => {
       jest.mocked(decodeNftTransferData).mockReturnValue(null)
       jest.mocked(fetchNftMetadata).mockReset()
       jest.mocked(fetchProfile).mockReset()
+    })
+
+    describe.each(['completed', 'canceled'] as const)('and the provider refreshes before the transfer is %s', outcome => {
+      let releaseTransfer: (hash: string) => void
+      let rejectTransfer: (error: Error) => void
+      let releaseRecovery: (request: ReturnType<typeof recovered>) => void
+      let rerender: ReturnType<typeof renderRequestPage>['rerender']
+
+      beforeEach(async () => {
+        mockConnectionData = { ...mockConnectionData, providerType: ProviderType.INJECTED }
+        releaseTransfer = () => undefined
+        rejectTransfer = () => undefined
+        releaseRecovery = () => undefined
+        jest.mocked(sendMetaTransaction).mockImplementationOnce(
+          () =>
+            new Promise((resolve, reject) => {
+              releaseTransfer = resolve
+              rejectTransfer = reject
+            })
+        )
+        rerender = renderRequestPage().rerender
+        await userEvent.click(await screen.findByTestId('transfer-confirm-approve'))
+        await waitFor(() => expect(sendMetaTransaction).toHaveBeenCalledTimes(1))
+        mockRecover.mockImplementationOnce(() => new Promise(resolve => (releaseRecovery = resolve)))
+        mockConnectionData = { ...mockConnectionData, provider: { isMagic: false, refreshed: true } }
+        rerenderRequestPage(rerender)
+        await screen.findByTestId('loading-request')
+        if (outcome === 'completed') {
+          await act(async () => releaseTransfer('0xrelayedhash'))
+        } else {
+          mockIsUserRejectedTransaction.mockReturnValueOnce(true)
+          await act(async () => rejectTransfer(new Error('user rejected')))
+        }
+        await screen.findByTestId(`transfer-${outcome}`)
+        await act(async () => releaseRecovery(recovered('eth_sendTransaction', [{ to: COLLECTION, data: '0x23b872dd', value: '0x0' }])))
+      })
+
+      it('should retain the reviewed recipient on the outcome screen', () => {
+        expect(screen.getByTestId(`transfer-${outcome}`)).toHaveAttribute('data-recipient', '0xrecipient')
+      })
     })
 
     it('should show the branded gift confirmation view', async () => {
@@ -3102,6 +3192,92 @@ describe('RequestPage', () => {
         it('should leave the replacement request on its own review', () => {
           expect(screen.getByTestId('action-request')).toBeInTheDocument()
         })
+      })
+    })
+
+    describe('and another tab has already answered before cancellation is delivered', () => {
+      beforeEach(async () => {
+        mockSendFailedOutcome.mockRejectedValueOnce(new RequestFulfilledError(REQUEST_ID))
+        renderRequestPage()
+        await screen.findByTestId('credits-purchase')
+        await userEvent.click(screen.getByTestId('credits-purchase-deny'))
+        await screen.findByTestId('request-already-answered')
+      })
+
+      it('should show a neutral already answered outcome', () => {
+        expect(screen.getByTestId('request-already-answered')).toBeInTheDocument()
+      })
+
+      it('should not claim the purchase was canceled', () => {
+        expect(screen.queryByTestId('credits-purchase-outcome')).not.toBeInTheDocument()
+      })
+
+      it('should answer only once without asking for a signature', () => {
+        expect(mockSendFailedOutcome).toHaveBeenCalledTimes(1)
+        expect(mockWalletRequest).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and another tab has already answered before the wallet rejection is delivered', () => {
+      beforeEach(async () => {
+        mockWalletRequest.mockRejectedValueOnce(new Error('user rejected'))
+        mockIsUserRejectedTransaction.mockReturnValueOnce(true)
+        mockSendFailedOutcome.mockRejectedValueOnce(new RequestFulfilledError(REQUEST_ID))
+        renderRequestPage()
+        await screen.findByTestId('credits-purchase')
+        await userEvent.click(screen.getByTestId('credits-purchase-approve'))
+        await screen.findByTestId('request-already-answered')
+      })
+
+      it('should show a neutral outcome instead of claiming the purchase was canceled', () => {
+        expect(screen.getByTestId('request-already-answered')).toBeInTheDocument()
+      })
+    })
+
+    describe('and a wallet error is followed by an already answered response', () => {
+      beforeEach(async () => {
+        mockWalletRequest.mockRejectedValueOnce(new Error('wallet unavailable'))
+        mockSendFailedOutcome.mockRejectedValueOnce(new RequestFulfilledError(REQUEST_ID))
+        renderRequestPage()
+        await screen.findByTestId('credits-purchase')
+        await userEvent.click(screen.getByTestId('credits-purchase-approve'))
+        await screen.findByTestId('request-already-answered')
+      })
+
+      it('should show the neutral outcome instead of offering a retry', () => {
+        expect(screen.getByTestId('request-already-answered')).toBeInTheDocument()
+      })
+    })
+
+    describe('and an already answered error occurs before any wallet result', () => {
+      beforeEach(async () => {
+        mockWalletRequest.mockRejectedValueOnce(new RequestFulfilledError(REQUEST_ID))
+        renderRequestPage()
+        await screen.findByTestId('credits-purchase')
+        await userEvent.click(screen.getByTestId('credits-purchase-approve'))
+        await screen.findByTestId('request-already-answered')
+      })
+
+      it('should not deliver a successful outcome', () => {
+        expect(mockSendSuccessfulOutcome).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('and a produced signature cannot be delivered because the request was already answered', () => {
+      beforeEach(async () => {
+        mockSendSuccessfulOutcome.mockRejectedValueOnce(new RequestFulfilledError(REQUEST_ID))
+        renderRequestPage()
+        await screen.findByTestId('credits-purchase')
+        await userEvent.click(screen.getByTestId('credits-purchase-approve'))
+        await waitFor(() => expect(screen.getByTestId('credits-purchase-outcome')).toHaveAttribute('data-delivery', 'failed'))
+      })
+
+      it('should retain the known signed outcome with failed delivery', () => {
+        expect(screen.getByTestId('credits-purchase-outcome')).toHaveAttribute('data-outcome', 'signed')
+      })
+
+      it('should not report the signed request as rejected', () => {
+        expect(mockSendFailedOutcome).not.toHaveBeenCalled()
       })
     })
 

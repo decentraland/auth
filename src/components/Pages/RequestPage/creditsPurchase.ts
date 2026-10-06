@@ -105,8 +105,9 @@ type CreditsPurchase = {
    * says what the item costs, and only the salt says what the purchase debits.
    */
   creditSalt: string
-  /** Unix seconds after which the trade (a marketplace purchase only) and credit stop being valid. */
+  /** Unix seconds after which the trade stops being valid (marketplace purchases only). */
   tradeExpiresAt: bigint | null
+  /** Unix seconds after which the credit stops being valid. */
   creditExpiresAt: bigint
   /**
    * The soonest of them, in unix seconds: the whole purchase is void once any of them passes. The page
@@ -140,6 +141,7 @@ type CreditsUnsupportedReason =
   | 'another_recipient'
   | 'price_asset_type'
   | 'payment_token'
+  | 'self_payment'
   | 'no_price'
 
 /**
@@ -315,12 +317,19 @@ function readMarketplacePurchase(
     return { reason: 'no_price' }
   }
 
+  // Marketplace._transferAssets resolves a zero beneficiary on received assets to the trade signer.
+  const paymentBeneficiary =
+    requestedPaymentBeneficiary === '0x0000000000000000000000000000000000000000' ? seller : requestedPaymentBeneficiary
+  // CreditsManager rejects a purchase that changes the buyer's MANA balance (SenderBalanceChanged).
+  if (paymentBeneficiary === recipient) {
+    return { reason: 'self_payment' }
+  }
+
   return {
     asset,
     recipient,
     seller,
-    // Marketplace._transferAssets resolves a zero beneficiary on received assets to the trade signer.
-    paymentBeneficiary: requestedPaymentBeneficiary === '0x0000000000000000000000000000000000000000' ? seller : requestedPaymentBeneficiary,
+    paymentBeneficiary,
     paymentTokenAddress,
     price:
       priceAssetType === ASSET_TYPE_USD_PEGGED_MANA

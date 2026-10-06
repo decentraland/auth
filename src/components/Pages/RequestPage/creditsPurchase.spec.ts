@@ -99,15 +99,48 @@ describe('when a marketplace payment uses its default beneficiary', () => {
     beforeEach(() => {
       const trade = buildTrade()
       recognition = recognizeArgs(
-        buildUseCreditsArgs({ trades: [buildTrade({ received: [{ ...trade.received[0], beneficiary: BUYER }] })] })
+        buildUseCreditsArgs({ trades: [buildTrade({ received: [{ ...trade.received[0], beneficiary: COLLECTION }] })] })
       )
     })
 
     it('should preserve the explicit payment destination', () => {
-      expect(recognition).toMatchObject({ status: 'recognized', purchase: { paymentBeneficiary: BUYER } })
+      expect(recognition).toMatchObject({ status: 'recognized', purchase: { paymentBeneficiary: COLLECTION } })
     })
   })
 })
+
+describe.each([ContractName.OffChainMarketplace, ContractName.OffChainMarketplaceV2, ContractName.OffChainMarketplaceV3])(
+  'when a purchase on %s pays the buyer',
+  settlementName => {
+    describe.each(['explicit', 'default'] as const)('and the payment beneficiary is %s', beneficiaryKind => {
+      let recognition: CreditsRecognition
+
+      beforeEach(() => {
+        const trade = buildTrade()
+        recognition = recognizeArgs(
+          buildUseCreditsArgs({
+            target: getContract(settlementName, POLYGON).address,
+            trades: [
+              buildTrade({
+                signer: beneficiaryKind === 'default' ? BUYER : SELLER,
+                received: [
+                  {
+                    ...trade.received[0],
+                    beneficiary: beneficiaryKind === 'explicit' ? BUYER : '0x0000000000000000000000000000000000000000'
+                  }
+                ]
+              })
+            ]
+          })
+        )
+      })
+
+      it('should leave the self-paying trade on the generic review', () => {
+        expect(recognition).toEqual({ status: 'unsupported', reason: 'self_payment' })
+      })
+    })
+  }
+)
 
 describe.each<[string, bigint]>([
   ['zero', 0n],

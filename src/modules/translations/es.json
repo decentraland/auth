@@ -115,6 +115,10 @@
       "title": "Tu aplicación necesita una actualización",
       "description": "Esta versión de {explorerText} usa un método de inicio de sesión que ya no es compatible. Actualiza a la última versión e inicia sesión de nuevo."
     },
+    "request_already_answered": {
+      "title": "Solicitud ya respondida",
+      "description": "Esta solicitud ya tiene una respuesta. Consulta su estado en la aplicación que la solicitó antes de volver a intentarlo."
+    },
     "wallet_interaction_complete": {
       "title": "Interacción con billetera completada",
       "description": "La acción se ejecutó exitosamente."
