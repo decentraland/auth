@@ -115,6 +115,10 @@
       "title": "Your app needs an update",
       "description": "This version of {explorerText} uses a sign-in method that is no longer supported. Please update to the latest version and sign in again."
     },
+    "request_already_answered": {
+      "title": "Request already answered",
+      "description": "This request already has an answer. Check the requesting app for its status before trying again."
+    },
     "wallet_interaction_complete": {
       "title": "Wallet interaction complete",
       "description": "The action has been executed successfully."
