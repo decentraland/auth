@@ -194,7 +194,8 @@ function isMagicNetworkError(error: unknown): boolean {
  * `preAuthenticate` rethrows the server's message as is. The login page already shows this as the
  * translated invalid-email error. It is a typo in user input, not a fault of ours.
  *
- * Only the exact message matches, so any other thirdweb failure keeps reporting.
+ * Only that message matches (ignoring case, surrounding spaces and the trailing period), so any other
+ * thirdweb failure keeps reporting.
  */
 function isThirdwebInvalidEmailError(error: unknown): boolean {
   return isErrorWithMessage(error) && typeof error.message === 'string' && /^invalid email\.?$/i.test(error.message.trim())
