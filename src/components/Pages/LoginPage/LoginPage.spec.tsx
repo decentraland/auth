@@ -684,7 +684,7 @@ describe('LoginPage', () => {
     })
   })
 
-  describe('when the clock sync continue flow fails after reconnecting', () => {
+  describe('when a wallet login is signed but the clock is out of sync', () => {
     let connectionResponse: ConnectionResponse
     let freshIdentity: AuthIdentity
 
@@ -692,12 +692,10 @@ describe('LoginPage', () => {
       connectionResponse = createMockConnectionResponse()
       freshIdentity = createMockIdentity()
 
-      // First connect (in handleOnConnect) succeeds, the reconnect during clock sync
-      // continue fails.
-      mockConnectToProvider.mockResolvedValueOnce(connectionResponse).mockRejectedValueOnce(new Error('clock continue failed'))
+      mockConnectToProvider.mockResolvedValue(connectionResponse)
       mockGetIdentitySignature.mockResolvedValue(freshIdentity)
       mockTrackLoginSuccess.mockResolvedValue(undefined)
-      // Force clock desync so the ClockSyncModal opens after the wallet connects
+      // Force clock desync so the ClockSyncModal opens after the wallet signs
       mockCheckClockSync.mockResolvedValue(false)
 
       Object.defineProperty(window, 'ethereum', { value: {}, writable: true, configurable: true })
@@ -708,7 +706,7 @@ describe('LoginPage', () => {
       delete (window as any).ethereum
     })
 
-    it('should show the connection layout with an error state instead of leaving the page silently disabled', async () => {
+    const signInAndContinue = async () => {
       const user = userEvent.setup()
       render(<LoginPage />)
 
@@ -725,11 +723,102 @@ describe('LoginPage', () => {
       })
 
       await user.click(continueButton)
+    }
 
-      await waitFor(() => {
-        const modal = document.querySelector('[data-testid="connection-modal"]')
-        expect(modal?.getAttribute('data-open')).toBe('true')
-        expect(modal?.getAttribute('data-state')).toBe(ConnectionLayoutState.ERROR)
+    describe('and the user continues past the clock sync warning', () => {
+      beforeEach(() => {
+        mockEnsureProfile.mockResolvedValue({ avatars: [{}] })
+      })
+
+      it('should finish the login with the already signed account and identity', async () => {
+        await signInAndContinue()
+
+        await waitFor(() => {
+          expect(mockEnsureProfile).toHaveBeenCalledWith(
+            connectionResponse.account,
+            freshIdentity,
+            expect.objectContaining({ redirectTo: expect.any(String) })
+          )
+        })
+        expect(mockRedirect).toHaveBeenCalled()
+      })
+
+      it('should not connect to the wallet a second time', async () => {
+        await signInAndContinue()
+
+        await waitFor(() => {
+          expect(mockRedirect).toHaveBeenCalled()
+        })
+        expect(mockConnectToProvider).toHaveBeenCalledTimes(1)
+      })
+    })
+
+    describe('and finishing the login fails after continuing', () => {
+      beforeEach(() => {
+        mockEnsureProfile.mockRejectedValue(new Error('clock continue failed'))
+        mockHandleError.mockReturnValue('clock continue failed')
+      })
+
+      it('should show the connection layout with a generic error state instead of leaving the page silently disabled', async () => {
+        await signInAndContinue()
+
+        await waitFor(() => {
+          const modal = document.querySelector('[data-testid="connection-modal"]')
+          expect(modal?.getAttribute('data-open')).toBe('true')
+          expect(modal?.getAttribute('data-state')).toBe(ConnectionLayoutState.ERROR_GENERIC)
+        })
+      })
+    })
+  })
+
+  describe('when an email login is signed but the clock is out of sync', () => {
+    let freshIdentity: AuthIdentity
+
+    beforeEach(() => {
+      freshIdentity = createMockIdentity()
+
+      mockGetIdentitySignature.mockResolvedValue(freshIdentity)
+      mockEnsureProfile.mockResolvedValue({ avatars: [{}] })
+      mockTrackLoginSuccess.mockResolvedValue(undefined)
+      mockCheckClockSync.mockResolvedValue(false)
+    })
+
+    describe('and the user continues past the clock sync warning', () => {
+      it('should finish the login with the OTP account and fresh identity without reconnecting the thirdweb provider', async () => {
+        const user = userEvent.setup()
+        render(<LoginPage />)
+
+        await waitFor(() => {
+          expect(capturedOnEmailSubmit).toBeDefined()
+        })
+
+        capturedOnEmailSubmit!('test@example.com')
+
+        const successButton = await waitFor(() => {
+          const btn = document.querySelector('[data-testid="mock-email-success"]')
+          expect(btn).toBeTruthy()
+          return btn as HTMLElement
+        })
+
+        await user.click(successButton)
+
+        const continueButton = await waitFor(() => {
+          const btn = document.querySelector('[data-testid="clock-sync-continue"]')
+          expect(btn).toBeTruthy()
+          return btn as HTMLElement
+        })
+
+        await user.click(continueButton)
+
+        await waitFor(() => {
+          expect(mockEnsureProfile).toHaveBeenCalledWith(
+            '0xemailuser',
+            freshIdentity,
+            expect.objectContaining({ redirectTo: expect.any(String) })
+          )
+        })
+        expect(mockRedirect).toHaveBeenCalled()
+        expect(mockConnectToProvider).not.toHaveBeenCalled()
       })
     })
   })
