@@ -1,15 +1,28 @@
 /**
- * Checks if the local computer clock is synchronized with the server clock
- * @param serverTimestamp - Server timestamp in milliseconds
- * @param toleranceMinutes - Tolerance in minutes (default: 5)
- * @returns true if clocks are synchronized within tolerance, false otherwise
+ * How far the local clock may lag behind the server's. Signed fetches (ADR-44) carry the local
+ * `Date.now()` as their timestamp and the auth server rejects one whose timestamp is more than 60s
+ * in its past, so a clock further behind than that fails every signed request (`POST /identities`
+ * answers "Expired signature"). Half the window leaves the other half for the request's latency.
  */
-const isClockSynchronized = (serverTimestamp: number, toleranceMinutes = 5): boolean => {
-  const localTimestamp = Date.now()
-  const timeDifference = Math.abs(localTimestamp - serverTimestamp)
-  const toleranceMs = toleranceMinutes * 60 * 1000 // Convert minutes to milliseconds
+const MAX_CLOCK_BEHIND_MS = 30 * 1000
 
-  return timeDifference <= toleranceMs
+/**
+ * How far the local clock may run ahead of the server's. A timestamp in the future is not rejected
+ * by the signed-fetch check, so this keeps the tolerance the check has always had.
+ */
+const MAX_CLOCK_AHEAD_MS = 5 * 60 * 1000
+
+/**
+ * Checks if the local computer clock is synchronized with the server clock.
+ * The tolerance is asymmetric: a clock that is behind breaks signed requests long before one that
+ * is ahead does (see MAX_CLOCK_BEHIND_MS).
+ * @param serverTimestamp - Server timestamp in milliseconds
+ * @returns true if the local clock is within tolerance of the server's, false otherwise
+ */
+const isClockSynchronized = (serverTimestamp: number): boolean => {
+  const drift = Date.now() - serverTimestamp // negative when the local clock is behind
+
+  return drift >= -MAX_CLOCK_BEHIND_MS && drift <= MAX_CLOCK_AHEAD_MS
 }
 
 /**
@@ -35,4 +48,4 @@ async function checkClockSync(): Promise<boolean> {
   }
 }
 
-export { isClockSynchronized, checkClockSync }
+export { isClockSynchronized, checkClockSync, MAX_CLOCK_AHEAD_MS, MAX_CLOCK_BEHIND_MS }
