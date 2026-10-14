@@ -605,8 +605,7 @@ export const RequestPage = () => {
       try {
         // Reuse an in-flight POST if the effect re-runs mid-request so the identity is
         // created exactly once instead of leaving an orphaned identity on the server.
-        // Forward the route UUID as the correlation id so the success event (fired inside
-        // postIdentity) can be tied to the instance that requested the login.
+        // The route UUID binds the identity to the client's verifier and tags the success event.
         if (!clientLoginPromiseRef.current) {
           clientLoginPromiseRef.current = authServerClient.current.postIdentity(currentIdentity, { authRequestId: requestId })
         }

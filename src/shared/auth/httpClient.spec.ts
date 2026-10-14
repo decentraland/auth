@@ -539,33 +539,59 @@ describe('createAuthServerClient', () => {
         })
       })
 
-      it('should post the identity and return the response', async () => {
-        const result = await client.postIdentity(mockIdentity)
+      describe('and no authRequestId is given', () => {
+        let result: unknown
 
-        expect(signedFetch).toHaveBeenCalledWith(mockUrl + '/identities', {
-          method: 'POST',
-          headers: {
-            // eslint-disable-next-line @typescript-eslint/naming-convention
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ identity: mockIdentity, isMobile: false }),
-          identity: mockIdentity
+        beforeEach(async () => {
+          result = await client.postIdentity(mockIdentity)
         })
-        expect(result).toEqual(mockResponse)
+
+        it('should post the identity without an authRequestId', () => {
+          expect(signedFetch).toHaveBeenCalledWith(mockUrl + '/identities', {
+            method: 'POST',
+            headers: {
+              // eslint-disable-next-line @typescript-eslint/naming-convention
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ identity: mockIdentity, isMobile: false }),
+            identity: mockIdentity
+          })
+        })
+
+        it('should return the response', () => {
+          expect(result).toEqual(mockResponse)
+        })
+
+        it('should track the success without an authRequestId', () => {
+          expect(mockTrack).toHaveBeenCalledWith(TrackingEvents.DEEP_LINK_AUTH_SUCCESS, { type: 'success' })
+        })
       })
 
-      it('should track the success without an authRequestId if the call gave none', async () => {
-        await client.postIdentity(mockIdentity)
+      describe('and an authRequestId is given', () => {
+        let authRequestId: string
 
-        expect(mockTrack).toHaveBeenCalledWith(TrackingEvents.DEEP_LINK_AUTH_SUCCESS, { type: 'success' })
-      })
+        beforeEach(async () => {
+          authRequestId = '13d31e96-1a1a-48ec-af16-b10c4c982e08'
+          await client.postIdentity(mockIdentity, { authRequestId })
+        })
 
-      it('should forward a given authRequestId onto the success tracking event', async () => {
-        await client.postIdentity(mockIdentity, { authRequestId: 'a-request-uuid' })
+        it('should post the identity with the authRequestId in the body', () => {
+          expect(signedFetch).toHaveBeenCalledWith(mockUrl + '/identities', {
+            method: 'POST',
+            headers: {
+              // eslint-disable-next-line @typescript-eslint/naming-convention
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ identity: mockIdentity, authRequestId }),
+            identity: mockIdentity
+          })
+        })
 
-        expect(mockTrack).toHaveBeenCalledWith(TrackingEvents.DEEP_LINK_AUTH_SUCCESS, {
-          type: 'success',
-          authRequestId: 'a-request-uuid'
+        it('should forward the authRequestId onto the success tracking event', () => {
+          expect(mockTrack).toHaveBeenCalledWith(TrackingEvents.DEEP_LINK_AUTH_SUCCESS, {
+            type: 'success',
+            authRequestId
+          })
         })
       })
     })

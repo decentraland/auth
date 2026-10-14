@@ -74,8 +74,8 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
 
   const postIdentity = async (
     identity: AuthIdentity,
-    // `authRequestId` is the deep-link handoff's correlation id (the route UUID); forwarded onto
-    // the success event so a login can be tied to the instance that requested it in analytics.
+    // `authRequestId` is the deep-link route UUID: sent so the server can bind retrieval to the client's verifier,
+    // and tracked on the success event.
     opts: { isMobile?: boolean; authRequestId?: string | null } = { isMobile: false }
   ): Promise<IdentityResponse> => {
     try {
@@ -85,7 +85,7 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
           // eslint-disable-next-line @typescript-eslint/naming-convention
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ identity, isMobile: opts.isMobile }),
+        body: JSON.stringify({ identity, isMobile: opts.isMobile, ...(opts.authRequestId ? { authRequestId: opts.authRequestId } : {}) }),
         identity
       })
 
