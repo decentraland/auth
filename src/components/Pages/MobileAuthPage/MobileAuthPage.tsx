@@ -47,7 +47,8 @@ export const MobileAuthPage = () => {
   const { trackLoginClick, trackLoginSuccess } = useAnalytics()
 
   const authRequestIdParam = searchParams.get(AUTH_REQUEST_ID_PARAM)
-  const authRequestId = authRequestIdParam && isValidUuidV4(authRequestIdParam) ? authRequestIdParam.toLowerCase() : null
+  // Forwarded as received, like RequestPage: the app may match it byte for byte and auth-server compares case-insensitively.
+  const authRequestId = authRequestIdParam && isValidUuidV4(authRequestIdParam) ? authRequestIdParam : null
   const providerParam = searchParams.get('provider')
   const parsedProvider = parseConnectionOptionType(providerParam)
   // Email has its own OTP flow (handleEmailSubmit) and can't be auto-initiated via initiateAuth,

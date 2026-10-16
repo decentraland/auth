@@ -57,7 +57,7 @@ function getConnectionOptionFromState(): ConnectionOptionType | undefined {
 // The authRequestId the app opened /mobile with, or null when absent or not a UUID v4.
 function getAuthRequestIdFromState(): string | null {
   const value = extractCustomDataFromState()?.authRequestId
-  return typeof value === 'string' && isValidUuidV4(value) ? value.toLowerCase() : null
+  return typeof value === 'string' && isValidUuidV4(value) ? value : null
 }
 
 // Exported for testing only

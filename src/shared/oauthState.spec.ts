@@ -96,8 +96,8 @@ describe('oauth state', () => {
         setLocation('/auth/mobile/callback', `?state=${state}`)
       })
 
-      it('should return it lowercased', () => {
-        expect(getAuthRequestIdFromState()).toBe('13d31e96-1a1a-48ec-af16-b10c4c982e08')
+      it('should return it as the app sent it', () => {
+        expect(getAuthRequestIdFromState()).toBe('13D31E96-1A1A-48EC-AF16-B10C4C982E08')
       })
     })
 

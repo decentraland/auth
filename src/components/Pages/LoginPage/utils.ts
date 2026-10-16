@@ -4,7 +4,7 @@ import { Env } from '@dcl/ui-env'
 import { ConnectionResponse, WalletConnectV2Connector, connection, getConfiguration } from 'decentraland-connect'
 import { config } from '../../../modules/config'
 import { clearWagmiStorage, hasLiveWalletConnectSession } from '../../../shared/connection/walletConnect'
-import { AUTH_REQUEST_ID_PARAM, extractReferrerFromSearchParameters } from '../../../shared/locations'
+import { AUTH_REQUEST_ID_PARAM, extractReferrerFromSearchParameters, isValidUuidV4 } from '../../../shared/locations'
 import { ConnectionOptionType, SignInOptionsMode } from '../../Connection'
 import { FeatureFlagsKeys, SignInPrimaryOptionVariant } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
 import type { FeatureFlagsVariants } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
@@ -71,6 +71,7 @@ async function connectToSocialProvider(
     const url = new URL(window.location.href)
     const search = new URLSearchParams(window.location.search)
     const referrer = extractReferrerFromSearchParameters(search)
+    const mobileAuthRequestId = search.get(AUTH_REQUEST_ID_PARAM)
     url.pathname = '/auth/callback'
     url.search = ''
 
@@ -87,7 +88,7 @@ async function connectToSocialProvider(
           mobileUserId: search.get('u') ?? undefined,
           mobileSessionId: search.get('s') ?? undefined,
           // Read back by MobileCallbackPage via getAuthRequestIdFromState() and posted with the identity.
-          authRequestId: search.get(AUTH_REQUEST_ID_PARAM) ?? undefined,
+          authRequestId: mobileAuthRequestId && isValidUuidV4(mobileAuthRequestId) ? mobileAuthRequestId : undefined,
           // Read back by MobileCallbackPage via getConnectionOptionFromState() so analytics know
           // which OAuth provider (Google/Apple/Discord/X) the mobile user picked.
           connectionOption
