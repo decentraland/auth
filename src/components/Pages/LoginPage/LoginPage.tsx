@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { AuthIdentity } from '@dcl/crypto'
 import { useTranslation } from '@dcl/hooks'
 import { connection } from 'decentraland-connect'
@@ -134,9 +134,16 @@ export const LoginPage = () => {
     [skipSetup, redirectTo, identity, ensureProfile, redirect]
   )
 
-  const checkClockSynchronization = useCallback(async (): Promise<boolean> => {
+  // The login that was already signed when the clock check failed. Continuing past the
+  // ClockSyncModal finishes this login as-is: reconnecting the provider would recreate the
+  // thirdweb in-app wallet (whose autoConnect can't see the OTP session yet, so it throws
+  // "No active session") or force a fresh WalletConnect pairing.
+  const pendingClockSyncLoginRef = useRef<{ account: string; identity: AuthIdentity } | null>(null)
+
+  const checkClockSynchronization = useCallback(async (pendingLogin: { account: string; identity: AuthIdentity }): Promise<boolean> => {
     const isSync = await checkClockSync()
     if (!isSync) {
+      pendingClockSyncLoginRef.current = pendingLogin
       setShowConnectionLayout(false)
       setShowClockSyncModal(true)
       return false
@@ -275,7 +282,7 @@ export const LoginPage = () => {
 
           const referrer = getReferrerFromCurrentSearch()
 
-          const isClockSync = await checkClockSynchronization()
+          const isClockSync = await checkClockSynchronization({ account: connectionData.account ?? '', identity: freshIdentity })
 
           if (isClockSync) {
             await runProfileRedirect(connectionData.account ?? '', referrer, freshIdentity, () => setShowConnectionLayout(false))
@@ -396,7 +403,7 @@ export const LoginPage = () => {
 
         const referrer = getReferrerFromCurrentSearch()
 
-        const isClockSync = await checkClockSynchronization()
+        const isClockSync = await checkClockSynchronization({ account: address, identity: freshIdentity })
 
         if (isClockSync) {
           await runProfileRedirect(address, referrer, freshIdentity, () => setShowConfirmingLogin(false))
@@ -442,26 +449,29 @@ export const LoginPage = () => {
   const handleClockSyncContinue = useCallback(async () => {
     setShowClockSyncModal(false)
 
-    if (!currentConnectionType) return
+    const pendingLogin = pendingClockSyncLoginRef.current
+    pendingClockSyncLoginRef.current = null
 
-    const referrer = getReferrerFromCurrentSearch()
-
-    if (requiresInjectedProvider(currentConnectionType) && !window.ethereum) {
-      handleError(new Error('No wallet extension detected'), 'Wallet extension not available for clock sync continue')
+    if (!pendingLogin) {
+      // Nothing to finish: release the login options instead of leaving them disabled.
+      setCurrentConnectionType(undefined)
       return
     }
 
+    const referrer = getReferrerFromCurrentSearch()
+
     try {
-      const connectionData = await connectToProvider(currentConnectionType)
-      await runProfileRedirect(connectionData.account ?? '', referrer, null, () => setShowConnectionLayout(false))
+      await runProfileRedirect(pendingLogin.account, referrer, pendingLogin.identity, () => setShowConnectionLayout(false))
     } catch (error) {
-      handleError(error, 'Error during clock sync continue flow')
+      const errorMessage = handleError(error, 'Error during clock sync continue flow')
       // Surface a visible, recoverable error instead of leaving the page silently
-      // disabled with currentConnectionType still set (mirrors the handleOnConnect catch).
-      setLoadingState(ConnectionLayoutState.ERROR)
+      // disabled with currentConnectionType still set. The wallet was not asked to confirm
+      // anything here, so this gets the generic copy rather than the did-not-confirm one.
+      setConnectionErrorDetail(errorMessage)
+      setLoadingState(ConnectionLayoutState.ERROR_GENERIC)
       setShowConnectionLayout(true)
     }
-  }, [currentConnectionType, runProfileRedirect, getReferrerFromCurrentSearch])
+  }, [runProfileRedirect, getReferrerFromCurrentSearch])
 
   useEffect(() => {
     const images = NEW_USER_BACKGROUND_IMAGES
