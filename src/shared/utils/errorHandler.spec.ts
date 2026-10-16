@@ -198,3 +198,40 @@ describe('handleError → Magic network failures', () => {
     })
   })
 })
+
+describe('handleError → thirdweb invalid-email rejections', () => {
+  const mockTrackEvent = trackEvent as jest.Mock
+  const invalidEmail = new Error('Invalid email.')
+
+  beforeEach(() => {
+    mockCaptureException.mockClear()
+    mockTrackEvent.mockClear()
+  })
+
+  it('should not report the address the user mistyped to Sentry', () => {
+    handleError(invalidEmail, 'Error sending verification code')
+
+    expect(mockCaptureException).not.toHaveBeenCalled()
+  })
+
+  it('should still track it, since the login did fail for the user', () => {
+    handleError(invalidEmail, 'Error sending verification code')
+
+    expect(mockTrackEvent).toHaveBeenCalledWith(
+      TrackingEvents.LOGIN_ERROR,
+      expect.objectContaining({ error: 'Invalid email.', context: 'Error sending verification code' })
+    )
+  })
+
+  it('should return the message so the login page can show the invalid-email error', () => {
+    expect(handleError(invalidEmail, 'Error sending verification code')).toBe('Invalid email.')
+  })
+
+  describe('and thirdweb fails for any other reason', () => {
+    it('should still be reported', () => {
+      handleError(new Error('Failed to send verification code'), 'Error sending verification code')
+
+      expect(mockCaptureException).toHaveBeenCalledTimes(1)
+    })
+  })
+})
