@@ -11,7 +11,7 @@ import { createAuthServerHttpClient } from '../../../shared/auth'
 import { ONE_MONTH_IN_MINUTES, getIdentitySignature } from '../../../shared/connection/identity'
 import { isMagicRpcError } from '../../../shared/errors'
 import { locations } from '../../../shared/locations'
-import { getConnectionOptionFromState } from '../../../shared/oauthState'
+import { getAuthRequestIdFromState, getConnectionOptionFromState } from '../../../shared/oauthState'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { OAUTH_ACCESS_DENIED_ERROR, createMagicInstance } from '../../../shared/utils/magicSdk'
 import { ConnectionContainer, ConnectionTitle, DecentralandLogo, ProgressContainer } from '../../ConnectionModal/ConnectionLayout.styled'
@@ -29,6 +29,8 @@ export const MobileCallbackPage = () => {
   const [targetConfig] = useTargetConfig()
   const { trackLoginSuccess } = useAnalytics()
 
+  // Read on first render, before getRedirectResult() strips the `state` query param.
+  const [authRequestId] = useState(getAuthRequestIdFromState)
   const hasStartedProcessing = useRef(false)
   const [identityId, setIdentityId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -38,7 +40,7 @@ export const MobileCallbackPage = () => {
     const oauthError = new URLSearchParams(window.location.search).get('error')
     if (oauthError === OAUTH_ACCESS_DENIED_ERROR) {
       // User cancelled at the OAuth provider — not an error, go back to mobile login
-      navigate(locations.mobile())
+      navigate(locations.mobile(undefined, authRequestId))
       return
     }
 
@@ -61,7 +63,7 @@ export const MobileCallbackPage = () => {
 
       // Post identity to server
       const httpClient = createAuthServerHttpClient()
-      const response = await httpClient.postIdentity(identity, { isMobile: true })
+      const response = await httpClient.postIdentity(identity, { isMobile: true, authRequestId })
 
       await trackLoginSuccess({
         ethAddress,
@@ -84,7 +86,7 @@ export const MobileCallbackPage = () => {
       })
       setError(err instanceof Error ? err.message : 'Authentication failed')
     }
-  }, [isMagicTest, navigate, trackLoginSuccess])
+  }, [authRequestId, isMagicTest, navigate, trackLoginSuccess])
 
   useEffect(() => {
     if (!initialized || hasStartedProcessing.current) return
@@ -94,8 +96,8 @@ export const MobileCallbackPage = () => {
   }, [initialized, processOAuthCallback])
 
   const handleRetry = useCallback(() => {
-    navigate(locations.mobile())
-  }, [navigate])
+    navigate(locations.mobile(undefined, authRequestId))
+  }, [authRequestId, navigate])
 
   // Show error state
   if (error) {
@@ -118,7 +120,14 @@ export const MobileCallbackPage = () => {
 
   // Show success screen - use shared MobileAuthSuccess component
   if (identityId) {
-    return <MobileAuthSuccess identityId={identityId} explorerText={targetConfig.explorerText} onTryAgain={handleRetry} />
+    return (
+      <MobileAuthSuccess
+        identityId={identityId}
+        authRequestId={authRequestId}
+        explorerText={targetConfig.explorerText}
+        onTryAgain={handleRetry}
+      />
+    )
   }
 
   // Show loading state

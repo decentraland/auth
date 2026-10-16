@@ -110,7 +110,13 @@ const locations = {
     `/quick-setup${redirectTo ? `?redirectTo=${encodeURIComponent(redirectTo)}` : ''}${
       referrer ? `${redirectTo ? '&' : '?'}referrer=${encodeURIComponent(referrer)}` : ''
     }`,
-  mobile: (provider?: string) => `/mobile${provider ? `?provider=${encodeURIComponent(provider)}` : ''}`,
+  mobile: (provider?: string, authRequestId?: string | null) => {
+    const params = new URLSearchParams()
+    if (provider) params.set('provider', provider)
+    if (authRequestId) params.set(AUTH_REQUEST_ID_PARAM, authRequestId)
+    const query = params.toString()
+    return `/mobile${query ? `?${query}` : ''}`
+  },
   mobileCallback: () => '/mobile/callback'
 }
 
