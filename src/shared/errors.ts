@@ -139,6 +139,16 @@ function isExpectedWalletError(error: unknown): boolean {
   // the AppKit modal, so the message is the only signal it leaves.
   if (isErrorWithMessage(error) && error.message === 'User closed the modal without connecting') return true
 
+  // viem InternalRpcError (-32603) thrown when a Ledger device has not been granted browser
+  // HID/WebUSB permission yet. The user must open the browser device-picker before connecting;
+  // there is nothing here for us to fix. The underlying Ledger message arrives in both `message`
+  // (viem formats it in) and `details` (the raw provider payload), so we search both.
+  if ((error as { code: unknown }).code === -32603) {
+    const message = isErrorWithMessage(error) ? error.message : ''
+    const details = typeof (error as { details?: unknown }).details === 'string' ? (error as { details: string }).details : ''
+    if (/No permitted Ledger device found/i.test(`${message} ${details}`)) return true
+  }
+
   return false
 }
 
