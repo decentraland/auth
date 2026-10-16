@@ -11,14 +11,13 @@ import { createAuthServerHttpClient } from '../../../shared/auth'
 import { ONE_MONTH_IN_MINUTES, getIdentitySignature } from '../../../shared/connection/identity'
 import { isMagicRpcError } from '../../../shared/errors'
 import { locations } from '../../../shared/locations'
-import { getConnectionOptionFromState } from '../../../shared/oauthState'
+import { getAuthRequestIdFromState, getConnectionOptionFromState } from '../../../shared/oauthState'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { OAUTH_ACCESS_DENIED_ERROR, createMagicInstance } from '../../../shared/utils/magicSdk'
 import { ConnectionContainer, ConnectionTitle, DecentralandLogo, ProgressContainer } from '../../ConnectionModal/ConnectionLayout.styled'
 import { FeatureFlagsContext, FeatureFlagsKeys } from '../../FeatureFlagsProvider'
 import { ActionButton, Background, Description, Icon, Main, SuccessContainer, Title } from '../MobileAuthPage/MobileAuthPage.styled'
 import { MobileAuthSuccess } from '../MobileAuthPage/MobileAuthSuccess'
-import { getPersistedMobileAuthRequestId } from '../MobileAuthPage/utils'
 
 const ArrowBackIosNewTwoToneIcon = muiIcons.ArrowBackIosNewTwoTone
 
@@ -30,7 +29,8 @@ export const MobileCallbackPage = () => {
   const [targetConfig] = useTargetConfig()
   const { trackLoginSuccess } = useAnalytics()
 
-  const [authRequestId] = useState(getPersistedMobileAuthRequestId)
+  // Read on first render, before getRedirectResult() strips the `state` query param.
+  const [authRequestId] = useState(getAuthRequestIdFromState)
   const hasStartedProcessing = useRef(false)
   const [identityId, setIdentityId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)

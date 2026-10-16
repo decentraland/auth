@@ -9,7 +9,7 @@ import { createAuthServerHttpClient } from '../../../shared/auth'
 import { ONE_MONTH_IN_MINUTES, getIdentitySignature } from '../../../shared/connection/identity'
 import { TRACKING_DELAY } from '../../../shared/constants'
 import { isErrorWithName } from '../../../shared/errors'
-import { AUTH_REQUEST_ID_PARAM } from '../../../shared/locations'
+import { AUTH_REQUEST_ID_PARAM, isValidUuidV4 } from '../../../shared/locations'
 import { disconnectWallet, sendEmailOTP } from '../../../shared/thirdweb'
 import { wait } from '../../../shared/time'
 import { handleError } from '../../../shared/utils/errorHandler'
@@ -30,7 +30,7 @@ import { MobileEmailLoginModal } from './MobileEmailLoginModal'
 import { EmailLoginResult } from './MobileEmailLoginModal/MobileEmailLoginModal.types'
 import { MobileProviderSelection } from './MobileProviderSelection'
 import { isTestAuthEmail, sendTestAuthCode } from './testAuth'
-import { parseConnectionOptionType, persistMobileAuthRequestId } from './utils'
+import { parseConnectionOptionType } from './utils'
 import { Main } from './MobileAuthPage.styled'
 
 type MobileAuthView = 'selection' | 'connecting' | 'success' | 'error'
@@ -46,8 +46,8 @@ export const MobileAuthPage = () => {
   const [targetConfig] = useTargetConfig()
   const { trackLoginClick, trackLoginSuccess } = useAnalytics()
 
-  // Persisted on every visit (or cleared when absent) so the OAuth callback posts the same id.
-  const [authRequestId] = useState(() => persistMobileAuthRequestId(searchParams.get(AUTH_REQUEST_ID_PARAM)))
+  const authRequestIdParam = searchParams.get(AUTH_REQUEST_ID_PARAM)
+  const authRequestId = authRequestIdParam && isValidUuidV4(authRequestIdParam) ? authRequestIdParam.toLowerCase() : null
   const providerParam = searchParams.get('provider')
   const parsedProvider = parseConnectionOptionType(providerParam)
   // Email has its own OTP flow (handleEmailSubmit) and can't be auto-initiated via initiateAuth,
