@@ -145,7 +145,8 @@ function isExpectedWalletError(error: unknown): boolean {
 /**
  * Wallet-side conditions that stay out of Sentry but, unlike {@link isExpectedWalletError}, keep
  * their message on the login screen. The login screen blanks the error detail for expected wallet
- * errors, and for these the wallet's own message is what tells the user what to do:
+ * errors, and for these the message (the wallet's own, or the connector's) is what tells the user
+ * what to do:
  *
  * - EIP-1193 `4100` (Unauthorized) with "DApp interaction is disabled": the user switched dApp
  *   access off in the wallet.
