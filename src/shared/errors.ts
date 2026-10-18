@@ -145,15 +145,19 @@ function isExpectedWalletError(error: unknown): boolean {
 /**
  * Wallet-side conditions that stay out of Sentry but, unlike {@link isExpectedWalletError}, keep
  * their message on the login screen. The login screen blanks the error detail for expected wallet
- * errors, and for these the wallet's own message is what tells the user what to do:
+ * errors, and for these the message (the wallet's own, or the connector's) is what tells the user
+ * what to do:
  *
  * - EIP-1193 `4100` (Unauthorized) with "DApp interaction is disabled": the user switched dApp
  *   access off in the wallet.
  * - `-32001` with "Already processing unlock. Please wait.": the wallet is still busy unlocking.
+ * - A bare `Error("Connection timeout")`: decentraland-connect's WalletConnectV2Connector gave up
+ *   after the AppKit modal sat open for five minutes without a wallet approving the connection.
  *
- * Both match on the code and the exact message. Other `4100` refusals (an account or method the
- * user never authorized) can point at our own requests, and other `-32001` failures are not this
- * state, so they keep reporting.
+ * The first two match on the code and the exact message. Other `4100` refusals (an account or
+ * method the user never authorized) can point at our own requests, and other `-32001` failures are
+ * not this state, so they keep reporting. The timeout carries no code, so it matches only a real
+ * `Error` with that exact message and no `code` of its own.
  */
 function isUnreportedWalletCondition(error: unknown): boolean {
   if (!isErrorWithMessage(error)) return false
@@ -166,6 +170,11 @@ function isUnreportedWalletCondition(error: unknown): boolean {
 
   if (code === 4100 && says('DApp interaction is disabled')) return true
   if (code === -32001 && says('Already processing unlock. Please wait.')) return true
+
+  // The connector's own 5-minute wait for the wallet to approve, rejected as a bare Error. It fires
+  // when the user leaves the QR modal open without finishing the pairing; the login screen keeps
+  // showing "Connection timeout", which is what tells the user to try again.
+  if (error instanceof Error && code === undefined && error.message === 'Connection timeout') return true
 
   return false
 }
