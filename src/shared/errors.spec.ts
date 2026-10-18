@@ -240,10 +240,29 @@ describe('isUnreportedWalletCondition', () => {
     })
   })
 
+  describe('when the WalletConnect modal was left open until the connector gave up', () => {
+    it('should match the bare timeout Error the connector rejects with', () => {
+      expect(isUnreportedWalletCondition(new Error('Connection timeout'))).toBe(true)
+    })
+
+    it('should not match a plain object that only carries the message', () => {
+      expect(isUnreportedWalletCondition({ message: 'Connection timeout' })).toBe(false)
+    })
+
+    it('should not match a timeout that carries a code of its own', () => {
+      expect(isUnreportedWalletCondition(Object.assign(new Error('Connection timeout'), { code: -32603 }))).toBe(false)
+    })
+
+    it('should not match a different timeout message', () => {
+      expect(isUnreportedWalletCondition(new Error('Connection timeout while fetching the profile'))).toBe(false)
+    })
+  })
+
   describe('when the login screen decides what to show', () => {
     it('should stay apart from the expected wallet errors, so the wallet message is kept', () => {
       expect(isExpectedWalletError({ code: 4100, message: 'DApp interaction is disabled' })).toBe(false)
       expect(isExpectedWalletError({ code: -32001, message: 'Already processing unlock. Please wait.' })).toBe(false)
+      expect(isExpectedWalletError(new Error('Connection timeout'))).toBe(false)
     })
   })
 
