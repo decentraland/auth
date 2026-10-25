@@ -115,6 +115,10 @@
       "title": "Your app needs an update",
       "description": "This version of {explorerText} uses a sign-in method that is no longer supported. Please update to the latest version and sign in again."
     },
+    "request_already_answered": {
+      "title": "Request already answered",
+      "description": "This request already has an answer. Check the requesting app for its status before trying again."
+    },
     "wallet_interaction_complete": {
       "title": "Wallet interaction complete",
       "description": "The action has been executed successfully."
@@ -203,6 +207,7 @@
       "processing_title": "Confirming your purchase",
       "price_label": "PRICE",
       "price": "{credits} credits",
+      "priced_in_mana": "Priced at {mana} MANA · charged in credits at the MANA/USD rate",
       "quantity": "QUANTITY 1",
       "delivered_to": "Delivered to your account {address}",
       "approve": "Confirm purchase",
@@ -232,12 +237,16 @@
       "seller": "Listed by",
       "payment_beneficiary": "Payment goes to",
       "price_usd_wei": "Signed price (USD wei, 1e18 = $1)",
+      "price_mana": "Signed price (MANA)",
+      "mana_usd_rate": "MANA/USD rate the charge was checked at",
       "max_credited_mana": "Most the credit may pay (MANA, not credits)",
       "credits_manager": "Credits contract",
       "marketplace": "Marketplace contract",
+      "collection_store": "Collection store contract",
       "payment_token": "Payment token",
       "expires_at": "Authorization expires",
       "trade_expires_at": "Listing expires",
+      "credit_expires_at": "Credit valid until",
       "network": "Network"
     }
   },

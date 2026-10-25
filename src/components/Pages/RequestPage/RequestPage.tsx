@@ -51,7 +51,7 @@ import { sendTipNotification } from '../../../shared/notifications'
 import { identifyUser, trackEvent } from '../../../shared/utils/analytics'
 import { handleError } from '../../../shared/utils/errorHandler'
 import { FeatureFlagsContext } from '../../FeatureFlagsProvider/FeatureFlagsProvider.types'
-import { fetchAuthorizedCharge, verifyAuthorizedCharge } from './authorizedCharge'
+import { fetchAuthorizedCharge, verifyApproximateCharge, verifyAuthorizedCharge } from './authorizedCharge'
 import {
   RequestClassification,
   classifyRequest,
@@ -59,8 +59,9 @@ import {
   getPayloadFingerprint,
   isTransactionClassification
 } from './classifyRequest'
+import { CENTS_PER_CREDIT, ManaUsdRate, approximateChargeBounds } from './creditsPricing'
 import { MILLISECONDS_PER_SECOND } from './creditsPurchase'
-import { CreditsPurchaseData, GasEstimateState, MANATransferData, NFTTransferData, TransferType } from './types'
+import { CreditsPurchaseData, CreditsPurchasePricing, GasEstimateState, MANATransferData, NFTTransferData, TransferType } from './types'
 import {
   decodeManaTransferData,
   decodeNftTransferData,
@@ -74,7 +75,8 @@ import {
   getNetworkProvider,
   getSigninDeeplink,
   isAddressWithoutCode,
-  isDecentralandCollection
+  isDecentralandCollection,
+  readManaUsdRate
 } from './utils'
 import {
   ActionRequestView,
@@ -89,6 +91,7 @@ import {
   LookupUnavailableError,
   OutdatedClientError,
   RecoverError,
+  RequestAlreadyAnswered,
   SigningError,
   TimeoutError,
   TransferCanceledView,
@@ -103,6 +106,7 @@ import { forwardSignatureRequest, toWalletSignatureRequest } from './walletSigna
 
 enum View {
   TIMEOUT,
+  REQUEST_ALREADY_ANSWERED,
   DIFFERENT_ACCOUNT,
   // Loading
   LOADING_REQUEST,
@@ -135,6 +139,7 @@ enum View {
 
 // Terminal views that should not trigger a re-fetch of the request
 const TERMINAL_VIEWS = new Set([
+  View.REQUEST_ALREADY_ANSWERED,
   View.DEEP_LINK_CONTINUE_IN_APP,
   View.CLIENT_LOGIN_ERROR,
   View.OUTDATED_CLIENT,
@@ -159,10 +164,6 @@ const INTERACTION_VIEWS = new Set([
   View.WALLET_MANA_INTERACTION,
   View.WALLET_CREDITS_INTERACTION
 ])
-
-// One credit is a fixed ten US cents, and the credits ledger accounts in cents, so a price derived in
-// credits is compared against it in cents. Same peg the decoder divides by (USD_WEI_PER_CREDIT).
-const CENTS_PER_CREDIT = 10n
 
 // Reported to the client when a request is rejected at recover time, before it reaches the wallet.
 const RPC_METHOD_NOT_SUPPORTED = -32601
@@ -232,6 +233,12 @@ export const RequestPage = () => {
   // every contract it reaches was checked. Null for every other request, and for a credits request whose
   // shape this page will not vouch for — those stay on the generic review.
   const [creditsPurchaseData, setCreditsPurchaseData] = useState<CreditsPurchaseData | null>(null)
+  // A dispatched operation keeps the transfer or purchase it reviewed for its eventual outcome. A provider
+  // refresh clears the live review while that operation can still settle; its summary must survive that
+  // reset. Only a new request/account clears this snapshot, and stale operations cannot publish it.
+  const [nftTransferOutcomeData, setNftTransferOutcomeData] = useState<NFTTransferData | null>(null)
+  const [manaTransferOutcomeData, setManaTransferOutcomeData] = useState<MANATransferData | null>(null)
+  const [creditsPurchaseOutcomeData, setCreditsPurchaseOutcomeData] = useState<CreditsPurchaseData | null>(null)
   // What has become of a signature the wallet already produced: it is being handed back to the app, it got
   // there, or it did not. Only ever set after the wallet has answered, and never a reason to sign again —
   // the screens read it so none of them claims a delivery that has not happened (see CreditsPurchaseOutcomeView).
@@ -294,7 +301,7 @@ export const RequestPage = () => {
   // getMetaTransactionChainId rather than by the wallet's active chain.
   const reviewedWalletChainIdRef = useRef<number>()
   // The moment this review stops being valid, in epoch milliseconds: the request's own expiry, or something
-  // it depends on that lapses sooner (a credits purchase's credit, external call or trade). The approval
+  // it depends on that lapses sooner (a credits purchase's credit or trade). The approval
   // reads it directly before dispatching, because a timer can fire late and every await before the dispatch
   // is a window the deadline can pass in.
   const reviewDeadlineRef = useRef<number>(Number.POSITIVE_INFINITY)
@@ -520,6 +527,9 @@ export const RequestPage = () => {
       setNftTransferData(null)
       setManaTransferData(null)
       setCreditsPurchaseData(null)
+      setNftTransferOutcomeData(null)
+      setManaTransferOutcomeData(null)
+      setCreditsPurchaseOutcomeData(null)
       setSignatureDelivery('delivering')
       setIsTransactionModalOpen(false)
       setReviewedChainId(undefined)
@@ -595,8 +605,7 @@ export const RequestPage = () => {
       try {
         // Reuse an in-flight POST if the effect re-runs mid-request so the identity is
         // created exactly once instead of leaving an orphaned identity on the server.
-        // Forward the route UUID as the correlation id so the success event (fired inside
-        // postIdentity) can be tied to the instance that requested the login.
+        // The route UUID binds the identity to the client's verifier and tags the success event.
         if (!clientLoginPromiseRef.current) {
           clientLoginPromiseRef.current = authServerClient.current.postIdentity(currentIdentity, { authRequestId: requestId })
         }
@@ -935,18 +944,58 @@ export const RequestPage = () => {
            * including a credits-server that cannot answer, leaves the request on the generic review: this
            * screen states a price as a fact, and a fact nothing stands behind must not be stated at all.
            */
+          //
+          // A USD-pegged price gives the credits exactly, and the charge must equal them. A MANA price gives
+          // them only at the MANA/USD rate, which is not in the bytes: it is read live from the feed the charge
+          // was quoted against, and the charge must be the same price quoted a moment earlier (see
+          // verifyApproximateCharge). The number the screen then states is the CHARGE — fixed on the ledger
+          // when the credit was authorized, and what the balance actually loses — never this page's own
+          // conversion, which may round to a different whole credit. A rate that cannot be read is the same as
+          // a ledger that cannot answer.
+          // The charge and the rate do not depend on each other, so the charge is asked for first and read
+          // after the rate, rather than one lookup waiting out the other's timeout. fetchAuthorizedCharge never
+          // rejects (an unreachable ledger is `unavailable`), so a charge left unread when the rate fails is
+          // simply discarded.
           const identity = identityRef.current
-          const chargeVerdict = identity
-            ? verifyAuthorizedCharge(await fetchAuthorizedCharge(purchase.creditSalt, identity), purchase.credits * CENTS_PER_CREDIT)
-            : 'unavailable'
+          const chargeLookup = identity
+            ? fetchAuthorizedCharge(purchase.creditSalt, identity)
+            : Promise.resolve({ status: 'unavailable' } as const)
+          let expectedCharge: { minCents: bigint; maxCents: bigint }
+          let rate: ManaUsdRate | null = null
+          if (purchase.price.kind === 'usd_pegged') {
+            const cents = purchase.price.credits * CENTS_PER_CREDIT
+            expectedCharge = { minCents: cents, maxCents: cents }
+          } else {
+            try {
+              rate = await readManaUsdRate(metaTransaction.chainId)
+            } catch (e) {
+              if (isStale()) return
+              console.error('The MANA/USD rate could not be read, falling back to the generic review', e)
+              trackEvent(TrackingEvents.REQUEST_CLASSIFIED, { requestId, stage: 'credits_rate_unavailable' })
+              showGenericReview()
+              return
+            }
+            if (isStale()) return
+            expectedCharge = approximateChargeBounds(purchase.price.manaWei, rate)
+          }
+
+          const charge = await chargeLookup
+          const chargeVerdict =
+            purchase.price.kind === 'usd_pegged'
+              ? verifyAuthorizedCharge(charge, expectedCharge.minCents)
+              : verifyApproximateCharge(charge, expectedCharge)
           if (isStale()) return
-          if (chargeVerdict !== 'verified') {
-            trackEvent(TrackingEvents.REQUEST_CLASSIFIED, { requestId, type: 'credits_charge_unverified', reason: chargeVerdict })
+          if (chargeVerdict !== 'verified' || charge.status !== 'found') {
+            trackEvent(TrackingEvents.REQUEST_CLASSIFIED, { requestId, stage: 'credits_charge_unverified', reason: chargeVerdict })
             showGenericReview()
             return
           }
+          const pricing: CreditsPurchasePricing =
+            purchase.price.kind === 'mana' && rate
+              ? { kind: 'converted', credits: BigInt(charge.charge.cents) / CENTS_PER_CREDIT, manaWei: purchase.price.manaWei, rate }
+              : { kind: 'exact', credits: BigInt(charge.charge.cents) / CENTS_PER_CREDIT }
 
-          // The whole purchase is void once the soonest of the credit, the external call and the trade
+          // The whole purchase is void once the soonest of the credit and the trade
           // lapses, and that can happen well before the auth request itself expires. Bring the review's
           // deadline forward so the screen stops being actionable at the right moment rather than the late
           // one; the approval checks the same deadline again before it signs.
@@ -960,7 +1009,7 @@ export const RequestPage = () => {
             console.info('The purchased item could not be named:', e instanceof Error ? e.message : String(e))
           }
           if (isStale()) return
-          setCreditsPurchaseData({ purchase, metadata })
+          setCreditsPurchaseData({ purchase, pricing, metadata })
           setView(View.WALLET_CREDITS_INTERACTION)
         }
 
@@ -1023,9 +1072,9 @@ export const RequestPage = () => {
           setView(View.TIMEOUT)
           return
         } else if (e instanceof RequestFulfilledError) {
-          // Request was already consumed successfully — not an error, stop re-fetching
+          // The server knows an answer was consumed, not whether a wallet action succeeded.
           hasCompletedRef.current = true
-          setView(View.WALLET_INTERACTION_COMPLETE)
+          setView(View.REQUEST_ALREADY_ANSWERED)
           return
         } else if (e instanceof ImpersonatedSignInError) {
           // The request tried to sign a sign-in payload. Block it outright instead of
@@ -1145,10 +1194,13 @@ export const RequestPage = () => {
   // Which completion view applies depends on the branded flow the request turned out to be.
   const showInteractionCompleteView = useCallback(() => {
     if (nftTransferData) {
+      setNftTransferOutcomeData(nftTransferData)
       setView(View.WALLET_NFT_INTERACTION_COMPLETE)
     } else if (manaTransferData) {
+      setManaTransferOutcomeData(manaTransferData)
       setView(View.WALLET_MANA_INTERACTION_COMPLETE)
     } else if (creditsPurchaseData) {
+      setCreditsPurchaseOutcomeData(creditsPurchaseData)
       setView(View.WALLET_CREDITS_INTERACTION_COMPLETE)
     } else {
       setView(View.WALLET_INTERACTION_COMPLETE)
@@ -1213,6 +1265,14 @@ export const RequestPage = () => {
         })
       }
     } catch (error) {
+      if (error instanceof RequestFulfilledError) {
+        if (!isStaleAction()) {
+          clearTimeout(timeoutRef.current)
+          setIsLoading(false)
+          setView(View.REQUEST_ALREADY_ANSWERED)
+        }
+        return
+      }
       console.error('Failed to send denied notification:', error)
     } finally {
       // Only the lock this action took: a replacement run may hold its own by now.
@@ -1223,10 +1283,13 @@ export const RequestPage = () => {
     setIsLoading(false)
     // Set appropriate view based on which branded flow the request turned out to be.
     if (nftTransferData) {
+      setNftTransferOutcomeData(nftTransferData)
       setView(View.WALLET_NFT_INTERACTION_DENIED)
     } else if (manaTransferData) {
+      setManaTransferOutcomeData(manaTransferData)
       setView(View.WALLET_MANA_INTERACTION_DENIED)
     } else if (creditsPurchaseData) {
+      setCreditsPurchaseOutcomeData(creditsPurchaseData)
       setView(View.WALLET_CREDITS_INTERACTION_DENIED)
     } else {
       setView(View.WALLET_INTERACTION_DENIED)
@@ -1309,13 +1372,20 @@ export const RequestPage = () => {
     // is sent, because the outcome endpoint does not check the sender and the reviewed request would be
     // consumed as a rejection from an account that never saw it. The caller then shows the account-change
     // view and leaves the request for the fresh review the load effect starts.
-    const reportFailedOutcomeForReviewedSigner = async (error: OutcomeError): Promise<'sent' | 'other_account' | 'unsent'> => {
+    const reportFailedOutcomeForReviewedSigner = async (
+      error: OutcomeError
+    ): Promise<'sent' | 'other_account' | 'unsent' | 'already_answered'> => {
       if (!walletClient || !reviewedSigner) return 'unsent'
       const [currentAddress] = await walletClient.getAddresses()
       if (currentAddress.toLowerCase() !== reviewedSigner) return 'other_account'
       // The wallet's own spelling of the reviewing account, as every other outcome sends it.
-      await authServerClient.current.sendFailedOutcome(requestId, currentAddress, error)
-      return 'sent'
+      try {
+        await authServerClient.current.sendFailedOutcome(requestId, currentAddress, error)
+        return 'sent'
+      } catch (deliveryError) {
+        if (deliveryError instanceof RequestFulfilledError) return 'already_answered'
+        throw deliveryError
+      }
     }
     // Flips once the wallet has executed the request. Past that point the action is irreversible —
     // the transaction is broadcast, or the payload is signed — so any later failure is a delivery
@@ -1443,7 +1513,7 @@ export const RequestPage = () => {
         //
         // The deadline is read here rather than left to the timer. Every await between the click and this
         // point is a window it can pass in — the account read above, a confirmation dialog the user left
-        // open — and a purchase whose credit, external call or trade has lapsed signs bytes that can only
+        // open — and a purchase whose credit or trade has lapsed signs bytes that can only
         // revert, against a credit the ledger may already have released. A timer fires late; this does not.
         if (Date.now() >= reviewDeadlineRef.current) {
           hasCompletedRef.current = true
@@ -1523,41 +1593,49 @@ export const RequestPage = () => {
         restartReview('wallet_rejected_chain')
       } else if (isUserRejectedTransaction(e)) {
         console.info('User rejected wallet interaction in wallet — not reporting to Sentry')
-        let delivery: 'sent' | 'other_account' | 'unsent' = 'unsent'
+        let delivery: 'sent' | 'other_account' | 'unsent' | 'already_answered' = 'unsent'
         try {
           delivery = await reportFailedOutcomeForReviewedSigner({ code: -32003, message: 'Transaction rejected' })
         } catch (failedOutcomeError) {
           console.error('Failed to send denied notification:', failedOutcomeError)
         }
         if (isStaleAction()) return
+        if (delivery === 'already_answered') {
+          hasCompletedRef.current = true
+          clearTimeout(timeoutRef.current)
+          setView(View.REQUEST_ALREADY_ANSWERED)
+          return
+        }
         if (delivery === 'other_account') {
           setView(View.DIFFERENT_ACCOUNT)
           return
         }
         hasCompletedRef.current = true
         if (nftTransferData) {
+          setNftTransferOutcomeData(nftTransferData)
           setView(View.WALLET_NFT_INTERACTION_DENIED)
         } else if (manaTransferData) {
+          setManaTransferOutcomeData(manaTransferData)
           setView(View.WALLET_MANA_INTERACTION_DENIED)
         } else if (creditsPurchaseData) {
+          setCreditsPurchaseOutcomeData(creditsPurchaseData)
           setView(View.WALLET_CREDITS_INTERACTION_DENIED)
         } else {
           setView(View.WALLET_INTERACTION_DENIED)
         }
       } else if (e instanceof RequestFulfilledError) {
-        // The request was already fulfilled (e.g. another tab completed it, or it executed and the
-        // outcome delivery raced). It succeeded — show completion instead of attempting a failed
-        // outcome and reporting an expected state as an error.
+        // No wallet result was produced here. An answer elsewhere does not establish success.
         if (isStaleAction()) return
         hasCompletedRef.current = true
-        showInteractionCompleteView()
+        clearTimeout(timeoutRef.current)
+        setView(View.REQUEST_ALREADY_ANSWERED)
       } else {
         handleError(e, 'Wallet interaction error', {
           sentryTags: { isWeb2Wallet: isUserUsingWeb2Wallet }
         })
 
         // Try to send failed outcome, but don't let it prevent showing the error view
-        let delivery: 'sent' | 'other_account' | 'unsent' = 'unsent'
+        let delivery: 'sent' | 'other_account' | 'unsent' | 'already_answered' = 'unsent'
         try {
           delivery = await reportFailedOutcomeForReviewedSigner(
             isRpcError(e) ? e.error : { code: 999, message: isErrorWithMessage(e) ? e.message : 'Unknown error' }
@@ -1566,6 +1644,12 @@ export const RequestPage = () => {
           console.error('Failed to send failed outcome:', failedOutcomeError)
         }
         if (isStaleAction()) return
+        if (delivery === 'already_answered') {
+          hasCompletedRef.current = true
+          clearTimeout(timeoutRef.current)
+          setView(View.REQUEST_ALREADY_ANSWERED)
+          return
+        }
         if (delivery === 'other_account') {
           setView(View.DIFFERENT_ACCOUNT)
           return
@@ -1586,7 +1670,16 @@ export const RequestPage = () => {
         setIsLoading(false)
       }
     }
-  }, [isUserUsingWeb2Wallet, nftTransferData, manaTransferData, requestId, identity, showInteractionCompleteView, restartReview])
+  }, [
+    isUserUsingWeb2Wallet,
+    nftTransferData,
+    manaTransferData,
+    creditsPurchaseData,
+    requestId,
+    identity,
+    showInteractionCompleteView,
+    restartReview
+  ])
 
   // Allow, on every review: web2 users get a confirmation dialog first, since their wallet has no
   // prompt of its own; external wallets go straight to theirs.
@@ -1726,6 +1819,8 @@ export const RequestPage = () => {
   )
 
   switch (renderedView) {
+    case View.REQUEST_ALREADY_ANSWERED:
+      return <RequestAlreadyAnswered />
     case View.TIMEOUT:
       return <TimeoutError requestId={requestId} />
     case View.DIFFERENT_ACCOUNT:
@@ -1760,21 +1855,21 @@ export const RequestPage = () => {
     case View.WALLET_INTERACTION_COMPLETE:
       return <WalletInteractionComplete />
     case View.WALLET_NFT_INTERACTION_COMPLETE:
-      return nftTransferData ? <TransferCompletedView type={TransferType.GIFT} transferData={nftTransferData} /> : null
+      return nftTransferOutcomeData ? <TransferCompletedView type={TransferType.GIFT} transferData={nftTransferOutcomeData} /> : null
     case View.WALLET_MANA_INTERACTION_COMPLETE:
-      return manaTransferData ? <TransferCompletedView type={TransferType.TIP} transferData={manaTransferData} /> : null
+      return manaTransferOutcomeData ? <TransferCompletedView type={TransferType.TIP} transferData={manaTransferOutcomeData} /> : null
     case View.WALLET_CREDITS_INTERACTION_COMPLETE:
-      return creditsPurchaseData ? (
-        <CreditsPurchaseOutcomeView purchaseData={creditsPurchaseData} outcome="signed" delivery={signatureDelivery} />
+      return creditsPurchaseOutcomeData ? (
+        <CreditsPurchaseOutcomeView purchaseData={creditsPurchaseOutcomeData} outcome="signed" delivery={signatureDelivery} />
       ) : null
     case View.WALLET_INTERACTION_DENIED:
       return <DeniedWalletInteraction />
     case View.WALLET_NFT_INTERACTION_DENIED:
-      return nftTransferData ? <TransferCanceledView type={TransferType.GIFT} transferData={nftTransferData} /> : null
+      return nftTransferOutcomeData ? <TransferCanceledView type={TransferType.GIFT} transferData={nftTransferOutcomeData} /> : null
     case View.WALLET_MANA_INTERACTION_DENIED:
-      return manaTransferData ? <TransferCanceledView type={TransferType.TIP} transferData={manaTransferData} /> : null
+      return manaTransferOutcomeData ? <TransferCanceledView type={TransferType.TIP} transferData={manaTransferOutcomeData} /> : null
     case View.WALLET_CREDITS_INTERACTION_DENIED:
-      return creditsPurchaseData ? <CreditsPurchaseOutcomeView purchaseData={creditsPurchaseData} outcome="canceled" /> : null
+      return creditsPurchaseOutcomeData ? <CreditsPurchaseOutcomeView purchaseData={creditsPurchaseOutcomeData} outcome="canceled" /> : null
     case View.LOADING_REQUEST:
       return <LoadingRequest />
 

@@ -22,6 +22,7 @@ import { FeatureFlagsProvider } from './components/FeatureFlagsProvider'
 import { ConnectionProvider } from './shared/connection'
 import { config } from './modules/config'
 import { translations } from './modules/translations'
+import { getSegmentProxy } from './modules/analytics/proxy'
 import { getAnalytics } from './modules/analytics/segment'
 import { setupMobileAnalytics } from './modules/analytics/setupMobileAnalytics'
 import './modules/analytics/snippet'
@@ -47,7 +48,13 @@ const getInitialLocale = (): string => {
 const initialLocale = getInitialLocale()
 
 const analytics = getAnalytics()
-analytics?.load(config.get('SEGMENT_API_KEY'))
+const segmentProxy = getSegmentProxy(config.get('SEGMENT_CDN_URL', ''), config.get('SEGMENT_API_HOST', ''))
+if (analytics && segmentProxy.cdnUrl) {
+  // Set explicitly so analytics.js resolves its settings and remote plugins from the proxy without relying on
+  // inferring the origin from the script tag
+  ;(analytics as unknown as { _cdn?: string })._cdn = segmentProxy.cdnUrl
+}
+analytics?.load(config.get('SEGMENT_API_KEY'), segmentProxy.loadOptions)
 
 setupMobileAnalytics(analytics, getMobileSession())
 

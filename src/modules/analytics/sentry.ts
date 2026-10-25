@@ -2,6 +2,7 @@ import { browserTracingIntegration, init, replayIntegration, setTag, setUser } f
 import { Env } from '@dcl/ui-env/dist/env'
 import { getMobileSession, isMobileSession } from '../../shared/mobile'
 import { config } from '../config'
+import { beforeSend } from './sentryFilters'
 
 const mobile = isMobileSession()
 const dsn = mobile ? config.get('SENTRY_DSN_MOBILE') : config.get('SENTRY_DSN')
@@ -19,31 +20,7 @@ init({
   replaysSessionSampleRate: 0.01,
   replaysOnErrorSampleRate: 0.01,
   enabled: !config.is(Env.DEVELOPMENT),
-  beforeSend(event) {
-    // Filter out exceptions from GTM and STAG
-    if (
-      event.exception?.values?.some(exception =>
-        exception.stacktrace?.frames?.some(frame => frame.filename?.includes('gtm') || frame.filename?.includes('stag'))
-      )
-    ) {
-      return null
-    }
-    // Filter out clipboard errors when the document is not focused
-    if (
-      event.exception?.values?.some(exception => exception.type === 'DOMException' && exception.value?.includes('Document is not focused'))
-    ) {
-      return null
-    }
-    // Filter out "JS idle timeout exceeded" errors from third-party scripts
-    if (
-      event.exception?.values?.some(
-        exception => exception.value?.includes('idle timeout exceeded') && exception.stacktrace?.frames?.every(frame => !frame.in_app)
-      )
-    ) {
-      return null
-    }
-    return event
-  }
+  beforeSend
 })
 
 // Set mobile-specific tags after init

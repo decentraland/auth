@@ -115,6 +115,10 @@
       "title": "Tu aplicación necesita una actualización",
       "description": "Esta versión de {explorerText} usa un método de inicio de sesión que ya no es compatible. Actualiza a la última versión e inicia sesión de nuevo."
     },
+    "request_already_answered": {
+      "title": "Solicitud ya respondida",
+      "description": "Esta solicitud ya tiene una respuesta. Consulta su estado en la aplicación que la solicitó antes de volver a intentarlo."
+    },
     "wallet_interaction_complete": {
       "title": "Interacción con billetera completada",
       "description": "La acción se ejecutó exitosamente."
@@ -203,6 +207,7 @@
       "processing_title": "Confirmando tu compra",
       "price_label": "PRECIO",
       "price": "{credits} créditos",
+      "priced_in_mana": "Precio: {mana} MANA · se cobra en créditos a la cotización MANA/USD",
       "quantity": "CANTIDAD 1",
       "delivered_to": "Se entrega a tu cuenta {address}",
       "approve": "Confirmar compra",
@@ -232,12 +237,16 @@
       "seller": "Publicado por",
       "payment_beneficiary": "El pago va a",
       "price_usd_wei": "Precio firmado (USD wei, 1e18 = 1 USD)",
+      "price_mana": "Precio firmado (MANA)",
+      "mana_usd_rate": "Cotización MANA/USD con la que se verificó el cargo",
       "max_credited_mana": "Máximo que puede pagar el crédito (MANA, no créditos)",
       "credits_manager": "Contrato de créditos",
       "marketplace": "Contrato del marketplace",
+      "collection_store": "Contrato de la tienda de la colección",
       "payment_token": "Token de pago",
       "expires_at": "La autorización vence",
       "trade_expires_at": "La publicación vence",
+      "credit_expires_at": "Crédito válido hasta",
       "network": "Red"
     }
   },

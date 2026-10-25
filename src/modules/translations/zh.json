@@ -115,6 +115,10 @@
       "title": "您的应用需要更新",
       "description": "此版本的 {explorerText} 使用的登录方式已不再受支持。请更新到最新版本后重新登录。"
     },
+    "request_already_answered": {
+      "title": "请求已有答复",
+      "description": "此请求已有答复。请先在发起请求的应用中查看其状态，再决定是否重试。"
+    },
     "wallet_interaction_complete": {
       "title": "钱包交互完成",
       "description": "操作已成功执行。"
@@ -203,6 +207,7 @@
       "processing_title": "正在确认你的购买",
       "price_label": "价格",
       "price": "{credits} 信用点",
+      "priced_in_mana": "价格 {mana} MANA · 按 MANA/USD 汇率以积分扣费",
       "quantity": "数量 1",
       "delivered_to": "将发送至你的账户 {address}",
       "approve": "确认购买",
@@ -232,12 +237,16 @@
       "seller": "挂单账户",
       "payment_beneficiary": "款项发往",
       "price_usd_wei": "签名价格（USD wei，1e18 = 1 美元）",
+      "price_mana": "签名价格（MANA）",
+      "mana_usd_rate": "用于核对扣费的 MANA/USD 汇率",
       "max_credited_mana": "信用点最多可支付（MANA，非信用点）",
       "credits_manager": "信用点合约",
       "marketplace": "市场合约",
+      "collection_store": "系列商店合约",
       "payment_token": "支付代币",
       "expires_at": "授权过期时间",
       "trade_expires_at": "挂单过期时间",
+      "credit_expires_at": "积分有效期至",
       "network": "网络"
     }
   },

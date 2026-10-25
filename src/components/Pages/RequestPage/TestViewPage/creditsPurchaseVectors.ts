@@ -25,6 +25,7 @@ const POLYGON = ChainId.MATIC_MAINNET as number
 const creditsManagerContract = getContract(ContractName.CreditsManager, POLYGON)
 const marketplaceContract = getContract(ContractName.OffChainMarketplaceV2, POLYGON)
 const manaContract = getContract(ContractName.MANAToken, POLYGON)
+const collectionStoreContract = getContract(ContractName.CollectionStore, POLYGON)
 
 const useCreditsFunction = (creditsManagerContract.abi as unknown as AbiFunction[]).find(
   item => item.type === 'function' && item.name === 'useCredits'
@@ -34,6 +35,11 @@ const acceptFunction = (marketplaceContract.abi as unknown as AbiFunction[]).fin
 ) as AbiFunction
 
 const ACCEPT_SELECTOR = toFunctionSelector(acceptFunction)
+
+const storeBuyFunction = (collectionStoreContract.abi as unknown as AbiFunction[]).find(
+  item => item.type === 'function' && item.name === 'buy'
+) as AbiFunction
+const STORE_BUY_SELECTOR = toFunctionSelector(storeBuyFunction)
 
 const ZERO_BYTES32 = pad('0x', { size: 32 })
 
@@ -68,6 +74,14 @@ type UseCreditsArgs = {
 /** `accept([trade])` as the (selector, data) pair the `externalCall` struct carries. */
 function encodeAccept(trades: readonly Trade[]): string {
   return encodeAbiParameters(acceptFunction.inputs, [trades] as never)
+}
+
+/** One line of a collection store `buy`: which collection, and per item its id, MANA price and beneficiary. */
+type StoreItemToBuy = { collection: string; ids: bigint[]; prices: bigint[]; beneficiaries: string[] }
+
+/** The `buy` a primary sale's external call carries, without its selector (like encodeAccept). */
+function encodeStoreBuy(items: readonly StoreItemToBuy[]): string {
+  return encodeAbiParameters(storeBuyFunction.inputs, [items] as never)
 }
 
 /** The `useCredits` calldata the meta-transaction signs. */
@@ -190,6 +204,39 @@ function buildUseCreditsArgs({
       ...externalCall
     }
   }
+}
+
+// A primary sale's MANA price: what the creator set on the collection item. 1.1 MANA is the size of the
+// three-credit items bought on Amoy while this path was being diagnosed.
+const PRIMARY_SALE_PRICE_MANA_WEI = 1100000000000000000n
+
+/**
+ * The `useCredits` of a primary sale: one item bought from the collection store, minted to the buyer at a
+ * MANA price. Overridable piece by piece, like buildUseCreditsArgs.
+ */
+function buildStoreUseCreditsArgs({
+  items,
+  buyer = BUYER,
+  target = collectionStoreContract.address,
+  ...overrides
+}: Partial<Omit<UseCreditsArgs, 'externalCall'>> & {
+  items?: readonly StoreItemToBuy[]
+  buyer?: string
+  target?: string
+} = {}): UseCreditsArgs {
+  return buildUseCreditsArgs({
+    ...overrides,
+    buyer,
+    target,
+    selector: STORE_BUY_SELECTOR,
+    externalCall: {
+      data: encodeStoreBuy(
+        items ?? [
+          { collection: COLLECTION, ids: [BigInt(REAL_LISTING_ITEM_ID)], prices: [PRIMARY_SALE_PRICE_MANA_WEI], beneficiaries: [buyer] }
+        ]
+      )
+    }
+  })
 }
 
 /** A complete Explorer-shaped credits purchase request: the calldata and the typed data around it. */
@@ -324,19 +371,24 @@ export {
   EXPLORER_GOLDEN_USE_CREDITS,
   FAR_FUTURE,
   POLYGON,
+  PRIMARY_SALE_PRICE_MANA_WEI,
   REAL_LISTING_CREDITS,
   REAL_LISTING_ITEM_ID,
   REAL_LISTING_PRICE_USD_WEI,
   SELLER,
+  STORE_BUY_SELECTOR,
   ZERO_BYTES32,
   buildCreditsPurchaseRequest,
   buildMetaTransactionTypedData,
+  buildStoreUseCreditsArgs,
   buildTrade,
   buildUseCreditsArgs,
+  collectionStoreContract,
   creditsManagerContract,
   encodeAccept,
+  encodeStoreBuy,
   encodeUseCredits,
   manaContract,
   marketplaceContract
 }
-export type { ExternalCheck, Trade, TradeAsset, UseCreditsArgs }
+export type { ExternalCheck, StoreItemToBuy, Trade, TradeAsset, UseCreditsArgs }

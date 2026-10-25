@@ -1,4 +1,4 @@
-import { pad, toFunctionSelector } from 'viem'
+import { encodeAbiParameters, pad, toFunctionSelector } from 'viem'
 import { ChainId } from '@dcl/schemas/dist/dapps/chain-id'
 import { ContractName, getContract } from 'decentraland-transactions'
 import { KnownContract, decodeKnownContractCall, getKnownDecentralandContract } from '../../../shared/auth'
@@ -11,15 +11,20 @@ import {
   EXPLORER_GOLDEN_USE_CREDITS,
   FAR_FUTURE,
   POLYGON,
+  PRIMARY_SALE_PRICE_MANA_WEI,
   REAL_LISTING_CREDITS,
   REAL_LISTING_ITEM_ID,
   REAL_LISTING_PRICE_USD_WEI,
   SELLER,
+  STORE_BUY_SELECTOR,
   UseCreditsArgs,
   ZERO_BYTES32,
+  buildStoreUseCreditsArgs,
   buildTrade,
   buildUseCreditsArgs,
+  collectionStoreContract,
   encodeAccept,
+  encodeStoreBuy,
   encodeUseCredits,
   manaContract,
   marketplaceContract
@@ -40,6 +45,154 @@ const recognizeArgs = (args: UseCreditsArgs, options?: Parameters<typeof recogni
 /** The reason a payload was refused, for the table-driven cases below. */
 const reasonOf = (recognition: CreditsRecognition): string =>
   recognition.status === 'unsupported' ? recognition.reason : recognition.status
+
+describe.each([ChainId.MATIC_MAINNET, ChainId.MATIC_AMOY])('when recognizing a V3 purchase on chain %s', chainId => {
+  let recognition: CreditsRecognition
+  let settlementAddress: string
+
+  beforeEach(() => {
+    settlementAddress = getContract(ContractName.OffChainMarketplaceV3, chainId).address.toLowerCase()
+    const contract = getKnownDecentralandContract(getContract(ContractName.CreditsManager, chainId).address, chainId) as KnownContract
+    const trade = buildTrade()
+    const args = buildUseCreditsArgs({
+      target: settlementAddress,
+      trades: [
+        buildTrade({
+          received: [{ ...trade.received[0], contractAddress: getContract(ContractName.MANAToken, chainId).address }]
+        })
+      ]
+    })
+    recognition = recognizeArgs(args, { contract, chainId })
+  })
+
+  it('should describe the item and its price through the actual V3 deployment', () => {
+    expect(recognition).toMatchObject({
+      status: 'recognized',
+      purchase: {
+        settlementName: ContractName.OffChainMarketplaceV3,
+        settlementAddress,
+        asset: { kind: 'collection_item', contractAddress: COLLECTION, itemId: REAL_LISTING_ITEM_ID },
+        recipient: BUYER,
+        price: { kind: 'usd_pegged', usdWei: REAL_LISTING_PRICE_USD_WEI, credits: REAL_LISTING_CREDITS }
+      }
+    })
+  })
+})
+
+describe('when a marketplace payment uses its default beneficiary', () => {
+  let recognition: CreditsRecognition
+
+  beforeEach(() => {
+    const trade = buildTrade()
+    recognition = recognizeArgs(
+      buildUseCreditsArgs({
+        trades: [buildTrade({ received: [{ ...trade.received[0], beneficiary: '0x0000000000000000000000000000000000000000' }] })]
+      })
+    )
+  })
+
+  it('should identify the seller who actually receives the payment', () => {
+    expect(recognition).toMatchObject({ status: 'recognized', purchase: { paymentBeneficiary: SELLER } })
+  })
+
+  describe('and the trade names an explicit different beneficiary', () => {
+    beforeEach(() => {
+      const trade = buildTrade()
+      recognition = recognizeArgs(
+        buildUseCreditsArgs({ trades: [buildTrade({ received: [{ ...trade.received[0], beneficiary: COLLECTION }] })] })
+      )
+    })
+
+    it('should preserve the explicit payment destination', () => {
+      expect(recognition).toMatchObject({ status: 'recognized', purchase: { paymentBeneficiary: COLLECTION } })
+    })
+  })
+})
+
+describe.each([ContractName.OffChainMarketplace, ContractName.OffChainMarketplaceV2, ContractName.OffChainMarketplaceV3])(
+  'when a purchase on %s pays the buyer',
+  settlementName => {
+    describe.each(['explicit', 'default'] as const)('and the payment beneficiary is %s', beneficiaryKind => {
+      let recognition: CreditsRecognition
+
+      beforeEach(() => {
+        const trade = buildTrade()
+        recognition = recognizeArgs(
+          buildUseCreditsArgs({
+            target: getContract(settlementName, POLYGON).address,
+            trades: [
+              buildTrade({
+                signer: beneficiaryKind === 'default' ? BUYER : SELLER,
+                received: [
+                  {
+                    ...trade.received[0],
+                    beneficiary: beneficiaryKind === 'explicit' ? BUYER : '0x0000000000000000000000000000000000000000'
+                  }
+                ]
+              })
+            ]
+          })
+        )
+      })
+
+      it('should leave the self-paying trade on the generic review', () => {
+        expect(recognition).toEqual({ status: 'unsupported', reason: 'self_payment' })
+      })
+    })
+  }
+)
+
+describe.each<[string, bigint]>([
+  ['zero', 0n],
+  ['in the past', BigInt(NOW_SECONDS - 1)],
+  ['earlier than the real deadlines', BigInt(NOW_SECONDS + 1)],
+  ['the maximum uint256', 2n ** 256n - 1n]
+])('when an allowlisted purchase has its ignored external expiry %s', (_description, externalExpiry) => {
+  describe('and it settles through the marketplace', () => {
+    let recognition: CreditsRecognition
+
+    beforeEach(() => {
+      const args = buildUseCreditsArgs({ externalCall: { expiresAt: externalExpiry } })
+      args.credits = [{ ...args.credits[0], expiresAt: FAR_FUTURE - 5n }]
+      recognition = recognizeArgs(args)
+    })
+
+    it('should remain a purchase until the credit expires', () => {
+      expect(recognition).toMatchObject({ status: 'recognized', purchase: { expiresAt: FAR_FUTURE - 5n } })
+    })
+
+    describe('and the trade expires before the credit', () => {
+      beforeEach(() => {
+        const trade = buildTrade()
+        recognition = recognizeArgs(
+          buildUseCreditsArgs({
+            externalCall: { expiresAt: externalExpiry },
+            trades: [buildTrade({ checks: { ...trade.checks, expiration: FAR_FUTURE - 10n } })]
+          })
+        )
+      })
+
+      it('should stop being a purchase at the trade deadline', () => {
+        expect(recognition).toMatchObject({ status: 'recognized', purchase: { expiresAt: FAR_FUTURE - 10n } })
+      })
+    })
+  })
+
+  describe('and it settles through the collection store', () => {
+    let recognition: CreditsRecognition
+
+    beforeEach(() => {
+      const args = buildStoreUseCreditsArgs()
+      args.externalCall.expiresAt = externalExpiry
+      args.credits = [{ ...args.credits[0], expiresAt: FAR_FUTURE - 5n }]
+      recognition = recognizeArgs(args)
+    })
+
+    it('should remain a purchase until the credit expires', () => {
+      expect(recognition).toMatchObject({ status: 'recognized', purchase: { expiresAt: FAR_FUTURE - 5n } })
+    })
+  })
+})
 
 describe('when reading a credits purchase out of a useCredits call', () => {
   describe('and the payload is the Explorer golden vector', () => {
@@ -72,8 +225,7 @@ describe('when reading a credits purchase out of a useCredits call', () => {
     it('should price it from the signed USD-pegged amount alone, matching the catalogue', () => {
       const recognition = recognizeArgs(buildUseCreditsArgs())
       if (recognition.status !== 'recognized') throw new Error(reasonOf(recognition))
-      expect(recognition.purchase.priceUsdWei).toBe(REAL_LISTING_PRICE_USD_WEI)
-      expect(recognition.purchase.credits).toBe(REAL_LISTING_CREDITS)
+      expect(recognition.purchase.price).toEqual({ kind: 'usd_pegged', usdWei: REAL_LISTING_PRICE_USD_WEI, credits: REAL_LISTING_CREDITS })
     })
 
     it('should name the item, the recipient, the seller and every contract from the payload', () => {
@@ -85,8 +237,9 @@ describe('when reading a credits purchase out of a useCredits call', () => {
       expect(purchase.seller).toBe(SELLER.toLowerCase())
       expect(purchase.paymentBeneficiary).toBe(SELLER.toLowerCase())
       expect(purchase.paymentTokenAddress).toBe(manaContract.address.toLowerCase())
-      expect(purchase.marketplaceAddress).toBe(marketplaceContract.address.toLowerCase())
-      expect(purchase.marketplaceName).toBe(ContractName.OffChainMarketplaceV2)
+      expect(purchase.via).toBe('marketplace')
+      expect(purchase.settlementAddress).toBe(marketplaceContract.address.toLowerCase())
+      expect(purchase.settlementName).toBe(ContractName.OffChainMarketplaceV2)
       expect(purchase.creditsManagerAddress).toBe(creditsManager.address)
     })
 
@@ -94,7 +247,7 @@ describe('when reading a credits purchase out of a useCredits call', () => {
       const recognition = recognizeArgs(buildUseCreditsArgs({ maxCreditedValue: 5_000_000_000_000_000_000n }))
       if (recognition.status !== 'recognized') throw new Error(reasonOf(recognition))
       expect(recognition.purchase.maxCreditedValueWei).toBe(5_000_000_000_000_000_000n)
-      expect(recognition.purchase.credits).toBe(REAL_LISTING_CREDITS)
+      expect(recognition.purchase.price).toEqual({ kind: 'usd_pegged', usdWei: REAL_LISTING_PRICE_USD_WEI, credits: REAL_LISTING_CREDITS })
     })
 
     it('should recognize a secondary listing of an ERC-721 token', () => {
@@ -110,7 +263,7 @@ describe('when reading a credits purchase out of a useCredits call', () => {
       const previous = getContract(ContractName.OffChainMarketplace, POLYGON)
       const recognition = recognizeArgs(buildUseCreditsArgs({ target: previous.address }))
       if (recognition.status !== 'recognized') throw new Error(reasonOf(recognition))
-      expect(recognition.purchase.marketplaceName).toBe(ContractName.OffChainMarketplace)
+      expect(recognition.purchase.settlementName).toBe(ContractName.OffChainMarketplace)
     })
   })
 
@@ -158,7 +311,6 @@ describe('when reading a credits purchase out of a useCredits call', () => {
         () => buildUseCreditsArgs({ credits: [{ value: 1n, expiresAt: BigInt(NOW_SECONDS - 1), salt: ZERO_BYTES32 }] }),
         'expired'
       ],
-      ['the external call has expired', () => buildUseCreditsArgs({ externalCall: { expiresAt: BigInt(NOW_SECONDS - 1) } }), 'expired'],
       [
         'the listing has expired',
         () => buildUseCreditsArgs({ trades: [buildTrade({ checks: { expiration: BigInt(NOW_SECONDS - 1) } as never })] }),
@@ -176,7 +328,7 @@ describe('when reading a credits purchase out of a useCredits call', () => {
       ],
       [
         'the external call targets another Decentraland contract',
-        () => buildUseCreditsArgs({ target: getContract(ContractName.CollectionStore, POLYGON).address }),
+        () => buildUseCreditsArgs({ target: getContract(ContractName.CollectionManager, POLYGON).address }),
         'not_a_marketplace'
       ],
       [
@@ -266,16 +418,36 @@ describe('when reading a credits purchase out of a useCredits call', () => {
         'another_recipient'
       ],
       [
-        'the price is denominated in MANA rather than pegged to USD',
+        'the price is not a payment at all but a token',
         () =>
           buildUseCreditsArgs({
             trades: [
               buildTrade({
-                received: [{ assetType: 1n, contractAddress: manaContract.address, value: 10n ** 18n, beneficiary: SELLER, extra: '0x' }]
+                received: [{ assetType: 3n, contractAddress: COLLECTION, value: 1n, beneficiary: SELLER, extra: '0x' }]
               })
             ]
           }),
         'price_asset_type'
+      ],
+      [
+        'the price is a plain ERC-20 that is not the chain MANA',
+        () =>
+          buildUseCreditsArgs({
+            trades: [
+              buildTrade({
+                received: [
+                  {
+                    assetType: 1n,
+                    contractAddress: '0x3c499c542cef5e3811e1192ce70d8cc03d5c3359',
+                    value: 10n ** 18n,
+                    beneficiary: SELLER,
+                    extra: '0x'
+                  }
+                ]
+              })
+            ]
+          }),
+        'payment_token'
       ],
       [
         'the payment is taken in a token that is not the chain MANA',
@@ -377,6 +549,167 @@ describe('when reading a credits purchase out of a useCredits call', () => {
         recognizeCreditsPurchase(creditsManager, exploding, { signerAddress: BUYER, chainId: POLYGON, nowSeconds: NOW_SECONDS })
       ).toEqual({ status: 'unsupported', reason: 'malformed_arguments' })
     })
+  })
+})
+
+describe('when reading a marketplace purchase priced in MANA', () => {
+  const MANA_PRICE_WEI = 2_600_000_000_000_000_000n
+  const manaTrade = () =>
+    buildTrade({
+      received: [{ assetType: 1n, contractAddress: manaContract.address, value: MANA_PRICE_WEI, beneficiary: SELLER, extra: '0x' }]
+    })
+
+  it('should be recognized with the price in MANA and no credits of its own', () => {
+    // The credits are not in the bytes: they need the MANA/USD rate, which the page reads and labels as
+    // approximate. The decoder must not invent a number for them.
+    const recognition = recognizeArgs(buildUseCreditsArgs({ trades: [manaTrade()] }))
+    if (recognition.status !== 'recognized') throw new Error(reasonOf(recognition))
+    expect(recognition.purchase.price).toEqual({ kind: 'mana', manaWei: MANA_PRICE_WEI })
+    expect(recognition.purchase.via).toBe('marketplace')
+    expect(recognition.purchase.seller).toBe(SELLER.toLowerCase())
+  })
+
+  it('should refuse a MANA price of zero', () => {
+    const trade = buildTrade({
+      received: [{ assetType: 1n, contractAddress: manaContract.address, value: 0n, beneficiary: SELLER, extra: '0x' }]
+    })
+    expect(reasonOf(recognizeArgs(buildUseCreditsArgs({ trades: [trade] })))).toBe('no_price')
+  })
+
+  it('should keep every other marketplace requirement, such as the buyer being the recipient', () => {
+    const trade = buildTrade({
+      sent: [{ assetType: 4n, contractAddress: COLLECTION, value: 0n, beneficiary: SELLER, extra: '0x' }],
+      received: manaTrade().received
+    })
+    expect(reasonOf(recognizeArgs(buildUseCreditsArgs({ trades: [trade] })))).toBe('another_recipient')
+  })
+})
+
+describe('when reading a primary sale through the collection store', () => {
+  describe('and it is one item minted to the buyer at a MANA price', () => {
+    it('should be recognized as a collection store purchase priced in MANA', () => {
+      const recognition = recognizeArgs(buildStoreUseCreditsArgs())
+      if (recognition.status !== 'recognized') throw new Error(reasonOf(recognition))
+      const { purchase } = recognition
+      expect(purchase.via).toBe('collection_store')
+      expect(purchase.settlementAddress).toBe(collectionStoreContract.address.toLowerCase())
+      expect(purchase.settlementName).toBe(ContractName.CollectionStore)
+      expect(purchase.asset).toEqual({ kind: 'collection_item', contractAddress: COLLECTION, itemId: REAL_LISTING_ITEM_ID })
+      expect(purchase.recipient).toBe(BUYER.toLowerCase())
+      expect(purchase.price).toEqual({ kind: 'mana', manaWei: PRIMARY_SALE_PRICE_MANA_WEI })
+      expect(purchase.paymentTokenAddress).toBe(manaContract.address.toLowerCase())
+    })
+
+    it('should not name a seller or a payment beneficiary the bytes do not carry', () => {
+      const recognition = recognizeArgs(buildStoreUseCreditsArgs())
+      if (recognition.status !== 'recognized') throw new Error(reasonOf(recognition))
+      expect(recognition.purchase.seller).toBeNull()
+      expect(recognition.purchase.paymentBeneficiary).toBeNull()
+      expect(recognition.purchase.tradeExpiresAt).toBeNull()
+    })
+  })
+
+  describe('and the call is not the single purchase the screen describes', () => {
+    const OTHER = '0x1111111111111111111111111111111111111111'
+    const item = (overrides: Partial<Parameters<typeof encodeStoreBuy>[0][number]> = {}) => ({
+      collection: COLLECTION,
+      ids: [0n],
+      prices: [PRIMARY_SALE_PRICE_MANA_WEI],
+      beneficiaries: [BUYER],
+      ...overrides
+    })
+
+    it.each([
+      ['it buys from two collections at once', () => buildStoreUseCreditsArgs({ items: [item(), item()] }), 'multiple_items'],
+      [
+        'it buys two items of one collection',
+        () => buildStoreUseCreditsArgs({ items: [item({ ids: [0n, 1n], prices: [1n, 1n], beneficiaries: [BUYER, BUYER] })] }),
+        'multiple_items'
+      ],
+      [
+        'it mints the item to another account',
+        () => buildStoreUseCreditsArgs({ items: [item({ beneficiaries: [OTHER] })] }),
+        'another_recipient'
+      ],
+      ['the item has no price', () => buildStoreUseCreditsArgs({ items: [item({ prices: [0n] })] }), 'no_price'],
+      ['part of it is paid from the buyer wallet', () => buildStoreUseCreditsArgs({ maxUncreditedValue: 1n }), 'own_wallet_spend'],
+      [
+        'it is not a call the store ABI reads',
+        () => buildUseCreditsArgs({ target: collectionStoreContract.address, selector: ACCEPT_SELECTOR }),
+        'not_a_store_buy'
+      ],
+      [
+        // A real store function that decodes cleanly, so it is the function-name check, not the decode, that
+        // refuses it.
+        'it is a store function other than buy',
+        () =>
+          buildUseCreditsArgs({
+            target: collectionStoreContract.address,
+            selector: toFunctionSelector('setFee(uint256)'),
+            externalCall: { data: encodeAbiParameters([{ type: 'uint256' }], [1n]) }
+          }),
+        'not_a_store_buy'
+      ],
+      [
+        // Bytes past the canonical encoding read as one call and could execute as another.
+        'its buy carries trailing bytes',
+        () =>
+          buildUseCreditsArgs({
+            target: collectionStoreContract.address,
+            selector: STORE_BUY_SELECTOR,
+            externalCall: { data: `${encodeStoreBuy([item()])}${'ab'.repeat(32)}` }
+          }),
+        'not_a_store_buy'
+      ],
+      ['its item lists more prices than ids', () => buildStoreUseCreditsArgs({ items: [item({ prices: [1n, 2n] })] }), 'multiple_items']
+    ])('should refuse it when %s', (_label, build, reason) => {
+      expect(reasonOf(recognizeArgs(build()))).toBe(reason)
+    })
+  })
+
+  it('should decode the store call against the store ABI rather than a hard-coded selector', () => {
+    expect(STORE_BUY_SELECTOR).toBe(
+      toFunctionSelector(collectionStoreContract.abi.find((entry: { name?: string }) => entry.name === 'buy') as never)
+    )
+  })
+})
+
+describe('when reading a purchase signed on Amoy, the chain the dev environment runs on', () => {
+  // Every other vector here is Polygon mainnet. These are the two shapes QA bought on decentraland.zone —
+  // a marketplace listing (the "Fairy Floss Dress Top" trade, USD-pegged at 2.70) and a primary sale — built
+  // against the Amoy deployments, so a registry or address mix-up between chains cannot hide behind mainnet.
+  const AMOY = ChainId.MATIC_AMOY as number
+  const amoyCreditsManager = getKnownDecentralandContract(getContract(ContractName.CreditsManager, AMOY).address, AMOY) as KnownContract
+  const amoyMana = getContract(ContractName.MANAToken, AMOY)
+  const AMOY_COLLECTION = '0x03b1940d80394614a5ba60abbf73fa749068bdad'
+  const recognizeOnAmoy = (args: UseCreditsArgs) => recognize(encodeUseCredits(args), { contract: amoyCreditsManager, chainId: AMOY })
+
+  it('should recognize the USD-pegged marketplace listing QA bought, at 27 credits', () => {
+    const trade = buildTrade({
+      sent: [{ assetType: 4n, contractAddress: AMOY_COLLECTION, value: 11n, beneficiary: BUYER, extra: '0x' }],
+      received: [{ assetType: 2n, contractAddress: amoyMana.address, value: 2_700_000_000_000_000_000n, beneficiary: SELLER, extra: '0x' }]
+    })
+    const recognition = recognizeOnAmoy(
+      buildUseCreditsArgs({ trades: [trade], target: getContract(ContractName.OffChainMarketplaceV2, AMOY).address })
+    )
+    if (recognition.status !== 'recognized') throw new Error(reasonOf(recognition))
+    expect(recognition.purchase.price).toEqual({ kind: 'usd_pegged', usdWei: 2_700_000_000_000_000_000n, credits: 27n })
+  })
+
+  it('should recognize a primary sale through the Amoy collection store', () => {
+    const recognition = recognizeOnAmoy(
+      buildStoreUseCreditsArgs({
+        target: getContract(ContractName.CollectionStore, AMOY).address,
+        items: [{ collection: AMOY_COLLECTION, ids: [11n], prices: [PRIMARY_SALE_PRICE_MANA_WEI], beneficiaries: [BUYER] }]
+      })
+    )
+    if (recognition.status !== 'recognized') throw new Error(reasonOf(recognition))
+    expect(recognition.purchase.via).toBe('collection_store')
+    expect(recognition.purchase.paymentTokenAddress).toBe(amoyMana.address.toLowerCase())
+  })
+
+  it('should refuse the mainnet collection store when the purchase is on Amoy', () => {
+    expect(reasonOf(recognizeOnAmoy(buildStoreUseCreditsArgs()))).toBe('not_a_marketplace')
   })
 })
 

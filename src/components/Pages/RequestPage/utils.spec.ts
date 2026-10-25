@@ -21,7 +21,8 @@ import {
   getNetworkProvider,
   getSigninDeeplink,
   isAddressWithoutCode,
-  isDecentralandCollection
+  isDecentralandCollection,
+  readManaUsdRate
 } from './utils'
 
 jest.mock('decentraland-connect')
@@ -1515,6 +1516,78 @@ describe('when fetching the place of a tip recipient', () => {
 
     it('should return null', async () => {
       await expect(fetchPlaceByCreatorAddress(CREATOR)).resolves.toBeNull()
+    })
+  })
+})
+
+describe('when reading the live MANA/USD rate', () => {
+  const MARKETPLACE = '0xmarketplace'
+  const AGGREGATOR = '0x00000000000000000000000000000000000a660e'
+  let mockReadContract: jest.Mock
+  let round: { roundId: bigint; answer: bigint; updatedAt: bigint; answeredInRound: bigint }
+
+  beforeEach(() => {
+    jest.useFakeTimers({ now: new Date('2026-09-29T19:00:00Z') })
+    const nowSeconds = BigInt(Math.floor(Date.now() / 1000))
+    round = { roundId: 10n, answer: 26_960_836n, updatedAt: nowSeconds - 60n, answeredInRound: 10n }
+    jest.mocked(getContract).mockReturnValue({ address: MARKETPLACE, abi: [] } as any)
+    jest.mocked(connection.createProvider).mockReturnValue({ isNetworkProvider: true } as any)
+    mockReadContract = jest.fn(async ({ address, functionName }: { address: string; functionName: string }) => {
+      if (functionName === 'manaUsdAggregator' && address === MARKETPLACE) return AGGREGATOR
+      if (address !== AGGREGATOR) throw new Error(`read ${functionName} from an unexpected contract ${address}`)
+      if (functionName === 'decimals') return 8
+      if (functionName === 'latestRoundData') return [round.roundId, round.answer, 0n, round.updatedAt, round.answeredInRound]
+      throw new Error(`unexpected read ${functionName}`)
+    })
+    jest.mocked(createPublicClient).mockReturnValue({ readContract: mockReadContract } as any)
+  })
+
+  afterEach(() => {
+    jest.resetAllMocks()
+    jest.useRealTimers()
+  })
+
+  describe('and the feed answers with a fresh, complete round', () => {
+    it('should return the rate and its decimals', async () => {
+      await expect(readManaUsdRate(ChainId.MATIC_AMOY)).resolves.toEqual({ rate: 26_960_836n, decimals: 8 })
+    })
+
+    it('should read the aggregator the marketplace itself converts with, on the purchase chain', async () => {
+      await readManaUsdRate(ChainId.MATIC_AMOY)
+      expect(getContract).toHaveBeenCalledWith(expect.anything(), ChainId.MATIC_AMOY)
+      expect(connection.createProvider).toHaveBeenCalledWith(ProviderType.NETWORK, ChainId.MATIC_AMOY)
+      expect(mockReadContract).toHaveBeenCalledWith(expect.objectContaining({ address: MARKETPLACE, functionName: 'manaUsdAggregator' }))
+    })
+  })
+
+  describe('and the round cannot be stood behind', () => {
+    it('should refuse an incomplete round', async () => {
+      round.answeredInRound = 9n
+      await expect(readManaUsdRate(ChainId.MATIC_AMOY)).rejects.toThrow('incomplete')
+    })
+
+    it('should refuse a rate that is not positive', async () => {
+      round.answer = 0n
+      await expect(readManaUsdRate(ChainId.MATIC_AMOY)).rejects.toThrow('not positive')
+    })
+
+    it('should refuse a round dated in the future beyond clock drift', async () => {
+      round.updatedAt = BigInt(Math.floor(Date.now() / 1000)) + 10n * 60n
+      await expect(readManaUsdRate(ChainId.MATIC_AMOY)).rejects.toThrow('in the future')
+    })
+
+    it('should refuse a round older than a day', async () => {
+      round.updatedAt = BigInt(Math.floor(Date.now() / 1000)) - 24n * 60n * 60n - 1n
+      await expect(readManaUsdRate(ChainId.MATIC_AMOY)).rejects.toThrow('old')
+    })
+  })
+
+  describe('and the feed does not answer', () => {
+    it('should give up after the lookup deadline instead of holding the review', async () => {
+      mockReadContract.mockImplementation(() => new Promise(() => undefined))
+      const outcome = expect(readManaUsdRate(ChainId.MATIC_AMOY)).rejects.toThrow('MANA/USD rate lookup timed out')
+      await jest.advanceTimersByTimeAsync(10_000)
+      await outcome
     })
   })
 })
