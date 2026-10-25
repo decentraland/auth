@@ -116,6 +116,40 @@ function isUserRejectedTransaction(error: unknown): boolean {
 }
 
 /**
+ * The message a hardware wallet left when MetaMask failed to use it. MetaMask drives Ledger, Trezor
+ * and QR (Keystone) devices through its own keyrings and, when one of them fails, answers the request
+ * with JSON-RPC internal error -32603 carrying the keyring's message. viem wraps that in an
+ * InternalRpcError that keeps the code, moves the message to `details` and also formats it into its
+ * own `message` as a `Details:` line. Returns undefined for anything that is not a -32603.
+ */
+function getHardwareWalletFailure(error: unknown): string | undefined {
+  if (error === null || typeof error !== 'object') return undefined
+
+  const { code, details, message } = error as { code?: unknown; details?: unknown; message?: unknown }
+  if (code !== -32603) return undefined
+  if (typeof details === 'string') return details
+  if (typeof message !== 'string') return undefined
+
+  return /^Details: (.*)$/m.exec(message)?.[1] ?? message
+}
+
+/**
+ * The user closed the hardware wallet's own prompt: the Trezor Connect popup, or the QR scanner a
+ * Keystone signature goes through. A rejection in all but name.
+ */
+const HARDWARE_WALLET_CANCELLATIONS = new Set(['Popup closed', 'Trezor action was interrupted (Popup closed)', 'Scan cancelled'])
+
+/**
+ * The hardware wallet is not in a state to answer, and its message says what the user has to do: grant
+ * the browser access to the Ledger, unlock the device, or plug in the device that holds the account.
+ */
+const HARDWARE_WALLET_DEVICE_STATES = [
+  /^No permitted Ledger device found\. User must grant permission from the UI first\.$/,
+  /^Device is locked$/,
+  /^Ledger: Account 0x[0-9a-fA-F]{40} does not belong to the connected device$/
+]
+
+/**
  * Wallet and connector conditions that are not application faults: the wallet is locked, it
  * already has a prompt open for this origin, or the user dismissed the connection modal. The
  * login genuinely fails for the user — so these are still logged and tracked — but there is
@@ -139,15 +173,9 @@ function isExpectedWalletError(error: unknown): boolean {
   // the AppKit modal, so the message is the only signal it leaves.
   if (isErrorWithMessage(error) && error.message === 'User closed the modal without connecting') return true
 
-  // viem InternalRpcError (-32603) thrown when a Ledger device has not been granted browser
-  // HID/WebUSB permission yet. The user must open the browser device-picker before connecting;
-  // there is nothing here for us to fix. The underlying Ledger message arrives in both `message`
-  // (viem formats it in) and `details` (the raw provider payload), so we search both.
-  if ((error as { code: unknown }).code === -32603) {
-    const message = isErrorWithMessage(error) ? error.message : ''
-    const details = typeof (error as { details?: unknown }).details === 'string' ? (error as { details: string }).details : ''
-    if (/No permitted Ledger device found/i.test(`${message} ${details}`)) return true
-  }
+  // The user backed out of a hardware wallet that MetaMask drives (see {@link getHardwareWalletFailure}).
+  const hardwareWalletFailure = getHardwareWalletFailure(error)
+  if (hardwareWalletFailure !== undefined && HARDWARE_WALLET_CANCELLATIONS.has(hardwareWalletFailure)) return true
 
   return false
 }
@@ -160,10 +188,12 @@ function isExpectedWalletError(error: unknown): boolean {
  * - EIP-1193 `4100` (Unauthorized) with "DApp interaction is disabled": the user switched dApp
  *   access off in the wallet.
  * - `-32001` with "Already processing unlock. Please wait.": the wallet is still busy unlocking.
+ * - `-32603` from a hardware wallet that needs the user's hand first: browser access to the Ledger
+ *   not granted, the device locked, or the account on another device ({@link HARDWARE_WALLET_DEVICE_STATES}).
  *
- * Both match on the code and the exact message. Other `4100` refusals (an account or method the
- * user never authorized) can point at our own requests, and other `-32001` failures are not this
- * state, so they keep reporting.
+ * Each matches on the code and the exact message. Other `4100` refusals (an account or method the
+ * user never authorized) can point at our own requests, and other `-32001` and `-32603` failures are
+ * not these states, so they keep reporting.
  */
 function isUnreportedWalletCondition(error: unknown): boolean {
   if (!isErrorWithMessage(error)) return false
@@ -176,6 +206,9 @@ function isUnreportedWalletCondition(error: unknown): boolean {
 
   if (code === 4100 && says('DApp interaction is disabled')) return true
   if (code === -32001 && says('Already processing unlock. Please wait.')) return true
+
+  const hardwareWalletFailure = getHardwareWalletFailure(error)
+  if (hardwareWalletFailure !== undefined && HARDWARE_WALLET_DEVICE_STATES.some(state => state.test(hardwareWalletFailure))) return true
 
   return false
 }

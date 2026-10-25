@@ -1,4 +1,4 @@
-import { UnauthorizedProviderError } from 'viem'
+import { InternalRpcError, UnauthorizedProviderError } from 'viem'
 import {
   WalletSignatureUnsupportedError,
   isChainMismatchRejection,
@@ -147,28 +147,29 @@ describe('isExpectedWalletError', () => {
     })
   })
 
-  describe('when the Ledger device has not been granted browser HID/WebUSB permission', () => {
-    it('should classify it as expected when viem formats the Ledger message into the error message', () => {
-      const error = Object.assign(
-        new Error(
-          'An internal error was received.\n\nDetails: No permitted Ledger device found. User must grant permission from the UI first.\nVersion: viem@2.43.4'
-        ),
-        {
-          code: -32603,
-          details: 'No permitted Ledger device found. User must grant permission from the UI first.'
-        }
-      )
-      expect(isExpectedWalletError(error)).toBe(true)
-    })
+  describe('when the user closes a hardware wallet prompt that MetaMask opened', () => {
+    it.each(['Trezor action was interrupted (Popup closed)', 'Popup closed', 'Scan cancelled'])(
+      'should classify "%s" as expected once viem wraps it',
+      failure => {
+        expect(isExpectedWalletError(new InternalRpcError(Object.assign(new Error(failure), { code: -32603 })))).toBe(true)
+      }
+    )
 
-    it('should classify it as expected when the Ledger message arrives only in details', () => {
+    it('should classify it as expected from the Details line when the error carries no details', () => {
       expect(
         isExpectedWalletError({
           code: -32603,
-          message: 'An internal error was received.',
-          details: 'No permitted Ledger device found. User must grant permission from the UI first.'
+          message: 'An internal error was received.\n\nDetails: Scan cancelled\nVersion: viem@2.43.4'
         })
       ).toBe(true)
+    })
+
+    it('should classify it as expected when it arrives as the raw provider error', () => {
+      expect(isExpectedWalletError({ code: -32603, message: 'Popup closed' })).toBe(true)
+    })
+
+    it('should not classify the same text under another code as expected', () => {
+      expect(isExpectedWalletError({ code: -32000, message: 'Popup closed' })).toBe(false)
     })
   })
 
@@ -262,6 +263,33 @@ describe('isUnreportedWalletCondition', () => {
   describe('when the wallet is still busy unlocking', () => {
     it('should match the code with the wallet message', () => {
       expect(isUnreportedWalletCondition({ code: -32001, message: 'Already processing unlock. Please wait.' })).toBe(true)
+    })
+  })
+
+  describe('when a hardware wallet that MetaMask drives needs the user first', () => {
+    it.each([
+      'No permitted Ledger device found. User must grant permission from the UI first.',
+      'Device is locked',
+      'Ledger: Account 0x1111111111111111111111111111111111111111 does not belong to the connected device'
+    ])('should match "%s" once viem wraps it', failure => {
+      expect(isUnreportedWalletCondition(new InternalRpcError(Object.assign(new Error(failure), { code: -32603 })))).toBe(true)
+    })
+
+    it('should match it from the Details line viem formats into the message', () => {
+      expect(
+        isUnreportedWalletCondition(
+          Object.assign(new Error('An internal error was received.\n\nDetails: Device is locked\nVersion: viem@2.43.4'), { code: -32603 })
+        )
+      ).toBe(true)
+    })
+
+    it('should stay apart from the expected wallet errors, so the device message is kept', () => {
+      expect(isExpectedWalletError({ code: -32603, message: 'Device is locked' })).toBe(false)
+    })
+
+    it('should not match another internal error from the keyring', () => {
+      expect(isUnreportedWalletCondition({ code: -32603, message: 'KeyringController - No keyring found' })).toBe(false)
+      expect(isUnreportedWalletCondition({ code: -32603, message: 'Internal error' })).toBe(false)
     })
   })
 
