@@ -151,7 +151,7 @@ describe('isExpectedWalletError', () => {
     it.each(['Trezor action was interrupted (Popup closed)', 'Popup closed', 'Scan cancelled'])(
       'should classify "%s" as expected once viem wraps it',
       failure => {
-        expect(isExpectedWalletError(new InternalRpcError(Object.assign(new Error(failure), { code: -32603 })))).toBe(true)
+        expect(isExpectedWalletError(new InternalRpcError(new Error(failure)))).toBe(true)
       }
     )
 
@@ -272,7 +272,7 @@ describe('isUnreportedWalletCondition', () => {
       'Device is locked',
       'Ledger: Account 0x1111111111111111111111111111111111111111 does not belong to the connected device'
     ])('should match "%s" once viem wraps it', failure => {
-      expect(isUnreportedWalletCondition(new InternalRpcError(Object.assign(new Error(failure), { code: -32603 })))).toBe(true)
+      expect(isUnreportedWalletCondition(new InternalRpcError(new Error(failure)))).toBe(true)
     })
 
     it('should match it from the Details line viem formats into the message', () => {
@@ -285,6 +285,17 @@ describe('isUnreportedWalletCondition', () => {
 
     it('should stay apart from the expected wallet errors, so the device message is kept', () => {
       expect(isExpectedWalletError({ code: -32603, message: 'Device is locked' })).toBe(false)
+    })
+
+    it('should leave the user closing the prompt to the expected wallet errors', () => {
+      expect(isUnreportedWalletCondition(new InternalRpcError(new Error('Scan cancelled')))).toBe(false)
+    })
+
+    it('should not match a Ledger account message with a malformed address or trailing text', () => {
+      expect(isUnreportedWalletCondition({ code: -32603, message: 'Ledger: Account 0x1234 does not belong to the connected device' })).toBe(
+        false
+      )
+      expect(isUnreportedWalletCondition({ code: -32603, message: 'Device is locked, and something else' })).toBe(false)
     })
 
     it('should not match another internal error from the keyring', () => {

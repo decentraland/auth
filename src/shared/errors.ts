@@ -121,6 +121,8 @@ function isUserRejectedTransaction(error: unknown): boolean {
  * with JSON-RPC internal error -32603 carrying the keyring's message. viem wraps that in an
  * InternalRpcError that keeps the code, moves the message to `details` and also formats it into its
  * own `message` as a `Details:` line. Returns undefined for anything that is not a -32603.
+ *
+ * Any -32603 yields its text, hardware or not, so callers must match it exactly.
  */
 function getHardwareWalletFailure(error: unknown): string | undefined {
   if (error === null || typeof error !== 'object') return undefined
@@ -137,13 +139,17 @@ function getHardwareWalletFailure(error: unknown): string | undefined {
  * The user closed the hardware wallet's own prompt: the Trezor Connect popup, or the QR scanner a
  * Keystone signature goes through. A rejection in all but name.
  */
-const HARDWARE_WALLET_CANCELLATIONS = new Set(['Popup closed', 'Trezor action was interrupted (Popup closed)', 'Scan cancelled'])
+const HARDWARE_WALLET_CANCELLATIONS: ReadonlySet<string> = new Set([
+  'Popup closed',
+  'Trezor action was interrupted (Popup closed)',
+  'Scan cancelled'
+])
 
 /**
  * The hardware wallet is not in a state to answer, and its message says what the user has to do: grant
  * the browser access to the Ledger, unlock the device, or plug in the device that holds the account.
  */
-const HARDWARE_WALLET_DEVICE_STATES = [
+const HARDWARE_WALLET_DEVICE_STATES: readonly RegExp[] = [
   /^No permitted Ledger device found\. User must grant permission from the UI first\.$/,
   /^Device is locked$/,
   /^Ledger: Account 0x[0-9a-fA-F]{40} does not belong to the connected device$/
@@ -173,7 +179,7 @@ function isExpectedWalletError(error: unknown): boolean {
   // the AppKit modal, so the message is the only signal it leaves.
   if (isErrorWithMessage(error) && error.message === 'User closed the modal without connecting') return true
 
-  // The user backed out of a hardware wallet that MetaMask drives (see {@link getHardwareWalletFailure}).
+  // The user backed out of a hardware wallet that MetaMask drives.
   const hardwareWalletFailure = getHardwareWalletFailure(error)
   if (hardwareWalletFailure !== undefined && HARDWARE_WALLET_CANCELLATIONS.has(hardwareWalletFailure)) return true
 
