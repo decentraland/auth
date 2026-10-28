@@ -3,6 +3,7 @@ import {
   clearWagmiStorage,
   getApprovedEip155Methods,
   hasLiveWalletConnectSession,
+  hasStoredWalletConnectSession,
   isMissingSessionError
 } from './walletConnect'
 
@@ -222,6 +223,59 @@ describe('clearWagmiStorage', () => {
 
     it('should not throw, so the connection attempt still goes ahead', () => {
       expect(() => clearWagmiStorage()).not.toThrow()
+    })
+  })
+})
+
+describe('hasStoredWalletConnectSession', () => {
+  afterEach(() => {
+    localStorage.clear()
+  })
+
+  describe('when a session is stored', () => {
+    beforeEach(() => {
+      localStorage.clear()
+      localStorage.setItem('wc@2:client:0.3//session', '[{"topic":"abc"}]')
+    })
+
+    it('should report there is something to restore', () => {
+      expect(hasStoredWalletConnectSession()).toBe(true)
+    })
+  })
+
+  describe('when the session entry is there but empty', () => {
+    beforeEach(() => {
+      localStorage.clear()
+      // What WalletConnect leaves behind once its sessions are gone: the key stays, the array
+      // does not. Restoring from this can only open the wallet chooser.
+      localStorage.setItem('wc@2:client:0.3//session', '[]')
+      localStorage.setItem('wc@2:core:0.3//keychain', '{}')
+    })
+
+    it('should report there is nothing to restore', () => {
+      expect(hasStoredWalletConnectSession()).toBe(false)
+    })
+  })
+
+  describe('when no session entry exists at all', () => {
+    beforeEach(() => {
+      localStorage.clear()
+      localStorage.setItem('wc@2:core:0.3//pairing', '[]')
+    })
+
+    it('should report there is nothing to restore', () => {
+      expect(hasStoredWalletConnectSession()).toBe(false)
+    })
+  })
+
+  describe('when the stored value cannot be parsed', () => {
+    beforeEach(() => {
+      localStorage.clear()
+      localStorage.setItem('wc@2:client:0.3//session', 'not json')
+    })
+
+    it('should keep the previous behaviour and let the restore go ahead', () => {
+      expect(hasStoredWalletConnectSession()).toBe(true)
     })
   })
 })
