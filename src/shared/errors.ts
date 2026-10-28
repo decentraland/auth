@@ -189,6 +189,19 @@ function isMagicNetworkError(error: unknown): boolean {
 }
 
 /**
+ * Detects thirdweb refusing the address the user typed for an email login. thirdweb's server is
+ * stricter than our own `isEmailValid` check (it refuses, for example, a one-character TLD), and
+ * `preAuthenticate` rethrows the server's message as is. The login page already shows this as the
+ * translated invalid-email error. It is a typo in user input, not a fault of ours.
+ *
+ * Only that message matches (ignoring case, surrounding spaces and the trailing period), so any other
+ * thirdweb failure keeps reporting.
+ */
+function isThirdwebInvalidEmailError(error: unknown): boolean {
+  return isErrorWithMessage(error) && typeof error.message === 'string' && /^invalid email\.?$/i.test(error.message.trim())
+}
+
+/**
  * Detects a wallet refusing an eth_sendTransaction because the request's `chainId` does not match its
  * active network: EIP-1474 invalid params, code -32602, with a message that names the chain. viem
  * wraps provider errors, so the code and message may sit on the error itself, on its `cause`, or on a
@@ -228,6 +241,7 @@ export {
   isMagicRpcError,
   isMagicExtensionError,
   isMagicNetworkError,
+  isThirdwebInvalidEmailError,
   isUserRejectedTransaction,
   isWalletSignatureUnsupportedError,
   isExpectedWalletError,

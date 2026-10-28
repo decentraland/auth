@@ -4,6 +4,7 @@ import {
   isChainMismatchRejection,
   isExpectedWalletError,
   isMagicNetworkError,
+  isThirdwebInvalidEmailError,
   isUnreportedWalletCondition,
   isUserRejectedTransaction,
   isWalletSignatureUnsupportedError
@@ -297,6 +298,34 @@ describe('isMagicNetworkError', () => {
       expect(isMagicNetworkError(null)).toBe(false)
       expect(isMagicNetworkError(undefined)).toBe(false)
       expect(isMagicNetworkError('Failed to fetch')).toBe(false)
+    })
+  })
+})
+
+describe('isThirdwebInvalidEmailError', () => {
+  describe('when thirdweb refuses the address the user typed', () => {
+    it('should match the message thirdweb forwards from its server', () => {
+      expect(isThirdwebInvalidEmailError(new Error('Invalid email.'))).toBe(true)
+    })
+
+    it('should match regardless of casing and the trailing period', () => {
+      expect(isThirdwebInvalidEmailError(new Error('invalid email'))).toBe(true)
+    })
+  })
+
+  describe('when thirdweb fails for any other reason', () => {
+    it('should not match a different message that mentions an invalid email', () => {
+      expect(isThirdwebInvalidEmailError(new Error('Invalid email provider configuration'))).toBe(false)
+    })
+
+    it('should not match the generic send failure', () => {
+      expect(isThirdwebInvalidEmailError(new Error('Failed to send verification code'))).toBe(false)
+    })
+
+    it('should not match values that are not errors', () => {
+      expect(isThirdwebInvalidEmailError('Invalid email.')).toBe(false)
+      expect(isThirdwebInvalidEmailError(null)).toBe(false)
+      expect(isThirdwebInvalidEmailError({ message: 42 })).toBe(false)
     })
   })
 })

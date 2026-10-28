@@ -1,7 +1,13 @@
 import { captureException } from '@sentry/react'
 import { TrackingEvents } from '../../modules/analytics/types'
 import { DeploymentError } from '../../modules/profile/errors'
-import { isErrorWithMessage, isExpectedWalletError, isMagicNetworkError, isUnreportedWalletCondition } from '../errors'
+import {
+  isErrorWithMessage,
+  isExpectedWalletError,
+  isMagicNetworkError,
+  isThirdwebInvalidEmailError,
+  isUnreportedWalletCondition
+} from '../errors'
 import { trackEvent } from './analytics'
 import { ErrorContext, HandleErrorOptions, SentryExtra } from './errorHandler.types'
 
@@ -84,8 +90,14 @@ const handleError = (error: unknown, context: string, options?: HandleErrorOptio
   // browser failing to reach Magic at all: the user's network, not something we can fix. The
   // unreported wallet conditions (dApp access switched off, an unlock still in progress) are the
   // same kind of condition, kept in their own predicate so the login screen still shows the
-  // wallet's message.
-  if (!isExpectedWalletError(error) && !isUnreportedWalletCondition(error) && !isMagicNetworkError(error)) {
+  // wallet's message. An email address thirdweb refuses as invalid is the user's typo, handled the
+  // same way.
+  if (
+    !isExpectedWalletError(error) &&
+    !isUnreportedWalletCondition(error) &&
+    !isMagicNetworkError(error) &&
+    !isThirdwebInvalidEmailError(error)
+  ) {
     const deploymentExtra = getDeploymentErrorExtra(error)
     const { error: normalised, originalShape } = normaliseError(error)
 
