@@ -20,7 +20,11 @@ const ASSET_TYPE_COLLECTION_ITEM = 4n
 // The off-chain marketplace deployments a resale or a listed item may settle through: the contracts that
 // verify a trade signature and move the assets. The CreditsManager's own allowlist also holds the legacy
 // marketplace, which takes an entirely different call; that is not this screen's shape.
-const PURCHASE_MARKETPLACES: ReadonlySet<string> = new Set([ContractName.OffChainMarketplace, ContractName.OffChainMarketplaceV2])
+const PURCHASE_MARKETPLACES: ReadonlySet<string> = new Set([
+  ContractName.OffChainMarketplace,
+  ContractName.OffChainMarketplaceV2,
+  ContractName.OffChainMarketplaceV3
+])
 
 // The one `accept` the dedicated screen stands in for. Read off the marketplace ABI rather than written
 // down, so it cannot drift from the contract the call is decoded against.
@@ -101,9 +105,9 @@ type CreditsPurchase = {
    * says what the item costs, and only the salt says what the purchase debits.
    */
   creditSalt: string
-  /** Unix seconds after which the external call, and the trade (a marketplace purchase only), stop being valid. */
-  externalCallExpiresAt: bigint
+  /** Unix seconds after which the trade stops being valid (marketplace purchases only). */
   tradeExpiresAt: bigint | null
+  /** Unix seconds after which the credit stops being valid. */
   creditExpiresAt: bigint
   /**
    * The soonest of them, in unix seconds: the whole purchase is void once any of them passes. The page
@@ -137,6 +141,7 @@ type CreditsUnsupportedReason =
   | 'another_recipient'
   | 'price_asset_type'
   | 'payment_token'
+  | 'self_payment'
   | 'no_price'
 
 /**
@@ -297,9 +302,9 @@ function readMarketplacePurchase(
     return { reason: 'price_asset_type' }
   }
   const paymentTokenAddress = toAddress(received.contractAddress)
-  const paymentBeneficiary = toAddress(received.beneficiary)
+  const requestedPaymentBeneficiary = toAddress(received.beneficiary)
   const amount = toBigInt(received.value)
-  if (paymentTokenAddress === null || paymentBeneficiary === null || amount === null || !isEmptyBytes(received.extra)) {
+  if (paymentTokenAddress === null || requestedPaymentBeneficiary === null || amount === null || !isEmptyBytes(received.extra)) {
     return { reason: 'malformed_arguments' }
   }
   // Anything but the chain's MANA in that slot is not the payment this screen names — and for a plain ERC-20
@@ -310,6 +315,14 @@ function readMarketplacePurchase(
   }
   if (amount <= 0n) {
     return { reason: 'no_price' }
+  }
+
+  // Marketplace._transferAssets resolves a zero beneficiary on received assets to the trade signer.
+  const paymentBeneficiary =
+    requestedPaymentBeneficiary === '0x0000000000000000000000000000000000000000' ? seller : requestedPaymentBeneficiary
+  // CreditsManager rejects a purchase that changes the buyer's MANA balance (SenderBalanceChanged).
+  if (paymentBeneficiary === recipient) {
+    return { reason: 'self_payment' }
   }
 
   return {
@@ -482,16 +495,16 @@ function recognizeCreditsPurchase(
     if (!isRecord(externalCall)) {
       return unsupported('malformed_arguments')
     }
-    const externalCallExpiresAt = toBigInt(externalCall.expiresAt)
     const target = toAddress(externalCall.target)
-    if (externalCallExpiresAt === null || !isSeconds(externalCallExpiresAt) || target === null) {
+    if (target === null) {
       return unsupported('malformed_arguments')
     }
 
-    // An expired credit or external call cannot execute, so a screen that summarized it as a purchase would
-    // be describing something that will not happen.
+    // CreditsManager checks externalCall.expiresAt only on its custom-target path. The marketplace/store
+    // paths recognized below ignore that field, so it cannot define their authorization deadline.
+    // Only the credit and (for marketplace purchases) trade provide an enforced expiry.
     const now = BigInt(Math.floor(context.nowSeconds))
-    if (creditExpiresAt <= now || externalCallExpiresAt <= now) {
+    if (creditExpiresAt <= now) {
       return unsupported('expired')
     }
 
@@ -517,7 +530,6 @@ function recognizeCreditsPurchase(
       settlementName: settlement.name,
       maxCreditedValueWei: maxCreditedValue,
       creditSalt,
-      externalCallExpiresAt,
       creditExpiresAt
     }
 
@@ -535,7 +547,7 @@ function recognizeCreditsPurchase(
           ...common,
           ...read,
           via: 'marketplace',
-          expiresAt: minimum(creditExpiresAt, externalCallExpiresAt, read.tradeExpiresAt)
+          expiresAt: minimum(creditExpiresAt, read.tradeExpiresAt)
         }
       }
     }
@@ -557,7 +569,7 @@ function recognizeCreditsPurchase(
           seller: null,
           paymentBeneficiary: null,
           tradeExpiresAt: null,
-          expiresAt: minimum(creditExpiresAt, externalCallExpiresAt)
+          expiresAt: creditExpiresAt
         }
       }
     }

@@ -201,7 +201,7 @@ test.describe('Request already fulfilled', () => {
     await injectMockWallet(context)
   })
 
-  test('already consumed request → shows completion view (no re-fetch)', async ({ page }) => {
+  test('already consumed request → shows an already answered view without claiming success', async ({ page }) => {
     await mockApiRoutes(page, { hasProfile: true, onboardingToExplorer: true })
 
     // Override: auth server returns "already been fulfilled" error
@@ -218,8 +218,8 @@ test.describe('Request already fulfilled', () => {
 
     await page.goto(`/auth/requests/${MOCK_REQUEST_ID}?loginMethod=METAMASK`)
 
-    // RequestFulfilledError → shows completion view
-    await expect(page.getByText(/Wallet interaction complete/i)).toBeVisible({ timeout: 15_000 })
+    // A consumed answer can be a rejection; no wallet success is established here.
+    await expect(page.getByText('Request already answered', { exact: true })).toBeVisible({ timeout: 15_000 })
   })
 })
 

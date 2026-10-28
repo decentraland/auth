@@ -64,7 +64,12 @@ const metadataFor = (purchase: CreditsPurchaseData['purchase']): CreditsPurchase
   rarity: Rarity.EPIC
 })
 
-const purchase = readFixturePurchase(buildUseCreditsArgs())
+// Exercise the current marketplace and its ignored external-call deadline in the browser fixtures too.
+const purchase = readFixturePurchase(
+  buildUseCreditsArgs({
+    externalCall: { target: getContract(ContractName.OffChainMarketplaceV3, POLYGON).address, expiresAt: 0n }
+  })
+)
 
 const creditsPurchaseData: CreditsPurchaseData = { purchase, pricing: priced(purchase), metadata: metadataFor(purchase) }
 

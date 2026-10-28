@@ -1,5 +1,5 @@
 import { ConnectionOptionType } from '../components/Connection'
-import { getConnectionOptionFromState, resetOauthStateCache } from './oauthState'
+import { getAuthRequestIdFromState, getConnectionOptionFromState, resetOauthStateCache } from './oauthState'
 
 function setLocation(pathname: string, search = '') {
   Object.defineProperty(window, 'location', {
@@ -86,6 +86,40 @@ describe('oauth state', () => {
         setLocation('/auth/callback', '')
 
         expect(getConnectionOptionFromState()).toBe(ConnectionOptionType.DISCORD)
+      })
+    })
+  })
+  describe('getAuthRequestIdFromState', () => {
+    describe('when state has a UUID v4 authRequestId', () => {
+      beforeEach(() => {
+        const state = makeState({ isMobileFlow: true, authRequestId: '13D31E96-1A1A-48EC-AF16-B10C4C982E08' })
+        setLocation('/auth/mobile/callback', `?state=${state}`)
+      })
+
+      it('should return it as the app sent it', () => {
+        expect(getAuthRequestIdFromState()).toBe('13D31E96-1A1A-48EC-AF16-B10C4C982E08')
+      })
+    })
+
+    describe('when state has an authRequestId that is not a UUID v4', () => {
+      beforeEach(() => {
+        const state = makeState({ isMobileFlow: true, authRequestId: 'not-a-uuid' })
+        setLocation('/auth/mobile/callback', `?state=${state}`)
+      })
+
+      it('should return null', () => {
+        expect(getAuthRequestIdFromState()).toBeNull()
+      })
+    })
+
+    describe('when state has no authRequestId', () => {
+      beforeEach(() => {
+        const state = makeState({ isMobileFlow: true })
+        setLocation('/auth/mobile/callback', `?state=${state}`)
+      })
+
+      it('should return null', () => {
+        expect(getAuthRequestIdFromState()).toBeNull()
       })
     })
   })

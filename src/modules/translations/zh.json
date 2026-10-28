@@ -115,6 +115,10 @@
       "title": "您的应用需要更新",
       "description": "此版本的 {explorerText} 使用的登录方式已不再受支持。请更新到最新版本后重新登录。"
     },
+    "request_already_answered": {
+      "title": "请求已有答复",
+      "description": "此请求已有答复。请先在发起请求的应用中查看其状态，再决定是否重试。"
+    },
     "wallet_interaction_complete": {
       "title": "钱包交互完成",
       "description": "操作已成功执行。"

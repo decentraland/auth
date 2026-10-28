@@ -115,6 +115,10 @@
       "title": "La tua app richiede un aggiornamento",
       "description": "Questa versione di {explorerText} usa un metodo di accesso che non è più supportato. Aggiorna all'ultima versione ed effettua di nuovo l'accesso."
     },
+    "request_already_answered": {
+      "title": "Richiesta già gestita",
+      "description": "Questa richiesta ha già ricevuto una risposta. Controlla il suo stato nell’app che l’ha inviata prima di riprovare."
+    },
     "wallet_interaction_complete": {
       "title": "Interazione con il portafoglio completata",
       "description": "L'azione è stata eseguita con successo."
