@@ -1,4 +1,5 @@
 import { ConnectionOptionType } from '../components/Connection'
+import { isValidUuidV4 } from './locations'
 
 // Only the fields actually consumed by the app. Other customData entries
 // (redirectTo, referrer, etc.) are not cached so they don't linger in memory.
@@ -6,6 +7,7 @@ interface OAuthCustomState {
   isMobileFlow?: boolean
   mobileUserId?: string
   mobileSessionId?: string
+  authRequestId?: string
   connectionOption?: ConnectionOptionType
 }
 
@@ -31,6 +33,7 @@ function extractCustomDataFromState(): OAuthCustomState | null {
         isMobileFlow: raw.isMobileFlow,
         mobileUserId: raw.mobileUserId,
         mobileSessionId: raw.mobileSessionId,
+        authRequestId: raw.authRequestId,
         connectionOption: raw.connectionOption
       }
       return cachedCustomData
@@ -51,10 +54,16 @@ function getConnectionOptionFromState(): ConnectionOptionType | undefined {
   return isConnectionOptionType(value) ? value : undefined
 }
 
+// The authRequestId the app opened /mobile with, or null when absent or not a UUID v4.
+function getAuthRequestIdFromState(): string | null {
+  const value = extractCustomDataFromState()?.authRequestId
+  return typeof value === 'string' && isValidUuidV4(value) ? value : null
+}
+
 // Exported for testing only
 function resetOauthStateCache(): void {
   cachedCustomData = undefined
 }
 
 export type { OAuthCustomState }
-export { extractCustomDataFromState, getConnectionOptionFromState, resetOauthStateCache }
+export { extractCustomDataFromState, getAuthRequestIdFromState, getConnectionOptionFromState, resetOauthStateCache }

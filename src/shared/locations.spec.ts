@@ -53,6 +53,28 @@ describe('locations', () => {
     })
   })
 
+  describe('mobile', () => {
+    it('returns /mobile when no params', () => {
+      expect(locations.mobile()).toBe('/mobile')
+    })
+
+    it('returns /mobile with the provider', () => {
+      expect(locations.mobile('google')).toBe('/mobile?provider=google')
+    })
+
+    it('returns /mobile with the authRequestId', () => {
+      expect(locations.mobile(undefined, '13d31e96-1a1a-48ec-af16-b10c4c982e08')).toBe(
+        '/mobile?authRequestId=13d31e96-1a1a-48ec-af16-b10c4c982e08'
+      )
+    })
+
+    it('returns /mobile with the provider and the authRequestId', () => {
+      expect(locations.mobile('google', '13d31e96-1a1a-48ec-af16-b10c4c982e08')).toBe(
+        '/mobile?provider=google&authRequestId=13d31e96-1a1a-48ec-af16-b10c4c982e08'
+      )
+    })
+  })
+
   describe('loginWithEmail', () => {
     it('returns email login URL without params', () => {
       expect(locations.loginWithEmail()).toBe('/login?loginMethod=email')
