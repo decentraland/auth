@@ -110,7 +110,8 @@ describe('handleError → expected wallet conditions', () => {
     ['a wallet prompt already pending', { code: -32002, message: "Request of type 'wallet_requestPermissions' already pending" }],
     ['the WalletConnect modal being dismissed', new Error('User closed the modal without connecting')],
     ['a wallet still busy unlocking', { code: -32001, message: 'Already processing unlock. Please wait.' }],
-    ['a wallet with dApp access switched off', { code: 4100, message: 'DApp interaction is disabled' }]
+    ['a wallet with dApp access switched off', { code: 4100, message: 'DApp interaction is disabled' }],
+    ['the WalletConnect modal left open until the connector timed out', new Error('Connection timeout')]
   ]
 
   it.each(expectedConditions)('should not report %s to Sentry', (_case, error) => {
