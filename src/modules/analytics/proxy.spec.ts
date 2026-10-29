@@ -18,7 +18,22 @@ describe('when resolving the segment first party proxy', () => {
     })
 
     it('should treat empty strings the same way', () => {
-      expect(getSegmentProxy('', '')).toEqual({})
+      expect(getSegmentProxy('', '', '')).toEqual({})
+    })
+  })
+
+  describe('and the analytics url is configured', () => {
+    it('should return it as the bundle url', () => {
+      expect(getSegmentProxy(undefined, undefined, 'https://evs.example.org/aPath/aBundle.min.js')).toEqual({
+        analyticsUrl: 'https://evs.example.org/aPath/aBundle.min.js'
+      })
+    })
+
+    it('should drop a query string or a fragment and warn about it', () => {
+      expect(getSegmentProxy(undefined, undefined, 'https://evs.example.org/aBundle.min.js?k=1#frag').analyticsUrl).toBe(
+        'https://evs.example.org/aBundle.min.js'
+      )
+      expect(consoleWarn).toHaveBeenCalledWith(expect.stringContaining('query string or fragment'))
     })
   })
 
@@ -81,12 +96,14 @@ describe('when resolving the segment first party proxy', () => {
 
   describe('and a value is not usable', () => {
     it.each([
-      ['a cdn url that is not served over https', 'http://evs.example.org', undefined],
-      ['a cdn url that is not a url', 'not a url', undefined],
-      ['an api host that is not served over https', undefined, 'http://api.example.org/v1'],
-      ['an api host that is not a url', undefined, 'https://[']
-    ])('should drop %s with a warning and keep segment own hosts', (_case, cdnUrl, apiHost) => {
-      expect(getSegmentProxy(cdnUrl, apiHost)).toEqual({})
+      ['a cdn url that is not served over https', 'http://evs.example.org', undefined, undefined],
+      ['a cdn url that is not a url', 'not a url', undefined, undefined],
+      ['an api host that is not served over https', undefined, 'http://api.example.org/v1', undefined],
+      ['an api host that is not a url', undefined, 'https://[', undefined],
+      ['an analytics url that is not served over https', undefined, undefined, 'http://evs.example.org/aBundle.min.js'],
+      ['an analytics url that is not a url', undefined, undefined, 'not a url']
+    ])('should drop %s with a warning and keep segment own hosts', (_case, cdnUrl, apiHost, analyticsUrl) => {
+      expect(getSegmentProxy(cdnUrl, apiHost, analyticsUrl)).toEqual({})
       expect(consoleWarn).toHaveBeenCalled()
     })
 

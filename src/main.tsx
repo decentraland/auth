@@ -48,11 +48,18 @@ const getInitialLocale = (): string => {
 const initialLocale = getInitialLocale()
 
 const analytics = getAnalytics()
-const segmentProxy = getSegmentProxy(config.get('SEGMENT_CDN_URL', ''), config.get('SEGMENT_API_HOST', ''))
+const segmentProxy = getSegmentProxy(
+  config.get('SEGMENT_CDN_URL', ''),
+  config.get('SEGMENT_API_HOST', ''),
+  config.get('SEGMENT_ANALYTICS_URL', '')
+)
 if (analytics && segmentProxy.cdnUrl) {
   // Set explicitly so analytics.js resolves its settings and remote plugins from the proxy without relying on
   // inferring the origin from the script tag
   ;(analytics as unknown as { _cdn?: string })._cdn = segmentProxy.cdnUrl
+}
+if (analytics && segmentProxy.analyticsUrl) {
+  ;(analytics as unknown as { _analyticsUrl?: string })._analyticsUrl = segmentProxy.analyticsUrl
 }
 analytics?.load(config.get('SEGMENT_API_KEY'), segmentProxy.loadOptions)
 

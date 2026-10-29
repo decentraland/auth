@@ -5,6 +5,8 @@ const TRAILING_SLASHES = /\/+$/
 type SegmentProxy = {
   /** Base url analytics.js loads its bundle, settings and remote plugins from, instead of Segment's CDN. */
   cdnUrl?: string
+  /** Full url of the analytics.js bundle, so it can be served from a path ad blocker filter lists do not match. */
+  analyticsUrl?: string
   /** Load options that deliver the events to the proxy instead of Segment's ingestion endpoint. */
   loadOptions?: { integrations: { 'Segment.io': { apiHost: string } } }
 }
@@ -31,17 +33,22 @@ function parseHttpsUrl(name: string, value: string): URL | undefined {
 }
 
 /**
- * Both values come from the build configuration and decide where a third party script is loaded from and where
+ * The values come from the build configuration and decide where a third party script is loaded from and where
  * every event is delivered, so a value that is not an https URL is dropped and analytics keeps Segment's own hosts.
  *
  * `apiHost` takes no protocol and no trailing slash, analytics.js prepends the protocol and appends the method path.
  */
-function getSegmentProxy(cdnUrl?: string, apiHost?: string): SegmentProxy {
+function getSegmentProxy(cdnUrl?: string, apiHost?: string, analyticsUrl?: string): SegmentProxy {
   const proxy: SegmentProxy = {}
 
   const cdn = cdnUrl ? parseHttpsUrl('cdn url', cdnUrl) : undefined
   if (cdn) {
     proxy.cdnUrl = `${cdn.origin}${cdn.pathname}`.replace(TRAILING_SLASHES, '')
+  }
+
+  const bundle = analyticsUrl ? parseHttpsUrl('analytics url', analyticsUrl) : undefined
+  if (bundle) {
+    proxy.analyticsUrl = `${bundle.origin}${bundle.pathname}`
   }
 
   const host = apiHost ? parseHttpsUrl('api host', PROTOCOL_PREFIX.test(apiHost) ? apiHost : `https://${apiHost}`) : undefined
