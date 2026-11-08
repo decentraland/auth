@@ -270,6 +270,7 @@ describe('isUnreportedWalletCondition', () => {
     it.each([
       'No permitted Ledger device found. User must grant permission from the UI first.',
       'Device is locked',
+      'Ethereum app closed',
       'Ledger: Account 0x1111111111111111111111111111111111111111 does not belong to the connected device'
     ])('should match "%s" once viem wraps it', failure => {
       expect(isUnreportedWalletCondition(new InternalRpcError(new Error(failure)))).toBe(true)

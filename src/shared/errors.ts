@@ -147,11 +147,13 @@ const HARDWARE_WALLET_CANCELLATIONS: ReadonlySet<string> = new Set([
 
 /**
  * The hardware wallet is not in a state to answer, and its message says what the user has to do: grant
- * the browser access to the Ledger, unlock the device, or plug in the device that holds the account.
+ * the browser access to the Ledger, unlock the device, open the Ethereum app on it, or plug in the
+ * device that holds the account.
  */
 const HARDWARE_WALLET_DEVICE_STATES: readonly RegExp[] = [
   /^No permitted Ledger device found\. User must grant permission from the UI first\.$/,
   /^Device is locked$/,
+  /^Ethereum app closed$/,
   /^Ledger: Account 0x[0-9a-fA-F]{40} does not belong to the connected device$/
 ]
 
@@ -195,7 +197,8 @@ function isExpectedWalletError(error: unknown): boolean {
  *   access off in the wallet.
  * - `-32001` with "Already processing unlock. Please wait.": the wallet is still busy unlocking.
  * - `-32603` from a hardware wallet that needs the user's hand first: browser access to the Ledger
- *   not granted, the device locked, or the account on another device ({@link HARDWARE_WALLET_DEVICE_STATES}).
+ *   not granted, the device locked, the Ethereum app not open on it, or the account on another device
+ *   ({@link HARDWARE_WALLET_DEVICE_STATES}).
  *
  * Each matches on the code and the exact message. Other `4100` refusals (an account or method the
  * user never authorized) can point at our own requests, and other `-32001` and `-32603` failures are
