@@ -12,18 +12,19 @@ const COUNTDOWN_SECONDS = 3
 
 type Props = {
   identityId: string
+  authRequestId?: string | null
   explorerText: string
   onTryAgain: () => void
 }
 
-export const MobileAuthSuccess = ({ identityId, explorerText, onTryAgain }: Props) => {
+export const MobileAuthSuccess = ({ identityId, authRequestId, explorerText, onTryAgain }: Props) => {
   const { t } = useTranslation()
   const [countdown, setCountdown] = useState(COUNTDOWN_SECONDS)
   const [deepLinkFailed, setDeepLinkFailed] = useState(false)
 
   // Reuse the shared builder so the mobile handoff carries dclenv (on non-production)
   // like the desktop deep-link login handoff, instead of a bare signin URL.
-  const deepLinkUrl = getSigninDeeplink(undefined, identityId)
+  const deepLinkUrl = getSigninDeeplink(undefined, identityId, undefined, authRequestId)
 
   const hasLaunchedRef = useRef(false)
 

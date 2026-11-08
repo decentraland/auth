@@ -9,6 +9,7 @@ import { createAuthServerHttpClient } from '../../../shared/auth'
 import { ONE_MONTH_IN_MINUTES, getIdentitySignature } from '../../../shared/connection/identity'
 import { TRACKING_DELAY } from '../../../shared/constants'
 import { isErrorWithName } from '../../../shared/errors'
+import { AUTH_REQUEST_ID_PARAM, isValidUuidV4 } from '../../../shared/locations'
 import { disconnectWallet, sendEmailOTP } from '../../../shared/thirdweb'
 import { wait } from '../../../shared/time'
 import { handleError } from '../../../shared/utils/errorHandler'
@@ -45,6 +46,9 @@ export const MobileAuthPage = () => {
   const [targetConfig] = useTargetConfig()
   const { trackLoginClick, trackLoginSuccess } = useAnalytics()
 
+  const authRequestIdParam = searchParams.get(AUTH_REQUEST_ID_PARAM)
+  // Forwarded as received, like RequestPage: the app may match it byte for byte and auth-server compares case-insensitively.
+  const authRequestId = authRequestIdParam && isValidUuidV4(authRequestIdParam) ? authRequestIdParam : null
   const providerParam = searchParams.get('provider')
   const parsedProvider = parseConnectionOptionType(providerParam)
   // Email has its own OTP flow (handleEmailSubmit) and can't be auto-initiated via initiateAuth,
@@ -106,7 +110,7 @@ export const MobileAuthPage = () => {
           setLoadingState(ConnectionLayoutState.VALIDATING_SIGN_IN)
 
           const httpClient = createAuthServerHttpClient()
-          const response = await httpClient.postIdentity(identity, { isMobile: true })
+          const response = await httpClient.postIdentity(identity, { isMobile: true, authRequestId })
 
           await trackLoginSuccess({
             ethAddress,
@@ -133,7 +137,7 @@ export const MobileAuthPage = () => {
         setView('error')
       }
     },
-    [flagInitialized, isMagicTest, trackLoginClick, trackLoginSuccess]
+    [authRequestId, flagInitialized, isMagicTest, trackLoginClick, trackLoginSuccess]
   )
   // Clear cached sessions and optionally auto-initiate auth in a single sequential flow.
   // This prevents a race condition where clearCachedSessions (magic.user.logout) and
@@ -288,7 +292,7 @@ export const MobileAuthPage = () => {
 
         setLoadingState(ConnectionLayoutState.VALIDATING_SIGN_IN)
         const httpClient = createAuthServerHttpClient()
-        const response = await httpClient.postIdentity(identity, { isMobile: true })
+        const response = await httpClient.postIdentity(identity, { isMobile: true, authRequestId })
 
         await trackLoginSuccess({
           ethAddress: address,
@@ -314,7 +318,7 @@ export const MobileAuthPage = () => {
         setView('error')
       }
     },
-    [trackLoginSuccess]
+    [authRequestId, trackLoginSuccess]
   )
 
   // Provider selection view
@@ -344,7 +348,14 @@ export const MobileAuthPage = () => {
 
   // Success view with deep link
   if (view === 'success' && identityId) {
-    return <MobileAuthSuccess identityId={identityId} explorerText={targetConfig.explorerText} onTryAgain={handleTryAgain} />
+    return (
+      <MobileAuthSuccess
+        identityId={identityId}
+        authRequestId={authRequestId}
+        explorerText={targetConfig.explorerText}
+        onTryAgain={handleTryAgain}
+      />
+    )
   }
 
   // Loading/error view - use ConnectionLayout directly for centering
