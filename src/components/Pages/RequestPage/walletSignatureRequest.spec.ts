@@ -2,7 +2,7 @@ import { MalformedSignatureRequestError, UnsupportedMethodError } from '../../..
 import { RequestClassification } from './classifyRequest'
 import { WalletSignatureRequest, forwardSignatureRequest, toWalletSignatureRequest } from './walletSignatureRequest'
 
-const SIGNER = '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd'
+const SIGNER = '0xfacefacefacefacefacefacefacefacefaceface'
 const RAW = '{"primaryType":"Permit"}'
 
 describe('when building the wallet request for a reviewed signature', () => {

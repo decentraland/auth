@@ -231,7 +231,7 @@ describe('createAuthServerClient', () => {
             primaryType: 'MetaTransaction',
             message: {
               nonce: 0,
-              from: '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd',
+              from: '0xfacefacefacefacefacefacefacefacefaceface',
               functionData: `0xdeadbeef${'00'.repeat(64)}`,
               functionSignature: `0x2d0335ab${'00'.repeat(32)}`
             }

@@ -347,7 +347,7 @@ jest.mock('@dcl/hooks', () => ({
 }))
 
 const REQUEST_ID = 'test-request-123'
-const SIGNER = '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd'
+const SIGNER = '0xfacefacefacefacefacefacefacefacefaceface'
 const CONTRACT = '0xcontract'
 const COLLECTION = '0xcollection'
 const CREDITS_MANAGER = '0xcreditsmanager'
