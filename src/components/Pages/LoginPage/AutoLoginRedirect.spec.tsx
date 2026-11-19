@@ -90,7 +90,7 @@ jest.mock('./utils', () => ({
 import { AutoLoginRedirect } from './AutoLoginRedirect'
 import { ConnectionOptionType } from '../../Connection/Connection.types'
 
-const REFERRER = '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd'
+const REFERRER = '0xfacefacefacefacefacefacefacefacefaceface'
 const ACCOUNT = '0x1234567890abcdef1234567890abcdef12345678'
 
 const originalLocation = window.location

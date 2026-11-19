@@ -413,7 +413,7 @@ describe('when testing getMetaTransactionChainId', () => {
 
 describe('when reading the addresses a Decentraland call is handed', () => {
   let call: DecodedCall
-  const SIGNER = '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd'
+  const SIGNER = '0xfacefacefacefacefacefacefacefacefaceface'
   const OTHER = '0x1234567890abcdef1234567890abcdef12345678'
   const NFT = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd'
   const CHAIN = 137
@@ -1249,7 +1249,7 @@ describe('when building the signin deep link', () => {
 })
 
 describe('when fetching the place of a tip recipient', () => {
-  const CREATOR = '0xD9B96b5dC720Fc52bEde1eC3B40A930E15F70DDD'
+  const CREATOR = '0xFAcefaCEFACefACeFaCefacEFaCeFACEFAceFAcE'
   let originalFetch: typeof global.fetch
   let cancel: jest.Mock
 

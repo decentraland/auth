@@ -12,7 +12,7 @@ type MutableTypedData = {
 }
 
 const METHOD = 'eth_signTypedData_v4'
-const USER = '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd'
+const USER = '0xfacefacefacefacefacefacefacefacefaceface'
 const COLLECTION = '0xfef5c99885c3036e591b6e6db52482891834a5f4'
 const MARKETPLACE = '0xa40b1d129b8906888720686f3a01921ddf37716f'
 const POLYGON_SALT = '0x0000000000000000000000000000000000000000000000000000000000000089'

@@ -8,9 +8,9 @@ const avatar: Avatar = {
   description: 'My description',
   tutorialStep: 4095,
   name: 'MotherHacker',
-  userId: '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd',
+  userId: '0xfacefacefacefacefacefacefacefacefaceface',
   email: '',
-  ethAddress: '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd',
+  ethAddress: '0xfacefacefacefacefacefacefacefacefaceface',
   version: 64,
   avatar: {
     bodyShape: 'urn:decentraland:off-chain:base-avatars:BaseMale',
@@ -131,7 +131,7 @@ const manaData: MANATransferData = {
   }
 }
 
-const USER_ADDRESS = '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd'
+const USER_ADDRESS = '0xfacefacefacefacefacefacefacefacefaceface'
 
 const MARKETPLACE_ADDRESS = '0x1234567890abcdef1234567890abcdef12345678'
 const USDC_ADDRESS = '0x2791bca1f2de4661ed88a30c99a7a9449aa84174'

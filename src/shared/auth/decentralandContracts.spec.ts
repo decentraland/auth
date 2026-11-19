@@ -16,7 +16,7 @@ import {
 
 const POLYGON = 137
 const ETHEREUM = 1
-const USER = '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd'
+const USER = '0xfacefacefacefacefacefacefacefacefaceface'
 const RECIPIENT = '0x1234567890abcdef1234567890abcdef12345678'
 const COLLECTION_ADDRESS = '0xFEF5c99885c3036e591b6e6dB52482891834A5f4'
 
@@ -494,7 +494,7 @@ describe('when asking whether an address is one of Decentraland contracts', () =
 
 describe('when collecting the addresses a call reaches', () => {
   const POLYGON = 137
-  const USER = '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd'
+  const USER = '0xfacefacefacefacefacefacefacefacefaceface'
   const OTHER = '0x1234567890abcdef1234567890abcdef12345678'
   const UNKNOWN_NFT = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd'
   let credits: KnownContract

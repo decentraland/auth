@@ -20,7 +20,7 @@ jest.mock('../../../../AnimatedBackground', () => ({
   AnimatedBackground: () => null
 }))
 
-const BUYER = '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd'
+const BUYER = '0xfacefacefacefacefacefacefacefacefaceface'
 const SELLER = '0x5e11e50000000000000000000000000000005e11'
 const COLLECTION = '0xd0e9b1e87f94ecedf15db41ddb95f1825d5e3f3f'
 

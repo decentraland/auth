@@ -2,7 +2,7 @@ import { ErrorCode, MetaTransactionError, sendMetaTransaction } from 'decentrala
 import { isUserRejectedTransaction } from '../errors'
 import { ReviewedRequestInvalidatedError, ReviewedSignerMismatchError, bindProviderToSigner } from './signerBoundProvider'
 
-const SIGNER = '0xD9b96b5DC720fc52BEDE1ec3B40A930e15F70Ddd'
+const SIGNER = '0xFAcefaCEFACefACeFaCefacEFaCeFACEFAceFAcE'
 const OTHER = '0x1234567890abcdef1234567890abcdef12345678'
 
 describe('when binding a provider to the reviewed signer', () => {

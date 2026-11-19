@@ -14,7 +14,7 @@ import { assertSignatureParamsAreCanonical } from './signMethodGuard'
 // and the classifier. If the strict rules ever reject a legitimate payload, this fails first.
 
 const METHOD = 'eth_signTypedData_v4'
-const USER = '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd'
+const USER = '0xfacefacefacefacefacefacefacefacefaceface'
 // Registry entries for per-collection proxies carry no address; the auth site clones them with the
 // target collection, so this does the same.
 const COLLECTION_ADDRESS = '0xfef5c99885c3036e591b6e6db52482891834a5f4'

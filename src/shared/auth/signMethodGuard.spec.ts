@@ -616,7 +616,7 @@ describe('assertSignatureParamsAreCanonical', () => {
     let trade: string
 
     beforeEach(() => {
-      signerAddress = '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd'
+      signerAddress = '0xfacefacefacefacefacefacefacefacefaceface'
       trade = JSON.stringify({
         domain: {
           name: 'DecentralandMarketplacePolygon',
@@ -656,7 +656,7 @@ describe('assertSignatureParamsAreCanonical', () => {
     let typedData: Record<string, unknown>
 
     beforeEach(() => {
-      signerAddress = '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd'
+      signerAddress = '0xfacefacefacefacefacefacefacefacefaceface'
       typedData = {
         // eslint-disable-next-line @typescript-eslint/naming-convention
         types: { EIP712Domain: DOMAIN_TYPE, MetaTransaction: OFFCHAIN_META_TRANSACTION_TYPE },

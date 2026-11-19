@@ -18,7 +18,7 @@ import { buildCreditsPurchaseRequest, buildTrade, buildUseCreditsArgs, marketpla
 const POLYGON = 137
 const ETHEREUM = 1
 const AMOY = 80002
-const USER = '0xd9b96b5dc720fc52bede1ec3b40a930e15f70ddd'
+const USER = '0xfacefacefacefacefacefacefacefacefaceface'
 const RECIPIENT = '0x1234567890abcdef1234567890abcdef12345678'
 const UNKNOWN_CONTRACT = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd'
 const COLLECTION_ADDRESS = '0xfef5c99885c3036e591b6e6db52482891834a5f4'
