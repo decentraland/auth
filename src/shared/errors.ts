@@ -177,6 +177,15 @@ function isUnreportedWalletCondition(error: unknown): boolean {
 const BROWSER_NETWORK_FAILURE_MESSAGES = new Set(['Failed to fetch', 'Load failed', 'NetworkError when attempting to fetch resource.'])
 
 /**
+ * Detects the browser's own `fetch` failing before any response arrived: a `TypeError` carrying one
+ * of the messages above. An HTTP error status is not this — the server answered — and neither is a
+ * Magic RPC error that merely carries the same text (see isMagicNetworkError).
+ */
+function isBrowserNetworkFailure(error: unknown): boolean {
+  return error instanceof TypeError && BROWSER_NETWORK_FAILURE_MESSAGES.has(error.message)
+}
+
+/**
  * Detects Magic SDK failing to reach Magic's own API. The request runs inside the Magic iframe; when
  * the browser's fetch fails there, the iframe answers with JSON-RPC internal error -32603 carrying the
  * browser's network-failure text, which the SDK surfaces as `Magic RPC Error: [-32603] Failed to fetch`.
@@ -228,6 +237,7 @@ export {
   isMagicRpcError,
   isMagicExtensionError,
   isMagicNetworkError,
+  isBrowserNetworkFailure,
   isUserRejectedTransaction,
   isWalletSignatureUnsupportedError,
   isExpectedWalletError,

@@ -1,3 +1,4 @@
+import { captureException } from '@sentry/react'
 import { AuthIdentity } from '@dcl/crypto'
 import signedFetchMock from 'decentraland-crypto-fetch'
 import { getAnalytics } from '../../modules/analytics/segment'
@@ -629,6 +630,58 @@ describe('createAuthServerClient', () => {
 
       it('should handle and rethrow the error', async () => {
         await expect(client.postIdentity(mockIdentity)).rejects.toThrow('Network error')
+      })
+    })
+  })
+
+  describe('when checking the auth server health', () => {
+    let client: ReturnType<typeof createAuthServerHttpClient>
+
+    beforeEach(() => {
+      client = createAuthServerHttpClient()
+    })
+
+    describe('and the server answers', () => {
+      beforeEach(() => {
+        mockFetch.mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ timestamp: 1234 }) })
+      })
+
+      it('should return the health data', async () => {
+        await expect(client.checkHealth()).resolves.toEqual({ timestamp: 1234 })
+      })
+    })
+
+    describe('and the browser cannot reach the server', () => {
+      beforeEach(() => {
+        mockFetch.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      })
+
+      it('should throw the network error', async () => {
+        await expect(client.checkHealth()).rejects.toThrow('Failed to fetch')
+      })
+
+      it('should not report it to Sentry', async () => {
+        await expect(client.checkHealth()).rejects.toThrow()
+        expect(captureException).not.toHaveBeenCalled()
+      })
+
+      it('should still track it', async () => {
+        await expect(client.checkHealth()).rejects.toThrow()
+        expect(mockTrack).toHaveBeenCalledWith(
+          TrackingEvents.LOGIN_ERROR,
+          expect.objectContaining({ error: 'Failed to fetch', context: 'Error checking auth server health' })
+        )
+      })
+    })
+
+    describe('and the server answers with an error status', () => {
+      beforeEach(() => {
+        mockFetch.mockResolvedValueOnce({ ok: false, status: 503 })
+      })
+
+      it('should report it to Sentry', async () => {
+        await expect(client.checkHealth()).rejects.toThrow('Health check failed with status: 503')
+        expect(captureException).toHaveBeenCalledTimes(1)
       })
     })
   })

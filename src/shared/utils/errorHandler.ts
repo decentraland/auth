@@ -85,7 +85,9 @@ const handleError = (error: unknown, context: string, options?: HandleErrorOptio
   // unreported wallet conditions (dApp access switched off, an unlock still in progress) are the
   // same kind of condition, kept in their own predicate so the login screen still shows the
   // wallet's message.
-  if (!isExpectedWalletError(error) && !isUnreportedWalletCondition(error) && !isMagicNetworkError(error)) {
+  // A caller can also opt a specific failure out of Sentry when it handles it itself (e.g. a
+  // best-effort probe that proceeds without the answer).
+  if (!options?.skipSentry && !isExpectedWalletError(error) && !isUnreportedWalletCondition(error) && !isMagicNetworkError(error)) {
     const deploymentExtra = getDeploymentErrorExtra(error)
     const { error: normalised, originalShape } = normaliseError(error)
 
