@@ -2,6 +2,7 @@ import { AuthIdentity } from '@dcl/crypto'
 import signedFetch from 'decentraland-crypto-fetch'
 import { RequestInteractionType, TrackingEvents } from '../../modules/analytics/types'
 import { config } from '../../modules/config'
+import { isBrowserNetworkFailure } from '../errors'
 import { trackEvent } from '../utils/analytics'
 import { handleError } from '../utils/errorHandler'
 import { DifferentSenderError, ExpiredRequestError, RequestFulfilledError, RequestNotFoundError } from './errors'
@@ -213,7 +214,10 @@ export const createAuthServerHttpClient = (authServerUrl?: string) => {
       const data = await response.json()
       return data
     } catch (e) {
-      handleError(e, 'Error checking auth server health')
+      // The health check only feeds the best-effort clock-sync probe, which proceeds when it fails. A
+      // browser that can't reach the auth server at all (offline, blocked host) is the user's network,
+      // not a fault of ours, so it stays out of Sentry. An HTTP error status is still reported.
+      handleError(e, 'Error checking auth server health', { skipSentry: isBrowserNetworkFailure(e) })
       throw e
     }
   }

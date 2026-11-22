@@ -79,6 +79,8 @@ interface HandleErrorOptions {
   sentryExtra?: SentryExtra
   skipLogging?: boolean
   skipTracking?: boolean
+  /** Keeps the error out of Sentry while still logging and tracking it (unlike an error's `skipReporting`). */
+  skipSentry?: boolean
   trackingEvent?: string
 }
 

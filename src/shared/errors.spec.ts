@@ -1,6 +1,7 @@
 import { UnauthorizedProviderError } from 'viem'
 import {
   WalletSignatureUnsupportedError,
+  isBrowserNetworkFailure,
   isChainMismatchRejection,
   isExpectedWalletError,
   isMagicNetworkError,
@@ -297,6 +298,38 @@ describe('isMagicNetworkError', () => {
       expect(isMagicNetworkError(null)).toBe(false)
       expect(isMagicNetworkError(undefined)).toBe(false)
       expect(isMagicNetworkError('Failed to fetch')).toBe(false)
+    })
+  })
+})
+
+describe('isBrowserNetworkFailure', () => {
+  describe('when the browser fetch never got a response', () => {
+    it.each(['Failed to fetch', 'Load failed', 'NetworkError when attempting to fetch resource.'])(
+      'should recognize a TypeError carrying %p',
+      message => {
+        expect(isBrowserNetworkFailure(new TypeError(message))).toBe(true)
+      }
+    )
+  })
+
+  describe('when the failure is anything else', () => {
+    it('should not match a TypeError with a different message', () => {
+      expect(isBrowserNetworkFailure(new TypeError("Cannot read properties of undefined (reading 'x')"))).toBe(false)
+    })
+
+    it('should not match a plain Error carrying a network message', () => {
+      expect(isBrowserNetworkFailure(new Error('Failed to fetch'))).toBe(false)
+    })
+
+    it('should not match a Magic RPC error carrying a network message', () => {
+      expect(isBrowserNetworkFailure(new FakeMagicRPCError(-32603, 'Failed to fetch'))).toBe(false)
+    })
+
+    it('should not match non-error values', () => {
+      expect(isBrowserNetworkFailure(null)).toBe(false)
+      expect(isBrowserNetworkFailure(undefined)).toBe(false)
+      expect(isBrowserNetworkFailure('Failed to fetch')).toBe(false)
+      expect(isBrowserNetworkFailure({ message: 'Failed to fetch' })).toBe(false)
     })
   })
 })

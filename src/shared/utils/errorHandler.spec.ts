@@ -198,3 +198,41 @@ describe('handleError → Magic network failures', () => {
     })
   })
 })
+
+describe('handleError → skipSentry', () => {
+  const mockTrackEvent = trackEvent as jest.Mock
+
+  beforeEach(() => {
+    mockCaptureException.mockClear()
+    mockTrackEvent.mockClear()
+  })
+
+  describe('when the caller asks to keep the error out of Sentry', () => {
+    it('should not report it to Sentry', () => {
+      handleError(new Error('probe failed'), 'context', { skipSentry: true })
+
+      expect(mockCaptureException).not.toHaveBeenCalled()
+    })
+
+    it('should still track it', () => {
+      handleError(new Error('probe failed'), 'context', { skipSentry: true })
+
+      expect(mockTrackEvent).toHaveBeenCalledWith(
+        TrackingEvents.LOGIN_ERROR,
+        expect.objectContaining({ error: 'probe failed', context: 'context' })
+      )
+    })
+
+    it('should return the message', () => {
+      expect(handleError(new Error('probe failed'), 'context', { skipSentry: true })).toBe('probe failed')
+    })
+  })
+
+  describe('when skipSentry is false', () => {
+    it('should report the error to Sentry', () => {
+      handleError(new Error('real failure'), 'context', { skipSentry: false })
+
+      expect(mockCaptureException).toHaveBeenCalledTimes(1)
+    })
+  })
+})
